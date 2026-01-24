@@ -5,7 +5,10 @@ import os
 import shutil
 import tempfile
 import zipfile
-from flask import Blueprint, jsonify, render_template, request, current_app, send_file
+from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory
+import logging
+
+logger = logging.getLogger(__name__)
 from helpers.language_data import load_language_data, get_language_name
 
 index_bp = Blueprint('index', __name__)
@@ -401,14 +404,49 @@ def delete_dictation(dictation_id):
     if not dictation_id:
         return jsonify({"success": False, "error": "dictation_id is required"}), 400
 
+    from helpers.db_dictations import delete_dictation as delete_dictation_from_db
+    from helpers.b2_storage import b2_storage
+
     static_base = current_app.static_folder
     dictation_path = os.path.join(static_base, "data", "dictations", dictation_id)
     temp_path = os.path.join(static_base, "data", "temp", dictation_id)
 
+    # 1. Удаляем из categories.json
     categories_data = load_categories()
     removed_refs = remove_dictation_from_categories(categories_data, dictation_id)
     save_categories(categories_data)
 
+    # 2. Удаляем из БД (если dictation_id в формате dict_<id>)
+    removed_from_db = False
+    if dictation_id.startswith('dict_'):
+        try:
+            db_id = int(dictation_id.replace('dict_', ''))
+            removed_from_db = delete_dictation_from_db(db_id)
+        except (ValueError, Exception) as e:
+            logger.warning(f"Не удалось удалить из БД: {e}")
+
+    # 3. Удаляем файлы из B2 (если B2 включен)
+    removed_from_b2 = False
+    if b2_storage.enabled:
+        try:
+            # Удаляем всю папку диктанта из B2
+            # Нужно удалить все файлы в папке dictations/{dictation_id}/
+            # B2 не поддерживает удаление папок, нужно удалять файлы по одному
+            # Для простоты удаляем основные файлы (обложка и основные аудио)
+            # В будущем можно добавить рекурсивное удаление всех файлов
+            remote_paths = [
+                f"dictations/{dictation_id}/cover.webp",
+                f"dictations/{dictation_id}/cover.png",
+                f"dictations/{dictation_id}/cover.jpg",
+            ]
+            for remote_path in remote_paths:
+                if b2_storage.file_exists(remote_path):
+                    b2_storage.delete_file(remote_path)
+                    removed_from_b2 = True
+        except Exception as e:
+            logger.warning(f"Не удалось удалить из B2: {e}")
+
+    # 4. Удаляем локальные файлы
     removed_files = False
     if os.path.exists(dictation_path):
         shutil.rmtree(dictation_path)
@@ -420,6 +458,8 @@ def delete_dictation(dictation_id):
     return jsonify({
         "success": True,
         "removed_references": removed_refs,
+        "removed_from_db": removed_from_db,
+        "removed_from_b2": removed_from_b2,
         "removed_files": removed_files
     })
 
@@ -565,23 +605,46 @@ def import_dictation():
         return jsonify({"success": False, "error": str(exc)}), 500
 @index_bp.route('/')
 def index():
+    """Главная страница - показываем приватную библиотеку (тот же шаблон, что и /library/private)
+    Не требует авторизации - данные загружаются через API на фронтенде
+    """
+    # Просто рендерим шаблон с пустыми данными - они загрузятся через API
+    return render_template(
+        "private_library.html",
+        own_books=[],
+        shelf_books=[],
+    )
+
+
+@index_bp.route('/old')
+def index_old():
+    """Старая главная страница (пока не удаляем)"""
     try:
+        logger.info("📄 Запрос к старой главной странице")
         categories_data = load_categories()
+        logger.info(f"✅ Категории загружены: {len(categories_data.get('children', []))} групп")
+
+        language_data = load_language_data()
+        logger.info(f"✅ Языки загружены: {len(language_data)} языков")
 
         return render_template(
             'index.html',
             categories_data=categories_data,
-            language_data=load_language_data()
+            language_data=language_data
         )
                     
     except Exception as e:
-        print(f"❌ Ошибка на главной странице: {e}")
-        categories_data = load_categories()
-        return render_template(
-            'index.html',
-            categories_data=categories_data,
-            language_data=load_language_data()
-        )
+        logger.error(f"❌ Ошибка на главной странице: {e}", exc_info=True)
+        try:
+            categories_data = load_categories()
+            return render_template(
+                'index.html',
+                categories_data=categories_data,
+                language_data=load_language_data()
+            )
+        except Exception as e2:
+            logger.error(f"❌ Критическая ошибка при загрузке главной страницы: {e2}", exc_info=True)
+            return f"Ошибка загрузки страницы: {str(e2)}", 500
 
 
 
@@ -600,80 +663,70 @@ def load_categories():
 
 @index_bp.route("/dictations-list")
 def dictations_list():
-    base_path = os.path.join(current_app.static_folder, "data", "dictations")
-    # print(f"❌❌❌ base_path: {base_path}")
+    """Получает список диктантов из БД по ID из categories.json"""
+    from helpers.db_dictations import get_dictation_by_id, get_dictation_sentences
+    
     result = []
     categories_data = load_categories()
-
-    for folder in os.listdir(base_path):
-        folder_path = os.path.join(base_path, folder)
-        info_path = os.path.join(folder_path, "info.json")
-
-        if os.path.isdir(folder_path) and os.path.isfile(info_path):
-            try:
-                with open(info_path, "r", encoding="utf-8") as f:
-                    info = json.load(f)
-                    dictation_id = info.get("id")
-                    cover_url = get_cover_url_for_id(dictation_id, info.get("language_original"))
-
-                    # Определяем языковую пару
-                    language_original = info.get("language_original") or ""
-                    language_translation = info.get("language_translation") or ""
-                    if (not language_translation) or (not language_original):
-                        lang_orig_cat, lang_trans_cat = find_dictation_languages(categories_data, dictation_id)
-                        if lang_orig_cat:
-                            language_original = lang_orig_cat
-                        if lang_trans_cat:
-                            language_translation = lang_trans_cat
-
-                    # Дополнительный fallback: проверяем директории с предложениями
-                    language_dirs = []
-                    for sub in os.listdir(folder_path):
-                        sub_path = os.path.join(folder_path, sub)
-                        if not os.path.isdir(sub_path):
-                            continue
-                        sentences_file = os.path.join(sub_path, "sentences.json")
-                        if os.path.isfile(sentences_file):
-                            language_dirs.append(sub)
-
-                    if not language_original and language_dirs:
-                        language_original = language_dirs[0]
-
-                    if not language_translation:
-                        for lang_dir in language_dirs:
-                            if lang_dir != language_original:
-                                language_translation = lang_dir
-                                break
-                    
-                    # Получаем количество предложений из info.json (если есть), иначе считаем из sentences.json
-                    sentences_count = info.get("sentences_count", 0)
-                    if sentences_count == 0 and language_original:
-                        # Fallback: считаем из sentences.json если в info.json нет поля или оно равно 0
-                        sentences_path = os.path.join(folder_path, language_original, "sentences.json")
-                        if os.path.exists(sentences_path):
-                            try:
-                                with open(sentences_path, "r", encoding="utf-8") as sf:
-                                    sentences_data = json.load(sf)
-                                    sentences = sentences_data.get("sentences", [])
-                                    sentences_count = len(sentences) if isinstance(sentences, list) else 0
-                            except Exception as e:
-                                print(f"⚠️ Ошибка при чтении {sentences_path}: {e}")
-                    
-                    result.append({
-                        "id": dictation_id,
-                        "title": info.get("title"),
-                        "parent_key": info.get("parent_key"),
-                        "language": language_original,
-                        "language_original": language_original,
-                        "language_translation": language_translation,
-                        "translations": language_translation,
-                        "languages": info.get("languages"),
-                        "level": info.get("level"),
-                        "cover_url": cover_url,
-                        "sentences_count": sentences_count
-                    })
-            except Exception as e:
-                    print(f"⚠️ Ошибка при чтении {info_path}: {e}")
+    
+    # Собираем все ID диктантов из categories.json
+    def collect_dictation_ids(node):
+        ids = []
+        if 'data' in node and 'dictations' in node['data']:
+            ids.extend(node['data']['dictations'])
+        if 'children' in node:
+            for child in node['children']:
+                ids.extend(collect_dictation_ids(child))
+        return ids
+    
+    dictation_ids = collect_dictation_ids(categories_data)
+    
+    # Обрабатываем каждый ID (формат dict_<id>)
+    for dictation_id_str in dictation_ids:
+        try:
+            if not dictation_id_str.startswith('dict_'):
+                continue  # Пропускаем неверный формат
+            
+            # Извлекаем ID из БД
+            db_id = int(dictation_id_str.replace('dict_', ''))
+            dictation = get_dictation_by_id(db_id)
+            
+            if not dictation:
+                continue
+            
+            # Получаем языки из предложений
+            sentences = get_dictation_sentences(db_id)
+            languages = set()
+            for sentence in sentences:
+                languages.add(sentence['language_code'])
+            
+            languages_list = sorted(list(languages))
+            language_original = dictation['language_code']
+            language_translation = languages_list[1] if len(languages_list) > 1 else (languages_list[0] if languages_list else '')
+            
+            # Считаем количество предложений для языка оригинала
+            sentences_count = len([s for s in sentences if s['language_code'] == language_original])
+            
+            # Получаем обложку
+            cover_url = get_cover_url_for_id(dictation_id_str, language_original)
+            
+            result.append({
+                "id": dictation_id_str,  # dict_<id>
+                "db_id": db_id,  # ID из БД
+                "title": dictation['title'],
+                "language": language_original,
+                "language_original": language_original,
+                "language_translation": language_translation,
+                "translations": language_translation,
+                "level": dictation['level'],
+                "cover_url": cover_url,
+                "sentences_count": sentences_count,
+                "author_materials_url": dictation.get('author_materials_url')
+            })
+            
+        except (ValueError, Exception) as e:
+            print(f"⚠️ Ошибка при обработке диктанта {dictation_id_str}: {e}")
+            continue
 
     return jsonify(result)  
 
@@ -681,6 +734,9 @@ def dictations_list():
 
 def get_cover_url_for_id(dictation_id, language=None):
     """
+    Получает URL обложки для диктанта.
+    Поддерживает новый формат dict_<id> и старый dicta_XXX (для обратной совместимости).
+    
     1) Сначала ищем индивидуальную обложку в папке диктанта:
        static/data/dictations/{dictation_id}/cover.(webp|png|jpg|jpeg)
     2) Если нет — смотрим стандартные обложки по языку:
@@ -690,9 +746,12 @@ def get_cover_url_for_id(dictation_id, language=None):
     4) Если и этого нет — возвращаем окончательный плейсхолдер:
        /static/images/cover_en.webp
     """
+    from helpers.b2_storage import b2_storage
 
     # абсолютные пути к папкам в файловой системе
     static_base = current_app.static_folder  # <project>/static
+    
+    # Для нового формата dict_<id> используем этот ID для пути
     dictation_path = os.path.join(static_base, "data", "dictations", dictation_id or "")
     covers_folder = os.path.join(static_base, "data", "covers")
 
@@ -704,6 +763,12 @@ def get_cover_url_for_id(dictation_id, language=None):
         p = os.path.join(dictation_path, name)
         if os.path.exists(p):
             return f"/static/data/dictations/{dictation_id}/{name}"
+        
+        # Если файла нет локально, но есть в B2, используем эндпоинт /api/cover для проксирования
+        if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
+            remote_path = f"dictations/{dictation_id}/{name}"
+            if b2_storage.file_exists(remote_path):
+                return f"/api/cover?dictation_id={dictation_id}&filename={name}"
 
     # --- 2) языковая обложка в /static/data/covers/ ---
     if language:
@@ -721,10 +786,55 @@ def get_cover_url_for_id(dictation_id, language=None):
 
     # --- 3) глобальная заглушка в /static/data/covers/ ---
     fallback_global = os.path.join(covers_folder, "cover.webp")
-    print(f"Проверяем глобальную заглушку: {fallback_global}")
     if os.path.exists(fallback_global):
         return "/static/data/covers/cover.webp"
 
-    # --- 4) последний-resort плейсхолдер в /static/images/ ---
-    print(f"Ничего не найдено для dictation_id={dictation_id} language={language}; возвращаем /static/images/cover_en.webp")
-    return "/static/images/cover_en.webp"
+    # --- 4) последний-resort плейсхолдер в /static/data/covers/ ---
+    return "/static/data/covers/cover_en.webp"
+
+@index_bp.route('/api/cover')
+def api_get_cover():
+    """Получение обложки диктанта (прокси из B2 если нет локально)"""
+    from helpers.b2_storage import b2_storage
+    
+    try:
+        dictation_id = request.args.get('dictation_id')
+        filename = request.args.get('filename', 'cover.webp')
+        
+        if not dictation_id:
+            return jsonify({'error': 'dictation_id parameter required'}), 400
+        
+        static_base = current_app.static_folder
+        local_path = os.path.join(static_base, "data", "dictations", dictation_id, filename)
+        
+        # B2 - основное хранилище! Сначала проверяем B2
+        if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
+            remote_path = f"dictations/{dictation_id}/{filename}"
+            if b2_storage.file_exists(remote_path):
+                # Файл есть в B2 - скачиваем и кэшируем локально
+                if b2_storage.download_file(remote_path, local_path):
+                    return send_from_directory(
+                        os.path.dirname(local_path),
+                        os.path.basename(local_path)
+                    )
+        
+        # Если нет в B2, проверяем локальный кэш
+        if os.path.exists(local_path):
+            return send_from_directory(
+                os.path.dirname(local_path),
+                os.path.basename(local_path)
+            )
+        
+        # Если ничего не помогло, возвращаем дефолтную обложку
+        default_path = os.path.join(static_base, "data", "covers", "cover_en.webp")
+        if os.path.exists(default_path):
+            return send_from_directory(
+                os.path.dirname(default_path),
+                os.path.basename(default_path)
+            )
+        
+        return jsonify({'error': 'Cover not found'}), 404
+        
+    except Exception as e:
+        logger.error(f"❌ Ошибка получения обложки: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500

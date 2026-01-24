@@ -2,6 +2,11 @@ from flask import Flask, jsonify, send_from_directory
 from dotenv import load_dotenv
 import os
 import sys
+import logging
+
+# Уменьшаем уровень логирования werkzeug (убираем лишние HTTP запросы)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.WARNING)
 
 app = Flask(__name__)
 
@@ -38,7 +43,20 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=7)  # Токе�
 app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 app.config["JWT_ACCESS_COOKIE_NAME"] = "access_token_cookie"
-jwt = JWTManager(app) 
+jwt = JWTManager(app)
+
+# Обработчики ошибок JWT для более понятных сообщений
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_payload):
+    return jsonify({"success": False, "error": "Token expired", "msg": "Token expired"}), 401
+
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    return jsonify({"success": False, "error": f"Invalid token: {str(error)}", "msg": f"Invalid token: {str(error)}"}), 422
+
+@jwt.unauthorized_loader
+def missing_token_callback(error):
+    return jsonify({"success": False, "error": "Authorization required", "msg": "Authorization required"}), 401 
 
 app.config['AUDIO_BASE_DIR'] = 'static/data/temp'
 
@@ -48,12 +66,16 @@ from routes.dictation_editor import editor_bp
 from routes.dictation import dictation_bp
 from routes.user_routes import user_bp
 from routes.statistics import statistics_bp
+from routes.library import library_bp
+from routes.desk import desk_bp
 
 app.register_blueprint(index_bp)
 app.register_blueprint(editor_bp)
 app.register_blueprint(dictation_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(statistics_bp)
+app.register_blueprint(library_bp)
+app.register_blueprint(desk_bp)
 
 
 @app.route('/favicon.ico')

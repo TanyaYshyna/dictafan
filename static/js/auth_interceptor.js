@@ -36,7 +36,10 @@
                     window.UM.token = null;
                     window.UM.userData = null;
                     localStorage.removeItem('jwt_token');
-                    window.UM.setupGuestMode();
+                    // Показываем модальное окно авторизации - гостевого режима нет!
+                    if (window.UM) {
+                        window.UM.requireAuth();
+                    }
                 }
 
                 // Показываем модальное окно логина

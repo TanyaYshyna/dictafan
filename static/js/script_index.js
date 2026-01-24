@@ -315,11 +315,11 @@ function createCardDOM(d) {
     thumb.setAttribute('aria-label', `Открыть диктант: ${d.title || ''}`);
 
     const img = document.createElement('img');
-    img.src = d.cover_url;
+    img.src = d.cover_url || '/static/data/covers/cover_en.webp';
     img.alt = d.title || 'Обложка диктанта';
     img.loading = 'lazy';
     img.decoding = 'async';
-    img.onerror = () => { img.src = 'data/covers/cover_en.webp'; };
+    img.onerror = () => { img.src = '/static/data/covers/cover_en.webp'; };
 
     thumb.appendChild(img);
     card.appendChild(thumb);
@@ -483,6 +483,22 @@ function createCardDOM(d) {
     levelSpan.textContent = d.level || '—';
     meta.appendChild(levelSpan);
     
+    // Кнопка для открытия ссылки на материалы автора (если есть)
+    if (d.author_materials_url) {
+        const authorLinkBtn = document.createElement('button');
+        authorLinkBtn.type = 'button';
+        authorLinkBtn.className = 'short-action-btn';
+        authorLinkBtn.title = 'Открыть материалы автора';
+        authorLinkBtn.setAttribute('aria-label', 'Открыть материалы автора');
+        authorLinkBtn.innerHTML = `<i data-lucide="external-link"></i>`;
+        authorLinkBtn.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            window.open(d.author_materials_url, '_blank');
+        });
+        meta.appendChild(authorLinkBtn);
+    }
+    
     card.appendChild(meta);
     
     // Сохраняем ID диктанта в data-атрибуте для обновления медалек
@@ -544,7 +560,7 @@ function createCardDOM(d) {
 }
 
 // Обновить медальки на всех карточках
-function updateCompletionBadges() {
+async function updateCompletionBadges() {
     if (!GRID) {
         console.log('[updateCompletionBadges] GRID не найден');
         return;
@@ -553,9 +569,9 @@ function updateCompletionBadges() {
     const cards = GRID.querySelectorAll('.short-card');
     console.log(`[updateCompletionBadges] Найдено ${cards.length} карточек для обновления`);
     
-    if (!allHistoryData || Object.keys(allHistoryData).length === 0) {
-        console.log('[updateCompletionBadges] История не загружена, пропускаем обновление медалек');
-        return;
+    // Загружаем данные из БД, если кеш пуст
+    if (Object.keys(completionCountsCache).length === 0) {
+        await loadCompletionCounts();
     }
     
     cards.forEach(card => {
@@ -624,16 +640,14 @@ function renderDictationsGrid(dictations) {
         window.lucide.createIcons();
     }
     
-    // Обновляем медальки после рендеринга (если история уже загружена)
-    if (allHistoryData && typeof allHistoryData === 'object' && Object.keys(allHistoryData).length > 0) {
-        setTimeout(() => {
-            updateCompletionBadges();
-            // Обновляем иконки Lucide после добавления медалек
-            if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                window.lucide.createIcons();
-            }
-        }, 50);
-    }
+    // Обновляем медальки после рендеринга (загружаем данные из БД)
+    setTimeout(async () => {
+        await updateCompletionBadges();
+        // Обновляем иконки Lucide после добавления медалек
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    }, 50);
 }
 
 
@@ -783,7 +797,8 @@ function createSimpleLanguageDisplay() {
 
 // ================ все диктанты в массив ========================
 let allDictations = [];
-let allHistoryData = {}; // Кэш всей истории для подсчета выполнений
+// Кеш для количества завершений диктантов (загружается из БД)
+let completionCountsCache = {};
 
 function loadDictations() {
     // console.log("🔄 Загружаем диктанты...");
@@ -834,54 +849,79 @@ async function loadAllHistory() {
 }
 
 /**
- * Подсчитать количество полных выполнений диктанта по всем файлам истории
+ * Подсчитать количество полных выполнений диктанта (использует данные из БД)
  * @param {string} dictationId - ID диктанта
  * @returns {number} - Количество полных выполнений
  */
+
+/**
+ * Загружает количество завершений для всех диктантов из БД
+ */
+async function loadCompletionCounts() {
+    if (!GRID) {
+        return;
+    }
+    
+    const cards = GRID.querySelectorAll('.short-card');
+    if (cards.length === 0) {
+        return;
+    }
+    
+    // Собираем все ID диктантов
+    const dictationIds = Array.from(cards)
+        .map(card => card.dataset.dictationId)
+        .filter(id => id);
+    
+    if (dictationIds.length === 0) {
+        return;
+    }
+    
+    // Получаем токен
+    const token = window.UM?.token || localStorage.getItem('jwt_token');
+    if (!token) {
+        console.warn('[loadCompletionCounts] Нет токена, пропускаем загрузку');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/statistics/success/count', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ dictation_ids: dictationIds })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            completionCountsCache = result.counts || {};
+            console.log('[loadCompletionCounts] Загружены количества завершений:', completionCountsCache);
+        } else {
+            console.error('[loadCompletionCounts] Ошибка загрузки:', await response.text());
+        }
+    } catch (error) {
+        console.error('[loadCompletionCounts] Ошибка при загрузке:', error);
+    }
+}
+
 function countDictationCompletions(dictationId) {
     if (!dictationId) {
         return 0;
     }
     
-    // Если история еще не загружена, возвращаем 0
-    if (!allHistoryData || typeof allHistoryData !== 'object' || Object.keys(allHistoryData).length === 0) {
-        console.log(`[countDictationCompletions] История не загружена для диктанта ${dictationId}`);
-        return 0;
+    // Получаем из кеша
+    const count = completionCountsCache[dictationId] || 0;
+    
+    if (count > 0) {
+        console.log(`[countDictationCompletions] Диктант ${dictationId}: найдено ${count} выполнений`);
     }
-
-    let totalCount = 0;
-
-    // Проходим по всем месяцам в истории
-    for (const monthKey in allHistoryData) {
-        const monthData = allHistoryData[monthKey];
-        if (!monthData) {
-            continue;
-        }
-        
-        // Проверяем наличие statistics_sentenses
-        if (!monthData.statistics_sentenses || !Array.isArray(monthData.statistics_sentenses)) {
-            continue;
-        }
-
-        // Считаем все записи для этого диктанта
-        // Каждая запись в statistics_sentenses - одно полное выполнение диктанта
-        const entries = monthData.statistics_sentenses.filter(
-            entry => entry && entry.dictation_id === dictationId
-        );
-
-        // Просто считаем количество записей (каждая запись - одно выполнение)
-        totalCount += entries.length;
-    }
-
-    if (totalCount > 0) {
-        console.log(`[countDictationCompletions] Диктант ${dictationId}: найдено ${totalCount} выполнений`);
-    }
-
-    return totalCount;
+    
+    return count;
 }
 
 /**
- * Получить статистику диктанта из истории (perfect, corrected, audio)
+ * Получить статистику диктанта из БД (perfect, corrected, audio)
  * @param {string} dictationId - ID диктанта
  * @returns {Object} - Объект с полями {perfect, corrected, audio, hasDraft}
  */
@@ -897,6 +937,7 @@ async function getDictationStats(dictationId) {
     }
 
     try {
+        // Получаем статистику из БД через API
         const response = await fetch(`/api/statistics/dictation_state/${dictationId}`, {
             method: 'GET',
             headers: {
@@ -909,6 +950,7 @@ async function getDictationStats(dictationId) {
             const data = await response.json();
             const state = data.state;
             if (state) {
+                // Вычисляем статистику из данных БД
                 const draftStats = computeDraftStatistics(state);
                 draftStats.hasDraft = true;
                 return draftStats;
@@ -917,7 +959,7 @@ async function getDictationStats(dictationId) {
             console.warn('Не авторизован для получения состояния диктанта');
         }
     } catch (error) {
-        console.warn('Ошибка получения черновика диктанта:', error);
+        console.warn('Ошибка получения черновика диктанта из БД:', error);
     }
 
     return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
@@ -1673,7 +1715,6 @@ async function newDictation() {
         return;
     }
 
-
     if (!selectedCategory) {
         alert("Сначала выберите категорию с языковой парой!");
 
@@ -1682,7 +1723,7 @@ async function newDictation() {
         return;
     }
 
-    // Сохраняем данные категории в sessionStorage для передачи на страницу создания
+    // Сохраняем данные категории в sessionStorage для передачи в редактор
     const categoryData = {
         key: selectedCategory.key,
         title: selectedCategory.title,
@@ -1690,11 +1731,21 @@ async function newDictation() {
         language_original: language_original,
         language_translation: language_translation
     };
-    
+
     sessionStorage.setItem('selectedCategoryForDictation', JSON.stringify(categoryData));
-    
-    // Переходим на страницу создания диктанта
-    window.location.href = '/dictation_editor/new';
+
+    // Открываем редактор в модальном окне поверх текущей страницы
+    const modal = document.getElementById('dictationEditorModal');
+    const frame = document.getElementById('dictationEditorFrame');
+
+    if (modal && frame) {
+        frame.src = '/dictation_editor/new';
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    } else {
+        // Fallback: если модальное окно не найдено, переходим как раньше
+        window.location.href = '/dictation_editor/new';
+    }
 }
 
 // Функция для получения пути к категории в дереве
@@ -2156,11 +2207,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         loadDictations(),
                         loadAllHistory().then(history => {
                             allHistoryData = history;
-                            console.log('✅ История загружена для подсчета выполнений:', Object.keys(history).length, 'месяцев');
-                            // Обновляем медальки после загрузки истории
-                            setTimeout(() => {
-                                updateCompletionBadges();
-                                console.log('✅ Медальки обновлены после загрузки истории');
+                            // Обновляем медальки после загрузки (данные теперь из БД)
+                            setTimeout(async () => {
+                                await updateCompletionBadges();
+                                console.log('✅ Медальки обновлены');
                             }, 100);
                         })
                     ]).then(() => {
@@ -2175,10 +2225,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             const filteredDictations = allDictations.filter(d => ids.includes(d.id));
                             renderDictationsGrid(filteredDictations);
                             // Обновляем медальки после перерисовки
-                            setTimeout(() => updateCompletionBadges(), 100);
+                            setTimeout(async () => await updateCompletionBadges(), 100);
                         } else {
                             // Обновляем медальки на всех существующих карточках
-                            updateCompletionBadges();
+                            (async () => {
+                                await updateCompletionBadges();
+                            })();
                         }
                     });
                 }).catch(error => {

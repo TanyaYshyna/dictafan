@@ -7,7 +7,12 @@ import os
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from helpers.user_helpers import get_user_folder, load_user_info, save_user_info
+from helpers.user_helpers import get_user_folder
+from helpers.db_users import get_user_by_email, update_user
+from helpers.db_history import (
+    add_activity, add_success, get_success_count, get_success_counts_for_dictations,
+    save_unclosed_dictation, get_unclosed_dictation, delete_unclosed_dictation, get_unclosed_dictation_stats
+)
 
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
@@ -54,133 +59,25 @@ def get_history():
 @statistics_bp.route('/history/save', methods=['POST'])
 @jwt_required()
 def save_history():
-    """Сохранить статистику активности"""
+    """
+    Сохранить статистику активности
+    
+    ВАЖНО: Сохранение в JSON файл h_YYYYMM.json отключено.
+    Все данные теперь сохраняются в таблицу history_activity в БД.
+    Этот endpoint оставлен для обратной совместимости, но не выполняет сохранение в файл.
+    """
     try:
         current_email = get_jwt_identity()
         data = request.get_json()
         
-        print(f'📊 [SAVE_HISTORY] Начало сохранения истории для пользователя: {current_email}')
+        print(f'📊 [SAVE_HISTORY] Запрос сохранения истории (отключено - используется БД)')
         print(f'📊 [SAVE_HISTORY] Полученные данные: {data}')
         
-        month = data.get('month')  # YYYYMM (может быть числом или строкой)
-        statistics = data.get('statistics')
-        
-        if not month or not statistics:
-            print(f'❌ [SAVE_HISTORY] Ошибка: не указаны месяц ({month}) или статистика ({statistics})')
-            return jsonify({'error': 'Не указаны месяц или статистика'}), 400
-
-        if not isinstance(statistics, dict):
-            print(f'❌ [SAVE_HISTORY] Некорректный формат статистики: ожидается объект, получено {type(statistics)}')
-            return jsonify({'error': 'Некорректный формат статистики'}), 400
-        
-        # Преобразуем месяц в строку для имени файла
-        month_str = str(month)
-        
-        user_folder = get_user_folder(current_email)
-        history_folder = os.path.join(user_folder, 'history')
-        os.makedirs(history_folder, exist_ok=True)
-        
-        filename = f'h_{month_str}.json'
-        file_path = os.path.join(history_folder, filename)
-        
-        # Загружаем существующие данные или создаем новые
-        if os.path.exists(file_path):
-            with open(file_path, 'r', encoding='utf-8') as f:
-                history_data = json.load(f)
-        else:
-            history_data = None
-
-        # Поддержка старого формата, когда history_data мог быть списком статистик
-        if isinstance(history_data, list):
-            history_data = {
-                'id_user': current_email,
-                'month': int(month_str),
-                'statistics': history_data
-            }
-        elif not isinstance(history_data, dict) or 'statistics' not in history_data:
-            history_data = {
-                'id_user': current_email,
-                'month': int(month_str),
-                'statistics': []
-            }
-        
-        # Обновляем или добавляем статистику ПО ДНЮ
-        # Правила:
-        # - Ищем запись того же диктанта и той же даты (YYYYMMDD)
-        # - perfect/corrected/audio суммируем
-        # - total берём max (или последнее разумное значение)
-        # - end - счетчик завершений: суммируем если входящая запись завершена (end > 0), иначе берем существующее
-
-        stats_list = history_data.get('statistics', [])
-        incoming_date = statistics.get('date')
-        
-        print(f'📊 [SAVE_HISTORY] Ищем запись: date={incoming_date}')
-        print(f'📊 [SAVE_HISTORY] Текущее количество записей в истории: {len(stats_list)}')
-        print(f'📊 [SAVE_HISTORY] Входящая статистика: perfect={statistics.get("perfect")}, corrected={statistics.get("corrected")}, audio={statistics.get("audio")}')
-        
-        # В "statistics" ищем запись только по дате (наработки суммируются по дате, независимо от диктанта)
-        idx_same_day = None
-        for i, stat in enumerate(stats_list):
-            if stat.get('date') == incoming_date:
-                idx_same_day = i
-                print(f'📊 [SAVE_HISTORY] Найдена существующая запись с индексом {i}: {stat}')
-                break
-
-        if idx_same_day is None:
-            # Первая запись за день — добавляем как есть
-            print(f'📊 [SAVE_HISTORY] Новая запись за день - добавляем')
-            new_stat = statistics.copy()
-            # Убираем поля, которые не должны быть в "statistics" (оставляем только date, perfect, corrected, audio)
-            # Эти поля остаются только в "statistics_sentenses"
-            new_stat.pop('end', None)
-            new_stat.pop('id_diktation', None)
-            new_stat.pop('number', None)
-            new_stat.pop('total', None)  # total - это просто число предложений, не нужно в истории
-            stats_list.append(new_stat)
-            print(f'📊 [SAVE_HISTORY] Добавлена новая запись: {new_stat}')
-        else:
-            existing = stats_list[idx_same_day]
-            print(f'📊 [SAVE_HISTORY] Обновляем существующую запись: {existing}')
-            merged = existing.copy()
-
-            # Суммируем показатели
-            old_perfect = int(existing.get('perfect', 0))
-            old_corrected = int(existing.get('corrected', 0))
-            old_audio = int(existing.get('audio', 0))
-            new_perfect = int(statistics.get('perfect', 0))
-            new_corrected = int(statistics.get('corrected', 0))
-            new_audio = int(statistics.get('audio', 0))
-            
-            merged['perfect'] = old_perfect + new_perfect
-            merged['corrected'] = old_corrected + new_corrected
-            merged['audio'] = old_audio + new_audio
-            # total не сохраняем - это просто число предложений, не нужно в истории
-
-            # Убираем поля, которые не должны быть в "statistics" (оставляем только date, perfect, corrected, audio)
-            # Эти поля остаются только в "statistics_sentenses"
-            merged.pop('end', None)
-            merged.pop('id_diktation', None)
-            merged.pop('number', None)
-            merged.pop('total', None)  # total - это просто число предложений, не нужно в истории
-
-            stats_list[idx_same_day] = merged
-            print(f'📊 [SAVE_HISTORY] Обновленная запись: {merged}')
-
-        history_data['statistics'] = stats_list
-        
-        print(f'📊 [SAVE_HISTORY] Сохраняем в файл: {file_path}')
-        print(f'📊 [SAVE_HISTORY] Всего записей после обновления: {len(stats_list)}')
-        
-        # Сохраняем
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(history_data, f, ensure_ascii=False, indent=2)
-        
-        print(f'✅ [SAVE_HISTORY] Файл успешно сохранен: {file_path}')
-        
-        # Обновляем streak пользователя
+        # Сохранение в JSON файл отключено - все данные сохраняются в БД через /api/statistics/activity
+        # Обновляем только streak пользователя
         update_user_streak(current_email)
         
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'Сохранение в JSON отключено, используется БД'})
     except Exception as e:
         import traceback
         print(f'❌ [SAVE_HISTORY] Ошибка сохранения истории: {e}')
@@ -254,8 +151,9 @@ def get_history_report():
 def update_user_streak(email):
     """Обновляет streak пользователя на основе истории активности"""
     try:
-        user_data = load_user_info(email)
-        if not user_data:
+        # Получаем пользователя из БД
+        user = get_user_by_email(email)
+        if not user:
             return
         
         user_folder = get_user_folder(email)
@@ -283,8 +181,8 @@ def update_user_streak(email):
                 continue
         
         if not active_dates:
-            user_data['streak_days'] = 0
-            save_user_info(email, user_data)
+            # Обновляем streak в БД
+            update_user(email, {'streak_days': 0})
             return
         
         # Сортируем даты
@@ -310,9 +208,8 @@ def update_user_streak(email):
             else:
                 break
         
-        # Обновляем streak пользователя
-        user_data['streak_days'] = streak
-        save_user_info(email, user_data)
+        # Обновляем streak пользователя в БД
+        update_user(email, {'streak_days': streak})
         
     except Exception as e:
         print(f'Ошибка обновления streak: {e}')
@@ -325,35 +222,63 @@ def update_user_streak(email):
 @statistics_bp.route('/dictation_state/<dictation_id>', methods=['GET'])
 @jwt_required()
 def get_dictation_state(dictation_id):
-    """Получить состояние черновика диктанта"""
+    """Получить состояние черновика диктанта из БД"""
     try:
         current_email = get_jwt_identity()
-        user_folder = get_user_folder(current_email)
-        drafts_folder = os.path.join(user_folder, 'history_dictations')
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
         
-        if not os.path.exists(drafts_folder):
+        user_id = user['id']
+        
+        # Получаем данные из БД
+        unclosed = get_unclosed_dictation(user_id, dictation_id)
+        if not unclosed:
             return jsonify({'state': None})
         
-        filename = f'{dictation_id}.json'
-        file_path = os.path.join(drafts_folder, filename)
+        # Преобразуем в формат, ожидаемый фронтендом
+        settings = json.loads(unclosed['settings_json']) if unclosed['settings_json'] else {}
         
-        if not os.path.exists(file_path):
-            return jsonify({'state': None})
+        # Формируем per_sentence в формате, ожидаемом фронтендом
+        per_sentence = {}
+        for sentence in unclosed.get('sentences', []):
+            selection_state = sentence.get('selection_state', 'unchecked')
+            
+            per_sentence[sentence['sentence_key']] = {
+                'number_of_perfect': sentence['perfect_count'],
+                'number_of_corrected': sentence['corrected_count'],
+                'number_of_audio': sentence['audio_count'],
+                'selection_state': selection_state
+            }
         
-        with open(file_path, 'r', encoding='utf-8') as f:
-            state = json.load(f)
+        audio_settings = settings.get('audio', {})
+        state = {
+            'dictation_id': dictation_id,
+            'time_ms': unclosed['time_ms'],
+            'playSequenceStart': audio_settings.get('start', 'oto'),
+            'playSequenceTypo': audio_settings.get('typo', 'o'),
+            'playSequenceSuccess': audio_settings.get('success', 'ot'),
+            'audio_repeats': audio_settings.get('repeats', 3),
+            'is_mixed': settings.get('sentence_order') == 'mixed',
+            'per_sentence': per_sentence,
+            'date_saved': int(unclosed['updated_at'].replace('-', '').replace(' ', '').replace(':', '')[:8]) if unclosed['updated_at'] else 0,
+            # Возвращаем settings_json для использования на фронтенде
+            'settings_json': unclosed.get('settings_json')
+        }
         
         return jsonify({'state': state})
         
     except Exception as e:
         print(f'Ошибка получения состояния диктанта: {e}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Ошибка получения состояния'}), 500
 
 
 @statistics_bp.route('/dictation_state/save', methods=['POST'])
 @jwt_required()
 def save_dictation_state():
-    """Сохранить состояние черновика диктанта"""
+    """Сохранить состояние черновика диктанта в БД"""
     try:
         current_email = get_jwt_identity()
         data = request.get_json()
@@ -364,82 +289,309 @@ def save_dictation_state():
         if not dictation_id or not state:
             return jsonify({'error': 'Не указаны dictation_id или state'}), 400
         
-        user_folder = get_user_folder(current_email)
-        drafts_folder = os.path.join(user_folder, 'history_dictations')
-        os.makedirs(drafts_folder, exist_ok=True)
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
         
-        filename = f'{dictation_id}.json'
-        file_path = os.path.join(drafts_folder, filename)
+        user_id = user['id']
         
-        # Добавляем дату сохранения
-        state['date_saved'] = int(datetime.now().strftime('%Y%m%d'))
+        # Используем settings_json из state, если он есть, иначе формируем
+        if 'settings_json' in state and state['settings_json']:
+            try:
+                # Проверяем, что это валидный JSON
+                settings_json = state['settings_json']
+                json.loads(settings_json)  # Проверка валидности
+            except (json.JSONDecodeError, TypeError):
+                # Если невалидный JSON, формируем заново
+                settings = {
+                    'audio': {
+                        'start': state.get('playSequenceStart', 'oto'),
+                        'typo': state.get('playSequenceTypo', 'o'),
+                        'success': state.get('playSequenceSuccess', 'ot'),
+                        'repeats': state.get('audio_repeats', 3),
+                        'without_entering_text': False,
+                        'show_text': False
+                    },
+                    'sentence_order': 'mixed' if state.get('is_mixed') else 'direct'
+                }
+                settings_json = json.dumps(settings)
+        else:
+            # Формируем settings_json из отдельных полей
+            settings = {
+                'audio': {
+                    'start': state.get('playSequenceStart', 'oto'),
+                    'typo': state.get('playSequenceTypo', 'o'),
+                    'success': state.get('playSequenceSuccess', 'ot'),
+                    'repeats': state.get('audio_repeats', 3),
+                    'without_entering_text': False,
+                    'show_text': False
+                },
+                'sentence_order': 'mixed' if state.get('is_mixed') else 'direct'
+            }
+            settings_json = json.dumps(settings)
         
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(state, f, ensure_ascii=False, indent=2)
+        # Формируем данные по предложениям
+        sentences_data = []
+        per_sentence = state.get('per_sentence', {})
+        for sentence_key, sentence_data in per_sentence.items():
+            selection_state = sentence_data.get('selection_state', 'unchecked')
+            
+            # Валидация значения
+            if selection_state not in ('unchecked', 'checked', 'completed'):
+                selection_state = 'unchecked'
+            
+            sentences_data.append({
+                'sentence_key': sentence_key,
+                # ИСПРАВЛЕНО: Убрано суммирование с circle_number_of_* так как логика "circle" удалена
+                # Теперь number_of_perfect и number_of_corrected уже содержат итоговые значения
+                'perfect_count': sentence_data.get('number_of_perfect', 0),
+                'corrected_count': sentence_data.get('number_of_corrected', 0),
+                'audio_count': sentence_data.get('number_of_audio', 0),
+                'selection_state': selection_state
+            })
+        
+        time_ms = state.get('time_ms', 0)
+        
+        # Сохраняем в БД
+        save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sentences_data)
         
         return jsonify({'success': True})
         
     except Exception as e:
         print(f'Ошибка сохранения состояния диктанта: {e}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Ошибка сохранения состояния'}), 500
 
 
 @statistics_bp.route('/dictation_state/<dictation_id>', methods=['DELETE'])
 @jwt_required()
 def delete_dictation_state(dictation_id):
-    """Удалить черновик диктанта (после успешного продолжения)"""
+    """Удалить черновик диктанта из БД (после успешного завершения)"""
     try:
         current_email = get_jwt_identity()
-        user_folder = get_user_folder(current_email)
-        drafts_folder = os.path.join(user_folder, 'history_dictations')
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
         
-        if not os.path.exists(drafts_folder):
-            return jsonify({'success': True})
+        user_id = user['id']
         
-        filename = f'{dictation_id}.json'
-        file_path = os.path.join(drafts_folder, filename)
-        
-        if os.path.exists(file_path):
-            os.remove(file_path)
+        # Удаляем из БД
+        delete_unclosed_dictation(user_id, dictation_id)
         
         return jsonify({'success': True})
         
     except Exception as e:
         print(f'Ошибка удаления состояния диктанта: {e}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Ошибка удаления состояния'}), 500
 
 
 @statistics_bp.route('/dictation_state/list', methods=['GET'])
 @jwt_required()
 def list_dictation_states():
-    """Получить список всех черновиков (для подсветки в индексе)"""
+    """Получить список всех черновиков из БД (для подсветки в индексе)"""
     try:
         current_email = get_jwt_identity()
-        user_folder = get_user_folder(current_email)
-        drafts_folder = os.path.join(user_folder, 'history_dictations')
-        
-        if not os.path.exists(drafts_folder):
+        user = get_user_by_email(current_email)
+        if not user:
             return jsonify({'drafts': []})
         
-        drafts = []
-        for filename in os.listdir(drafts_folder):
-            if filename.endswith('.json'):
-                dictation_id = filename.replace('.json', '')
-                file_path = os.path.join(drafts_folder, filename)
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        state = json.load(f)
-                        drafts.append({
-                            'dictation_id': dictation_id,
-                            'date_saved': state.get('date_saved', 0)
-                        })
-                except Exception as e:
-                    print(f'Ошибка чтения черновика {filename}: {e}')
-                    continue
+        user_id = user['id']
         
-        return jsonify({'drafts': drafts})
+        # Получаем список незавершенных диктантов из БД
+        from helpers.db import get_db_connection
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT dictation_id, updated_at
+                    FROM history_unclosed_dictations
+                    WHERE user_id = %s
+                    ORDER BY updated_at DESC
+                """, (user_id,))
+                
+                rows = cur.fetchall()
+                drafts = []
+                for row in rows:
+                    dictation_id = row[0]
+                    updated_at = row[1]
+                    # Преобразуем в формат dict_<id>
+                    dictation_id_str = f'dict_{dictation_id}'
+                    # Преобразуем дату в формат YYYYMMDD
+                    date_saved = int(updated_at.strftime('%Y%m%d')) if updated_at else 0
+                    drafts.append({
+                        'dictation_id': dictation_id_str,
+                        'date_saved': date_saved
+                    })
+                
+                return jsonify({'drafts': drafts})
+        finally:
+            conn.close()
         
     except Exception as e:
         print(f'Ошибка получения списка черновиков: {e}')
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Ошибка получения списка'}), 500
+
+
+# ==============================================================
+# API для работы с историей активности (новая система на БД)
+# ==============================================================
+
+@statistics_bp.route('/activity', methods=['POST'])
+@jwt_required()
+def save_activity():
+    """Сохранить активность пользователя (perfect/corrected/audio) в БД"""
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json()
+        
+        # Временные логи для отладки
+        print(f'📥 [SAVE_ACTIVITY] Получен запрос на сохранение активности')
+        print(f'   email: {current_email}')
+        print(f'   данные: {data}')
+        
+        dictation_id = data.get('dictation_id')  # может быть dict_<id> или integer
+        type_activity = data.get('type_activity')  # 'perfect', 'corrected' или 'audio'
+        number = data.get('number', 1)  # опционально, по умолчанию 1
+        
+        if not dictation_id or not type_activity:
+            print(f'❌ [SAVE_ACTIVITY] Ошибка: не указаны dictation_id или type_activity')
+            return jsonify({'error': 'Не указаны dictation_id или type_activity'}), 400
+        
+        if type_activity not in ['perfect', 'corrected', 'audio']:
+            print(f'❌ [SAVE_ACTIVITY] Ошибка: неверный type_activity: {type_activity}')
+            return jsonify({'error': f'Неверный type_activity: {type_activity}. Допустимые: perfect, corrected, audio'}), 400
+        
+        # Получаем user_id из БД по email
+        user = get_user_by_email(current_email)
+        if not user:
+            print(f'❌ [SAVE_ACTIVITY] Пользователь не найден: {current_email}')
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        user_id = user['id']
+        print(f'✅ [SAVE_ACTIVITY] Найден user_id: {user_id} для email: {current_email}')
+        
+        # Сохраняем активность в БД (агрегируется по дням автоматически)
+        activity = add_activity(user_id, dictation_id, type_activity, number)
+        
+        print(f'✅ [SAVE_ACTIVITY] Активность успешно сохранена в БД')
+        
+        return jsonify({
+            'success': True,
+            'activity': activity
+        })
+        
+    except ValueError as e:
+        print(f'❌ [SAVE_ACTIVITY] ValueError: {e}')
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f'❌ [SAVE_ACTIVITY] Ошибка сохранения активности: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Ошибка сохранения активности'}), 500
+
+
+@statistics_bp.route('/success', methods=['POST'])
+@jwt_required()
+def save_success():
+    """Сохранить успешное завершение диктанта в history_successes"""
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json()
+        
+        # Временные логи для отладки
+        print(f'📥 [SAVE_SUCCESS] Получен запрос на сохранение успеха')
+        print(f'   email: {current_email}')
+        print(f'   данные: {data}')
+        
+        dictation_id = data.get('dictation_id')  # может быть dict_<id> или integer
+        perfect_count = data.get('perfect_count', 0)
+        corrected_count = data.get('corrected_count', 0)
+        audio_count = data.get('audio_count', 0)
+        time_ms = data.get('time_ms', 0)
+        
+        if not dictation_id:
+            print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
+            return jsonify({'error': 'Не указан dictation_id'}), 400
+        
+        # Получаем user_id из БД по email
+        user = get_user_by_email(current_email)
+        if not user:
+            print(f'❌ [SAVE_SUCCESS] Пользователь не найден: {current_email}')
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        user_id = user['id']
+        print(f'✅ [SAVE_SUCCESS] Найден user_id: {user_id} для email: {current_email}')
+        
+        # Сохраняем успех в БД (каждое завершение - отдельная запись)
+        success = add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms)
+        
+        # Сохраняем данные в незавершенные диктанты (для восстановления прогресса)
+        # Получаем данные из запроса (если есть)
+        sentences_data = data.get('sentences_data', [])
+        settings_json = data.get('settings_json')
+        
+        if sentences_data and settings_json:
+            try:
+                save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sentences_data)
+                print(f'✅ [SAVE_SUCCESS] Данные сохранены в незавершенные диктанты')
+            except Exception as e:
+                print(f'⚠️ [SAVE_SUCCESS] Ошибка сохранения в незавершенные диктанты: {e}')
+        
+        print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
+        
+        return jsonify({
+            'success': True,
+            'success_data': success
+        })
+        
+    except ValueError as e:
+        print(f'❌ [SAVE_SUCCESS] ValueError: {e}')
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        print(f'❌ [SAVE_SUCCESS] Ошибка сохранения успеха: {e}')
+        import traceback
+        print(f'❌ [SAVE_SUCCESS] Полная трассировка:')
+        traceback.print_exc()
+        return jsonify({'error': f'Ошибка сохранения успеха: {str(e)}'}), 500
+
+
+@statistics_bp.route('/success/count', methods=['POST'])
+@jwt_required()
+def get_success_counts():
+    """Получить количество успешных завершений для списка диктантов"""
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json()
+        
+        dictation_ids = data.get('dictation_ids', [])
+        
+        if not dictation_ids or not isinstance(dictation_ids, list):
+            return jsonify({'error': 'Не указан список dictation_ids'}), 400
+        
+        # Получаем user_id из БД по email
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        user_id = user['id']
+        
+        # Получаем количество завершений для всех диктантов
+        counts = get_success_counts_for_dictations(user_id, dictation_ids)
+        
+        return jsonify({
+            'success': True,
+            'counts': counts
+        })
+        
+    except Exception as e:
+        print(f'❌ [GET_SUCCESS_COUNTS] Ошибка получения количества завершений: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Ошибка получения количества завершений'}), 500
 

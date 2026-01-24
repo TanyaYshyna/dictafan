@@ -334,14 +334,40 @@ h2 {
     font-family: sans-serif;
     padding-left: 5vw;
     padding-right: 5vw;
-    overflow: hidden; /* Убираем скролл у панели */
+    overflow-y: auto; /* Вертикальная прокрутка для панели */
+    overflow-x: hidden;
 
     height: calc(100vh - 80px); /* 80px = высота header, фиксированная высота */
     box-sizing: border-box;
 
     display: flex;  
-    flex-direction: column;  
+    flex-direction: column;
+    
+    /* Для Firefox */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-light, #dcdcdc) var(--color-hover-panel, #f7f6f5);
 }
+
+/* Стилизация скроллбара для панели */
+.panel::-webkit-scrollbar {
+    width: 12px;
+}
+
+.panel::-webkit-scrollbar-track {
+    background: var(--color-hover-panel, #f7f6f5);
+    border-radius: 6px;
+}
+
+.panel::-webkit-scrollbar-thumb {
+    background: var(--color-border-light, #dcdcdc);
+    border-radius: 6px;
+    border: 2px solid var(--color-hover-panel, #f7f6f5);
+}
+
+.panel::-webkit-scrollbar-thumb:hover {
+    background: var(--color-border, #bdbdbd);
+}
+
 /* h2 и панель кнопок не должны растягиваться по высоте */
 .panel > h2,
 .panel > .buttons-row {
@@ -419,6 +445,7 @@ select {
     height: 5em;
     /* ровно в 5 раз больше высоты строки текста */
     vertical-align: middle;
+    cursor: pointer;
 }
 
 .user-section {
@@ -426,6 +453,11 @@ select {
     display: flex;
     gap: 10px;
     align-items: center;
+}
+
+/* Отступ для streak после username - увеличить расстояние на 4px */
+.username + .streak {
+    margin-left: 14px; /* 10px (gap) + 4px = 14px */
 }
 
 .auth-buttons a + a {
@@ -521,7 +553,8 @@ select {
   min-height: 100px; /* или больше, если кнопка крупная */
   padding-top: 10px; /* чтобы кнопка не прилипала к краю */
 }
-#recordButton {
+/* Кнопка записи вне панели с эквалайзером - абсолютное позиционирование */
+.audio-user-panel > #recordButton {
   position: absolute;
   top: 0;
   right: 0;
@@ -530,6 +563,11 @@ select {
   white-space: nowrap;
   font-size: 16px;
   box-sizing: border-box;
+}
+/* Кнопка записи внутри панели с эквалайзером - обычное позиционирование */
+#panel-audio-visualizer #recordButton {
+  position: static;
+  width: auto;
 }
 
 
@@ -865,11 +903,26 @@ select {
 .username {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px; /* Уменьшено с 8px до 4px - сблизить аватар и имя */
+    text-decoration: none;
+    color: var(--color-text, #1f2933);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.username:visited {
+    color: var(--color-text, #1f2933);
+}
+
+.username:hover {
+    color: var(--color-text, #1f2933);
+    opacity: 0.8;
 }
 
 .username-text {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--color-text, #1f2933);
 }
 
 .panel-header {
@@ -914,13 +967,59 @@ select {
     align-items: center;
     justify-content: center;
     padding: 8px;
-    border-radius: 4px;
+    border-radius: 6px;
     transition: background-color 0.2s;
+    background: transparent;
+    border: none;
+    color: var(--color-text, #1f2933);
+    cursor: pointer;
 }
 
 .logout-btn:hover {
-    background-color: var(--color-button-lightgreen);
+    background-color: var(--color-hover, #f8f9fa);
 }
+
+.logout-btn i {
+    width: 20px;
+    height: 20px;
+}
+
+.logout-btn .logout-text {
+    display: none; /* Скрываем текст, он будет только в title */
+}
+
+/* Стили для streak (несгораемая сумма) */
+.streak {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0px; /* Уменьшено до 0px - еще ближе огонек и число */
+    padding: 0;
+    margin: 0 8px; /* Отступы по 8px с обеих сторон */
+    background: var(--color-button-yellow, #fbbf24);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    position: relative; /* Для позиционирования числа */
+}
+
+.streak i {
+    width: 16px;
+    height: 16px;
+    color: var(--color-button-text-yellow, #1f2933);
+}
+
+.streak-days {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text, #1f2933); /* Цвет как у остального текста */
+    line-height: 1;
+    position: relative;
+    top: 3px; /* Опустить число на 3px вниз */
+}
+
 
 /* ------------------------------------------------------------------------ */
 /* ---------------- CSS стили для двухпанельной структуры языков ---------- */
@@ -1559,6 +1658,31 @@ select {
 /* ============================================
    Стили для модального окна логина
    ============================================ */
+
+#login-modal {
+    display: flex;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000 !important;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+#login-modal .modal-content,
+#login-modal .login-modal-content {
+    position: relative;
+    z-index: 10001;
+    margin: auto;
+}
 
 .login-modal-content {
     max-width: 440px;

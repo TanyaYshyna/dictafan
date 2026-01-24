@@ -1,6 +1,7 @@
 // Режимы:
 // native-selector - только селектор родного языка
 // learning-selector - селектор языка изучения
+// learning-selector-compact - селектор языка изучения (только флаг в выбранном, флаг+название в списке)
 // learning-list - список изучаемых языков с чекбоксами
 // flag-combo - комбинация флагов (изучаемый → родной)
 // header-selector - выпадающий селектор для шапки
@@ -120,16 +121,20 @@ class LanguageSelector {
         if (!availableLanguages.includes(currentValue) && availableLanguages.length > 0) {
             this.options.currentLearning = availableLanguages[0];
         }
+        
+        // Проверяем, нужен ли компактный режим (только флаг в trigger)
+        const isCompact = this.options.mode === 'learning-selector-compact';
+        const triggerContent = isCompact
+            ? `${this.createFlagElement(currentValue)}<i data-lucide="chevron-down"></i>`
+            : `${this.createFlagElement(currentValue)} ${this.getLanguageName(currentValue)}<i data-lucide="chevron-down"></i>`;
+        
         // <label class="language-label">Текущий изучаемый язык</label>
         return `
         <div class="language-selector-group" data-selector-type="learning">
             
             <div class="custom-select-wrapper">
                 <div class="custom-select-trigger">
-                    ${this.createFlagElement(currentValue)} 
-                    ${this.getLanguageName(currentValue)}
-                    <i data-lucide="chevron-down"></i>
-                        
+                    ${triggerContent}
                 </div>
                 <div class="custom-select-options">
                     ${availableLanguages.map(code => `
@@ -158,6 +163,7 @@ class LanguageSelector {
 createLearningList() {
     const currentLearning = this.options.currentLearning;
     const learningLangs = this.options.learningLanguages;
+    const userSettings = (typeof window.UM !== 'undefined' && window.UM.getUserSettings) ? window.UM.getUserSettings() : {};
 
     return `
     <div class="language-selector-group">
@@ -167,6 +173,7 @@ createLearningList() {
         const isSelected = learningLangs.includes(code);
         const isCurrent = code === currentLearning;
         const languageName = this.getLanguageName(code);
+        const useLocalWhisperModel = userSettings.audio?.use_local_whisper_model?.[code] || false;
 
         // Определяем иконку для чекбокса
         let checkboxIcon = 'circle'; // ⭕ по умолчанию для невыбранных
@@ -176,20 +183,29 @@ createLearningList() {
             iconStyle = ''; // Убираем прозрачность для выбранных
         }
 
+        // Определяем иконку для Whisper переключателя
+        const whisperIcon = useLocalWhisperModel ? 'circle-check-big' : 'circle';
+        const whisperOpacity = useLocalWhisperModel ? '' : 'opacity: 0.5;';
+        
         return `
                 <div class="language-item ${isSelected ? 'selected' : ''}" data-lang="${code}">
                     <label class="language-checkbox">
                         <input type="checkbox" ${isSelected ? 'checked' : ''} style="display: none;">
-                        <i data-lucide="${checkboxIcon}" class="checkbox-icon ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}" style="${iconStyle}"></i>
+                        <i data-lucide="${checkboxIcon}" class="checkbox-icon ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}" style="${iconStyle}" data-action="${isSelected ? (isCurrent ? 'current' : 'set-current') : 'toggle'}"></i>
                         ${this.createFlagElement(code)} 
                         <span class="language-name">${languageName}</span>
                     </label>
                     ${isSelected ? `
-                        <button class="set-current-btn ${isCurrent ? 'active' : ''}" 
-                                data-lang="${code}"
-                                title="${isCurrent ? 'Текущий язык изучения' : 'Сделать текущим языком изучения'}">
-                            <i data-lucide="${isCurrent ? 'circle-check-big' : 'circle-chevron-down'}" class="current-icon"></i>
-                        </button>
+                        <div class="whisper-model-toggle-container" data-lang="${code}">
+                            <label class="whisper-toggle-label">
+                                <i data-lucide="${whisperIcon}" 
+                                   class="whisper-toggle-icon" 
+                                   data-lang="${code}"
+                                   id="whisper-toggle-${code}"
+                                   style="cursor: pointer; ${whisperOpacity}"></i>
+                                <span class="whisper-toggle-text">локальная модель</span>
+                            </label>
+                        </div>
                     ` : ''}
                 </div>
             `;
@@ -297,6 +313,7 @@ createLearningList() {
                 html = this.createNativeSelector();
                 break;
             case 'learning-selector':
+            case 'learning-selector-compact':
                 html = this.createLearningSelector();
                 break;
             case 'learning-list':
@@ -407,18 +424,114 @@ createLearningList() {
             });
         });
 
-        // Обработчики для кнопок выбора текущего языка
-        const currentButtons = this.options.container.querySelectorAll('.set-current-btn');
-        currentButtons.forEach(button => {
-            button.addEventListener('click', (e) => {
-                const lang = e.currentTarget.dataset.lang;
-                if (this.options.learningLanguages.includes(lang)) {
-                    this.options.currentLearning = lang;
-                    this.render();
-                    this.triggerChange();
+        // Обработчики для иконок чекбоксов - клик по иконке делает язык текущим (если язык уже выбран)
+        const checkboxIcons = this.options.container.querySelectorAll('.checkbox-icon');
+        checkboxIcons.forEach(icon => {
+            icon.addEventListener('click', (e) => {
+                e.stopPropagation(); // Предотвращаем всплытие события
+                const action = icon.dataset.action;
+                const lang = icon.closest('.language-item').dataset.lang;
+                
+                if (action === 'set-current') {
+                    // Язык выбран, но не текущий - делаем его текущим
+                    if (this.options.learningLanguages.includes(lang)) {
+                        this.options.currentLearning = lang;
+                        this.render();
+                        this.triggerChange();
+                    }
+                } else if (action === 'toggle') {
+                    // Язык не выбран - переключаем чекбокс
+                    const checkbox = icon.closest('.language-checkbox').querySelector('input');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event('change'));
+                    }
+                }
+                // Если action === 'current', ничего не делаем (язык уже текущий)
+            });
+        });
+
+        // Обработчик клика по всей строке языка - переключает чекбокс
+        const languageItems = this.options.container.querySelectorAll('.language-item');
+        languageItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Пропускаем клики по иконке чекбокса (она обрабатывается отдельно)
+                if (e.target.closest('.checkbox-icon')) {
+                    return;
+                }
+                // Пропускаем клики по переключателю Whisper
+                if (e.target.closest('.whisper-model-toggle-container')) {
+                    return;
+                }
+                
+                const checkbox = item.querySelector('.language-checkbox input');
+                if (checkbox) {
+                    checkbox.checked = !checkbox.checked;
+                    checkbox.dispatchEvent(new Event('change'));
                 }
             });
         });
+
+        // Обработчики для переключателей локальной модели Whisper (иконки Lucide)
+        // Используем делегирование событий для динамически созданных элементов
+        this.options.container.addEventListener('click', async (e) => {
+            const icon = e.target.closest('.whisper-toggle-icon');
+            if (!icon) return;
+            
+            e.stopPropagation(); // Предотвращаем всплытие события на language-item
+            const lang = icon.dataset.lang;
+            if (!lang) return;
+            
+            const isChecked = icon.getAttribute('data-lucide') === 'circle-check-big';
+            
+            console.log(`🔄 Переключатель Whisper для языка ${lang}: ${isChecked ? 'выключен' : 'включен'}`);
+            
+            if (!isChecked) {
+                // Включаем переключатель - начинаем загрузку модели
+                try {
+                    await this.downloadWhisperModelIcon(lang, icon);
+                } catch (error) {
+                    console.error(`Ошибка загрузки модели для ${lang}:`, error);
+                    // В случае ошибки оставляем иконку в выключенном состоянии
+                    icon.setAttribute('data-lucide', 'circle');
+                    icon.style.opacity = '0.5';
+                    if (window.lucide) {
+                        window.lucide.createIcons();
+                    }
+                }
+            } else {
+                // Выключаем переключатель - модель остается в браузере, но не используется
+                icon.setAttribute('data-lucide', 'circle');
+                icon.style.opacity = '0.5';
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+                this.updateWhisperModelStatus(lang, false);
+            }
+        });
+        
+        // Инициализация состояния иконок после рендеринга
+        const whisperToggleIcons = this.options.container.querySelectorAll('.whisper-toggle-icon');
+        console.log(`🔍 Найдено переключателей Whisper: ${whisperToggleIcons.length}`);
+        
+        whisperToggleIcons.forEach((icon, index) => {
+            const lang = icon.dataset.lang;
+            if (!lang) return;
+            
+            console.log(`🔧 Настройка переключателя ${index + 1} для языка: ${lang}`);
+            
+            // Проверяем состояние модели при загрузке
+            this.checkWhisperModelStatusIcon(lang, icon).catch(err => {
+                console.error(`Ошибка проверки статуса модели для ${lang}:`, err);
+            });
+        });
+        
+        // Обновляем иконки Lucide после рендеринга
+        if (window.lucide && window.lucide.createIcons) {
+            setTimeout(() => {
+                window.lucide.createIcons();
+            }, 100);
+        }
 
         // Обработчик ТОЛЬКО для header-selector режима
         if (this.options.mode === 'header-selector') {
@@ -457,6 +570,489 @@ createLearningList() {
                     }
                 });
             }
+        }
+    }
+
+    // Проверка статуса модели Whisper для языка (для иконки)
+    async checkWhisperModelStatusIcon(langCode, iconElement) {
+        try {
+            // Проверяем, есть ли модель в глобальном хранилище
+            const modelKey = `whisper_model_${langCode}_base`;
+            const storedModel = window.WhisperModels?.get?.(modelKey);
+            
+            if (storedModel && storedModel.isReady) {
+                iconElement.setAttribute('data-lucide', 'circle-check-big');
+                iconElement.style.opacity = '1';
+                this.updateWhisperModelStatus(langCode, true);
+            } else {
+                // Проверяем в localStorage как fallback
+                const modelStatus = localStorage.getItem(modelKey);
+                if (modelStatus === 'downloaded' || modelStatus === 'ready') {
+                    iconElement.setAttribute('data-lucide', 'circle-check-big');
+                    iconElement.style.opacity = '1';
+                    this.updateWhisperModelStatus(langCode, true);
+                } else {
+                    iconElement.setAttribute('data-lucide', 'circle');
+                    iconElement.style.opacity = '0.5';
+                    this.updateWhisperModelStatus(langCode, false);
+                }
+            }
+            
+            // Обновляем иконки Lucide
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        } catch (error) {
+            console.error('Ошибка проверки статуса модели Whisper:', error);
+            iconElement.setAttribute('data-lucide', 'circle');
+            iconElement.style.opacity = '0.5';
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+    }
+
+    // Проверка статуса модели Whisper для языка (старый метод для совместимости)
+    async checkWhisperModelStatus(langCode, toggleElement) {
+        try {
+            // Проверяем, есть ли модель в глобальном хранилище
+            const modelKey = `whisper_model_${langCode}_base`;
+            const storedModel = window.WhisperModels?.get?.(modelKey);
+            
+            if (storedModel && storedModel.isReady) {
+                toggleElement.checked = true;
+                this.updateWhisperModelStatus(langCode, true);
+            } else {
+                // Проверяем в localStorage как fallback
+                const modelStatus = localStorage.getItem(modelKey);
+                if (modelStatus === 'downloaded' || modelStatus === 'ready') {
+                    toggleElement.checked = true;
+                    this.updateWhisperModelStatus(langCode, true);
+                } else {
+                    toggleElement.checked = false;
+                    this.updateWhisperModelStatus(langCode, false);
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка проверки статуса модели Whisper:', error);
+            toggleElement.checked = false;
+        }
+    }
+
+    // Обновление визуального статуса модели
+    updateWhisperModelStatus(langCode, isEnabled) {
+        // Обновляем иконку переключателя Whisper
+        const iconElement = this.options.container.querySelector(`.whisper-toggle-icon[data-lang="${langCode}"]`);
+        if (iconElement) {
+            if (isEnabled) {
+                iconElement.setAttribute('data-lucide', 'circle-check-big');
+                iconElement.style.opacity = '1';
+            } else {
+                iconElement.setAttribute('data-lucide', 'circle');
+                iconElement.style.opacity = '0.5';
+            }
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+    }
+
+    // Создание модального окна для загрузки модели
+    createWhisperDownloadModal(langCode) {
+        // Проверяем, существует ли уже модальное окно
+        let modal = document.getElementById('whisper-download-modal');
+        if (modal) {
+            return modal;
+        }
+
+        // Создаем модальное окно
+        modal = document.createElement('div');
+        modal.id = 'whisper-download-modal';
+        modal.className = 'modal whisper-download-modal';
+        modal.style.display = 'none';
+
+        const languageName = this.getLanguageName(langCode);
+        
+        modal.innerHTML = `
+            <div class="modal-content whisper-download-modal-content">
+                <div class="whisper-download-header">
+                    <h3>Загрузка модели Whisper</h3>
+                </div>
+                <div class="whisper-download-body">
+                    <p class="whisper-download-text">Загрузка модели для языка: <strong>${languageName}</strong></p>
+                    <div class="whisper-download-progress-container">
+                        <div class="whisper-download-progress-bar">
+                            <div class="whisper-download-progress-fill" id="whisper-progress-fill"></div>
+                        </div>
+                        <div class="whisper-download-percent" id="whisper-progress-percent">0%</div>
+                    </div>
+                    <p class="whisper-download-status" id="whisper-download-status">Подготовка к загрузке...</p>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        return modal;
+    }
+
+    // Показать модальное окно загрузки
+    showWhisperDownloadModal(langCode) {
+        const modal = this.createWhisperDownloadModal(langCode);
+        const progressFill = document.getElementById('whisper-progress-fill');
+        const progressPercent = document.getElementById('whisper-progress-percent');
+        const statusText = document.getElementById('whisper-download-status');
+        
+        // Обновляем название языка
+        const languageName = this.getLanguageName(langCode);
+        const textElement = modal.querySelector('.whisper-download-text');
+        if (textElement) {
+            textElement.innerHTML = `Загрузка модели для языка: <strong>${languageName}</strong>`;
+        }
+        
+        // Сбрасываем прогресс
+        if (progressFill) progressFill.style.width = '0%';
+        if (progressPercent) progressPercent.textContent = '0%';
+        if (statusText) statusText.textContent = 'Начало загрузки...';
+        
+        modal.style.display = 'flex';
+    }
+
+    // Обновить прогресс в модальном окне
+    updateWhisperDownloadModalProgress(percent) {
+        const progressFill = document.getElementById('whisper-progress-fill');
+        const progressPercent = document.getElementById('whisper-progress-percent');
+        
+        if (progressFill) {
+            progressFill.style.width = `${percent}%`;
+        }
+        if (progressPercent) {
+            progressPercent.textContent = `${percent}%`;
+        }
+    }
+
+    // Обновить статус в модальном окне
+    updateWhisperDownloadModalStatus(text) {
+        const statusText = document.getElementById('whisper-download-status');
+        if (statusText) {
+            statusText.textContent = text;
+        }
+    }
+
+    // Скрыть модальное окно загрузки
+    hideWhisperDownloadModal() {
+        const modal = document.getElementById('whisper-download-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    // Загрузка модели Whisper Base для языка (для иконки)
+    async downloadWhisperModelIcon(langCode, iconElement) {
+        console.log(`🔄 downloadWhisperModelIcon вызвана для языка: ${langCode}`);
+
+        try {
+            // Проверяем, есть ли уже модель
+            const modelKey = `whisper_model_${langCode}_base`;
+            const storedModel = window.WhisperModels?.get?.(modelKey);
+            
+            if (storedModel && storedModel.isReady) {
+                // Модель уже загружена
+                console.log(`✅ Модель для языка ${langCode} уже загружена`);
+                iconElement.setAttribute('data-lucide', 'circle-check-big');
+                iconElement.style.opacity = '1';
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+                this.updateWhisperModelStatus(langCode, true);
+                return;
+            }
+
+            // Используем WhisperModelManager для загрузки модели
+            if (!window.WhisperModelManager) {
+                console.error('❌ WhisperModelManager не загружен. Проверьте подключение скрипта whisper-model-manager.js');
+                iconElement.setAttribute('data-lucide', 'circle');
+                iconElement.style.opacity = '0.5';
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+                alert('Менеджер моделей Whisper не загружен. Пожалуйста, обновите страницу.');
+                return;
+            }
+
+            const modelManager = new window.WhisperModelManager();
+            console.log(`🚀 Начинаем загрузку модели Whisper Base для языка: ${langCode}`);
+
+            // Показываем модальное окно загрузки
+            this.showWhisperDownloadModal(langCode);
+            this.updateWhisperDownloadModalStatus('Подготовка к загрузке...');
+
+            // Обновляем прогресс загрузки
+            const updateProgress = (progressInfo) => {
+                let percent = 0;
+                
+                // Transformers.js передает объект с полями: status, file, progress, loaded, total
+                if (typeof progressInfo === 'object' && progressInfo !== null) {
+                    if (progressInfo.progress !== undefined) {
+                        // progress может быть в диапазоне 0-1 или 0-100
+                        const progressValue = progressInfo.progress;
+                        if (progressValue <= 1) {
+                            // Диапазон 0-1
+                            percent = Math.min(100, Math.max(0, Math.round(progressValue * 100)));
+                        } else {
+                            // Диапазон 0-100, уже в процентах
+                            percent = Math.min(100, Math.max(0, Math.round(progressValue)));
+                        }
+                    } else if (progressInfo.loaded !== undefined && progressInfo.total !== undefined && progressInfo.total > 0) {
+                        // Рассчитываем из loaded/total
+                        percent = Math.min(100, Math.max(0, Math.round((progressInfo.loaded / progressInfo.total) * 100)));
+                    }
+                    
+                    // Обновляем статус, если есть информация о файле
+                    if (progressInfo.file) {
+                        this.updateWhisperDownloadModalStatus(`Загрузка: ${progressInfo.file}`);
+                    } else if (progressInfo.status) {
+                        this.updateWhisperDownloadModalStatus(progressInfo.status);
+                    }
+                } else if (typeof progressInfo === 'number') {
+                    // Если передано число напрямую
+                    if (progressInfo <= 1) {
+                        // Диапазон 0-1
+                        percent = Math.min(100, Math.max(0, Math.round(progressInfo * 100)));
+                    } else {
+                        // Диапазон 0-100
+                        percent = Math.min(100, Math.max(0, Math.round(progressInfo)));
+                    }
+                }
+                
+                // Обновляем прогресс в модальном окне
+                this.updateWhisperDownloadModalProgress(percent);
+                
+                // Логируем только если процент изменился значительно
+                if (percent > 0 && percent <= 100) {
+                    console.log(`📈 Прогресс загрузки: ${percent}%`);
+                }
+            };
+
+            // Загружаем модель через менеджер
+            updateProgress(0.1);
+            this.updateWhisperDownloadModalStatus('Загрузка модели Whisper Base...');
+            console.log('⏳ Загружаем модель через WhisperModelManager...');
+            
+            try {
+                const model = await modelManager.loadLanguageModel(
+                    langCode,
+                    'base',
+                    updateProgress
+                );
+
+                console.log('✅ Модель загружена:', model);
+                updateProgress(100);
+                this.updateWhisperDownloadModalStatus('✅ Модель успешно загружена!');
+                
+                // Обновляем иконку
+                iconElement.setAttribute('data-lucide', 'circle-check-big');
+                iconElement.style.opacity = '1';
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+                
+                // Проверяем, что модель (recognizer) загружена и готова
+                if (model && typeof model === 'function') {
+                    // Это recognizer от Transformers.js - готов к использованию
+                    this.updateWhisperModelStatus(langCode, true);
+                    console.log('✅ Recognizer готов к использованию');
+                } else if (model && model.isReady) {
+                    // Старый формат с флагом isReady
+                    this.updateWhisperModelStatus(langCode, true);
+                } else {
+                    // Модель загружена, но не готова
+                    this.updateWhisperModelStatus(langCode, true);
+                    console.warn('⚠️ Модель загружена, но может быть не готова к использованию.');
+                }
+                
+                // Закрываем модальное окно через 2 секунды
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Ошибка загрузки модели:', error);
+                iconElement.setAttribute('data-lucide', 'circle');
+                iconElement.style.opacity = '0.5';
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+                this.updateWhisperDownloadModalStatus(`❌ Ошибка: ${error.message}`);
+                
+                // Закрываем модальное окно через 2 секунды даже при ошибке
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 2000);
+                
+                alert(`Ошибка загрузки модели: ${error.message}`);
+                return;
+            }
+
+            // Обновляем UI
+            this.updateWhisperModelStatus(langCode, true);
+            console.log(`Модель Whisper Base для языка ${langCode} успешно загружена`);
+        } catch (error) {
+            console.error('Ошибка загрузки модели Whisper:', error);
+            iconElement.setAttribute('data-lucide', 'circle');
+            iconElement.style.opacity = '0.5';
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+            this.hideWhisperDownloadModal();
+        }
+    }
+
+    // Загрузка модели Whisper Base для языка (старый метод для совместимости)
+    async downloadWhisperModel(langCode, toggleElement) {
+        console.log(`🔄 downloadWhisperModel вызвана для языка: ${langCode}`);
+
+        try {
+            // Проверяем, есть ли уже модель
+            const modelKey = `whisper_model_${langCode}_base`;
+            const storedModel = window.WhisperModels?.get?.(modelKey);
+            
+            if (storedModel && storedModel.isReady) {
+                // Модель уже загружена
+                console.log(`✅ Модель для языка ${langCode} уже загружена`);
+                this.updateWhisperModelStatus(langCode, true);
+                return;
+            }
+
+            // Используем WhisperModelManager для загрузки модели
+            if (!window.WhisperModelManager) {
+                console.error('❌ WhisperModelManager не загружен. Проверьте подключение скрипта whisper-model-manager.js');
+                toggleElement.checked = false;
+                alert('Менеджер моделей Whisper не загружен. Пожалуйста, обновите страницу.');
+                return;
+            }
+
+            const modelManager = new window.WhisperModelManager();
+            console.log(`🚀 Начинаем загрузку модели Whisper Base для языка: ${langCode}`);
+
+            // Показываем модальное окно загрузки
+            this.showWhisperDownloadModal(langCode);
+            this.updateWhisperDownloadModalStatus('Подготовка к загрузке...');
+
+            // Обновляем прогресс загрузки
+            const updateProgress = (progressInfo) => {
+                let percent = 0;
+                
+                // Transformers.js передает объект с полями: status, file, progress, loaded, total
+                if (typeof progressInfo === 'object' && progressInfo !== null) {
+                    if (progressInfo.progress !== undefined) {
+                        // progress может быть в диапазоне 0-1 или 0-100
+                        const progressValue = progressInfo.progress;
+                        if (progressValue <= 1) {
+                            // Диапазон 0-1
+                            percent = Math.min(100, Math.max(0, Math.round(progressValue * 100)));
+                        } else {
+                            // Диапазон 0-100, уже в процентах
+                            percent = Math.min(100, Math.max(0, Math.round(progressValue)));
+                        }
+                    } else if (progressInfo.loaded !== undefined && progressInfo.total !== undefined && progressInfo.total > 0) {
+                        // Рассчитываем из loaded/total
+                        percent = Math.min(100, Math.max(0, Math.round((progressInfo.loaded / progressInfo.total) * 100)));
+                    }
+                    
+                    // Обновляем статус, если есть информация о файле
+                    if (progressInfo.file) {
+                        this.updateWhisperDownloadModalStatus(`Загрузка: ${progressInfo.file}`);
+                    } else if (progressInfo.status) {
+                        this.updateWhisperDownloadModalStatus(progressInfo.status);
+                    }
+                } else if (typeof progressInfo === 'number') {
+                    // Если передано число напрямую
+                    if (progressInfo <= 1) {
+                        // Диапазон 0-1
+                        percent = Math.min(100, Math.max(0, Math.round(progressInfo * 100)));
+                    } else {
+                        // Диапазон 0-100
+                        percent = Math.min(100, Math.max(0, Math.round(progressInfo)));
+                    }
+                }
+                
+                // Обновляем прогресс в модальном окне
+                this.updateWhisperDownloadModalProgress(percent);
+                
+                // Логируем только если процент изменился значительно
+                if (percent > 0 && percent <= 100) {
+                    console.log(`📈 Прогресс загрузки: ${percent}%`);
+                }
+            };
+
+            // Загружаем модель через менеджер
+            updateProgress(0.1);
+            this.updateWhisperDownloadModalStatus('Загрузка модели Whisper Base...');
+            console.log('⏳ Загружаем модель через WhisperModelManager...');
+            
+            try {
+                const model = await modelManager.loadLanguageModel(
+                    langCode,
+                    'base',
+                    updateProgress
+                );
+
+                console.log('✅ Модель загружена:', model);
+                updateProgress(100);
+                this.updateWhisperDownloadModalStatus('✅ Модель успешно загружена!');
+                
+                // Проверяем, что модель (recognizer) загружена и готова
+                if (model && typeof model === 'function') {
+                    // Это recognizer от Transformers.js - готов к использованию
+                    this.updateWhisperModelStatus(langCode, true);
+                    console.log('✅ Recognizer готов к использованию');
+                } else if (model && model.isReady) {
+                    // Старый формат с флагом isReady
+                    this.updateWhisperModelStatus(langCode, true);
+                } else {
+                    // Модель загружена, но не готова
+                    this.updateWhisperModelStatus(langCode, true);
+                    console.warn('⚠️ Модель загружена, но может быть не готова к использованию.');
+                }
+                
+                // Закрываем модальное окно через 2 секунды
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 2000);
+                
+            } catch (error) {
+                console.error('❌ Ошибка загрузки модели:', error);
+                toggleElement.checked = false;
+                this.updateWhisperDownloadModalStatus(`❌ Ошибка: ${error.message}`);
+                
+                // Закрываем модальное окно через 2 секунды даже при ошибке
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 2000);
+                
+                alert(`Ошибка загрузки модели: ${error.message}`);
+                return;
+            }
+
+            // Обновляем UI
+            this.updateWhisperModelStatus(langCode, true);
+            console.log(`Модель Whisper Base для языка ${langCode} успешно загружена`);
+            
+            // Обновляем иконку режима распознавания на странице диктанта (если она есть)
+            if (typeof updateRecognitionModeIcon === 'function') {
+                updateRecognitionModeIcon();
+            }
+            
+            // Обновляем панель настроек аудио (если она есть), чтобы разблокировать кнопку переключения режима
+            if (typeof audioSettingsModalPanel !== 'undefined' && audioSettingsModalPanel && typeof audioSettingsModalPanel.render === 'function') {
+                // Перерисовываем панель, чтобы обновить состояние кнопки
+                audioSettingsModalPanel.render();
+                audioSettingsModalPanel.bindEvents();
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки модели Whisper:', error);
+            toggleElement.checked = false;
+            this.hideWhisperDownloadModal();
         }
     }
 

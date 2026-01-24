@@ -8,11 +8,23 @@ import shutil
 from datetime import datetime
 import uuid
 from flask import Blueprint, request, jsonify, render_template, send_file
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    set_access_cookies,
+)
 
 # Импортируем из helpers
 from helpers.language_data import load_language_data
-from helpers.user_helpers import load_user_info, save_user_info, get_user_folder
+from helpers.user_helpers import get_user_folder, email_to_folder
+from helpers.db_users import (
+    create_user,
+    get_user_by_email,
+    verify_user_password,
+    update_user,
+)
+from helpers.b2_storage import b2_storage
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
 
@@ -41,8 +53,9 @@ def api_register():
     if not username or not email or not password:
         return jsonify({'error': 'Email, имя пользователя и пароль обязательны'}), 400
 
-    # Проверяем, существует ли пользователь
-    if load_user_info(email):
+    # Проверяем, существует ли пользователь в БД
+    existing_user = get_user_by_email(email)
+    if existing_user:
         return jsonify({'error': 'User already exists'}), 400
 
     language_data = load_language_data()
@@ -66,34 +79,33 @@ def api_register():
     if learning_language not in learning_languages:
         learning_languages.append(learning_language)
 
-    # Создаем пользователя
-    user_data = {
-        'id': generate_user_id(),
-        'username': username,
-        'email': email,
-        'password': password,  # 🚨 В будущем нужно хэшировать!
-        'native_language': native_language,
-        'learning_language': learning_language,
-        'learning_languages': learning_languages,
-        'current_learning': learning_language,
-        'streak_days': 0,
-        'created_at': datetime.now().isoformat()
-    }
-    
-    save_user_info(email, user_data)
-    
-    # Создаем токен
+    # Создаем пользователя в БД
+    try:
+        user_response = create_user(
+            email=email,
+            username=username,
+            password=password,
+            native_language=native_language,
+            current_learning=learning_language,
+            learning_languages=learning_languages,
+        )
+    except ValueError:
+        return jsonify({'error': 'User already exists'}), 400
+    except Exception as exc:
+        return jsonify({'error': f'Failed to create user: {exc}'}), 500
+
+    # Создаем токен (identity = email, как и раньше)
     access_token = create_access_token(identity=email)
     
-    # Убираем пароль из ответа
-    user_response = user_data.copy()
-    user_response.pop('password', None)
-    
-    return jsonify({
+    # Формируем ответ и записываем токен и в куки, и в тело ответа
+    response = jsonify({
         'message': 'User created successfully',
         'access_token': access_token,
         'user': user_response
     })
+    # Куки нужны для работы @jwt_required() на обычных HTML-страницах (напр. /library/private)
+    set_access_cookies(response, access_token)
+    return response
 
 
 
@@ -102,48 +114,29 @@ def api_login():
     """Логин через API"""
     try:
         data = request.get_json()
-        print(f"❌❌❌❌❌❌❌❌❌❌❌ api_login()")
-        print(data)
         email = data.get('email')
         password = data.get('password')
         
-        print(f"🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐🔐 Попытка входа: email={email}")  # Не логируем пароль
-        
         if not email or not password:
             return jsonify({'error': 'Email and password are required'}), 400
-        
-        user_data = load_user_info(email)
-        
-        if not user_data:
-            print(f"❌❌❌❌❌❌❌❌❌❌❌ Пользователь {email} не найден")
-            # Проверим существующие пользователи для отладки
-            users_path = 'data/users'
-            if os.path.exists(users_path):
-                existing_users = os.listdir(users_path)
-                print(f"📁 Существующие пользователи: {existing_users}")
+
+        # Проверяем пользователя и пароль в БД
+        user_response = verify_user_password(email, password)
+        if not user_response:
             return jsonify({'error': 'Invalid credentials'}), 401
-        
-        print(f"✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅ Пользователь найден: {user_data.get('username')}")
-        
-        if user_data.get('password') != password:
-            print("❌ ❌ ❌ Неверный пароль")
-            return jsonify({'error': 'Invalid credentials'}), 401
-        
+
         # Создаем токен
         access_token = create_access_token(identity=email)
-        print("❌ ❌ ❌ email"+email)
-        print("❌ ❌ ❌ access_token"+access_token)
-        # Убираем пароль из ответа
-        user_response = user_data.copy()
-        user_response.pop('password', None)
         
-        print("✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅ Логин успешен")
-        
-        return jsonify({
+        # Формируем ответ и записываем токен и в куки, и в тело ответа
+        response = jsonify({
             'message': 'Login successful',
             'access_token': access_token,
             'user': user_response
         })
+        # Куки нужны для работы @jwt_required() на обычных HTML-страницах (напр. /library/private)
+        set_access_cookies(response, access_token)
+        return response
         
     except Exception as e:
         print(f"❌ Ошибка при логине: {e}")
@@ -155,15 +148,30 @@ def api_login():
 def api_get_current_user():
     """Получить текущего пользователя по токену"""
     current_email = get_jwt_identity()
-    user_data = load_user_info(current_email)
+    user_data = get_user_by_email(current_email)
     
     if not user_data:
         return jsonify({'error': 'User not found'}), 404
         
-    # Убираем пароль
-    user_response = user_data.copy()
-    user_response.pop('password', None)
-    return jsonify(user_response)
+    # В БД мы пароль не возвращаем, password_hash наружу не отдаём
+    user_copy = dict(user_data)
+    user_copy.pop('password_hash', None)
+    
+    # audio_settings_json уже включен в user_data из get_user_by_email
+    # и будет возвращен автоматически
+    
+    # Вычисляем URL аватаров по шаблону (ничего не храним в БД)
+    # Всегда используем локальные URL (B2 используется только как бэкап, не для фронтенда)
+    user_id = user_data['id']
+    avatar_large_url = f'/user/api/avatar?user_id={user_id}&size=large'
+    avatar_small_url = f'/user/api/avatar?user_id={user_id}&size=small'
+    
+    user_copy['avatar'] = {
+        'large': avatar_large_url,
+        'small': avatar_small_url,
+    }
+    
+    return jsonify(user_copy)
 
 @user_bp.route('/api/logout', methods=['POST'])
 @jwt_required()
@@ -183,8 +191,8 @@ def profile_page():
 @user_bp.route('/logout')
 def logout():
     """Выход из системы"""
-    from flask import redirect, url_for
-    response = redirect(url_for('index.index'))
+    from flask import redirect
+    response = redirect('/')
     response.set_cookie('access_token_cookie', '', expires=0)
     return response
 
@@ -197,48 +205,65 @@ def api_update_profile():
     """Обновление профиля пользователя"""
     try:
         current_email = get_jwt_identity()
-        user_data = load_user_info(current_email)
         
-        if not user_data:
+        # Получаем пользователя из БД
+        user_db = get_user_by_email(current_email)
+        if not user_db:
             return jsonify({'error': 'User not found'}), 404
         
         updates = request.get_json()
         
+        # Формируем словарь для обновления
+        db_updates = {}
+        
         # Обновляем основные поля
         if 'username' in updates:
-            user_data['username'] = updates['username']
+            db_updates['username'] = updates['username']
         
         if 'password' in updates and updates['password']:
-            user_data['password'] = updates['password']  # 🚨 В будущем хэшировать!
+            db_updates['password'] = updates['password']
         
         if 'native_language' in updates:
-            user_data['native_language'] = updates['native_language']
+            db_updates['native_language'] = updates['native_language']
         
         if 'learning_languages' in updates:
-            user_data['learning_languages'] = updates['learning_languages']
+            db_updates['learning_languages'] = updates['learning_languages']
         
         if 'current_learning' in updates:
-            user_data['current_learning'] = updates['current_learning']
+            db_updates['current_learning'] = updates['current_learning']
         
-        # Обновляем настройки аудио
-        if 'audio_start' in updates:
-            user_data['audio_start'] = updates['audio_start']
+        # Обновляем settings_json (новый способ хранения настроек)
+        if 'settings_json' in updates:
+            db_updates['settings_json'] = updates['settings_json']
+        # Для обратной совместимости также поддерживаем audio_settings_json
+        elif 'audio_settings_json' in updates:
+            db_updates['audio_settings_json'] = updates['audio_settings_json']
         
-        if 'audio_typo' in updates:
-            user_data['audio_typo'] = updates['audio_typo']
+        # Обновляем данные в БД
+        if db_updates:
+            updated_user = update_user(current_email, db_updates)
+            if not updated_user:
+                return jsonify({'error': 'Failed to update user'}), 500
+        else:
+            updated_user = user_db
         
-        if 'audio_success' in updates:
-            user_data['audio_success'] = updates['audio_success']
+        # Формируем ответ (без password_hash)
+        user_response = {
+            'id': updated_user['id'],
+            'username': updated_user['username'],
+            'email': updated_user['email'],
+            'native_language': updated_user['native_language'],
+            'current_learning': updated_user['current_learning'],
+            'learning_languages': updated_user.get('learning_languages', []),
+            'streak_days': updated_user['streak_days'],
+            'role': updated_user['role'],
+        }
         
-        if 'audio_repeats' in updates:
-            user_data['audio_repeats'] = updates['audio_repeats']
-        
-        # Сохраняем обновленные данные
-        save_user_info(current_email, user_data)
-        
-        # Убираем пароль из ответа
-        user_response = user_data.copy()
-        user_response.pop('password', None)
+        # Добавляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
+        if 'settings_json' in updated_user:
+            user_response['settings_json'] = updated_user['settings_json']
+        elif 'audio_settings_json' in updated_user:
+            user_response['audio_settings_json'] = updated_user['audio_settings_json']
         
         return jsonify({
             'message': 'Profile updated successfully',
@@ -246,6 +271,9 @@ def api_update_profile():
         })
         
     except Exception as e:
+        print(f"Ошибка обновления профиля: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -255,9 +283,9 @@ def api_upload_avatar():
     """Загрузка аватара пользователя"""
     try:
         current_email = get_jwt_identity()
-        user_data = load_user_info(current_email)
-        
-        if not user_data:
+        # Ищем пользователя в БД (основное хранилище)
+        user_db = get_user_by_email(current_email)
+        if not user_db:
             return jsonify({'error': 'User not found'}), 404
         
         if 'avatar' not in request.files:
@@ -272,7 +300,7 @@ def api_upload_avatar():
         if not avatar_file.content_type.startswith('image/'):
             return jsonify({'error': 'File must be an image'}), 400
         
-        # Получаем папку пользователя
+        # Получаем папку пользователя (локальный кэш для аватаров)
         user_folder = get_user_folder(current_email)
         os.makedirs(user_folder, exist_ok=True)
         
@@ -291,27 +319,42 @@ def api_upload_avatar():
         avatar_small = image.copy()
         avatar_small.thumbnail(SMALL_SIZE, Image.Resampling.LANCZOS)
         
-        # Сохраняем аватары
+        # Сохраняем аватары локально в папку, основанную на user_id (через get_user_folder)
         avatar_large_path = os.path.join(user_folder, 'avatar.webp')
         avatar_small_path = os.path.join(user_folder, 'avatar_min.webp')
-        
-        # Сохраняем в формате WEBP (лучшее качество/размер)
         avatar_large.save(avatar_large_path, 'WEBP', quality=85)
         avatar_small.save(avatar_small_path, 'WEBP', quality=85)
-        
-        # Генерируем URL для аватаров
-        avatar_large_url = f'/user/api/avatar?email={current_email}&size=large'
-        avatar_small_url = f'/user/api/avatar?email={current_email}&size=small'
-        
-        # Сохраняем информацию об аватаре в данные пользователя
-        user_data['avatar'] = {
-            'large': avatar_large_url,
-            'small': avatar_small_url,
-            'uploaded': datetime.now().isoformat()
-        }
-        
-        save_user_info(current_email, user_data)
 
+        user_id = user_db['id']
+        
+        # Всегда используем локальные URL для аватаров (B2 может вызывать SSL проблемы)
+        # Файлы сохраняются локально, а если B2 включён - дополнительно загружаются туда как бэкап
+        avatar_large_url = f'/user/api/avatar?user_id={user_id}&size=large'
+        avatar_small_url = f'/user/api/avatar?user_id={user_id}&size=small'
+        
+        # Если включён B2 — загружаем туда как бэкап (но не используем URL для фронтенда)
+        if b2_storage.enabled:
+            user_id_folder = f"user_{user_id}"
+
+            remote_large = f'avatars/{user_id_folder}/avatar.webp'
+            print(f"📤 Загрузка в B2: {remote_large}")
+            b2_large_result = b2_storage.upload_file(str(avatar_large_path), remote_large)
+            if b2_large_result:
+                print(f"✅ Загружено в B2: {remote_large}")
+            else:
+                print(f"❌ Ошибка загрузки в B2: {remote_large}")
+
+            remote_small = f'avatars/{user_id_folder}/avatar_min.webp'
+            print(f"📤 Загрузка в B2: {remote_small}")
+            b2_small_result = b2_storage.upload_file(str(avatar_small_path), remote_small)
+            if b2_small_result:
+                print(f"✅ Загружено в B2: {remote_small}")
+            else:
+                print(f"❌ Ошибка загрузки в B2: {remote_small}")
+        else:
+            print("ℹ️  B2 Storage выключен (B2_ENABLED=false или не настроен)")
+
+        # Возвращаем URL для фронтенда (вычислены по шаблону, ничего не храним в БД)
         return jsonify({
             'message': 'Avatar uploaded successfully',
             'avatar_urls': {
@@ -329,21 +372,38 @@ def api_get_avatar():
     """Получение аватара пользователя"""
     try:
         email = request.args.get('email')
+        user_id = request.args.get('user_id')
         size = request.args.get('size', 'large')
         
-        if not email:
-            return jsonify({'error': 'Email parameter required'}), 400
-        
-        user_folder = get_user_folder(email)
+        # Получаем user_id либо из параметра, либо из email
+        if user_id:
+            try:
+                user_id = int(user_id)
+            except ValueError:
+                return jsonify({'error': 'Invalid user_id'}), 400
+        elif email:
+            user_db = get_user_by_email(email)
+            if not user_db:
+                return jsonify({'error': 'User not found'}), 404
+            user_id = user_db['id']
+        else:
+            return jsonify({'error': 'Email or user_id parameter required'}), 400
+
+        # Вычисляем путь к аватару по шаблону user_<id>
+        user_folder = os.path.join('static', 'data', 'users', f'user_{user_id}')
         avatar_filename = 'avatar.webp' if size == 'large' else 'avatar_min.webp'
         avatar_path = os.path.join(user_folder, avatar_filename)
         
-        print(f"🔍 Ищем аватар по пути: {avatar_path}")
+        # B2 - основное хранилище! Сначала проверяем B2
+        from helpers.b2_storage import b2_storage
+        if b2_storage.enabled:
+            remote_path = f"avatars/user_{user_id}/{avatar_filename}"
+            if b2_storage.file_exists(remote_path):
+                b2_storage.download_file(remote_path, avatar_path)
         
+        # Проверяем локальный кэш или дефолтный аватар
         if not os.path.exists(avatar_path):
-            # Используем правильный путь к аватарам по умолчанию
             default_path = os.path.join('static', 'icons', f'default-avatar-{size}.svg')
-            print(f"🔍 Аватар не найден, пробуем: {default_path}")
             
             if not os.path.exists(default_path):
                 # Если файлов по умолчанию нет, возвращаем логотип как запасной вариант

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Приватная библиотека — DictaFan</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style_color.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style_private_library.css?v=40">
+    <!-- Cropper.js для обрезки изображений -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+</head>
+
+<body class="page-index">
+    <div class="topbar">
+        <a href="/" class="logo-link">
+            <img src="/static/icons/logo.svg" class="logo">
+        </a>
+        <div class="user-section" id="user-section">
+            <div class="auth-buttons" style="display: none;"></div>
+            <div class="user-info" style="display: none;">
+                <a href="/user/profile" class="username">
+                    <div class="user-avatar-small"></div>
+                    <span class="username-text"></span>
+                </a>
+                <div class="streak" title="Несгораемая сумма дней">
+                    <i data-lucide="flame"></i> <span class="streak-days">0</span>
+                </div>
+                <button id="logoutBtn" class="logout-btn" title="Выйти">
+                    <i data-lucide="log-out"></i>
+                    <span class="logout-text">Выйти</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
+        <div class="desk-zone">
+            <div class="desk-zone-header">
+                <h3><i data-lucide="clipboard"></i> Рабочий стол</h3>
+                <button id="btnPublicLibrary" class="btn-icon-round" title="Публичная библиотека">
+                    <i data-lucide="globe"></i>
+                </button>
+            </div>
+            <div class="desk-scroll-container">
+                <div class="desk-cards-container" id="deskCardsContainer">
+                    <!-- Карточки диктантов будут загружаться через JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ЗОНА 2 и ЗОНА 3: Двухпанельная структура -->
+        <div class="library-content">
+            <!-- ЗОНА 2: Список книг (слева) -->
+            <div class="books-zone" id="booksZone">
+                <div class="books-zone-header">
+                    <div id="booksLanguageSelector" class="books-language-selector"></div>
+                    <h3>Мои книги</h3>
+                    <div class="books-zone-header-right">
+                        <button id="btnNewBookInZone" class="btn-new-book" title="Новая книга">
+                            <i data-lucide="plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="books-list" id="booksList">
+                    <!-- Минимальные карточки книг будут загружаться через JS -->
+                </div>
+            </div>
+
+            <!-- Разделитель между зонами -->
+            <div class="zone-resizer" id="zoneResizer" style="display: none;"></div>
+
+            <!-- ЗОНА 3: Активная книга (справа) -->
+            <div class="active-book-zone" id="activeBookZone" style="display: none;">
+                <div class="active-book-card" id="activeBookCard">
+                    <!-- Максимальная карточка книги -->
+                </div>
+                <div class="active-book-content">
+                    <div class="book-structure" id="bookStructure">
+                        <!-- Структура книги (главы + диктанты) будет загружаться через JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно обрезки изображения -->
+    <div id="crop-modal" class="modal" style="display: none;">
+        <div class="modal-content crop-modal-content">
+            <div class="modal-header">
+                <h3>Обрезка обложки</h3>
+                <button class="modal-close" id="crop-close">&times;</button>
+            </div>
+            <div class="modal-body crop-modal-body">
+                <div class="crop-container">
+                    <img id="crop-image" src="" alt="Crop">
+                </div>
+                <div class="crop-actions">
+                    <button type="button" class="btn-secondary" id="crop-cancel">Отмена</button>
+                    <button type="button" class="btn-primary" id="crop-confirm">Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания/редактирования книги -->
+    <div id="book-edit-modal" class="modal" style="display: none;">
+        <div class="modal-content book-edit-modal-content">
+            <div class="modal-header">
+                <h3 id="book-edit-title">Новая книга</h3>
+                <button class="modal-close" id="book-edit-close">&times;</button>
+            </div>
+            <div class="modal-body book-edit-modal-body">
+                <div class="book-edit-form-container">
+                    <div class="book-edit-form-left">
+                        <div class="book-cover-upload-section">
+                            <label class="book-cover-label">Обложка книги</label>
+                            <div class="book-cover-preview-wrapper" id="book-cover-clickable">
+                                <img id="book-cover-preview" src="" alt="Обложка" class="book-cover-preview" style="display: none;">
+                                <div id="book-cover-placeholder" class="book-cover-placeholder">
+                                    <i data-lucide="image"></i>
+                                    <span>200x200</span>
+                                </div>
+                            </div>
+                            <input type="file" id="book-cover-upload" accept="image/*" style="display: none;">
+                            <button type="button" id="book-cover-upload-btn" class="btn-secondary">Загрузить обложку</button>
+                        </div>
+                    </div>
+                    <form id="book-edit-form" class="book-edit-form-right">
+                        <input type="hidden" id="book-id-input" value="">
+                        <div class="form-row">
+                            <label for="book-title-input">Название</label>
+                            <input type="text" id="book-title-input" required>
+                        </div>
+                        <div class="form-row">
+                            <label for="book-author-text-input">Автор текста (необязательно)</label>
+                            <input type="text" id="book-author-text-input">
+                        </div>
+                        <div class="form-row">
+                            <label for="book-author-materials-url-input">Ссылка на материалы автора</label>
+                            <input type="url" id="book-author-materials-url-input" placeholder="https://...">
+                        </div>
+                        <div class="form-row">
+                            <label>Язык оригинала</label>
+                            <div id="book-language-selector" class="language-selector-wrapper"></div>
+                        </div>
+                        <div class="form-row">
+                            <label for="book-theme-input">Тема</label>
+                            <input type="text" id="book-theme-input" placeholder="стихи, школьные диктанты и т.п.">
+                        </div>
+                        <div class="form-row">
+                            <label for="book-visibility-input">Видимость</label>
+                            <select id="book-visibility-input">
+                                <option value="private">Вижу только я</option>
+                                <option value="public">Видна всем (публичная книга)</option>
+                            </select>
+                        </div>
+                        <div class="form-row form-row-textarea">
+                            <label for="book-description-input">Описание</label>
+                            <textarea id="book-description-input" rows="3"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary">Сохранить</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно создания/редактирования раздела -->
+    <div id="section-edit-modal" class="modal" style="display: none;">
+        <div class="modal-content section-edit-modal-content">
+            <div class="modal-header section-edit-modal-header">
+                <h3 id="section-edit-title">Новый раздел</h3>
+                <button class="modal-close section-edit-modal-close" id="section-edit-close">&times;</button>
+            </div>
+            <div class="modal-body section-edit-modal-body">
+                <form id="section-edit-form">
+                    <input type="hidden" id="section-id-input" value="">
+                    <input type="hidden" id="section-parent-id-input" value="">
+                    <div class="form-row section-edit-form-row">
+                        <label for="section-number-input">Номер раздела</label>
+                        <input type="number" id="section-number-input" min="1" placeholder="Введите номер раздела">
+                    </div>
+                    <div class="form-row section-edit-form-row">
+                        <label for="section-title-input">Название раздела</label>
+                        <input type="text" id="section-title-input" required placeholder="Введите название раздела">
+                    </div>
+                    <div class="form-actions section-edit-form-actions">
+                        <button type="submit" class="btn-primary section-edit-submit">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно перемещения диктанта -->
+    <!-- Модальное окно публичной библиотеки -->
+    <div id="public-library-modal" class="modal" style="display: none;">
+        <div class="modal-content public-library-modal-content">
+            <div class="modal-header">
+                <h3>Публичная библиотека</h3>
+                <button class="modal-close" id="public-library-close">&times;</button>
+            </div>
+            <div class="modal-body public-library-modal-body">
+                <div class="public-library-content">
+                    <!-- ЗОНА 2: Список публичных книг (слева) -->
+                    <div class="public-books-zone">
+                        <div class="books-list" id="publicBooksList">
+                            <!-- Публичные книги будут загружаться через JS -->
+                        </div>
+                    </div>
+                    
+                    <!-- Разделитель между зонами -->
+                    <div id="publicZoneResizer" class="zone-resizer"></div>
+                    
+                    <!-- ЗОНА 3: Активная книга (справа) -->
+                    <div class="active-book-zone" id="publicActiveBookZone" style="display: none;">
+                        <div class="active-book-card" id="publicActiveBookCard">
+                            <!-- Максимальная карточка книги -->
+                        </div>
+                        <div class="active-book-content">
+                            <div class="book-structure" id="publicBookStructure">
+                                <!-- Структура книги (главы + диктанты) будет загружаться через JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="move-dictation-modal" class="modal" style="display: none;">
+        <div class="modal-content move-dictation-modal-content">
+            <div class="modal-header">
+                <h3>Переместить диктант в книгу</h3>
+                <button class="modal-close" id="move-dictation-close">&times;</button>
+            </div>
+            <div class="modal-body move-dictation-modal-body">
+                <form id="move-dictation-form">
+                    <input type="hidden" id="move-dictation-id" value="">
+                    <input type="hidden" id="move-target-section" value="">
+                    <div class="form-row move-dictation-book-row">
+                        <label for="move-target-book">Выберите книгу:</label>
+                        <select id="move-target-book" class="form-control move-dictation-book-select" required>
+                            <option value="">-- Выберите книгу --</option>
+                        </select>
+                    </div>
+                    <div id="move-dictation-sections-container" class="move-dictation-sections-container" style="display: none;">
+                        <label>Выберите раздел:</label>
+                        <div id="move-dictation-sections-list" class="move-dictation-sections-list"></div>
+                    </div>
+                    <div class="form-actions move-dictation-actions">
+                        <button type="submit" class="btn-secondary move-dictation-submit">Выбрать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра диктанта -->
+    <div id="view-dictation-modal" class="modal" style="display: none;">
+        <div class="modal-content view-dictation-modal-content">
+            <div class="view-dictation-header">
+                <div class="view-dictation-header-left">
+                    <img id="view-dictation-cover-img" src="" alt="Обложка диктанта" class="view-dictation-cover-img-small">
+                    <div class="view-dictation-title-author">
+                        <h3 id="view-dictation-title">Просмотр диктанта</h3>
+                        <a id="view-dictation-materials-link" href="#" target="_blank" class="view-dictation-materials-link" style="display: none;">
+                            <i data-lucide="external-link"></i> Материалы автора
+                        </a>
+                    </div>
+                </div>
+                <button class="modal-close view-dictation-close" id="view-dictation-close">&times;</button>
+            </div>
+            <div class="view-dictation-body">
+                <div class="view-dictation-sentences">
+                    <table class="view-dictation-table">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>Предложение в оригинале</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="view-dictation-sentences-tbody">
+                            <!-- Предложения будут загружены через JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
+    <script> lucide.createIcons(); </script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/private_library.js') }}?v=34"></script>
+</body>
+
+</html>
+

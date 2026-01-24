@@ -33,26 +33,26 @@ class UserManager {
   // Инициализация пользователя
   async init() {
     try {
-      // console.log('🔄 Инициализация UserManager, токен:', this.token);
+      console.log('🔄 Инициализация UserManager, токен:', this.token ? 'есть' : 'нет');
 
       if (this.token) {
+        console.log('🔐 Валидируем токен...');
         this.userData = await this.validateToken(this.token);
+        console.log('✅ Валидация токена завершена, userData:', this.userData ? 'есть' : 'null');
 
         if (this.userData) {
           // console.log('✅ Пользователь авторизован:', this.userData.username);
           this.setupAuthenticatedUser(this.userData);
         } else {
-          // console.log('❌ Токен невалиден, очищаем');
+          console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
           localStorage.removeItem('jwt_token');
           this.token = null;
-          this.setupGuestMode();
-          // Показываем модальное окно логина, если пользователь не авторизован
+          // Показываем модальное окно авторизации - гостевого режима нет!
           this.requireAuth();
         }
       } else {
-        // console.log('👤 Гостевой режим');
-        this.setupGuestMode();
-        // Показываем модальное окно логина, если пользователь не авторизован
+        console.log('❌ Нет токена - показываем модальное окно авторизации');
+        // Нет токена - показываем модальное окно авторизации - гостевого режима нет!
         this.requireAuth();
       }
 
@@ -62,8 +62,7 @@ class UserManager {
 
     } catch (error) {
       console.error('🚨 Ошибка инициализации пользователя:', error);
-      this.setupGuestMode();
-      // Показываем модальное окно логина при ошибке
+      // Показываем модальное окно авторизации при ошибке - гостевого режима нет!
       this.requireAuth();
     }
   }
@@ -72,43 +71,72 @@ class UserManager {
   requireAuth() {
     // Не показываем модальное окно, если пользователь уже авторизован
     if (this.isAuthenticated()) {
+      console.log('✅ Пользователь авторизован, модальное окно не показываем');
       return;
     }
 
-    // Загружаем скрипт модального окна, если он еще не загружен
-    if (typeof LoginModal === 'undefined') {
-      // Проверяем, не загружается ли уже скрипт
-      if (document.querySelector('script[src="/static/js/login_modal.js"]')) {
-        // Скрипт уже загружается, просто показываем модальное окно после загрузки
-        const existingScript = document.querySelector('script[src="/static/js/login_modal.js"]');
-        existingScript.addEventListener('load', () => {
-          if (window.loginModal) {
-            window.loginModal.show();
-          } else if (LoginModal) {
-            LoginModal.show();
-          }
-        });
-        return;
-      }
+    console.log('🔐 Требуем авторизацию - показываем модальное окно');
 
-      const script = document.createElement('script');
-      script.src = '/static/js/login_modal.js';
-      script.onload = () => {
-        if (window.loginModal) {
-          window.loginModal.show();
-        } else if (LoginModal) {
-          LoginModal.show();
-        }
-      };
-      document.head.appendChild(script);
-    } else {
+    // Проверяем, подключен ли скрипт login_modal.js в HTML
+    const scriptExists = document.querySelector('script[src*="login_modal.js"]');
+    
+    // Проверяем, определен ли LoginModal или window.loginModal
+    if (typeof LoginModal !== 'undefined' || window.loginModal) {
       // Модальное окно уже загружено, показываем его
+      console.log('✅ LoginModal уже загружен, показываем модальное окно');
       if (window.loginModal) {
         window.loginModal.show();
-      } else if (LoginModal) {
+      } else if (typeof LoginModal !== 'undefined') {
         LoginModal.show();
       }
+      return;
     }
+    
+    // Если скрипт подключен в HTML, но еще не выполнился, ждем
+    if (scriptExists) {
+      console.log('⏳ Скрипт login_modal.js подключен в HTML, ждём загрузки');
+      // Ждем загрузки скрипта (максимум 3 секунды)
+      let attempts = 0;
+      const maxAttempts = 60;
+      const checkInterval = setInterval(() => {
+        attempts++;
+        if (typeof LoginModal !== 'undefined' || window.loginModal) {
+          clearInterval(checkInterval);
+          console.log('✅ LoginModal загружен, показываем модальное окно');
+          if (window.loginModal) {
+            window.loginModal.show();
+          } else if (typeof LoginModal !== 'undefined') {
+            LoginModal.show();
+          }
+        } else if (attempts >= maxAttempts) {
+          clearInterval(checkInterval);
+          console.error('❌ LoginModal не загрузился за 3 секунды');
+        }
+      }, 50);
+      return;
+    }
+    
+    // Если скрипт не подключен в HTML, загружаем его динамически
+    console.log('📦 LoginModal не найден, загружаем скрипт');
+    const script = document.createElement('script');
+    script.src = '/static/js/login_modal.js';
+    script.onload = () => {
+      console.log('✅ Скрипт login_modal.js загружен');
+      // Небольшая задержка, чтобы класс успел определиться
+      setTimeout(() => {
+        if (window.loginModal) {
+          window.loginModal.show();
+        } else if (typeof LoginModal !== 'undefined') {
+          LoginModal.show();
+        } else {
+          console.error('❌ Модальное окно не найдено после загрузки скрипта');
+        }
+      }, 100);
+    };
+    script.onerror = () => {
+      console.error('❌ Ошибка загрузки скрипта login_modal.js');
+    };
+    document.head.appendChild(script);
   }
 
   // Получение URL аватара
@@ -144,13 +172,13 @@ class UserManager {
         // console.log('✅ Данные пользователя получены:', userData);
         return userData;
       } else {
-        console.log('❌ Ошибка валидации, статус:', response.status);
+        // console.log('❌ Ошибка валидации, статус:', response.status);
         // Попробуем прочитать текст ошибки
         try {
           const errorText = await response.text();
-          console.log('📄 Текст ошибки:', errorText);
+          // console.log('📄 Текст ошибки:', errorText);
         } catch (e) {
-          console.log('Не удалось прочитать текст ошибки');
+          // console.log('Не удалось прочитать текст ошибки');
         }
         return null;
       }
@@ -166,8 +194,7 @@ class UserManager {
     // console.log('✅✅✅✅✅✅ 2 ✅token  Выход', this.token);
     this.token = null;
     this.userData = null;
-    this.setupGuestMode();
-    // Показываем модальное окно логина после выхода
+    // Показываем модальное окно авторизации после выхода - гостевого режима нет!
     this.requireAuth();
   }
 
@@ -236,23 +263,11 @@ class UserManager {
   }
 
   // Гостевой режим
+  // Гостевой режим удален - всегда требуем авторизацию!
+  // Эта функция оставлена для обратной совместимости, но теперь просто показывает модальное окно
   setupGuestMode() {
-    const userSection = document.getElementById('user-section');
-    if (!userSection) {
-      // Это нормально на страницах, где нет элемента user-section
-      console.log('ℹ️ user-section не найден в DOM - это нормально');
-      return;
-    }
-
-    console.log('🔄 Настройка гостевого режима');
-
-    const authButtons = userSection.querySelector('.auth-buttons');
-    const userInfo = userSection.querySelector('.user-info');
-
-    if (authButtons) authButtons.style.display = 'flex';
-    if (userInfo) userInfo.style.display = 'none';
-
-    // console.log('✅ Интерфейс настроен для гостя');
+    // Гостевого режима больше нет - всегда требуем авторизацию
+    this.requireAuth();
   }
 
 
@@ -381,6 +396,9 @@ class UserManager {
           window.loginModal.hide();
         }
 
+        // Отправляем событие о успешном логине
+        window.dispatchEvent(new CustomEvent('user-logged-in', { detail: { user: this.userData } }));
+
         return { success: true, user: this.userData };
       } else {
         return { success: false, error: data.error || 'Ошибка входа' };
@@ -439,6 +457,9 @@ class UserManager {
         if (window.loginModal && window.loginModal.isVisible) {
           window.loginModal.hide();
         }
+        
+        // Отправляем событие о успешной регистрации
+        window.dispatchEvent(new CustomEvent('user-logged-in', { detail: { user: this.userData } }));
         
         return { success: true, user: this.userData };
       } else {

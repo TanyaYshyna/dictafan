@@ -8,6 +8,38 @@
     <link rel="stylesheet" href="/static/css/style_color.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/style_user_profile.css">
+    
+    <!-- Cropper.js для обрезки изображений -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <!-- Transformers.js от Hugging Face для локального распознавания речи -->
+    <!-- Используем модульный подход -->
+    <script type="module" id="transformers-loader">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+        
+        // Подавляем предупреждения ONNX Runtime (они не критичны)
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            // Фильтруем предупреждения ONNX Runtime о неиспользуемых инициализаторах
+            if (args[0] && typeof args[0] === 'string' && args[0].includes('CleanUnusedInitializersAndNodeArgs')) {
+                return; // Не показываем эти предупреждения
+            }
+            originalWarn.apply(console, args);
+        };
+        
+        // Настраиваем кэш для моделей
+        env.allowLocalModels = false;
+        env.allowRemoteModels = true;
+        
+        // Экспортируем в глобальную область видимости
+        window.pipeline = pipeline;
+        window.transformers = { pipeline, env };
+        
+        console.log('✅ Transformers.js загружен через ES modules');
+        
+        // Уведомляем о готовности
+        window.dispatchEvent(new CustomEvent('transformers-ready'));
+    </script>
 </head>
 
 <body>
@@ -24,7 +56,7 @@
                     <i data-lucide="save"></i>
                 </button>
                 <button id="exitToIndexBtn" class="button-color-yellow" type="button" title="Вернуться к списку диктантов">
-                    <i data-lucide="log-out"></i>
+                    <i data-lucide="forward"></i>
                 </button>
             </div>
         </div>
@@ -106,6 +138,25 @@
                 </div>
             </div>
         </div>
+
+        <!-- Модальное окно обрезки изображения для аватара -->
+        <div id="crop-modal" class="modal" style="display: none;">
+            <div class="modal-content crop-modal-content">
+                <div class="modal-header">
+                    <h3>Обрезка аватара</h3>
+                    <button class="modal-close" id="crop-close">&times;</button>
+                </div>
+                <div class="modal-body crop-modal-body">
+                    <div class="crop-container">
+                        <img id="crop-image" src="" alt="Crop">
+                    </div>
+                    <div class="crop-actions">
+                        <button type="button" class="btn-secondary" id="crop-cancel">Отмена</button>
+                        <button type="button" class="btn-primary" id="crop-confirm">Применить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
@@ -115,6 +166,7 @@
     </script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
     <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/script_user_profile.js') }}"></script>
@@ -123,6 +175,37 @@
             if (window.lucide) {
                 window.lucide.createIcons();
             }
+            
+            // Функция проверки библиотек
+            function checkLibraries() {
+                // Проверяем Transformers.js
+                if (typeof window.pipeline !== 'undefined') {
+                    console.log('✅ Transformers.js загружен через window.pipeline');
+                } else if (typeof window.transformers !== 'undefined') {
+                    console.log('✅ Transformers.js загружен через window.transformers');
+                } else {
+                    console.warn('⚠️ Transformers.js еще не загружен. Ожидаем...');
+                }
+                
+                // Проверяем WhisperModelManager
+                if (window.WhisperModelManager) {
+                    console.log('✅ WhisperModelManager загружен');
+                } else {
+                    console.warn('⚠️ WhisperModelManager не найден');
+                }
+            }
+            
+            // Проверяем сразу
+            checkLibraries();
+            
+            // Слушаем событие готовности Transformers.js
+            window.addEventListener('transformers-ready', () => {
+                console.log('🎉 Transformers.js готов к использованию!');
+                checkLibraries();
+            });
+            
+            // Fallback: проверяем через 3 секунды
+            setTimeout(checkLibraries, 3000);
         });
     </script>
 </body>

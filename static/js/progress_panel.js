@@ -61,6 +61,8 @@ class ProgressPanel {
         this._beepCtx = null;
         this.timerSounds = [];
         this.timerSoundsLoaded = false;
+        this.victorySounds = [];
+        this.victorySoundsLoaded = false;
         this.timerPreferenceKey = 'progressPanelTimerPreference';
         this._lucideRetryScheduled = false;
         this._suppressDirty = false;
@@ -165,6 +167,8 @@ class ProgressPanel {
         this._loadTimerPreference();
         // Загружаем список звуков таймера
         this._loadTimerSounds();
+        // Загружаем список звуков победы
+        this._loadVictorySounds();
         
         // Обновим глобальные переменные для совместимости со старым кодом
         if (typeof window !== 'undefined') {
@@ -1160,6 +1164,82 @@ class ProgressPanel {
             osc.stop(now + duration);
         } catch (error) {
             console.warn('Timer sound fallback error:', error);
+        }
+    }
+
+    async _loadVictorySounds() {
+        if (this.victorySoundsLoaded) return;
+        try {
+            const response = await fetch('/static/sounds/victory/victory_sounds.json');
+            if (!response.ok) {
+                console.warn('Не удалось загрузить список звуков победы');
+                return;
+            }
+            const data = await response.json();
+            if (Array.isArray(data.sounds) && data.sounds.length > 0) {
+                // Формируем полные пути к файлам
+                this.victorySounds = data.sounds.map(filename => 
+                    `/static/sounds/victory/${filename}`
+                );
+                this.victorySoundsLoaded = true;
+                console.log('Звуки победы загружены:', this.victorySounds.length);
+            }
+        } catch (error) {
+            console.warn('Ошибка загрузки звуков победы:', error);
+        }
+    }
+
+    _playVictorySound() {
+        // Пробуем проиграть случайный звук из списка
+        if (this.victorySounds && this.victorySounds.length > 0) {
+            const randomSound = this.victorySounds[Math.floor(Math.random() * this.victorySounds.length)];
+            const audio = new Audio(randomSound);
+            audio.volume = 0.7; // Умеренная громкость
+            audio.play().catch((error) => {
+                console.warn('Не удалось проиграть звук победы, используем fallback:', error);
+                this._playVictorySoundFallback();
+            });
+            return;
+        }
+        
+        // Fallback на Web Audio бип, если звуки не загружены
+        this._playVictorySoundFallback();
+    }
+
+    _playVictorySoundFallback() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            if (!this._beepCtx) {
+                this._beepCtx = new AudioCtx();
+            }
+            const ctx = this._beepCtx;
+            if (ctx.state === 'suspended') {
+                ctx.resume().catch(() => {});
+            }
+
+            // Звук победы - более радостная последовательность тонов
+            const duration = 0.5;
+            const now = ctx.currentTime;
+            
+            // Играем несколько тонов для более праздничного звука
+            const frequencies = [523.25, 659.25, 783.99]; // До, Ми, Соль (мажорное трезвучие)
+            frequencies.forEach((freq, index) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.exponentialRampToValueAtTime(0.15, now + 0.05 + index * 0.1);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration + index * 0.1);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now + index * 0.1);
+                osc.stop(now + duration + index * 0.1);
+            });
+        } catch (error) {
+            console.warn('Victory sound fallback error:', error);
         }
     }
 }

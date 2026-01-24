@@ -9,6 +9,10 @@
     <link rel="stylesheet" href="/static/css/style_dictation_editor.css">
     <link rel="icon" href="data:,"> <!-- Пустая иконка -->
 
+    <!-- Cropper.js для обрезки изображений -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+
     <!-- WaveformCanvas -->
     <script src="{{ url_for('static', filename='js/waveform_canvas.js') }}"></script>
 </head>
@@ -17,6 +21,9 @@
     <div class="topbar">
         <!-- <img src="/static/icons/logo.svg" class="logo"> -->
         <img src="/static/icons/logo.svg" class="logo" onclick="handleLogoClick()">
+        <div class="book-cover-wrapper" id="bookCoverWrapper" style="display: none;">
+            <img src="" alt="Обложка книги" class="book-cover-image" id="bookCoverImage">
+        </div>
         <div class="topbar-actions">
 
             <di0945v class="user-section" id="user-section">
@@ -25,15 +32,14 @@
                     <span class="user-avatar-small"></span>
                     <span class="username-text"></span>
                 </div>
-                <button class="streak"><i data-lucide="flame"></i> <span class="streak-days">0</span> дней
-                    подряд</button>
+                <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span class="streak-days">0</span></button>
         </div>
         <div class="button-group topbar-save-group">
             <button id="saveBtn" class="button-color-yellow" title="Сохранить">
                 <i data-lucide="save"></i>
             </button>
             <button id="exitToIndexBtn" class="button-color-yellow" title="Вернуться к списку диктантов">
-                <i data-lucide="log-out"></i>
+                <i data-lucide="forward"></i>
             </button>
         </div>
     </div>
@@ -120,6 +126,10 @@
                                             </ul>
                                         </div>
                                     </div>
+                                </div>
+                                <div class="form-group-line">
+                                    <label for="dictation-author-materials-url-input">Ссылка на материалы автора</label>
+                                    <input class="text-input" type="url" id="dictation-author-materials-url-input" placeholder="https://...">
                                 </div>
 
                             </div>
@@ -240,7 +250,7 @@
                                 <tbody>
                                     <tr>
                                         <td>1:</td>
-                                        <td><input type="text" class="speaker-name" value="Спикер 1"
+                                        <td><input type="text" class="speaker-name" value=""
                                                 placeholder="Имя спикера">
                                         </td>
                                         <td>
@@ -251,7 +261,7 @@
                                     </tr>
                                     <tr>
                                         <td>2:</td>
-                                        <td><input type="text" class="speaker-name" value="Спикер 2"
+                                        <td><input type="text" class="speaker-name" value=""
                                                 placeholder="Имя спикера">
                                         </td>
                                         <td>
@@ -449,7 +459,8 @@
                 </div>
                 <div class="form-group">
                     <label for="translationDelimiter">Символ начала строки перевода:</label>
-                    <input type="text" id="translationDelimiter" value="/*" placeholder="/*">
+                    <!-- Старое значение: value="/*" -->
+                    <input type="text" id="translationDelimiter" value="//" placeholder="//">
                 </div>
             </div>
             <div id="speakersTable" class="speakers-table" style="display: none;">
@@ -458,7 +469,7 @@
                     <tbody>
                         <tr>
                             <td>1:</td>
-                            <td><input type="text" class="speaker-name" value="Спикер 1" placeholder="Имя спикера">
+                            <td><input type="text" class="speaker-name" value="" placeholder="Имя спикера">
                             </td>
                             <td>
                                 <button type="button" class="remove-speaker" title="Удалить спикера">
@@ -468,7 +479,7 @@
                         </tr>
                         <tr>
                             <td>2:</td>
-                            <td><input type="text" class="speaker-name" value="Спикер 2" placeholder="Имя спикера">
+                            <td><input type="text" class="speaker-name" value="" placeholder="Имя спикера">
                             </td>
                             <td>
                                 <button type="button" class="remove-speaker" title="Удалить спикера">
@@ -688,13 +699,15 @@
         "translation_data": translation_data,
         "audio_file": audio_file,
         "title": title,
+        "title_translations": title_translations|default({}),
         "level": level,
         "audio_words": audio_words,
         "safe_email": safe_email,
         "category_info": category_info,
         "is_dialog": is_dialog,
         "speakers": speakers,
-        "cover_url": cover_url
+        "cover_url": cover_url,
+        "author_materials_url": info.get("author_materials_url") if info else None
      } | tojson }}
     </script>
 
@@ -735,6 +748,25 @@
             }
         });
     </script>
+
+    <!-- Модальное окно обрезки изображения для ковера -->
+    <div id="crop-modal" class="modal" style="display: none;">
+        <div class="modal-content crop-modal-content">
+            <div class="modal-header">
+                <h3>Обрезка обложки</h3>
+                <button class="modal-close" id="crop-close">&times;</button>
+            </div>
+            <div class="modal-body crop-modal-body">
+                <div class="crop-container">
+                    <img id="crop-image" src="" alt="Crop">
+                </div>
+                <div class="crop-actions">
+                    <button type="button" class="btn-secondary" id="crop-cancel">Отмена</button>
+                    <button type="button" class="btn-primary" id="crop-confirm">Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 

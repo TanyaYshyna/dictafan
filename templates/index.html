@@ -20,7 +20,9 @@
 
 <body class="page-index">
     <div class="topbar">
+        <a href="/" class="logo-link">
         <img src="/static/icons/logo.svg" class="logo">
+        </a>
         <div class="user-section" id="user-section">
             <!-- Для авторизованных пользователей (изначально скрыто) -->
             <div class="auth-buttons" style="display: none;">
@@ -58,7 +60,14 @@
     </div>
 
     <div class="panel">
+        <div class="panel-header">
+            <div class="panel-header-left">
         <h2>Список диктантов</h2>
+            </div>
+            <div class="panel-header-right">
+                <!-- Ссылки на удаленные страницы убраны -->
+            </div>
+        </div>
         <div class="buttons-row">
             <div class="buttons-row-left">
                 <div id="header-language-selector"></div> <!-- ← ЭТОТ ЭЛЕМЕНТ -->
@@ -105,6 +114,16 @@
                     <div id="dictationsGrid" class="shorts-grid"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактора диктанта -->
+    <div id="dictationEditorModal" class="dictation-editor-modal" style="display: none;">
+        <div class="dictation-editor-modal-content">
+            <button id="dictationEditorCloseBtn" class="dictation-editor-modal-close" type="button" title="Закрыть">
+                ×
+            </button>
+            <iframe id="dictationEditorFrame" class="dictation-editor-frame" src=""></iframe>
         </div>
     </div>
 

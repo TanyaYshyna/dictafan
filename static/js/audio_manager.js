@@ -41,6 +41,32 @@ class AudioManagerClass {
         const currentAudio = this.audio;
         const currentButton = this.currentButton;
         
+        // Применяем скорость воспроизведения из AudioPlayerVisual если она установлена
+        const applyPlaybackRate = () => {
+            if (this.audioPlayerVisual && currentAudio) {
+                const playbackRate = this.audioPlayerVisual.getPlaybackRate();
+                if (playbackRate !== undefined && playbackRate !== null) {
+                    try {
+                        currentAudio.playbackRate = parseFloat(playbackRate);
+                    } catch (e) {
+                        console.warn('Не удалось установить playbackRate:', e);
+                    }
+                }
+            }
+        };
+        
+        // Пытаемся установить скорость сразу, если метаданные уже загружены
+        if (currentAudio.readyState >= 1) {
+            applyPlaybackRate();
+        } else {
+            // Устанавливаем после загрузки метаданных
+            currentAudio.addEventListener('loadedmetadata', () => {
+                if (this.audio === currentAudio) {
+                    applyPlaybackRate();
+                }
+            }, { once: true });
+        }
+        
         // Если был предыдущий аудио элемент, убеждаемся что он остановлен
         if (previousAudio && previousAudio !== this.audio) {
             try {
@@ -71,7 +97,25 @@ class AudioManagerClass {
 
         // Обработка ошибок загрузки/воспроизведения
         currentAudio.onerror = (error) => {
-            console.error('❌ Ошибка загрузки/воспроизведения аудио:', error, audioUrl);
+            // Добавляем детальное логирование для диагностики
+            const errorDetails = {
+                url: audioUrl,
+                readyState: currentAudio.readyState,
+                networkState: currentAudio.networkState,
+                error: currentAudio.error ? {
+                    code: currentAudio.error.code,
+                    message: currentAudio.error.message
+                } : 'unknown'
+            };
+            
+            // Не выводим критическую ошибку в консоль для файлов _avto
+            // (это может быть нормальной ситуацией, если файлы не были созданы или имеют проблемы с форматом)
+            if (audioUrl && audioUrl.includes('_avto')) {
+                console.warn('⚠️ Аудио файл недоступен или имеет проблемы с форматом:', audioUrl, errorDetails);
+            } else {
+                console.error('❌ Ошибка загрузки/воспроизведения аудио:', audioUrl, errorDetails);
+            }
+            
             // Проверяем, что это действительно текущий аудио элемент
             if (this.audio === currentAudio && currentButton) {
                 // При ошибке возвращаем состояние на 'ready' (не на 'creating'!)
@@ -274,6 +318,16 @@ class AudioManagerClass {
             this.audio = null;
             this.stopPlayheadSync();
         };
+    }
+
+    setPlaybackRate(rate) {
+        if (this.audio) {
+            this.audio.playbackRate = parseFloat(rate);
+            // Синхронизируем с AudioPlayerVisual если он есть
+            if (this.audioPlayerVisual) {
+                this.audioPlayerVisual.setPlaybackRate(rate);
+            }
+        }
     }
 
     pause() {

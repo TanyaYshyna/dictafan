@@ -6,6 +6,8 @@ from flask import request, current_app
 from functools import wraps
 from datetime import datetime
 
+from helpers.db_users import get_user_by_email
+
 
 # Пути к данным пользователей
 USERS_BASE_DIR = os.path.join('static', 'data', 'users')
@@ -14,11 +16,21 @@ def email_to_folder(email):
     """Конвертирует email в имя папки"""
     return email.replace('@', '_at_').replace('.', '_dot_')
 
-def get_user_folder(email):
-    """Получает путь к папке пользователя"""
-    # safe_email = email.replace('@', '_at_').replace('.', '_dot_')
-    safe_email = email_to_folder(email)
-    user_path = os.path.join('static', 'data', 'users', safe_email)
+def get_user_folder(email: str) -> str:
+    """
+    Получает путь к папке пользователя в новом мире БД.
+
+    Логика:
+      - находим пользователя по email в БД;
+      - если не найден — считаем, что пользователя нет (JSON-хвосты не поддерживаем);
+      - имя папки: `user_<id>`.
+    """
+    user = get_user_by_email(email)
+    if not user or "id" not in user:
+        raise ValueError(f"User with email {email} not found when resolving folder")
+
+    folder_name = f"user_{user['id']}"
+    user_path = os.path.join(USERS_BASE_DIR, folder_name)
     return user_path
 
 def get_safe_email_from_token():
@@ -34,49 +46,23 @@ def get_safe_email_from_token():
 
 
 def load_user_info(email):
-    """Загружает информацию о пользователе"""
-    try:
-        user_folder = get_user_folder(email)
-        info_path = os.path.join(user_folder, 'info.json')
-        
-        if not os.path.exists(info_path):
-            return None
-            
-        with open(info_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            
-            # Добавляем поле avatar если его нет
-            if 'avatar' not in data:
-                data['avatar'] = {}
-                
-            print(f"✅ Данные пользователя загружены: {data.keys()}")  # Отладочная информация
-            return data
-                
-    except Exception as e:
-        print(f"Error loading user info: {e}")
-        return None
-    
+    """
+    ⚠️ УСТАРЕВШАЯ ФУНКЦИЯ - НЕ ИСПОЛЬЗУЕТСЯ!
+    Все данные пользователя теперь хранятся только в БД.
+    Используйте get_user_by_email из helpers.db_users.
+    """
+    print(f"⚠️ Предупреждение: load_user_info({email}) устарела - используйте get_user_by_email")
+    return None
+
 
 def save_user_info(email, user_data):
-    """Сохраняет информацию о пользователе"""
-    try:
-        user_folder = get_user_folder(email)
-        os.makedirs(user_folder, exist_ok=True)
-        
-        info_path = os.path.join(user_folder, 'info.json')
-       
-        # Обновляем timestamp
-        user_data['updated_at'] = datetime.now().isoformat()
-        
-        with open(info_path, 'w', encoding='utf-8') as f:
-            json.dump(user_data, f, ensure_ascii=False, indent=2)
-
-        print(f"✅ Данные сохранены в: {info_path}")  # Отладочная информация
-
-        return True
-    except Exception as e:
-        print(f"Error saving user info: {e}")
-        return False
+    """
+    ⚠️ УСТАРЕВШАЯ ФУНКЦИЯ - НЕ ИСПОЛЬЗУЕТСЯ!
+    Все данные пользователя теперь сохраняются только в БД.
+    Используйте update_user из helpers.db_users.
+    """
+    print(f"⚠️ Предупреждение: save_user_info({email}) устарела - используйте update_user")
+    return False
     
 
 

@@ -17,6 +17,124 @@
     border: 1px solid var(--color-border-light, rgba(255, 255, 255, 0.2));
 }
 
+/* Стили для username на странице диктанта - убрать серый цвет */
+.username {
+    color: var(--color-text, #1f2933) !important;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.username:visited {
+    color: var(--color-text, #1f2933) !important;
+}
+
+/* Убираем opacity для всего элемента username */
+.username {
+    opacity: 1 !important;
+}
+
+.username:hover {
+    color: var(--color-text, #1f2933) !important;
+    opacity: 1 !important; /* Переопределяем opacity: 0.8 из style.css */
+}
+
+/* Аватар всегда должен быть непрозрачным */
+.user-avatar-small {
+    opacity: 1 !important;
+}
+
+.username:hover .user-avatar-small {
+    opacity: 1 !important;
+}
+
+.username .user-avatar-small {
+    opacity: 1 !important;
+}
+
+.username-text {
+    color: var(--color-text, #1f2933) !important;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+/* Стили для streak на странице диктанта */
+.streak {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0px;
+    padding: 0;
+    margin: 0 8px;
+    background: var(--color-button-yellow, #fbbf24);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+}
+
+.streak i {
+    width: 16px;
+    height: 16px;
+    color: var(--color-button-text-yellow, #1f2933);
+}
+
+.streak-days {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text, #1f2933);
+    line-height: 1;
+    position: relative;
+    top: 3px;
+}
+
+/* По умолчанию мини-логотип скрыт */
+.logo-min {
+    display: none;
+}
+
+/* Адаптивность для узких экранов на странице диктанта */
+@media (max-width: 768px) {
+    /* Показываем мини-логотип, скрываем полный */
+    .logo-full {
+        display: none;
+    }
+    
+    .logo-min {
+        display: block;
+    }
+    
+    /* Скрываем обложку диктанта */
+    .dictation-cover-wrapper {
+        display: none !important;
+    }
+    
+    /* Скрываем имя пользователя, оставляем только аватар */
+    .username-text {
+        display: none !important;
+    }
+    
+    /* Убираем margin-right у аватара, так как имя скрыто */
+    .user-avatar-small {
+        margin-right: 0;
+    }
+    
+    /* При сужении кнопка btn-new-circle переходит на новую строку */
+    .button-group {
+        flex-wrap: wrap;
+    }
+    
+    /* Кнопка btn-new-circle на новой строке при узком экране */
+    #btn-new-circle {
+        width: 100%;
+        margin-top: 8px;
+        order: 10; /* Перемещаем в конец */
+    }
+}
+
 /* Спикер в диктанте */
 #speaker {
     color: var(--color-button-text-gray);
@@ -264,6 +382,11 @@ body.playing-audio::after {
   border: none !important;
 }
 
+/* Первая ячейка в таблице модального окна - без padding и с шириной по содержимому */
+#start-modal table td:first-child {
+  padding: 0 !important;
+}
+
 /* Убираем обводку у всех ячеек таблицы в модальном окне */
 /* .modal-content table,
 .modal-content table * {
@@ -372,6 +495,89 @@ body.playing-audio::after {
 #userAudioAnswer .interim {
   color: #888;
   font-style: italic;
+}
+
+/* Анимация обработки для Whisper (локальный режим) */
+.whisper-processing-animation {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px;
+}
+
+.dots-animation {
+  display: inline-flex;
+  gap: 4px;
+  font-size: 24px;
+  color: #8b5cf6;
+}
+
+.dots-animation span {
+  animation: dot-bounce 1.4s infinite;
+  animation-delay: calc(var(--i) * 0.2s);
+}
+
+@keyframes dot-bounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-10px);
+    opacity: 1;
+  }
+}
+
+.processing-text {
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.progress-container {
+  width: 100%;
+  max-width: 300px;
+  height: 4px;
+  background: rgba(139, 92, 246, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  width: 0%;
+  transition: width 0.1s ease;
+  border-radius: 2px;
+}
+
+/* Результат Whisper с анимацией печати */
+.whisper-result-text {
+  font-size: 16px;
+  color: #333;
+  line-height: 1.5;
+  min-height: 24px;
+}
+
+.whisper-success-indicator {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #10b981;
+  font-weight: 500;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .audio-user-text {
@@ -935,7 +1141,7 @@ body.playing-audio::after {
   margin: 0 2px;
   /* Добавляем небольшой отступ вокруг каждого элемента */
   gap: 5px;
-  width: auto;
+  width: 100%;
   flex-wrap: nowrap;
 }
 
@@ -955,10 +1161,10 @@ body.playing-audio::after {
 }
 
 .custom-audio-player .progress-bar {
-  flex: 0 1 auto;
-  min-width: 150px;
-  max-width: 200px;
-  width: 150px;
+  flex: 1 1 0;
+  min-width: 100px;
+  max-width: none;
+  width: 0;
   appearance: none;
   height: 6px;
   background: var(--color-muted);
@@ -1057,8 +1263,10 @@ body.playing-audio::after {
 
 /* Полный сброс всех горизонтальных промежутков -----------------------------------*/
 .custom-audio-player .controls {
-  gap: 0 !important;
-  /* Убираем flex/grid gaps */
+  gap: 5px !important;
+  /* Небольшой отступ между элементами */
+  width: 100%;
+  justify-content: flex-start;
 }
 
 .custom-audio-player .controls>* {
@@ -1067,7 +1275,21 @@ body.playing-audio::after {
   padding-left: 1px !important;
   padding-right: 1px !important;
   border: none !important;
-  /* Если нужно убрать и обводки */
+}
+
+/* Прогресс-бар должен растягиваться и занимать все доступное пространство */
+.custom-audio-player .controls .progress-bar {
+  flex: 1 1 0 !important;
+  min-width: 100px !important;
+  max-width: none !important;
+  width: 0 !important;
+}
+
+/* Селекторы скорости и типа файла прижимаем к правому краю */
+.custom-audio-player .audio-type-select-wrapper,
+.custom-audio-player .custom-speed-select {
+  margin-left: auto !important;
+  flex-shrink: 0;
 }
 
 /* Особенно для проблемных элементов */
@@ -1290,9 +1512,17 @@ body.playing-audio::after {
   align-items: flex-start;
   justify-content: flex-start;
   gap: 10px;
-  width: auto;
+  width: 100%;
   max-width: 100%;
+  margin-top: 10px;
   align-self: flex-start;
+}
+
+/* Плеер оригинального аудио растягивается на всю ширину */
+#originalAudioPlayer {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 /* Стили для обертки кнопки перевода */
@@ -1389,9 +1619,19 @@ body.playing-audio::after {
   }
 }
 
-/* Гарантируем, что элементы управления не сжимаются */
+/* Гарантируем, что элементы управления (кроме прогресс-бара) не сжимаются */
 .custom-audio-player .controls>* {
   flex-shrink: 0;
+}
+
+/* Прогресс-бар должен растягиваться - переопределяем правило выше */
+.custom-audio-player .controls .progress-bar {
+  flex: 1 1 0 !important;
+  flex-shrink: 1 !important;
+  flex-grow: 1 !important;
+  min-width: 100px !important;
+  max-width: none !important;
+  width: 0 !important;
 }
 
 
@@ -1430,6 +1670,32 @@ body.playing-audio::after {
 
 
 /* кнопки чек и запись аудио полоьзователем ------------------------- */
+/* Кнопка проверки - фиксированная ширина и подписи */
+#checkBtn {
+  min-width: 160px;
+  width: 160px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  padding: 12px 16px;
+}
+
+#checkBtn .check-btn-label {
+  display: inline-block;
+  white-space: nowrap;
+  margin-left: 4px;
+}
+
+#checkBtn i {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.5;
+}
+
 /* Запрет наведения/обводки для отключённой кнопки проверки */
 #checkBtn.disabled,
 #checkBtn:disabled {
@@ -1510,80 +1776,109 @@ body.playing-audio::after {
   z-index: 10;
 }
 
-/* Фиксированные ширины для первых 5 видимых колонок */
-/* Колонка 1: Выбор */
-#sentences-table th:nth-child(1),
-#final-sentences-table th:nth-child(1),
-#sentences-table td:nth-child(1),
-#final-sentences-table td:nth-child(1) {
-  width: 50px;
-  min-width: 50px;
-  max-width: 50px;
+/* Фиксированные ширины для колонок таблицы предложений */
+/* Колонка 0: Настройки (audio-settings-header-cell) */
+#sentences-table td.audio-settings-header-cell,
+#final-sentences-table td.audio-settings-header-cell {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  padding: 4px !important;
+  overflow: visible !important;
 }
 
-/* Колонка 2: Номер строки */
-#sentences-table th:nth-child(2),
-#final-sentences-table th:nth-child(2),
+/* Колонка 1: Номер строки (ПЕРВАЯ после settingsCell) */
+#sentences-table td.sentence-number-cell,
 #sentences-table td:nth-child(2),
 #final-sentences-table td:nth-child(2) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
   text-align: center;
+  padding: 4px 8px !important;
+  overflow: visible !important;
+  font-weight: 500;
 }
 
-/* Колонка 3: Код (скрытая) */
-#sentences-table th:nth-child(3),
-#final-sentences-table th:nth-child(3),
+/* Колонка 2: Выбор */
 #sentences-table td:nth-child(3),
 #final-sentences-table td:nth-child(3) {
-  width: 0;
-  min-width: 0;
-  max-width: 0;
-  padding: 0;
-  overflow: hidden;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  padding: 4px !important;
+  overflow: visible !important;
+  text-align: center;
 }
 
-/* Колонка 4: Звезда 1 (perfect) */
-#sentences-table th:nth-child(4),
-#final-sentences-table th:nth-child(4),
-#sentences-table td:nth-child(4),
-#final-sentences-table td:nth-child(4) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
-  text-align: center;
+/* Колонка 3: Код (скрытая) - ТОЛЬКО для элементов с классом hidden-column */
+#sentences-table td:nth-child(4).hidden-column,
+#final-sentences-table td:nth-child(4).hidden-column {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+
+/* Колонка 4: Звезда 1 (perfect) - полная звезда - ВСЕГДА ВИДНА */
+#sentences-table td.sentence-star-perfect,
+#sentences-table td.sentence-progress-cell.sentence-star-perfect,
+#sentences-table tbody tr td.sentence-star-perfect,
+#sentences-table tbody tr td:nth-child(5),
+#final-sentences-table td:nth-child(5) {
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  text-align: center !important;
+  padding: 4px !important;
+  overflow: visible !important;
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+}
+
+/* Дополнительная гарантия видимости для всех ячеек прогресса */
+#sentences-table tbody tr td.sentence-progress-cell {
+  display: table-cell !important;
+  visibility: visible !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
 }
 
 /* Колонка 5: Звезда 2 (corrected) */
-#sentences-table th:nth-child(5),
-#final-sentences-table th:nth-child(5),
-#sentences-table td:nth-child(5),
-#final-sentences-table td:nth-child(5) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
+#sentences-table td.sentence-star-corrected,
+#sentences-table td:nth-child(6),
+#final-sentences-table td:nth-child(6) {
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
   text-align: center;
+  padding: 4px !important;
+  overflow: visible !important;
 }
 
 /* Колонка 6: Микрофон */
-#sentences-table th:nth-child(6),
-#final-sentences-table th:nth-child(6),
-#sentences-table td:nth-child(6),
-#final-sentences-table td:nth-child(6) {
-  width: 60px;
-  min-width: 60px;
-  max-width: 60px;
+#sentences-table td:nth-child(7),
+#final-sentences-table td:nth-child(7) {
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
   text-align: center;
+  padding: 4px !important;
+  overflow: visible !important;
 }
 
 /* Колонка 7: Текст (последняя, занимает весь остальной размер) */
-#sentences-table th:last-child,
-#final-sentences-table th:last-child,
 #sentences-table td:last-child,
 #final-sentences-table td:last-child {
-  width: auto;
+  width: auto !important;
   min-width: 200px;
+  padding: 4px 8px !important;
+  overflow: visible !important;
 }
 
 
@@ -1769,12 +2064,40 @@ body.playing-audio::after {
 }
 
 /* Специальные стили для модального окна выбора предложений */
-.modal-content:has(table) {
-  max-width: 1000px;
+.modal-content:has(table),
+#start-modal .modal-content {
+  max-width: 90vw;
+  width: 90%;
   display: flex;
   flex-direction: column;
   text-align: center;
   position: relative;
+}
+
+/* Стили для таблицы в модальном окне - убираем ограничение ширины первой колонки */
+#start-modal table colgroup col:first-child {
+  width: 1px;
+  min-width: 0;
+}
+
+#start-modal table td:first-child {
+  width: 1px !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  padding: 0 !important;
+  white-space: nowrap;
+}
+
+/* Контейнер настроек аудио в модальном окне - подстраивается под содержимое */
+#start-modal #audioSettingsContainer {
+  width: fit-content;
+  max-width: 100%;
+  display: inline-block;
+}
+
+#start-modal .audio-settings-main-table {
+  width: fit-content !important;
+  max-width: 100%;
 }
 
 
@@ -1889,7 +2212,33 @@ body.playing-audio::after {
   text-align: center;
   font-size: 13px;
   color: var(--color-text);
-  min-width: 60px;
+  min-width: 50px !important;
+  width: 50px !important;
+  max-width: 50px !important;
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Убеждаемся, что колонка с полной звездой всегда видна - максимальная специфичность */
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect,
+#sentences-table tbody tr td.sentence-star-perfect,
+#sentences-table tbody tr td:nth-child(5) {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  padding: 4px !important;
+  text-align: center !important;
+}
+
+/* Убеждаемся, что колонка с полной звездой всегда видна */
+.sentence-progress-cell.sentence-star-perfect {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 .sentence-progress-cell i {
@@ -1918,24 +2267,68 @@ body.playing-audio::after {
 }
 
 /* Отступы в ячейках таблицы */
-#sentences-table td:first-child {
-  padding: 4px;
-  text-align: center;
+/* Колонка 0: settingsCell (audio-settings-header-cell) */
+#sentences-table td.audio-settings-header-cell,
+#sentences-table td:first-child.audio-settings-header-cell {
+  padding: 4px !important;
+  text-align: center !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
 }
 
+/* Колонка 1: Номер строки (ПЕРВАЯ после settingsCell) */
+#sentences-table td.sentence-number-cell,
 #sentences-table td:nth-child(2) {
-  padding: 4px 8px;
+  padding: 4px 8px !important;
+  text-align: center !important;
+  font-weight: 500;
 }
 
-#sentences-table td:nth-child(4),
-#sentences-table td:nth-child(5),
+/* Колонка 2: Выбор */
+#sentences-table td:nth-child(3) {
+  padding: 4px !important;
+  text-align: center !important;
+}
+
+/* Колонка 4: Звезда 1 (perfect) - полная звезда - ВСЕГДА ВИДНА */
+#sentences-table td.sentence-star-perfect,
+#sentences-table td.sentence-progress-cell.sentence-star-perfect,
+#sentences-table td:nth-child(5) {
+  padding: 4px !important;
+  text-align: center !important;
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+}
+
+/* Убеждаемся, что иконка внутри видна */
+#sentences-table td.sentence-star-perfect i,
+#sentences-table td.sentence-star-perfect i[data-lucide="star"] {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Колонка 5: Звезда 2 (corrected) */
+#sentences-table td.sentence-star-corrected,
 #sentences-table td:nth-child(6) {
-  padding: 4px;
-  text-align: center;
+  padding: 4px !important;
+  text-align: center !important;
 }
 
+/* Колонка 6: Микрофон */
+#sentences-table td:nth-child(7) {
+  padding: 4px !important;
+  text-align: center !important;
+}
+
+/* Колонка 7: Текст (последняя) */
 #sentences-table td:last-child {
-  padding: 4px 8px;
+  padding: 4px 8px !important;
 }
 
 /* Для полного устранения теней---------------------------------------------------*/
@@ -2120,7 +2513,7 @@ body.playing-audio::after {
 /* Канвас — фикс. ширина и запрет сжатия в flex */
 .audio-visualizer {
   width: 200px;
-  height: 45px;
+  height: 50px;
   background: var(--color-button-purple);
   border-radius: 8px;
   margin-left: 5px;
@@ -2145,6 +2538,17 @@ body.playing-audio::after {
   display: flex;
   align-items: center; /* выравнивание по вертикали */
   gap: 8px; /* отступ между элементами */
+  flex-wrap: wrap; /* Разрешаем перенос на новую строку */
+}
+
+/* Минимальная ширина для счетчика предложений */
+.sentence-counter {
+  min-width: 80px; /* Минимальная ширина для "1 / 10" */
+  flex-shrink: 0; /* Не сжимается */
+}
+
+.sentence-counter-simple {
+  white-space: nowrap; /* Не переносим текст внутри */
 }
 
 #checkPrevios,#checkNext{
@@ -2165,7 +2569,29 @@ body.playing-audio::after {
 
 /* Скрытая колонка "Код" в таблице предложений */
 .hidden-column {
-  display: none;
+  display: none !important;
+}
+
+/* КРИТИЧНО: Убеждаемся, что колонка с полной звездой НЕ скрыта правилом для hidden-column */
+#sentences-table td.sentence-star-perfect:not(.hidden-column),
+#sentences-table td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column),
+#sentences-table tbody tr td.sentence-star-perfect:not(.hidden-column),
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column) {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+}
+
+/* КРИТИЧНО: Убеждаемся, что колонка с полной звездой НЕ скрыта правилом для hidden-column */
+#sentences-table td.sentence-star-perfect:not(.hidden-column),
+#sentences-table td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column),
+#sentences-table tbody tr td.sentence-star-perfect:not(.hidden-column) {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Поля ввода для аудио сначала ошибка и вкрнце ---------------------------------------------------*/
@@ -2253,14 +2679,14 @@ body.playing-audio::after {
 .audio-settings-main-table {
     width: auto;
     border-collapse: collapse;
-    padding:10px;
+    padding: 0;
 }
 
 /* Левая колонка - настройки (ширина по содержимому) */
 .audio-settings-column {
     width: auto;
     vertical-align: top;
-    padding: 10px;
+    padding: 0;
 }
 
 /* Правая колонка - обозначения (минимальная ширина 200px) */
@@ -2289,9 +2715,10 @@ body.playing-audio::after {
 
 /* Таблица для выравнивания полей ввода */
 .audio-settings-table {
-    width: 100%;
+    width: auto;
     border-collapse: collapse;
     border-spacing: 0;
+    table-layout: auto;
 }
 
 .audio-settings-table tr {
@@ -2312,6 +2739,7 @@ body.playing-audio::after {
     padding: 8px 8px 8px 0;
     vertical-align: middle;
     width: auto;
+    white-space: nowrap;
 }
 
 .audio-settings-label label {
@@ -2319,12 +2747,23 @@ body.playing-audio::after {
     color: var(--color-text);
     display: flex;
     align-items: center;
+    white-space: nowrap;
     gap: 6px;
 }
 
 .audio-settings-input {
     padding: 8px 8px 8px 20px;
     vertical-align: middle;
+    width: auto;
+    max-width: none;
+}
+
+/* Убеждаемся, что стили настроек аудио не влияют на таблицу предложений */
+#sentences-table .audio-settings-input,
+#final-sentences-table .audio-settings-input {
+    padding: inherit;
+    width: inherit;
+    max-width: inherit;
 }
 
 /* Отступы между полями ввода в строке */
@@ -2338,6 +2777,12 @@ body.playing-audio::after {
     box-sizing: border-box;
 }
 
+/* Поле "Повторы аудио" шире в модальном окне */
+#modal-audioRepeatsInput {
+    min-width: 80px;
+    width: 80px;
+}
+
 .audio-settings-input .play-sequence-input:focus {
     outline: none;
     border-color: var(--color-button-text-pink);
@@ -2347,6 +2792,47 @@ body.playing-audio::after {
 .audio-settings-input .play-sequence-input:last-child {
     margin-right: 0;
 }
+
+/* Стили для кнопок-чекбоксов в настройках аудио */
+.audio-setting-checkbox-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: 0;
+    border: none !important;
+    background: transparent;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: none;
+    box-shadow: none !important;
+    outline: none !important;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.audio-setting-checkbox-btn:hover,
+.audio-setting-checkbox-btn:active,
+.audio-setting-checkbox-btn:focus,
+.audio-setting-checkbox-btn:focus-visible,
+.audio-setting-checkbox-btn:focus-within {
+    background-color: var(--color-button-gray);
+    transform: none;
+    box-shadow: none !important;
+    outline: none !important;
+    border: none !important;
+}
+
+.audio-setting-checkbox-btn i {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Стили для режима user-settings */
 
 .audio-settings-input .play-sequence-input {
     width: 60px !important;
@@ -2391,7 +2877,6 @@ body.playing-audio::after {
 /* ==================== СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА СТАТИСТИКИ ==================== */
 
 /* Стили статистики перенесены в style.css (общие для всех страниц) */
-}
 
 @media (max-width: 768px) {
     .statistics-modal-content {
@@ -2970,4 +3455,265 @@ body.playing-audio::after {
     min-width: calc(var(--vk-key-unit, 1) * 36px);
     height: 52px;
   }
+}
+
+/* ==================== СТИЛИ ДЛЯ КНОПКИ НАСТРОЕК АУДИО ==================== */
+.audio-settings-header-cell {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  padding: 4px !important;
+  text-align: center;
+}
+
+.audio-settings-header-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.audio-settings-header-btn:hover {
+  background-color: var(--color-button-gray);
+}
+
+.audio-settings-header-btn:active {
+  transform: none;
+  box-shadow: none !important;
+}
+
+.audio-settings-header-btn i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text);
+}
+
+/* ==================== СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА НАСТРОЕК АУДИО ==================== */
+.audio-settings-modal-content {
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.audio-settings-modal-content .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 20px 15px 20px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.audio-settings-modal-content .modal-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.modal-close-btn:hover {
+  background-color: var(--color-button-gray);
+}
+
+.modal-close-btn i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text);
+}
+
+.audio-settings-modal-body {
+  padding: 20px;
+}
+
+/* Стили для переключателя локальной модели Whisper */
+.toggle-switch-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 26px;
+    cursor: pointer;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: 0.3s;
+    border-radius: 26px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #ffc107; /* желтый цвет когда включено */
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+}
+
+.toggle-label {
+    font-size: 14px;
+    color: var(--color-text);
+    user-select: none;
+}
+
+/* Стили для радио-кнопок распознавания речи */
+/* Кнопка переключения режима распознавания речи (циклическое переключение) */
+.speech-recognition-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border-light, #e0e0e0);
+  background-color: var(--color-panel-bg, #ffffff);
+  transition: all 0.2s;
+}
+
+.speech-recognition-toggle-button:hover {
+  background-color: var(--color-hover, #f5f5f5);
+  border-color: var(--color-button-purple, #8b5cf6);
+}
+
+.speech-recognition-toggle-button .speech-recognition-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+.speech-recognition-toggle-button .speech-recognition-label {
+  font-size: 14px;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* Иконка режима распознавания речи рядом с кнопкой записи */
+.recognition-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 8px;
+  color: var(--color-button-text-purple);
+  cursor: default;
+  flex-shrink: 0;
+}
+
+.recognition-mode-icon i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-button-text-purple);
+}
+
+/* ============================================================
+   КРИТИЧНО: Колонка с полной звездой (perfect) ДОЛЖНА быть видна!
+   Добавляем в конец файла для максимальной специфичности
+   Порядок колонок: 1=settingsCell, 2=номер, 3=чекбокс, 4=код(скрытая), 5=полная звезда, 6=полузвезда, 7=микрофон, 8=текст
+   ============================================================ */
+
+/* ПЕРЕОПРЕДЕЛЯЕМ: Убеждаемся что колонка с полной звездой НИКОГДА не скрыта */
+#sentences-table tbody tr td.sentence-star-perfect,
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+  padding: 4px !important;
+  text-align: center !important;
+  overflow: visible !important;
+}
+
+/* Даже если случайно добавили класс hidden-column - все равно показываем */
+#sentences-table tbody tr td.sentence-star-perfect.hidden-column {
+  display: table-cell !important;
+}
+
+/* Перекрываем правило для nth-child(5) - это должна быть полная звезда, а не код */
+#sentences-table tbody tr td:nth-child(5).sentence-star-perfect,
+#sentences-table tbody tr td:nth-child(5).sentence-progress-cell.sentence-star-perfect {
+  display: table-cell !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 50px !important;
+  min-width: 50px !important;
+  max-width: 50px !important;
+}
+
+/* Гарантируем видимость иконки внутри */
+#sentences-table tbody tr td.sentence-star-perfect i,
+#sentences-table tbody tr td.sentence-star-perfect i[data-lucide="star"],
+#sentences-table tbody tr td.sentence-star-perfect svg,
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect i,
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect svg,
+#sentences-table tbody tr td:nth-child(5).sentence-star-perfect i,
+#sentences-table tbody tr td:nth-child(5).sentence-star-perfect svg {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
+/* ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: перекрываем ВСЕ inline стили через атрибут style */
+#sentences-table tbody tr td.sentence-star-perfect[style*="display: none"],
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect[style*="display: none"] {
+  display: table-cell !important;
 }

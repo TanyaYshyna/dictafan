@@ -25,6 +25,8 @@ from helpers.language_data import load_language_data
 from helpers.user_helpers import get_safe_email_from_token, get_current_user 
 from routes.index import get_cover_url_for_id
 from helpers.b2_storage import b2_storage
+from helpers.db_dictations import create_dictation, update_dictation, get_dictation_by_id
+from helpers.db_users import get_user_by_email
 
 
 # Настройка логгера
@@ -63,6 +65,7 @@ def generate_audio():
 
     try:
         dictation_id = data.get('dictation_id')
+        user_id = data.get('user_id')  # ID пользователя для пути temp/<user_id>/
         safe_email = data.get('safe_email')  # получаем из запроса
         if not safe_email:
             logging.error("Отсутствует safe_email")
@@ -76,10 +79,18 @@ def generate_audio():
         lang = data.get('language')
 
         # Создаем базовую директорию для хранения аудио
-        # base_dir = current_app.config.get('AUDIO_BASE_DIR', 'static/data/temp')
+        # Для новых диктантов используем temp/<user_id>/dict_temp_<timestamp>/
+        # Для существующих - temp/dict_<id>/
         base_dir = 'static/data/temp'
-        # сохраняем прямо в папку языка без дополнительной подпапки
-        audio_dir = os.path.join(base_dir, dictation_id, lang)
+        if user_id and dictation_id.startswith('dict_temp_'):
+            # Новый диктант - используем путь temp/<user_id>/dict_temp_<timestamp>/
+            audio_dir = os.path.join(base_dir, str(user_id), dictation_id, lang)
+            logging.info(f"📁 Создаём папку для нового диктанта: {audio_dir} (user_id={user_id})")
+        else:
+            # Существующий диктант или user_id отсутствует - используем старый формат temp/dict_<id>/
+            audio_dir = os.path.join(base_dir, dictation_id, lang)
+            if dictation_id.startswith('dict_temp_') and not user_id:
+                logging.warning(f"⚠️ user_id отсутствует для временного диктанта, используем temp/{dictation_id}/")
         
         # Проверяем и создаем директории
         try:
@@ -98,10 +109,12 @@ def generate_audio():
             tts.save(filepath)
             logging.info(f"Аудиофайл успешно сохранен: {filepath}")
             
-            # Загружаем в B2, если включено
+            # Загружаем в B2, если включено (только для существующих диктантов)
+            # Для временных диктантов не загружаем в B2 до сохранения
             audio_url = None
-            if b2_storage.enabled:
-                remote_path = f"audio/{dictation_id}/{lang}/{filename_audio}"
+            if b2_storage.enabled and not dictation_id.startswith('dict_temp_'):
+                # Используем формат dictations/dict_<id>/<lang>/<filename>
+                remote_path = f"dictations/{dictation_id}/{lang}/{filename_audio}"
                 b2_url = b2_storage.upload_file(filepath, remote_path)
                 
                 if b2_url:
@@ -109,11 +122,17 @@ def generate_audio():
                     logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
                 else:
                     # Fallback на локальный путь
-                    audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
+                    if user_id and dictation_id.startswith('dict_temp_'):
+                        audio_url = f"/static/data/temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
+                    else:
+                        audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
                     logging.warning(f"Не удалось загрузить в B2, используется локальный путь")
             else:
-                # Локальный путь, если B2 не включен
-                audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
+                # Локальный путь
+                if user_id and dictation_id.startswith('dict_temp_'):
+                    audio_url = f"/static/data/temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
+                else:
+                    audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
 
             return jsonify({
                 "success": True,
@@ -134,11 +153,7 @@ def generate_audio():
         }), 500
 
 # ==============================================================
-# Генерирует ID в формате dicta_ + timestamp (как в старых диктантах)
-def generate_dictation_id():
-    # Генерирует ID в формате dicta_ + timestamp (как в старых диктантах)
-    timestamp = int(time.time() * 1000)
-    return f"dicta_{timestamp}"
+# Удалено: generate_dictation_id() - теперь ID создаётся в БД через API
 
 # ==============================================================
 # Форма загрузки диктантов
@@ -151,36 +166,77 @@ def generate_dictation_id():
 def dictation_editor(dictation_id, language_original, language_translation):
     base_path = os.path.join('static', 'data', 'dictations', dictation_id)
 
-    # Загружаем info.json
-    info_path = os.path.join(base_path, 'info.json')
+    # Загружаем данные ТОЛЬКО из БД (никаких JSON файлов!)
     info = {}
-    if os.path.exists(info_path):
-        with open(info_path, 'r', encoding='utf-8') as f:
-            info = json.load(f)
-
-    # Загружаем оригинальные предложения (новая структура)
-    path_sentences_orig = os.path.join(base_path, language_original, 'sentences.json')
-    if os.path.exists(path_sentences_orig):
-        with open(path_sentences_orig, 'r', encoding='utf-8') as f:
-            original_data = json.load(f)
-    else:
-        original_data = {
-            "language": language_original,
-            "title": "",
-            "sentences": []
-        }
-
-    # Загружаем переведённые предложения (новая структура)
-    path_sentences_tr = os.path.join(base_path, language_translation, 'sentences.json')
-    if os.path.exists(path_sentences_tr):
-        with open(path_sentences_tr, 'r', encoding='utf-8') as f:
-            translation_data = json.load(f)
-    else:
-        translation_data = {
-            "language": language_translation,
-            "title": "",
-            "sentences": []
-        }
+    original_data = {"language": language_original, "title": "", "sentences": []}
+    translation_data = {"language": language_translation, "title": "", "sentences": []}
+    
+    if dictation_id.startswith('dict_') and not dictation_id.startswith('dict_temp_'):
+        try:
+            # Извлекаем ID из формата dict_<id>
+            db_id = int(dictation_id.replace('dict_', ''))
+            dictation = get_dictation_by_id(db_id)
+            if dictation:
+                # Получаем переводы заголовка из БД
+                title_translations = dictation.get('title_translations', {})
+                
+                info = {
+                    "title": dictation.get('title', ''),
+                    "level": dictation.get('level', 'A1'),
+                    "is_dialog": False,  # Пока не храним в БД
+                    "speakers": dictation.get('speakers', {}),
+                    "title_translations": title_translations,
+                    "author_materials_url": dictation.get('author_materials_url')
+                }
+                logger.info(f"✅ Загружен диктант из БД: id={db_id}, title={info.get('title')}, title_translations={title_translations}")
+                
+                # Загружаем предложения из БД
+                from helpers.db_dictations import get_dictation_sentences
+                all_sentences = get_dictation_sentences(db_id)
+                
+                # Группируем предложения по языкам
+                sentences_by_lang = {}
+                for sentence in all_sentences:
+                    lang = sentence['language_code']
+                    if lang not in sentences_by_lang:
+                        sentences_by_lang[lang] = []
+                    sentences_by_lang[lang].append({
+                        "key": sentence['sentence_key'],
+                        "text": sentence['text'],
+                        "explanation": sentence.get('explanation'),
+                        "speaker": sentence.get('speaker'),
+                        "audio": sentence.get('audio'),
+                        "audio_avto": sentence.get('audio_avto'),
+                        "audio_mic": sentence.get('audio_mic'),
+                        "audio_user": sentence.get('audio_user'),
+                        "start": sentence.get('start'),
+                        "end": sentence.get('end'),
+                        "chain": sentence.get('chain', False),
+                        "checked": sentence.get('checked', False)
+                    })
+                
+                # Формируем original_data и translation_data
+                if language_original in sentences_by_lang:
+                    original_data = {
+                        "language": language_original,
+                        "title": info.get("title", ""),  # Используем title из БД (оригинальный заголовок)
+                        "sentences": sentences_by_lang[language_original]
+                    }
+                
+                if language_translation in sentences_by_lang:
+                    # Используем перевод заголовка из title_translations для языка перевода
+                    translation_title = title_translations.get(language_translation, "")
+                    translation_data = {
+                        "language": language_translation,
+                        "title": translation_title,  # Перевод названия из БД
+                        "sentences": sentences_by_lang[language_translation]
+                    }
+            else:
+                logger.warning(f"⚠️ Диктант с id={db_id} не найден в БД")
+        except (ValueError, Exception) as e:
+            logger.error(f"❌ Ошибка загрузки диктанта из БД: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     # Загружаем распознанные слова из audio_words.json (если есть)
     audio_words_path = os.path.join(base_path, 'audio_words.json')
@@ -212,6 +268,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
         original_language=language_original,
         translation_language=language_translation,
         title=info.get("title", ""),
+        title_translations=info.get("title_translations", {}),
         level=info.get("level", "A1"),
         is_dialog=info.get("is_dialog", False),
         speakers=info.get("speakers", {}),
@@ -281,6 +338,57 @@ def dictation_editor_new():
     except Exception as e:
         logger.error(f"Ошибка при открытии страницы создания диктанта: {e}")
         return f"Ошибка: {e}", 500
+
+
+@editor_bp.route('/api/dictation/create', methods=['POST'])
+@jwt_required()
+def api_create_dictation():
+    """Создаёт новый диктант в БД"""
+    try:
+        data = request.get_json()
+        current_email = get_jwt_identity()
+        
+        # Получаем пользователя для owner_id
+        user_db = get_user_by_email(current_email)
+        if not user_db:
+            return jsonify({'error': 'User not found'}), 404
+        
+        owner_id = user_db['id']
+        
+        # Параметры диктанта
+        title = data.get('title', 'Untitled')
+        language_code = data.get('language_code', 'en')
+        level = data.get('level', 'A1')
+        is_public = data.get('is_public', True)
+        speakers = data.get('speakers', {})
+        
+        # Создаём диктант в БД
+        dictation = create_dictation(
+            title=title,
+            language_code=language_code,
+            level=level,
+            owner_id=owner_id,
+            is_public=is_public,
+            speakers=speakers if speakers else None
+        )
+        
+        # Возвращаем данные диктанта с ID из БД
+        return jsonify({
+            'success': True,
+            'dictation': {
+                'id': dictation['id'],
+                'db_id': dictation['id'],  # ID из БД
+                'title': dictation['title'],
+                'language_code': dictation['language_code'],
+                'level': dictation['level'],
+                'owner_id': dictation['owner_id'],
+                'is_public': dictation['is_public'],
+                'speakers': dictation['speakers'],
+            }
+        })
+    except Exception as e:
+        logger.error(f"Ошибка создания диктанта: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @editor_bp.route('/download/<path:filename>')
@@ -391,6 +499,8 @@ def api_upload_cover():
     try:
         # Получаем данные из формы
         dictation_id = request.form.get('dictation_id')
+        user_id = request.form.get('user_id')  # ID пользователя для пути temp/<user_id>/
+        
         if not dictation_id:
             return jsonify({'error': 'dictation_id is required'}), 400
         
@@ -413,8 +523,20 @@ def api_upload_cover():
         # Сбрасываем позицию файла
         cover_file.seek(0)
         
-        # Создаем папку диктанта если её нет (в temp папке)
-        dictation_path = os.path.join('static', 'data', 'temp', dictation_id)
+        # Определяем путь к временной папке (как в generate_audio и save_dictation_final)
+        # Для новых диктантов используем temp/<user_id>/dict_temp_<timestamp>/
+        # Для существующих - temp/dict_<id>/
+        base_dir = 'static/data/temp'
+        if user_id and dictation_id.startswith('dict_temp_'):
+            # Новый диктант - используем путь temp/<user_id>/dict_temp_<timestamp>/
+            dictation_path = os.path.join(base_dir, str(user_id), dictation_id)
+            logger.info(f"📁 Сохраняем ковер для нового диктанта: {dictation_path} (user_id={user_id})")
+        else:
+            # Существующий диктант или user_id отсутствует - используем старый формат temp/dict_<id>/
+            dictation_path = os.path.join(base_dir, dictation_id)
+            if dictation_id.startswith('dict_temp_') and not user_id:
+                logger.warning(f"⚠️ user_id отсутствует для временного диктанта, используем temp/{dictation_id}/")
+        
         os.makedirs(dictation_path, exist_ok=True)
         
         # Сохраняем cover
@@ -429,10 +551,17 @@ def api_upload_cover():
         # Сохраняем в формате WEBP
         image.save(cover_path, 'WEBP', quality=85)
         
+        # Формируем URL для возврата (с учетом user_id)
+        if user_id and dictation_id.startswith('dict_temp_'):
+            cover_url = f'/static/data/temp/{user_id}/{dictation_id}/cover.webp'
+        else:
+            cover_url = f'/static/data/temp/{dictation_id}/cover.webp'
+        
+        logger.info(f"✅ Ковер сохранен: {cover_path}")
         
         return jsonify({
             'success': True,
-            'cover_url': f'/static/data/temp/{dictation_id}/cover.webp'
+            'cover_url': cover_url
         })
         
     except Exception as e:
@@ -572,14 +701,7 @@ def copy_dictation_to_temp():
         # Создаем temp папку
         os.makedirs(temp_dictation_path, exist_ok=True)
         
-        # Копируем info.json
-        source_info_path = os.path.join(source_dictation_path, 'info.json')
-        temp_info_path = os.path.join(temp_dictation_path, 'info.json')
-        
-        if os.path.exists(source_info_path):
-            shutil.copy2(source_info_path, temp_info_path)
-        else:
-            logger.warning(f"⚠️ Файл {source_info_path} не найден")
+        # НЕ копируем info.json - все данные только в БД!
         
         # Копируем cover.webp
         source_cover_path = os.path.join(source_dictation_path, 'cover.webp')
@@ -644,69 +766,274 @@ def copy_audio_files_from_temp(dictation_id, language):
 
 
 @editor_bp.route('/save_dictation_final', methods=['POST'])
+@jwt_required()
 def save_dictation_final():
-    """Сохраняет диктант сразу в финальную папку и добавляет в категорию"""
+    """Сохраняет диктант в БД и файлы, добавляет в категорию"""
+    from helpers.db_dictations import create_dictation, update_dictation, add_sentence, get_dictation_sentences, delete_sentence
+    # Для привязки диктанта к книге/разделу в приватной библиотеке
+    from helpers.db_books import add_dictation_to_book
+    from helpers.db_users import get_user_by_email
+    from flask_jwt_extended import get_jwt_identity
+    
     try:
         data = request.get_json()
-        dictation_id = data.get('id')
+        
+        # Логируем полученные данные для отладки
+        logger.info(f"📥 Получены данные для сохранения диктанта: id={data.get('id')}, temp_id={data.get('temp_id')}, db_id={data.get('db_id')}, category_key={data.get('category_key')}, user_id={data.get('user_id')}")
+        
+        temp_id = data.get('temp_id')  # dict_temp_<timestamp> для новых диктантов
+        dictation_id = data.get('id')  # dict_<id> или dict_temp_<timestamp>
+        db_id = data.get('db_id')  # ID из БД (может быть None для новых)
         category_key = data.get('category_key')
+        user_id = data.get('user_id')  # ID пользователя для пути temp/<user_id>/
+        # Целевая книга/раздел из приватной библиотеки (может быть None)
+        target_book_id = data.get('book_id')
+        
+        # Если db_id не передан, но dictation_id имеет формат dict_<id>, извлекаем db_id из него
+        if not db_id and dictation_id and dictation_id.startswith('dict_') and not dictation_id.startswith('dict_temp_'):
+            try:
+                # Извлекаем ID из формата dict_<id>
+                db_id_str = dictation_id.replace('dict_', '')
+                db_id = int(db_id_str)
+                logger.info(f"✅ Извлечен db_id из dictation_id: {db_id}")
+            except (ValueError, AttributeError):
+                logger.warning(f"⚠️ Не удалось извлечь db_id из dictation_id: {dictation_id}")
+        
+        # Если user_id не передан, получаем его из БД по email из токена
+        if not user_id:
+            try:
+                current_email = get_jwt_identity()
+                user_db = get_user_by_email(current_email)
+                if user_db and user_db.get('id'):
+                    user_id = user_db['id']
+                    logger.info(f"✅ user_id получен из БД по токену: {user_id}")
+                else:
+                    logger.warning(f"⚠️ Пользователь не найден в БД для email: {current_email}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось получить user_id из токена: {e}")
         
         if not dictation_id:
+            logger.error("❌ Отсутствует dictation_id")
             return jsonify({"success": False, "error": "Missing dictation_id"}), 400
         
-        if not category_key:
-            return jsonify({"success": False, "error": "Missing category_key"}), 400
+        # category_key может быть пустым если диктант создается из приватной библиотеки (привязан к книге/разделу)
+        # Используем дефолтное значение только если нет target_book_id
+        if not category_key and not target_book_id:
+            logger.warning("⚠️ category_key пустой и нет book_id, используем дефолтное значение")
+            # Пытаемся определить категорию по языку
+            language_code = data.get("language_original", "en")
+            # Для английского языка используем категорию "english"
+            if language_code == "en":
+                category_key = "english"
+            else:
+                category_key = "other"  # Дефолтная категория
+            logger.info(f"📁 Используем category_key: {category_key}")
         
-        # Создаем финальную папку
+        # Если это новый диктант (temp_id начинается с dict_temp_) - создаём в БД
+        is_new_dictation = dictation_id.startswith('dict_temp_') or (temp_id and temp_id.startswith('dict_temp_'))
+        
+        if is_new_dictation and not db_id:
+            # Создаём диктант в БД
+            try:
+                current_email = get_jwt_identity()
+                logger.info(f"📧 Email пользователя: {current_email}")
+                
+                user_db = get_user_by_email(current_email)
+                if not user_db:
+                    logger.error(f"❌ Пользователь не найден: {current_email}")
+                    return jsonify({"success": False, "error": "User not found", "msg": "User not found"}), 404
+                
+                owner_id = user_db['id'] if user_db else None
+                logger.info(f"👤 Owner ID: {owner_id}")
+                
+                # create_dictation возвращает словарь, а не просто ID
+                dictation = create_dictation(
+                    title=data.get("title", "Новый диктант"),
+                    language_code=data.get("language_original", "en"),
+                    level=data.get("level", "A1"),
+                    owner_id=owner_id,
+                    is_public=True,
+                    speakers=data.get("speakers", {}),  # Передаём словарь, не JSON строку
+                    title_translations=data.get("title_translations", {}),  # Переводы заголовка
+                    author_materials_url=data.get("author_materials_url")  # Ссылка на материалы автора
+                )
+                
+                if not dictation or 'id' not in dictation:
+                    logger.error(f"❌ Не удалось создать диктант в БД: {dictation}")
+                    return jsonify({"success": False, "error": "Failed to create dictation in DB", "msg": "Failed to create dictation in DB"}), 500
+            except Exception as e:
+                import traceback
+                error_trace = traceback.format_exc()
+                logger.error(f"❌ Ошибка при создании диктанта в БД: {e}\n{error_trace}")
+                return jsonify({"success": False, "error": str(e), "msg": str(e)}), 500
+            
+            db_id = dictation['id']
+            
+            # Обновляем dictation_id на реальный
+            dictation_id = f"dict_{db_id}"
+            logger.info(f"✅ Создан новый диктант в БД: dict_{db_id}")
+            
+            # Обновляем диктант с полными данными (title, level, speakers, title_translations, author_materials_url)
+            update_dictation(
+                dictation_id=db_id,
+                title=data.get("title", "Новый диктант"),
+                level=data.get("level", "A1"),
+                speakers=data.get("speakers", {}),
+                title_translations=data.get("title_translations", {}),
+                author_materials_url=data.get("author_materials_url")
+            )
+        elif db_id:
+            # Обновляем существующий диктант в БД
+            update_dictation(
+                dictation_id=db_id,
+                title=data.get("title"),
+                level=data.get("level"),
+                speakers=data.get("speakers", {}),
+                title_translations=data.get("title_translations", {}),
+                author_materials_url=data.get("author_materials_url")
+            )
+        else:
+            return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
+        
+        # Умное сохранение предложений: обновляем только изменённые, добавляем новые, удаляем только отсутствующие
+        from helpers.db_dictations import get_sentence_by_key, update_sentence
+        
+        sentences_data = data.get('sentences', {})
+        logger.info(f"📝 Сохранение предложений для диктанта {dictation_id} (db_id={db_id}), языков: {list(sentences_data.keys())}")
+        
+        # Собираем все ключи предложений из новых данных
+        new_sentence_keys = set()
+        for lang, lang_data in sentences_data.items():
+            if not lang_data or 'sentences' not in lang_data:
+                logger.warning(f"⚠️ Пустые данные для языка {lang}")
+                continue
+            sentences_count = len(lang_data.get('sentences', []))
+            logger.info(f"  Язык {lang}: {sentences_count} предложений")
+            for sentence in lang_data.get('sentences', []):
+                sentence_key = sentence.get('key', '')
+                if sentence_key:
+                    new_sentence_keys.add((lang, sentence_key))
+        
+        # Получаем все существующие предложения
+        old_sentences = get_dictation_sentences(db_id)
+        old_sentences_map = {}
+        for old_sentence in old_sentences:
+            key = (old_sentence['language_code'], old_sentence['sentence_key'])
+            old_sentences_map[key] = old_sentence
+        
+        # Обрабатываем каждое предложение из новых данных
+        for lang, lang_data in sentences_data.items():
+            if not lang_data or 'sentences' not in lang_data:
+                continue
+            
+            for sentence in lang_data.get('sentences', []):
+                sentence_key = sentence.get('key', '')
+                if not sentence_key:
+                    continue
+                
+                key = (lang, sentence_key)
+                old_sentence = old_sentences_map.get(key)
+                
+                if old_sentence:
+                    # Предложение существует - проверяем изменилось ли что-то
+                    # Сравниваем числа с небольшой погрешностью (для float)
+                    def float_eq(a, b):
+                        if a is None and b is None:
+                            return True
+                        if a is None or b is None:
+                            return False
+                        return abs(float(a) - float(b)) < 0.01
+                    
+                    has_changes = (
+                        old_sentence['text'] != sentence.get('text', '') or
+                        old_sentence['explanation'] != sentence.get('explanation') or
+                        old_sentence['speaker'] != sentence.get('speaker') or
+                        old_sentence['audio'] != sentence.get('audio') or
+                        old_sentence['audio_avto'] != sentence.get('audio_avto') or
+                        old_sentence['audio_mic'] != sentence.get('audio_mic') or
+                        old_sentence['audio_user'] != sentence.get('audio_user') or
+                        not float_eq(old_sentence['start'], sentence.get('start')) or
+                        not float_eq(old_sentence['end'], sentence.get('end')) or
+                        old_sentence['chain'] != sentence.get('chain', False) or
+                        old_sentence['checked'] != sentence.get('checked', False)
+                    )
+                    
+                    if has_changes:
+                        # Обновляем только изменённые поля
+                        update_sentence(
+                            sentence_id=old_sentence['id'],
+                            text=sentence.get('text', ''),
+                            explanation=sentence.get('explanation'),
+                            speaker=sentence.get('speaker'),
+                            audio=sentence.get('audio'),
+                            audio_avto=sentence.get('audio_avto'),
+                            audio_mic=sentence.get('audio_mic'),
+                            audio_user=sentence.get('audio_user'),
+                            start=sentence.get('start'),
+                            end=sentence.get('end'),
+                            chain=sentence.get('chain', False),
+                            checked=sentence.get('checked', False)
+                        )
+                else:
+                    # Новое предложение - добавляем
+                    add_sentence(
+                        dictation_id=db_id,
+                        language_code=lang,
+                        sentence_key=sentence_key,
+                        text=sentence.get('text', ''),
+                        explanation=sentence.get('explanation'),
+                        speaker=sentence.get('speaker'),
+                        audio=sentence.get('audio'),
+                        audio_avto=sentence.get('audio_avto'),
+                        audio_mic=sentence.get('audio_mic'),
+                        audio_user=sentence.get('audio_user'),
+                        start=sentence.get('start'),
+                        end=sentence.get('end'),
+                        chain=sentence.get('chain', False),
+                        checked=sentence.get('checked', False)
+                    )
+        
+        # Удаляем только те предложения, которых нет в новых данных
+        for old_sentence in old_sentences:
+            key = (old_sentence['language_code'], old_sentence['sentence_key'])
+            if key not in new_sentence_keys:
+                delete_sentence(old_sentence['id'])
+        
+        # Создаем финальную папку ТОЛЬКО для аудиофайлов и обложки (никаких JSON!)
         final_path = os.path.join('static', 'data', 'dictations', dictation_id)
         os.makedirs(final_path, exist_ok=True)
-
-        # Создаем sentences.json для каждого языка и подсчитываем количество предложений
-        sentences_data = data.get('sentences', {})
-        sentences_count = 0
         
-        # Подсчитываем количество предложений из языка оригинала
-        language_original = data.get("language_original")
-        if language_original and language_original in sentences_data:
-            lang_sentences = sentences_data[language_original].get("sentences", [])
-            sentences_count = len(lang_sentences) if isinstance(lang_sentences, list) else 0
+        # НЕ сохраняем sentences.json - все данные только в БД!
 
-        # Создаем info.json
-        info = {
-            "id": dictation_id,
-            "language_original": language_original,
-            "title": data.get("title"),
-            "level": data.get("level"),
-            "is_dialog": data.get("is_dialog", False),
-            "speakers": data.get("speakers", {}),
-            "sentences_count": sentences_count
-        }
-        info_path = os.path.join(final_path, 'info.json')
-        with open(info_path, 'w', encoding='utf-8') as f:
-            json.dump(info, f, ensure_ascii=False, indent=2)
+        # Копируем аудиофайлы из temp в финальную папку
+        # Для новых диктантов используем путь temp/<user_id>/dict_temp_<timestamp>/
+        # Для существующих - temp/dict_<id>/
+        temp_dictation_id = data.get('temp_id') or dictation_id
         
-        for lang, lang_data in sentences_data.items():
-            if not lang_data:
-                continue
-
-            lang_dir = os.path.join(final_path, lang)
-            os.makedirs(lang_dir, exist_ok=True)
-
-            sentences_json = {
-                "language": lang,
-                "title": lang_data.get("title", ""),  # Берем название из данных языка
-                "sentences": lang_data.get("sentences", []),
-                "audio_user_shared": lang_data.get("audio_user_shared", ""),
-                "audio_user_shared_start": lang_data.get("audio_user_shared_start", 0),
-                "audio_user_shared_end": lang_data.get("audio_user_shared_end", 0)
-            }
-
-            with open(os.path.join(lang_dir, "sentences.json"), 'w', encoding='utf-8') as f:
-                json.dump(sentences_json, f, ensure_ascii=False, indent=2)
-
-        # Копируем аудиофайлы и аватар из temp в финальную папку
-        temp_path = os.path.join('static', 'data', 'temp', dictation_id)
-        if os.path.exists(temp_path):
+        # Определяем путь к временной папке
+        # Пробуем сначала temp/<user_id>/dict_temp_<timestamp>/, потом temp/dict_temp_<timestamp>/
+        temp_path = None
+        if user_id and temp_dictation_id.startswith('dict_temp_'):
+            # Новый диктант - путь temp/<user_id>/dict_temp_<timestamp>/
+            temp_path = os.path.join('static', 'data', 'temp', str(user_id), temp_dictation_id)
+            logger.info(f"📁 Ищем временные файлы в: {temp_path}")
+            if not os.path.exists(temp_path):
+                # Fallback: если папка не найдена, пробуем без user_id
+                temp_path_fallback = os.path.join('static', 'data', 'temp', temp_dictation_id)
+                if os.path.exists(temp_path_fallback):
+                    logger.warning(f"⚠️ Папка {temp_path} не найдена, используем fallback: {temp_path_fallback}")
+                    temp_path = temp_path_fallback
+        else:
+            # Существующий диктант - старый формат temp/dict_<id>/
+            temp_path = os.path.join('static', 'data', 'temp', temp_dictation_id)
+            if temp_dictation_id.startswith('dict_temp_') and not user_id:
+                logger.warning(f"⚠️ user_id отсутствует, ищем в temp/{temp_dictation_id}/")
+        
+        if not temp_path:
+            logger.warning(f"⚠️ temp_path не определен для dictation_id={dictation_id}, temp_id={temp_dictation_id}, user_id={user_id}")
+        
+        if temp_path and os.path.exists(temp_path):
+            logger.info(f"📁 Копируем файлы из temp папки: {temp_path}")
             # Копируем все аудиофайлы из temp
             for root, dirs, files in os.walk(temp_path):
                 for file in files:
@@ -724,9 +1051,8 @@ def save_dictation_final():
                         shutil.copy2(src_file, dst_file)
                         logger.info(f"Скопирован аудиофайл: {rel_path}")
                         
-                        # Загружаем в B2, если включено
+                        # Загружаем в B2, если включено (используем правильный формат dict_<id>)
                         if b2_storage.enabled:
-                            # Формируем путь в B2: dictations/{dictation_id}/{rel_path}
                             remote_path = f"dictations/{dictation_id}/{rel_path.replace(os.sep, '/')}"
                             b2_url = b2_storage.upload_file(dst_file, remote_path)
                             if b2_url:
@@ -734,27 +1060,78 @@ def save_dictation_final():
                             else:
                                 logger.warning(f"Не удалось загрузить в B2: {remote_path}")
             
-            # Копируем аватар если есть
-            avatar_src = os.path.join(temp_path, 'cover.webp')
-            if os.path.exists(avatar_src):
-                avatar_dst = os.path.join(final_path, 'cover.webp')
-                shutil.copy2(avatar_src, avatar_dst)
+            # Копируем обложку если есть
+            cover_src = os.path.join(temp_path, 'cover.webp')
+            if not os.path.exists(cover_src) and temp_dictation_id.startswith('dict_temp_'):
+                # Fallback: пробуем найти ковер в альтернативных местах
+                fallback_paths = [
+                    os.path.join('static', 'data', 'temp', temp_dictation_id, 'cover.webp'),  # temp/dict_temp_<timestamp>/cover.webp
+                ]
+                if user_id:
+                    fallback_paths.insert(0, os.path.join('static', 'data', 'temp', str(user_id), temp_dictation_id, 'cover.webp'))  # temp/<user_id>/dict_temp_<timestamp>/cover.webp
+                
+                for fallback_path in fallback_paths:
+                    if os.path.exists(fallback_path):
+                        logger.info(f"📁 Ковер найден в fallback: {fallback_path}")
+                        cover_src = fallback_path
+                        break
             
-            # Не удаляем temp папку при обычном сохранении — пользователь может продолжать редактирование
-            logger.info(f"Пропускаем очистку temp папки при сохранении: {temp_path}")
+            if os.path.exists(cover_src):
+                cover_dst = os.path.join(final_path, 'cover.webp')
+                shutil.copy2(cover_src, cover_dst)
+                logger.info(f"✅ Ковер скопирован: {cover_src} -> {cover_dst}")
+                
+                # Загружаем обложку в B2
+                if b2_storage.enabled:
+                    remote_path = f"dictations/{dictation_id}/cover.webp"
+                    b2_storage.upload_file(cover_dst, remote_path)
+                    logger.info(f"✅ Ковер загружен в B2: {remote_path}")
+            else:
+                logger.warning(f"⚠️ Ковер не найден в temp папке: {temp_path}/cover.webp")
 
-        # Добавляем диктант в категорию
-        result = add_dictation_to_categories(dictation_id, info, category_key)
+        # Очищаем временную папку после копирования
+        if os.path.exists(temp_path):
+            try:
+                shutil.rmtree(temp_path)
+                logger.info(f"✅ Очищена временная папка: {temp_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось удалить временную папку {temp_path}: {e}")
+        
+        # Если диктант был создан из приватной библиотеки и передан book_id,
+        # привязываем его к книге/разделу через таблицу book_dictations
+        if target_book_id and db_id:
+            try:
+                add_dictation_to_book(dictation_id=db_id, book_id=int(target_book_id))
+                logger.info(f"✅ Диктант {db_id} привязан к книге/разделу {target_book_id}")
+            except Exception as e:
+                logger.error(f"❌ Не удалось привязать диктант {db_id} к книге {target_book_id}: {e}")
+        
+        # Добавляем диктант в категорию только если нет book_id (новая идеология: диктант принадлежит книге, а не категории)
+        result = False
+        if category_key and not target_book_id:
+            info = {
+                "id": dictation_id,
+                "language_original": data.get("language_original"),
+                "title": data.get("title"),
+                "level": data.get("level"),
+                "is_dialog": data.get("is_dialog", False),
+                "speakers": data.get("speakers", {}),
+            }
+            result = add_dictation_to_categories(dictation_id, info, category_key, db_id=db_id)
         
         if result:
-            return jsonify({"success": True, "message": "Dictation saved to final location and added to category"})
+            return jsonify({"success": True, "message": "Dictation saved to DB and added to category", "dictation_id": dictation_id, "db_id": db_id})
+        elif target_book_id:
+            return jsonify({"success": True, "message": "Dictation saved to DB and added to book", "dictation_id": dictation_id, "db_id": db_id})
         else:
-            logger.warning("⚠️ Диктант сохранен, но не добавлен в категорию")
-            return jsonify({"success": True, "message": "Dictation saved to final location (category addition failed)"})
+            logger.warning("⚠️ Диктант сохранен в БД, но не добавлен ни в категорию, ни в книгу")
+            return jsonify({"success": True, "message": "Dictation saved to DB", "dictation_id": dictation_id, "db_id": db_id})
         
     except Exception as e:
-        logger.error(f"Ошибка в save_dictation_final: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"❌ Ошибка в save_dictation_final: {e}\n{error_trace}")
+        return jsonify({"success": False, "error": str(e), "msg": str(e)}), 500
 
 @editor_bp.route('/copy_dictation_to_final', methods=['POST'])
 def copy_dictation_to_final():
@@ -808,28 +1185,42 @@ def cleanup_temp_dictation():
     try:
         data = request.get_json()
         dictation_id = data.get('dictation_id')
+        user_id = data.get('user_id')  # ID пользователя для пути temp/<user_id>/
         safe_email = data.get('safe_email')
         
-        if not dictation_id or not safe_email:
-            return jsonify({'error': 'Missing required parameters'}), 400
+        if not dictation_id:
+            return jsonify({'error': 'Missing dictation_id'}), 400
         
-        # Путь к temp папке
-        temp_path = os.path.join('static/data/temp', dictation_id)
+        # Для новых диктантов используем путь temp/<user_id>/dict_temp_<timestamp>/
+        # Для существующих - temp/dict_<id>/
+        if user_id and dictation_id.startswith('dict_temp_'):
+            temp_path = os.path.join('static/data/temp', str(user_id), dictation_id)
+        else:
+            temp_path = os.path.join('static/data/temp', dictation_id)
         
         # Удаляем temp папку если она существует
         if os.path.exists(temp_path):
             shutil.rmtree(temp_path)
-            logger.info(f"Cleaned up temp dictation: {dictation_id}")
+            logger.info(f"✅ Очищена временная папка: {temp_path}")
             return jsonify({'success': True, 'message': 'Temp dictation cleaned up'})
         else:
+            logger.info(f"ℹ️ Временная папка не найдена: {temp_path}")
             return jsonify({'success': True, 'message': 'No temp dictation to clean up'})
         
     except Exception as e:
-        logger.error(f"Error cleaning up temp dictation: {str(e)}")
+        logger.error(f"❌ Ошибка очистки временной папки: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-def add_dictation_to_categories(dictation_id, info_data, category_key=None):
-    """Добавляет диктант в categories.json"""
+def add_dictation_to_categories(dictation_id, info_data=None, category_key=None, db_id=None):
+    """
+    Добавляет диктант в categories.json
+    
+    Args:
+        dictation_id: ID диктанта (может быть старый формат dicta_XXX или новый dict_<id>)
+        info_data: Данные диктанта из info.json (для обратной совместимости)
+        category_key: Ключ категории
+        db_id: ID из БД (если указан, используется формат dict_<id>)
+    """
     try:
         categories_path = 'static/data/categories.json'
         
@@ -837,7 +1228,13 @@ def add_dictation_to_categories(dictation_id, info_data, category_key=None):
         with open(categories_path, 'r', encoding='utf-8') as f:
             categories = json.load(f)
         
-        # Просто добавляем ID диктанта
+        # Формируем ID для categories.json
+        # Если передан db_id, используем формат dict_<id>
+        if db_id is not None:
+            dictation_id_for_category = f"dict_{db_id}"
+        else:
+            # Старый формат (dicta_XXX) для обратной совместимости
+            dictation_id_for_category = dictation_id
         
         target_category = None
         
@@ -858,7 +1255,7 @@ def add_dictation_to_categories(dictation_id, info_data, category_key=None):
         if category_key:
             find_category_by_key(categories, category_key)
         else:
-            logger.warning(f"category_key не передан для диктанта {dictation_id}")
+            logger.warning(f"category_key не передан для диктанта {dictation_id_for_category}")
             return False
         
         if target_category:
@@ -871,15 +1268,17 @@ def add_dictation_to_categories(dictation_id, info_data, category_key=None):
             # Проверяем, нет ли уже такого диктанта
             existing_ids = target_category['data']['dictations']
             
-            if dictation_id not in existing_ids:
-                target_category['data']['dictations'].append(dictation_id)
+            if dictation_id_for_category not in existing_ids:
+                target_category['data']['dictations'].append(dictation_id_for_category)
                 
                 # Сохраняем обновленный categories.json
                 with open(categories_path, 'w', encoding='utf-8') as f:
                     json.dump(categories, f, ensure_ascii=False, indent=2)
                 
+                logger.info(f"Диктант {dictation_id_for_category} добавлен в категорию {category_key}")
                 return True
             else:
+                logger.info(f"Диктант {dictation_id_for_category} уже есть в категории {category_key}")
                 return True
         else:
             logger.warning(f"Не найдена категория с ключом {category_key}")
@@ -931,9 +1330,9 @@ def upload_audio_file():
         # Загружаем в B2, если включено
         browser_path = None
         if b2_storage.enabled:
-            # Формируем путь в B2: audio/{dictation_id}/{language}/{filename}
+            # Формируем путь в B2: dictations/{dictation_id}/{language}/{filename}
             dictation_folder = os.path.basename(os.path.dirname(temp_path))
-            remote_path = f"audio/{dictation_folder}/{language}/{filename}"
+            remote_path = f"dictations/{dictation_folder}/{language}/{filename}"
             b2_url = b2_storage.upload_file(filepath, remote_path)
             
             if b2_url:
@@ -996,8 +1395,8 @@ def upload_mic_audio():
         # Загружаем в B2, если включено
         browser_path = None
         if b2_storage.enabled:
-            # Формируем путь в B2: audio/{dictation_id}/{language}/{filename}
-            remote_path = f"audio/{dictation_id}/{language}/{filename}"
+            # Формируем путь в B2: dictations/{dictation_id}/{language}/{filename}
+            remote_path = f"dictations/{dictation_id}/{language}/{filename}"
             b2_url = b2_storage.upload_file(filepath, remote_path)
             
             if b2_url:
@@ -1067,7 +1466,7 @@ def delete_audio_file():
                     if 'temp/' in physical_path:
                         parts = physical_path.split('temp/')[1].split('/')
                         if len(parts) >= 3:
-                            remote_path = f"audio/{'/'.join(parts)}"
+                            remote_path = f"dictations/{'/'.join(parts)}"
                             b2_storage.delete_file(remote_path)  # Пытаемся удалить, но не критично если не найдено
         
         if deleted:

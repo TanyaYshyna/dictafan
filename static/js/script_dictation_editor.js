@@ -36,6 +36,7 @@ let currentDictation = {
     tableFilled: false, // флаг заполнения таблицы
     is_dialog: false, // флаг диалога
     speakers: {}, // словарь спикеров {"1": "Таня", "2": "Ваня"}
+    title_translations: {}, // переводы заголовка {"en": "Title", "ru": "Заголовок"}
     current_edit_mode: null, // 'original' | 'translation' | null
     current_row_key: null, // текущая строка для настроек аудио
     isSaved: false // флаг - сохранен ли диктант
@@ -79,6 +80,10 @@ let levelSelectOutsideHandler = null;
 let currentTabName = 'general';
 let explanationVisible = false;
 
+// Глобальные переменные для обрезки изображений
+let cropper = null;
+let croppedImageBlob = null;
+
 
 
 
@@ -110,8 +115,8 @@ function setupCoverHandlers() {
             coverFile.click();
         });
 
-        // При выборе файла обрабатываем его
-        coverFile.addEventListener('change', async (event) => {
+        // При выборе файла открываем модальное окно обрезки
+        coverFile.addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
 
@@ -127,20 +132,132 @@ function setupCoverHandlers() {
                 return;
             }
 
-            try {
-                // Показываем превью загруженного изображения
+            // Открываем crop modal
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    if (coverImage) {
-                        coverImage.src = e.target.result;
-                    }
+                openCropModal(e.target.result);
                 };
                 reader.readAsDataURL(file);
+        });
+    }
 
-                // Отправляем файл на сервер
+    // Обработчики для модального окна обрезки
+    const cropClose = document.getElementById('crop-close');
+    const cropCancel = document.getElementById('crop-cancel');
+    const cropConfirm = document.getElementById('crop-confirm');
+
+    if (cropClose) {
+        cropClose.addEventListener('click', () => closeCropModal(true));
+    }
+    if (cropCancel) {
+        cropCancel.addEventListener('click', () => closeCropModal(true));
+    }
+    if (cropConfirm) {
+        cropConfirm.addEventListener('click', handleCropConfirm);
+    }
+}
+
+function openCropModal(imageSrc) {
+    const modal = document.getElementById("crop-modal");
+    const image = document.getElementById("crop-image");
+    
+    if (!modal || !image) return;
+    
+    // Устанавливаем изображение
+    image.src = imageSrc;
+    
+    // Показываем модальное окно
+    modal.style.display = "flex";
+    modal.classList.add("show");
+    
+    // Уничтожаем предыдущий cropper если есть
+    if (cropper) {
+        cropper.destroy();
+    }
+    
+    // Инициализируем cropper с прямоугольным crop box 200x120 (ШxВ)
+    cropper = new Cropper(image, {
+        aspectRatio: 200 / 120, // Прямоугольник 200x120
+        viewMode: 2,
+        dragMode: 'move',
+        autoCropArea: 1,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        minCropBoxWidth: 100,
+        minCropBoxHeight: 100,
+    });
+}
+
+function closeCropModal(clearBlob = true) {
+    const modal = document.getElementById("crop-modal");
+    if (modal) {
+        modal.style.display = "none";
+        modal.classList.remove("show");
+    }
+    
+    if (cropper) {
+        cropper.destroy();
+        cropper = null;
+    }
+    
+    // Очищаем blob только при отмене, НЕ при применении
+    if (clearBlob) {
+        croppedImageBlob = null;
+        
+        // Очищаем input только при отмене
+        const coverFile = document.getElementById("coverFile");
+        if (coverFile) {
+            coverFile.value = '';
+        }
+    }
+}
+
+async function handleCropConfirm() {
+    if (!cropper) return;
+    
+    // Получаем canvas с обрезанным изображением для ковера диктанта (200x120, ШxВ)
+    const canvas = cropper.getCroppedCanvas({
+        width: 200,
+        height: 120,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: 'high',
+    });
+    
+    if (!canvas) {
+        alert('Ошибка обрезки изображения');
+        return;
+    }
+    
+    // Конвертируем canvas в blob (webp)
+    canvas.toBlob(async (blob) => {
+        if (!blob) {
+            alert('Ошибка создания изображения');
+            return;
+        }
+        
+        croppedImageBlob = blob;
+        
+        // Показываем preview в элементе coverImage
+        const coverImage = document.getElementById("coverImage");
+        if (coverImage) {
+            const url = URL.createObjectURL(blob);
+            coverImage.src = url;
+        }
+        
+        // Отправляем обрезанное изображение на сервер
+        try {
                 const formData = new FormData();
-                formData.append('cover', file);
+            formData.append('cover', blob, 'cover.webp');
                 formData.append('dictation_id', currentDictation.id);
+                // Передаем user_id для правильного пути temp/<user_id>/dict_temp_<timestamp>/
+                if (currentDictation.user_id) {
+                    formData.append('user_id', currentDictation.user_id);
+                }
 
                 const response = await fetch('/api/cover', {
                     method: 'POST',
@@ -149,9 +266,10 @@ function setupCoverHandlers() {
 
                 if (response.ok) {
                     const result = await response.json();
-                    // console.log('Cover сохранен на сервере:', result.cover_url);
-                    // Сохраняем файл в памяти для последующего сохранения
-                    currentDictation.coverFile = file;
+                // Сохраняем blob в памяти для последующего сохранения
+                currentDictation.coverFile = blob;
+                // Закрываем crop modal БЕЗ очистки blob
+                closeCropModal(false);
                 } else {
                     const error = await response.json();
                     console.error('Ошибка сохранения cover:', error.error);
@@ -161,8 +279,7 @@ function setupCoverHandlers() {
                 console.error('Ошибка при загрузке cover:', error);
                 alert('Ошибка при загрузке изображения');
             }
-        });
-    }
+    }, 'image/webp', 0.9);
 }
 
 // Функция для загрузки cover существующего диктанта
@@ -234,10 +351,7 @@ function newSentances(key, text, key_audio, start = '', end = '') {
 
 // ============================================================
 // Инициализация нового диктанта
-function initNewDictation(safe_email, initData) {
-    const timestamp = Date.now();
-    const dictation_id = `dicta_${timestamp}`;
-
+async function initNewDictation(safe_email, initData) {
     // Получаем информацию о категории и языках из sessionStorage
     const categoryDataStr = sessionStorage.getItem('selectedCategoryForDictation');
     const categoryInfo = categoryDataStr ? JSON.parse(categoryDataStr) : {};
@@ -246,9 +360,73 @@ function initNewDictation(safe_email, initData) {
 
     const initialLevel = (initData && initData.level) ? initData.level : 'A1';
 
-    // Получаем safe_email из initData
+    // Создаём временный ID для работы (не создаём в БД до сохранения)
+    const timestamp = Date.now();
+    const temp_id = `dict_temp_${timestamp}`;
+
+    // Получаем user_id из UserManager (если доступен)
+    // Пробуем несколько раз, так как UserManager может еще не быть полностью инициализирован
+    let user_id = null;
+    if (window.UM && window.UM.getCurrentUser) {
+        const user = window.UM.getCurrentUser();
+        if (user && user.id) {
+            user_id = user.id;
+        } else {
+            // Пробуем еще раз через небольшую задержку
+            setTimeout(() => {
+                if (window.UM && window.UM.getCurrentUser) {
+                    const userRetry = window.UM.getCurrentUser();
+                    if (userRetry && userRetry.id) {
+                        currentDictation.user_id = userRetry.id;
+                        console.log('✅ user_id получен после повторной попытки:', userRetry.id);
+                    }
+                }
+            }, 500);
+            console.warn('⚠️ UserManager.getCurrentUser() не вернул user.id, попробуем позже');
+        }
+    } else {
+        // Пробуем еще раз через небольшую задержку
+        setTimeout(() => {
+            if (window.UM && window.UM.getCurrentUser) {
+                const userRetry = window.UM.getCurrentUser();
+                if (userRetry && userRetry.id) {
+                    currentDictation.user_id = userRetry.id;
+                    console.log('✅ user_id получен после повторной попытки:', userRetry.id);
+                }
+            }
+        }, 500);
+        console.warn('⚠️ UserManager не доступен при инициализации нового диктанта, попробуем позже');
+    }
+    
+    // Пытаемся получить целевую книгу/раздел для привязки диктанта (из приватной библиотеки)
+    let targetBookId = null;
+    try {
+        const targetRaw = sessionStorage.getItem('dictationTargetBook');
+        if (targetRaw) {
+            const target = JSON.parse(targetRaw);
+            if (target && target.book_id) {
+                targetBookId = Number(target.book_id) || null;
+            }
+        }
+    } catch (e) {
+        console.warn('⚠️ Не удалось прочитать dictationTargetBook из sessionStorage:', e);
+    }
+    
+    console.log('📝 Инициализация нового диктанта:', {
+        temp_id,
+        user_id,
+        safe_email,
+        language_original,
+        language_translation,
+        targetBookId
+    });
+
+    // Используем временный ID для работы
     currentDictation = {
-        id: dictation_id,
+        id: temp_id,  // Временный ID для работы с файлами
+        temp_id: temp_id,  // Сохраняем временный ID отдельно
+        db_id: null,  // Будет установлен при сохранении в БД
+        user_id: user_id,  // ID пользователя для пути temp/<user_id>/
         isNew: true,
         safe_email: safe_email,
         language_original: language_original,
@@ -260,17 +438,26 @@ function initNewDictation(safe_email, initData) {
         coverFile: null, // загруженный файл cover в памяти
         is_dialog: false,
         speakers: {},
+        // Целевая книга (книга или раздел из приватной библиотеки), может быть null
+        book_id: targetBookId,
         current_edit_mode: null, // 'original' | 'translation' | null - группа активных секций в таблице
         current_row_key: null, // текущая строка в таблице
         isSaved: false // новый диктант - не сохранен
     };
+
+    // ID не показываем пока не сохранён в БД
+    const dictationIdElement = document.getElementById('dictation-id');
+    if (dictationIdElement) {
+        dictationIdElement.style.display = 'none';
+        dictationIdElement.textContent = 'id: ';
+    }
 
     // Очищаем поля формы
     document.getElementById('title').value = '';
     document.getElementById('title_translation').value = '';
     // document.getElementById('text').value = ''; // TODO: Добавить элемент text в шаблон
     // document.querySelector('#sentences-table tbody').innerHTML = ''; // TODO: Добавить таблицу sentences в шаблон
-    document.getElementById('dictation-id').textContent = `id: ` +categoryInfo.title || '';
+    
     document.getElementById('dictation-name').textContent = ``;
     
     // ==================== Открываем стартовое модальное окно для нового диктанта ========================================
@@ -292,6 +479,11 @@ function initNewDictation(safe_email, initData) {
     
     // Обновляем отображение пути к диктанту
     updateDictationPathDisplay();
+    
+    // Загружаем обложку книги, если диктант принадлежит книге
+    if (currentDictation.book_id) {
+        await loadBookCoverForDictation(null, currentDictation.book_id);
+    }
 
     initLevelSelector(initialLevel);
 
@@ -384,6 +576,7 @@ async function loadExistingDictation(initData) {
         original_language,
         translation_language,
         title,
+        title_translations,
         level,
         original_data,
         translation_data,
@@ -392,7 +585,8 @@ async function loadExistingDictation(initData) {
         safe_email,
         is_dialog,
         speakers,
-        cover_url
+        cover_url,
+        author_materials_url
     } = initData;
 
     // Для редактирования диктанта категория берется из sessionStorage (текущее местоположение в дереве)
@@ -400,9 +594,19 @@ async function loadExistingDictation(initData) {
     const categoryInfo = categoryDataStr ? JSON.parse(categoryDataStr) : {};
 
     const resolvedLevel = level || 'A1';
+    
+    // Извлекаем db_id из dictation_id (формат dict_<id>)
+    let db_id = null;
+    if (dictation_id && dictation_id.startsWith('dict_')) {
+        const idMatch = dictation_id.match(/^dict_(\d+)$/);
+        if (idMatch) {
+            db_id = parseInt(idMatch[1], 10);
+        }
+    }
 
     currentDictation = {
         id: dictation_id,
+        db_id: db_id,  // ID из БД для существующих диктантов
         isNew: false,
         safe_email: safe_email,
         language_original: original_language,
@@ -415,14 +619,28 @@ async function loadExistingDictation(initData) {
         coverFile: null, // загруженный файл cover в памяти
         is_dialog: is_dialog || false,
         speakers: speakers || {}, // Спикеры теперь только в info.json
+        title_translations: title_translations || {}, // Переводы заголовка из БД
+        author_materials_url: author_materials_url || null, // Ссылка на материалы автора
         isSaved: true // существующий диктант - уже сохранен
     };
 
     // Обновляем заголовки
     document.getElementById('dictation-name').textContent = title;
-    document.getElementById('dictation-id').textContent = `id: ` + dictation_id;
+    // Показываем ID только если он есть
+    const dictationIdElement = document.getElementById('dictation-id');
+    if (dictationIdElement && dictation_id) {
+        dictationIdElement.textContent = `id: ${dictation_id}`;
+     } else if (dictationIdElement) {
+        dictationIdElement.textContent = '';
+    }
     document.getElementById('title').value = title;
     document.getElementById('title_translation').value = translation_data?.title || "";
+    
+    // Загружаем author_materials_url если есть
+    const authorMaterialsUrlInput = document.getElementById('dictation-author-materials-url-input');
+    if (authorMaterialsUrlInput && initData.author_materials_url) {
+        authorMaterialsUrlInput.value = initData.author_materials_url || "";
+    }
 
     // Синхронизируем с вкладками
     const tabTitle = document.getElementById('tabTitle');
@@ -438,8 +656,26 @@ async function loadExistingDictation(initData) {
         } else {
             await loadCoverForExistingDictation(dictation_id, original_language);
         }
+        
+        // Устанавливаем обработчик двойного щелчка для открытия ссылки на материалы автора
+        if (currentDictation?.author_materials_url) {
+            coverImage.addEventListener('dblclick', () => {
+                window.open(currentDictation.author_materials_url, '_blank');
+            });
+            coverImage.style.cursor = 'pointer';
+            coverImage.title = 'Двойной щелчок для открытия ссылки на материалы автора';
+        }
     } else {
         await loadCoverForExistingDictation(dictation_id, original_language);
+    }
+    
+    // Загружаем обложку книги, если диктант принадлежит книге
+    // И устанавливаем book_id в currentDictation для последующего сохранения
+    if (db_id) {
+        const bookInfo = await loadBookCoverForDictation(db_id);
+        if (bookInfo && bookInfo.book_id) {
+            currentDictation.book_id = bookInfo.book_id;
+        }
     }
 
     initLevelSelector(resolvedLevel);
@@ -505,7 +741,7 @@ async function loadExistingDictation(initData) {
 
 
 // Инициализация при загрузке страницы
-function initDictationGenerator() {
+async function initDictationGenerator() {
     // const path = window.location.pathname;
 
 
@@ -524,7 +760,7 @@ function initDictationGenerator() {
 
     // 4. Анализируем dictation_id для определения режима
     if (initData.dictation_id !== 'new') {
-        loadExistingDictation(initData);
+        await loadExistingDictation(initData);
     } else {
         initNewDictation(safe_email, initData);
     }
@@ -651,7 +887,7 @@ async function handleAudioPlayback(event) {
     // 1️⃣ Определяем URL    
     const state = button.dataset.state;
     const language = button.dataset.language; // 'en' или 'ru'
-    const languageUrl = `/static/data/temp/${currentDictation.id}/${language}`;
+    const languageUrl = getAudioPath(language);
     
     let fieldName = 'audio'; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
     let nameAudioFile = 'audio.mp3';
@@ -917,7 +1153,7 @@ async function handleEditAllCreating() {
     
     try {
         const language = currentDictation.language_original;
-        const languageUrl = `/static/data/temp/${currentDictation.id}/${language}`;
+        const languageUrl = getAudioPath(language);
         
         // Создаем аудио для каждой кнопки последовательно
         for (let i = 0; i < creatingButtons.length; i++) {
@@ -1025,7 +1261,7 @@ async function playAudioFile(nameAudioFile, language, updatePlayhead = false) {
         return;
     }
 
-    const audioUrl = `/static/data/temp/${currentDictation.id}/${language}/${nameAudioFile}`;
+    const audioUrl = `${getAudioPath(language)}/${nameAudioFile}`;
 
     // Если сейчас играет другая кнопка — остановим и восстановим её состояние
     if (currentPlayingButton && currentPlayingButton !== button) {
@@ -1263,7 +1499,8 @@ function setupTextareaHighlighting(editor) {
 
         const text = editor.innerText || editor.textContent;
         const lines = text.split('\n');
-        const delimiter = document.getElementById('translationDelimiter')?.value || '/*';
+        // Старое значение по умолчанию: '/*'
+        const delimiter = document.getElementById('translationDelimiter')?.value || '//';
 
         const highlightedText = lines.map(line => {
             if (line.trim().startsWith(delimiter)) {
@@ -2606,16 +2843,12 @@ function updateDialogTab() {
         if (tbody) {
             tbody.innerHTML = '';
             const speakerEntries = Object.entries(currentDictation.speakers);
-            
-            // Если нет спикеров, добавляем двух по умолчанию
-            if (speakerEntries.length === 0) {
-                speakerEntries.push(['1', 'Спикер 1'], ['2', 'Спикер 2']);
-            }
 
-            speakerEntries.forEach(([id, name], index) => {
+            // Больше НЕ добавляем дефолтные имена «Спикер 1/2» — пользователь сам вводит имена спикеров
+            speakerEntries.forEach(([id, name]) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${index + 1}:</td>
+                    <td>${id}:</td>
                     <td><input type="text" class="speaker-name" value="${name}" placeholder="Имя спикера"></td>
                     <td>
                         <button type="button" class="remove-speaker" title="Удалить спикера">
@@ -3192,7 +3425,7 @@ function updateWaveformVisibilityForMicMode() {
         }).catch(error => {
             console.warn('⚠️ Файл не найден в dictations, пробуем temp:', error);
             // Если не найден в dictations, пробуем temp
-            audioPath = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${sentence.audio_mic}`;
+            audioPath = `${getAudioPath(currentDictation.language_original)}/${sentence.audio_mic}`;
             return loadAudioIntoWaveform(audioPath);
         }).then(() => {
             if (window.waveformCanvas) {
@@ -4312,7 +4545,13 @@ function uploadAudioFile(file, audioMode) {
 
 function continueUpload(file, audioMode, durationFormatted, duration) {
     // Проверяем JWT токен
-    const token = localStorage.getItem('access_token');
+    // Используем jwt_token (как в user_manager.js) или токен из UserManager
+    let token = null;
+    if (window.UM && window.UM.token) {
+        token = window.UM.token;
+    } else {
+        token = localStorage.getItem('jwt_token');
+    }
     // console.log('🔑 JWT токен:', token ? 'есть' : 'отсутствует');
     if (token) {
         // Проверяем структуру JWT токена (должен содержать 3 части, разделенные точками)
@@ -5062,7 +5301,7 @@ function getCurrentAudioFileForScissors() {
 
 
     // Создаем правильный путь к файлу на сервере
-    const serverFilePath = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${filename}`;
+    const serverFilePath = `${getAudioPath(currentDictation.language_original)}/${filename}`;
     console.log('✂️✂️✂️✂️✂️ 2 ✂️ Путь к файлу на сервере:', serverFilePath);
 
     // Проверяем, есть ли файл в input элементе (для новых загрузок)
@@ -5092,7 +5331,7 @@ function getCurrentAudioFileForScissors() {
 async function splitAudioIntoSentences() {
     // Получаем текущий аудиофайл
     //const currentAudioFile = getCurrentAudioFileForScissors();
-    const filePath = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${currentAudioFileName}`;
+    const filePath = `${getAudioPath(currentDictation.language_original)}/${currentAudioFileName}`;
     console.log('✂️✂️✂️✂️✂️3✂️ Текущий аудиофайл:', currentAudioFileName);
 
     // Получаем все предложения
@@ -5322,7 +5561,7 @@ function updateTableWithNewAudio() {
 
         // Обновляем плеер для аудио
         const audioFileName = `${key}_${currentDictation.language_original}_user.mp3`;
-        const audioPath = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${audioFileName}`;
+        const audioPath = `${getAudioPath(currentDictation.language_original)}/${audioFileName}`;
 
         try {
             const audio = new Audio(audioPath);
@@ -5413,6 +5652,110 @@ function selectSentenceRow(row) {
 }
 
 /**
+ * Загрузить обложку книги для диктанта
+ */
+async function loadBookCoverForDictation(dictationDbId, bookId = null) {
+    try {
+        console.log('🔍 loadBookCoverForDictation вызвана:', { dictationDbId, bookId });
+        
+        // Если book_id не передан, пытаемся получить его из БД по dictation_id
+        if (!bookId && dictationDbId) {
+            const token = window.UM?.token || localStorage.getItem('jwt_token');
+            if (!token) {
+                console.warn('⚠️ Нет токена для загрузки обложки книги');
+                return { book_id: null };
+            }
+            
+            console.log('📡 Запрашиваю book_id для dictation_id:', dictationDbId);
+            // Получаем информацию о диктанте, включая book_id
+            const response = await fetch(`/library/api/dictation/${dictationDbId}/book`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('📦 Ответ API /dictation/book:', data);
+                if (data.success && data.book_id) {
+                    bookId = data.book_id;
+                    console.log('✅ Получен book_id:', bookId);
+                } else {
+                    console.log('ℹ️ Диктант не принадлежит книге');
+                    return { book_id: null }; // Диктант не принадлежит книге
+                }
+            } else {
+                const errorText = await response.text();
+                console.warn('⚠️ Ошибка при получении book_id:', response.status, errorText);
+                return { book_id: null }; // Ошибка или диктант не принадлежит книге
+            }
+        }
+        
+        if (!bookId) {
+            console.log('ℹ️ book_id не указан, пропускаем загрузку обложки');
+            return { book_id: null };
+        }
+        
+        // Загружаем информацию о книге
+        const token = window.UM?.token || localStorage.getItem('jwt_token');
+        if (!token) {
+            console.warn('⚠️ Нет токена для загрузки информации о книге');
+            return { book_id: bookId };
+        }
+        
+        console.log('📡 Запрашиваю информацию о книге:', bookId);
+        const bookResponse = await fetch(`/library/api/book/${bookId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (bookResponse.ok) {
+            const bookData = await bookResponse.json();
+            console.log('📦 Ответ API /book:', bookData);
+            if (bookData.success && bookData.book) {
+                const book = bookData.book;
+                const bookCoverWrapper = document.getElementById('bookCoverWrapper');
+                const bookCoverImage = document.getElementById('bookCoverImage');
+                
+                console.log('🖼️ Элементы обложки:', { bookCoverWrapper: !!bookCoverWrapper, bookCoverImage: !!bookCoverImage, cover_url: book.cover_url });
+                
+                if (bookCoverWrapper && bookCoverImage) {
+                    if (book.cover_url) {
+                        bookCoverImage.src = book.cover_url;
+                        bookCoverImage.alt = book.title || 'Обложка книги';
+                        bookCoverWrapper.style.display = 'flex';
+                        // Добавляем tooltip с названием книги
+                        bookCoverWrapper.title = book.title || '';
+                        console.log('✅ Обложка книги отображена:', book.title);
+                    } else {
+                        console.log('ℹ️ У книги нет обложки');
+                        bookCoverWrapper.style.display = 'none';
+                    }
+                } else {
+                    console.warn('⚠️ Элементы обложки не найдены в DOM');
+                }
+                // Возвращаем book_id для установки в currentDictation
+                return { book_id: bookId };
+            }
+        } else {
+            const errorText = await bookResponse.text();
+            console.warn('⚠️ Ошибка при получении информации о книге:', bookResponse.status, errorText);
+            return { book_id: bookId }; // Все равно возвращаем book_id, даже если не удалось загрузить обложку
+        }
+    } catch (error) {
+        console.error('❌ Ошибка при загрузке обложки книги:', error);
+        return { book_id: null };
+    }
+    
+    return { book_id: bookId };
+}
+
+/**
  * Обновить волну и поля для предложения (только в режиме sentence)
  */
 function updateWaveformForSentence(sentence) {
@@ -5472,7 +5815,7 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
     }
 
     try {
-        const filePath = `/static/data/temp/${currentDictation.id}/${language}/${sourceAudioFileName}`;
+        const filePath = `${getAudioPath(language)}/${sourceAudioFileName}`;
         const outputFileName = `${sentence.key}_${language}_user.mp3`;
         
         // Используем эндпоинт /split-audio с одним предложением для создания отдельного файла
@@ -5558,7 +5901,7 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
     try {
         // Используем правильный путь к файлу на сервере
         // console.log('📤 Обрезаем файл на сервере:', audioFile.filepath);
-        filePath = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${audioFileName}`;
+        filePath = `${getAudioPath(currentDictation.language_original)}/${audioFileName}`;
         // Обрезаем файл на сервере
         const response = await fetch('/cut-audio', {
             method: 'POST',
@@ -5901,7 +6244,7 @@ async function cancelDictationCreation() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    dictation_id: currentDictation.id,
+                    dictation_id: tempDictationId,
                     safe_email: currentDictation.safe_email
                 })
             });
@@ -5969,29 +6312,33 @@ function toggleExplanationColumn() {
 }
 
 function addSpeaker() {
-    const tbody_speakers = document.querySelector('#speakersTable tbody');
+    const tbody_speakers = document.querySelector('#speakersTableContent tbody');
     if (!tbody_speakers) return;
 
     const speakerCount = tbody_speakers.children.length + 1;
     const row = document.createElement('tr');
     row.innerHTML = `
         <td>${speakerCount}:</td>
-        <td><input type="text" value="Спикер ${speakerCount}" class="speaker-name-input"></td>
+        <td><input type="text" value="Спикер ${speakerCount}" class="speaker-name" placeholder="Имя спикера"></td>
         <td><button type="button" class="remove-speaker" title="Удалить спикера">
         <i data-lucide="trash-2"></i>
         </button></td>
     `;
     tbody_speakers.appendChild(row);
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
 }
 
 function removeSpeaker(button) {
     const row = button.closest('tr');
-    if (row && document.querySelector('#speakersTable tbody').children.length > 1) {
+    const tbody = document.querySelector('#speakersTableContent tbody');
+    if (row && tbody && tbody.children.length > 1) {
         row.remove();
         // Перенумеровать оставшихся спикеров
-        const rows = document.querySelectorAll('#speakersTable tbody tr');
+        const rows = tbody.querySelectorAll('tr');
         rows.forEach((row, index) => {
-            row.cells[0].textContent = index + 1;
+            row.cells[0].textContent = `${index + 1}:`;
         });
     }
 }
@@ -6043,6 +6390,9 @@ async function createDictationFromStart() {
 
         // Создать таблицу
         await createTable();
+        
+        // Обновить выпадающие списки спикеров после создания таблицы
+        refreshAllSpeakerSelectOptions();
 
         // Очистить поле ввода текста в модальном окне
         const startTextInput = document.getElementById('startTextInput');
@@ -6085,22 +6435,26 @@ function showExitModal() {
     const exitModal = document.getElementById('exitModal');
     if (!exitModal) return;
 
-    const hasUnsaved = hasUnsavedChanges();
+    // Проверяем: новый диктант и не создан в БД = нет сохранённых данных
+    const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
+    const hasUnsaved = isNewNotSaved || hasUnsavedChanges();
+    
+    // Если всё сохранено - просто выходим без вопросов
+    if (!hasUnsaved) {
+        cleanupTempAndExit();
+        return;
+    }
+    
+    // Если есть несохранённые изменения - показываем модальное окно
     const exitModalMessage = document.getElementById('exitModalMessage');
     const exitWithSavingBtn = document.getElementById('exitWithSavingBtn');
 
     if (exitModalMessage) {
-        exitModalMessage.textContent = hasUnsaved
-            ? 'Есть несохранённые изменения. Сохранить перед выходом?'
-            : 'Все изменения уже сохранены. Что сделать дальше?';
+        exitModalMessage.textContent = 'Сохранить изменения?';
     }
 
     if (exitWithSavingBtn) {
-        if (hasUnsaved) {
-            exitWithSavingBtn.style.display = '';
-        } else {
-            exitWithSavingBtn.style.display = 'none';
-        }
+        exitWithSavingBtn.style.display = '';
     }
 
     exitModal.style.display = 'flex';
@@ -6203,46 +6557,164 @@ async function saveDictationOnly() {
         currentDictation.is_dialog = tabIsDialogCheckbox.checked;
     }
     
+    // Если это НЕ диалог, очищаем всех спикеров перед сохранением,
+    // чтобы в БД не оставались старые «Спикер 1», «Спикер 2» и т.п.
+    if (!currentDictation.is_dialog) {
+        currentDictation.speakers = {};
+    }
+    
     try {
         // Показываем индикатор загрузки
         showLoadingIndicator('Сохранение диктанта...');
 
+        // Для новых диктантов создание в БД происходит в save_dictation_final()
+        // Здесь просто проверяем, что у нас есть временный ID
+        if (!currentDictation.id || currentDictation.id === 'new') {
+            throw new Error('Отсутствует ID диктанта');
+        }
+
+        // Получаем user_id из UserManager или из API
+        let user_id = currentDictation.user_id;
+        if (!user_id && window.UM && window.UM.getCurrentUser) {
+            const user = window.UM.getCurrentUser();
+            if (user && user.id) {
+                user_id = user.id;
+            }
+        }
+        
+        // Собираем переводы заголовка
+        const titleTranslationValue = document.getElementById('title_translation')?.value || '';
+        const titleTranslations = currentDictation.title_translations || {};
+        // Обновляем перевод для текущего языка перевода
+        if (titleTranslationValue) {
+            titleTranslations[currentDictation.language_translation] = titleTranslationValue;
+        }
+        
+        // Собираем author_materials_url
+        const authorMaterialsUrlInput = document.getElementById('dictation-author-materials-url-input');
+        const authorMaterialsUrl = authorMaterialsUrlInput ? authorMaterialsUrlInput.value.trim() || null : null;
+        
         // Подготавливаем данные для сохранения
         const saveData = {
-            id: currentDictation.id,
+            id: currentDictation.id,  // Может быть dict_temp_<timestamp> для новых
+            temp_id: currentDictation.temp_id || currentDictation.id,  // Временный ID для копирования файлов
+            db_id: currentDictation.db_id,  // Может быть null для новых диктантов
+            user_id: user_id,  // ID пользователя для пути temp/<user_id>/
             language_original: currentDictation.language_original,
             language_translation: currentDictation.language_translation,
             title: workingData.original.title || 'Без названия',
+            title_translations: titleTranslations,  // Переводы заголовка
             level: currentDictation.level || 'A1',
             is_dialog: currentDictation.is_dialog || false,
             speakers: currentDictation.speakers || {},
+            author_materials_url: authorMaterialsUrl,  // Ссылка на материалы автора
             sentences: {
                 [currentDictation.language_original]: workingData.original,
                 [currentDictation.language_translation]: workingData.translation
             },
-            category_key: currentDictation.category_key
+            category_key: currentDictation.category_key,
+            // Если диктант создан из приватной библиотеки, сюда попадёт ID книги/раздела
+            book_id: currentDictation.book_id || null
         };
 
-        // Отправляем данные на сервер
+        // Проверяем наличие токена
+        // Используем jwt_token (как в user_manager.js) или токен из UserManager
+        let token = null;
+        if (window.UM && window.UM.token) {
+            token = window.UM.token;
+        } else {
+            token = localStorage.getItem('jwt_token');
+        }
+        
+        if (!token) {
+            alert('Ошибка: отсутствует токен авторизации. Пожалуйста, войдите в систему заново.');
+            hideLoadingIndicator();
+            return;
+        }
+        
+        // Получаем user_id из API, если он не установлен
+        if (!saveData.user_id) {
+            try {
+                const userResponse = await fetch('/user/api/me', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+                    if (userData && userData.id) {
+                        saveData.user_id = userData.id;
+                        currentDictation.user_id = userData.id;
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Не удалось получить user_id из API:', e);
+            }
+        }
+        
+        // Проверяем category_key только если нет book_id (новая идеология: диктант принадлежит книге/разделу, а не категории)
+        if (!saveData.book_id && !saveData.category_key) {
+            alert('Ошибка: не выбрана категория для диктанта. Пожалуйста, выберите категорию.');
+            hideLoadingIndicator();
+            return;
+        }
+        
+        // Отправляем данные на сервер для сохранения предложений и обновления диктанта
+        
         const response = await fetch('/save_dictation_final', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(saveData)
         });
 
+        // Проверяем статус ответа перед парсингом JSON
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Ошибка HTTP:', {
+                status: response.status,
+                statusText: response.statusText,
+                errorText: errorText
+            });
+            
+            let errorMessage = `Ошибка ${response.status}: ${response.statusText}`;
+            try {
+                const errorJson = JSON.parse(errorText);
+                errorMessage = errorJson.error || errorJson.msg || errorMessage;
+            } catch (e) {
+                errorMessage = errorText || errorMessage;
+            }
+            
+            alert('Ошибка сохранения диктанта: ' + errorMessage);
+            hideLoadingIndicator();
+            return;
+        }
+        
         const result = await response.json();
 
         if (result.success) {
-
-            // Обновляем ID диктанта если это был новый диктант
-            if (currentDictation.id === 'new' && result.dictation_id) {
+            // Если диктант был создан в БД - обновляем ID
+            if (result.dictation_id && result.db_id) {
                 currentDictation.id = result.dictation_id;
-                document.getElementById('dictation-id').textContent = `Диктант: ${currentDictation.id}`;
+                currentDictation.db_id = result.db_id;
+                currentDictation.isNew = false;
+                
+                // Показываем ID
+                const dictationIdElement = document.getElementById('dictation-id');
+                if (dictationIdElement) {
+                    dictationIdElement.textContent = `id: ${result.dictation_id}`;
+                    dictationIdElement.style.display = '';
+                }
             }
-
+            
+            // Обновляем title_translations в currentDictation
+            currentDictation.title_translations = titleTranslations;
+            
             // Отмечаем диктант как сохраненный
             currentDictation.isSaved = true;
 
@@ -6286,16 +6758,19 @@ async function cleanupTempAndExit() {
         // Показываем индикатор загрузки
         showLoadingIndicator('Очистка временных файлов...');
 
-        // Очищаем temp папку если это новый диктант
-        if (currentDictation.id && currentDictation.id !== 'new') {
+        // Очищаем temp папку если это новый диктант (используем временный ID если был создан)
+        // Для нового диктанта без сохранения в БД - используем временный ID из temp если есть
+        const tempDictationId = currentDictation.temp_id || currentDictation.id;
+        if (tempDictationId && tempDictationId !== 'new' && tempDictationId.startsWith('dict_temp_')) {
             const response = await fetch('/cleanup_temp_dictation', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                    'Authorization': `Bearer ${window.UM?.token || localStorage.getItem('jwt_token')}`
                 },
                 body: JSON.stringify({
-                    dictation_id: currentDictation.id,
+                    dictation_id: tempDictationId,
+                    user_id: currentDictation.user_id,  // Для пути temp/<user_id>/
                     safe_email: currentDictation.safe_email
                 })
             });
@@ -6331,6 +6806,11 @@ async function saveDictationAndExit() {
         currentDictation.is_dialog = tabIsDialogCheckbox.checked;
     }
     
+    // Если это НЕ диалог, очищаем всех спикеров перед сохранением
+    if (!currentDictation.is_dialog) {
+        currentDictation.speakers = {};
+    }
+    
     try {
         // Показываем индикатор загрузки
         showLoadingIndicator('Сохранение диктанта...');
@@ -6357,7 +6837,8 @@ async function saveDictationAndExit() {
             return;
         }
 
-        if (!currentDictation.category_key) {
+        // Проверяем category_key только если нет book_id (новая идеология: диктант принадлежит книге/разделу, а не категории)
+        if (!currentDictation.book_id && !currentDictation.category_key) {
             alert('Ошибка: не выбрана категория для диктанта');
             hideLoadingIndicator();
             return;
@@ -6422,27 +6903,34 @@ async function saveDictationAndExit() {
  */
 function getSpeakersFromTable() {
     const speakers = {};
-    // Ограничиваем поиск только таблицей во вкладке, чтобы избежать дублирования
-    const tbody = document.querySelector('#tabSpeakersTableContent tbody');
-    if (!tbody) {
-        // Если таблица во вкладке не найдена, используем основную таблицу
+    // Сначала проверяем модальное окно (стартовое окно создания диктанта)
         const mainTbody = document.querySelector('#speakersTableContent tbody');
         if (mainTbody) {
-            mainTbody.querySelectorAll('.speaker-name-input').forEach((input, index) => {
+        mainTbody.querySelectorAll('.speaker-name').forEach((input, index) => {
                 const speakerId = (index + 1).toString();
                 const speakerName = input.value.trim() || `Спикер ${speakerId}`;
+            if (speakerName) {
                 speakers[speakerId] = speakerName;
-            });
         }
+        });
+        // Если нашли спикеров в модальном окне, возвращаем их
+        if (Object.keys(speakers).length > 0) {
         return speakers;
+        }
     }
     
-    // Берем спикеров только из таблицы во вкладке
+    // Если в модальном окне нет спикеров, берем из таблицы во вкладке
+    const tbody = document.querySelector('#tabSpeakersTableContent tbody');
+    if (tbody) {
     tbody.querySelectorAll('.speaker-name').forEach((input, index) => {
         const speakerId = (index + 1).toString();
         const speakerName = input.value.trim() || `Спикер ${speakerId}`;
+            if (speakerName) {
         speakers[speakerId] = speakerName;
+            }
     });
+    }
+    
     return speakers;
 }
 
@@ -6498,6 +6986,18 @@ async function autoTranslate(text, fromLanguage, toLanguage) {
 /**
  * Генерировать аудио для одного предложения
  */
+/**
+ * Формирует путь к папке с аудио файлами для диктанта
+ * @param {string} language - код языка ('en', 'ru', и т.д.)
+ * @returns {string} - путь к папке с аудио
+ */
+function getAudioPath(language) {
+    if (currentDictation.user_id && currentDictation.id.startsWith('dict_temp_')) {
+        return `/static/data/temp/${currentDictation.user_id}/${currentDictation.id}/${language}`;
+    }
+    return `/static/data/temp/${currentDictation.id}/${language}`;
+}
+
 async function generateAudioForSentence(sentence, language) {
     if (!sentence.text.trim()) return null;
 
@@ -6530,6 +7030,35 @@ async function generateAudioForSentence(sentence, language) {
     }
 
     try {
+        // Получаем user_id - сначала из currentDictation, потом из UserManager
+        let user_id = currentDictation.user_id;
+        if (!user_id && window.UM && window.UM.getCurrentUser) {
+            const user = window.UM.getCurrentUser();
+            if (user && user.id) {
+                user_id = user.id;
+                // Сохраняем user_id в currentDictation для последующих вызовов
+                currentDictation.user_id = user_id;
+            }
+        }
+        
+        // Получаем safe_email
+        let safe_email = currentDictation.safe_email;
+        if (!safe_email && window.UM && window.UM.getSafeEmail) {
+            safe_email = window.UM.getSafeEmail();
+            if (safe_email) {
+                currentDictation.safe_email = safe_email;
+            }
+        }
+        
+        console.log('🎵 Генерирую аудио:', {
+            text: cleanText.substring(0, 50) + '...',
+            language,
+            filename,
+            dictation_id: currentDictation.id,
+            user_id,
+            safe_email
+        });
+        
         const response = await fetch('/generate_audio', {
             method: 'POST',
             headers: {
@@ -6542,7 +7071,8 @@ async function generateAudioForSentence(sentence, language) {
                 filename_audio: filename,
                 tipe_audio: 'avto',
                 dictation_id: currentDictation.id,
-                safe_email: currentDictation.safe_email
+                user_id: user_id,  // Для пути temp/<user_id>/
+                safe_email: safe_email
             })
         });
 
@@ -6781,7 +7311,7 @@ async function preloadAudioFiles() {
     for (const sentence of originalSentences) {
         if (sentence.audio && !audioPlayers[sentence.audio]) {
             try {
-                const audioUrl = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${sentence.audio}`;
+                const audioUrl = `${getAudioPath(currentDictation.language_original)}/${sentence.audio}`;
                 const audio = new Audio(audioUrl);
                 audioPlayers[sentence.audio] = audio;
             } catch (error) {
@@ -6794,7 +7324,7 @@ async function preloadAudioFiles() {
     for (const sentence of translationSentences) {
         if (sentence.audio && !audioPlayers[sentence.audio]) {
             try {
-                const audioUrl = `/static/data/temp/${currentDictation.id}/${currentDictation.language_translation}/${sentence.audio}`;
+                const audioUrl = `${getAudioPath(currentDictation.language_translation)}/${sentence.audio}`;
                 const audio = new Audio(audioUrl);
                 audioPlayers[sentence.audio] = audio;
             } catch (error) {
@@ -7821,7 +8351,7 @@ function loadWaveformForCurrentAudio(audioFile) {
 
     if (!audioFile) return;
 
-    const audioUrl = `/static/data/temp/${currentDictation.id}/${currentDictation.language_original}/${audioFile}`;
+    const audioUrl = `${getAudioPath(currentDictation.language_original)}/${audioFile}`;
 
     loadWaveformForFile(audioUrl);
 }
