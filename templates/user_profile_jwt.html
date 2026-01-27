@@ -8,7 +8,8 @@
     <link rel="stylesheet" href="/static/css/style_color.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/style_user_profile.css">
-    
+    <link rel="stylesheet" href="/static/css/model_selector.css">
+    <link rel="stylesheet" href="/static/css/language_selector.css">
     <!-- Cropper.js для обрезки изображений -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -108,6 +109,12 @@
             </div>
         </div>
 
+        <!-- Языковые модели-->
+        <div class="form-section">
+            <h3>Настройки языковых моделей </h3>
+            <div id="languageSelectorModelsContainer"></div>
+        </div>
+
         <!-- Настройки аудио для диктантов -->
         <div class="form-section">
             <h3>Настройки аудио для диктантов</h3>
@@ -165,6 +172,7 @@
     {{ language_data | tojson | safe }}
     </script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>

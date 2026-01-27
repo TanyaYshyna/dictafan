@@ -3,7 +3,44 @@
     "country_cod": "us",
     "country_cod_url": "en-US",
     "language_ru": "Английский",
-    "language_en": "English"
+    "language_en": "English",
+    "models": {
+      "whisper": [
+        {
+          "id": "tiny",
+          "name": "Tiny",
+          "size": "75 MB",
+          "quality": "65%",
+          "recommended": false
+        },
+        {
+          "id": "base",
+          "name": "Base",
+          "size": "145 MB",
+          "quality": "75%",
+          "recommended": true
+        },
+        {
+          "id": "small",
+          "name": "Small",
+          "size": "480 MB",
+          "quality": "85%",
+          "recommended": false
+        }
+      ],
+      "tts": [
+        {
+          "id": "fast",
+          "name": "Fast",
+          "size": "50 MB"
+        },
+        {
+          "id": "standard",
+          "name": "Standard",
+          "size": "120 MB"
+        }
+      ]
+    }
   },
   "uk": {
     "country_cod": "ua",
@@ -27,7 +64,32 @@
     "country_cod": "ru",
     "country_cod_url": "ru-RU",
     "language_ru": "Русский",
-    "language_en": "Russian"
+    "language_en": "Russian",
+    "models": {
+      "whisper": [
+        {
+          "id": "tiny",
+          "name": "Tiny",
+          "size": "75 MB",
+          "quality": "70%",
+          "recommended": false
+        },
+        {
+          "id": "base",
+          "name": "Base",
+          "size": "145 MB",
+          "quality": "80%",
+          "recommended": true
+        }
+      ],
+      "tts": [
+        {
+          "id": "standard",
+          "name": "Standard",
+          "size": "100 MB"
+        }
+      ]
+    }
   },
   "de": {
     "country_cod": "de",
@@ -72,4 +134,3 @@
     "language_en": "Polish"
   }
 }
-

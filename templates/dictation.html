@@ -13,27 +13,27 @@
     <!-- Используем модульный подход -->
     <script type="module" id="transformers-loader">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
-        
+
         // Подавляем предупреждения ONNX Runtime (они не критичны)
         const originalWarn = console.warn;
-        console.warn = function(...args) {
+        console.warn = function (...args) {
             // Фильтруем предупреждения ONNX Runtime о неиспользуемых инициализаторах
             if (args[0] && typeof args[0] === 'string' && args[0].includes('CleanUnusedInitializersAndNodeArgs')) {
                 return; // Не показываем эти предупреждения
             }
             originalWarn.apply(console, args);
         };
-        
+
         // Настраиваем кэш для моделей
         env.allowLocalModels = false;
         env.allowRemoteModels = true;
-        
+
         // Экспортируем в глобальную область видимости
         window.pipeline = pipeline;
         window.transformers = { pipeline, env };
-        
+
         console.log('✅ Transformers.js загружен через ES modules');
-        
+
         // Уведомляем о готовности
         window.dispatchEvent(new CustomEvent('transformers-ready'));
     </script>
@@ -52,7 +52,8 @@
                 <span class="user-avatar-small"></span>
                 <span class="username-text"></span>
             </a>
-            <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span class="streak-days">0</span></button>
+            <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span
+                    class="streak-days">0</span></button>
             <button id="showStatisticsBtn" class="statistics-btn" title="Показать статистику">
                 <i data-lucide="bar-chart-3"></i>
                 <!-- <span>Статистика</span> -->
@@ -178,7 +179,8 @@
                     <thead>
                         <tr>
                             <th class="audio-settings-header-cell">
-                                <button id="audioSettingsButton" class="audio-settings-header-btn" title="Настройки аудио">
+                                <button id="audioSettingsButton" class="audio-settings-header-btn"
+                                    title="Настройки аудио">
                                     <i data-lucide="settings"></i>
                                 </button>
                             </th>
@@ -242,10 +244,6 @@
                 <button id="completionExitBtn" class="button-color-yellow">
                     <i data-lucide="log-out"></i>
                     Выйти
-                </button>
-                <button id="completionRetryBtn" class="button-color-green">
-                    <i data-lucide="repeat"></i>
-                    Пройти еще раз
                 </button>
             </div>
         </div>
@@ -324,6 +322,19 @@
         <!-- тут пользователь набирает тектст -->
         <!-- <div id="userInput" contenteditable="true" class="text-input"></div> -->
         <div id="speaker">Tanya: </div>
+        <div id="tablo_result">
+            <div id="tablo_result_star">
+                <i data-lucide="star"></i>
+            </div>
+            <div id="tablo_result_star_half">
+                <i data-lucide="star-half"></i>
+                <i data-lucide="star-half"></i>
+                <i data-lucide="star-half"></i>
+            </div>
+            <div id="tablo_result_mic">
+                <i data-lucide="mic"></i>
+            </div>
+        </div>
         <div id="userInput" contenteditable="true" class="text-input" spellcheck="false" autocorrect="off"
             autocapitalize="off" autocomplete="off" aria-autocomplete="none" data-gramm="false"
             data-enable-grammarly="false">
@@ -336,7 +347,8 @@
                 <!-- <div id="translation">...</div> -->
             </div>
 
-            <button id="checkBtn" class="button-color-yellow" onclick="checkText()" title="Нажмите Enter/Return когда закончили ввод текста">
+            <button id="checkBtn" class="button-color-yellow" onclick="checkText()"
+                title="Нажмите Enter/Return когда закончили ввод текста">
                 <i data-lucide="corner-down-left"></i>
             </button>
         </div>
@@ -423,6 +435,7 @@
     </script>
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
@@ -438,12 +451,11 @@
     <script src="{{ url_for('static', filename='js/virtual_keyboard.js') }}"></script>
 
     <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
-    <div id="dictation-data"
-        data-language-original="{{ language_original }}" data-language-translation="{{ language_translation }}"
-        data-title-orig="{{ title_orig }}" data-dictation-id="{{ dictation_id }}"
-        data-is-dialog="{{ 'true' if is_dialog else 'false' }}" data-speakers='{{ speakers | tojson | safe }}'
-        {% if author_materials_url %}data-author-materials-url="{{ author_materials_url }}"{% endif %}
-        style="display: none;">
+    <div id="dictation-data" data-language-original="{{ language_original }}"
+        data-language-translation="{{ language_translation }}" data-title-orig="{{ title_orig }}"
+        data-dictation-id="{{ dictation_id }}" data-is-dialog="{{ 'true' if is_dialog else 'false' }}"
+        data-speakers='{{ speakers | tojson | safe }}' {% if author_materials_url
+        %}data-author-materials-url="{{ author_materials_url }}" {% endif %} style="display: none;">
     </div>
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
@@ -531,7 +543,7 @@
             } else {
                 console.error('❌ Функция onloadInitializeDictation не найдена');
             }
-            
+
             // Обработчик двойного щелчка по картинке для открытия ссылки на материалы автора
             const coverImage = document.querySelector('.dictation-cover-image');
             const dictationData = document.getElementById('dictation-data');

@@ -2377,6 +2377,43 @@ body.playing-audio::after {
   stroke: currentColor;      /* цвет из color родителя (обычно так по умолчанию) */
 }
 
+/* Табло с результатом иконками */
+#tablo_result{
+  display: inline-flex;      /* gap/justify начнут работать */
+  align-items: center;
+  gap: 6px;
+  color: var(--color-button-purple);
+  font-size: 30px;           /* задаём 30px один раз */
+  line-height: 1;            /* без лишних отступов по вертикали */
+  margin-left: auto;
+  min-height: 30px;
+}
+
+/* Прозрачный текст-заглушка */
+#tablo_result:empty::before {
+  content: "0";
+  opacity: 0; /* Полностью прозрачный, но занимает место */
+  visibility: hidden;
+}
+
+#tablo_result_star svg{
+  width: 1em;                /* 1em = 30px */
+  height: 1em;
+  stroke: var(--color-button-mint);
+}
+
+#tablo_result_star_half svg{
+  width: 1em;                /* 1em = 30px */
+  height: 1em;
+  stroke: var(--color-button-lightgreen);
+}
+
+#tablo_result_mic svg{
+  width: 1em;                /* 1em = 30px */
+  height: 1em;
+  stroke: var(--color-button-purple);
+}
+
 /* Лейбл-проценты слева (иконка %) */
 #word_percent {
   /* background: rgb(97, 201, 140); */

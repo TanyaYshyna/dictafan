@@ -73,8 +73,6 @@ class LanguageSelector {
     createNativeSelector() {
         const currentValue = this.options.nativeLanguage;
         const availableLanguages = Object.keys(this.languageData);
-        // <label class="language-label">Родной язык</label>
-        // <span class="arrow">▼</span>
 
         return `
             <div class="language-selector-group" data-selector-type="native">
@@ -113,21 +111,14 @@ class LanguageSelector {
     createLearningSelector() {
         const currentValue = this.options.currentLearning;
         // В режиме profile-panels используем только изучаемые языки, в registration - все языки
-        const availableLanguages = this.options.mode === 'profile-panels'
-            ? this.options.learningLanguages
-            : Object.keys(this.languageData);
+        const availableLanguages = Object.keys(this.languageData);
 
-        // Убедимся, что текущий язык есть в доступных
-        if (!availableLanguages.includes(currentValue) && availableLanguages.length > 0) {
-            this.options.currentLearning = availableLanguages[0];
-        }
-        
         // Проверяем, нужен ли компактный режим (только флаг в trigger)
         const isCompact = this.options.mode === 'learning-selector-compact';
         const triggerContent = isCompact
             ? `${this.createFlagElement(currentValue)}<i data-lucide="chevron-down"></i>`
             : `${this.createFlagElement(currentValue)} ${this.getLanguageName(currentValue)}<i data-lucide="chevron-down"></i>`;
-        
+
         // <label class="language-label">Текущий изучаемый язык</label>
         return `
         <div class="language-selector-group" data-selector-type="learning">
@@ -160,60 +151,667 @@ class LanguageSelector {
         `;
     }
 
-createLearningList() {
-    const currentLearning = this.options.currentLearning;
-    const learningLangs = this.options.learningLanguages;
-    const userSettings = (typeof window.UM !== 'undefined' && window.UM.getUserSettings) ? window.UM.getUserSettings() : {};
 
-    return `
-    <div class="language-selector-group">
-        <label class="language-label">Изучаемые языки</label>
-        <div class="learning-languages-list">
-            ${Object.entries(this.languageData).map(([code, data]) => {
-        const isSelected = learningLangs.includes(code);
-        const isCurrent = code === currentLearning;
-        const languageName = this.getLanguageName(code);
-        const useLocalWhisperModel = userSettings.audio?.use_local_whisper_model?.[code] || false;
 
-        // Определяем иконку для чекбокса
-        let checkboxIcon = 'circle'; // ⭕ по умолчанию для невыбранных
-        let iconStyle = 'opacity: 0.3;'; // Стиль для невыбранных
-        if (isSelected) {
-            checkboxIcon = isCurrent ? 'circle-check-big' : 'circle-chevron-down'; // ✅ для текущего, 🔽 для выбранных но не текущих
-            iconStyle = ''; // Убираем прозрачность для выбранных
+    // ОБНОВЛЕННЫЙ МЕТОД: создание списка языков С ТАБЛИЦЕЙ МОДЕЛЕЙ
+    createLearningList() {
+        return `
+        <div class="two-panel-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <!-- ПАНЕЛЬ 1: Выбор языков и моделей -->
+            <div class="panel-left">
+                ${this.createLanguageSelectionPanel()}
+            </div>
+            
+            <!-- ПАНЕЛЬ 2: Таблица загруженных моделей -->
+            <div class="panel-right">
+                ${this.createDownloadedModelsTable()}
+            </div>
+        </div>
+        
+        <!-- ПАНЕЛЬ С БЕГУНКОМ (под двумя панелями) -->
+        <div class="storage-info-full" style="margin-top: 20px; padding: 12px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #555;">
+                <span style="font-weight: bold;">Хранилище браузера:</span>
+                <span style="color: #333;" id="storage-stats-text">
+                    Загрузка информации...
+                </span>
+            </div>
+            <div class="storage-progress-full" style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative;">
+                <div class="storage-progress-fill-full" id="storage-progress-fill"
+                     style="height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s;">
+                </div>
+                <div class="storage-progress-text-full" id="storage-progress-text" 
+                     style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">
+                    0%
+                </div>
+            </div>
+            <div style="font-size: 11px; color: #888; margin-top: 4px; text-align: center;" id="storage-details">
+                Рассчитываем использование памяти...
+            </div>
+        </div>
+    `;
+    }
+
+    // НОВЫЙ МЕТОД: создание панели выбора языков
+    createLanguageSelectionPanel() {
+        const currentLearning = this.options.currentLearning;
+        const learningLangs = this.options.learningLanguages;
+
+        return `
+        <div class="language-selector-group">
+            <label class="language-label">Язык - модель</label>
+            <div class="learning-languages-list">
+                ${Object.entries(this.languageData).map(([code, data]) => {
+            // Показываем ВСЕ языки, но dropdown только если есть модели
+            const hasModels = data.models && (
+                (data.models.whisper && data.models.whisper.length > 0) ||
+                (data.models.tts && data.models.tts.length > 0)
+            );
+
+            const isSelected = learningLangs.includes(code);
+            const isCurrent = code === currentLearning;
+            const languageName = this.getLanguageName(code);
+            const selectedModels = this.getSelectedModelsForLanguage(code);
+
+            return `
+                        <div class="language-item" data-lang="${code}">
+                            <div class="language-display" style="display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer;">
+                                ${this.createFlagElement(code)} 
+                                <span class="language-name" style="font-weight: ${isCurrent ? 'bold' : 'normal'};">
+                                    ${languageName}${isCurrent ? ' (текущий)' : ''}
+                                </span>
+                                
+                                ${hasModels ? `
+                                    <div class="model-select-wrapper" style="margin-left: auto; position: relative;">
+                                        <div class="model-select-trigger" data-lang="${code}" 
+                                             style="display: flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1px solid #ddd; border-radius: 4px; background: white; cursor: pointer; min-width: 200px; max-width: 250px;">
+                                            <span class="model-select-text" style="flex-grow: 1; font-size: 13px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                ${selectedModels ? selectedModels : 'Выберите модель'}
+                                            </span>
+                                            <i data-lucide="chevron-down" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+                                        </div>
+                                        <div class="model-select-dropdown" id="model-dropdown-${code}" 
+                                             style="display: none; position: fixed; background: white; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10000; max-height: 400px; overflow-y: auto; width: 350px;">
+                                            ${this.createModelDropdownItems(code)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+        }).filter(Boolean).join('')}
+            </div>
+        </div>
+    `;
+    }
+
+
+
+    // НОВЫЙ МЕТОД: создание элементов выпадающего списка моделей
+    createModelDropdownItems(langCode) {
+        const languageData = this.languageData[langCode];
+        if (!languageData || !languageData.models) {
+            return '<div style="padding: 12px; color: #999; font-size: 12px; text-align: center;">Нет доступных моделей</div>';
         }
 
-        // Определяем иконку для Whisper переключателя
-        const whisperIcon = useLocalWhisperModel ? 'circle-check-big' : 'circle';
-        const whisperOpacity = useLocalWhisperModel ? '' : 'opacity: 0.5;';
-        
-        return `
-                <div class="language-item ${isSelected ? 'selected' : ''}" data-lang="${code}">
-                    <label class="language-checkbox">
-                        <input type="checkbox" ${isSelected ? 'checked' : ''} style="display: none;">
-                        <i data-lucide="${checkboxIcon}" class="checkbox-icon ${isSelected ? 'selected' : ''} ${isCurrent ? 'current' : ''}" style="${iconStyle}" data-action="${isSelected ? (isCurrent ? 'current' : 'set-current') : 'toggle'}"></i>
-                        ${this.createFlagElement(code)} 
-                        <span class="language-name">${languageName}</span>
-                    </label>
-                    ${isSelected ? `
-                        <div class="whisper-model-toggle-container" data-lang="${code}">
-                            <label class="whisper-toggle-label">
-                                <i data-lucide="${whisperIcon}" 
-                                   class="whisper-toggle-icon" 
-                                   data-lang="${code}"
-                                   id="whisper-toggle-${code}"
-                                   style="cursor: pointer; ${whisperOpacity}"></i>
-                                <span class="whisper-toggle-text">локальная модель</span>
-                            </label>
-                        </div>
+        let items = [];
+
+        // Проверяем, выбрана ли какая-то модель для каждого типа
+        const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
+        const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
+
+        // Проверяем, есть ли хотя бы один тип моделей
+        const hasWhisper = languageData.models.whisper && languageData.models.whisper.length > 0;
+        const hasTTS = languageData.models.tts && languageData.models.tts.length > 0;
+
+        // Добавляем ОДНУ опцию "без модели" в начало списка, если есть хотя бы один тип моделей
+        if (hasWhisper || hasTTS) {
+            items.push({
+                id: null,
+                type: 'all', // специальный тип для "без модели" всех типов
+                name: 'без модели',
+                displayText: 'без модели',
+                isNone: true
+            });
+        }
+
+        // Whisper модели
+        if (hasWhisper) {
+            items.push(...languageData.models.whisper.map(model => ({
+                id: model.id,
+                type: 'whisper',
+                name: model.name,
+                quality: model.quality,
+                size: model.size,
+                recommended: model.recommended,
+                displayText: `whisper: ${model.name} ${model.quality ? model.quality + ' ' : ''}${model.size}`,
+                isNone: false
+            })));
+        }
+
+        // TTS модели
+        if (hasTTS) {
+            items.push(...languageData.models.tts.map(model => ({
+                id: model.id,
+                type: 'tts',
+                name: model.name,
+                size: model.size,
+                displayText: `tts: ${model.name} ${model.size}`,
+                isNone: false
+            })));
+        }
+
+        return items.map(item => {
+            // Для опции "без модели" проверяем, выбрана ли какая-то модель
+            let isSelected = false;
+            let selectedModel = null; // Инициализируем переменную для всех случаев
+
+            if (item.isNone) {
+                // "без модели" выбрана, если не выбрана ни одна модель (ни whisper, ни tts)
+                const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
+                const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
+
+                const hasSelectedWhisper = selectedWhisper && selectedWhisper !== null && selectedWhisper !== '' && selectedWhisper !== 'none' && String(selectedWhisper).trim() !== '';
+                const hasSelectedTTS = selectedTTS && selectedTTS !== null && selectedTTS !== '' && selectedTTS !== 'none' && String(selectedTTS).trim() !== '';
+
+                // "без модели" выбрана только если не выбрана ни одна модель
+                isSelected = !hasSelectedWhisper && !hasSelectedTTS;
+                selectedModel = 'none'; // Для опции "без модели"
+            } else {
+                // Для обычных моделей проверяем стандартным способом
+                selectedModel = this.getSelectedModelWithFallback(langCode, item.type);
+                // selectedModel должен точно совпадать с item.id (сравниваем как строки)
+                isSelected = String(selectedModel) === String(item.id);
+            }
+
+            // Отладочный вывод для выбранных элементов
+            if (isSelected) {
+                console.log(`✓ Модель выбрана: ${langCode}/${item.type}/${item.isNone ? 'none' : item.id}, selectedModel="${selectedModel}" (тип: ${typeof selectedModel})`);
+            }
+
+            // Проверяем, загружена ли модель (для опции "без модели" всегда true)
+            const isDownloaded = item.isNone ? true : this.isModelDownloadedWithFallback(langCode, item.id, item.type);
+
+            return `
+                <div class="model-dropdown-item ${isSelected ? 'selected' : ''}" 
+                     data-lang="${langCode}" 
+                     data-model="${item.isNone ? 'none' : item.id}" 
+                     data-type="${item.isNone ? 'all' : item.type}"
+                     data-is-none="${item.isNone}"
+                     data-is-downloaded="${isDownloaded}"
+                     style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; gap: 10px;">
+                    <!-- ГАЛОЧКА ВЫБРАННОЙ МОДЕЛИ (или заглушка для выравнивания) -->
+                    <div style="width: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        ${isSelected ? '<span style="color: var(--color-button-text-yellow); font-size: 16px; font-weight: bold;">✓</span>' : '<span style="width: 16px;"></span>'}
+                    </div>
+                    
+                    <!-- НАЗВАНИЕ МОДЕЛИ -->
+                    <span style="font-size: 13px; color: #333; ${item.isNone ? 'font-style: italic;' : ''}; flex-grow: 1;">${item.displayText}</span>
+                    
+                    <!-- СЛАЙДЕР ЗАГРУЗКИ (только для обычных моделей) -->
+                    ${!item.isNone ? `
+                    <div style="display: flex; align-items: center; flex-shrink: 0;">
+                        <label class="model-switch" style="position: relative; display: inline-block; width: 40px; height: 20px;">
+                            <input type="checkbox" 
+                                   class="model-download-toggle"
+                                   ${isDownloaded ? 'checked' : ''}
+                                   data-lang="${langCode}"
+                                   data-model="${item.id}"
+                                   data-type="${item.type}"
+                                   style="opacity: 0; width: 0; height: 0;">
+                            <span class="model-slider ${isDownloaded ? 'downloaded' : ''}" 
+                                  style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDownloaded ? '#8B4513' : '#ccc'}; transition: .4s; border-radius: 20px;">
+                                <span class="model-slider-circle" 
+                                      style="position: absolute; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: ${isDownloaded ? '#FFD700' : 'white'}; transition: .4s; border-radius: 50%; ${isDownloaded ? 'transform: translateX(20px);' : ''}"></span>
+                            </span>
+                        </label>
+                    </div>
                     ` : ''}
                 </div>
             `;
-    }).join('')}
+        }).join('');
+    }
+
+    // НОВЫЙ МЕТОД: создание таблицы загруженных моделей
+    createDownloadedModelsTable() {
+        const models = this.getDownloadedModelsList();
+
+        if (models.length === 0) {
+            return `
+            <div class="downloaded-models-panel">
+                <label class="language-label">Язык - модель</label>
+                <div class="empty-models-message" style="padding: 20px; text-align: center; color: #888; font-style: italic;">
+                    Нет загруженных моделей
+                </div>
+            </div>
+        `;
+        }
+
+        return `
+        <div class="downloaded-models-panel">
+            <label class="language-label">Все языковые модели в памяти</label>
+            <div class="models-list-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
+                ${models.map(model => {
+            const isActive = this.isModelActive(model.langCode, model.modelId, model.modelType);
+            const languageName = this.getLanguageName(model.langCode);
+            const modelTypeName = model.modelType === 'whisper' ? 'Whisper' : 'TTS';
+
+            return `
+                    <div class="model-list-item ${isActive ? 'active-model' : ''}" 
+                         data-lang="${model.langCode}"
+                         data-model="${model.modelId}"
+                         data-type="${model.modelType}"
+                         style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; ${isActive ? 'background-color: #f0f9ff;' : ''}">
+                        <div style="width: 20px; text-align: center; flex-shrink: 0;">
+                            ${isActive ? '<span style="color: #4CAF50; font-weight: bold;">✓</span>' : ''}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                            ${this.createFlagElement(model.langCode)}
+                            <span style="font-weight: 500;">${languageName}</span>
+                        </div>
+                        <div style="flex-shrink: 0; color: #666; font-size: 12px; min-width: 70px;">
+                            ${modelTypeName}
+                        </div>
+                        <div style="flex-grow: 1; min-width: 0;">
+                            <span style="font-size: 13px;">${model.modelName}</span>
+                            ${model.quality ? `<span style="color: #666; font-size: 12px;"> (${model.quality})</span>` : ''}
+                        </div>
+                        <div style="flex-shrink: 0; color: #666; font-size: 12px; min-width: 80px; text-align: right;">
+                            ${model.size}
+                        </div>
+                        <button class="remove-model-btn" 
+                                data-lang="${model.langCode}"
+                                data-model="${model.modelId}"
+                                data-type="${model.modelType}"
+                                style="padding: 6px; background: transparent; color: #dc3545; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; transition: background-color 0.2s; flex-shrink: 0;"
+                                onmouseover="this.style.backgroundColor='#fee'"
+                                onmouseout="this.style.backgroundColor='transparent'"
+                                title="Удалить модель">
+                            <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                `;
+        }).join('')}
+            </div>
+            <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 0 4px;">
+                Всего загружено: ${models.length} моделей | Двойной щелчок по строке - выбор модели
+            </div>
         </div>
-    </div>
     `;
-}
+    }
+
+    // НОВЫЙ МЕТОД: получение списка загруженных моделей
+    getDownloadedModelsList() {
+        const models = [];
+        const learningLangs = this.options.learningLanguages;
+
+        Object.entries(this.languageData).forEach(([langCode, data]) => {
+            if (learningLangs.includes(langCode) && data.models) {
+                // Whisper модели
+                if (data.models.whisper) {
+                    data.models.whisper.forEach(model => {
+                        if (this.isModelDownloadedWithFallback(langCode, model.id, 'whisper')) {
+                            models.push({
+                                langCode,
+                                modelId: model.id,
+                                modelType: 'whisper',
+                                modelName: model.name,
+                                quality: model.quality,
+                                size: model.size,
+                                isActive: this.isModelActive(langCode, model.id, 'whisper')
+                            });
+                        }
+                    });
+                }
+
+                // TTS модели
+                if (data.models.tts) {
+                    data.models.tts.forEach(model => {
+                        if (this.isModelDownloadedWithFallback(langCode, model.id, 'tts')) {
+                            models.push({
+                                langCode,
+                                modelId: model.id,
+                                modelType: 'tts',
+                                modelName: model.name,
+                                size: model.size,
+                                isActive: this.isModelActive(langCode, model.id, 'tts')
+                            });
+                        }
+                    });
+                }
+            }
+        });
+
+        return models;
+    }
+
+    // НОВЫЙ МЕТОД: проверка активности модели
+    isModelActive(langCode, modelId, modelType) {
+        const selectedModel = this.getSelectedModelWithFallback(langCode, modelType);
+        return String(selectedModel) === String(modelId);
+    }
+
+
+
+
+
+
+
+    // НОВЫЙ МЕТОД: получаем строку выбранных моделей для языка
+    getSelectedModelsForLanguage(langCode) {
+        const languageData = this.languageData[langCode];
+        if (!languageData || !languageData.models) return null;
+
+        let selectedModels = [];
+
+        // Проверяем выбранную Whisper модель
+        if (languageData.models.whisper && languageData.models.whisper.length > 0) {
+            const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
+            if (selectedWhisper && selectedWhisper !== 'none' && selectedWhisper !== '') {
+                const model = languageData.models.whisper.find(m => m.id === selectedWhisper);
+                if (model) {
+                    selectedModels.push(`whisper: ${model.name}`);
+                }
+            }
+        }
+
+        // Проверяем выбранную TTS модель
+        if (languageData.models.tts && languageData.models.tts.length > 0) {
+            const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
+            if (selectedTTS && selectedTTS !== 'none' && selectedTTS !== '') {
+                const model = languageData.models.tts.find(m => m.id === selectedTTS);
+                if (model) {
+                    selectedModels.push(`tts: ${model.name}`);
+                }
+            }
+        }
+
+        return selectedModels.length > 0 ? selectedModels.join(' + ') : 'без модели';
+    }
+
+    // ОБНОВЛЕННЫЙ МЕТОД: расчет использования памяти (правильный)
+    calculateStorageUsage() {
+        let downloadedCount = 0;
+        let totalDownloadedSizeMB = 0;
+
+        // Сначала собираем все доступные модели
+        let totalAvailableModels = 0;
+        let totalAvailableSizeMB = 0;
+
+        // В режиме models-only показываем все языки с моделями, в остальных - только изучаемые
+        const learningLangs = this.options.learningLanguages;
+        const showAllLanguages = this.options.mode === 'models-only';
+
+        Object.entries(this.languageData).forEach(([code, data]) => {
+            // Проверяем, нужно ли учитывать этот язык
+            const shouldInclude = showAllLanguages 
+                ? (data.models && ((data.models.whisper && data.models.whisper.length > 0) || (data.models.tts && data.models.tts.length > 0)))
+                : learningLangs.includes(code);
+
+            if (shouldInclude && data.models) {
+                // Whisper модели
+                if (data.models.whisper) {
+                    data.models.whisper.forEach(model => {
+                        const sizeMB = this.parseSizeToMB(model.size);
+                        totalAvailableModels++;
+                        totalAvailableSizeMB += sizeMB;
+
+                        // Проверяем, скачана ли модель
+                        if (this.isModelDownloadedWithFallback(code, model.id, 'whisper')) {
+                            downloadedCount++;
+                            totalDownloadedSizeMB += sizeMB;
+                        }
+                    });
+                }
+
+                // TTS модели
+                if (data.models.tts) {
+                    data.models.tts.forEach(model => {
+                        const sizeMB = this.parseSizeToMB(model.size);
+                        totalAvailableModels++;
+                        totalAvailableSizeMB += sizeMB;
+
+                        // Проверяем, скачана ли модель
+                        if (this.isModelDownloadedWithFallback(code, model.id, 'tts')) {
+                            downloadedCount++;
+                            totalDownloadedSizeMB += sizeMB;
+                        }
+                    });
+                }
+            }
+        });
+
+        const percentage = totalAvailableSizeMB > 0 ?
+            Math.round((totalDownloadedSizeMB / totalAvailableSizeMB) * 100) : 0;
+
+        console.log(`📊 Хранилище моделей: ${downloadedCount}/${totalAvailableModels} моделей, ${this.formatSize(totalDownloadedSizeMB)} из ${this.formatSize(totalAvailableSizeMB)} (${percentage}%)`);
+
+        return {
+            downloadedCount,
+            totalModels: totalAvailableModels,
+            downloadedSize: totalDownloadedSizeMB,
+            totalSize: totalAvailableSizeMB,
+            percentage
+        };
+    }
+
+
+    // НОВЫЙ МЕТОД: проверка загрузки модели с fallback
+    isModelDownloadedWithFallback(langCode, modelId, modelType) {
+        // 1. Проверяем ModelManager
+        if (window.ModelManager && typeof window.ModelManager.isModelDownloaded === 'function') {
+            const result = window.ModelManager.isModelDownloaded(langCode, modelId, modelType);
+            if (result) {
+                return true;
+            }
+        }
+
+        // 2. Проверяем localStorage как fallback
+        const key = `model_${langCode}_${modelType}_${modelId}`;
+        const stateStr = localStorage.getItem(key);
+        if (stateStr) {
+            try {
+                const state = JSON.parse(stateStr);
+                return state.isDownloaded === true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    // НОВЫЙ МЕТОД: получение выбранной модели с fallback
+    getSelectedModelWithFallback(langCode, modelType) {
+        // Сначала проверяем localStorage (как основной источник истины)
+        const key = `selected_model_${langCode}_${modelType}`;
+        const localStorageValue = localStorage.getItem(key);
+
+        // Если есть ModelManager, проверяем его тоже
+        if (window.ModelManager && typeof window.ModelManager.getSelectedModel === 'function') {
+            const modelManagerValue = window.ModelManager.getSelectedModel(langCode, modelType);
+            // Если значения различаются, приоритет у localStorage
+            if (localStorageValue !== modelManagerValue && localStorageValue !== null) {
+                console.log(`⚠️ Расхождение: localStorage=${localStorageValue}, ModelManager=${modelManagerValue}, используем localStorage`);
+            }
+        }
+
+        // Возвращаем значение из localStorage (или null если его нет)
+        return localStorageValue;
+    }
+
+    // НОВЫЙ МЕТОД: сохраняем состояние модели в localStorage
+    saveModelState(langCode, modelId, modelType, isDownloaded = true) {
+        const key = `model_${langCode}_${modelType}_${modelId}`;
+        const state = {
+            langCode,
+            modelId,
+            modelType,
+            isDownloaded,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(key, JSON.stringify(state));
+        console.log(`💾 Сохранено состояние модели: ${langCode}/${modelType}/${modelId} = ${isDownloaded}`);
+    }
+
+    // НОВЫЙ МЕТОД: удаляем состояние модели из localStorage
+    removeModelState(langCode, modelId, modelType) {
+        const key = `model_${langCode}_${modelType}_${modelId}`;
+        localStorage.removeItem(key);
+        console.log(`🗑️ Удалено состояние модели: ${langCode}/${modelType}/${modelId}`);
+    }
+
+    // ДОБАВЬТЕ НОВЫЙ МЕТОД:
+    getTotalModelCount() {
+        const learningLangs = this.options.learningLanguages;
+        let count = 0;
+
+        Object.entries(this.languageData).forEach(([code, data]) => {
+            if (learningLangs.includes(code) && data.models) {
+                if (data.models.whisper) {
+                    count += data.models.whisper.length;
+                }
+                if (data.models.tts) {
+                    count += data.models.tts.length;
+                }
+            }
+        });
+
+        return count;
+    }
+
+    // ОБНОВЛЕННЫЙ МЕТОД: обновление информации о хранилище
+    async updateStorageInfo() {
+        const storageInfo = this.calculateStorageUsage();
+
+        // Получаем информацию о реальном хранилище браузера
+        let browserQuota = null;
+        let browserUsage = null;
+        let browserAvailable = null;
+        let indexedDBUsage = null;
+
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const estimate = await navigator.storage.estimate();
+                browserQuota = estimate.quota; // Максимальный объем хранилища (в байтах)
+                browserUsage = estimate.usage; // Текущее использование (в байтах)
+                browserAvailable = browserQuota - browserUsage; // Свободное место (в байтах)
+                
+                // Пытаемся получить детали использования IndexedDB
+                if (estimate.usageDetails && estimate.usageDetails.indexedDB !== undefined) {
+                    indexedDBUsage = estimate.usageDetails.indexedDB;
+                }
+            } catch (error) {
+                console.warn('Не удалось получить информацию о хранилище браузера:', error);
+            }
+        }
+
+        // Используем размер загруженных моделей для более точного отображения
+        // Если IndexedDB usage доступен, используем его, иначе используем расчетный размер моделей
+        const modelsSizeBytes = storageInfo.downloadedSize * 1024 * 1024; // Размер моделей в байтах
+        
+        // Определяем какое значение использовать для отображения
+        let displayUsage = null;
+        if (indexedDBUsage !== null && indexedDBUsage > 0) {
+            displayUsage = indexedDBUsage;
+        } else if (browserUsage !== null && browserUsage > modelsSizeBytes * 0.5) {
+            // Используем browserUsage только если он больше половины размера моделей
+            // (чтобы избежать показа 0 когда модели загружены)
+            displayUsage = browserUsage;
+        } else if (modelsSizeBytes > 0) {
+            // Если есть загруженные модели, используем их размер
+            displayUsage = modelsSizeBytes;
+        } else if (browserUsage !== null) {
+            // Fallback на browserUsage
+            displayUsage = browserUsage;
+        }
+
+        // Обновляем прогресс-бар
+        const storageFill = document.getElementById('storage-progress-fill');
+        const storageText = document.getElementById('storage-progress-text');
+
+        let percentage = 0;
+        if (browserQuota && displayUsage !== null) {
+            percentage = Math.round((displayUsage / browserQuota) * 100);
+        } else if (storageInfo.totalSize > 0) {
+            // Fallback: используем процент от общего размера моделей
+            percentage = storageInfo.percentage;
+        }
+
+        if (storageFill) {
+            storageFill.style.width = `${percentage}%`;
+        }
+        if (storageText) {
+            storageText.textContent = `${percentage}%`;
+        }
+
+        // Обновляем статистику
+        const statsText = document.getElementById('storage-stats-text');
+        const detailsText = document.getElementById('storage-details');
+
+        if (statsText) {
+            if (browserQuota && displayUsage !== null) {
+                // Показываем реальное использование хранилища браузера
+                statsText.textContent = `${this.formatSize(displayUsage / (1024 * 1024))} из ${this.formatSize(browserQuota / (1024 * 1024))}`;
+            } else {
+                // Fallback: показываем информацию о моделях
+                statsText.textContent = `${storageInfo.downloadedCount} из ${storageInfo.totalModels} моделей (${this.formatSize(storageInfo.downloadedSize)})`;
+            }
+        }
+
+        if (detailsText) {
+            if (browserQuota && browserUsage !== null && browserAvailable !== null) {
+                // Определяем какое значение использовать для "Использовано"
+                // Если browserUsage очень мал, но есть загруженные модели, используем размер моделей
+                const modelsSizeMB = storageInfo.downloadedSize;
+                const browserUsageMB = browserUsage / (1024 * 1024);
+                const displayUsageMB = (browserUsageMB < modelsSizeMB * 0.5 && modelsSizeMB > 0) 
+                    ? modelsSizeMB 
+                    : browserUsageMB;
+                
+                // Пересчитываем доступное место с учетом реального использования
+                const displayAvailableMB = (browserQuota / (1024 * 1024)) - displayUsageMB;
+                
+                const modelsInfo = storageInfo.downloadedCount > 0 
+                    ? ` | <strong>Модели:</strong> ${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSize)})`
+                    : '';
+                detailsText.innerHTML = `
+                    <strong>Использовано:</strong> ${this.formatSize(displayUsageMB)} | 
+                    <strong>Доступно:</strong> ${this.formatSize(displayAvailableMB)} | 
+                    <strong>Всего:</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
+                `;
+            } else {
+                // Fallback: показываем информацию о моделях
+                detailsText.innerHTML = `
+                    <strong>Загружено моделей:</strong> ${storageInfo.downloadedCount} из ${storageInfo.totalModels} | 
+                    <strong>Размер моделей:</strong> ${this.formatSize(storageInfo.downloadedSize)}
+                `;
+            }
+        }
+    }
+
+    // Вспомогательные методы для работы с размерами
+    parseSizeToMB(sizeString) {
+        if (!sizeString) return 0;
+
+        const size = parseFloat(sizeString);
+        if (sizeString.toLowerCase().includes('gb')) {
+            return size * 1024;
+        } else if (sizeString.toLowerCase().includes('mb')) {
+            return size;
+        } else if (sizeString.toLowerCase().includes('kb')) {
+            return size / 1024;
+        }
+        return size;
+    }
+
+    formatSize(mbSize) {
+        if (mbSize >= 1024) {
+            return (mbSize / 1024).toFixed(1) + ' GB';
+        } else {
+            return mbSize.toFixed(1) + ' MB';
+        }
+    }
 
     // НОВЫЙ МЕТОД: компактная структура для профиля пользователя
     createProfilePanels() {
@@ -300,13 +898,6 @@ createLearningList() {
             return;
         }
 
-        // console.log('🎨 Рендер LanguageSelector в режиме:', this.options.mode);
-        // console.log('📦 Данные:', {
-        //     native: this.options.nativeLanguage,
-        //     learning: this.options.currentLearning,
-        //     learningList: this.options.learningLanguages
-        // });
-
         let html = '';
         switch (this.options.mode) {
             case 'native-selector':
@@ -325,37 +916,45 @@ createLearningList() {
             case 'header-selector':
                 html = this.createHeaderSelector();
                 break;
-            case 'profile-panels': // НОВЫЙ РЕЖИМ
+            case 'profile-panels':
                 html = this.createProfilePanels();
                 break;
-            case 'profile': // старый режим для обратной совместимости
+            case 'profile':
                 html = this.createNativeSelector() + this.createLearningList() + this.createLearningSelector();
                 break;
             case 'registration':
                 html = this.createNativeSelector() + this.createLearningSelector();
                 break;
+            case 'models-only':
+                html = this.createLearningList();
+                break;
             default:
                 html = this.createNativeSelector();
         }
 
-        // console.log('📝', html.length);
         this.options.container.innerHTML = html;
-
         this.bindEvents();
 
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+
+        // Обновляем информацию о хранилище после рендеринга (для режима models-only)
+        if (this.options.mode === 'models-only' || this.options.mode === 'learning-list') {
+            setTimeout(() => {
+                this.updateStorageInfo();
+            }, 100);
+        }
     }
 
+    // Обновленные обработчики событий
     bindEvents() {
-        // Обработчики для кастомных селекторов
+        // 1. Обработчики для кастомных селекторов
         const customSelects = this.options.container.querySelectorAll('.custom-select-wrapper');
         customSelects.forEach(select => {
             const trigger = select.querySelector('.custom-select-trigger');
             const options = select.querySelector('.custom-select-options');
             const parentGroup = select.closest('.language-selector-group');
-            const hiddenSelect = parentGroup ? parentGroup.querySelector('.language-select-hidden') : null;
             const selectorType = parentGroup ? parentGroup.dataset.selectorType : null;
 
             if (!trigger || !options) {
@@ -372,22 +971,14 @@ createLearningList() {
                 option.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const value = option.dataset.value;
-                    console.log('🎯 Выбран язык:', value);
 
-                    // Обновляем данные в зависимости от типа селектора
                     if (selectorType === 'native') {
                         this.options.nativeLanguage = value;
                     } else if (selectorType === 'learning') {
                         this.options.currentLearning = value;
                     }
 
-                    // В режиме profile-panels перерисовываем только нужные части
-                    if (this.options.mode === 'profile-panels') {
-                        this.render();
-                    } else {
-                        this.render();
-                    }
-
+                    this.render();
                     this.triggerChange();
                 });
             });
@@ -398,142 +989,121 @@ createLearningList() {
             this.options.container.querySelectorAll('.custom-select-options').forEach(options => {
                 options.style.display = 'none';
             });
-        });
 
-        // Обработчики для чекбоксов изучаемых языков
-        const checkboxes = this.options.container.querySelectorAll('.language-checkbox input');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', (e) => {
-                const lang = e.target.closest('.language-item').dataset.lang;
-
-                if (e.target.checked) {
-                    if (!this.options.learningLanguages.includes(lang)) {
-                        this.options.learningLanguages.push(lang);
-                    }
-                } else {
-                    this.options.learningLanguages = this.options.learningLanguages.filter(l => l !== lang);
-                    // Если убрали текущий изучаемый язык, выбираем первый из оставшихся
-                    if (this.options.currentLearning === lang) {
-                        this.options.currentLearning = this.options.learningLanguages[0] || '';
-                    }
-                }
-
-                // В режиме profile-panels перерисовываем полностью для синхронизации
-                this.render();
-                this.triggerChange();
+            // Закрываем все выпадающие списки моделей
+            this.options.container.querySelectorAll('.model-select-dropdown').forEach(dropdown => {
+                dropdown.style.display = 'none';
             });
         });
 
-        // Обработчики для иконок чекбоксов - клик по иконке делает язык текущим (если язык уже выбран)
-        const checkboxIcons = this.options.container.querySelectorAll('.checkbox-icon');
-        checkboxIcons.forEach(icon => {
-            icon.addEventListener('click', (e) => {
-                e.stopPropagation(); // Предотвращаем всплытие события
-                const action = icon.dataset.action;
-                const lang = icon.closest('.language-item').dataset.lang;
-                
-                if (action === 'set-current') {
-                    // Язык выбран, но не текущий - делаем его текущим
-                    if (this.options.learningLanguages.includes(lang)) {
-                        this.options.currentLearning = lang;
-                        this.render();
-                        this.triggerChange();
-                    }
-                } else if (action === 'toggle') {
-                    // Язык не выбран - переключаем чекбокс
-                    const checkbox = icon.closest('.language-checkbox').querySelector('input');
-                    if (checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        checkbox.dispatchEvent(new Event('change'));
+        // 2. Обработчики для выпадающих списков моделей
+        this.options.container.addEventListener('click', (e) => {
+            // Клик по строке языка (делаем текущим изучаемым)
+            const languageItem = e.target.closest('.language-item');
+            if (languageItem && !e.target.closest('.model-select-wrapper')) {
+                const lang = languageItem.dataset.lang;
+
+                if (this.options.learningLanguages.includes(lang)) {
+                    this.options.currentLearning = lang;
+                    this.render();
+                    this.triggerChange();
+                }
+                return;
+            }
+
+            // Открытие/закрытие выпадающего списка моделей
+            if (e.target.closest('.model-select-trigger')) {
+                const trigger = e.target.closest('.model-select-trigger');
+                const langCode = trigger.dataset.lang;
+                const dropdown = this.options.container.querySelector(`#model-dropdown-${langCode}`);
+
+                if (dropdown) {
+                    // Закрываем все другие выпадающие списки
+                    this.options.container.querySelectorAll('.model-select-dropdown').forEach(d => {
+                        if (d !== dropdown) {
+                            d.style.display = 'none';
+                        }
+                    });
+
+                    // Открываем/закрываем текущий
+                    const isVisible = dropdown.style.display === 'block';
+                    if (!isVisible) {
+                        // Вычисляем позицию для fixed позиционирования
+                        const triggerRect = trigger.getBoundingClientRect();
+                        dropdown.style.position = 'fixed';
+                        dropdown.style.top = `${triggerRect.bottom + window.scrollY + 2}px`;
+                        dropdown.style.right = `${window.innerWidth - triggerRect.right + window.scrollX}px`;
+                        dropdown.style.left = 'auto';
+                        dropdown.style.width = '350px';
+                        dropdown.style.zIndex = '10000';
+                        dropdown.style.display = 'block';
+                    } else {
+                        dropdown.style.display = 'none';
                     }
                 }
-                // Если action === 'current', ничего не делаем (язык уже текущий)
-            });
-        });
+                e.stopPropagation();
+                return;
+            }
 
-        // Обработчик клика по всей строке языка - переключает чекбокс
-        const languageItems = this.options.container.querySelectorAll('.language-item');
-        languageItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                // Пропускаем клики по иконке чекбокса (она обрабатывается отдельно)
-                if (e.target.closest('.checkbox-icon')) {
+            // Выбор модели из списка (кроме переключателя загрузки)
+            const modelItem = e.target.closest('.model-dropdown-item');
+            if (modelItem && !e.target.closest('.model-switch')) {
+                const langCode = modelItem.dataset.lang;
+                const modelId = modelItem.dataset.model;
+                const modelType = modelItem.dataset.type;
+                const isNone = modelItem.dataset.isNone === 'true';
+                const isDownloaded = modelItem.dataset.isDownloaded === 'true';
+
+                // Двойной клик - выбор модели
+                if (e.detail === 2) {
+                    // Очищаем таймер одинарного клика, если он был установлен
+                    if (this._clickTimeout) {
+                        clearTimeout(this._clickTimeout);
+                        this._clickTimeout = null;
+                    }
+                    this.selectModel(langCode, modelId, modelType, isNone, isDownloaded);
+                    e.stopPropagation();
                     return;
                 }
-                // Пропускаем клики по переключателю Whisper
-                if (e.target.closest('.whisper-model-toggle-container')) {
-                    return;
-                }
-                
-                const checkbox = item.querySelector('.language-checkbox input');
-                if (checkbox) {
-                    checkbox.checked = !checkbox.checked;
-                    checkbox.dispatchEvent(new Event('change'));
-                }
-            });
-        });
 
-        // Обработчики для переключателей локальной модели Whisper (иконки Lucide)
-        // Используем делегирование событий для динамически созданных элементов
-        this.options.container.addEventListener('click', async (e) => {
-            const icon = e.target.closest('.whisper-toggle-icon');
-            if (!icon) return;
-            
-            e.stopPropagation(); // Предотвращаем всплытие события на language-item
-            const lang = icon.dataset.lang;
-            if (!lang) return;
-            
-            const isChecked = icon.getAttribute('data-lucide') === 'circle-check-big';
-            
-            console.log(`🔄 Переключатель Whisper для языка ${lang}: ${isChecked ? 'выключен' : 'включен'}`);
-            
-            if (!isChecked) {
-                // Включаем переключатель - начинаем загрузку модели
-                try {
-                    await this.downloadWhisperModelIcon(lang, icon);
-                } catch (error) {
-                    console.error(`Ошибка загрузки модели для ${lang}:`, error);
-                    // В случае ошибки оставляем иконку в выключенном состоянии
-                    icon.setAttribute('data-lucide', 'circle');
-                    icon.style.opacity = '0.5';
-                    if (window.lucide) {
-                        window.lucide.createIcons();
-                    }
+                // Одинарный клик - выбор модели (для удобства)
+                // Используем setTimeout чтобы не конфликтовать с двойным кликом
+                if (!this._clickTimeout) {
+                    this._clickTimeout = setTimeout(() => {
+                        this.selectModel(langCode, modelId, modelType, isNone, isDownloaded);
+                        this._clickTimeout = null;
+                    }, 300); // Задержка для двойного клика
                 }
-            } else {
-                // Выключаем переключатель - модель остается в браузере, но не используется
-                icon.setAttribute('data-lucide', 'circle');
-                icon.style.opacity = '0.5';
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-                this.updateWhisperModelStatus(lang, false);
+
+                e.stopPropagation();
+                return;
             }
         });
-        
-        // Инициализация состояния иконок после рендеринга
-        const whisperToggleIcons = this.options.container.querySelectorAll('.whisper-toggle-icon');
-        console.log(`🔍 Найдено переключателей Whisper: ${whisperToggleIcons.length}`);
-        
-        whisperToggleIcons.forEach((icon, index) => {
-            const lang = icon.dataset.lang;
-            if (!lang) return;
-            
-            console.log(`🔧 Настройка переключателя ${index + 1} для языка: ${lang}`);
-            
-            // Проверяем состояние модели при загрузке
-            this.checkWhisperModelStatusIcon(lang, icon).catch(err => {
-                console.error(`Ошибка проверки статуса модели для ${lang}:`, err);
-            });
-        });
-        
-        // Обновляем иконки Lucide после рендеринга
-        if (window.lucide && window.lucide.createIcons) {
-            setTimeout(() => {
-                window.lucide.createIcons();
-            }, 100);
-        }
 
-        // Обработчик ТОЛЬКО для header-selector режима
+        // 3. Обработчик переключателей загрузки моделей
+        this.options.container.addEventListener('change', (e) => {
+            if (e.target.classList.contains('model-download-toggle')) {
+                const langCode = e.target.dataset.lang;
+                const modelId = e.target.dataset.model;
+                const modelType = e.target.dataset.type;
+                const isChecked = e.target.checked;
+
+                const slider = e.target.nextElementSibling;
+                const sliderCircle = slider.querySelector('.model-slider-circle');
+
+                if (isChecked) {
+                    // Загрузка модели
+                    this.downloadModel(langCode, modelId, modelType, slider, sliderCircle);
+                } else {
+                    // Удаление модели
+                    this.removeModel(langCode, modelId, modelType, slider, sliderCircle);
+                }
+
+                e.stopPropagation();
+            }
+        });
+
+        // 4. Обработчик для header-selector режима
         if (this.options.mode === 'header-selector') {
             const headerCombo = this.options.container.querySelector('.header-flag-combo');
             const headerDropdown = this.options.container.querySelector('.header-selector-dropdown');
@@ -550,7 +1120,6 @@ createLearningList() {
                     option.addEventListener('click', (e) => {
                         e.stopPropagation();
                         const value = option.dataset.value;
-                        console.log('🎯 Выбран язык:', value);
 
                         this.options.currentLearning = value;
                         this.updateHeaderButton();
@@ -571,122 +1140,565 @@ createLearningList() {
                 });
             }
         }
+
+        // 5. Отладочная кнопка для тестирования
+        const debugBtn = document.createElement('button');
+        debugBtn.textContent = '🔄 Отладка хранилища';
+        debugBtn.style.cssText = 'position: fixed; bottom: 10px; right: 10px; padding: 5px 10px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; z-index: 9999; font-size: 11px;';
+        debugBtn.onclick = () => this.debugStorage();
+        document.body.appendChild(debugBtn);
+
+        // Обновляем иконки Lucide
+        if (window.lucide && window.lucide.createIcons) {
+            setTimeout(() => {
+                window.lucide.createIcons();
+            }, 100);
+        }
+
+        // 6. Обработчики для списка загруженных моделей
+        this.options.container.addEventListener('click', (e) => {
+            // Клик по кнопке удаления в списке
+            const removeBtn = e.target.closest('.remove-model-btn');
+            if (removeBtn) {
+                e.stopPropagation();
+                const langCode = removeBtn.dataset.lang;
+                const modelId = removeBtn.dataset.model;
+                const modelType = removeBtn.dataset.type;
+
+                this.confirmAndRemoveModel(langCode, modelId, modelType, removeBtn);
+                return;
+            }
+
+            // Двойной клик по строке в списке для выбора модели
+            const modelRow = e.target.closest('.model-list-item');
+            if (modelRow && e.detail === 2) {
+                e.stopPropagation();
+                const langCode = modelRow.dataset.lang;
+                const modelId = modelRow.dataset.model;
+                const modelType = modelRow.dataset.type;
+
+                // Проверяем, активна ли уже эта модель
+                if (this.isModelActive(langCode, modelId, modelType)) {
+                    console.log(`Модель ${langCode}/${modelType}/${modelId} уже активна`);
+                    return;
+                }
+
+                // Выбираем модель
+                this.selectModel(langCode, modelId, modelType, false, true);
+                return;
+            }
+        });
     }
 
-    // Проверка статуса модели Whisper для языка (для иконки)
-    async checkWhisperModelStatusIcon(langCode, iconElement) {
+    // НОВЫЙ МЕТОД: подтверждение и удаление модели
+    async confirmAndRemoveModel(langCode, modelId, modelType, buttonElement) {
+            const modelData = this.languageData[langCode]?.models?.[modelType]?.find(m => m.id === modelId);
+            if (!modelData) return;
+
+            const languageName = this.getLanguageName(langCode);
+            const modelName = modelData.name;
+            const modelTypeName = modelType === 'whisper' ? 'Whisper' : 'TTS';
+
+            // Проверяем, активна ли эта модель
+            const isActive = this.isModelActive(langCode, modelId, modelType);
+
+            // Показываем модальное окно подтверждения
+            const confirmed = await this.showModelRemoveConfirmModal(
+                languageName,
+                modelTypeName,
+                modelName,
+                isActive
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                buttonElement.disabled = true;
+
+                // Показываем индикатор загрузки
+                this.showRemoveModelLoading();
+
+                // Если модель активна, снимаем выбор
+                if (isActive) {
+                    const key = `selected_model_${langCode}_${modelType}`;
+                    localStorage.removeItem(key);
+
+                    if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+                        window.ModelManager.setSelectedModel(langCode, modelType, null);
+                    }
+                }
+
+                // Удаляем модель
+                await this.removeModel(langCode, modelId, modelType);
+
+                // Скрываем индикатор загрузки
+                this.hideRemoveModelLoading();
+
+                // Обновляем интерфейс (таблица обновится и строка исчезнет)
+                this.updateModelSelectionUI(langCode);
+                this.updateModelsTable();
+                this.updateStorageInfo();
+                
+                // Если это правая панель, обновляем также левую панель (если она существует)
+                if (window.languageSelector && this.options.mode === 'models-only') {
+                    window.languageSelector.updateModelSelectionUI(langCode);
+                }
+
+            } catch (error) {
+                console.error('Ошибка при удалении модели:', error);
+                this.hideRemoveModelLoading();
+                alert('Ошибка при удалении модели: ' + error.message);
+                buttonElement.disabled = false;
+            }
+    }
+
+    // Модальное окно подтверждения удаления модели
+    showModelRemoveConfirmModal(languageName, modelTypeName, modelName, isActive) {
+        return new Promise((resolve) => {
+            // Удаляем старое модальное окно, если есть
+            const oldModal = document.getElementById('model-remove-confirm-modal');
+            if (oldModal) {
+                oldModal.remove();
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'model-remove-confirm-modal';
+            modal.style.cssText = `
+                display: flex;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 10001;
+                justify-content: center;
+                align-items: center;
+            `;
+
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 24px;
+                    border-radius: 8px;
+                    max-width: 450px;
+                    width: 90%;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                ">
+                    <h3 style="margin: 0 0 16px 0; color: #333; font-size: 18px;">
+                        Удаление модели
+                    </h3>
+                    <div style="margin: 0 0 20px 0; color: #666; font-size: 14px; line-height: 1.6;">
+                        <p style="margin: 0 0 12px 0;">
+                            Вы уверены, что хотите удалить модель
+                        </p>
+                        <p style="margin: 0 0 12px 0;">
+                            <strong>"${modelTypeName}: ${modelName}"</strong>
+                        </p>
+                        <p style="margin: 0;">
+                            для языка <strong>"${languageName}"</strong>?
+                        </p>
+                        ${isActive ? `
+                            <p style="margin: 12px 0 0 0; color: #d32f2f; font-weight: 500;">
+                                ⚠️ Эта модель активна! После удаления будет выбрана опция "без модели".
+                            </p>
+                        ` : ''}
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button id="remove-cancel-btn" style="
+                            padding: 10px 20px;
+                            border: 1px solid #ddd;
+                            border-radius: 6px;
+                            background: white;
+                            color: #333;
+                            cursor: pointer;
+                            font-size: 14px;
+                            transition: background-color 0.2s;
+                        " onmouseover="this.style.backgroundColor='#f5f5f5'" onmouseout="this.style.backgroundColor='white'">
+                            Не удалять
+                        </button>
+                        <button id="remove-confirm-btn" style="
+                            padding: 10px 20px;
+                            border: none;
+                            border-radius: 6px;
+                            background: #dc3545;
+                            color: white;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 600;
+                            transition: background-color 0.2s;
+                        " onmouseover="this.style.backgroundColor='#c82333'" onmouseout="this.style.backgroundColor='#dc3545'">
+                            Удалить
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Обработчики кнопок
+            const cancelBtn = modal.querySelector('#remove-cancel-btn');
+            const confirmBtn = modal.querySelector('#remove-confirm-btn');
+
+            const cleanup = () => {
+                modal.remove();
+            };
+
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(false);
+            });
+
+            confirmBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(true);
+            });
+
+            // Закрытие по клику вне модального окна
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    cleanup();
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    // Показать индикатор загрузки при удалении
+    showRemoveModelLoading() {
+        let loadingModal = document.getElementById('model-remove-loading-modal');
+        if (loadingModal) {
+            loadingModal.style.display = 'flex';
+            return;
+        }
+
+        loadingModal = document.createElement('div');
+        loadingModal.id = 'model-remove-loading-modal';
+        loadingModal.style.cssText = `
+            display: flex;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10002;
+            justify-content: center;
+            align-items: center;
+        `;
+
+        loadingModal.innerHTML = `
+            <div style="
+                background: white;
+                padding: 30px;
+                border-radius: 8px;
+                text-align: center;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                min-width: 200px;
+            ">
+                <div class="loading-spinner" style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #e0e0e0;
+                    border-top: 4px solid #dc3545;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 15px;
+                "></div>
+                <p style="
+                    margin: 0;
+                    color: #666;
+                    font-size: 14px;
+                ">Удаление модели...</p>
+            </div>
+        `;
+
+        // Добавляем анимацию spin если её нет
+        if (!document.getElementById('remove-loading-spin-style')) {
+            const style = document.createElement('style');
+            style.id = 'remove-loading-spin-style';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
+        document.body.appendChild(loadingModal);
+    }
+
+    // Скрыть индикатор загрузки при удалении
+    hideRemoveModelLoading() {
+        const loadingModal = document.getElementById('model-remove-loading-modal');
+        if (loadingModal) {
+            loadingModal.style.display = 'none';
+        }
+    }
+
+    // НОВЫЙ МЕТОД: обновление списка моделей
+    updateModelsTable() {
+        const modelsPanel = this.options.container.querySelector('.downloaded-models-panel');
+        if (modelsPanel) {
+            modelsPanel.outerHTML = this.createDownloadedModelsTable();
+            // Инициализируем иконки Lucide после обновления списка
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                setTimeout(() => {
+                    lucide.createIcons();
+                }, 0);
+            }
+            // Обновляем информацию о хранилище после обновления списка
+            setTimeout(() => {
+                this.updateStorageInfo();
+            }, 50);
+        }
+    }
+
+    // НОВЫЙ МЕТОД: загрузка модели
+    async downloadModel(langCode, modelId, modelType, slider, sliderCircle) {
         try {
-            // Проверяем, есть ли модель в глобальном хранилище
-            const modelKey = `whisper_model_${langCode}_base`;
-            const storedModel = window.WhisperModels?.get?.(modelKey);
-            
-            if (storedModel && storedModel.isReady) {
-                iconElement.setAttribute('data-lucide', 'circle-check-big');
-                iconElement.style.opacity = '1';
-                this.updateWhisperModelStatus(langCode, true);
-            } else {
-                // Проверяем в localStorage как fallback
-                const modelStatus = localStorage.getItem(modelKey);
-                if (modelStatus === 'downloaded' || modelStatus === 'ready') {
-                    iconElement.setAttribute('data-lucide', 'circle-check-big');
-                    iconElement.style.opacity = '1';
-                    this.updateWhisperModelStatus(langCode, true);
+            const languageName = this.getLanguageName(langCode);
+            const modelData = this.languageData[langCode]?.models?.[modelType]?.find(m => m.id === modelId);
+
+            if (!modelData) {
+                console.error(`Модель ${modelId} не найдена для языка ${langCode}`);
+                return;
+            }
+
+            // Показываем модальное окно загрузки
+            this.showWhisperDownloadModal(langCode);
+            this.updateWhisperDownloadModalStatus(`Загрузка ${modelType === 'whisper' ? 'Whisper' : 'TTS'} модели ${modelData.name}...`);
+
+            const updateProgress = (percent) => {
+                this.updateWhisperDownloadModalProgress(percent);
+            };
+
+            updateProgress(0);
+
+            try {
+                // Пробуем загрузить через ModelManager
+                if (window.ModelManager && typeof window.ModelManager.downloadModel === 'function') {
+                    console.log(`🔄 Начинаем загрузку через ModelManager: ${langCode}/${modelType}/${modelId}`);
+
+                    // Сначала устанавливаем модель как скачанную (чтобы UI обновился сразу)
+                    window.ModelManager.setModelDownloaded(langCode, modelId, modelType, {
+                        size: this.parseSizeToMB(modelData.size) * 1024 * 1024, // в байтах
+                        name: modelData.name
+                    });
+
+                    // Обновляем UI сразу
+                    slider.classList.add('downloaded');
+                    slider.style.backgroundColor = '#8B4513';
+                    if (sliderCircle) {
+                        sliderCircle.style.backgroundColor = '#FFD700';
+                        sliderCircle.style.transform = 'translateX(20px)';
+                    }
+
+                    // Пытаемся скачать (это может упасть с 404)
+                    try {
+                        await window.ModelManager.downloadModel(langCode, modelId, modelType, (progress) => {
+                            if (progress && progress.percent !== undefined) {
+                                const percent = Math.round(progress.percent);
+                                updateProgress(percent);
+                            }
+                        });
+
+                        console.log(`✅ ModelManager успешно загрузил модель ${langCode}/${modelType}/${modelId}`);
+
+                    } catch (downloadError) {
+                        console.log(`⚠️ Ошибка загрузки модели:`, downloadError);
+
+                        // Если это 404, продолжаем работу с локально сохраненной моделью
+                        if (downloadError.message.includes('404')) {
+                            console.log(`ℹ️ Сервер не доступен, работаем в offline режиме`);
+                            this.updateWhisperDownloadModalStatus('⚠️ Офлайн режим. Модель сохранена локально');
+
+                            // Ждем немного для показа сообщения
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                        } else {
+                            throw downloadError;
+                        }
+                    }
+
                 } else {
-                    iconElement.setAttribute('data-lucide', 'circle');
-                    iconElement.style.opacity = '0.5';
-                    this.updateWhisperModelStatus(langCode, false);
+                    // ModelManager не найден, работаем локально
+                    console.log(`🔄 ModelManager не найден, работаем локально`);
+
+                    // Сохраняем в localStorage напрямую
+                    this.saveModelState(langCode, modelId, modelType, true);
+
+                    // Обновляем UI
+                    slider.classList.add('downloaded');
+                    slider.style.backgroundColor = '#8B4513';
+                    if (sliderCircle) {
+                        sliderCircle.style.backgroundColor = '#FFD700';
+                        sliderCircle.style.transform = 'translateX(20px)';
+                    }
+
+                    // Имитация загрузки
+                    await new Promise(resolve => {
+                        let percent = 0;
+                        const interval = setInterval(() => {
+                            percent += 10;
+                            updateProgress(percent);
+
+                            if (percent >= 100) {
+                                clearInterval(interval);
+                                resolve();
+                            }
+                        }, 100);
+                    });
+                }
+
+                updateProgress(100);
+                this.updateWhisperDownloadModalStatus('✅ Модель готова к использованию!');
+
+                // Закрываем модальное окно через 1 секунду
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 1000);
+
+                // Обновляем информацию о хранилище и список моделей
+                this.updateStorageInfo();
+                this.updateModelsTable();
+                
+                // Если это левая панель, обновляем также правую панель (если она существует)
+                if (window.languageModelsSelector && this.options.mode !== 'models-only') {
+                    window.languageModelsSelector.updateModelsTable();
+                    window.languageModelsSelector.updateStorageInfo();
+                }
+
+            } catch (error) {
+                console.error('Неожиданная ошибка:', error);
+                this.updateWhisperDownloadModalStatus(`❌ Ошибка: ${error.message}`);
+
+                setTimeout(() => {
+                    this.hideWhisperDownloadModal();
+                }, 2000);
+            }
+
+        } catch (error) {
+            console.error('Ошибка в downloadModel:', error);
+            this.hideWhisperDownloadModal();
+        }
+    }
+
+    // ОБНОВЛЕННЫЙ МЕТОД: удаление модели
+    async removeModel(langCode, modelId, modelType, slider = null, sliderCircle = null) {
+        // Если нет slider и sliderCircle (вызов из таблицы), все равно удаляем
+        try {
+            // Удаляем из ModelManager
+            if (window.ModelManager && typeof window.ModelManager.removeModel === 'function') {
+                window.ModelManager.removeModel(langCode, modelId, modelType);
+            }
+
+            // Удаляем из localStorage
+            this.removeModelState(langCode, modelId, modelType);
+
+            // Обновляем UI если переданы элементы
+            if (slider) {
+                slider.classList.remove('downloaded');
+                slider.style.backgroundColor = '#ccc';
+                if (sliderCircle) {
+                    sliderCircle.style.backgroundColor = 'white';
+                    sliderCircle.style.transform = 'translateX(0)';
                 }
             }
-            
-            // Обновляем иконки Lucide
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
-        } catch (error) {
-            console.error('Ошибка проверки статуса модели Whisper:', error);
-            iconElement.setAttribute('data-lucide', 'circle');
-            iconElement.style.opacity = '0.5';
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
-        }
-    }
 
-    // Проверка статуса модели Whisper для языка (старый метод для совместимости)
-    async checkWhisperModelStatus(langCode, toggleElement) {
-        try {
-            // Проверяем, есть ли модель в глобальном хранилище
-            const modelKey = `whisper_model_${langCode}_base`;
-            const storedModel = window.WhisperModels?.get?.(modelKey);
+            // Обновляем таблицу и информацию о хранилище
+            this.updateModelsTable();
+            this.updateStorageInfo();
             
-            if (storedModel && storedModel.isReady) {
-                toggleElement.checked = true;
-                this.updateWhisperModelStatus(langCode, true);
+            // Синхронизация между панелями
+            if (this.options.mode === 'models-only') {
+                // Если это правая панель, обновляем левую панель
+                if (window.languageSelector) {
+                    window.languageSelector.updateModelSelectionUI(langCode);
+                }
             } else {
-                // Проверяем в localStorage как fallback
-                const modelStatus = localStorage.getItem(modelKey);
-                if (modelStatus === 'downloaded' || modelStatus === 'ready') {
-                    toggleElement.checked = true;
-                    this.updateWhisperModelStatus(langCode, true);
-                } else {
-                    toggleElement.checked = false;
-                    this.updateWhisperModelStatus(langCode, false);
+                // Если это левая панель, обновляем правую панель
+                if (window.languageModelsSelector) {
+                    window.languageModelsSelector.updateModelsTable();
+                    window.languageModelsSelector.updateStorageInfo();
                 }
             }
+
         } catch (error) {
-            console.error('Ошибка проверки статуса модели Whisper:', error);
-            toggleElement.checked = false;
+            console.error('Ошибка удаления модели:', error);
+            throw error; // Пробрасываем ошибку дальше
         }
     }
 
-    // Обновление визуального статуса модели
-    updateWhisperModelStatus(langCode, isEnabled) {
-        // Обновляем иконку переключателя Whisper
-        const iconElement = this.options.container.querySelector(`.whisper-toggle-icon[data-lang="${langCode}"]`);
-        if (iconElement) {
-            if (isEnabled) {
-                iconElement.setAttribute('data-lucide', 'circle-check-big');
-                iconElement.style.opacity = '1';
-            } else {
-                iconElement.setAttribute('data-lucide', 'circle');
-                iconElement.style.opacity = '0.5';
-            }
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
-        }
-    }
-
-    // Создание модального окна для загрузки модели
+    // Методы для модального окна загрузки
     createWhisperDownloadModal(langCode) {
-        // Проверяем, существует ли уже модальное окно
         let modal = document.getElementById('whisper-download-modal');
         if (modal) {
             return modal;
         }
 
-        // Создаем модальное окно
         modal = document.createElement('div');
         modal.id = 'whisper-download-modal';
         modal.className = 'modal whisper-download-modal';
-        modal.style.display = 'none';
+        modal.style.cssText = `
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        `;
 
         const languageName = this.getLanguageName(langCode);
-        
+
         modal.innerHTML = `
-            <div class="modal-content whisper-download-modal-content">
+            <div class="modal-content whisper-download-modal-content" style="
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                max-width: 400px;
+                width: 90%;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            ">
                 <div class="whisper-download-header">
-                    <h3>Загрузка модели Whisper</h3>
+                    <h3 style="margin: 0 0 15px 0; color: #333;">Загрузка модели</h3>
                 </div>
                 <div class="whisper-download-body">
-                    <p class="whisper-download-text">Загрузка модели для языка: <strong>${languageName}</strong></p>
-                    <div class="whisper-download-progress-container">
-                        <div class="whisper-download-progress-bar">
-                            <div class="whisper-download-progress-fill" id="whisper-progress-fill"></div>
+                    <p class="whisper-download-text" style="margin: 0 0 15px 0; color: #666;">
+                        Загрузка модели для языка: <strong>${languageName}</strong>
+                    </p>
+                    <div class="whisper-download-progress-container" style="margin-bottom: 15px;">
+                        <div class="whisper-download-progress-bar" style="
+                            height: 8px;
+                            background: #e0e0e0;
+                            border-radius: 4px;
+                            overflow: hidden;
+                        ">
+                            <div class="whisper-download-progress-fill" id="whisper-progress-fill" style="
+                                height: 100%;
+                                background: #2196F3;
+                                width: 0%;
+                                transition: width 0.3s;
+                            "></div>
                         </div>
-                        <div class="whisper-download-percent" id="whisper-progress-percent">0%</div>
+                        <div class="whisper-download-percent" id="whisper-progress-percent" style="
+                            text-align: right;
+                            font-size: 12px;
+                            color: #666;
+                            margin-top: 5px;
+                        ">0%</div>
                     </div>
-                    <p class="whisper-download-status" id="whisper-download-status">Подготовка к загрузке...</p>
+                    <p class="whisper-download-status" id="whisper-download-status" style="
+                        margin: 0;
+                        font-size: 14px;
+                        color: #666;
+                    ">Подготовка к загрузке...</p>
                 </div>
             </div>
         `;
@@ -695,33 +1707,29 @@ createLearningList() {
         return modal;
     }
 
-    // Показать модальное окно загрузки
     showWhisperDownloadModal(langCode) {
         const modal = this.createWhisperDownloadModal(langCode);
         const progressFill = document.getElementById('whisper-progress-fill');
         const progressPercent = document.getElementById('whisper-progress-percent');
         const statusText = document.getElementById('whisper-download-status');
-        
-        // Обновляем название языка
+
         const languageName = this.getLanguageName(langCode);
         const textElement = modal.querySelector('.whisper-download-text');
         if (textElement) {
             textElement.innerHTML = `Загрузка модели для языка: <strong>${languageName}</strong>`;
         }
-        
-        // Сбрасываем прогресс
+
         if (progressFill) progressFill.style.width = '0%';
         if (progressPercent) progressPercent.textContent = '0%';
         if (statusText) statusText.textContent = 'Начало загрузки...';
-        
+
         modal.style.display = 'flex';
     }
 
-    // Обновить прогресс в модальном окне
     updateWhisperDownloadModalProgress(percent) {
         const progressFill = document.getElementById('whisper-progress-fill');
         const progressPercent = document.getElementById('whisper-progress-percent');
-        
+
         if (progressFill) {
             progressFill.style.width = `${percent}%`;
         }
@@ -730,7 +1738,6 @@ createLearningList() {
         }
     }
 
-    // Обновить статус в модальном окне
     updateWhisperDownloadModalStatus(text) {
         const statusText = document.getElementById('whisper-download-status');
         if (statusText) {
@@ -738,7 +1745,6 @@ createLearningList() {
         }
     }
 
-    // Скрыть модальное окно загрузки
     hideWhisperDownloadModal() {
         const modal = document.getElementById('whisper-download-modal');
         if (modal) {
@@ -746,314 +1752,255 @@ createLearningList() {
         }
     }
 
-    // Загрузка модели Whisper Base для языка (для иконки)
-    async downloadWhisperModelIcon(langCode, iconElement) {
-        console.log(`🔄 downloadWhisperModelIcon вызвана для языка: ${langCode}`);
+    // НОВЫЙ МЕТОД: выбор модели с проверкой загрузки
+    async selectModel(langCode, modelId, modelType, isNone, isDownloaded) {
+        // Если выбрана опция "без модели"
+        if (isNone) {
+            // Снимаем выборы со всех типов моделей (whisper и tts)
+            const whisperKey = `selected_model_${langCode}_whisper`;
+            const ttsKey = `selected_model_${langCode}_tts`;
 
-        try {
-            // Проверяем, есть ли уже модель
-            const modelKey = `whisper_model_${langCode}_base`;
-            const storedModel = window.WhisperModels?.get?.(modelKey);
-            
-            if (storedModel && storedModel.isReady) {
-                // Модель уже загружена
-                console.log(`✅ Модель для языка ${langCode} уже загружена`);
-                iconElement.setAttribute('data-lucide', 'circle-check-big');
-                iconElement.style.opacity = '1';
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-                this.updateWhisperModelStatus(langCode, true);
-                return;
+            localStorage.removeItem(whisperKey);
+            localStorage.removeItem(ttsKey);
+
+            console.log(`⭐ Снят выбор всех моделей для языка: ${langCode}`);
+
+            if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+                window.ModelManager.setSelectedModel(langCode, 'whisper', null);
+                window.ModelManager.setSelectedModel(langCode, 'tts', null);
             }
+            this.updateModelSelectionUI(langCode);
+            return;
+        }
 
-            // Используем WhisperModelManager для загрузки модели
-            if (!window.WhisperModelManager) {
-                console.error('❌ WhisperModelManager не загружен. Проверьте подключение скрипта whisper-model-manager.js');
-                iconElement.setAttribute('data-lucide', 'circle');
-                iconElement.style.opacity = '0.5';
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-                alert('Менеджер моделей Whisper не загружен. Пожалуйста, обновите страницу.');
-                return;
-            }
+        // Проверяем загрузку модели заново (на случай, если данные устарели)
+        const actuallyDownloaded = this.isModelDownloadedWithFallback(langCode, modelId, modelType);
 
-            const modelManager = new window.WhisperModelManager();
-            console.log(`🚀 Начинаем загрузку модели Whisper Base для языка: ${langCode}`);
+        // Если модель не загружена - показываем модальное окно подтверждения
+        if (!actuallyDownloaded) {
+            const languageData = this.languageData[langCode];
+            if (!languageData || !languageData.models) return;
 
-            // Показываем модальное окно загрузки
-            this.showWhisperDownloadModal(langCode);
-            this.updateWhisperDownloadModalStatus('Подготовка к загрузке...');
+            const modelData = languageData.models[modelType]?.find(m => m.id === modelId);
+            if (!modelData) return;
 
-            // Обновляем прогресс загрузки
-            const updateProgress = (progressInfo) => {
-                let percent = 0;
-                
-                // Transformers.js передает объект с полями: status, file, progress, loaded, total
-                if (typeof progressInfo === 'object' && progressInfo !== null) {
-                    if (progressInfo.progress !== undefined) {
-                        // progress может быть в диапазоне 0-1 или 0-100
-                        const progressValue = progressInfo.progress;
-                        if (progressValue <= 1) {
-                            // Диапазон 0-1
-                            percent = Math.min(100, Math.max(0, Math.round(progressValue * 100)));
-                        } else {
-                            // Диапазон 0-100, уже в процентах
-                            percent = Math.min(100, Math.max(0, Math.round(progressValue)));
+            const languageName = this.getLanguageName(langCode);
+            const modelName = modelData.name;
+            const modelSize = modelData.size;
+            const modelQuality = modelData.quality || '';
+
+            // Показываем модальное окно подтверждения
+            const confirmed = await this.showModelDownloadConfirmModal(
+                languageName,
+                modelType,
+                modelName,
+                modelSize,
+                modelQuality
+            );
+
+            if (confirmed) {
+                // Пользователь подтвердил - начинаем загрузку
+                // Находим элемент модели для загрузки
+                const dropdown = this.options.container.querySelector(`#model-dropdown-${langCode}`);
+                if (dropdown) {
+                    const modelItem = dropdown.querySelector(`[data-model="${modelId}"][data-type="${modelType}"]`);
+                    if (modelItem) {
+                        const slider = modelItem.querySelector('.model-slider');
+                        const sliderCircle = slider?.querySelector('.model-slider-circle');
+                        const checkbox = modelItem.querySelector('.model-download-toggle');
+
+                        if (checkbox) {
+                            checkbox.checked = true;
+                            await this.downloadModel(langCode, modelId, modelType, slider, sliderCircle);
+
+                            // После загрузки проверяем еще раз и выбираем модель
+                            const stillDownloaded = this.isModelDownloadedWithFallback(langCode, modelId, modelType);
+                            if (stillDownloaded) {
+                                // ВАЖНО: может быть выбрана только ОДНА модель (whisper ИЛИ tts)
+                                const currentKey = `selected_model_${langCode}_${modelType}`;
+                                const otherType = modelType === 'whisper' ? 'tts' : 'whisper';
+                                const otherKey = `selected_model_${langCode}_${otherType}`;
+
+                                // Сохраняем выбранную модель
+                                localStorage.setItem(currentKey, modelId);
+
+                                // Снимаем выбор с модели другого типа
+                                localStorage.removeItem(otherKey);
+
+                                if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+                                    window.ModelManager.setSelectedModel(langCode, modelType, modelId);
+                                    // Снимаем выбор с модели другого типа
+                                    window.ModelManager.setSelectedModel(langCode, otherType, null);
+                                }
+                                this.updateModelSelectionUI(langCode);
+                            }
                         }
-                    } else if (progressInfo.loaded !== undefined && progressInfo.total !== undefined && progressInfo.total > 0) {
-                        // Рассчитываем из loaded/total
-                        percent = Math.min(100, Math.max(0, Math.round((progressInfo.loaded / progressInfo.total) * 100)));
-                    }
-                    
-                    // Обновляем статус, если есть информация о файле
-                    if (progressInfo.file) {
-                        this.updateWhisperDownloadModalStatus(`Загрузка: ${progressInfo.file}`);
-                    } else if (progressInfo.status) {
-                        this.updateWhisperDownloadModalStatus(progressInfo.status);
-                    }
-                } else if (typeof progressInfo === 'number') {
-                    // Если передано число напрямую
-                    if (progressInfo <= 1) {
-                        // Диапазон 0-1
-                        percent = Math.min(100, Math.max(0, Math.round(progressInfo * 100)));
-                    } else {
-                        // Диапазон 0-100
-                        percent = Math.min(100, Math.max(0, Math.round(progressInfo)));
                     }
                 }
-                
-                // Обновляем прогресс в модальном окне
-                this.updateWhisperDownloadModalProgress(percent);
-                
-                // Логируем только если процент изменился значительно
-                if (percent > 0 && percent <= 100) {
-                    console.log(`📈 Прогресс загрузки: ${percent}%`);
-                }
-            };
-
-            // Загружаем модель через менеджер
-            updateProgress(0.1);
-            this.updateWhisperDownloadModalStatus('Загрузка модели Whisper Base...');
-            console.log('⏳ Загружаем модель через WhisperModelManager...');
-            
-            try {
-                const model = await modelManager.loadLanguageModel(
-                    langCode,
-                    'base',
-                    updateProgress
-                );
-
-                console.log('✅ Модель загружена:', model);
-                updateProgress(100);
-                this.updateWhisperDownloadModalStatus('✅ Модель успешно загружена!');
-                
-                // Обновляем иконку
-                iconElement.setAttribute('data-lucide', 'circle-check-big');
-                iconElement.style.opacity = '1';
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-                
-                // Проверяем, что модель (recognizer) загружена и готова
-                if (model && typeof model === 'function') {
-                    // Это recognizer от Transformers.js - готов к использованию
-                    this.updateWhisperModelStatus(langCode, true);
-                    console.log('✅ Recognizer готов к использованию');
-                } else if (model && model.isReady) {
-                    // Старый формат с флагом isReady
-                    this.updateWhisperModelStatus(langCode, true);
-                } else {
-                    // Модель загружена, но не готова
-                    this.updateWhisperModelStatus(langCode, true);
-                    console.warn('⚠️ Модель загружена, но может быть не готова к использованию.');
-                }
-                
-                // Закрываем модальное окно через 2 секунды
-                setTimeout(() => {
-                    this.hideWhisperDownloadModal();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('❌ Ошибка загрузки модели:', error);
-                iconElement.setAttribute('data-lucide', 'circle');
-                iconElement.style.opacity = '0.5';
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-                this.updateWhisperDownloadModalStatus(`❌ Ошибка: ${error.message}`);
-                
-                // Закрываем модальное окно через 2 секунды даже при ошибке
-                setTimeout(() => {
-                    this.hideWhisperDownloadModal();
-                }, 2000);
-                
-                alert(`Ошибка загрузки модели: ${error.message}`);
-                return;
             }
+            return;
+        }
 
-            // Обновляем UI
-            this.updateWhisperModelStatus(langCode, true);
-            console.log(`Модель Whisper Base для языка ${langCode} успешно загружена`);
-        } catch (error) {
-            console.error('Ошибка загрузки модели Whisper:', error);
-            iconElement.setAttribute('data-lucide', 'circle');
-            iconElement.style.opacity = '0.5';
-            if (window.lucide) {
-                window.lucide.createIcons();
+        // Если модель уже загружена - выбираем её
+        // ВАЖНО: может быть выбрана только ОДНА модель (whisper ИЛИ tts)
+        // Поэтому снимаем выбор с модели другого типа, если она была выбрана
+
+        const currentKey = `selected_model_${langCode}_${modelType}`;
+        const otherType = modelType === 'whisper' ? 'tts' : 'whisper';
+        const otherKey = `selected_model_${langCode}_${otherType}`;
+
+        // Сохраняем выбранную модель
+        localStorage.setItem(currentKey, modelId);
+
+        // Снимаем выбор с модели другого типа
+        localStorage.removeItem(otherKey);
+
+        console.log(`⭐ Выбрана модель: ${langCode}/${modelType}/${modelId}`);
+        console.log(`   Снят выбор с модели другого типа: ${langCode}/${otherType}`);
+
+        if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+            window.ModelManager.setSelectedModel(langCode, modelType, modelId);
+            // Снимаем выбор с модели другого типа
+            window.ModelManager.setSelectedModel(langCode, otherType, null);
+        }
+        this.updateModelSelectionUI(langCode);
+    }
+
+    // НОВЫЙ МЕТОД: обновление UI после выбора модели
+    updateModelSelectionUI(langCode) {
+        // Проверяем текущее состояние перед обновлением
+        const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
+        const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
+        console.log(`🔄 Обновление UI для ${langCode}: whisper=${selectedWhisper}, tts=${selectedTTS}`);
+
+        // Обновляем выпадающий список
+        const dropdown = this.options.container.querySelector(`#model-dropdown-${langCode}`);
+        if (dropdown) {
+            dropdown.innerHTML = this.createModelDropdownItems(langCode);
+            // Принудительно применяем стили после обновления
+            setTimeout(() => {
+                const selectedItems = dropdown.querySelectorAll('.model-dropdown-item.selected');
+                console.log(`🎨 Найдено выбранных элементов: ${selectedItems.length}`);
+                selectedItems.forEach(item => {
+                    item.style.backgroundColor = 'var(--color-hover)';
+                    console.log(`  - Элемент: ${item.dataset.type}/${item.dataset.model}`);
+                });
+            }, 0);
+        }
+
+        // Обновляем текст на триггере
+        const trigger = this.options.container.querySelector(`.model-select-trigger[data-lang="${langCode}"]`);
+        if (trigger) {
+            const selectedModels = this.getSelectedModelsForLanguage(langCode);
+            const textElement = trigger.querySelector('.model-select-text');
+            if (textElement) {
+                textElement.textContent = selectedModels || 'Выберите модель';
             }
-            this.hideWhisperDownloadModal();
         }
     }
 
-    // Загрузка модели Whisper Base для языка (старый метод для совместимости)
-    async downloadWhisperModel(langCode, toggleElement) {
-        console.log(`🔄 downloadWhisperModel вызвана для языка: ${langCode}`);
-
-        try {
-            // Проверяем, есть ли уже модель
-            const modelKey = `whisper_model_${langCode}_base`;
-            const storedModel = window.WhisperModels?.get?.(modelKey);
-            
-            if (storedModel && storedModel.isReady) {
-                // Модель уже загружена
-                console.log(`✅ Модель для языка ${langCode} уже загружена`);
-                this.updateWhisperModelStatus(langCode, true);
-                return;
+    // НОВЫЙ МЕТОД: модальное окно подтверждения загрузки модели
+    showModelDownloadConfirmModal(languageName, modelType, modelName, modelSize, modelQuality) {
+        return new Promise((resolve) => {
+            // Удаляем старое модальное окно, если есть
+            const oldModal = document.getElementById('model-download-confirm-modal');
+            if (oldModal) {
+                oldModal.remove();
             }
 
-            // Используем WhisperModelManager для загрузки модели
-            if (!window.WhisperModelManager) {
-                console.error('❌ WhisperModelManager не загружен. Проверьте подключение скрипта whisper-model-manager.js');
-                toggleElement.checked = false;
-                alert('Менеджер моделей Whisper не загружен. Пожалуйста, обновите страницу.');
-                return;
-            }
+            const modal = document.createElement('div');
+            modal.id = 'model-download-confirm-modal';
+            modal.style.cssText = `
+                display: flex;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 10001;
+                justify-content: center;
+                align-items: center;
+            `;
 
-            const modelManager = new window.WhisperModelManager();
-            console.log(`🚀 Начинаем загрузку модели Whisper Base для языка: ${langCode}`);
+            const modelTypeName = modelType === 'whisper' ? 'Whisper' : 'TTS';
+            const qualityText = modelQuality ? ` (качество: ${modelQuality})` : '';
 
-            // Показываем модальное окно загрузки
-            this.showWhisperDownloadModal(langCode);
-            this.updateWhisperDownloadModalStatus('Подготовка к загрузке...');
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 24px;
+                    border-radius: 8px;
+                    max-width: 450px;
+                    width: 90%;
+                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                ">
+                    <h3 style="margin: 0 0 16px 0; color: #333; font-size: 18px;">
+                        Загрузка модели
+                    </h3>
+                    <p style="margin: 0 0 20px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                        Вы хотите загрузить модель: <strong>${modelTypeName} ${modelName}${qualityText}</strong><br>
+                        Размер: <strong>${modelSize}</strong><br>
+                        Язык: <strong>${languageName}</strong>
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button id="confirm-cancel-btn" style="
+                            padding: 10px 20px;
+                            border: 1px solid #ddd;
+                            border-radius: 6px;
+                            background: white;
+                            color: #333;
+                            cursor: pointer;
+                            font-size: 14px;
+                            transition: background-color 0.2s;
+                        " onmouseover="this.style.backgroundColor='#f5f5f5'" onmouseout="this.style.backgroundColor='white'">
+                            Отмена
+                        </button>
+                        <button id="confirm-ok-btn" style="
+                            padding: 10px 20px;
+                            border: none;
+                            border-radius: 6px;
+                            background: #4CAF50;
+                            color: white;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: 600;
+                            transition: background-color 0.2s;
+                        " onmouseover="this.style.backgroundColor='#45a049'" onmouseout="this.style.backgroundColor='#4CAF50'">
+                            Загрузить
+                        </button>
+                    </div>
+                </div>
+            `;
 
-            // Обновляем прогресс загрузки
-            const updateProgress = (progressInfo) => {
-                let percent = 0;
-                
-                // Transformers.js передает объект с полями: status, file, progress, loaded, total
-                if (typeof progressInfo === 'object' && progressInfo !== null) {
-                    if (progressInfo.progress !== undefined) {
-                        // progress может быть в диапазоне 0-1 или 0-100
-                        const progressValue = progressInfo.progress;
-                        if (progressValue <= 1) {
-                            // Диапазон 0-1
-                            percent = Math.min(100, Math.max(0, Math.round(progressValue * 100)));
-                        } else {
-                            // Диапазон 0-100, уже в процентах
-                            percent = Math.min(100, Math.max(0, Math.round(progressValue)));
-                        }
-                    } else if (progressInfo.loaded !== undefined && progressInfo.total !== undefined && progressInfo.total > 0) {
-                        // Рассчитываем из loaded/total
-                        percent = Math.min(100, Math.max(0, Math.round((progressInfo.loaded / progressInfo.total) * 100)));
-                    }
-                    
-                    // Обновляем статус, если есть информация о файле
-                    if (progressInfo.file) {
-                        this.updateWhisperDownloadModalStatus(`Загрузка: ${progressInfo.file}`);
-                    } else if (progressInfo.status) {
-                        this.updateWhisperDownloadModalStatus(progressInfo.status);
-                    }
-                } else if (typeof progressInfo === 'number') {
-                    // Если передано число напрямую
-                    if (progressInfo <= 1) {
-                        // Диапазон 0-1
-                        percent = Math.min(100, Math.max(0, Math.round(progressInfo * 100)));
-                    } else {
-                        // Диапазон 0-100
-                        percent = Math.min(100, Math.max(0, Math.round(progressInfo)));
-                    }
-                }
-                
-                // Обновляем прогресс в модальном окне
-                this.updateWhisperDownloadModalProgress(percent);
-                
-                // Логируем только если процент изменился значительно
-                if (percent > 0 && percent <= 100) {
-                    console.log(`📈 Прогресс загрузки: ${percent}%`);
-                }
+            document.body.appendChild(modal);
+
+            // Обработчики кнопок
+            const cancelBtn = modal.querySelector('#confirm-cancel-btn');
+            const okBtn = modal.querySelector('#confirm-ok-btn');
+
+            const cleanup = () => {
+                modal.remove();
             };
 
-            // Загружаем модель через менеджер
-            updateProgress(0.1);
-            this.updateWhisperDownloadModalStatus('Загрузка модели Whisper Base...');
-            console.log('⏳ Загружаем модель через WhisperModelManager...');
-            
-            try {
-                const model = await modelManager.loadLanguageModel(
-                    langCode,
-                    'base',
-                    updateProgress
-                );
+            cancelBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(false);
+            });
 
-                console.log('✅ Модель загружена:', model);
-                updateProgress(100);
-                this.updateWhisperDownloadModalStatus('✅ Модель успешно загружена!');
-                
-                // Проверяем, что модель (recognizer) загружена и готова
-                if (model && typeof model === 'function') {
-                    // Это recognizer от Transformers.js - готов к использованию
-                    this.updateWhisperModelStatus(langCode, true);
-                    console.log('✅ Recognizer готов к использованию');
-                } else if (model && model.isReady) {
-                    // Старый формат с флагом isReady
-                    this.updateWhisperModelStatus(langCode, true);
-                } else {
-                    // Модель загружена, но не готова
-                    this.updateWhisperModelStatus(langCode, true);
-                    console.warn('⚠️ Модель загружена, но может быть не готова к использованию.');
+            okBtn.addEventListener('click', () => {
+                cleanup();
+                resolve(true);
+            });
+
+            // Закрытие по клику вне модального окна
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    cleanup();
+                    resolve(false);
                 }
-                
-                // Закрываем модальное окно через 2 секунды
-                setTimeout(() => {
-                    this.hideWhisperDownloadModal();
-                }, 2000);
-                
-            } catch (error) {
-                console.error('❌ Ошибка загрузки модели:', error);
-                toggleElement.checked = false;
-                this.updateWhisperDownloadModalStatus(`❌ Ошибка: ${error.message}`);
-                
-                // Закрываем модальное окно через 2 секунды даже при ошибке
-                setTimeout(() => {
-                    this.hideWhisperDownloadModal();
-                }, 2000);
-                
-                alert(`Ошибка загрузки модели: ${error.message}`);
-                return;
-            }
-
-            // Обновляем UI
-            this.updateWhisperModelStatus(langCode, true);
-            console.log(`Модель Whisper Base для языка ${langCode} успешно загружена`);
-            
-            // Обновляем иконку режима распознавания на странице диктанта (если она есть)
-            if (typeof updateRecognitionModeIcon === 'function') {
-                updateRecognitionModeIcon();
-            }
-            
-            // Обновляем панель настроек аудио (если она есть), чтобы разблокировать кнопку переключения режима
-            if (typeof audioSettingsModalPanel !== 'undefined' && audioSettingsModalPanel && typeof audioSettingsModalPanel.render === 'function') {
-                // Перерисовываем панель, чтобы обновить состояние кнопки
-                audioSettingsModalPanel.render();
-                audioSettingsModalPanel.bindEvents();
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки модели Whisper:', error);
-            toggleElement.checked = false;
-            this.hideWhisperDownloadModal();
-        }
+            });
+        });
     }
 
     triggerChange(additionalData = null) {
@@ -1091,6 +2038,32 @@ createLearningList() {
             this.options.container.innerHTML = '';
         }
     }
+
+    // ДОБАВЬТЕ В КЛАСС LanguageSelector:
+    debugStorage() {
+        console.log('🔍 Отладочная информация о хранилище:');
+
+        // Проверяем localStorage
+        console.log('📁 LocalStorage:');
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.includes('model_') || key.includes('selected_model_')) {
+                console.log(`  ${key}:`, localStorage.getItem(key));
+            }
+        }
+
+        // Проверяем ModelManager
+        if (window.ModelManager) {
+            console.log('📊 ModelManager:');
+            console.log('  Выбранные модели:', window.ModelManager.selectedModels);
+            console.log('  Загруженные модели:', window.ModelManager.downloadedModels);
+            console.log('  Всего загружено:', window.ModelManager.getAllDownloadedModels().length);
+        }
+
+        // Информация о текущих расчетах
+        const storageInfo = this.calculateStorageUsage();
+        console.log('📈 Расчет использования памяти:', storageInfo);
+    }
 }
 
 window.initLanguageSelector = function (containerId, options = {}) {
@@ -1105,3 +2078,21 @@ window.initLanguageSelector = function (containerId, options = {}) {
         ...options
     });
 };
+
+// Добавляем CSS для переключателей и выпадающих списков
+// const style = document.createElement('style');
+// style.textContent = `
+//     .model-switch .model-slider.downloaded {
+//         background-color: #8B4513 !important;
+//     }
+//     .model-switch .model-slider.downloaded .model-slider-circle {
+//         transform: translateX(20px) !important;
+//         background-color: #FFD700 !important;
+//     }
+//     .model-dropdown-item.selected {
+//         background-color: #f0f9ff !important;
+//     }
+// `;
+// document.head.appendChild(style);
+
+console.log('✅ LanguageSelector загружен успешно');

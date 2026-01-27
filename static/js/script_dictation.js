@@ -141,7 +141,7 @@ async function saveAudioSettingsToUser(settings) {
 async function loadAudioSettingsFromUser() {
     // Пробуем получить UM из разных источников
     let um = window.UM || userManager;
-    
+
     // Если UM не инициализирован, ждем его инициализации
     if (!um || !um.isInitialized) {
         // Ждем до 5 секунд, пока UM инициализируется
@@ -153,16 +153,16 @@ async function loadAudioSettingsFromUser() {
             }
         }
     }
-    
+
     if (um && um.userData) {
         const userData = um.userData;
-        
+
         // Сначала пытаемся загрузить из settings_json (новый формат)
         if (userData.settings_json) {
             try {
                 const settings = JSON.parse(userData.settings_json);
                 const audioSettings = settings.audio || {};
-                
+
                 if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
                     playSequenceStart = audioSettings.start;
                 }
@@ -176,7 +176,7 @@ async function loadAudioSettingsFromUser() {
                     const parsedValue = parseInt(audioSettings.repeats, 10);
                     REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
                 }
-                
+
                 // Загружаем новые настройки
                 if (audioSettings.without_entering_text !== undefined) {
                     window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
@@ -184,7 +184,7 @@ async function loadAudioSettingsFromUser() {
                 if (audioSettings.show_text !== undefined) {
                     window.audioSettingsShowText = Boolean(audioSettings.show_text);
                 }
-                
+
                 // Загружаем режим распознавания речи (конвертируем старый 'avto' в 'route')
                 if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
                     if (audioSettings.speech_recognition_mode === 'avto') {
@@ -194,18 +194,18 @@ async function loadAudioSettingsFromUser() {
                         speechRecognitionMode = audioSettings.speech_recognition_mode;
                     }
                 }
-                
+
                 return; // Используем настройки из JSON
             } catch (e) {
                 console.warn('Ошибка парсинга settings_json:', e);
             }
         }
-        
+
         // Обратная совместимость: пытаемся загрузить из audio_settings_json
         if (userData.audio_settings_json) {
             try {
                 const audioSettings = JSON.parse(userData.audio_settings_json);
-                
+
                 if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
                     playSequenceStart = audioSettings.start;
                 }
@@ -219,7 +219,7 @@ async function loadAudioSettingsFromUser() {
                     const parsedValue = parseInt(audioSettings.repeats, 10);
                     REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
                 }
-                
+
                 // Загружаем новые настройки
                 if (audioSettings.without_entering_text !== undefined) {
                     window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
@@ -227,13 +227,13 @@ async function loadAudioSettingsFromUser() {
                 if (audioSettings.show_text !== undefined) {
                     window.audioSettingsShowText = Boolean(audioSettings.show_text);
                 }
-                
+
                 return; // Используем настройки из JSON
             } catch (e) {
                 console.warn('Ошибка парсинга audio_settings_json:', e);
             }
         }
-        
+
         // Fallback на старые отдельные поля (для обратной совместимости)
         if (userData.audio_start !== undefined && userData.audio_start !== null && userData.audio_start !== '') {
             playSequenceStart = userData.audio_start;
@@ -411,7 +411,7 @@ function getWhisperModel(langCode) {
 
 function hasWhisperModel(langCode) {
     const modelKey = `whisper_model_${langCode}_base`;
-    
+
     // Сначала проверяем в памяти (быстрая проверка)
     if (window.WhisperModels) {
         const storedModel = window.WhisperModels.get(modelKey);
@@ -419,7 +419,7 @@ function hasWhisperModel(langCode) {
             return true;
         }
     }
-    
+
     // Если в памяти нет, проверяем localStorage (как в профиле)
     // Это важно, так как модель может быть загружена, но еще не инициализирована в памяти
     const modelStatus = localStorage.getItem(modelKey);
@@ -431,6 +431,7 @@ function hasWhisperModel(langCode) {
 // === Настройки для аудио-урока ===
 const MIN_MATCH_PERCENT = 80;      // минимальный % совпадения, чтобы засчитать попытку
 let REQUIRED_PASSED_COUNT = 3;   // сколько засчитанных аудио нужно для сдачи урока (можно изменить через поле ввода)
+let REQUIRED_PASSED_STAR_HALF = 3;   // сколько засчитанных полузвезд меняем на одну звезду
 
 // Служебный счётчик пройденных попыток в текущем уроке
 let passedAudioCount = 0;
@@ -631,13 +632,13 @@ function setupExitHandlers() {
         exitToIndexBtn.addEventListener('click', () => {
             const panel = getProgressPanelInstance();
             const hasPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
-            
+
             // Если все сохранено - тихо выходим без модального окна
             if (!hasPending) {
                 window.location.href = "/";
                 return;
             }
-            
+
             // Если есть несохраненные изменения - показываем модальное окно
             showExitModal(() => window.location.href = "/");
         });
@@ -737,31 +738,31 @@ function showCompletionModal() {
         console.warn('Модальное окно завершения не найдено');
         return;
     }
-    
+
     // Останавливаем таймер
     stopTimer();
-    
+
     // Останавливаем таймер бездействия
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;
     }
-    
+
     // Останавливаем все аудио
     stopAllAudios();
-    
+
     // Показываем модальное окно
     completionModal.style.display = 'flex';
-    
+
     // Инициализируем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
     }
-    
+
     // Устанавливаем фокус на кнопку "Пройти еще раз"
-    const retryBtn = document.getElementById('completionRetryBtn');
-    if (retryBtn) {
-        retryBtn.focus();
+    const exitBtn = document.getElementById('completionExitBtn');
+    if (exitBtn) {
+        exitBtn.focus();
     }
 }
 
@@ -781,13 +782,12 @@ function hideCompletionModal() {
 function setupCompletionModalHandlers() {
     const completionModal = document.getElementById('completionModal');
     const exitBtn = document.getElementById('completionExitBtn');
-    const retryBtn = document.getElementById('completionRetryBtn');
-    
-    if (!completionModal || !exitBtn || !retryBtn) {
+ 
+    if (!completionModal || !exitBtn ) {
         console.warn('Элементы модального окна завершения не найдены');
         return;
     }
-    
+
     // Обработчик кнопки "Выйти"
     // Если диктант полностью завершен, история уже сохранена и черновик удален
     // Не нужно показывать модальное окно сохранения прогресса - сразу выходим
@@ -798,39 +798,9 @@ function setupCompletionModalHandlers() {
         // Черновик уже удален, временный прогресс не нужен
         window.location.href = "/";
     });
-    
-    // Обработчик кнопки "Пройти еще раз"
-    retryBtn.addEventListener('click', () => {
-        hideCompletionModal();
-        
-        // Сбрасываем флаг начала игры
-        gameHasAlreadyBegun = false;
-        
-        // Сбрасываем completed состояние у всех предложений и отмечаем их как checked
-        allSentences.forEach(s => {
-            // Сбрасываем состояние выбора - все становятся checked (доступны для выбора)
-            // completed предложения теряют звезду и становятся обычными
-            s.selection_state = 'checked';
-            updateSentenceSelectionState(s);
-        });
-        
-        // Обновляем таблицу выбора предложений
-        renderSelectionTable();
-        
-        // Показываем модальное окно списка предложений
-        startModal.style.display = 'flex';
-        
-        // Инициализируем иконки Lucide
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
-        
-        // Устанавливаем фокус на кнопку "Начать"
-        if (confirmStartBtn) {
-            confirmStartBtn.focus();
-        }
-    });
-    
+
+
+
     // Закрытие по клику вне контента
     // При полном завершении сразу выходим, без модального окна сохранения прогресса
     completionModal.addEventListener('click', (e) => {
@@ -840,7 +810,7 @@ function setupCompletionModalHandlers() {
             window.location.href = "/";
         }
     });
-    
+
     // Закрытие по клавише Escape
     // При полном завершении сразу выходим, без модального окна сохранения прогресса
     document.addEventListener('keydown', (e) => {
@@ -861,20 +831,20 @@ function showNoSelectionModal(customMessage = null) {
         console.warn('Модальное окно предупреждения не найдено');
         return;
     }
-    
+
     const messageNode = noSelectionModal.querySelector('.warning-message');
     if (messageNode) {
         messageNode.textContent = customMessage || 'Пожалуйста, отметьте предложения для работы в таблице выше.';
     }
-    
+
     // Показываем модальное окно
     noSelectionModal.style.display = 'flex';
-    
+
     // Инициализируем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
     }
-    
+
     // Устанавливаем фокус на кнопку "Понятно"
     const okBtn = document.getElementById('noSelectionOkBtn');
     if (okBtn) {
@@ -898,24 +868,24 @@ function hideNoSelectionModal() {
 function setupNoSelectionModalHandlers() {
     const noSelectionModal = document.getElementById('noSelectionModal');
     const okBtn = document.getElementById('noSelectionOkBtn');
-    
+
     if (!noSelectionModal || !okBtn) {
         console.warn('Элементы модального окна предупреждения не найдены');
         return;
     }
-    
+
     // Обработчик кнопки "Понятно"
     okBtn.addEventListener('click', () => {
         hideNoSelectionModal();
     });
-    
+
     // Закрытие по клику вне контента
     noSelectionModal.addEventListener('click', (e) => {
         if (e.target === noSelectionModal) {
             hideNoSelectionModal();
         }
     });
-    
+
     // Закрытие по клавише Escape
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && noSelectionModal.style.display === 'flex') {
@@ -1182,19 +1152,19 @@ function makeByKeyMap(arr) {
  */
 function calculateSentenceSelectionState(s) {
     if (!s) return 'unchecked';
-    
+
     const totalPerfect = Number(s.number_of_perfect) || 0;
     const totalAudio = Number(s.number_of_audio) || 0;
     const unavailable = getUnavailable(s);
-    
+
     // Проверяем, полностью ли выполнено предложение
     // completed: текст набран с первого раза (perfect) И все аудио выполнены
     const isCompleted = unavailable || (totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT);
-    
+
     if (isCompleted) {
         return 'completed';
     }
-    
+
     // Если не completed, проверяем выбрано ли оно
     return selectedSentences.includes(s.key) ? 'checked' : 'unchecked';
 }
@@ -1206,11 +1176,11 @@ function calculateSentenceSelectionState(s) {
  */
 function updateSentenceSelectionState(s, forceUpdate = false) {
     if (!s) return;
-    
+
     if (forceUpdate || s.selection_state === undefined) {
         s.selection_state = calculateSentenceSelectionState(s);
     }
-    
+
     // Синхронизируем selectedSentences с состоянием
     // НЕ удаляем предложения из selectedSentences - они должны оставаться в списке для навигации
     // Только добавляем новые checked предложения, если их еще нет
@@ -1228,16 +1198,16 @@ function updateSentenceSelectionState(s, forceUpdate = false) {
  */
 function renderSelectionStateButton(statusBtn, s, row = null) {
     if (!statusBtn || !s) return;
-    
+
     // Обновляем состояние в объекте предложения
     updateSentenceSelectionState(s);
-    
+
     const state = s.selection_state || calculateSentenceSelectionState(s);
-    
+
     // Очищаем предыдущие классы и атрибуты
     statusBtn.className = 'sentence-check';
     statusBtn.dataset.key = s.key;
-    
+
     if (state === 'completed') {
         statusBtn.dataset.checked = 'star';
         statusBtn.innerHTML = '<i data-lucide="circle-star"></i>';
@@ -1260,7 +1230,7 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
             row.classList.remove('sentence-row-completed');
         }
     }
-    
+
     // Обновляем иконки Lucide
     if (window.lucide?.createIcons) {
         lucide.createIcons();
@@ -1296,7 +1266,7 @@ function renderSelectionTable() {
                 }
             }
         }
-        
+
         // Обновляем состояние на основе текущего прогресса (но не перезаписываем явно установленное checked)
         const calculatedState = calculateSentenceSelectionState(s);
         if (calculatedState === 'completed') {
@@ -1305,10 +1275,10 @@ function renderSelectionTable() {
             // Если состояние не было явно установлено, используем вычисленное
             s.selection_state = calculatedState;
         }
-        
+
         // Синхронизируем с selectedSentences
         updateSentenceSelectionState(s);
-        
+
         // Добавляем в обновленный список все предложения (checked и completed)
         // unchecked тоже остаются в списке для навигации
         if (s.selection_state === 'checked' || s.selection_state === 'completed' || s.selection_state === 'unchecked') {
@@ -1324,7 +1294,7 @@ function renderSelectionTable() {
         const settingsCell = document.createElement('td');
         settingsCell.className = 'audio-settings-header-cell';
         settingsCell.style.width = '40px';
-        
+
         // Колонка номера строки (код преобразованный в число + 1) - ПЕРВАЯ
         const rowNumberCell = document.createElement('td');
         const rowNumber = parseInt(s.key, 10) + 1;
@@ -1374,7 +1344,7 @@ function renderSelectionTable() {
         row.appendChild(tdText);
 
         tableSentences.appendChild(row);
-        
+
         // КРИТИЧНО: Инициализируем иконки Lucide сразу после добавления строки
         // Это гарантирует, что иконка звезды будет видна
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1384,7 +1354,7 @@ function renderSelectionTable() {
                 window.lucide.createIcons();
             }
         }
-        
+
         // Обновляем статус строки сразу после создания (чтобы правильно отобразить прогресс)
         updateTableRowStatus(s);
     });
@@ -1392,14 +1362,14 @@ function renderSelectionTable() {
     // Обновляем selectedSentences - все предложения остаются в списке
     // Просто синхронизируем порядок и добавляем новые, если есть
     selectedSentences = Array.from(new Set(updatedSelection));
-    
+
     // Убеждаемся, что все предложения из allSentences есть в selectedSentences
     allSentences.forEach(s => {
         if (!selectedSentences.includes(s.key)) {
             selectedSentences.push(s.key);
         }
     });
-    
+
     // Если после рендеринга selectedSentences пустой, но есть checked предложения - исправляем
     if (selectedSentences.length === 0) {
         allSentences.forEach(s => {
@@ -1408,7 +1378,7 @@ function renderSelectionTable() {
             }
         });
     }
-    
+
     // Убеждаемся что selectedSentences не пустой после рендеринга
     if (selectedSentences.length === 0 && allSentences.length > 0) {
         // Если ничего не выбрано, но есть предложения - выбираем все не-completed
@@ -1419,7 +1389,7 @@ function renderSelectionTable() {
             }
         });
     }
-    
+
     console.log('[renderSelectionTable] selectedSentences после рендеринга:', selectedSentences.length, selectedSentences);
 
     if (!tableSentences.dataset.listenerAttached) {
@@ -1444,19 +1414,19 @@ function handleSentenceTableClick(e) {
     const key = statusBtn.dataset.key;
     const s = makeByKeyMap(allSentences).get(key);
     if (!s) return;
-    
+
     // Нельзя изменить состояние completed
     if (s.selection_state === 'completed' || statusBtn.dataset.checked === 'star') {
         return;
     }
-    
+
     // Переключаем состояние между checked и unchecked
     const isCurrentlyChecked = s.selection_state === 'checked';
     s.selection_state = isCurrentlyChecked ? 'unchecked' : 'checked';
-    
+
     // Обновляем selectedSentences
     updateSentenceSelectionState(s);
-    
+
     // Перерисовываем кнопку
     const row = statusBtn.closest('tr');
     renderSelectionStateButton(statusBtn, s, row);
@@ -1518,14 +1488,14 @@ function initializeAllCheckbox() {
                 const key = checkbox.dataset.key;
                 const s = makeByKeyMap(allSentences).get(key);
                 if (!s) return;
-                
+
                 // НЕ изменяем состояние completed предложений
                 if (s.selection_state === 'completed') {
                     return;
                 }
-                
+
                 const row = checkbox.closest('tr');
-                
+
                 if (newState === 'true') {
                     s.selection_state = 'checked';
                     updateSentenceSelectionState(s);
@@ -1620,10 +1590,10 @@ function resetDictationProgress() {
     number_of_corrected = 0;
     number_of_audio = 0;
     circle_number = 0;
-    
+
     // Очищаем localStorage черновика
     clearLocalStorageDraft();
-    
+
     // Все предложения выбраны после сброса
     selectedSentences = allSentences.map(s => s.key);
 
@@ -1667,6 +1637,17 @@ function getRemainingAudio(s) {
     return remaining > 0 ? remaining : 0;
 }
 
+function getRemainingAllResult(s) {
+    const totalPerfect = Number(s.number_of_perfect) || 0;
+    const totalCorrected = Number(s.number_of_corrected) || 0;
+    const totalAudio = Number(s.number_of_audio) || 0;
+    return {
+        totalPerfect,
+        totalCorrected,
+        totalAudio
+    };
+}
+
 function updateTableRowStatus(s) {
     // Находим строку с нужным ключом
     const row = tableSentences.querySelector(`tr button[data-key="${s.key}"]`)?.closest('tr');
@@ -1674,7 +1655,7 @@ function updateTableRowStatus(s) {
 
     // Обновляем состояние предложения на основе прогресса
     updateSentenceSelectionState(s, true);
-    
+
     // Перерисовываем кнопку состояния
     const statusIcon = row.querySelector('.sentence-check');
     if (statusIcon) {
@@ -1777,7 +1758,7 @@ function getSelectedSentences() {
     checkboxes.forEach(checkbox => {
         const key = checkbox.dataset.key;
         const state = checkbox.dataset.checked;
-        
+
         // Добавляем если checked (но не star/completed)
         if (state === 'true' && key) {
             const s = makeByKeyMap(allSentences).get(key);
@@ -1790,7 +1771,7 @@ function getSelectedSentences() {
             }
         }
     });
-    
+
     // Если ничего не выбрано в таблице, но есть предложения с checked состоянием - используем их
     if (selectedSentences.length === 0) {
         allSentences.forEach(s => {
@@ -1800,14 +1781,14 @@ function getSelectedSentences() {
             }
         });
     }
-    
+
     // На всякий случай отфильтруем completed, чтобы не стартовать с ними по умолчанию
     const byKeyMap = makeByKeyMap(allSentences);
     selectedSentences = selectedSentences.filter(key => {
         const sentence = byKeyMap.get(key);
         return sentence && calculateSentenceSelectionState(sentence) === 'checked';
     });
-    
+
     console.log('[getSelectedSentences] Выбрано предложений:', selectedSentences.length, selectedSentences);
 }
 
@@ -1824,11 +1805,11 @@ function startGame(isResume = false) {
     // Если это продолжение черновика, не увеличиваем круг
     if (!isResume) {
         circle_number++;
-        
+
         // При новом круге создаем файл черновика заново (если он был удален при завершении)
         // Это происходит автоматически при первом сохранении черновика
     }
-    
+
     // ИСПРАВЛЕНО: Убрана логика обнуления прогресса - прогресс уже загружен из черновика или инициализирован
     // Не нужно обнулять прогресс при старте игры
 
@@ -1837,7 +1818,7 @@ function startGame(isResume = false) {
     if (panel) {
         panel.setStat('circleNumber', circle_number);
     }
-    
+
     // Убрано поле number из статистики - оно больше не используется
 
     maxIndTablo = (selectedSentences.length < MAXVISIBLE) ? (selectedSentences.length - 1) : (MAXVISIBLE - 1);
@@ -1864,7 +1845,7 @@ function startGame(isResume = false) {
 
     // выбрать из таблицы ключи отмеченных предложений по порядку
     getSelectedSentences();
-    
+
     // Если ничего не выбрано, проверяем еще раз и показываем более информативное сообщение
     if (!selectedSentences.length) {
         // Попробуем собрать из DOM еще раз
@@ -1873,15 +1854,15 @@ function startGame(isResume = false) {
             selectedSentences = Array.from(checkboxes).map(cb => cb.dataset.key).filter(Boolean);
             console.log('[startGame] Найдено выбранных предложений в DOM:', selectedSentences.length);
         }
-        
+
         if (!selectedSentences.length) {
             // Проверяем DOM напрямую для более надежной проверки
             const completedCheckboxes = document.querySelectorAll('#sentences-table .sentence-check[data-checked="star"]');
             const checkedCheckboxes = document.querySelectorAll('#sentences-table .sentence-check[data-checked="true"]');
-            
+
             const hasAnyCompleted = completedCheckboxes.length > 0;
             const hasAnyChecked = checkedCheckboxes.length > 0;
-            
+
             // Если есть completed предложения (звезды), но нет checked (галочек) - показываем сообщение
             const noSelectionMessage = (hasAnyCompleted && !hasAnyChecked)
                 ? 'Ни одно предложение не выбрано для диктанта'
@@ -1908,11 +1889,11 @@ function startGame(isResume = false) {
     initTabloSentenceCounter();
     showCurrentSentence(0, 0);//функция загрузки предложения
     updateStats();            // показываем полные итоги
-    
+
     // ВАЖНО: Обновляем видимость аудио-полей после установки currentSentence
     // Это гарантирует, что поля скрываются, если аудио уже выполнено
     refreshAudioUIForCurrentSentence();
-    
+
     applyStatusNewCircle(); // кнопка новий цикл знов прозора 
 
     // закриваэмо модалку
@@ -1920,7 +1901,7 @@ function startGame(isResume = false) {
 
     // запускаємо годинник в останню чергу
     gameHasAlreadyBegun = true;
-    
+
     // Запускаем таймер бездействия после начала игры
     resetInactivityTimer();
 
@@ -2061,7 +2042,7 @@ function refreshAudioUIForCurrentSentence() {
         // Остаток попыток
         const remainingAudio = getRemainingAudio(currentSentence);
         const hasAttempts = remainingAudio > 0;
-        
+
         // ИСПРАВЛЕНО: Скрываем все элементы аудио, если аудио уже выполнено
         const recordingIndicator = document.getElementById('recordingIndicator');
         const countPercent = document.getElementById('count_percent');
@@ -2082,12 +2063,12 @@ function refreshAudioUIForCurrentSentence() {
         // Проценты: скрываем полностью
         if (percentWrap) percentWrap.style.display = hasAttempts ? '' : 'none';
         if (countPercent) countPercent.style.display = hasAttempts ? 'block' : 'none';
-        
+
         // Индикатор записи (кружок): скрываем
         if (recordingIndicator) {
             recordingIndicator.style.display = hasAttempts ? '' : 'none';
         }
-        
+
         // Кнопка воспроизведения: скрываем
         if (playBtn) playBtn.style.display = hasAttempts ? '' : 'none';
 
@@ -2118,21 +2099,21 @@ function refreshAudioUIForCurrentSentence() {
  */
 function recalculateAudioAvailabilityForAllSentences() {
     if (!allSentences || allSentences.length === 0) return;
-    
+
     // Пересчитываем статусы для всех предложений
     allSentences.forEach(s => {
         const totalAudio = Number(s.number_of_audio) || 0;
         const totalPerfect = Number(s.number_of_perfect) || 0;
         const totalCorrected = Number(s.number_of_corrected) || 0;
         const unavailable = getUnavailable(s);
-        
+
         // Обновляем флаг all_audio_completed
         s.all_audio_completed = totalAudio >= REQUIRED_PASSED_COUNT;
-        
+
         // Обновляем состояние выбора (может стать completed или вернуться к checked)
         const wasCompleted = s.selection_state === 'completed';
         const isNowCompleted = unavailable || (totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT);
-        
+
         if (isNowCompleted && !wasCompleted) {
             // Предложение стало completed
             s.selection_state = 'completed';
@@ -2145,14 +2126,14 @@ function recalculateAudioAvailabilityForAllSentences() {
                 s.selection_state = 'unchecked';
             }
         }
-        
+
         // Обновляем ТОЛЬКО кнопку состояния (чекбокс), не трогая звезды, полузвезды и микрофон
         // НЕ меняем состояние выбора, если оно было явно установлено пользователем
         const row = tableSentences.querySelector(`tr button[data-key="${s.key}"]`)?.closest('tr');
         if (row) {
             // Сохраняем текущее состояние перед пересчетом
             const previousState = s.selection_state;
-            
+
             // Обновляем состояние только если:
             // 1. Предложение стало completed (нужно показать звезду)
             // 2. Предложение перестало быть completed (нужно убрать звезду)
@@ -2172,13 +2153,13 @@ function recalculateAudioAvailabilityForAllSentences() {
                 updateSentenceSelectionState(s, false); // false - не пересчитывать, использовать установленное
             }
             // Если состояние не менялось (не было перехода в/из completed), НЕ трогаем его
-            
+
             // Обновляем отображение кнопки состояния
             const statusIcon = row.querySelector('.sentence-check');
             if (statusIcon) {
                 renderSelectionStateButton(statusIcon, s, row);
             }
-            
+
             // Обновляем класс completed строки, но НЕ трогаем ячейки со звездами и микрофоном
             const completedSentence = unavailable || (totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT);
             if (completedSentence) {
@@ -2188,21 +2169,59 @@ function recalculateAudioAvailabilityForAllSentences() {
             }
         }
     });
-    
+
     // Если текущее предложение активно, обновляем его UI
     if (currentSentence) {
         refreshAudioUIForCurrentSentence();
     }
-    
+
     // Обновляем иконки Lucide
     if (window.lucide?.createIcons) {
         lucide.createIcons();
     }
 }
 
+// --- helpers: «Звезда / Полузвезда / Микрофоны» -----------------------------------------------
+function renderResultTablo() {
+    const tablo_result = document.getElementById('tablo_result');
+    const tablo_result_star = document.getElementById('tablo_result_star');
+    const tablo_result_star_half = document.getElementById('tablo_result_star_half');
+    const tablo_result_mic = document.getElementById('tablo_result_mic');
+
+
+
+    const { totalPerfect, totalCorrected, totalAudio } = getRemainingAllResult(currentSentence);
+    // Проверяем, есть ли хотя бы одна иконка
+    const hasAnyIcon = totalPerfect > 0 || totalCorrected > 0 || totalAudio > 0;
+    
+    // Показываем/скрываем весь блок в зависимости от наличия иконок
+    if (hasAnyIcon) {
+        tablo_result.classList.add('visible');
+    } else {
+        tablo_result.classList.remove('visible');
+    }
+
+    // Если R==0 — сам блок скроется в updateAudioPanelVisibility()   
+    if (totalPerfect === 0) {
+        tablo_result_star.innerHTML = '';
+    } else if (totalPerfect === 1) {
+        tablo_result_star.innerHTML = '<i data-lucide="star"></i>';
+    }
+
+    const parts_star_half = [];
+    for (let i = 0; i < totalCorrected; i++) parts_star_half.push('<i data-lucide="star-half"></i>');
+    tablo_result_star_half.innerHTML = parts_star_half.join('');
+
+    const parts_mic = [];
+    for (let i = 0; i < totalAudio; i++) parts_mic.push('<i data-lucide="mic-off"></i>');
+    tablo_result_mic.innerHTML = parts_mic.join('');
+
+    if (window.lucide?.createIcons) {
+        lucide.createIcons();
+    }
+}
 
 // --- helpers: «Микрофоны/галочки» в #userAudioTablo по RemainingAudio -----------------------------------------------
-
 function renderUserAudioTablo() {
     const tablo = document.getElementById('userAudioTablo');
     if (!tablo) return;
@@ -2225,6 +2244,7 @@ function renderUserAudioTablo() {
     if (window.lucide?.createIcons) {
         lucide.createIcons();
     }
+    renderResultTablo();
 }
 
 function updateAudioPanelVisibility() {
@@ -2235,13 +2255,13 @@ function updateAudioPanelVisibility() {
     const answer = document.getElementById('userAudioAnswer');
 
     const R = Number(REQUIRED_PASSED_COUNT ?? 0);
-    
+
     // Проверяем, все ли аудио выполнены для текущего предложения
     const allAudioCompleted = currentSentence && currentSentence.all_audio_completed;
 
     const hide = (el) => { if (el) el.style.display = 'none'; };
     const show = (el) => { if (el) el.style.display = ''; };
-    
+
     // Если все аудио выполнены, скрываем панель аудио
     if (allAudioCompleted && R > 0) {
         hide(panel);
@@ -2304,12 +2324,12 @@ function updateStats(circle = null) {
     let totalPerfect = 0;
     let totalCorrected = 0;
     let totalAudio = 0;
-    
+
     allSentences.forEach(s => {
         const perfect = Number(s.number_of_perfect) || 0;
         const corrected = Number(s.number_of_corrected) || 0;
         const audio = Number(s.number_of_audio) || 0;
-        
+
         // Учитываем предложение как perfect, если есть хотя бы один perfect (1 предложение = 1 звезда)
         if (perfect > 0) {
             totalPerfect++;
@@ -2323,16 +2343,16 @@ function updateStats(circle = null) {
         // Аудио уже хранится как счётчик и суммируется по всем предложениям
         totalAudio += audio;
     });
-    
+
     console.log('[updateStats] Итого: perfect=', totalPerfect, 'corrected=', totalCorrected, 'audio=', totalAudio);
-    
+
     // Синхронизируем глобальные переменные с вычисленными значениями
     number_of_perfect = totalPerfect;
     number_of_corrected = totalCorrected;
     number_of_audio = totalAudio;
-    
+
     const totalTotal = allSentences.length;
-    
+
     // в диктанте
     setText('count-perfect', totalPerfect);
     setText('count-corrected', totalCorrected);
@@ -2465,16 +2485,16 @@ function initTabloSentenceCounter() {
     if (window.lucide?.createIcons) {
         lucide.createIcons();
     }
-    
+
     // Сохраняем общее количество выбранных предложений при старте
     totalSelectedSentences = selectedSentences.length;
-    
+
     // Устанавливаем общее количество предложений один раз при старте
     const btnTotal = document.getElementById("sentenceTotalNumber");
     if (btnTotal && totalSelectedSentences > 0) {
         btnTotal.textContent = `/ ${totalSelectedSentences}`;
     }
-    
+
     // Обновляем отображение
     updateSimpleSentenceCounter();
 }
@@ -2483,12 +2503,12 @@ function initTabloSentenceCounter() {
 function applyStatusClass(btn, s, isCurrent = false, preserveNumber = false) {
     btn.className = '';
     btn.classList.value = '';
-    
+
     // Если нужно сохранить номер (для табло), используем его, иначе serial_number
     const displayNumber = preserveNumber && btn.textContent && !isNaN(parseInt(btn.textContent))
         ? btn.textContent
         : s.serial_number;
-    
+
     // Устанавливаем только текст (номер), иконки добавим позже
     btn.textContent = displayNumber;
 
@@ -2561,7 +2581,7 @@ function applyStatusPreviosNext() {
     // Кнопки теперь всегда прозрачные (класс задан в HTML), 
     // видимость управляется через updateSimpleSentenceCounter() с помощью класса .hidden
     // Не меняем классы кнопок, чтобы сохранить button-color-transparent из HTML
-    
+
     // Обновляем иконки Lucide
     if (window.lucide?.createIcons) {
         lucide.createIcons();
@@ -2590,7 +2610,7 @@ function applyStatusNewCircle() {
             if (s.number_of_corrected > 0) correctedCount++;
         }
     });
-    
+
     if (perfectCount === totalSelectedSentences) {
         // все правильные с первого раза
         btnNewCircle.classList.add('button-color-mint');
@@ -2607,11 +2627,11 @@ function applyStatusNewCircle() {
 
 // Функция обновления простого счетчика предложений (заменяет updateTabloSentenceCounter)
 function updateSimpleSentenceCounter() {
-    
+
     if (btnCurrent) {
         btnCurrent.textContent = (currentSentenceIndex + 1).toString();
     }
-    
+
     // Скрываем стрелку влево, если на первом предложении
     if (btnPrev) {
         if (currentSentenceIndex === 0) {
@@ -2620,7 +2640,7 @@ function updateSimpleSentenceCounter() {
             btnPrev.classList.remove('hidden');
         }
     }
-    
+
     // Скрываем стрелку вправо, если на последнем предложении
     // Используем сохраненное общее количество, а не текущее selectedSentences.length
     if (btnNext) {
@@ -2653,7 +2673,7 @@ function checkIfAllCompleted() {
     // 1. Все предложения должны быть perfect (набраны с полной звездой)
     // 2. Все аудио должны быть произнесены (для каждого предложения >= REQUIRED_PASSED_COUNT)
     const sum = sumRez();
-    
+
     // Проверяем perfect: считаем все предложения, которые имеют perfect (number_of_perfect = 1)
     // ИСПРАВЛЕНО: Убрано использование circle_number_of_perfect
     let perfectCount = 0;
@@ -2664,7 +2684,7 @@ function checkIfAllCompleted() {
         }
     });
     const allPerfect = perfectCount === allSentences.length;
-    
+
     // Проверяем аудио для каждого предложения
     let allAudioCompleted = true;
     for (const s of allSentences) {
@@ -2674,14 +2694,14 @@ function checkIfAllCompleted() {
             break;
         }
     }
-    
+
     const allCompleted = allPerfect && allAudioCompleted;
-    
+
     // Если диктант полностью завершен, показываем модальное окно завершения
     if (allCompleted) {
         // Регистрируем завершенный диктант и удаляем черновик
         registerCompletedDictation();
-        
+
         // Сохраняем завершение сессии
         const panel = getProgressPanelInstance();
         if (panel) {
@@ -2689,22 +2709,22 @@ function checkIfAllCompleted() {
                 console.log('✅ Сессия завершена и сохранена');
             });
         }
-        
+
         // Сохраняем завершение сессии (старая система)
         if (dictationStatistics) {
             dictationStatistics.endSession(allCompleted);
         }
-        
+
         // Воспроизводим звук победы
         if (panel) {
             panel._playVictorySound();
         }
-        
+
         // Показываем модальное окно завершения
         showCompletionModal();
         return;
     }
-    
+
     // Если не полностью завершен, показываем обычное модальное окно списка предложений
     // Сохраняем завершение сессии
     const panel = getProgressPanelInstance();
@@ -2716,7 +2736,7 @@ function checkIfAllCompleted() {
             // Продолжаем работу, ошибка не блокирует завершение диктанта
         });
     }
-    
+
     // Сохраняем завершение сессии (старая система)
     if (dictationStatistics) {
         dictationStatistics.endSession(allCompleted);
@@ -2729,7 +2749,7 @@ function checkIfAllCompleted() {
     const btnAudio = document.getElementById('btn-modal-count-audio');
     const btnTotal = document.getElementById('btn-modal-count-total');
     const btnCircle = document.getElementById('btn-modal-circle-number');
-    
+
     if (btnTimer) btnTimer.style.display = 'flex';
     if (btnPerfect) btnPerfect.style.display = 'flex';
     if (btnCorrected) btnCorrected.style.display = 'flex';
@@ -2751,7 +2771,7 @@ function checkIfAllCompleted() {
         const snapshot = getProgressTimerSnapshot();
         updateDictationTimerDisplay(getTimerDisplayMs(snapshot), modalTimerEl);
     }
-    
+
     // Также обновляем через progressPanel для синхронизации
     if (panel) {
         panel.updateTimer();
@@ -2771,13 +2791,13 @@ function checkIfAllCompleted() {
         // currentSentence может быть объектом или ключом, получаем объект предложения
         const currentKey = typeof currentSentence === 'object' ? currentSentence.key : currentSentence;
         const currentSentenceObj = allSentences.find(s => s.key === currentKey || s.key === String(currentKey));
-        
+
         // Проверяем, стало ли текущее предложение completed
         if (currentSentenceObj && currentSentenceObj.selection_state === 'completed') {
             // Находим следующее не-completed предложение
             const currentIndex = allSentences.findIndex(s => s.key === currentKey || s.key === String(currentKey));
             let nextSentence = null;
-            
+
             // Ищем следующее предложение, которое не completed
             for (let i = currentIndex + 1; i < allSentences.length; i++) {
                 const s = allSentences[i];
@@ -2786,7 +2806,7 @@ function checkIfAllCompleted() {
                     break;
                 }
             }
-            
+
             // Если не нашли после текущего, ищем с начала
             if (!nextSentence) {
                 for (let i = 0; i < currentIndex; i++) {
@@ -2797,12 +2817,12 @@ function checkIfAllCompleted() {
                     }
                 }
             }
-            
+
             // Если нашли следующее предложение, ставим на нем галочку
             if (nextSentence && nextSentence.selection_state !== 'checked') {
                 nextSentence.selection_state = 'checked';
                 updateSentenceSelectionState(nextSentence);
-                
+
                 // Обновляем отображение в таблице
                 const nextRow = tableSentences.querySelector(`tr button[data-key="${nextSentence.key}"]`)?.closest('tr');
                 if (nextRow) {
@@ -2811,10 +2831,10 @@ function checkIfAllCompleted() {
                         renderSelectionStateButton(statusBtn, nextSentence, nextRow);
                     }
                 }
-                
+
                 // Обновляем состояние чекбокса "Выбрать все"
                 updateAllCheckboxState();
-                
+
                 console.log('✅ Автоматически выбрано следующее предложение:', nextSentence.key);
             }
         }
@@ -2878,10 +2898,10 @@ function setRecordStateIcon(name) {
 // Функция для уменьшения счетчика записей
 function decreaseAudioCounter() {
     currentSentence.number_of_audio = (Number(currentSentence.number_of_audio) || 0) + 1;
-    
+
     // Сохраняем активность в БД
     saveActivityToDB('audio');
-    
+
     // Обновляем флаг all_audio_completed
     const totalAudio = Number(currentSentence.number_of_audio) || 0;
     currentSentence.all_audio_completed = totalAudio >= REQUIRED_PASSED_COUNT;
@@ -2921,7 +2941,7 @@ function decreaseAudioCounter() {
                 completedCount++;
             }
         });
-        
+
         if (completedCount === selectedSentences.length) {
             console.log("👀 [01] decreaseAudioCounter()");
             btnNewCircle.focus();
@@ -2941,7 +2961,7 @@ function decreaseAudioCounter() {
 // Сначала объявляем stopRecording
 function stopRecording(cause = 'manual') {
     console.log(`🔄 [stopRecording] Вызвана функция stopRecording, cause: ${cause}, isStopping: ${isStopping}, mediaRecorder.state: ${mediaRecorder?.state}`);
-    
+
     if (isStopping) {
         console.log(`⚠️ [stopRecording] Уже останавливается, пропускаем`);
         return;
@@ -2957,7 +2977,7 @@ function stopRecording(cause = 'manual') {
         clearTimeout(autoStopTimer);
         autoStopTimer = null;
     }
-    
+
     // Сброс таймера активности распознавания
     if (recognitionActivityTimer) {
         clearTimeout(recognitionActivityTimer);
@@ -3066,7 +3086,7 @@ async function startRecording() {
         if (audioTracks.length === 0) {
             throw new Error('Нет аудио треков в потоке');
         }
-        
+
         // Проверяем, что все треки в состоянии 'live'
         const inactiveTracks = audioTracks.filter(track => track.readyState !== 'live');
         if (inactiveTracks.length > 0) {
@@ -3084,7 +3104,7 @@ async function startRecording() {
         };
 
         mediaRecorder = new MediaRecorder(stream, options);
-        
+
         // В Safari лучше инициализировать визуализацию ПОСЛЕ запуска MediaRecorder
         // чтобы избежать конфликтов с захватом микрофона
 
@@ -3092,7 +3112,7 @@ async function startRecording() {
         // mediaRecorder.onstop = saveRecording;
         mediaRecorder.onstop = () => {
             console.log(`🔄 [mediaRecorder.onstop] Событие onstop вызвано, audioChunks.length: ${audioChunks.length}, lastStopCause: ${lastStopCause}`);
-            
+
             // Сразу сбрасываем флаги, чтобы разблокировать интерфейс
             isRecording = false;   // ← важно!
             isStopping = false;   // ← важно!
@@ -3104,14 +3124,14 @@ async function startRecording() {
 
             currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
             resetInactivityTimer();
-            
+
             // Выполняем сохранение асинхронно, чтобы не блокировать интерфейс
             // Используем setTimeout(0) чтобы дать браузеру обновить UI перед тяжелыми операциями
             console.log(`🔄 [mediaRecorder.onstop] Планируем вызов saveRecording через setTimeout`);
             setTimeout(() => {
                 console.log(`🔄 [mediaRecorder.onstop] setTimeout выполнен, вызываем saveRecording`);
-                try { 
-                    saveRecording(lastStopCause); 
+                try {
+                    saveRecording(lastStopCause);
                 } catch (error) {
                     console.error('❌ Ошибка при сохранении записи:', error);
                 }
@@ -3129,7 +3149,7 @@ async function startRecording() {
             setRecordStateIcon('square');
             updateRecordingIndicator(false);
             stopVisualization();
-            
+
             // Останавливаем MediaRecorder, если он еще активен
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 try {
@@ -3138,7 +3158,7 @@ async function startRecording() {
                     console.warn('Не удалось остановить MediaRecorder после ошибки:', e);
                 }
             }
-            
+
             // Останавливаем распознавание
             if (recognition) {
                 try {
@@ -3147,7 +3167,7 @@ async function startRecording() {
                     console.warn('Не удалось остановить распознавание после ошибки:', e);
                 }
             }
-            
+
             userAudioAnswer.innerHTML = `Ошибка записи: ${event.error?.message || 'Неизвестная ошибка'}`;
             currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
             resetInactivityTimer();
@@ -3169,7 +3189,7 @@ async function startRecording() {
                     setRecordStateIcon('square');
                     updateRecordingIndicator(false);
                     stopVisualization();
-                    
+
                     // Останавливаем MediaRecorder
                     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                         try {
@@ -3178,7 +3198,7 @@ async function startRecording() {
                             console.warn('Не удалось остановить MediaRecorder после завершения трека:', e);
                         }
                     }
-                    
+
                     // Останавливаем распознавание
                     if (recognition) {
                         try {
@@ -3187,7 +3207,7 @@ async function startRecording() {
                             console.warn('Не удалось остановить распознавание после завершения трека:', e);
                         }
                     }
-                    
+
                     userAudioAnswer.innerHTML = 'Запись прервана (ошибка захвата)';
                     currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
                     resetInactivityTimer();
@@ -3198,7 +3218,7 @@ async function startRecording() {
         audioChunks = [];
         // mediaRecorder.start(100); // Захватываем данные каждые 100мс
         mediaRecorder.start(); // один цельный chunk — стабильнее для audio/mp4 в Safari
-        
+
         // Инициализируем визуализацию ПОСЛЕ запуска MediaRecorder (важно для Safari)
         // Обертываем в try-catch, чтобы ошибки визуализации не прерывали запись
         try {
@@ -3261,7 +3281,7 @@ async function startRecording() {
         }
 
         setRecordStateIcon('pause');    // показать паузу
-        
+
         // ВАЖНО: Индикатор становится красным ТОЛЬКО когда все готово и запись реально началась
         // (после запуска MediaRecorder.start(), setupVisualizer и recognition.start())
         // Это последняя манипуляция - когда все системы готовы к записи
@@ -3269,12 +3289,12 @@ async function startRecording() {
 
         currentInactivityTimeout = INACTIVITY_TIMEOUT_RECORDING;
         resetInactivityTimer();
-        
+
     } catch (error) {
         console.error('Ошибка записи:', error);
         userAudioAnswer.innerHTML = `Ошибка: ${error.message}`;
         updateRecordingIndicator(false);  // В случае ошибки сбрасываем индикатор
-        
+
         // ВАЖНО: Сбрасываем флаги при ошибке, чтобы разблокировать интерфейс
         isRecording = false;
         isStopping = false;
@@ -3282,7 +3302,7 @@ async function startRecording() {
         if (rb) rb.classList.remove('recording');
         setRecordStateIcon('square');
         stopVisualization();
-        
+
         // Закрываем поток, если он был создан
         if (window.currentStream) {
             window.currentStream.getTracks().forEach(track => {
@@ -3292,7 +3312,7 @@ async function startRecording() {
             });
             window.currentStream = null;
         }
-        
+
         currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
         resetInactivityTimer();
     }
@@ -3325,30 +3345,30 @@ function getSupportedMimeType() {
  */
 function extractNamesFromHint(explanation, langCode = 'en') {
     console.log(`🔍 [extractNamesFromHint] Входной explanation: "${explanation}"`);
-    
+
     if (!explanation || typeof explanation !== 'string') {
         console.log(`⚠️ [extractNamesFromHint] explanation пустой или не строка`);
         return [];
     }
-    
+
     const trimmed = explanation.trim();
     if (!trimmed) {
         console.log(`⚠️ [extractNamesFromHint] explanation пустой после trim`);
         return [];
     }
-    
+
     // Просто берем все слова из explanation (независимо от регистра)
     // Разделяем по пробелам, запятым, дефисам и другим разделителям
     const words = trimmed.split(/[\s,\-:;()]+/).map(word => word.trim()).filter(word => word.length > 0);
-    
+
     // Фильтруем слишком короткие (меньше 2 символов) и слишком длинные (больше 30 символов)
     const filtered = words.filter(word => word.length >= 2 && word.length <= 30);
-    
+
     if (filtered.length > 0) {
         console.log(`✅ [extractNamesFromHint] Найдено слов:`, filtered);
         return filtered;
     }
-    
+
     console.log(`⚠️ [extractNamesFromHint] Слова не найдены`);
     return [];
 }
@@ -3363,20 +3383,20 @@ function generateWhisperPrompt(explanation, langCode = 'en') {
     if (!explanation || typeof explanation !== 'string') {
         return null;
     }
-    
+
     const names = extractNamesFromHint(explanation, langCode);
-    
+
     if (names.length === 0) {
         return null;
     }
-    
+
     // Простой формат: "имена: имя1, имя2, имя3"
     return `имена: ${names.join(', ')}`;
 }
 
 async function saveRecording(cause = undefined) {
     console.log(`🔍 [saveRecording] Вызвана функция saveRecording, cause: ${cause}, audioChunks.length: ${audioChunks.length}`);
-    
+
     if (!audioChunks.length) {
         console.warn("Нет аудиоданных для сохранения");
         return;
@@ -3399,15 +3419,15 @@ async function saveRecording(cause = undefined) {
     // ⬇️ добавлено: получаем оригинал и распознанный текст
     const originalText = currentSentence.text ?? '';
     let spokenText = '';
-    
+
     // Проверяем, нужно ли использовать Whisper для локального распознавания
     const currentLang = langCodeUrl?.split('-')[0] || 'en';
-    
+
     if (speechRecognitionMode === 'route-off') {
         // Проверяем наличие модели (в памяти или в localStorage)
         const hasModel = hasWhisperModel(currentLang);
         console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang} доступна: ${hasModel}`);
-        
+
         if (!hasModel) {
             console.log(`⚠️ [saveRecording] Модель Whisper не найдена, используем Web Speech API результаты`);
             // Fallback на Web Speech API результаты
@@ -3417,7 +3437,7 @@ async function saveRecording(cause = undefined) {
             // Модель есть - используем Whisper для распознавания
             try {
                 console.log(`🔄 [saveRecording] Используем Whisper для распознавания языка ${currentLang}`);
-                
+
                 // Убеждаемся, что модель загружена в память
                 let whisperModel = getWhisperModel(currentLang);
                 if (!whisperModel && hasModel) {
@@ -3430,42 +3450,42 @@ async function saveRecording(cause = undefined) {
                         throw new Error('WhisperModelManager не доступен');
                     }
                 }
-                
+
                 // Генерируем промпт из подсказки (explanation)
                 const explanation = currentSentence.explanation || '';
                 console.log(`🔍 [saveRecording] explanation: "${explanation}"`);
-                
+
                 // Определяем язык оригинала для правильного извлечения имен
                 const originalLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
                 console.log(`🔍 [saveRecording] Язык оригинала диктанта: ${originalLang}`);
-                
+
                 const names = extractNamesFromHint(explanation, originalLang);
                 console.log(`🔍 [saveRecording] Извлеченные имена:`, names);
-                
+
                 const prompt = generateWhisperPrompt(explanation, originalLang);
                 console.log(`🔍 [saveRecording] Сгенерированный промпт:`, prompt);
-                
+
                 if (prompt) {
                     console.log(`📝 Используем промпт для улучшения распознавания: "${prompt}"`);
                 } else {
                     console.log(`⚠️ [saveRecording] Промпт не сгенерирован (имена не найдены или explanation пустой)`);
                 }
-                
+
                 // Используем WhisperModelManager для распознавания с промптом
                 const whisperManager = window.WhisperModelManager ? new window.WhisperModelManager() : null;
-                
+
                 if (!whisperManager) {
                     throw new Error('WhisperModelManager не доступен');
                 }
-                
+
                 // Показываем интерактивный процесс обработки вместо молчаливого ожидания
                 showWhisperProcessingAnimation();
-                
+
                 // Запускаем анимацию прогресс-бара
                 const progressBarId = 'whisper-progress';
                 const progressDuration = 2000; // 2 секунды анимации
                 animateProgressBar(progressBarId, progressDuration);
-                
+
                 // Используем метод transcribe с поддержкой промпта
                 console.log(`🔄 [saveRecording] Вызываем whisperManager.transcribe для языка ${currentLang}`);
                 const result = await whisperManager.transcribe(
@@ -3474,11 +3494,11 @@ async function saveRecording(cause = undefined) {
                     'base', // modelSize
                     prompt // prompt
                 );
-                
+
                 // Transformers.js возвращает объект с полем text
                 // Формат: { text: "распознанный текст", chunks: [...] }
                 console.log('Результат Whisper (полный):', result);
-                
+
                 let recognizedText = '';
                 if (result && typeof result === 'object') {
                     if (result.text) {
@@ -3501,9 +3521,9 @@ async function saveRecording(cause = undefined) {
                 } else if (typeof result === 'string') {
                     recognizedText = result.trim();
                 }
-                
+
                 console.log('Whisper распознал (извлеченный текст):', recognizedText);
-                
+
                 // Если распознавание не дало результата, используем fallback
                 if (!recognizedText || recognizedText.length === 0) {
                     console.warn('Whisper вернул пустой результат, используем fallback');
@@ -3511,7 +3531,7 @@ async function saveRecording(cause = undefined) {
                         (srLiveText && srLiveText.trim()) ? srLiveText.trim()
                             : (recognition && recognition.finalTranscript ? recognition.finalTranscript : '');
                 }
-                
+
                 // Постепенно показываем результат (анимация печати)
                 await typeTextAnimated(recognizedText, {
                     container: userAudioAnswer,
@@ -3524,7 +3544,7 @@ async function saveRecording(cause = undefined) {
                         userAudioAnswer.appendChild(successIndicator);
                     }
                 });
-                
+
                 spokenText = recognizedText;
             } catch (error) {
                 console.error('❌ Ошибка распознавания через Whisper:', error);
@@ -3540,7 +3560,7 @@ async function saveRecording(cause = undefined) {
             (srLiveText && srLiveText.trim()) ? srLiveText.trim()
                 : (recognition && recognition.finalTranscript ? recognition.finalTranscript : '');
     }
-    
+
     // Логируем для отладки
     console.log('Распознанный текст:', spokenText);
     console.log('Оригинальный текст:', originalText);
@@ -3552,7 +3572,7 @@ async function saveRecording(cause = undefined) {
     // ⬇️ добавлено: проверяем «зачтено»
     const isPassed = percent >= MIN_MATCH_PERCENT;
     console.log(`Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
-    
+
     if (isPassed) {
         // Уменьшаем счетчик только если запись зачтена
         console.log('✅ Запись засчитана, уменьшаем счетчик');
@@ -3601,11 +3621,11 @@ function animateProgressBar(elementId, duration) {
         console.warn(`Элемент прогресс-бара ${elementId} не найден`);
         return;
     }
-    
+
     let start = 0;
     const end = 100;
     const increment = 100 / (duration / 50); // Обновляем каждые 50ms
-    
+
     const timer = setInterval(() => {
         start += increment;
         if (start >= end) {
@@ -3627,28 +3647,28 @@ function animateProgressBar(elementId, duration) {
 async function typeTextAnimated(text, options = {}) {
     const container = options.container || userAudioAnswer;
     const speed = options.speed || 50;
-    const onComplete = options.onComplete || (() => {});
-    
+    const onComplete = options.onComplete || (() => { });
+
     if (!container) {
         console.warn('Контейнер для результата не найден');
         return;
     }
-    
+
     // Очищаем контейнер от анимации прогресса
     container.innerHTML = '<div class="whisper-result-text"></div>';
     const resultDiv = container.querySelector('.whisper-result-text');
-    
+
     if (!resultDiv) {
         console.warn('Элемент для результата не найден');
         return;
     }
-    
+
     // Печатаем текст посимвольно
     for (let i = 0; i < text.length; i++) {
         resultDiv.textContent = text.substring(0, i + 1);
         await new Promise(resolve => setTimeout(resolve, speed));
     }
-    
+
     // Вызываем callback при завершении
     onComplete();
 }
@@ -3671,7 +3691,7 @@ function fallbackComputeMatchPercent(a, b) {
 async function checkInternetConnection() {
     try {
         // Пробуем сделать запрос к серверу
-        const response = await fetch('/health', { 
+        const response = await fetch('/health', {
             method: 'GET',
             cache: 'no-cache',
             signal: AbortSignal.timeout(3000) // Таймаут 3 секунды
@@ -3702,24 +3722,24 @@ function initOfflineRecognition() {
 function updateRecognitionModeIcon() {
     const iconElement = document.getElementById('recognitionModeIcon');
     if (!iconElement) return;
-    
+
     let iconName = 'route';
     let title = 'Распознавание через интернет';
-    
+
     if (speechRecognitionMode === 'route') {
         iconName = 'route';
         title = 'Распознавание через интернет';
     } else if (speechRecognitionMode === 'route-off') {
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
         iconName = 'route-off';
-        title = hasWhisperModel(currentLang) 
-            ? 'Локальное распознавание (Whisper)' 
+        title = hasWhisperModel(currentLang)
+            ? 'Локальное распознавание (Whisper)'
             : 'Локальное распознавание (модель Whisper не загружена)';
     }
-    
+
     iconElement.innerHTML = `<i data-lucide="${iconName}"></i>`;
     iconElement.setAttribute('title', title);
-    
+
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
     }
@@ -3731,7 +3751,7 @@ function initSpeechRecognition() {
     // НЕ автоматически на основе наличия интернета
     // ВАЖНО: Web Speech API в Chrome требует интернет - отправляет аудио на серверы Google
     const hasWebSpeech = checkWebSpeechAPI();
-    
+
     if (!hasWebSpeech) {
         console.warn('Web Speech API недоступен в этом браузере');
         if (userAudioAnswer) {
@@ -3739,9 +3759,9 @@ function initSpeechRecognition() {
         }
         return;
     }
-    
+
     console.log(`🔍 [initSpeechRecognition] Инициализация с режимом: ${speechRecognitionMode}`);
-    
+
     if (speechRecognitionMode === 'route') {
         // Только через интернет (Web Speech API - требует интернет)
         console.log('✅ [initSpeechRecognition] Режим: только через интернет (Web Speech API)');
@@ -3753,7 +3773,7 @@ function initSpeechRecognition() {
         // ВАЖНО: Режим НЕ меняется автоматически - пользователь выбрал "локально"
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
         console.log(`🔍 [initSpeechRecognition] Режим route-off, проверяем модель для языка: ${currentLang}`);
-        
+
         if (hasWhisperModel(currentLang)) {
             console.log(`✅ [initSpeechRecognition] Режим: только локально (Whisper для языка ${currentLang})`);
             // Whisper будет использован в saveRecording при сохранении записи
@@ -3789,7 +3809,7 @@ function initWebSpeechRecognition() {
     // Chrome/Edge: window.SpeechRecognition
     // Safari: window.webkitSpeechRecognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
         console.error('Браузер не поддерживает SpeechRecognition. Используйте Chrome, Edge или Safari.');
         if (userAudioAnswer) {
@@ -3797,7 +3817,7 @@ function initWebSpeechRecognition() {
         }
         return;
     }
-    
+
     recognition = new SpeechRecognition();
     recognition.lang = langCodeUrl; // Используем переданный язык
     console.log('Recognition language set to:', recognition.lang, '(Web Speech API - требует интернет)');
@@ -3879,12 +3899,12 @@ function initWebSpeechRecognition() {
 
         // 5) Авто-стоп при хорошем совпадении (УЛУЧШЕНО: учитываем активность распознавания)
         const expectedText = currentSentence.text ?? '';
-        
+
         // ИСПРАВЛЕНО: Используем только финальные результаты для стабильного процента
         // Промежуточные результаты (interim) постоянно меняются и создают иллюзию высокого процента,
         // который потом падает когда результаты становятся финальными
         const finalTextForPercent = recognition.finalTranscript || '';
-        
+
         // Для отображения процента используем только финальные результаты (стабильные)
         // Промежуточные результаты игнорируем для процента, но показываем пользователю в тексте
         let currentPercent = 0;
@@ -3896,18 +3916,18 @@ function initWebSpeechRecognition() {
             // Это предотвращает скачки процента от первых букв
             currentPercent = computeMatchPercentASR(expectedText, interimTranscript);
         }
-        
+
         count_percent.textContent = currentPercent;
-        
+
         // Обновляем время последней активности распознавания
         lastRecognitionTime = Date.now();
-        
+
         // Сбрасываем таймер неактивности (если был)
         if (recognitionActivityTimer) {
             clearTimeout(recognitionActivityTimer);
             recognitionActivityTimer = null;
         }
-        
+
         // УЛУЧШЕНО: Автостоп только если:
         // 1. Процент >= порога
         // 2. Нет активности распознавания в течение 1.5 секунд (пользователь закончил говорить)
@@ -3929,11 +3949,11 @@ function initWebSpeechRecognition() {
                     if (recognitionActivityTimer) {
                         clearTimeout(recognitionActivityTimer);
                     }
-                    
+
                     // Запускаем таймер: через 1.5 секунды проверяем, была ли активность
                     recognitionActivityTimer = setTimeout(() => {
                         const timeSinceLastActivity = Date.now() - lastRecognitionTime;
-                        
+
                         // Если прошло 1.5 секунды без новых результатов - запускаем финальный таймер
                         if (timeSinceLastActivity >= 1500) {
                             autoStopTimer = setTimeout(() => {
@@ -3955,21 +3975,21 @@ function initWebSpeechRecognition() {
     // Функция проверки значимости изменения результата
     function isSignificantChange(newText, oldText) {
         if (!oldText) return true; // Первый результат всегда значим
-        
+
         const newWords = newText.trim().split(/\s+/).filter(w => w.length > 0);
         const oldWords = oldText.trim().split(/\s+/).filter(w => w.length > 0);
-        
+
         // Изменение считается значимым если:
         // 1. Добавлено/удалено более 2 слов
         if (Math.abs(newWords.length - oldWords.length) > 2) {
             return true;
         }
-        
+
         // 2. Изменено более 30% текста (по словам)
         const commonWords = newWords.filter(w => oldWords.includes(w)).length;
         const totalWords = Math.max(newWords.length, oldWords.length);
         if (totalWords === 0) return false;
-        
+
         const similarity = commonWords / totalWords;
         return similarity < 0.7; // Менее 70% совпадения = значимое изменение
     }
@@ -3981,7 +4001,7 @@ function initWebSpeechRecognition() {
             return; // не считаем это ошибками
         }
         console.error('SpeechRecognition error:', code);
-        
+
         // Специальная обработка ошибки сети (нет интернета)
         if (code === 'network') {
             if (userAudioAnswer) {
@@ -3990,7 +4010,7 @@ function initWebSpeechRecognition() {
             console.error('Web Speech API требует интернет для работы. Ошибка сети.');
             return;
         }
-        
+
         // Остальные ошибки
         if (userAudioAnswer) {
             userAudioAnswer.innerHTML = `<span class="error">Ошибка распознавания: ${code}</span>`;
@@ -3998,22 +4018,22 @@ function initWebSpeechRecognition() {
     };
 
     recognition.onend = () => {
-            // Проверяем, что запись все еще активна
-            if (mediaRecorder?.state !== 'recording') {
-                return;
-            }
+        // Проверяем, что запись все еще активна
+        if (mediaRecorder?.state !== 'recording') {
+            return;
+        }
 
-            const original = currentSentence.text.toLowerCase().trim();
-            const spoken = (recognition.finalTranscript || '').toLowerCase().trim();
+        const original = currentSentence.text.toLowerCase().trim();
+        const spoken = (recognition.finalTranscript || '').toLowerCase().trim();
 
-            const origASR = simplifyText(prepareTextForASR(original)).join(" ");
-            const spokASR = simplifyText(prepareTextForASR(spoken)).join(" ");
-            if (origASR === spokASR) {
-                // может в этом месте надо ставить отметку о вполненном аудио
-                disableRecordButton(false);
+        const origASR = simplifyText(prepareTextForASR(original)).join(" ");
+        const spokASR = simplifyText(prepareTextForASR(spoken)).join(" ");
+        if (origASR === spokASR) {
+            // может в этом месте надо ставить отметку о вполненном аудио
+            disableRecordButton(false);
 
-                const nextBtn = document.getElementById('checkNext');
-                if (nextBtn) nextBtn.focus();
+            const nextBtn = document.getElementById('checkNext');
+            if (nextBtn) nextBtn.focus();
         } else {
             console.log("Голос не совпал с текстом.");
             // Пробуем продолжить распознавание, если запись еще идет
@@ -4032,7 +4052,7 @@ function initWebSpeechRecognition() {
 function updateRecordingIndicator(isRecording) {
     const indicator = document.getElementById('recordingIndicator');
     if (!indicator) return;
-    
+
     if (isRecording) {
         indicator.classList.add('recording');
         indicator.title = 'Идет запись';
@@ -4084,7 +4104,7 @@ function setupVisualizer(stream) {
         console.warn('⚠️ Поток не активен, визуализация не может быть инициализирована');
         return;
     }
-    
+
     // 1. СНАЧАЛА ОЧИСТИМ СТАРЫЙ AudioContext
     if (vizAC && vizAC.state !== 'closed') {
         try {
@@ -4124,7 +4144,7 @@ function setupVisualizer(stream) {
         console.warn('⚠️ Треки стали неактивными перед созданием источника визуализации');
         return;
     }
-    
+
     vizSource = vizAC.createMediaStreamSource(stream);
     vizSource.connect(vizAnalyser);
 
@@ -4342,7 +4362,7 @@ async function saveActivityToDB(type_activity) {
         console.log('📤 [CLIENT] Отправка активности на сервер:');
         console.log(`   type_activity: ${type_activity}`);
         console.log(`   dictation_id: ${currentDictation.id}`);
-        
+
         if (!currentDictation.id || !window.UM) {
             console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет dictation_id или UserManager');
             return;
@@ -4360,7 +4380,7 @@ async function saveActivityToDB(type_activity) {
             type_activity: type_activity,
             number: 1
         };
-        
+
         console.log('📤 [CLIENT] Данные для отправки:', requestData);
 
         const response = await fetch('/api/statistics/activity', {
@@ -4406,7 +4426,7 @@ function loadDictationData() {
         // Сохраняем в глобальную переменную для доступа из других скриптов
         window.activityHistory = activityHistory;
     }
-    
+
     // Старая система статистики (для совместимости, если нужна)
     if (dictationId && userManager && typeof DictationStatistics !== 'undefined') {
         dictationStatistics = new DictationStatistics(userManager, dictationId);
@@ -4436,18 +4456,18 @@ function loadDictationData() {
         currentDictation.language_original = dictationDataElement.dataset.languageOriginal || '';
         currentDictation.language_translation = dictationDataElement.dataset.languageTranslation || '';
         currentDictation.title_orig = dictationDataElement.dataset.titleOrig || '';
-        
+
         // Логируем для отладки
         console.log('📝 Загружен язык из data-атрибутов:', {
             language_original: currentDictation.language_original,
             language_translation: currentDictation.language_translation,
             dictationId: currentDictation.id
         });
-        
+
         if (!currentDictation.language_original) {
             console.warn('⚠️ language_original пустой! Проверьте data-language-original в HTML');
         }
-        
+
         // Обновляем язык перевода в интерфейсе
         const translationLanguageElement = document.querySelector('.translation-audio-button-wrapper .language');
         if (translationLanguageElement && currentDictation.language_translation) {
@@ -4458,7 +4478,7 @@ function loadDictationData() {
         } else if (!currentDictation.language_translation) {
             console.warn('⚠️ language_translation пустой! Проверьте data-language-translation в HTML');
         }
-        
+
         applyInputDirection(currentDictation.language_original);
         // Используем LanguageManager для получения country_cod_url
         if (window.LanguageManager && typeof window.LanguageManager.getCountryCodeUrl === 'function') {
@@ -4487,24 +4507,24 @@ async function loadSentencesFromAPI() {
         console.error('❌ Недостаточно данных для загрузки предложений:', currentDictation);
         return false;
     }
-    
+
     try {
         const url = `/api/dictation/${currentDictation.id}/${currentDictation.language_original}/${currentDictation.language_translation}/sentences`;
         console.log('📡 Загрузка предложений из API:', url);
-        
+
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
         if (!data.success || !data.sentences) {
             throw new Error('Неверный формат ответа от API');
         }
-        
+
         // Загружаем предложения
         allSentences = data.sentences;
-        
+
         // Инициализируем поля прогресса для всех предложений (по умолчанию 0)
         // Поля circle_number_of_* больше не инициализируются - логика кругов убрана
         allSentences.forEach(s => {
@@ -4512,10 +4532,10 @@ async function loadSentencesFromAPI() {
             if (s.number_of_corrected === undefined) s.number_of_corrected = 0;
             if (s.number_of_audio === undefined) s.number_of_audio = 0;
         });
-        
+
         console.log('✅ Загружено предложений из БД:', allSentences.length);
         return true;
-        
+
     } catch (error) {
         console.error('❌ Ошибка загрузки предложений из API:', error);
         return false;
@@ -4525,16 +4545,16 @@ async function loadSentencesFromAPI() {
 async function initializeDictation() {
     // Сначала загружаем данные
     console.log('=======================initializeDictation:');
-    
+
     // Загружаем настройки аудио из данных пользователя (до загрузки черновика)
     await loadAudioSettingsFromUser();
-    
+
     // Загружаем метаданные диктанта (ID, языки)
     if (!loadDictationData()) {
         alert('Ошибка загрузки данных диктанта');
         return;
     }
-    
+
     // Загружаем предложения из БД через API
     const sentencesLoaded = await loadSentencesFromAPI();
     if (!sentencesLoaded) {
@@ -4554,7 +4574,7 @@ async function initializeDictation() {
     // Проверяем наличие черновика (черновик может перезаписать настройки пользователя)
     const hasDraft = await loadAndApplyDraft();
     hasDraftLoaded = hasDraft; // Сохраняем флаг в глобальной переменной для использования в startGame()
-    
+
     // Если черновика нет, инициализируем только первое предложение как checked
     if (!hasDraft) {
         let firstSentenceSelected = false;
@@ -4579,7 +4599,7 @@ async function initializeDictation() {
             .filter(s => s.selection_state === 'checked')
             .map(s => s.key);
     }
-    
+
     renderSelectionTable();
     if (hasDraft) {
         updateStats();
@@ -4599,7 +4619,7 @@ async function initializeDictation() {
         const snapshot = getProgressTimerSnapshot();
         updateDictationTimerDisplay(getTimerDisplayMs(snapshot), modalTimerEl);
     }
-    
+
     // Также обновляем через progressPanel для синхронизации
     const panel = getProgressPanelInstance();
     if (panel) {
@@ -4704,13 +4724,13 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
             correctAnswerEl.style.display = "none";
         }
     }
-    
+
     // Обновляем поле подсказки для аудио (если оно существует)
     const audioHint = document.getElementById('audioHint');
     if (audioHint && currentSentence && currentSentence.text) {
         audioHint.textContent = currentSentence.text;
     }
-    
+
     // Применяем настройки аудио к UI
     applyAudioSettingsToUI();
 
@@ -4794,6 +4814,7 @@ function nextSentence() {
     let newSentenceIndex = currentSentenceIndex + 1; // по списку выбранных чеком ключей к предложениям
 
     if (newSentenceIndex < totalSelectedSentences) {
+        if (mediaRecorder?.state === 'recording') {stopRecording('manual');}
         currentSentenceIndex = newSentenceIndex;
         console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
         updateSimpleSentenceCounter();
@@ -4808,6 +4829,7 @@ function previousSentence() {
     let newSentenceIndex = currentSentenceIndex - 1; // по списку выбранных чеком ключей к предложениям
 
     if (newSentenceIndex >= 0) {
+        if (mediaRecorder?.state === 'recording') {stopRecording('manual');}
         currentSentenceIndex = newSentenceIndex;
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex);
@@ -4918,7 +4940,7 @@ async function onloadInitializeDictation() {
         originalAudioVisual = new AudioPlayerVisual(originalAudioContainer);
         window.originalAudioVisual = originalAudioVisual;
         originalAudioVisual.setLanguage(currentDictation.language_original);
-        
+
         // Настройка callbacks для AudioPlayerVisual
         originalAudioVisual.setOnPlayClick(() => {
             const audioPath = originalAudioVisual.getCurrentAudioPath();
@@ -4941,7 +4963,7 @@ async function onloadInitializeDictation() {
                 window.AudioManager.play(originalAudioVisual.playButton, audioPath);
             }
         });
-        
+
         originalAudioVisual.setOnAudioTypeChange((type, path) => {
             if (window.AudioManager && window.AudioManager.isPlaying()) {
                 window.AudioManager.stop();
@@ -4951,19 +4973,19 @@ async function onloadInitializeDictation() {
                 window.AudioManager.play(originalAudioVisual.playButton, path);
             }
         });
-        
+
         originalAudioVisual.setOnSpeedChange((rate) => {
             if (window.AudioManager) {
                 window.AudioManager.setPlaybackRate(rate);
             }
         });
-        
+
         originalAudioVisual.setOnProgressSeek((time) => {
             if (window.AudioManager) {
                 window.AudioManager.setCurrentTime(time);
             }
         });
-        
+
         // Регистрируем AudioPlayerVisual в AudioManager (как волну)
         if (window.AudioManager) {
             window.AudioManager.setAudioPlayerVisual(originalAudioVisual);
@@ -4976,10 +4998,10 @@ async function onloadInitializeDictation() {
     if (translationPlayButton) {
         translationPlayButton.addEventListener('click', () => {
             if (!currentSentence) return;
-            
+
             const translationPath = currentSentence.audio_tr;
             if (!translationPath) return;
-            
+
             const isPlaying = (window.AudioManager && typeof window.AudioManager.isPlaying === 'function')
                 ? window.AudioManager.isPlaying()
                 : !!(window.AudioManager && window.AudioManager.audio && !window.AudioManager.audio.paused && !window.AudioManager.audio.ended);
@@ -5007,7 +5029,7 @@ async function onloadInitializeDictation() {
                 }
             }
         });
-        
+
         // Настройка callback для обновления иконки кнопки перевода
         if (window.AudioManager && typeof window.AudioManager.onPlayStateChange === 'function') {
             window.AudioManager.onPlayStateChange((isPlaying) => {
@@ -5062,12 +5084,12 @@ async function onloadInitializeDictation() {
                         e.target.value = prevValue;
                     }
                 });
-                
+
                 input.addEventListener('focus', (e) => {
                     // Сохраняем текущее значение перед изменением
                     e.target.dataset.prevValue = e.target.value;
                 });
-                
+
                 input.addEventListener('blur', (e) => {
                     // Восстанавливаем значение, если оно пустое или невалидное
                     const value = parseInt(e.target.value, 10);
@@ -5087,7 +5109,7 @@ async function onloadInitializeDictation() {
                         }
                     }
                 });
-                
+
                 input.addEventListener('change', (e) => {
                     // При изменении через стрелки также обновляем REQUIRED_PASSED_COUNT
                     const value = parseInt(e.target.value, 10);
@@ -5100,7 +5122,7 @@ async function onloadInitializeDictation() {
                         }
                     }
                 });
-                
+
                 return; // Пропускаем остальную обработку для этого поля
             }
 
@@ -5145,7 +5167,7 @@ async function onloadInitializeDictation() {
     const playSequenceStartEl = document.getElementById('playSequenceStart');
     const playSequenceTypoEl = document.getElementById('playSequenceTypo');
     const playSequenceSuccessEl = document.getElementById('playSequenceSuccess');
-    
+
     if (playSequenceStartEl) {
         playSequenceStartEl.value = playSequenceStart;
     }
@@ -5190,40 +5212,40 @@ async function onloadInitializeDictation() {
         }
     });
 
-document.addEventListener('keydown', function (event) {
-    if (event.repeat) return;
-    if (!(event.ctrlKey || event.metaKey)) return;
-    if (event.altKey) return;
+    document.addEventListener('keydown', function (event) {
+        if (event.repeat) return;
+        if (!(event.ctrlKey || event.metaKey)) return;
+        if (event.altKey) return;
 
-    const key = (event.key || '').toLowerCase();
-    if (event.code === 'KeyS' || SAVE_KEY_VALUES.includes(key)) {
-        event.preventDefault();
-        console.log('[Draft] hotkey save triggered', { key: event.key, code: event.code });
+        const key = (event.key || '').toLowerCase();
+        if (event.code === 'KeyS' || SAVE_KEY_VALUES.includes(key)) {
+            event.preventDefault();
+            console.log('[Draft] hotkey save triggered', { key: event.key, code: event.code });
 
-        const panel = getProgressPanelInstance();
-        const historySavePromise = panel
-            ? panel.save().then(() => true).catch(error => {
-                console.error('[Draft] history save error', error);
-                return false;
-            })
-            : Promise.resolve(true);
+            const panel = getProgressPanelInstance();
+            const historySavePromise = panel
+                ? panel.save().then(() => true).catch(error => {
+                    console.error('[Draft] history save error', error);
+                    return false;
+                })
+                : Promise.resolve(true);
 
-        saveDictationDraft()
-            .then(saved => {
-                return Promise.all([Promise.resolve(saved), historySavePromise]);
-            })
-            .then(([draftSaved, historySaved]) => {
-                const success = !!draftSaved && historySaved !== false;
-                if (panel && success) {
-                    panel.markClean();
-                }
-                console.log('[Draft] hotkey save completed', { success });
-            })
-            .catch(error => {
-                console.error('[Draft] hotkey save error', error);
-            });
-    }
-}, true);
+            saveDictationDraft()
+                .then(saved => {
+                    return Promise.all([Promise.resolve(saved), historySavePromise]);
+                })
+                .then(([draftSaved, historySaved]) => {
+                    const success = !!draftSaved && historySaved !== false;
+                    if (panel && success) {
+                        panel.markClean();
+                    }
+                    console.log('[Draft] hotkey save completed', { success });
+                })
+                .catch(error => {
+                    console.error('[Draft] hotkey save error', error);
+                });
+        }
+    }, true);
 
     // startTimer();
 
@@ -5391,19 +5413,19 @@ const CONTRACTIONS_DICT = {
 function areWordsEquivalent(word1, word2) {
     if (!word1 || !word2) return false;
     if (word1 === word2) return true;
-    
+
     // Проверяем, является ли word1 сокращением word2
     const expansion1 = CONTRACTIONS_DICT[word1];
     if (expansion1 && expansion1.length === 1 && expansion1[0] === word2) {
         return true;
     }
-    
+
     // Проверяем, является ли word2 сокращением word1
     const expansion2 = CONTRACTIONS_DICT[word2];
     if (expansion2 && expansion2.length === 1 && expansion2[0] === word1) {
         return true;
     }
-    
+
     return false;
 }
 
@@ -5415,12 +5437,12 @@ function areWordsEquivalent(word1, word2) {
  */
 function areWordSequencesEquivalent(word, words) {
     if (!word || !words || words.length === 0) return false;
-    
+
     // Если одно слово и один элемент массива - простая проверка
     if (words.length === 1) {
         return areWordsEquivalent(word, words[0]);
     }
-    
+
     // Проверяем, является ли word сокращением для массива words
     const expansion = CONTRACTIONS_DICT[word];
     if (expansion && expansion.length === words.length) {
@@ -5432,11 +5454,11 @@ function areWordSequencesEquivalent(word, words) {
         }
         return true;
     }
-    
+
     // Проверяем обратное: может быть words[0] + words[1] = сокращение для word
     // Но это сложнее, так как нужно проверить все возможные комбинации
     // Для простоты пока не реализуем этот случай
-    
+
     return false;
 }
 
@@ -5446,12 +5468,12 @@ function simplifyText(text) {
         .normalize('NFKC')          // унификация Юникода
         .replace(/\u00A0/g, ' ')    // NBSP → пробел
         .toLowerCase();
-    
+
     // Явно удаляем все варианты кавычек перед применением PUNCTUATION_REGEX
     // Это гарантирует, что все кавычки будут удалены
     // Включаем все возможные варианты кавычек: обычные ", ", умные ", ", угловые «», немецкие „", и другие
     const allQuotesRegex = /[""'""""«»„"\u201C\u201D\u201E\u201F\u2033\u2036]/g;
-    
+
     result = result
         .replace(CURLY_APOS, "'")   // «умные» апострофы → обычный
         .replace(/['`´]/g, "")      // убираем апострофы
@@ -5461,9 +5483,9 @@ function simplifyText(text) {
         .replace(ARABIC_DIACRITICS_REGEX, "") // снимаем огласовки
         .replace(/\s+/g, " ")
         .trim();
-    
+
     const words = result.split(" ");
-    
+
     return words;
 }
 
@@ -5580,7 +5602,7 @@ function computeMatchPercentASR(originalText, spokenText) {
         }
     }
     const lcs = dp[la][lb];
-    
+
     // НОВОЕ: Ищем максимальное совпадение с конца (suffix matching)
     // Это помогает, когда пользователь правильно сказал конец фразы, но ошибся в начале
     let maxSuffixMatch = 0;
@@ -5592,7 +5614,7 @@ function computeMatchPercentASR(originalText, spokenText) {
             break;
         }
     }
-    
+
     // Если суффиксное совпадение значительное (>50% от оригинала), используем его
     // Иначе используем стандартный LCS
     if (maxSuffixMatch > la * 0.5) {
@@ -5602,7 +5624,7 @@ function computeMatchPercentASR(originalText, spokenText) {
         // Берем максимальный из двух
         return Math.max(suffixPercent, lcsPercent);
     }
-    
+
     return Math.round((2 * lcs) / (la + lb) * 100);
 }
 
@@ -5649,7 +5671,7 @@ function renderResult(original, userVerified) {
             // Используем errorIndex из word (вычислен в check для упрощенных версий)
             const errorIndexInSimplified = word.errorIndex || 0;
             const errorIndexInOriginal = Math.min(errorIndexInSimplified, correctTextNoPunct.length - 1);
-            
+
             // Отображаем оригинальный текст с пунктуацией, но выделяем ошибку в упрощенной версии
             const before = correctTextNoPunct.slice(0, errorIndexInOriginal);
             const errorLetter = correctTextNoPunct[errorIndexInOriginal] || "";
@@ -5829,7 +5851,7 @@ function playAudioSequence(sequence) {
         console.error('AudioManager не найден');
         return;
     }
-    
+
     const steps = sequence.toLowerCase().split(''); // Разбиваем строку на массив
     let index = 0;
 
@@ -5916,17 +5938,18 @@ function playAudioSequence(sequence) {
         if (blockAudioPlaybackIfRecording()) {
             return;
         }
-        
+
         // Для перевода, если кнопка не найдена, используем null
         const playButton = button || null;
         console.log('▶️ [playAudioSequence] Воспроизведение шага:', step, 'путь:', audioPath, 'кнопка:', !!playButton);
-        
+
         window.AudioManager.play(playButton, audioPath, () => {
             console.log('✅ [playAudioSequence] Шаг завершен:', step);
             index++;
             playNext();
         });
     }
+
 
     playNext(); // Запускаем процесс
 }
@@ -5935,18 +5958,18 @@ function playAudioSequence(sequence) {
 function applyAudioSettingsToUI() {
     // Обновляем иконку режима распознавания
     updateRecognitionModeIcon();
-    
+
     const checkBtn = document.getElementById('checkBtn');
     const userInput = document.getElementById('userInput');
     const correctAnswer = document.getElementById('correctAnswer');
     const audioHint = document.getElementById('audioHint');
     const virtualKeyboardToggle = document.getElementById('virtualKeyboardToggle');
     const virtualKeyboardContainer = document.querySelector('.virtual-keyboard-container');
-    
+
     // Проверяем, включен ли режим "без ввода текста"
     const withoutEnteringText = window.audioSettingsWithoutEnteringText || false;
     const showText = window.audioSettingsShowText || false;
-    
+
     if (withoutEnteringText) {
         // Полностью скрываем поле ввода
         if (userInput) {
@@ -5954,18 +5977,18 @@ function applyAudioSettingsToUI() {
             userInput.contentEditable = "false";
             userInput.style.pointerEvents = "none";
         }
-        
+
         // Полностью скрываем и отключаем кнопку проверки
         if (checkBtn) {
             checkBtn.style.display = "none";
             checkBtn.disabled = true;
         }
-        
+
         // Скрываем обычную подсказку вместе с полем ввода
         if (correctAnswer) {
             correctAnswer.style.display = "none";
         }
-        
+
         // Скрываем чекбокс "Показать клавиатуру"
         if (virtualKeyboardContainer) {
             virtualKeyboardContainer.style.display = "none";
@@ -5978,7 +6001,7 @@ function applyAudioSettingsToUI() {
         if (virtualKeyboardInstance && typeof virtualKeyboardInstance.hide === 'function') {
             virtualKeyboardInstance.hide();
         }
-        
+
         // Показываем отдельное поле подсказки для аудио, если включен флаг показа текста
         if (showText && audioHint) {
             // Используем currentSentence.text, если доступен
@@ -6001,12 +6024,12 @@ function applyAudioSettingsToUI() {
             userInput.style.pointerEvents = "auto";
             userInput.style.opacity = "1";
         }
-        
+
         // Показываем кнопку проверки (состояние будет установлено через disableCheckButton)
         if (checkBtn) {
             checkBtn.style.display = "";
         }
-        
+
         // Показываем чекбокс "Показать клавиатуру"
         if (virtualKeyboardContainer) {
             virtualKeyboardContainer.style.display = "";
@@ -6014,19 +6037,19 @@ function applyAudioSettingsToUI() {
         if (virtualKeyboardToggle) {
             virtualKeyboardToggle.disabled = false;
         }
-        
+
         // Скрываем поле подсказки для аудио (оно только для режима "Только аудио")
         if (audioHint) {
             audioHint.style.display = "none";
         }
-        
+
         // Обычная подсказка работает как обычно (существующая логика не меняется)
         // Если флаг показа текста включен, показываем текст в обычной подсказке серым цветом
         if (showText && correctAnswer && currentSentence) {
             // Проверяем, не установлена ли подсказка существующей логикой (например, после правильного ответа)
             const existingDisplay = correctAnswer.style.display;
             const existingText = correctAnswer.textContent;
-            
+
             // Если подсказка уже показана и содержит перевод (из существующей логики), не перезаписываем
             if (existingDisplay === 'block' && existingText && existingText !== currentSentence.text) {
                 // Подсказка уже установлена существующей логикой - не трогаем
@@ -6047,13 +6070,13 @@ function applyAudioSettingsToUI() {
 function disableCheckButton(active) {
     const checkBtn = document.getElementById('checkBtn');
     const userInput = document.getElementById('userInput');
-    
+
     // Если включен режим "без ввода текста", не меняем состояние
     const withoutEnteringText = window.audioSettingsWithoutEnteringText || false;
     if (withoutEnteringText) {
         return;
     }
-    
+
     // Сначала удаляем все возможные цветные классы
     checkBtn.classList.value = '';
     switch (active) {
@@ -6083,6 +6106,8 @@ function disableCheckButton(active) {
             hideVirtualKeyboardIfActive();
             break;
     }
+
+    renderResultTablo();
     lucide.createIcons();
 }
 
@@ -6126,7 +6151,7 @@ function check(original, userInput, currentKey) {
         } else {
             // Проверяем эквивалентности сокращений перед тем, как считать ошибкой
             let isEquivalent = false;
-            
+
             // Случай 1: Оригинал - сокращение (одно слово), пользователь - полная форма (два слова)
             // Например: оригинал "I'm" (im), пользователь "I am" (i, am)
             const expansionOrig = CONTRACTIONS_DICT[wordOrig];
@@ -6151,7 +6176,7 @@ function check(original, userInput, currentKey) {
                     isEquivalent = true;
                 }
             }
-            
+
             // Случай 2: Пользователь - сокращение (одно слово), оригинал - полная форма (два слова)
             // Например: пользователь "I'm" (im), оригинал "I am" (i, am)
             if (!isEquivalent) {
@@ -6183,7 +6208,7 @@ function check(original, userInput, currentKey) {
                     }
                 }
             }
-            
+
             // Случай 3: Оба - одно слово, но одно может быть сокращением другого (редкий случай)
             // Например: "its" vs "it is" уже обработано выше, но на всякий случай
             if (!isEquivalent && areWordsEquivalent(wordOrig, wordUser)) {
@@ -6192,7 +6217,7 @@ function check(original, userInput, currentKey) {
                 i++; j++;
                 isEquivalent = true;
             }
-            
+
             // Если не эквивалентны - это ошибка
             if (!isEquivalent) {
                 const errorIndex = findFirstErrorIndex(wordOrig || "", wordUser || "");
@@ -6215,7 +6240,7 @@ function check(original, userInput, currentKey) {
     if (!foundError) {
 
         const s = currentSentence;
-        
+
         // ИСПРАВЛЕНО: Убрано использование circle_number_of_* полей
         // Если уже был perfect (number_of_perfect = 1), увеличиваем corrected
         if (s.number_of_perfect === 1) {
@@ -6237,15 +6262,20 @@ function check(original, userInput, currentKey) {
             // выполнять задание с ошибкой, пока не сделает правильно (perfect)
             const oldCorrected = Number(s.number_of_corrected) || 0;
             s.number_of_corrected = oldCorrected + 1;
-            console.log('[checkText] Увеличиваем corrected для предложения', s.key, 'с', oldCorrected, 'до', s.number_of_corrected);
-            disableCheckButton(1);         // отключить кнопку и нарисовать пол звезды на ней
-            // Сохраняем активность в БД
-            saveActivityToDB('corrected');
+            if (s.number_of_corrected >= REQUIRED_PASSED_STAR_HALF) {
+                s.number_of_perfect = 1;
+                disableCheckButton(0);         // отключить кнопку и нарисовать на ней звезду                
+                saveActivityToDB('perfect');// Сохраняем активность в БД
+            }
+            else {
+                disableCheckButton(1);         // отключить кнопку и нарисовать пол звезды на ней
+            }
+            saveActivityToDB('corrected'); // Сохраняем активность в БД
         }
 
         // Обновляем состояние выбора предложения (может стать completed)
         updateSentenceSelectionState(currentSentence, true);
-        
+
         // Обновить табло предложений и шапку:
         // Обновляем простой счетчик предложений
         updateSimpleSentenceCounter();
@@ -6253,7 +6283,7 @@ function check(original, userInput, currentKey) {
 
         // Обновить табло итогов:
         updateStats();
-        
+
         // Обновляем строку в таблице модального окна (если оно открыто)
         updateTableRowStatus(currentSentence);
 
@@ -6273,9 +6303,17 @@ function check(original, userInput, currentKey) {
 }
 
 function checkText() {
-    const original = currentSentence.text;
-    const translation = currentSentence.translation;
     const userInput = inputField.innerText;
+    const original = currentSentence.text;
+    if (userInput.length === 0) {
+        console.log('хоть какой-то текст введи!!!');
+        return;
+    }    
+    if (userInput.length <= Math.floor(original.length / 2)) {
+        console.log('Хоть половину текста введи!!!');
+        return;
+    }
+    const translation = currentSentence.translation;
     const currentKey = currentSentence.key;
     const result = check(original, userInput, currentKey);
 
@@ -6361,7 +6399,7 @@ document.getElementById("userInput").addEventListener("input", function () {
     if (correctAnswer && correctAnswer.style.display != "none") {
         // Проверяем, является ли это подсказкой "показывать текст" (не скрываем её при вводе)
         const isShowTextHint = correctAnswer.dataset.showTextHint === 'true';
-        
+
         if (!isShowTextHint) {
             // Воспроизводим последовательность O, тут может в дальнейшем быть условие от пользователя воспроизводить или нет
             playAudioSequence(playSequenceTypo); // "t"
@@ -6434,7 +6472,7 @@ async function registerCompletedDictation() {
         const totalPerfect = number_of_perfect;
         const totalCorrected = number_of_corrected;
         const totalAudio = number_of_audio; // number_of_audio уже накопленное значение
-        
+
         // Получаем общее время выполнения диктанта (накопленное время работы)
         const timerSnapshot = getProgressTimerSnapshot();
         const totalTimeMs = timerSnapshot.accumulatedMs || 0;
@@ -6454,7 +6492,7 @@ async function registerCompletedDictation() {
             const totalPerfect = s.number_of_perfect || 0;
             const totalCorrected = s.number_of_corrected || 0;
             const totalAudio = Number(s.number_of_audio) || 0;
-            
+
             if (totalPerfect > 0 || totalCorrected > 0 || totalAudio > 0) {
                 sentences_data.push({
                     sentence_key: s.key,
@@ -6465,7 +6503,7 @@ async function registerCompletedDictation() {
                 });
             }
         });
-        
+
         // Получаем настройки для сохранения
         const sequences = getPlaySequenceValues();
         const isMixed = mixControl && mixControl.dataset.checked === 'true';
@@ -6474,7 +6512,7 @@ async function registerCompletedDictation() {
             const settings = audioSettingsPanel.getSettings();
             audioRepeats = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
         }
-        
+
         const settings_json = JSON.stringify({
             audio: {
                 start: sequences.start || playSequenceStart,
@@ -6562,20 +6600,20 @@ async function saveDictationDraft() {
     allSentences.forEach(s => {
         // Сохраняем текущее selection_state перед любыми изменениями
         const originalSelectionState = s.selection_state;
-        
+
         // Проверяем наличие прогресса
-        const hasProgress = s.number_of_perfect > 0 || 
-                           s.number_of_corrected > 0 || 
-                           (Number(s.number_of_audio) || 0) > 0;
-        
+        const hasProgress = s.number_of_perfect > 0 ||
+            s.number_of_corrected > 0 ||
+            (Number(s.number_of_audio) || 0) > 0;
+
         // Определяем финальное состояние для сохранения
         let finalSelectionState;
-        
+
         // Вычисляем completed состояние на основе прогресса
         const totalPerfect = Number(s.number_of_perfect) || 0;
         const totalAudio = Number(s.number_of_audio) || 0;
         const isCompleted = totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT;
-        
+
         if (isCompleted) {
             // Предложение полностью выполнено - всегда completed
             finalSelectionState = 'completed';
@@ -6593,14 +6631,14 @@ async function saveDictationDraft() {
             // По умолчанию - unchecked
             finalSelectionState = 'unchecked';
         }
-        
+
         // Сохраняем предложение, если:
         // 1. Есть прогресс (perfect, corrected, audio)
         // 2. ИЛИ есть явно установленное selection_state (checked/unchecked) - важно для сохранения выбора пользователя!
-        const hasExplicitSelection = originalSelectionState === 'checked' || 
-                                     originalSelectionState === 'unchecked' || 
-                                     originalSelectionState === 'completed';
-        
+        const hasExplicitSelection = originalSelectionState === 'checked' ||
+            originalSelectionState === 'unchecked' ||
+            originalSelectionState === 'completed';
+
         if (hasProgress || hasExplicitSelection) {
             perSentence[s.key] = {
                 number_of_perfect: s.number_of_perfect || 0,
@@ -6722,213 +6760,213 @@ async function loadAndApplyDraft(forceClear = false) {
             return false;
         }
 
-    // Восстанавливаем настройки из settings_json (приоритет) или из отдельных полей
-    let audioSettingsFromDraft = null;
-    if (draft.settings_json) {
-        try {
-            const settings = JSON.parse(draft.settings_json);
-            audioSettingsFromDraft = settings.audio || null;
-        } catch (e) {
-            console.warn('Ошибка парсинга settings_json из черновика:', e);
+        // Восстанавливаем настройки из settings_json (приоритет) или из отдельных полей
+        let audioSettingsFromDraft = null;
+        if (draft.settings_json) {
+            try {
+                const settings = JSON.parse(draft.settings_json);
+                audioSettingsFromDraft = settings.audio || null;
+            } catch (e) {
+                console.warn('Ошибка парсинга settings_json из черновика:', e);
+            }
         }
-    }
-    
-    if (audioSettingsFromDraft || draft.playSequenceStart || draft.playSequenceTypo || draft.playSequenceSuccess || draft.audio_repeats !== undefined) {
-        if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
-            const settingsToApply = audioSettingsFromDraft ? {
-                start: audioSettingsFromDraft.start || draft.playSequenceStart || playSequenceStart || 'oto',
-                typo: audioSettingsFromDraft.typo || draft.playSequenceTypo || playSequenceTypo || 'o',
-                success: audioSettingsFromDraft.success || draft.playSequenceSuccess || playSequenceSuccess || 'ot',
-                repeats: audioSettingsFromDraft.repeats !== undefined ? audioSettingsFromDraft.repeats : (draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)),
-                without_entering_text: audioSettingsFromDraft.without_entering_text !== undefined ? Boolean(audioSettingsFromDraft.without_entering_text) : false,
-                show_text: audioSettingsFromDraft.show_text !== undefined ? Boolean(audioSettingsFromDraft.show_text) : false,
-                speech_recognition_mode: audioSettingsFromDraft.speech_recognition_mode || speechRecognitionMode || 'route'
-            } : {
-                start: draft.playSequenceStart || playSequenceStart || 'oto',
-                typo: draft.playSequenceTypo || playSequenceTypo || 'o',
-                success: draft.playSequenceSuccess || playSequenceSuccess || 'ot',
-                repeats: draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)
-            };
-            
-            audioSettingsPanel.setSettings(settingsToApply);
-            // Обновляем глобальные переменные
-            const settings = audioSettingsPanel.getSettings();
-            playSequenceStart = settings.start;
-            playSequenceTypo = settings.typo;
-            playSequenceSuccess = settings.success;
-            const oldValue = REQUIRED_PASSED_COUNT;
-            REQUIRED_PASSED_COUNT = settings.repeats;
-            // Обновляем новые настройки
-            if (settings.without_entering_text !== undefined) {
-                window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
-            }
-            if (settings.show_text !== undefined) {
-                window.audioSettingsShowText = Boolean(settings.show_text);
-            }
-            if (settings.speech_recognition_mode !== undefined) {
-                speechRecognitionMode = settings.speech_recognition_mode;
-            }
-            // Применяем настройки к UI
-            applyAudioSettingsToUI();
-            // Пересчитываем доступность кнопок записи при загрузке черновика
-            if (oldValue !== REQUIRED_PASSED_COUNT) {
-                recalculateAudioAvailabilityForAllSentences();
-            }
-        } else {
-            // Fallback на старый способ
-            if (draft.playSequenceStart) {
-                playSequenceStart = draft.playSequenceStart;
-                const el = document.getElementById('playSequenceStart');
-                if (el) el.value = draft.playSequenceStart;
-            }
-            if (draft.playSequenceTypo) {
-                playSequenceTypo = draft.playSequenceTypo;
-                const el = document.getElementById('playSequenceTypo');
-                if (el) el.value = draft.playSequenceTypo;
-            }
-            if (draft.playSequenceSuccess) {
-                playSequenceSuccess = draft.playSequenceSuccess;
-                const el = document.getElementById('playSequenceSuccess');
-                if (el) el.value = draft.playSequenceSuccess;
-            }
-            if (draft.audio_repeats !== undefined) {
+
+        if (audioSettingsFromDraft || draft.playSequenceStart || draft.playSequenceTypo || draft.playSequenceSuccess || draft.audio_repeats !== undefined) {
+            if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
+                const settingsToApply = audioSettingsFromDraft ? {
+                    start: audioSettingsFromDraft.start || draft.playSequenceStart || playSequenceStart || 'oto',
+                    typo: audioSettingsFromDraft.typo || draft.playSequenceTypo || playSequenceTypo || 'o',
+                    success: audioSettingsFromDraft.success || draft.playSequenceSuccess || playSequenceSuccess || 'ot',
+                    repeats: audioSettingsFromDraft.repeats !== undefined ? audioSettingsFromDraft.repeats : (draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)),
+                    without_entering_text: audioSettingsFromDraft.without_entering_text !== undefined ? Boolean(audioSettingsFromDraft.without_entering_text) : false,
+                    show_text: audioSettingsFromDraft.show_text !== undefined ? Boolean(audioSettingsFromDraft.show_text) : false,
+                    speech_recognition_mode: audioSettingsFromDraft.speech_recognition_mode || speechRecognitionMode || 'route'
+                } : {
+                    start: draft.playSequenceStart || playSequenceStart || 'oto',
+                    typo: draft.playSequenceTypo || playSequenceTypo || 'o',
+                    success: draft.playSequenceSuccess || playSequenceSuccess || 'ot',
+                    repeats: draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)
+                };
+
+                audioSettingsPanel.setSettings(settingsToApply);
+                // Обновляем глобальные переменные
+                const settings = audioSettingsPanel.getSettings();
+                playSequenceStart = settings.start;
+                playSequenceTypo = settings.typo;
+                playSequenceSuccess = settings.success;
                 const oldValue = REQUIRED_PASSED_COUNT;
-                REQUIRED_PASSED_COUNT = draft.audio_repeats;
-                const el = document.getElementById('audioRepeatsInput');
-                if (el) el.value = draft.audio_repeats;
+                REQUIRED_PASSED_COUNT = settings.repeats;
+                // Обновляем новые настройки
+                if (settings.without_entering_text !== undefined) {
+                    window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
+                }
+                if (settings.show_text !== undefined) {
+                    window.audioSettingsShowText = Boolean(settings.show_text);
+                }
+                if (settings.speech_recognition_mode !== undefined) {
+                    speechRecognitionMode = settings.speech_recognition_mode;
+                }
+                // Применяем настройки к UI
+                applyAudioSettingsToUI();
                 // Пересчитываем доступность кнопок записи при загрузке черновика
                 if (oldValue !== REQUIRED_PASSED_COUNT) {
                     recalculateAudioAvailabilityForAllSentences();
                 }
+            } else {
+                // Fallback на старый способ
+                if (draft.playSequenceStart) {
+                    playSequenceStart = draft.playSequenceStart;
+                    const el = document.getElementById('playSequenceStart');
+                    if (el) el.value = draft.playSequenceStart;
+                }
+                if (draft.playSequenceTypo) {
+                    playSequenceTypo = draft.playSequenceTypo;
+                    const el = document.getElementById('playSequenceTypo');
+                    if (el) el.value = draft.playSequenceTypo;
+                }
+                if (draft.playSequenceSuccess) {
+                    playSequenceSuccess = draft.playSequenceSuccess;
+                    const el = document.getElementById('playSequenceSuccess');
+                    if (el) el.value = draft.playSequenceSuccess;
+                }
+                if (draft.audio_repeats !== undefined) {
+                    const oldValue = REQUIRED_PASSED_COUNT;
+                    REQUIRED_PASSED_COUNT = draft.audio_repeats;
+                    const el = document.getElementById('audioRepeatsInput');
+                    if (el) el.value = draft.audio_repeats;
+                    // Пересчитываем доступность кнопок записи при загрузке черновика
+                    if (oldValue !== REQUIRED_PASSED_COUNT) {
+                        recalculateAudioAvailabilityForAllSentences();
+                    }
+                }
             }
         }
-    }
-    if (draft.is_mixed !== undefined && mixControl) {
-        mixControl.dataset.checked = draft.is_mixed ? 'true' : 'false';
-        // Обновляем текст кнопки
-        const mixControlText = mixControl.querySelector('span');
-        if (mixControlText) {
-            mixControlText.textContent = draft.is_mixed ? 'случайный порядок' : 'прямой порядок';
+        if (draft.is_mixed !== undefined && mixControl) {
+            mixControl.dataset.checked = draft.is_mixed ? 'true' : 'false';
+            // Обновляем текст кнопки
+            const mixControlText = mixControl.querySelector('span');
+            if (mixControlText) {
+                mixControlText.textContent = draft.is_mixed ? 'случайный порядок' : 'прямой порядок';
+            }
         }
-    }
 
-    // Восстанавливаем круг и счетчики
-    if (draft.circle_number) {
-        circle_number = draft.circle_number;
-    }
-    if (draft.number_of_perfect !== undefined) {
-        number_of_perfect = draft.number_of_perfect;
-    }
-    if (draft.number_of_corrected !== undefined) {
-        number_of_corrected = draft.number_of_corrected;
-    }
-    if (draft.number_of_audio !== undefined) {
-        number_of_audio = draft.number_of_audio;
-    }
+        // Восстанавливаем круг и счетчики
+        if (draft.circle_number) {
+            circle_number = draft.circle_number;
+        }
+        if (draft.number_of_perfect !== undefined) {
+            number_of_perfect = draft.number_of_perfect;
+        }
+        if (draft.number_of_corrected !== undefined) {
+            number_of_corrected = draft.number_of_corrected;
+        }
+        if (draft.number_of_audio !== undefined) {
+            number_of_audio = draft.number_of_audio;
+        }
 
-    // Восстанавливаем прогресс по предложениям
-    if (draft.per_sentence) {
-        const byKey = makeByKeyMap(allSentences);
-        Object.keys(draft.per_sentence).forEach(key => {
-            const s = byKey.get(key);
-            if (s && draft.per_sentence[key]) {
-                const progress = draft.per_sentence[key];
-                // ИСПРАВЛЕНО: Правильное преобразование всех числовых полей в числа
-                // number_of_perfect: преобразуем в число
-                if (progress.hasOwnProperty('number_of_perfect')) {
-                    const perfectValue = progress.number_of_perfect;
-                    if (perfectValue !== null && perfectValue !== undefined) {
-                        const numValue = Number(perfectValue);
-                        s.number_of_perfect = isNaN(numValue) ? 0 : numValue;
-                    } else {
-                        s.number_of_perfect = 0;
+        // Восстанавливаем прогресс по предложениям
+        if (draft.per_sentence) {
+            const byKey = makeByKeyMap(allSentences);
+            Object.keys(draft.per_sentence).forEach(key => {
+                const s = byKey.get(key);
+                if (s && draft.per_sentence[key]) {
+                    const progress = draft.per_sentence[key];
+                    // ИСПРАВЛЕНО: Правильное преобразование всех числовых полей в числа
+                    // number_of_perfect: преобразуем в число
+                    if (progress.hasOwnProperty('number_of_perfect')) {
+                        const perfectValue = progress.number_of_perfect;
+                        if (perfectValue !== null && perfectValue !== undefined) {
+                            const numValue = Number(perfectValue);
+                            s.number_of_perfect = isNaN(numValue) ? 0 : numValue;
+                        } else {
+                            s.number_of_perfect = 0;
+                        }
                     }
-                }
-                // number_of_corrected: преобразуем в число (важно для правильного подсчета)
-                if (progress.hasOwnProperty('number_of_corrected')) {
-                    const correctedValue = progress.number_of_corrected;
-                    if (correctedValue !== null && correctedValue !== undefined) {
-                        const numValue = Number(correctedValue);
-                        s.number_of_corrected = isNaN(numValue) ? 0 : numValue;
-                        console.log('[loadAndApplyDraft] Загружено number_of_corrected для', key, '=', s.number_of_corrected, '(было:', correctedValue, ')');
-                    } else {
-                        s.number_of_corrected = 0;
+                    // number_of_corrected: преобразуем в число (важно для правильного подсчета)
+                    if (progress.hasOwnProperty('number_of_corrected')) {
+                        const correctedValue = progress.number_of_corrected;
+                        if (correctedValue !== null && correctedValue !== undefined) {
+                            const numValue = Number(correctedValue);
+                            s.number_of_corrected = isNaN(numValue) ? 0 : numValue;
+                            console.log('[loadAndApplyDraft] Загружено number_of_corrected для', key, '=', s.number_of_corrected, '(было:', correctedValue, ')');
+                        } else {
+                            s.number_of_corrected = 0;
+                        }
                     }
-                }
-                // number_of_audio: если значение есть в progress, устанавливаем (даже если 0)
-                // Если undefined, оставляем текущее значение
-                if (progress.hasOwnProperty('number_of_audio')) {
-                    // Преобразуем в число, чтобы корректно обработать строки и null
-                    const audioValue = progress.number_of_audio;
-                    if (audioValue !== null && audioValue !== undefined) {
-                        const numValue = Number(audioValue);
-                        s.number_of_audio = isNaN(numValue) ? 0 : numValue;
-                    } else {
-                        s.number_of_audio = 0;
+                    // number_of_audio: если значение есть в progress, устанавливаем (даже если 0)
+                    // Если undefined, оставляем текущее значение
+                    if (progress.hasOwnProperty('number_of_audio')) {
+                        // Преобразуем в число, чтобы корректно обработать строки и null
+                        const audioValue = progress.number_of_audio;
+                        if (audioValue !== null && audioValue !== undefined) {
+                            const numValue = Number(audioValue);
+                            s.number_of_audio = isNaN(numValue) ? 0 : numValue;
+                        } else {
+                            s.number_of_audio = 0;
+                        }
                     }
+                    // ИСПРАВЛЕНО: Убрана загрузка circle_number_of_* полей, так как логика "circle" удалена
+                    // Эти поля больше не сохраняются и не должны использоваться
+                    // Игнорируем их, если они есть в старых черновиках, чтобы избежать проблем
+                    // circle_number_of_audio больше не используется - убрана логика кругов для аудио
+                    // НЕ восстанавливаем selection_state из черновика - он будет пересчитан ниже
+                    // Это позволяет избежать проблем с unchecked состояниями
                 }
-                // ИСПРАВЛЕНО: Убрана загрузка circle_number_of_* полей, так как логика "circle" удалена
-                // Эти поля больше не сохраняются и не должны использоваться
-                // Игнорируем их, если они есть в старых черновиках, чтобы избежать проблем
-                // circle_number_of_audio больше не используется - убрана логика кругов для аудио
-                // НЕ восстанавливаем selection_state из черновика - он будет пересчитан ниже
-                // Это позволяет избежать проблем с unchecked состояниями
+            });
+        }
+
+        // Обновляем состояния всех предложений на основе текущего прогресса
+        allSentences.forEach(s => {
+            // Сначала вычисляем состояние на основе прогресса
+            const calculatedState = calculateSentenceSelectionState(s);
+
+            // Если предложение completed - устанавливаем completed
+            if (calculatedState === 'completed') {
+                s.selection_state = 'completed';
+            } else {
+                // Если предложение не completed, проверяем что было в черновике
+                const draftSentence = draft.per_sentence && draft.per_sentence[s.key];
+                const draftState = draftSentence ? draftSentence.selection_state : undefined;
+
+                // Если в черновике есть явно сохраненное состояние - ВОССТАНАВЛИВАЕМ его
+                // Это важно для сохранения выбора пользователя (checked/unchecked)
+                if (draftSentence && draftState !== undefined && draftState !== null) {
+                    // Восстанавливаем явно сохраненное состояние (checked или unchecked)
+                    // Это может быть даже для предложений без прогресса, которые пользователь выбрал
+                    s.selection_state = draftState;
+                } else if (draftSentence) {
+                    // Предложение есть в черновике (есть прогресс), но selection_state не указан
+                    // Значит было checked по умолчанию (пользователь работал с этим предложением)
+                    s.selection_state = 'checked';
+                } else {
+                    // Предложения НЕТ в черновике - значит пользователь его НЕ выбирал
+                    // Устанавливаем unchecked (не selected)
+                    s.selection_state = 'unchecked';
+                }
+            }
+
+            // Обновляем состояние, но НЕ перезаписываем явно восстановленное из черновика
+            // Это важно - если мы восстановили unchecked, не нужно его менять на checked
+            updateSentenceSelectionState(s, false);
+        });
+
+        // Восстанавливаем selectedSentences на основе selection_state
+        selectedSentences = [];
+        allSentences.forEach(s => {
+            // Включаем в selectedSentences:
+            // 1. checked - явно выбранные пользователем
+            // 2. completed - полностью завершенные (должны оставаться в списке)
+            // 3. Предложения с прогрессом (perfect, corrected, audio)
+            if (s.selection_state === 'checked' || s.selection_state === 'completed') {
+                if (!selectedSentences.includes(s.key)) {
+                    selectedSentences.push(s.key);
+                }
             }
         });
-    }
 
-    // Обновляем состояния всех предложений на основе текущего прогресса
-    allSentences.forEach(s => {
-        // Сначала вычисляем состояние на основе прогресса
-        const calculatedState = calculateSentenceSelectionState(s);
-        
-        // Если предложение completed - устанавливаем completed
-        if (calculatedState === 'completed') {
-            s.selection_state = 'completed';
-        } else {
-            // Если предложение не completed, проверяем что было в черновике
-            const draftSentence = draft.per_sentence && draft.per_sentence[s.key];
-            const draftState = draftSentence ? draftSentence.selection_state : undefined;
-            
-            // Если в черновике есть явно сохраненное состояние - ВОССТАНАВЛИВАЕМ его
-            // Это важно для сохранения выбора пользователя (checked/unchecked)
-            if (draftSentence && draftState !== undefined && draftState !== null) {
-                // Восстанавливаем явно сохраненное состояние (checked или unchecked)
-                // Это может быть даже для предложений без прогресса, которые пользователь выбрал
-                s.selection_state = draftState;
-            } else if (draftSentence) {
-                // Предложение есть в черновике (есть прогресс), но selection_state не указан
-                // Значит было checked по умолчанию (пользователь работал с этим предложением)
-                s.selection_state = 'checked';
-            } else {
-                // Предложения НЕТ в черновике - значит пользователь его НЕ выбирал
-                // Устанавливаем unchecked (не selected)
-                s.selection_state = 'unchecked';
-            }
-        }
-        
-        // Обновляем состояние, но НЕ перезаписываем явно восстановленное из черновика
-        // Это важно - если мы восстановили unchecked, не нужно его менять на checked
-        updateSentenceSelectionState(s, false);
-    });
+        console.log('[loadAndApplyDraft] Восстановлено selectedSentences:', selectedSentences.length, selectedSentences);
 
-    // Восстанавливаем selectedSentences на основе selection_state
-    selectedSentences = [];
-    allSentences.forEach(s => {
-        // Включаем в selectedSentences:
-        // 1. checked - явно выбранные пользователем
-        // 2. completed - полностью завершенные (должны оставаться в списке)
-        // 3. Предложения с прогрессом (perfect, corrected, audio)
-        if (s.selection_state === 'checked' || s.selection_state === 'completed') {
-            if (!selectedSentences.includes(s.key)) {
-                selectedSentences.push(s.key);
-            }
-        }
-    });
-    
-    console.log('[loadAndApplyDraft] Восстановлено selectedSentences:', selectedSentences.length, selectedSentences);
-
-    // Восстанавливаем current_index
+        // Восстанавливаем current_index
         if (draft.current_index !== undefined && draft.current_index < selectedSentences.length) {
             currentSentenceIndex = draft.current_index;
         } else {
@@ -6949,14 +6987,14 @@ async function loadAndApplyDraft(forceClear = false) {
                 // Состояние было восстановлено из черновика - только синхронизируем selectedSentences
                 updateSentenceSelectionState(s, false);
             }
-            
+
             // Добавляем в selectedSentences если checked или completed
-            if ((s.selection_state === 'checked' || s.selection_state === 'completed') && 
+            if ((s.selection_state === 'checked' || s.selection_state === 'completed') &&
                 !selectedSentences.includes(s.key)) {
                 selectedSentences.push(s.key);
             }
         });
-        
+
         console.log('[loadAndApplyDraft] Финальный selectedSentences:', selectedSentences.length, selectedSentences);
 
         // Обновляем отображение всех строк таблицы после загрузки черновика
@@ -6968,7 +7006,7 @@ async function loadAndApplyDraft(forceClear = false) {
         // ВАЖНО: Обновляем статистику ПОСЛЕ загрузки всех данных
         // Это гарантирует, что глобальные переменные и UI синхронизированы с загруженным прогрессом
         updateStats();
-        
+
         // ВАЖНО: Обновляем видимость аудио-полей для текущего предложения
         // Это гарантирует, что поля скрываются, если аудио уже выполнено
         if (currentSentence) {
@@ -7004,7 +7042,7 @@ function clickBtnBackToList() {
 async function handleSave() {
     const saveBtn = document.getElementById('saveBtn');
     const exitToIndexBtn = document.getElementById('exitToIndexBtn');
-    
+
     if (saveBtn) {
         saveBtn.disabled = true;
         // Не блокируем кнопку выхода, чтобы пользователь мог выйти даже во время сохранения
@@ -7013,7 +7051,7 @@ async function handleSave() {
         if (typeof lucide !== 'undefined' && lucide.createIcons) {
             lucide.createIcons();
         }
-        
+
         try {
             const panel = getProgressPanelInstance();
             const historySavePromise = panel
@@ -7026,11 +7064,11 @@ async function handleSave() {
             const draftSaved = await saveDictationDraft();
             const historySaved = await historySavePromise;
             const success = !!draftSaved && historySaved !== false;
-            
+
             if (panel && success) {
                 panel.markClean();
             }
-            
+
             if (success) {
                 showSaveToast('Прогресс сохранён', 'success');
             } else {
@@ -7280,12 +7318,12 @@ function initPlaySequenceInputs() {
                     e.target.value = prevValue;
                 }
             });
-            
+
             input.addEventListener('focus', (e) => {
                 // Сохраняем текущее значение перед изменением
                 e.target.dataset.prevValue = e.target.value;
             });
-            
+
             input.addEventListener('blur', (e) => {
                 // Восстанавливаем значение, если оно пустое или невалидное
                 const value = parseInt(e.target.value, 10);
@@ -7301,7 +7339,7 @@ function initPlaySequenceInputs() {
                     REQUIRED_PASSED_COUNT = finalValue;
                 }
             });
-            
+
             input.addEventListener('change', (e) => {
                 // При изменении через стрелки обновляем REQUIRED_PASSED_COUNT
                 // Пересчет произойдет через AudioSettingsPanel.onSettingsChange
@@ -7310,7 +7348,7 @@ function initPlaySequenceInputs() {
                     REQUIRED_PASSED_COUNT = value;
                 }
             });
-            
+
             return; // Пропускаем остальную обработку для этого поля
         }
 
@@ -7348,12 +7386,12 @@ function getPlaySequenceValues() {
             success: settings.success || 'ot'
         };
     }
-    
+
     // Fallback на старый способ (для обратной совместимости)
     const startEl = document.getElementById('playSequenceStart');
     const typoEl = document.getElementById('playSequenceTypo');
     const successEl = document.getElementById('playSequenceSuccess');
-    
+
     return {
         start: startEl ? startEl.value || 'oto' : 'oto',
         typo: typoEl ? typoEl.value || 'o' : 'o',
@@ -7365,14 +7403,14 @@ function getPlaySequenceValues() {
 document.addEventListener('DOMContentLoaded', async function () {
     // Загружаем настройки аудио из данных пользователя (асинхронно)
     await loadAudioSettingsFromUser();
-    
+
     // Инициализируем панель настроек аудио
     const container = document.getElementById('audioSettingsContainer');
     if (container && typeof AudioSettingsPanel !== 'undefined') {
         // Глобальные переменные для новых настроек
         window.audioSettingsWithoutEnteringText = false;
         window.audioSettingsShowText = false;
-        
+
         audioSettingsPanel = new AudioSettingsPanel({
             container: container,
             mode: 'modal',
@@ -7385,29 +7423,29 @@ document.addEventListener('DOMContentLoaded', async function () {
                 // Используем явную проверку, чтобы 0 не заменялся на 3
                 const oldValue = REQUIRED_PASSED_COUNT;
                 REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-                
+
                 // Пересчитываем доступность кнопок записи при инициализации
                 if (oldValue !== REQUIRED_PASSED_COUNT) {
                     recalculateAudioAvailabilityForAllSentences();
                 }
-                
+
                 // Обновляем новые настройки
                 window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
                 window.audioSettingsShowText = Boolean(settings.show_text);
-                
+
                 // Сохраняем настройки в БД через API
                 await saveAudioSettingsToUser(settings);
-                
+
                 // Пересчитываем доступность кнопок записи для всех предложений при изменении REQUIRED_PASSED_COUNT
                 if (oldValue !== REQUIRED_PASSED_COUNT) {
                     recalculateAudioAvailabilityForAllSentences();
                 }
-                
+
                 // Применяем настройки к текущему предложению
                 applyAudioSettingsToUI();
             }
         });
-        
+
         // Загружаем настройки из данных пользователя (или значения по умолчанию)
         audioSettingsPanel.setSettings({
             start: playSequenceStart,
@@ -7415,9 +7453,9 @@ document.addEventListener('DOMContentLoaded', async function () {
             success: playSequenceSuccess,
             repeats: REQUIRED_PASSED_COUNT
         });
-        
+
         audioSettingsPanel.init();
-        
+
         // Инициализируем модальное окно настроек аудио
         initAudioSettingsModal();
     } else {
@@ -7492,12 +7530,12 @@ function initAudioSettingsModal() {
     const audioSettingsButton = document.getElementById('audioSettingsButton');
     const closeAudioSettingsModal = document.getElementById('closeAudioSettingsModal');
     const modalContainer = document.getElementById('audioSettingsModalContainer');
-    
+
     if (!audioSettingsModal || !audioSettingsButton || !modalContainer) {
         console.warn('Элементы модального окна настроек аудио не найдены');
         return;
     }
-    
+
     // Инициализируем панель настроек в модальном окне
     audioSettingsModalPanel = new AudioSettingsPanel({
         container: modalContainer,
@@ -7510,10 +7548,10 @@ function initAudioSettingsModal() {
             playSequenceSuccess = settings.success || 'ot';
             const oldValue = REQUIRED_PASSED_COUNT;
             REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-            
+
             window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
             window.audioSettingsShowText = Boolean(settings.show_text);
-            
+
             // Обновляем метод распознавания речи
             if (settings.speech_recognition_mode) {
                 console.log(`🔄 [onSettingsChange] Изменяем режим распознавания: ${speechRecognitionMode} -> ${settings.speech_recognition_mode}`);
@@ -7522,15 +7560,15 @@ function initAudioSettingsModal() {
                 console.log(`🔄 [onSettingsChange] Вызываем updateRecognitionModeIcon() с режимом: ${speechRecognitionMode}`);
                 updateRecognitionModeIcon();
             }
-            
+
             // Сохраняем настройки в БД
             await saveAudioSettingsToUser(settings);
-            
+
             // Пересчитываем доступность кнопок записи
             if (oldValue !== REQUIRED_PASSED_COUNT) {
                 recalculateAudioAvailabilityForAllSentences();
             }
-            
+
             // Применяем настройки к текущему предложению
             // ВАЖНО: applyAudioSettingsToUI() также вызывает updateRecognitionModeIcon(),
             // но это нормально - это гарантирует, что иконка будет обновлена
@@ -7538,7 +7576,7 @@ function initAudioSettingsModal() {
             applyAudioSettingsToUI();
         }
     });
-    
+
     // Загружаем настройки из данных пользователя
     loadAudioSettingsFromUser().then(() => {
         if (audioSettingsModalPanel) {
@@ -7554,7 +7592,7 @@ function initAudioSettingsModal() {
             audioSettingsModalPanel.init();
         }
     });
-    
+
     // Обработчик открытия модального окна
     audioSettingsButton.addEventListener('click', () => {
         audioSettingsModal.style.display = 'flex';
@@ -7563,7 +7601,7 @@ function initAudioSettingsModal() {
             window.lucide.createIcons();
         }
     });
-    
+
     // Обработчик закрытия модального окна
     closeAudioSettingsModal.addEventListener('click', () => {
         audioSettingsModal.style.display = 'none';
@@ -7571,7 +7609,7 @@ function initAudioSettingsModal() {
         // (на случай, если настройки были изменены, но иконка не обновилась)
         updateRecognitionModeIcon();
     });
-    
+
     // Закрытие по клику вне модального окна
     audioSettingsModal.addEventListener('click', (e) => {
         if (e.target === audioSettingsModal) {

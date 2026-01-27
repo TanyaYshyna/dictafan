@@ -1,0 +1,116 @@
+.model-switch .model-slider.downloaded {
+    background-color: var(--color-button-text-yellow) !important;
+}
+
+.model-switch .model-slider.downloaded .model-slider-circle {
+    transform: translateX(20px) !important;
+    background-color: var(--color-button-yellow) !important;
+}
+
+.model-dropdown-item {
+    background-color: white;
+    transition: background-color 0.2s ease;
+}
+
+.model-dropdown-item:hover {
+    background-color: #f9f9f9;
+}
+
+.model-dropdown-item.selected {
+    background-color: var(--color-hover) !important; /* бежевый цвет для выбранной модели */
+}
+
+.model-dropdown-item.selected:hover {
+    background-color: var(--color-hover) !important; /* сохраняем бежевый при наведении */
+}
+
+.two-panel-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.panel-left, .panel-right {
+    background: white;
+    padding: 15px;
+    border-radius: 6px;
+    /* border: 1px solid #e0e0e0; */
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-left .language-selector-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+}
+
+.panel-left .learning-languages-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: visible;
+    position: relative;
+}
+
+.model-select-wrapper {
+    margin-left: auto !important;
+    position: relative;
+}
+
+.model-select-dropdown {
+    position: fixed !important;
+    z-index: 10000 !important;
+}
+
+.models-panel-title {
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    color: #333;
+    font-weight: 600;
+}
+
+.models-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+
+.model-list-item {
+    transition: background-color 0.2s;
+}
+
+.model-list-item:hover {
+    background-color: #f9f9f9 !important;
+}
+
+.model-list-item.active-model {
+    background-color: #f0f9ff !important;
+}
+
+.model-list-item.active-model:hover {
+    background-color: #e0f0ff !important;
+}
+
+.empty-models-message {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}
+
+.storage-info-full {
+    margin-top: 20px;
+    padding: 12px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    border: 1px solid #eee;
+}
+
+@media (max-width: 768px) {
+    .two-panel-container {
+        grid-template-columns: 1fr;
+    }
+}

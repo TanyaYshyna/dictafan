@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
         loadUserData();
         initializeLanguageSelector();
+        initializeLanguageModelsSelector();
         initializeAudioSettings();
         setupFormListeners();
         initializeTopbarControls();
@@ -60,7 +61,7 @@ function loadUserData() {
 }
 
 
-// Инициализация языкового селектора
+// Инициализация языкового селектора (только выбор родного и изучаемого языка)
 function initializeLanguageSelector() {
     const container = document.getElementById('languageSelectorContainer');
     
@@ -71,28 +72,66 @@ function initializeLanguageSelector() {
 
     try {
         const languageData = window.LanguageManager.getLanguageData();
-        // console.log('🔄 Инициализация LanguageSelector с', Object.keys(languageData).length, 'языками');
 
         languageSelector = new LanguageSelector({
             container: container,
-            mode: 'profile-panels',
+            mode: 'registration', // Режим как при регистрации - только родной и изучаемый язык
             nativeLanguage: originalData.native_language,
             learningLanguages: originalData.learning_languages,
             currentLearning: originalData.current_learning,
             languageData: languageData,
             onLanguageChange: function (data) {
-                // console.log('LanguageSelector: изменения', data);
                 checkForChanges();
             }
         });
-
-        // console.log('✅ LanguageSelector инициализирован');
+        
+        // Делаем глобальной для доступа из других селекторов
+        window.languageSelector = languageSelector;
 
     } catch (error) {
         console.error('❌ Ошибка инициализации LanguageSelector:', error);
         container.innerHTML = `
             <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; text-align: center;">
                 <p style="color: #dc3545;">Ошибка загрузки языковых настроек</p>
+            </div>
+        `;
+    }
+}
+
+// Инициализация селектора языковых моделей (только модели, без выбора языков)
+let languageModelsSelector = null;
+
+function initializeLanguageModelsSelector() {
+    const container = document.getElementById('languageSelectorModelsContainer');
+    
+    if (!container) {
+        console.error('❌ Контейнер для LanguageModelsSelector не найден');
+        return;
+    }
+
+    try {
+        const languageData = window.LanguageManager.getLanguageData();
+
+        languageModelsSelector = new LanguageSelector({
+            container: container,
+            mode: 'models-only', // Новый режим - только модели, без выбора языков
+            nativeLanguage: originalData.native_language,
+            learningLanguages: originalData.learning_languages,
+            currentLearning: originalData.current_learning,
+            languageData: languageData,
+            onLanguageChange: function (data) {
+                // Модели не влияют на сохранение профиля
+            }
+        });
+        
+        // Делаем глобальной для доступа из других селекторов
+        window.languageModelsSelector = languageModelsSelector;
+
+    } catch (error) {
+        console.error('❌ Ошибка инициализации LanguageModelsSelector:', error);
+        container.innerHTML = `
+            <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; text-align: center;">
+                <p style="color: #dc3545;">Ошибка загрузки настроек моделей</p>
             </div>
         `;
     }
