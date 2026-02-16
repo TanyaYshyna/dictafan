@@ -4,7 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>Dikte</title>
+    <title>DictaFan</title>
+    <!-- <link rel="icon" href="/static/icons/logo_min.svg" type="image/svg+xml"> -->
+    <link rel="shortcut icon" href="/static/icons/favicon.ico">
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style_color.css">
     <link rel="stylesheet" href="/static/css/style.css">
@@ -54,15 +57,18 @@
             </a>
             <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span
                     class="streak-days">0</span></button>
-            <button id="showStatisticsBtn" class="statistics-btn" title="Показать статистику">
+            <button id="showStatisticsBtn" class="statistics-btn topbar-icon-btn" title="Показать статистику">
                 <i data-lucide="bar-chart-3"></i>
                 <!-- <span>Статистика</span> -->
             </button>
+            <button id="openDictationSettingsBtn" class="statistics-btn topbar-icon-btn" title="Настройки">
+                <i data-lucide="settings"></i>
+            </button>
             <div class="button-group topbar-save-group">
-                <button id="saveBtn" class="button-color-yellow" title="Сохранить">
+                <button id="saveBtn" class="button-color-yellow topbar-icon-btn save-status-clean" title="Сохранить">
                     <i data-lucide="save"></i>
                 </button>
-                <button id="exitToIndexBtn" class="button-color-yellow" title="Вернуться к списку диктантов">
+                <button id="exitToIndexBtn" class="button-color-yellow topbar-icon-btn" title="Вернуться к списку диктантов">
                     <i data-lucide="forward"></i>
                 </button>
             </div>
@@ -109,7 +115,7 @@
                         <!-- <td rowspan="2">1111</td> -->
                         <td rowspan="2">
                             <!-- Поля для настройки последовательности воспроизведения -->
-                            <div id="audioSettingsContainer"></div>
+                            <div id="audioSettingsContainer" style="display: none;"></div>
 
                         </td>
                         <!-- <td>2222</td> -->
@@ -118,9 +124,14 @@
                         </td>
                         <!-- <td>3333</td> -->
                         <td>
-                            <button id="btnBackToList" onclick=clickBtnBackToList() class="button-color-yellow">
-                                <i data-lucide="x"></i>
-                            </button>
+                            <div class="start-modal-header-actions">
+                                <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
+                                    <i data-lucide="settings"></i>
+                                </button>
+                                <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
+                                    <i data-lucide="x"></i>
+                                </button>
+                            </div>
 
                         </td>
                     </tr>
@@ -180,7 +191,7 @@
                         <tr>
                             <th class="audio-settings-header-cell">
                                 <button id="audioSettingsButton" class="audio-settings-header-btn"
-                                    title="Настройки аудио">
+                                    title="Настройки">
                                     <i data-lucide="settings"></i>
                                 </button>
                             </th>
@@ -190,6 +201,7 @@
                             <th><i data-lucide="star"></i></th>
                             <th><i data-lucide="star-half"></i></th>
                             <th><i data-lucide="mic"></i></th>
+                            <th><i data-lucide="repeat"></i></th>
                             <th>Предложение</th>
                         </tr>
                     </thead>
@@ -221,8 +233,8 @@
     <div id="audioSettingsModal" class="modal" style="display: none;">
         <div class="modal-content audio-settings-modal-content">
             <div class="modal-header">
-                <h2>Настройки аудио</h2>
-                <button id="closeAudioSettingsModal" class="modal-close-btn" title="Закрыть">
+                <h2>Настройки</h2>
+                <button class="modal-close" id="closeAudioSettingsModal" title="Закрыть">
                     <i data-lucide="x"></i>
                 </button>
             </div>
@@ -347,15 +359,24 @@
                 <!-- <div id="translation">...</div> -->
             </div>
 
-            <button id="checkBtn" class="button-color-yellow" onclick="checkText()"
-                title="Нажмите Enter/Return когда закончили ввод текста">
-                <i data-lucide="corner-down-left"></i>
-            </button>
+            <div class="check-group">
+                <i data-lucide="rat" class="error-count-label"></i>
+                <span id="errorCountLabel" class="error-count-label"></span>
+                <button id="checkBtn" class="button-color-yellow" onclick="checkText()"
+                    title="Нажмите Enter/Return когда закончили ввод текста">
+                    <i data-lucide="corner-down-left"></i>
+                    <span>Проверить</span>
+                </button>
+            </div>
         </div>
 
         <div class="virtual-keyboard-container">
             <label class="vk-toggle" for="virtualKeyboardToggle">
                 <input type="checkbox" id="virtualKeyboardToggle">
+                <span class="vk-toggle-icon" aria-hidden="true">
+                    <i class="vk-toggle-icon-off" data-lucide="circle"></i>
+                    <i class="vk-toggle-icon-on" data-lucide="check-circle"></i>
+                </span>
                 <span>Показать клавиатуру</span>
             </label>
             <div id="virtualKeyboard" hidden></div>
@@ -448,7 +469,9 @@
     <script src="{{ url_for('static', filename='js/progress_panel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}"></script>
     <script src="{{ url_for('static', filename='js/statistics_report.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/virtual_keyboard.js') }}"></script>
+    <!-- Unified Speech Recognition -->
+    <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v=20260212_1"></script>
+    <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v=20260212_1"></script>
 
     <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
     <div id="dictation-data" data-language-original="{{ language_original }}"
@@ -459,7 +482,7 @@
     </div>
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
-    <script src="{{ url_for('static', filename='js/script_dictation.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script_dictation.js') }}?v=20260212_1"></script>
 
     <script>
         // Инициализация UserManager и основного скрипта

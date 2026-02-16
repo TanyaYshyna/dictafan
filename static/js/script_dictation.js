@@ -73,6 +73,330 @@ let btnModalCountAudio = document.getElementById('btn-modal-count-audio');
 let btnModalCountTotal = document.getElementById('btn-modal-count-total');
 let circleBtnModal = document.getElementById('btn-modal-circle-number');
 
+const DRAFT_AUTOSAVE_DEBOUNCE_MS = 1200;
+const DRAFT_AUTOSAVE_INTERVAL_MS = 30000;
+
+let draftAutosaveTimer = null;
+let draftPeriodicAutosaveTimer = null;
+let draftSyncInFlight = null;
+
+function getDraftUserIdForKey() {
+    try {
+        const um = window.UM || userManager;
+        const id = um?.userData?.id;
+        return id ? String(id) : 'anon';
+    } catch {
+        return 'anon';
+    }
+}
+
+function getDraftKey() {
+    const dictationId = currentDictation?.id;
+    if (!dictationId) return null;
+    return `${getDraftUserIdForKey()}:${dictationId}`;
+}
+
+function setSaveButtonStatus(status) {
+    const saveBtn = document.getElementById('saveBtn');
+    if (!saveBtn) return;
+    saveBtn.classList.remove('save-status-clean', 'save-status-pending', 'save-status-syncing', 'save-status-error');
+    if (status === 'clean') saveBtn.classList.add('save-status-clean');
+    else if (status === 'pending') saveBtn.classList.add('save-status-pending');
+    else if (status === 'syncing') saveBtn.classList.add('save-status-syncing');
+    else if (status === 'error') saveBtn.classList.add('save-status-error');
+
+    updateUnsavedIndicators();
+}
+
+function setUnsavedStarVisible(isVisible) {
+    const el = document.getElementById('unsavedStar');
+    if (!el) return;
+    el.style.display = isVisible ? 'inline-flex' : 'none';
+}
+
+async function hasLocalPendingDraft() {
+    const key = getDraftKey();
+    if (!key) return false;
+    try {
+        const queued = await idbGet('outbox', key);
+        return !!(queued && queued.state);
+    } catch {
+        return false;
+    }
+}
+
+function updateUnsavedIndicators() {
+    const panel = getProgressPanelInstance();
+    const hasPanelPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+
+    // local pending is async; we update star when the promise resolves
+    if (hasPanelPending) {
+        setUnsavedStarVisible(true);
+        return;
+    }
+
+    hasLocalPendingDraft().then((hasPending) => {
+        setUnsavedStarVisible(!!hasPending);
+    }).catch(() => {
+        setUnsavedStarVisible(false);
+    });
+}
+
+function scheduleDraftAutosave(reason = 'unknown') {
+    if (!currentDictation?.id) return;
+    setSaveButtonStatus('pending');
+    if (draftAutosaveTimer) clearTimeout(draftAutosaveTimer);
+    draftAutosaveTimer = setTimeout(() => {
+        draftAutosaveTimer = null;
+        saveDraftToIndexedDbAndQueueSync(reason).catch(err => {
+            console.warn('[Draft][IDB] autosave failed', err);
+            setSaveButtonStatus('error');
+        });
+    }, DRAFT_AUTOSAVE_DEBOUNCE_MS);
+}
+
+function startDraftPeriodicAutosave() {
+    if (draftPeriodicAutosaveTimer) return;
+    draftPeriodicAutosaveTimer = setInterval(() => {
+        saveDraftToIndexedDbAndQueueSync('periodic').catch(() => {});
+    }, DRAFT_AUTOSAVE_INTERVAL_MS);
+}
+
+async function openDraftDb() {
+    return await new Promise((resolve, reject) => {
+        const req = indexedDB.open('dictafan_drafts', 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('drafts')) {
+                db.createObjectStore('drafts', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('outbox')) {
+                db.createObjectStore('outbox', { keyPath: 'key' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function idbGet(storeName, key) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+async function idbPut(storeName, value) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.put(value);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+async function idbDelete(storeName, key) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.delete(key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+function buildDictationDraftState() {
+    if (!dictationStatistics || !currentDictation?.id) return null;
+
+    const perSentence = {};
+    allSentences.forEach(s => {
+        const originalSelectionState = s.selection_state;
+        const hasProgress = s.number_of_perfect > 0 ||
+            s.number_of_corrected > 0 ||
+            (Number(s.number_of_audio) || 0) > 0;
+
+        let finalSelectionState;
+        const totalPerfect = Number(s.number_of_perfect) || 0;
+        const totalAudio = Number(s.number_of_audio) || 0;
+        const isCompleted = totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT;
+
+        if (isCompleted) {
+            finalSelectionState = 'completed';
+        } else if (originalSelectionState === 'unchecked') {
+            finalSelectionState = 'unchecked';
+        } else if (hasProgress) {
+            finalSelectionState = 'checked';
+        } else if (originalSelectionState === 'checked' || originalSelectionState === 'completed') {
+            finalSelectionState = 'checked';
+        } else {
+            finalSelectionState = 'unchecked';
+        }
+
+        const hasExplicitSelection = originalSelectionState === 'checked' ||
+            originalSelectionState === 'unchecked' ||
+            originalSelectionState === 'completed';
+
+        if (hasProgress || hasExplicitSelection) {
+            perSentence[s.key] = {
+                number_of_perfect: s.number_of_perfect || 0,
+                number_of_corrected: s.number_of_corrected || 0,
+                number_of_audio: s.number_of_audio || 0,
+                attempts_total: Number(s.attempts_total) || 0,
+                error_count: Number(s.error_count) || 0,
+                selection_state: finalSelectionState
+            };
+        }
+    });
+
+    const sequences = getPlaySequenceValues();
+    const isMixed = mixControl && mixControl.dataset.checked === 'true';
+
+    let audioRepeats = REQUIRED_PASSED_COUNT;
+    let audioSettings = {};
+    if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
+        const settings = audioSettingsPanel.getSettings();
+        audioRepeats = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
+        audioSettings = {
+            start: settings.start || 'oto',
+            typo: settings.typo || 'o',
+            success: settings.success || 'ot',
+            repeats: audioRepeats,
+            required_passed_star_half: settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : REQUIRED_PASSED_STAR_HALF,
+            without_entering_text: Boolean(settings.without_entering_text),
+            show_text: Boolean(settings.show_text),
+            speech_recognition_mode: settings.speech_recognition_mode || speechRecognitionMode || 'route'
+        };
+    } else {
+        audioSettings = {
+            start: sequences.start || playSequenceStart || 'oto',
+            typo: sequences.typo || playSequenceTypo || 'o',
+            success: sequences.success || playSequenceSuccess || 'ot',
+            repeats: audioRepeats,
+            required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
+            without_entering_text: Boolean(window.audioSettingsWithoutEnteringText || false),
+            show_text: Boolean(window.audioSettingsShowText || false),
+            speech_recognition_mode: speechRecognitionMode || 'route'
+        };
+    }
+
+    const timerSnapshot = getProgressTimerSnapshot();
+    const accumulatedMs = timerSnapshot.accumulatedMs || 0;
+
+    const settings_json = JSON.stringify({
+        audio: audioSettings,
+        sentence_order: isMixed ? 'mixed' : 'direct'
+    });
+
+    return {
+        dictation_id: currentDictation.id,
+        circle_number: circle_number,
+        current_index: currentSentenceIndex || 0,
+        playSequenceStart: sequences.start || playSequenceStart,
+        playSequenceTypo: sequences.typo || playSequenceTypo,
+        playSequenceSuccess: sequences.success || playSequenceSuccess,
+        audio_repeats: audioRepeats,
+        is_mixed: isMixed,
+        per_sentence: perSentence,
+        number_of_perfect: number_of_perfect,
+        number_of_corrected: number_of_corrected,
+        number_of_audio: number_of_audio,
+        dictation_accumulated_ms: accumulatedMs,
+        settings_json: settings_json
+    };
+}
+
+async function saveDraftToIndexedDbAndQueueSync(reason = 'unknown') {
+    const key = getDraftKey();
+    if (!key) return false;
+
+    const state = buildDictationDraftState();
+    if (!state) return false;
+
+    const now = Date.now();
+    await idbPut('drafts', {
+        key,
+        dictationId: currentDictation.id,
+        userId: getDraftUserIdForKey(),
+        updatedAt: now,
+        state
+    });
+
+    await idbPut('outbox', {
+        key,
+        dictationId: currentDictation.id,
+        userId: getDraftUserIdForKey(),
+        updatedAt: now,
+        reason,
+        state
+    });
+
+    syncDraftIfOnline(false).catch(() => {});
+    return true;
+}
+
+async function syncDraftIfOnline(force = false) {
+    if (draftSyncInFlight) return draftSyncInFlight;
+
+    draftSyncInFlight = (async () => {
+        const key = getDraftKey();
+        if (!key) return false;
+
+        if (!force && !navigator.onLine) {
+            return false;
+        }
+
+        const queued = await idbGet('outbox', key);
+        if (!queued || !queued.state) {
+            setSaveButtonStatus('clean');
+            return true;
+        }
+
+        if (!dictationStatistics || typeof dictationStatistics.saveResumeState !== 'function') {
+            return false;
+        }
+
+        setSaveButtonStatus('syncing');
+        const ok = await dictationStatistics.saveResumeState(currentDictation.id, queued.state);
+        if (ok) {
+            await idbDelete('outbox', key);
+            setSaveButtonStatus('clean');
+            return true;
+        }
+
+        setSaveButtonStatus('error');
+        return false;
+    })();
+
+    try {
+        return await draftSyncInFlight;
+    } finally {
+        draftSyncInFlight = null;
+    }
+}
+
+window.addEventListener('online', () => {
+    syncDraftIfOnline(false).catch(() => {});
+});
+
 // Legacy DOM <audio> elements were removed from HTML; keep placeholders null to avoid accidental use
 const audio = null;
 const audio_tr = null;
@@ -177,6 +501,11 @@ async function loadAudioSettingsFromUser() {
                     REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
                 }
 
+                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
+                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
+                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
+                }
+
                 // Загружаем новые настройки
                 if (audioSettings.without_entering_text !== undefined) {
                     window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
@@ -191,8 +520,11 @@ async function loadAudioSettingsFromUser() {
                         console.log(`🔄 [loadAudioSettingsFromUser] Конвертируем старый режим 'avto' в 'route'`);
                         speechRecognitionMode = 'route';
                     } else {
+                        console.log(`🔄 [loadAudioSettingsFromUser] Загружаем режим распознавания: ${audioSettings.speech_recognition_mode}`);
                         speechRecognitionMode = audioSettings.speech_recognition_mode;
                     }
+                } else {
+                    console.log(`🔄 [loadAudioSettingsFromUser] Режим распознавания не найден в настройках, используем значение по умолчанию: ${speechRecognitionMode}`);
                 }
 
                 return; // Используем настройки из JSON
@@ -218,6 +550,11 @@ async function loadAudioSettingsFromUser() {
                 if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
                     const parsedValue = parseInt(audioSettings.repeats, 10);
                     REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
+                }
+
+                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
+                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
+                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
                 }
 
                 // Загружаем новые настройки
@@ -294,6 +631,11 @@ let number_of_total = 0;           // 1 — со 2-й и далее (сумар�
 let selectedSentences = [];
 let currentSentenceIndex = 0;// индекс списка выбранных по чакауту предложений
 let currentSentence = 0;   // текущее предложение из allSentences с kay = selectedSentencesх[currentSentenceIndex]
+// Делаем currentSentence доступной глобально для UnifiedSpeechRecognition
+window.currentSentence = null;
+
+// Метрики по предложению (анти-обход): сколько раз стартовали предложение + сколько ошибок в последней проверке
+// Храним на объекте предложения (allSentences) как s.attempts_total и s.error_count
 
 // Диалоговые метаданные (из info.json)
 let dictationIsDialog = false;
@@ -351,7 +693,99 @@ const userAudioVisualizer = document.getElementById('userAudioVisualizer');
 // ===== Виртуальная клавиатура =====
 const virtualKeyboardToggle = document.getElementById('virtualKeyboardToggle');
 const virtualKeyboardContainer = document.getElementById('virtualKeyboard');
-let virtualKeyboardInstance = null;
+let keyboardLayoutsCache = null;
+let keyboardLayoutsLoadPromise = null;
+let virtualKeyboardShiftPressed = false;
+let lastKeyboardHintLayout = null;
+let keyboardHintRenderScheduled = false;
+
+function doesVirtualKeyboardFitViewport() {
+    try {
+        if (!virtualKeyboardContainer) return true;
+        if (virtualKeyboardContainer.hasAttribute('hidden') || virtualKeyboardContainer.style.display === 'none') return true;
+        const viewportWidth = Math.ceil(window.innerWidth || document.documentElement.clientWidth || 0);
+        if (!viewportWidth) return true;
+
+        // If the viewport is narrow, the keyboard starts wrapping (see CSS @media max-width: 900px).
+        // In that state it becomes hard to use; auto-hide it.
+        const MIN_VK_VIEWPORT_WIDTH = 900;
+        if (viewportWidth < MIN_VK_VIEWPORT_WIDTH) return false;
+
+        // Additionally detect any wrapping in rows (keys moved to multiple lines).
+        const rows = virtualKeyboardContainer.querySelectorAll('.vk-row');
+        for (const row of rows) {
+            const keys = row.querySelectorAll('.vk-key');
+            if (!keys.length) continue;
+            const firstTop = keys[0].offsetTop;
+            for (let i = 1; i < keys.length; i++) {
+                if (keys[i].offsetTop !== firstTop) {
+                    return false;
+                }
+            }
+        }
+
+        // Fallback: if keyboard content is wider than the viewport (with a small safety margin), it doesn't fit.
+        const safetyMargin = 24;
+        const keyboardWidth = Math.ceil(virtualKeyboardContainer.scrollWidth || virtualKeyboardContainer.getBoundingClientRect().width || 0);
+        if (!keyboardWidth) return true;
+        return keyboardWidth + safetyMargin <= viewportWidth;
+    } catch (e) {
+        return true;
+    }
+}
+
+function enforceVirtualKeyboardFitsViewport() {
+    try {
+        if (!virtualKeyboardToggle || !virtualKeyboardContainer) return;
+        if (!virtualKeyboardToggle.checked) return;
+        if (doesVirtualKeyboardFitViewport()) return;
+        hideVirtualKeyboardIfActive();
+    } catch (e) {
+    }
+}
+
+if (!window.__dictafanVirtualKeyboardResizeHandlerAttached) {
+    window.__dictafanVirtualKeyboardResizeHandlerAttached = true;
+    window.addEventListener('resize', () => {
+        enforceVirtualKeyboardFitsViewport();
+    });
+}
+
+function scheduleKeyboardHintRender() {
+    if (keyboardHintRenderScheduled) return;
+    keyboardHintRenderScheduled = true;
+    requestAnimationFrame(() => {
+        keyboardHintRenderScheduled = false;
+        if (!virtualKeyboardContainer) return;
+        if (!virtualKeyboardToggle || !virtualKeyboardToggle.checked) return;
+        if (!lastKeyboardHintLayout) return;
+        renderKeyboardHint(virtualKeyboardContainer, lastKeyboardHintLayout, virtualKeyboardShiftPressed);
+        enforceVirtualKeyboardFitsViewport();
+    });
+}
+
+if (!window.__dictafanKeyboardHintShiftHotkeyAttached) {
+    window.__dictafanKeyboardHintShiftHotkeyAttached = true;
+    document.addEventListener('keydown', (e) => {
+        try {
+            if (e.key !== 'Shift') return;
+            if (virtualKeyboardShiftPressed) return;
+            virtualKeyboardShiftPressed = true;
+            scheduleKeyboardHintRender();
+        } catch (err) {
+        }
+    }, true);
+
+    document.addEventListener('keyup', (e) => {
+        try {
+            if (e.key !== 'Shift') return;
+            if (!virtualKeyboardShiftPressed) return;
+            virtualKeyboardShiftPressed = false;
+            scheduleKeyboardHintRender();
+        } catch (err) {
+        }
+    }, true);
+}
 
 // ===== Переменные для аудио =====
 // ===== Элементы DOM =====
@@ -391,6 +825,7 @@ let textAttemptCount = 0;
 let lastRecognitionTime = 0;  // Время последнего результата распознавания для умного автостопа
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
 let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (только интернет), 'route-off' (только локально, только если модель загружена)
+let audioSettingsPanel = null;
 let audioSettingsModalPanel = null;  // Панель настроек в модальном окне
 
 // Инициализация глобального хранилища моделей Whisper
@@ -398,34 +833,218 @@ if (typeof window !== 'undefined' && !window.WhisperModels) {
     window.WhisperModels = new Map();
 }
 
+// Глобальный экземпляр UnifiedSpeechRecognition
+let unifiedSpeechRecognizer = null;
+
+/**
+ * Инициализация UnifiedSpeechRecognition
+ */
+function initUnifiedSpeechRecognition() {
+    if (typeof UnifiedSpeechRecognition === 'undefined') {
+        console.warn('⚠️ UnifiedSpeechRecognition не загружен');
+        return null;
+    }
+    
+    const userAudioAnswer = document.getElementById('userAudioAnswer');
+    const audioVisualizer = document.getElementById('audioVisualizer');
+    
+    // Определяем режим распознавания (только 'online' или 'offline')
+    let mode = 'online'; // по умолчанию онлайн
+    if (speechRecognitionMode === 'route-off') {
+        mode = 'offline';
+    } else if (speechRecognitionMode === 'route') {
+        mode = 'online';
+    }
+    
+    // Определяем язык
+    const language = langCodeUrl || 'en-US';
+    
+    unifiedSpeechRecognizer = new UnifiedSpeechRecognition({
+        language: language,
+        mode: mode,
+        autoStopThreshold: AUTO_STOP_THRESHOLD,
+        autoStopStableMs: AUTO_STOP_STABLE_MS,
+        visualizerCanvas: audioVisualizer,
+        transcriptContainer: userAudioAnswer
+    });
+    
+    // Настраиваем колбэки
+    unifiedSpeechRecognizer.callbacks.onTranscript = (fullText, isFinal) => {
+        // Обновление уже происходит внутри UnifiedSpeechRecognition
+        // Но можем добавить дополнительную логику здесь
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onFinalTranscript = (transcript) => {
+        // Финальный текст получен
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onError = (error) => {
+        // Web Speech API иногда сообщает уведомления вроде 'aborted' при штатной остановке.
+        // Не показываем их как фатальные ошибки пользователю.
+        const code = (error && typeof error === 'object')
+            ? (error.error || error.message)
+            : error;
+        const codeStr = (code || '').toString().toLowerCase();
+        if (codeStr === 'aborted' || codeStr === 'no-speech' || codeStr === 'audio-capture') {
+            console.debug('UnifiedSpeechRecognition notice:', codeStr);
+            return;
+        }
+
+        console.error('Ошибка UnifiedSpeechRecognition:', error);
+        if (userAudioAnswer) {
+            userAudioAnswer.innerHTML = `<span class="error">Ошибка распознавания: ${error}</span>`;
+        }
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onRecordingStart = () => {
+        isRecording = true;
+        isStopping = false;
+        lastStopCause = 'manual';
+        srLiveText = '';
+        setRecordStateIcon('pause');
+        updateRecordingIndicator(true);
+        currentInactivityTimeout = INACTIVITY_TIMEOUT_RECORDING;
+        resetInactivityTimer();
+        
+        const rb = document.getElementById('recordButton');
+        if (rb) rb.classList.add('recording');
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onRecordingStop = () => {
+        isRecording = false;
+        isStopping = false;
+        const rb = document.getElementById('recordButton');
+        if (rb) rb.classList.remove('recording');
+        setRecordStateIcon('square');
+        updateRecordingIndicator(false);
+        currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
+        resetInactivityTimer();
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onProcessingStart = () => {
+        // Показываем анимацию обработки для офлайн-режима
+        if (speechRecognitionMode === 'route-off' && userAudioAnswer) {
+            showWhisperProcessingAnimation();
+        }
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onProcessingEnd = () => {
+        // Обработка завершена
+    };
+    
+    unifiedSpeechRecognizer.callbacks.onPercentUpdate = (percent) => {
+        console.log(`[onPercentUpdate] Получен процент: ${percent}%`);
+        if (count_percent) {
+            console.log(`[onPercentUpdate] Обновляем count_percent.textContent = ${percent}`);
+            count_percent.textContent = percent;
+        } else {
+            console.error(`[onPercentUpdate] count_percent элемент не найден!`);
+        }
+    };
+    
+    console.log('✅ UnifiedSpeechRecognition инициализирован, режим:', mode);
+    return unifiedSpeechRecognizer;
+}
+
 // Функции для работы с моделями Whisper
-function getWhisperModel(langCode) {
+function normalizeWhisperLangCode(langCode) {
+    const raw = (langCode || '').toString().trim().toLowerCase();
+    if (!raw) return '';
+    return raw.split('-')[0] || raw;
+}
+
+function getSelectedWhisperModelSize(langCode) {
+    const normalizedLang = normalizeWhisperLangCode(langCode);
+    if (!normalizedLang) return null;
+    const key = `selected_model_${normalizedLang}_whisper`;
+    const value = localStorage.getItem(key);
+    if (!value || value === 'null' || value === 'none') return null;
+    return String(value);
+}
+
+function getWhisperSizeCandidates(langCode, modelSize = null) {
+    const raw = (langCode || '').toString().trim().toLowerCase();
+    const normalized = normalizeWhisperLangCode(raw);
+    const selected = modelSize || getSelectedWhisperModelSize(normalized) || getSelectedWhisperModelSize(raw);
+
+    if (selected) {
+        const sizes = [selected];
+        if (!sizes.includes('base')) sizes.push('base');
+        return sizes;
+    }
+
+    return ['base', 'tiny', 'small'];
+}
+
+function getWhisperModelKeyCandidates(langCode, modelSize = null) {
+    const raw = (langCode || '').toString().trim().toLowerCase();
+    const normalized = normalizeWhisperLangCode(raw);
+    const sizes = getWhisperSizeCandidates(langCode, modelSize);
+    const keys = [];
+    for (const size of sizes) {
+        if (raw) keys.push(`whisper_model_${raw}_${size}`);
+        if (normalized && normalized !== raw) keys.push(`whisper_model_${normalized}_${size}`);
+    }
+    return keys;
+}
+
+function getWhisperModel(langCode, modelSize = null) {
     if (!window.WhisperModels) return null;
-    const modelKey = `whisper_model_${langCode}_base`;
-    const storedModel = window.WhisperModels.get(modelKey);
-    if (storedModel && storedModel.isReady && storedModel.recognizer) {
-        return storedModel.recognizer;
+    const candidates = getWhisperModelKeyCandidates(langCode, modelSize);
+    for (const modelKey of candidates) {
+        const storedModel = window.WhisperModels.get(modelKey);
+        if (storedModel && storedModel.isReady && storedModel.recognizer) {
+            return storedModel.recognizer;
+        }
     }
     return null;
 }
 
-function hasWhisperModel(langCode) {
-    const modelKey = `whisper_model_${langCode}_base`;
+function hasWhisperModel(langCode, modelSize = null) {
+    const candidates = getWhisperModelKeyCandidates(langCode, modelSize);
+    for (const modelKey of candidates) {
+        // Сначала проверяем в памяти (быстрая проверка)
+        if (window.WhisperModels) {
+            const storedModel = window.WhisperModels.get(modelKey);
+            if (storedModel && storedModel.isReady && storedModel.recognizer) {
+                return true;
+            }
+        }
 
-    // Сначала проверяем в памяти (быстрая проверка)
-    if (window.WhisperModels) {
-        const storedModel = window.WhisperModels.get(modelKey);
-        if (storedModel && storedModel.isReady && storedModel.recognizer) {
-            return true;
+        // Если в памяти нет, проверяем localStorage (как в профиле)
+        // Это важно, так как модель может быть загружена, но еще не инициализирована в памяти
+        const modelStatus = localStorage.getItem(modelKey);
+        const isInStorage = modelStatus === 'downloaded' || modelStatus === 'ready';
+        console.log(`🔍 [hasWhisperModel] Проверка для ключа ${modelKey} (язык ${langCode}): память=${!!(window.WhisperModels && window.WhisperModels.get(modelKey))}, localStorage=${modelStatus}, результат=${isInStorage}`);
+        if (isInStorage) return true;
+    }
+
+    // Fallback #2: модель могла быть скачана через ModelManager/language_selector,
+    // где используется другая схема ключей (downloaded_models / model_<lang>_<type>_<id>)
+    const normalizedLang = normalizeWhisperLangCode(langCode);
+    const sizes = getWhisperSizeCandidates(langCode, modelSize);
+    for (const size of sizes) {
+        // language_selector.js сохраняет состояние так
+        const stateKey = `model_${normalizedLang}_whisper_${size}`;
+        const stateStr = localStorage.getItem(stateKey);
+        if (stateStr) {
+            try {
+                const parsed = JSON.parse(stateStr);
+                if (parsed && parsed.isDownloaded) return true;
+            } catch {
+                return true;
+            }
+        }
+
+        // ModelManager хранит downloaded_models в JSON
+        if (window.ModelManager && typeof window.ModelManager.isModelDownloaded === 'function') {
+            try {
+                if (window.ModelManager.isModelDownloaded(normalizedLang, size, 'whisper')) return true;
+            } catch {}
         }
     }
 
-    // Если в памяти нет, проверяем localStorage (как в профиле)
-    // Это важно, так как модель может быть загружена, но еще не инициализирована в памяти
-    const modelStatus = localStorage.getItem(modelKey);
-    const isInStorage = modelStatus === 'downloaded' || modelStatus === 'ready';
-    console.log(`🔍 [hasWhisperModel] Проверка для языка ${langCode}: память=${!!(window.WhisperModels && window.WhisperModels.get(modelKey))}, localStorage=${modelStatus}, результат=${isInStorage}`);
-    return isInStorage;
+    return false;
 }
 
 // === Настройки для аудио-урока ===
@@ -629,18 +1248,19 @@ function setupExitHandlers() {
     // Обработчик кнопки "Вернуться к списку диктантов"
     const exitToIndexBtn = document.getElementById('exitToIndexBtn');
     if (exitToIndexBtn) {
-        exitToIndexBtn.addEventListener('click', () => {
+        exitToIndexBtn.addEventListener('click', async () => {
             const panel = getProgressPanelInstance();
-            const hasPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+            const hasPanelPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+            const hasLocalPending = await hasLocalPendingDraft();
 
             // Если все сохранено - тихо выходим без модального окна
-            if (!hasPending) {
+            if (!hasPanelPending && !hasLocalPending) {
                 window.location.href = "/";
                 return;
             }
 
             // Если есть несохраненные изменения - показываем модальное окно
-            showExitModal(() => window.location.href = "/");
+            await showExitModal(() => window.location.href = "/");
         });
     }
 
@@ -684,12 +1304,14 @@ function setupExitHandlers() {
     });
 }
 
-function showExitModal(action) {
+async function showExitModal(action) {
     const exitModal = document.getElementById('exitModal');
     if (!exitModal) return;
 
     const panel = getProgressPanelInstance();
-    const hasPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+    const hasPanelPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+    const hasLocalPending = await hasLocalPendingDraft();
+    const hasPending = hasPanelPending || hasLocalPending;
 
     window.pendingExitAction = typeof action === 'function' ? action : () => window.location.href = "/";
 
@@ -1237,6 +1859,17 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
     }
 }
 
+function updateErrorCountLabel(count) {
+    const el = document.getElementById('errorCountLabel');
+    if (!el) return;
+    const n = Number(count);
+    if (!Number.isFinite(n) || n <= 0) {
+        el.textContent = '';
+        return;
+    }
+    el.textContent = String(n);
+}
+
 const tableSentences = document.querySelector(`#sentences-table tbody`);
 function renderSelectionTable() {
     if (!tableSentences) return;
@@ -1330,6 +1963,12 @@ function renderSelectionTable() {
         // Ячейка будет обновлена через updateTableRowStatus, здесь только создаем
         audioCell.innerHTML = '';
 
+        const attemptsCell = document.createElement('td');
+        attemptsCell.className = 'sentence-progress-cell sentence-attempts';
+        const attemptsTotal = Number(s.attempts_total) || 0;
+        const failedChecks = Number(s.error_count) || 0;
+        attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
+
         // Предложение (оригинал/перевод)
         const tdText = document.createElement('td');
         tdText.textContent = s.text;
@@ -1341,6 +1980,7 @@ function renderSelectionTable() {
         row.appendChild(perfectCell);
         row.appendChild(correctedCell);
         row.appendChild(audioCell);
+        row.appendChild(attemptsCell);
         row.appendChild(tdText);
 
         tableSentences.appendChild(row);
@@ -1394,8 +2034,12 @@ function renderSelectionTable() {
 
     if (!tableSentences.dataset.listenerAttached) {
         tableSentences.addEventListener('click', handleSentenceTableClick);
-        tableSentences.dataset.listenerAttached = '1';
+        tableSentences.dataset.listenerAttached = 'true';
     }
+
+    // Рендер таблицы часто означает, что изменился выбор/прогресс.
+    // Сохраняем черновик локально (debounce).
+    scheduleDraftAutosave('renderSelectionTable');
 
     if (window.lucide?.createIcons) {
         lucide.createIcons();
@@ -1433,6 +2077,9 @@ function handleSentenceTableClick(e) {
 
     updateAllCheckboxState();
     confirmStartBtn.focus();
+
+    // После изменений выбора предложений — сохраняем черновик локально.
+    scheduleDraftAutosave('sentenceSelection');
 }
 
 function updateAllCheckboxState() {
@@ -1510,7 +2157,7 @@ function initializeAllCheckbox() {
             updateAllCheckboxState();
             confirmStartBtn.focus();
         });
-        allCheckbox.dataset.listenerAttached = '1';
+        allCheckbox.dataset.listenerAttached = 'true';
     }
 
     updateAllCheckboxState();
@@ -1542,7 +2189,7 @@ function initializeMixControl() {
                 lucide.createIcons();
             }
         });
-        mixControl.dataset.listenerAttached = '1';
+        mixControl.dataset.listenerAttached = 'true';
     }
 
     const iconName = mixControl.dataset.checked === 'true' ? 'shuffle' : 'move-right';
@@ -1562,7 +2209,7 @@ function initializeResetProgressButton() {
     resetProgressBtn.addEventListener('click', () => {
         resetDictationProgress();
     });
-    resetProgressBtn.dataset.listenerAttached = '1';
+    resetProgressBtn.dataset.listenerAttached = 'true';
 }
 
 /**
@@ -1663,18 +2310,20 @@ function updateTableRowStatus(s) {
     }
 
     // Порядок колонок в таблице (ОБНОВЛЕНО):
-    // 1. settingsCell (audio-settings-header-cell) - скрытая для выравнивания (td:nth-child(1))
-    // 2. Номер строки (sentence-number-cell) (td:nth-child(2))
-    // 3. Выбор/чекбокс (td:nth-child(3))
-    // 4. Код (скрытая колонка, hidden-column) (td:nth-child(4))
-    // 5. Звезда (perfect) - полная звезда (sentence-star-perfect) (td:nth-child(5))
-    // 6. Полузвезда (corrected) (sentence-star-corrected) (td:nth-child(6))
-    // 7. Микрофон (audio) (sentence-microphone) (td:nth-child(7))
-    // 8. Предложение (td:nth-child(8))
+    // 1. settingsCell (audio-settings-header-cell)
+    // 2. Номер строки (sentence-number-cell)
+    // 3. Выбор/чекбокс
+    // 4. Код (hidden-column)
+    // 5. Звезда (perfect)
+    // 6. Полузвезда (corrected)
+    // 7. Микрофон (audio)
+    // 8. Попытки (attempts)
+    // 9. Предложение
     // Используем классы для надежного поиска колонок
     const starCell = row.querySelector('td.sentence-star-perfect');
     const halfStarCell = row.querySelector('td.sentence-star-corrected');
     const micCell = row.querySelector('td.sentence-microphone');
+    const attemptsCell = row.querySelector('td.sentence-attempts');
 
     const totalPerfect = Number(s.number_of_perfect) || 0;
     const totalCorrected = Number(s.number_of_corrected) || 0;
@@ -1696,6 +2345,12 @@ function updateTableRowStatus(s) {
         const micIcon = totalAudio > 0 ? 'mic-off' : 'mic';
         const micCount = totalAudio > 0 ? `<span>${totalAudio}</span>` : '';
         micCell.innerHTML = `<i data-lucide="${micIcon}" style="color:${iconColor};"></i>${micCount}`;
+    }
+
+    if (attemptsCell) {
+        const attemptsTotal = Number(s.attempts_total) || 0;
+        const failedChecks = Number(s.error_count) || 0;
+        attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
     }
 
     // Обновляем состояние строки в зависимости от выполненности предложения
@@ -1831,8 +2486,10 @@ function startGame(isResume = false) {
     // Обновляем REQUIRED_PASSED_COUNT из панели настроек или поля ввода
     if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
         const settings = audioSettingsPanel.getSettings();
-        // Используем ?? вместо ||, чтобы 0 не заменялся на 3
         REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
+        if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {
+            REQUIRED_PASSED_STAR_HALF = settings.required_passed_star_half;
+        }
     } else {
         const audioRepeatsInput = document.getElementById('audioRepeatsInput');
         if (audioRepeatsInput) {
@@ -1841,6 +2498,22 @@ function startGame(isResume = false) {
                 REQUIRED_PASSED_COUNT = value;
             }
         }
+    }
+
+    // Валидируем настройки нагрузки: нельзя выключить и текст, и аудио одновременно
+    // (если repeats=0 и without_entering_text=true, пользователь вообще ничего не сможет делать)
+    try {
+        const hasAudio = Number(REQUIRED_PASSED_COUNT) > 0;
+        const withoutEnteringText = audioSettingsPanel && audioSettingsPanel.isInitialized
+            ? Boolean(audioSettingsPanel.getSettings().without_entering_text)
+            : Boolean(window.audioSettingsWithoutEnteringText || false);
+        const hasText = !withoutEnteringText;
+        if (!hasText && !hasAudio) {
+            showNoSelectionModal('В настройках выключены и текст, и аудио. Включите хотя бы одно упражнение.');
+            return;
+        }
+    } catch (e) {
+        console.warn('[startGame] settings validation failed', e);
     }
 
     // выбрать из таблицы ключи отмеченных предложений по порядку
@@ -2064,9 +2737,19 @@ function refreshAudioUIForCurrentSentence() {
         if (percentWrap) percentWrap.style.display = hasAttempts ? '' : 'none';
         if (countPercent) countPercent.style.display = hasAttempts ? 'block' : 'none';
 
-        // Индикатор записи (кружок): скрываем
+        // Индикатор записи (кружок):
+        // - если попыток нет: полностью скрываем
+        // - если попытки есть: место резервируем, но сам кружок скрываем (visibility)
         if (recordingIndicator) {
-            recordingIndicator.style.display = hasAttempts ? '' : 'none';
+            if (!hasAttempts) {
+                recordingIndicator.style.display = '';
+                recordingIndicator.style.visibility = 'hidden';
+                recordingIndicator.style.opacity = '0';
+            } else {
+                recordingIndicator.style.display = '';
+                recordingIndicator.style.visibility = isRecording ? 'visible' : 'hidden';
+                recordingIndicator.style.opacity = isRecording ? '1' : '0';
+            }
         }
 
         // Кнопка воспроизведения: скрываем
@@ -2319,6 +3002,9 @@ function sumRez() {
 function updateStats(circle = null) {
     console.log('[updateStats] updateStats', circle);
     const panel = getProgressPanelInstance();
+
+    // Прогресс/счетчики могли измениться — сохраняем локально (debounce).
+    scheduleDraftAutosave('updateStats');
 
     // Вычисляем итоги напрямую из allSentences (как источник истины)
     let totalPerfect = 0;
@@ -2959,8 +3645,13 @@ function decreaseAudioCounter() {
 }
 
 // Сначала объявляем stopRecording
-function stopRecording(cause = 'manual') {
-    console.log(`🔄 [stopRecording] Вызвана функция stopRecording, cause: ${cause}, isStopping: ${isStopping}, mediaRecorder.state: ${mediaRecorder?.state}`);
+async function stopRecording(cause = 'manual') {
+    console.log(`🔄 [stopRecording] Вызвана функция stopRecording, cause: ${cause}`);
+    
+    // Делаем функцию доступной глобально для UnifiedSpeechRecognition
+    if (!window.stopRecording) {
+        window.stopRecording = stopRecording;
+    }
 
     if (isStopping) {
         console.log(`⚠️ [stopRecording] Уже останавливается, пропускаем`);
@@ -2969,65 +3660,93 @@ function stopRecording(cause = 'manual') {
     isStopping = true;
     lastStopCause = cause;
 
-    // Больше ничего не слушаем в onresult:
-    isRecording = false;
-
-    // Сброс авто-стопа, если висит
-    if (autoStopTimer) {
-        clearTimeout(autoStopTimer);
-        autoStopTimer = null;
-    }
-
-    // Сброс таймера активности распознавания
-    if (recognitionActivityTimer) {
-        clearTimeout(recognitionActivityTimer);
-        recognitionActivityTimer = null;
-    }
-
-    // Мягко гасим распознавание (без "aborted")
-    if (typeof recognition !== 'undefined' && recognition) {
+    // Используем UnifiedSpeechRecognition если доступен
+    if (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state.isRecording) {
         try {
-            recognition.stop();
-        } catch (e) {
-            console.log('Ошибка остановки распознавания:', e);
-        }
-    }
-
-    // Останавливаем запись — onstop сам вызовет saveRecording()
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        console.log(`🔄 [stopRecording] Останавливаем mediaRecorder, audioChunks.length: ${audioChunks.length}`);
-        try {
-            mediaRecorder.stop();
-            console.log(`✅ [stopRecording] mediaRecorder.stop() вызван`);
+            console.log(`🔄 [stopRecording] Вызываем unifiedSpeechRecognizer.stopRecording()`);
+            const result = await unifiedSpeechRecognizer.stopRecording();
+            console.log(`✅ [stopRecording] unifiedSpeechRecognizer.stopRecording() вернул результат:`, result);
+            
+            // Сохраняем результат для использования в saveRecording
+            window.lastRecognitionResult = result;
+            
+            // Вызываем saveRecording с результатом
+            setTimeout(() => {
+                try {
+                    console.log(`🔄 [stopRecording] Вызываем saveRecording с результатом, cause: ${cause}`);
+                    saveRecording(cause, result);
+                } catch (error) {
+                    console.error('❌ Ошибка при сохранении записи:', error);
+                } finally {
+                    isStopping = false;
+                }
+            }, 0);
         } catch (error) {
-            console.error('❌ Ошибка остановки записи:', error);
+            console.error('❌ Ошибка остановки UnifiedSpeechRecognition:', error);
             isStopping = false;
         }
     } else {
-        console.log(`⚠️ [stopRecording] mediaRecorder не записывает (state: ${mediaRecorder?.state}), но audioChunks.length: ${audioChunks.length}`);
-        // Если есть аудиоданные, но запись не была запущена, все равно вызываем saveRecording
-        if (audioChunks.length > 0) {
-            console.log(`🔄 [stopRecording] Вызываем saveRecording напрямую, так как есть аудиоданные`);
-            setTimeout(() => {
-                try {
-                    saveRecording(cause);
-                } catch (error) {
-                    console.error('❌ Ошибка при сохранении записи:', error);
-                }
-            }, 0);
+        // Fallback на старую логику если UnifiedSpeechRecognition не используется
+        console.warn('⚠️ UnifiedSpeechRecognition не активен, используем старую логику');
+        isRecording = false;
+        
+        // Сброс авто-стопа, если висит
+        if (autoStopTimer) {
+            clearTimeout(autoStopTimer);
+            autoStopTimer = null;
         }
-        isStopping = false;
+
+        // Сброс таймера активности распознавания
+        if (recognitionActivityTimer) {
+            clearTimeout(recognitionActivityTimer);
+            recognitionActivityTimer = null;
+        }
+
+        // Мягко гасим распознавание (без "aborted")
+        if (typeof recognition !== 'undefined' && recognition) {
+            try {
+                recognition.stop();
+            } catch (e) {
+                console.log('Ошибка остановки распознавания:', e);
+            }
+        }
+
+        // Останавливаем запись — onstop сам вызовет saveRecording()
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            console.log(`🔄 [stopRecording] Останавливаем mediaRecorder, audioChunks.length: ${audioChunks.length}`);
+            try {
+                mediaRecorder.stop();
+                console.log(`✅ [stopRecording] mediaRecorder.stop() вызван`);
+            } catch (error) {
+                console.error('❌ Ошибка остановки записи:', error);
+                isStopping = false;
+            }
+        } else {
+            console.log(`⚠️ [stopRecording] mediaRecorder не записывает (state: ${mediaRecorder?.state}), но audioChunks.length: ${audioChunks.length}`);
+            // Если есть аудиоданные, но запись не была запущена, все равно вызываем saveRecording
+            if (audioChunks.length > 0) {
+                console.log(`🔄 [stopRecording] Вызываем saveRecording напрямую, так как есть аудиоданные`);
+                setTimeout(() => {
+                    try {
+                        saveRecording(cause);
+                    } catch (error) {
+                        console.error('❌ Ошибка при сохранении записи:', error);
+                    }
+                }, 0);
+            }
+            isStopping = false;
+        }
+
+        // Погасим визуализатор и вернём квадрат
+        stopVisualization();
+        setRecordStateIcon('square');
+
+        const rb = document.getElementById('recordButton');
+        if (rb) rb.classList.remove('recording'); // на всякий случай сняли класс
+
+        currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
+        resetInactivityTimer();
     }
-
-    // Погасим визуализатор и вернём квадрат
-    stopVisualization();
-    setRecordStateIcon('square');
-
-    const rb = document.getElementById('recordButton');
-    if (rb) rb.classList.remove('recording'); // на всякий случай сняли класс
-
-    currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
-    resetInactivityTimer();
 }
 
 function stopAllAudios() {
@@ -3058,271 +3777,71 @@ async function startRecording() {
     try {
         stopAllAudios();
 
+        setRecordStateIcon('pause');
+        updateRecordingIndicator('preparing');
+
         // стартовый процент 0% (чтобы не показывало процетны из предыдущих записей)
-        count_percent.textContent = 0;
-
-        // ВАЖНО: закрываем предыдущий stream перед созданием нового
-        if (window.currentStream) {
-            window.currentStream.getTracks().forEach(track => {
-                if (track.readyState === 'live') {
-                    track.stop();
-                }
-            });
-            window.currentStream = null;
+        if (count_percent) {
+            count_percent.textContent = 0;
         }
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: false,
-                noiseSuppression: false,
-                autoGainControl: false
+        // Инициализируем UnifiedSpeechRecognition если еще не инициализирован
+        // При изменении режима unifiedSpeechRecognizer сбрасывается в null, 
+        // поэтому он пересоздается с правильным режимом
+        if (!unifiedSpeechRecognizer) {
+            unifiedSpeechRecognizer = initUnifiedSpeechRecognition();
+            if (!unifiedSpeechRecognizer) {
+                throw new Error('Не удалось инициализировать UnifiedSpeechRecognition');
             }
-        });
-
-        window.currentStream = stream; // сохраняем ссылку
-
-        // Проверяем состояние треков перед использованием (важно для Safari)
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length === 0) {
-            throw new Error('Нет аудио треков в потоке');
+        }
+        
+        // Определяем режим для отображения сообщения пользователю
+        let mode = 'online'; // по умолчанию онлайн
+        if (speechRecognitionMode === 'route-off') {
+            mode = 'offline';
+        } else if (speechRecognitionMode === 'route') {
+            mode = 'online';
         }
 
-        // Проверяем, что все треки в состоянии 'live'
-        const inactiveTracks = audioTracks.filter(track => track.readyState !== 'live');
-        if (inactiveTracks.length > 0) {
-            console.warn('⚠️ Некоторые треки не в состоянии live:', inactiveTracks.map(t => t.readyState));
-        }
-
-        isRecording = true;     // теперь onresult можно обрабатывать
-        isStopping = false;    // открываем возможность стопа
-        lastStopCause = 'manual';
-        srLiveText = '';        // очищаем «живой» буфер распознавания
-
-        // Определяем лучший формат для текущего браузера
-        const options = {
-            mimeType: getSupportedMimeType()
-        };
-
-        mediaRecorder = new MediaRecorder(stream, options);
-
-        // В Safari лучше инициализировать визуализацию ПОСЛЕ запуска MediaRecorder
-        // чтобы избежать конфликтов с захватом микрофона
-
-        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-        // mediaRecorder.onstop = saveRecording;
-        mediaRecorder.onstop = () => {
-            console.log(`🔄 [mediaRecorder.onstop] Событие onstop вызвано, audioChunks.length: ${audioChunks.length}, lastStopCause: ${lastStopCause}`);
-
-            // Сразу сбрасываем флаги, чтобы разблокировать интерфейс
-            isRecording = false;   // ← важно!
-            isStopping = false;   // ← важно!
-            const rb = document.getElementById('recordButton');
-            if (rb) rb.classList.remove('recording');   // дубль, если стоп пришёл асинхронно
-            setRecordStateIcon('square');
-            // Обновляем индикатор записи (серый)
-            updateRecordingIndicator(false);
-
-            currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
-            resetInactivityTimer();
-
-            // Выполняем сохранение асинхронно, чтобы не блокировать интерфейс
-            // Используем setTimeout(0) чтобы дать браузеру обновить UI перед тяжелыми операциями
-            console.log(`🔄 [mediaRecorder.onstop] Планируем вызов saveRecording через setTimeout`);
-            setTimeout(() => {
-                console.log(`🔄 [mediaRecorder.onstop] setTimeout выполнен, вызываем saveRecording`);
-                try {
-                    saveRecording(lastStopCause);
-                } catch (error) {
-                    console.error('❌ Ошибка при сохранении записи:', error);
-                }
-            }, 0);
-        };
-
-        // Обработчик ошибок MediaRecorder
-        mediaRecorder.onerror = (event) => {
-            console.error('❌ Ошибка MediaRecorder:', event.error);
-            // При ошибке сбрасываем флаги и разблокируем интерфейс
-            isRecording = false;
-            isStopping = false;
-            const rb = document.getElementById('recordButton');
-            if (rb) rb.classList.remove('recording');
-            setRecordStateIcon('square');
-            updateRecordingIndicator(false);
-            stopVisualization();
-
-            // Останавливаем MediaRecorder, если он еще активен
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                try {
-                    mediaRecorder.stop();
-                } catch (e) {
-                    console.warn('Не удалось остановить MediaRecorder после ошибки:', e);
-                }
-            }
-
-            // Останавливаем распознавание
-            if (recognition) {
-                try {
-                    recognition.stop();
-                } catch (e) {
-                    console.warn('Не удалось остановить распознавание после ошибки:', e);
-                }
-            }
-
-            userAudioAnswer.innerHTML = `Ошибка записи: ${event.error?.message || 'Неизвестная ошибка'}`;
-            currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
-            resetInactivityTimer();
-        };
-
-        // Отслеживаем завершение треков потока (например, при ошибке захвата)
-        stream.getTracks().forEach(track => {
-            track.onended = () => {
-                console.warn('⚠️ MediaStreamTrack завершен:', track.kind, track.readyState);
-                // В Safari трек может завершиться сразу после создания, если была ошибка захвата
-                // Проверяем, что MediaRecorder действительно записывает, прежде чем считать это ошибкой
-                if (isRecording && mediaRecorder?.state === 'recording' && mediaRecorder.state !== 'inactive') {
-                    console.error('❌ Трек завершился во время записи - сбрасываем состояние');
-                    // Сбрасываем флаги
-                    isRecording = false;
-                    isStopping = false;
-                    const rb = document.getElementById('recordButton');
-                    if (rb) rb.classList.remove('recording');
-                    setRecordStateIcon('square');
-                    updateRecordingIndicator(false);
-                    stopVisualization();
-
-                    // Останавливаем MediaRecorder
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        try {
-                            mediaRecorder.stop();
-                        } catch (e) {
-                            console.warn('Не удалось остановить MediaRecorder после завершения трека:', e);
-                        }
-                    }
-
-                    // Останавливаем распознавание
-                    if (recognition) {
-                        try {
-                            recognition.stop();
-                        } catch (e) {
-                            console.warn('Не удалось остановить распознавание после завершения трека:', e);
-                        }
-                    }
-
-                    userAudioAnswer.innerHTML = 'Запись прервана (ошибка захвата)';
-                    currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
-                    resetInactivityTimer();
-                }
-            };
-        });
-
-        audioChunks = [];
-        // mediaRecorder.start(100); // Захватываем данные каждые 100мс
-        mediaRecorder.start(); // один цельный chunk — стабильнее для audio/mp4 в Safari
-
-        // Инициализируем визуализацию ПОСЛЕ запуска MediaRecorder (важно для Safari)
-        // Обертываем в try-catch, чтобы ошибки визуализации не прерывали запись
-        try {
-            // Проверяем, что треки все еще активны перед инициализацией визуализации
-            const tracksStillLive = audioTracks.every(track => track.readyState === 'live');
-            if (tracksStillLive) {
-                setupVisualizer(stream);
+        // Начинаем запись через UnifiedSpeechRecognition
+        await unifiedSpeechRecognizer.startRecording();
+        
+        // Устанавливаем начальное сообщение
+        const userAudioAnswer = document.getElementById('userAudioAnswer');
+        if (userAudioAnswer) {
+            if (mode === 'offline') {
+                userAudioAnswer.innerHTML = 'Говорите... (локально)';
             } else {
-                console.warn('⚠️ Треки не активны, визуализация пропущена');
-            }
-        } catch (vizError) {
-            console.error('❌ Ошибка инициализации визуализации (запись продолжается):', vizError);
-            // Не прерываем запись из-за ошибки визуализации
-        }
-
-
-        // Инициализируем распознавание речи заново при каждом старте записи
-        // Определяем метод распознавания на основе настроек
-        if (speechRecognitionMode === 'route') {
-            // Только через интернет (Web Speech API)
-            const hasWebSpeech = checkWebSpeechAPI();
-            if (!hasWebSpeech) {
-                console.warn('Web Speech API недоступен, но выбран режим "только через интернет"');
-                userAudioAnswer.innerHTML = '<span class="error">Web Speech API недоступен</span>';
-                return;
-            }
-            initWebSpeechRecognition();
-            userAudioAnswer.innerHTML = 'Говорите...';
-            if (recognition) {
-                try {
-                    recognition.start();
-                    console.log('✅ SpeechRecognition started successfully');
-                } catch (e) {
-                    console.error('❌ Ошибка запуска распознавания:', e);
-                }
-            }
-        } else if (speechRecognitionMode === 'route-off') {
-            // Только локально (Whisper) - не запускаем Web Speech API
-            // Whisper будет использован в saveRecording при сохранении записи
-            console.log('✅ [startRecording] Режим route-off: используем только Whisper, Web Speech API не запускаем');
-            userAudioAnswer.innerHTML = 'Говорите... (локально)';
-            // НЕ запускаем recognition.start() - используем только Whisper
-        } else {
-            // Fallback: используем Web Speech API если доступен
-            const hasWebSpeech = checkWebSpeechAPI();
-            if (hasWebSpeech) {
-                initWebSpeechRecognition();
                 userAudioAnswer.innerHTML = 'Говорите...';
-                if (recognition) {
-                    try {
-                        recognition.start();
-                        console.log('✅ SpeechRecognition started successfully');
-                    } catch (e) {
-                        console.error('❌ Ошибка запуска распознавания:', e);
-                    }
-                }
-            } else {
-                userAudioAnswer.innerHTML = '<span class="error">Web Speech API недоступен</span>';
             }
         }
-
-        setRecordStateIcon('pause');    // показать паузу
-
-        // ВАЖНО: Индикатор становится красным ТОЛЬКО когда все готово и запись реально началась
-        // (после запуска MediaRecorder.start(), setupVisualizer и recognition.start())
-        // Это последняя манипуляция - когда все системы готовы к записи
-        updateRecordingIndicator(true);
-
-        currentInactivityTimeout = INACTIVITY_TIMEOUT_RECORDING;
-        resetInactivityTimer();
 
     } catch (error) {
         console.error('Ошибка записи:', error);
-        userAudioAnswer.innerHTML = `Ошибка: ${error.message}`;
-        updateRecordingIndicator(false);  // В случае ошибки сбрасываем индикатор
-
-        // ВАЖНО: Сбрасываем флаги при ошибке, чтобы разблокировать интерфейс
+        const userAudioAnswer = document.getElementById('userAudioAnswer');
+        if (userAudioAnswer) {
+            userAudioAnswer.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+        }
+        updateRecordingIndicator(false);
+        
+        // Сбрасываем флаги при ошибке
         isRecording = false;
         isStopping = false;
         const rb = document.getElementById('recordButton');
         if (rb) rb.classList.remove('recording');
         setRecordStateIcon('square');
-        stopVisualization();
-
-        // Закрываем поток, если он был создан
-        if (window.currentStream) {
-            window.currentStream.getTracks().forEach(track => {
-                if (track.readyState === 'live') {
-                    track.stop();
-                }
-            });
-            window.currentStream = null;
-        }
-
+        
         currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
         resetInactivityTimer();
     }
 }
 
 async function toggleRecording() {
-    if (mediaRecorder?.state === 'recording') {
-        stopRecording('manual');
+    // Используем UnifiedSpeechRecognition если доступен
+    if (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state.isRecording) {
+        await stopRecording('manual');
     } else {
-        startRecording();
+        await startRecording();
     }
 }
 
@@ -3394,8 +3913,95 @@ function generateWhisperPrompt(explanation, langCode = 'en') {
     return `имена: ${names.join(', ')}`;
 }
 
-async function saveRecording(cause = undefined) {
-    console.log(`🔍 [saveRecording] Вызвана функция saveRecording, cause: ${cause}, audioChunks.length: ${audioChunks.length}`);
+// Экспортируем функции глобально для использования в UnifiedSpeechRecognition
+if (typeof window !== 'undefined') {
+    window.generateWhisperPrompt = generateWhisperPrompt;
+    window.extractNamesFromHint = extractNamesFromHint;
+}
+
+async function saveRecording(cause = undefined, recognitionResult = null) {
+    console.log(`🔍 [saveRecording] Вызвана функция saveRecording, cause: ${cause}`);
+    
+    // Делаем функцию доступной глобально для UnifiedSpeechRecognition
+    if (!window.saveRecording) {
+        window.saveRecording = saveRecording;
+    }
+
+    // Используем результат из UnifiedSpeechRecognition если доступен
+    if (recognitionResult || window.lastRecognitionResult) {
+        const result = recognitionResult || window.lastRecognitionResult;
+        window.lastRecognitionResult = null; // очищаем
+        
+        console.log(`🔍 [saveRecording] Обрабатываем результат UnifiedSpeechRecognition:`, result);
+        
+        const audioBlob = result.audioBlob || unifiedSpeechRecognizer?.getAudioBlob();
+        if (!audioBlob) {
+            console.warn("⚠️ [saveRecording] Нет аудиоданных для сохранения, но продолжаем обработку текста");
+            // Не возвращаемся - продолжаем обработку текста даже без blob
+        } else {
+            // Сделать последнюю запись доступной на кнопке #userPlay
+            setUserAudioBlob(audioBlob);
+        }
+        
+        // Получаем распознанный текст
+        let spokenText = result.text || '';
+        console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
+        
+        // Для офлайн-режима показываем анимацию печати если нужно
+        if (result.mode === 'offline' && spokenText) {
+            await typeTextAnimated(spokenText, {
+                container: userAudioAnswer,
+                speed: 50,
+                onComplete: () => {
+                    const successIndicator = document.createElement('div');
+                    successIndicator.className = 'whisper-success-indicator';
+                    successIndicator.textContent = '✅ Готово!';
+                    if (userAudioAnswer) {
+                        userAudioAnswer.appendChild(successIndicator);
+                    }
+                }
+            });
+        }
+        
+        // Получаем оригинальный текст
+        const originalText = currentSentence?.text ?? '';
+        console.log(`🔍 [saveRecording] Оригинальный текст: "${originalText}"`);
+        
+        if (!originalText) {
+            console.error(`❌ [saveRecording] currentSentence.text пустой! currentSentence:`, currentSentence);
+        }
+        
+        // Считаем процент совпадения
+        const percent = computeMatchPercentASR(originalText, spokenText);
+        console.log(`🔍 [saveRecording] Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
+        
+        // Обновляем отображение процента
+        if (count_percent) {
+            count_percent.textContent = percent;
+        }
+
+        // После распознавания обычно меняется прогресс/статистика — сохраняем локально.
+        scheduleDraftAutosave('saveRecording');
+        
+        // Проверяем «зачтено»
+        const isPassed = percent >= MIN_MATCH_PERCENT;
+        console.log(`🔍 [saveRecording] Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
+        
+        if (isPassed) {
+            console.log('✅ [saveRecording] Запись засчитана, уменьшаем счетчик');
+            playSuccessSound();
+            decreaseAudioCounter();
+        } else {
+            console.log('❌ [saveRecording] Запись не засчитана, счетчик не уменьшается');
+        }
+        
+        renderUserAudioTablo();
+        srLiveText = '';
+        return;
+    }
+    
+    // Fallback на старую логику
+    console.log(`🔍 [saveRecording] Fallback на старую логику, audioChunks.length: ${audioChunks.length}`);
 
     if (!audioChunks.length) {
         console.warn("Нет аудиоданных для сохранения");
@@ -3422,11 +4028,12 @@ async function saveRecording(cause = undefined) {
 
     // Проверяем, нужно ли использовать Whisper для локального распознавания
     const currentLang = langCodeUrl?.split('-')[0] || 'en';
+    const selectedSize = getSelectedWhisperModelSize(currentLang);
 
     if (speechRecognitionMode === 'route-off') {
         // Проверяем наличие модели (в памяти или в localStorage)
-        const hasModel = hasWhisperModel(currentLang);
-        console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang} доступна: ${hasModel}`);
+        const hasModel = hasWhisperModel(currentLang, selectedSize);
+        console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
 
         if (!hasModel) {
             console.log(`⚠️ [saveRecording] Модель Whisper не найдена, используем Web Speech API результаты`);
@@ -3436,15 +4043,15 @@ async function saveRecording(cause = undefined) {
         } else {
             // Модель есть - используем Whisper для распознавания
             try {
-                console.log(`🔄 [saveRecording] Используем Whisper для распознавания языка ${currentLang}`);
+                console.log(`🔄 [saveRecording] Используем Whisper${selectedSize ? ' ' + selectedSize : ''} для распознавания языка ${currentLang}`);
 
                 // Убеждаемся, что модель загружена в память
-                let whisperModel = getWhisperModel(currentLang);
+                let whisperModel = getWhisperModel(currentLang, selectedSize);
                 if (!whisperModel && hasModel) {
                     console.log(`🔄 [saveRecording] Модель есть в localStorage, но не в памяти. Загружаем...`);
                     const whisperManager = window.WhisperModelManager ? new window.WhisperModelManager() : null;
                     if (whisperManager) {
-                        await whisperManager.loadLanguageModel(currentLang, 'base');
+                        await whisperManager.loadLanguageModel(currentLang, selectedSize || 'base');
                         console.log(`✅ [saveRecording] Модель загружена в память`);
                     } else {
                         throw new Error('WhisperModelManager не доступен');
@@ -3491,7 +4098,7 @@ async function saveRecording(cause = undefined) {
                 const result = await whisperManager.transcribe(
                     audioBlob,
                     currentLang,
-                    'base', // modelSize
+                    selectedSize || 'base', // modelSize
                     prompt // prompt
                 );
 
@@ -3731,9 +4338,10 @@ function updateRecognitionModeIcon() {
         title = 'Распознавание через интернет';
     } else if (speechRecognitionMode === 'route-off') {
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
+        const selectedSize = getSelectedWhisperModelSize(currentLang);
         iconName = 'route-off';
-        title = hasWhisperModel(currentLang)
-            ? 'Локальное распознавание (Whisper)'
+        title = hasWhisperModel(currentLang, selectedSize)
+            ? (selectedSize ? `Локальное распознавание (Whisper ${selectedSize})` : 'Локальное распознавание (Whisper)')
             : 'Локальное распознавание (модель Whisper не загружена)';
     }
 
@@ -3772,10 +4380,11 @@ function initSpeechRecognition() {
         // "Только локально" - используем Whisper если модель загружена, иначе Web Speech API
         // ВАЖНО: Режим НЕ меняется автоматически - пользователь выбрал "локально"
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
+        const selectedSize = getSelectedWhisperModelSize(currentLang);
         console.log(`🔍 [initSpeechRecognition] Режим route-off, проверяем модель для языка: ${currentLang}`);
 
-        if (hasWhisperModel(currentLang)) {
-            console.log(`✅ [initSpeechRecognition] Режим: только локально (Whisper для языка ${currentLang})`);
+        if (hasWhisperModel(currentLang, selectedSize)) {
+            console.log(`✅ [initSpeechRecognition] Режим: только локально (Whisper${selectedSize ? ' ' + selectedSize : ''} для языка ${currentLang})`);
             // Whisper будет использован в saveRecording при сохранении записи
             // Не запускаем Web Speech API, так как используем Whisper
             updateRecognitionModeIcon(); // Обновляем иконку
@@ -4049,11 +4658,27 @@ function initWebSpeechRecognition() {
 }
 
 // Обновление индикатора записи (серая/красная кнопка)
-function updateRecordingIndicator(isRecording) {
+function updateRecordingIndicator(state) {
     const indicator = document.getElementById('recordingIndicator');
     if (!indicator) return;
 
-    if (isRecording) {
+    const normalized = (state === true) ? 'recording'
+        : (state === false) ? 'hidden'
+        : String(state || 'hidden');
+
+    if (normalized === 'hidden') {
+        indicator.style.display = '';
+        indicator.style.visibility = 'hidden';
+        indicator.style.opacity = '0';
+        indicator.classList.remove('recording');
+        return;
+    }
+
+    indicator.style.display = '';
+    indicator.style.visibility = 'visible';
+    indicator.style.opacity = '1';
+
+    if (normalized === 'recording') {
         indicator.classList.add('recording');
         indicator.title = 'Идет запись';
         // Обновляем иконку на "circle" (красную при записи)
@@ -4066,7 +4691,7 @@ function updateRecordingIndicator(isRecording) {
         }
     } else {
         indicator.classList.remove('recording');
-        indicator.title = 'Индикатор записи';
+        indicator.title = 'Подготовка записи';
         // Иконка уже должна быть "circle" (серая когда не записываем)
         const icon = indicator.querySelector('i[data-lucide]');
         if (icon && icon.getAttribute('data-lucide') !== 'circle') {
@@ -4211,39 +4836,400 @@ function stopVisualization() {
 
 // ===== Аудио-функционал КОНЕЦ =====
 
+async function ensureKeyboardLayoutsLoaded() {
+    if (keyboardLayoutsCache) return keyboardLayoutsCache;
+    if (keyboardLayoutsLoadPromise) return keyboardLayoutsLoadPromise;
+
+    if (typeof fetch !== 'function') {
+        keyboardLayoutsCache = {};
+        return keyboardLayoutsCache;
+    }
+
+    keyboardLayoutsLoadPromise = fetch('/static/data/keyboard_layouts.json', { cache: 'no-cache' })
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            return response.json();
+        })
+        .then((data) => {
+            if (!data || typeof data !== 'object') {
+                keyboardLayoutsCache = {};
+                return keyboardLayoutsCache;
+            }
+            keyboardLayoutsCache = Object.keys(data).reduce((acc, lang) => {
+                if (lang && typeof lang === 'string') {
+                    acc[lang.toLowerCase()] = data[lang];
+                }
+                return acc;
+            }, {});
+            return keyboardLayoutsCache;
+        })
+        .catch((error) => {
+            console.error('❌ Ошибка загрузки раскладок клавиатуры:', error);
+            keyboardLayoutsCache = {};
+            return keyboardLayoutsCache;
+        })
+        .finally(() => {
+            keyboardLayoutsLoadPromise = null;
+        });
+
+    return keyboardLayoutsLoadPromise;
+}
+
+function getKeyColorVarsByCode(code) {
+    const c = String(code || '');
+
+    const grayCodes = new Set([
+        'Escape',
+        'Tab',
+        'CapsLock',
+        'ShiftLeft',
+        'ShiftRight',
+        'Backspace',
+        'Backslash'
+    ]);
+
+    const purpleCodes = new Set(['Digit1', 'Digit2', 'KeyQ', 'KeyA', 'KeyZ']);
+    const lightgreenCodes = new Set([
+        'Digit3',
+        'KeyW',
+        'KeyS',
+        'KeyX',
+        'Digit0',
+        'Minus',
+        'Equal',
+        'KeyP',
+        'BracketLeft',
+        'BracketRight',
+        'Semicolon',
+        'Quote',
+        'Enter',
+        'Slash'
+    ]);
+    const pinkCodes = new Set(['Digit4', 'KeyE', 'KeyD', 'KeyC', 'Digit8', 'KeyI', 'KeyK', 'Comma']);
+    const mintCodes = new Set(['Digit5', 'Digit6', 'KeyR', 'KeyT', 'KeyF', 'KeyG', 'KeyV', 'KeyB']);
+    const yellowCodes = new Set(['Digit7', 'KeyY', 'KeyU', 'KeyH', 'KeyJ', 'KeyN', 'KeyM']);
+    const orangeCodes = new Set(['Digit9', 'KeyO', 'KeyL', 'Period']);
+
+    if (grayCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-gray, #eeede8ff)',
+            fg: 'var(--color-button-text-gray, rgb(168, 167, 155))'
+        };
+    }
+    if (purpleCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-purple, #c8c9fbff)',
+            fg: 'var(--color-button-text-purple, rgb(63, 66, 147))'
+        };
+    }
+    if (lightgreenCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-lightgreen, #bbf1caff)',
+            fg: 'var(--color-button-text-lightgreen, #366f40ff)'
+        };
+    }
+    if (pinkCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-pink, #f5c0caff)',
+            fg: 'var(--color-button-text-pink, #802c35ff)'
+        };
+    }
+    if (mintCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-mint, #aae7e4ff)',
+            fg: 'var(--color-button-text-mint, #28615fff)'
+        };
+    }
+    if (yellowCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-yellow, rgb(252, 235, 163))',
+            fg: 'var(--color-button-text-yellow, rgb(255, 198, 9))'
+        };
+    }
+    if (orangeCodes.has(c)) {
+        return {
+            bg: 'var(--color-button-orange, #f9d6a1ff)',
+            fg: 'var(--color-button-text-orange, rgb(250, 147, 21))'
+        };
+    }
+
+    return {
+        bg: 'var(--color-button-gray, #eeede8ff)',
+        fg: 'var(--color-text, #224156)'
+    };
+}
+
+function renderKeyboardHint(container, layout, shiftMode = false) {
+    if (!container) return;
+
+    container.classList.add('virtual-keyboard');
+    container.innerHTML = '';
+
+    if (!layout || !layout.rows) {
+        container.innerHTML = '<div class="vk-empty">Раскладка для текущего языка отсутствует</div>';
+        return;
+    }
+
+    const body = document.createElement('div');
+    body.className = 'vk-body';
+
+    const rawRows = Array.isArray(layout.rows) ? layout.rows : [];
+    const rows = rawRows.map(row => Array.isArray(row) ? row : []);
+    const filteredRows = rows.map((row, idx) => {
+        if (idx !== rows.length - 1) return row;
+        const spaceKey = row.find(k => (k && (k.code === 'Space' || k.label === 'Space')));
+        return spaceKey ? [spaceKey] : [];
+    }).filter(r => Array.isArray(r) && r.length > 0);
+
+    const modifierCodes = new Set(['Tab', 'CapsLock', 'Enter', 'Backspace', 'ShiftLeft', 'ShiftRight']);
+    const modLabelMap = {
+        Tab: 'TAB',
+        CapsLock: 'CAPS',
+        Enter: '',
+        Backspace: '',
+        ShiftLeft: 'SHIFT',
+        ShiftRight: 'SHIFT'
+    };
+
+    const fixedUnitsByCode = {
+        Tab: 1.6,
+        CapsLock: 1.9,
+        ShiftLeft: 2.35,
+        ShiftRight: 2.35,
+        Backspace: 2.1,
+        Enter: 2.25,
+        Backslash: 1
+    };
+
+    const homeCodes = new Set(['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon']);
+    const tactileFCodes = new Set(['KeyF']);
+    const tactileJCodes = new Set(['KeyJ']);
+
+    const getKeyUnit = (def) => {
+        const code = String(def?.code || '');
+        if (fixedUnitsByCode[code] != null) return Number(fixedUnitsByCode[code]);
+        if (Number.isFinite(def?.size)) return Number(def.size);
+        return 1;
+    };
+
+    const sumRowUnits = (row) => {
+        return (Array.isArray(row) ? row : []).reduce((sum, k) => {
+            const def = k && typeof k === 'object' ? k : {};
+            return sum + getKeyUnit(def);
+        }, 0);
+    };
+
+    const findRowByCodes = (codes) => {
+        return filteredRows.find(r => Array.isArray(r) && r.some(k => codes.has(String(k?.code || '')))) || null;
+    };
+
+    const secondRow = findRowByCodes(new Set(['Tab', 'Backslash']));
+    const secondRowUnits = secondRow ? sumRowUnits(secondRow) : null;
+
+    if (secondRowUnits != null && Number.isFinite(secondRowUnits) && secondRowUnits > 0) {
+        const backspaceRow = findRowByCodes(new Set(['Backspace']));
+        if (backspaceRow) {
+            const otherUnits = backspaceRow.reduce((sum, k) => {
+                const def = k && typeof k === 'object' ? k : {};
+                if (String(def.code || '') === 'Backspace') return sum;
+                return sum + getKeyUnit(def);
+            }, 0);
+            const needed = Math.max(1, secondRowUnits - otherUnits);
+            fixedUnitsByCode.Backspace = Number(needed.toFixed(2));
+        }
+
+        const enterRow = findRowByCodes(new Set(['Enter']));
+        if (enterRow) {
+            const otherUnits = enterRow.reduce((sum, k) => {
+                const def = k && typeof k === 'object' ? k : {};
+                if (String(def.code || '') === 'Enter') return sum;
+                return sum + getKeyUnit(def);
+            }, 0);
+            const needed = Math.max(1, secondRowUnits - otherUnits);
+            fixedUnitsByCode.Enter = Number(needed.toFixed(2));
+        }
+
+        const shiftRow = findRowByCodes(new Set(['ShiftRight']));
+        if (shiftRow) {
+            const otherUnits = shiftRow.reduce((sum, k) => {
+                const def = k && typeof k === 'object' ? k : {};
+                if (String(def.code || '') === 'ShiftRight') return sum;
+                return sum + getKeyUnit(def);
+            }, 0);
+            const needed = Math.max(1, secondRowUnits - otherUnits);
+            fixedUnitsByCode.ShiftRight = Number(needed.toFixed(2));
+        }
+    }
+
+    filteredRows.forEach((row, rowIndex) => {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'vk-row';
+        rowEl.dataset.rowIndex = String(rowIndex);
+
+        if (Array.isArray(row) && row.length === 1) {
+            const only = row[0] && typeof row[0] === 'object' ? row[0] : null;
+            if (only && (only.code === 'Space' || only.label === 'Space')) {
+                rowEl.classList.add('vk-row-space');
+            }
+        }
+
+        (row || []).forEach((keyDef, keyIndex) => {
+            const def = keyDef && typeof keyDef === 'object' ? keyDef : {};
+
+            const code = String(def.code || '');
+
+            const keyEl = document.createElement('div');
+            keyEl.className = 'vk-key';
+            keyEl.dataset.keyIndex = String(keyIndex);
+
+            const fingerClass = def.finger ? `finger-${def.finger}` : 'finger-unknown';
+            keyEl.classList.add(fingerClass);
+
+            const unitSize = Number.isFinite(def.size) ? def.size : 1;
+            keyEl.style.setProperty('--vk-key-unit', unitSize);
+
+            if (fixedUnitsByCode[code] != null) {
+                keyEl.style.setProperty('--vk-key-unit', String(fixedUnitsByCode[code]));
+            }
+
+            if (def.code) {
+                keyEl.dataset.code = def.code;
+            }
+
+            if (code === 'Enter') {
+                keyEl.classList.add('vk-key-enter');
+            }
+
+            if (code === 'ShiftLeft' || code === 'ShiftRight') {
+                keyEl.classList.add('vk-key-shift');
+                if (shiftMode) {
+                    keyEl.classList.add('vk-key-shift-pressed');
+                }
+            }
+
+            const colorVars = getKeyColorVarsByCode(def.code);
+            keyEl.style.background = colorVars.bg;
+            keyEl.style.color = colorVars.fg;
+
+            const shiftLabel = def.shiftLabel ? String(def.shiftLabel) : '';
+            const label = def.label ? String(def.label) : '';
+            const altLabel = def.altLabel ? String(def.altLabel) : '';
+
+            const isSpace = def.code === 'Space' || label === 'Space';
+            const isModifier = modifierCodes.has(String(def.code || ''));
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'vk-key-label';
+
+            if (isSpace) {
+                labelSpan.textContent = '';
+                keyEl.classList.add('vk-key-space');
+            } else if (isModifier) {
+                const code = String(def.code || '');
+                if (Object.prototype.hasOwnProperty.call(modLabelMap, code)) {
+                    labelSpan.textContent = String(modLabelMap[code]);
+                } else {
+                    labelSpan.textContent = label.toUpperCase();
+                }
+                keyEl.classList.add('vk-key-mod');
+            } else {
+                labelSpan.textContent = (shiftMode && shiftLabel) ? shiftLabel : label;
+            }
+
+            keyEl.appendChild(labelSpan);
+
+            if (code === 'Enter') {
+                const icon = document.createElement('i');
+                icon.setAttribute('data-lucide', 'corner-down-left');
+                icon.className = 'vk-key-icon';
+                keyEl.appendChild(icon);
+            }
+
+            if (code === 'Backspace') {
+                const icon = document.createElement('i');
+                icon.setAttribute('data-lucide', 'move-left');
+                icon.className = 'vk-key-icon';
+                keyEl.appendChild(icon);
+            }
+
+            if (homeCodes.has(code)) {
+                keyEl.classList.add('vk-key-home');
+            }
+
+            if (tactileFCodes.has(code)) {
+                keyEl.classList.add('vk-key-tactile', 'vk-key-tactile-f');
+            }
+
+            if (tactileJCodes.has(code)) {
+                keyEl.classList.add('vk-key-tactile', 'vk-key-tactile-j');
+            }
+
+            if (altLabel) {
+                const altSpan = document.createElement('span');
+                altSpan.className = 'vk-key-alt';
+                altSpan.textContent = altLabel;
+                keyEl.appendChild(altSpan);
+                keyEl.classList.add('vk-key-has-alt');
+            }
+
+            rowEl.appendChild(keyEl);
+        });
+
+        body.appendChild(rowEl);
+    });
+
+    container.appendChild(body);
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        try {
+            window.lucide.createIcons();
+        } catch (e) {
+        }
+    }
+}
+
+if (!window.__dictafanLucideIconsRefreshedOnce) {
+    window.__dictafanLucideIconsRefreshedOnce = true;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        try {
+            window.lucide.createIcons();
+        } catch (e) {
+        }
+    }
+}
+
 async function setupVirtualKeyboard(langCode) {
     try {
-        if (!virtualKeyboardContainer || typeof window.VirtualKeyboard !== 'function') {
+        if (!virtualKeyboardContainer) {
             return;
         }
 
         const normalizedLang = (langCode || currentDictation.language_original || 'en').toLowerCase();
 
-        if (!virtualKeyboardInstance) {
-            virtualKeyboardInstance = new window.VirtualKeyboard(virtualKeyboardContainer, {
-                layoutManager: window.KeyboardLayoutManager,
-                languageManager: window.LanguageManager,
-                langCode: normalizedLang
-            });
-        } else {
-            await virtualKeyboardInstance.setLanguage(normalizedLang);
-        }
+        const layouts = await ensureKeyboardLayoutsLoaded();
+        const layout = layouts?.[normalizedLang] || null;
+        lastKeyboardHintLayout = layout;
+        renderKeyboardHint(virtualKeyboardContainer, layout, virtualKeyboardShiftPressed);
+        enforceVirtualKeyboardFitsViewport();
 
         if (virtualKeyboardToggle && !virtualKeyboardToggle.dataset.listenerAttached) {
             virtualKeyboardToggle.addEventListener('change', async (event) => {
                 try {
-                    if (!virtualKeyboardInstance) {
-                        return;
-                    }
-
                     const isChecked = Boolean(event.target.checked);
-                    const langForRender = (currentDictation.language_original || normalizedLang).toLowerCase();
-                    await virtualKeyboardInstance.setLanguage(langForRender);
-
                     if (isChecked) {
-                        await virtualKeyboardInstance.show();
+                        virtualKeyboardContainer.removeAttribute('hidden');
+                        virtualKeyboardContainer.style.display = '';
+                        const langForRender = (currentDictation.language_original || normalizedLang).toLowerCase();
+                        const layoutsInner = await ensureKeyboardLayoutsLoaded();
+                        const layoutInner = layoutsInner?.[langForRender] || null;
+                        lastKeyboardHintLayout = layoutInner;
+                        renderKeyboardHint(virtualKeyboardContainer, layoutInner, virtualKeyboardShiftPressed);
+                        enforceVirtualKeyboardFitsViewport();
                     } else {
-                        virtualKeyboardInstance.hide();
+                        virtualKeyboardContainer.setAttribute('hidden', 'true');
+                        virtualKeyboardContainer.style.display = 'none';
                     }
                 } catch (error) {
                     console.error('❌ Ошибка при переключении виртуальной клавиатуры:', error);
@@ -4251,8 +5237,9 @@ async function setupVirtualKeyboard(langCode) {
                     if (virtualKeyboardToggle) {
                         virtualKeyboardToggle.checked = false;
                     }
-                    if (virtualKeyboardInstance && typeof virtualKeyboardInstance.hide === 'function') {
-                        virtualKeyboardInstance.hide();
+                    if (virtualKeyboardContainer) {
+                        virtualKeyboardContainer.setAttribute('hidden', 'true');
+                        virtualKeyboardContainer.style.display = 'none';
                     }
                 }
             });
@@ -4260,9 +5247,12 @@ async function setupVirtualKeyboard(langCode) {
         }
 
         if (virtualKeyboardToggle && virtualKeyboardToggle.checked) {
-            await virtualKeyboardInstance.show();
-        } else if (virtualKeyboardInstance) {
-            virtualKeyboardInstance.hide();
+            virtualKeyboardContainer.removeAttribute('hidden');
+            virtualKeyboardContainer.style.display = '';
+            enforceVirtualKeyboardFitsViewport();
+        } else if (virtualKeyboardContainer) {
+            virtualKeyboardContainer.setAttribute('hidden', 'true');
+            virtualKeyboardContainer.style.display = 'none';
         }
     } catch (error) {
         console.error('❌ Ошибка инициализации виртуальной клавиатуры:', error);
@@ -4287,9 +5277,7 @@ function hideVirtualKeyboardIfActive() {
             virtualKeyboardToggle.checked = false;
         }
 
-        if (virtualKeyboardInstance && typeof virtualKeyboardInstance.hide === 'function') {
-            virtualKeyboardInstance.hide();
-        } else if (virtualKeyboardContainer) {
+        if (virtualKeyboardContainer) {
             virtualKeyboardContainer.setAttribute('hidden', 'true');
             virtualKeyboardContainer.style.display = 'none';
         }
@@ -4575,6 +5563,11 @@ async function initializeDictation() {
     const hasDraft = await loadAndApplyDraft();
     hasDraftLoaded = hasDraft; // Сохраняем флаг в глобальной переменной для использования в startGame()
 
+    // Всегда включаем периодическое автосохранение: даже если черновика не было,
+    // прогресс должен сохраняться локально без Ctrl+S.
+    setSaveButtonStatus('clean');
+    startDraftPeriodicAutosave();
+
     // Если черновика нет, инициализируем только первое предложение как checked
     if (!hasDraft) {
         let firstSentenceSelected = false;
@@ -4604,6 +5597,9 @@ async function initializeDictation() {
     if (hasDraft) {
         updateStats();
     }
+
+    // Если есть интернет и есть pending в outbox — синхронизируем в фоне.
+    syncDraftIfOnline(false).catch(() => {});
 
     // Останавливаем таймер при открытии модального окна списка предложений
     stopTimer();
@@ -4655,6 +5651,19 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
     currentSentenceIndex = showSentenceIndex;
     currentSentence = makeByKeyMap(allSentences).get(selectedSentences[currentSentenceIndex]);
+    // Обновляем глобальную переменную для UnifiedSpeechRecognition
+    window.currentSentence = currentSentence;
+
+    // Анти-обход: считаем старты предложения
+    if (currentSentence) {
+        const old = Number(currentSentence.attempts_total) || 0;
+        currentSentence.attempts_total = old + 1;
+        updateTableRowStatus(currentSentence);
+        scheduleDraftAutosave('sentenceStart');
+    }
+
+    // Показываем число неуспешных нажатий "Проверить" по этому предложению
+    updateErrorCountLabel(Number(currentSentence?.error_count) || 0);
 
     // Обновляем простой счетчик предложений
     updateSimpleSentenceCounter();
@@ -4893,6 +5902,10 @@ async function onloadInitializeDictation() {
     await initializeDictation();
     // Теперь вызываем loadLanguageCodes после того, как данные диктанта загружены
     loadLanguageCodes();
+    
+    // Инициализируем UnifiedSpeechRecognition после загрузки языка
+    initUnifiedSpeechRecognition();
+    
     // userManager.init(); 
     // initializeUser(); // Инициализируем пользователя
     // setupAuthHandlers(); // ДОБАВИТЬ ЭТУ СТРОЧКУ
@@ -5066,8 +6079,43 @@ async function onloadInitializeDictation() {
         const inputs = document.querySelectorAll('.play-sequence-input');
 
         inputs.forEach(input => {
+            const id = input.id || '';
+            const isNumberInput = input.type === 'number' || input.getAttribute('type') === 'number';
+            const isStarHalfInput = id === 'requiredPassedStarHalfInput' || id.endsWith('requiredPassedStarHalfInput');
+            const isAudioRepeatsInput = id === 'audioRepeatsInput' || id.endsWith('audioRepeatsInput');
+
+            if (isStarHalfInput) {
+                const clampStarHalf = (raw) => {
+                    const value = parseInt(raw, 10);
+                    if (isNaN(value)) return REQUIRED_PASSED_STAR_HALF;
+                    return Math.min(10, Math.max(1, value));
+                };
+
+                const applyStarHalfValue = (raw) => {
+                    const v = clampStarHalf(raw);
+                    input.value = String(v);
+                    REQUIRED_PASSED_STAR_HALF = v;
+                };
+
+                input.addEventListener('input', (e) => {
+                    const v = clampStarHalf(e.target.value);
+                    REQUIRED_PASSED_STAR_HALF = v;
+                });
+
+                input.addEventListener('change', (e) => {
+                    applyStarHalfValue(e.target.value);
+                });
+
+                input.addEventListener('blur', (e) => {
+                    applyStarHalfValue(e.target.value);
+                });
+
+                applyStarHalfValue(input.value);
+                return;
+            }
+
             // Пропускаем поле числа (Повторы аудио) - для него отдельная обработка
-            if (input.type === 'number' || input.id === 'audioRepeatsInput') {
+            if (isAudioRepeatsInput) {
                 // Обработка для поля числа
                 input.addEventListener('input', (e) => {
                     const value = parseInt(e.target.value, 10);
@@ -5124,6 +6172,12 @@ async function onloadInitializeDictation() {
                 });
 
                 return; // Пропускаем остальную обработку для этого поля
+            }
+
+            // Для любых number-input (включая модальные) не применяем буквенную валидацию.
+            // Числовые поля обрабатываются отдельно (AudioSettingsPanel в модалке).
+            if (isNumberInput) {
+                return;
             }
 
             // Валидация при вводе (только для текстовых полей)
@@ -5643,6 +6697,7 @@ function renderResult(original, userVerified) {
 
     const correctLine = [];
     let foundError = false;
+    let errorCount = 0;
     let originalIndex = 0;
 
     userVerified.forEach(word => {
@@ -6124,6 +7179,7 @@ function check(original, userInput, currentKey) {
     const userVerified = [];
     let i = 0, j = 0;
     let foundError = false;
+    let errorCount = 0;
 
     while (i < simplOriginal.length || j < simplUser.length) {
         const wordOrig = simplOriginal[i];
@@ -6147,6 +7203,8 @@ function check(original, userInput, currentKey) {
         } else if (!REQUIRE_EVERY_WORD && simplOriginal[i + 1] === wordUser) {
             // Режим «разрешить пропуск слова» — ВЫКЛ по умолчанию
             userVerified.push({ type: "missing", text: fullWordOrig });
+            errorCount++;
+            foundError = true;
             i++;
         } else {
             // Проверяем эквивалентности сокращений перед тем, как считать ошибкой
@@ -6229,6 +7287,7 @@ function check(original, userInput, currentKey) {
                     correctText: fullWordOrig,
                     errorIndex: errorIndex
                 });
+                errorCount++;
                 i++; j++;
                 foundError = true; // ← ключ: пропуск/несовпадение — это ошибка, а не «мягкий» missing
             }
@@ -6236,7 +7295,6 @@ function check(original, userInput, currentKey) {
 
     }
 
-    // === ==
     if (!foundError) {
 
         const s = currentSentence;
@@ -6321,6 +7379,30 @@ function checkText() {
     renderResult(original, result);
 
     const allCorrect = result.every(word => word.type === "correct");
+
+    // error_count: число неуспешных нажатий "Проверить" по предложению
+    // Инкрементируем ТОЛЬКО когда проверка не прошла (нужно исправляться)
+    if (currentSentence && !allCorrect) {
+        currentSentence.error_count = (Number(currentSentence.error_count) || 0) + 1;
+    }
+    const failedChecks = Number(currentSentence?.error_count) || 0;
+    updateErrorCountLabel(failedChecks);
+    scheduleDraftAutosave('checkErrorCount');
+
+    // Debug: логируем распределение типов и число неуспешных проверок
+    try {
+        const typeCounts = result.reduce((acc, w) => {
+            const t = w?.type || 'unknown';
+            acc[t] = (acc[t] || 0) + 1;
+            return acc;
+        }, {});
+        console.log('[Dictation][Check] sentence_key=', currentSentence?.key,
+            'failedChecks=', failedChecks,
+            'allCorrect=', allCorrect,
+            'typeCounts=', typeCounts);
+    } catch (e) {
+        console.log('[Dictation][Check] failedChecks=', failedChecks, '(failed to build typeCounts)', e);
+    }
 
     correctAnswerDiv.style.display = "block";
     if (allCorrect) {
@@ -6518,13 +7600,16 @@ async function registerCompletedDictation() {
                 start: sequences.start || playSequenceStart,
                 typo: sequences.typo || playSequenceTypo,
                 success: sequences.success || playSequenceSuccess,
-                repeats: audioRepeats
+                repeats: audioRepeats,
+                required_passed_star_half: REQUIRED_PASSED_STAR_HALF
             },
             sentence_order: isMixed ? 'mixed' : 'direct'
         });
 
         // Сохраняем успех в новую таблицу history_successes
         try {
+            const totalAttempts = allSentences.reduce((sum, s) => sum + (Number(s.attempts_total) || 0), 0);
+            const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.error_count) || 0), 0);
             const successResponse = await fetch('/api/statistics/success', {
                 method: 'POST',
                 headers: {
@@ -6536,6 +7621,8 @@ async function registerCompletedDictation() {
                     perfect_count: totalPerfect,
                     corrected_count: totalCorrected,
                     audio_count: totalAudio,
+                    attempts_total: totalAttempts,
+                    error_count: totalErrors,
                     time_ms: totalTimeMs,
                     sentences_data: sentences_data,
                     settings_json: settings_json
@@ -6595,129 +7682,21 @@ async function saveDictationDraft() {
         return false;
     }
 
-    // Собираем прогресс по предложениям (только измененные поля)
-    const perSentence = {};
-    allSentences.forEach(s => {
-        // Сохраняем текущее selection_state перед любыми изменениями
-        const originalSelectionState = s.selection_state;
+    const state = buildDictationDraftState();
+    if (!state) {
+        return false;
+    }
 
-        // Проверяем наличие прогресса
-        const hasProgress = s.number_of_perfect > 0 ||
-            s.number_of_corrected > 0 ||
-            (Number(s.number_of_audio) || 0) > 0;
-
-        // Определяем финальное состояние для сохранения
-        let finalSelectionState;
-
-        // Вычисляем completed состояние на основе прогресса
-        const totalPerfect = Number(s.number_of_perfect) || 0;
-        const totalAudio = Number(s.number_of_audio) || 0;
-        const isCompleted = totalPerfect > 0 && totalAudio >= REQUIRED_PASSED_COUNT;
-
-        if (isCompleted) {
-            // Предложение полностью выполнено - всегда completed
-            finalSelectionState = 'completed';
-        } else if (originalSelectionState === 'unchecked') {
-            // Явно установленное unchecked - сохраняем как есть
-            finalSelectionState = 'unchecked';
-        } else if (hasProgress) {
-            // Есть прогресс - предложение должно быть checked (если не было явно unchecked)
-            // Это важно: предложения с полузвездой или микрофоном должны быть checked
-            finalSelectionState = 'checked';
-        } else if (originalSelectionState === 'checked' || originalSelectionState === 'completed') {
-            // Явно установленное checked - сохраняем
-            finalSelectionState = 'checked';
-        } else {
-            // По умолчанию - unchecked
-            finalSelectionState = 'unchecked';
-        }
-
-        // Сохраняем предложение, если:
-        // 1. Есть прогресс (perfect, corrected, audio)
-        // 2. ИЛИ есть явно установленное selection_state (checked/unchecked) - важно для сохранения выбора пользователя!
-        const hasExplicitSelection = originalSelectionState === 'checked' ||
-            originalSelectionState === 'unchecked' ||
-            originalSelectionState === 'completed';
-
-        if (hasProgress || hasExplicitSelection) {
-            perSentence[s.key] = {
-                number_of_perfect: s.number_of_perfect || 0,
-                number_of_corrected: s.number_of_corrected || 0,
-                number_of_audio: s.number_of_audio || 0,
-                selection_state: finalSelectionState
-            };
-        }
-    });
-
-    // Сохраняем настройки
-    const sequences = getPlaySequenceValues();
-    const isMixed = mixControl && mixControl.dataset.checked === 'true';
-    const changedCount = Object.keys(perSentence).length;
+    const changedCount = Object.keys(state.per_sentence || {}).length;
 
     console.log('[Draft] saveDictationDraft: prepared payload', {
         dictationId: currentDictation.id,
         changedSentences: changedCount,
-        isMixed,
+        isMixed: !!state.is_mixed,
         currentIndex: currentSentenceIndex || 0
     });
 
-    // Получаем настройки аудио из панели или из глобальных переменных
-    let audioRepeats = REQUIRED_PASSED_COUNT;
-    let audioSettings = {};
-    if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
-        const settings = audioSettingsPanel.getSettings();
-        // Используем явную проверку, чтобы 0 не заменялся на 3
-        audioRepeats = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-        audioSettings = {
-            start: settings.start || 'oto',
-            typo: settings.typo || 'o',
-            success: settings.success || 'ot',
-            repeats: audioRepeats,
-            without_entering_text: Boolean(settings.without_entering_text),
-            show_text: Boolean(settings.show_text),
-            speech_recognition_mode: settings.speech_recognition_mode || speechRecognitionMode || 'route'
-        };
-    } else {
-        audioSettings = {
-            start: sequences.start || playSequenceStart || 'oto',
-            typo: sequences.typo || playSequenceTypo || 'o',
-            success: sequences.success || playSequenceSuccess || 'ot',
-            repeats: audioRepeats,
-            without_entering_text: Boolean(window.audioSettingsWithoutEnteringText || false),
-            show_text: Boolean(window.audioSettingsShowText || false),
-            speech_recognition_mode: speechRecognitionMode || 'route'
-        };
-    }
-
-    // Получаем накопленное время работы над диктантом
-    const timerSnapshot = getProgressTimerSnapshot();
-    const accumulatedMs = timerSnapshot.accumulatedMs || 0;
-
-    // Формируем settings_json для сохранения в черновик
-    const settings_json = JSON.stringify({
-        audio: audioSettings,
-        sentence_order: isMixed ? 'mixed' : 'direct'
-    });
-
-    const state = {
-        dictation_id: currentDictation.id,
-        circle_number: circle_number,
-        current_index: currentSentenceIndex || 0,
-        playSequenceStart: sequences.start || playSequenceStart,
-        playSequenceTypo: sequences.typo || playSequenceTypo,
-        playSequenceSuccess: sequences.success || playSequenceSuccess,
-        audio_repeats: audioRepeats,
-        is_mixed: isMixed,
-        per_sentence: perSentence,
-        // Общие счетчики
-        number_of_perfect: number_of_perfect,
-        number_of_corrected: number_of_corrected,
-        number_of_audio: number_of_audio,
-        // Накопленное время работы над диктантом (в миллисекундах)
-        dictation_accumulated_ms: accumulatedMs,
-        // settings_json для сохранения в БД
-        settings_json: settings_json
-    };
+    await saveDraftToIndexedDbAndQueueSync('manual');
 
     try {
         const result = await dictationStatistics.saveResumeState(currentDictation.id, state);
@@ -6751,14 +7730,34 @@ async function loadAndApplyDraft(forceClear = false) {
     if (panel) panel._suppressDirty = true;
 
     try {
-        const draft = await dictationStatistics.loadResumeState(currentDictation.id);
+        let draft = null;
+
+        const key = getDraftKey();
+        if (key) {
+            try {
+                const local = await idbGet('drafts', key);
+                if (local && local.state) {
+                    draft = local.state;
+                    console.log('[Draft][IDB] local draft loaded', { updatedAt: local.updatedAt || null });
+                }
+            } catch (e) {
+                console.warn('[Draft][IDB] failed to load local draft', e);
+            }
+        }
+
+        if (!draft) {
+            draft = await dictationStatistics.loadResumeState(currentDictation.id);
+        }
 
         if (!draft) {
             if (panel) {
                 panel.markClean();
             }
+            setSaveButtonStatus('clean');
             return false;
         }
+
+        setSaveButtonStatus('pending');
 
         // Восстанавливаем настройки из settings_json (приоритет) или из отдельных полей
         let audioSettingsFromDraft = null;
@@ -6778,6 +7777,7 @@ async function loadAndApplyDraft(forceClear = false) {
                     typo: audioSettingsFromDraft.typo || draft.playSequenceTypo || playSequenceTypo || 'o',
                     success: audioSettingsFromDraft.success || draft.playSequenceSuccess || playSequenceSuccess || 'ot',
                     repeats: audioSettingsFromDraft.repeats !== undefined ? audioSettingsFromDraft.repeats : (draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)),
+                    required_passed_star_half: audioSettingsFromDraft.required_passed_star_half !== undefined ? audioSettingsFromDraft.required_passed_star_half : REQUIRED_PASSED_STAR_HALF,
                     without_entering_text: audioSettingsFromDraft.without_entering_text !== undefined ? Boolean(audioSettingsFromDraft.without_entering_text) : false,
                     show_text: audioSettingsFromDraft.show_text !== undefined ? Boolean(audioSettingsFromDraft.show_text) : false,
                     speech_recognition_mode: audioSettingsFromDraft.speech_recognition_mode || speechRecognitionMode || 'route'
@@ -6796,6 +7796,9 @@ async function loadAndApplyDraft(forceClear = false) {
                 playSequenceSuccess = settings.success;
                 const oldValue = REQUIRED_PASSED_COUNT;
                 REQUIRED_PASSED_COUNT = settings.repeats;
+                if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {
+                    REQUIRED_PASSED_STAR_HALF = settings.required_passed_star_half;
+                }
                 // Обновляем новые настройки
                 if (settings.without_entering_text !== undefined) {
                     window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
@@ -6904,6 +7907,20 @@ async function loadAndApplyDraft(forceClear = false) {
                         } else {
                             s.number_of_audio = 0;
                         }
+                    }
+
+                    // attempts_total: анти-обход, считаем старты предложения
+                    if (progress.hasOwnProperty('attempts_total')) {
+                        const attemptsValue = progress.attempts_total;
+                        const numValue = Number(attemptsValue);
+                        s.attempts_total = (!isNaN(numValue) && numValue >= 0) ? numValue : 0;
+                    }
+
+                    // error_count: ошибки в последней проверке
+                    if (progress.hasOwnProperty('error_count')) {
+                        const errorValue = progress.error_count;
+                        const numValue = Number(errorValue);
+                        s.error_count = (!isNaN(numValue) && numValue >= 0) ? numValue : 0;
                     }
                     // ИСПРАВЛЕНО: Убрана загрузка circle_number_of_* полей, так как логика "circle" удалена
                     // Эти поля больше не сохраняются и не должны использоваться
@@ -7026,6 +8043,9 @@ async function loadAndApplyDraft(forceClear = false) {
             panel.markClean();
         }
 
+        startDraftPeriodicAutosave();
+        syncDraftIfOnline(false).catch(() => {});
+
         return true;
     } finally {
         if (panel) panel._suppressDirty = false;
@@ -7061,7 +8081,8 @@ async function handleSave() {
                 })
                 : Promise.resolve(true);
 
-            const draftSaved = await saveDictationDraft();
+            await saveDraftToIndexedDbAndQueueSync('explicit-save');
+            const draftSaved = await syncDraftIfOnline(true);
             const historySaved = await historySavePromise;
             const success = !!draftSaved && historySaved !== false;
 
@@ -7077,6 +8098,7 @@ async function handleSave() {
         } catch (error) {
             console.error('[Save] error', error);
             showSaveToast('Ошибка при сохранении', 'error');
+            setSaveButtonStatus('error');
         } finally {
             saveBtn.innerHTML = originalHTML;
             if (typeof lucide !== 'undefined' && lucide.createIcons) {
@@ -7101,7 +8123,8 @@ async function handleSaveAndExit() {
         })
         : Promise.resolve(true);
 
-    const draftSaved = await saveDictationDraft();
+    await saveDraftToIndexedDbAndQueueSync('save-and-exit');
+    const draftSaved = await syncDraftIfOnline(true);
     const historySaved = await historySavePromise;
     const success = !!draftSaved && historySaved !== false;
     if (panel && success) {
@@ -7372,30 +8395,12 @@ function initPlaySequenceInputs() {
     });
 }
 
-// Глобальная переменная для панели настроек аудио
-let audioSettingsPanel = null;
-
 // Функция для получения значений
 function getPlaySequenceValues() {
-    // Если панель инициализирована, используем её значения
-    if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
-        const settings = audioSettingsPanel.getSettings();
-        return {
-            start: settings.start || 'oto',
-            typo: settings.typo || 'o',
-            success: settings.success || 'ot'
-        };
-    }
-
-    // Fallback на старый способ (для обратной совместимости)
-    const startEl = document.getElementById('playSequenceStart');
-    const typoEl = document.getElementById('playSequenceTypo');
-    const successEl = document.getElementById('playSequenceSuccess');
-
     return {
-        start: startEl ? startEl.value || 'oto' : 'oto',
-        typo: typoEl ? typoEl.value || 'o' : 'o',
-        success: successEl ? successEl.value || 'ot' : 'ot'
+        start: playSequenceStart || 'oto',
+        typo: playSequenceTypo || 'o',
+        success: playSequenceSuccess || 'ot'
     };
 }
 
@@ -7404,70 +8409,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Загружаем настройки аудио из данных пользователя (асинхронно)
     await loadAudioSettingsFromUser();
 
-    // Инициализируем панель настроек аудио
-    const container = document.getElementById('audioSettingsContainer');
-    if (container && typeof AudioSettingsPanel !== 'undefined') {
-        // Глобальные переменные для новых настроек
-        window.audioSettingsWithoutEnteringText = false;
-        window.audioSettingsShowText = false;
-
-        audioSettingsPanel = new AudioSettingsPanel({
-            container: container,
-            mode: 'modal',
-            showExplanations: false,
-            onSettingsChange: async (settings) => {
-                // Обновляем глобальные переменные
-                playSequenceStart = settings.start || 'oto';
-                playSequenceTypo = settings.typo || 'o';
-                playSequenceSuccess = settings.success || 'ot';
-                // Используем явную проверку, чтобы 0 не заменялся на 3
-                const oldValue = REQUIRED_PASSED_COUNT;
-                REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-
-                // Пересчитываем доступность кнопок записи при инициализации
-                if (oldValue !== REQUIRED_PASSED_COUNT) {
-                    recalculateAudioAvailabilityForAllSentences();
-                }
-
-                // Обновляем новые настройки
-                window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
-                window.audioSettingsShowText = Boolean(settings.show_text);
-
-                // Сохраняем настройки в БД через API
-                await saveAudioSettingsToUser(settings);
-
-                // Пересчитываем доступность кнопок записи для всех предложений при изменении REQUIRED_PASSED_COUNT
-                if (oldValue !== REQUIRED_PASSED_COUNT) {
-                    recalculateAudioAvailabilityForAllSentences();
-                }
-
-                // Применяем настройки к текущему предложению
-                applyAudioSettingsToUI();
-            }
-        });
-
-        // Загружаем настройки из данных пользователя (или значения по умолчанию)
-        audioSettingsPanel.setSettings({
-            start: playSequenceStart,
-            typo: playSequenceTypo,
-            success: playSequenceSuccess,
-            repeats: REQUIRED_PASSED_COUNT
-        });
-
-        audioSettingsPanel.init();
-
-        // Инициализируем модальное окно настроек аудио
-        initAudioSettingsModal();
-    } else {
-        // Fallback на старый способ
-        initPlaySequenceInputs();
-        const startEl = document.getElementById('playSequenceStart');
-        const typoEl = document.getElementById('playSequenceTypo');
-        const successEl = document.getElementById('playSequenceSuccess');
-        if (startEl) startEl.value = playSequenceStart;
-        if (typoEl) typoEl.value = playSequenceTypo;
-        if (successEl) successEl.value = playSequenceSuccess;
-    }
+    // Инициализируем модальное окно настроек аудио
+    initAudioSettingsModal();
 });
 
 // обработчики событий для отслеживания активности:-----------------------------------------------
@@ -7528,13 +8471,51 @@ document.addEventListener('DOMContentLoaded', disableProfileNavigation);
 function initAudioSettingsModal() {
     const audioSettingsModal = document.getElementById('audioSettingsModal');
     const audioSettingsButton = document.getElementById('audioSettingsButton');
+    const topbarSettingsButton = document.getElementById('openDictationSettingsBtn');
+    const startModalSettingsButton = document.getElementById('startModalOpenSettingsBtn');
     const closeAudioSettingsModal = document.getElementById('closeAudioSettingsModal');
     const modalContainer = document.getElementById('audioSettingsModalContainer');
 
-    if (!audioSettingsModal || !audioSettingsButton || !modalContainer) {
+    const setAudioSettingsBusy = (isBusy) => {
+        if (!audioSettingsModal) return;
+        const header = audioSettingsModal.querySelector('.modal-header');
+        if (!header) return;
+
+        let indicator = header.querySelector('#audioSettingsBusyIndicator');
+        if (!indicator) {
+            indicator = document.createElement('span');
+            indicator.id = 'audioSettingsBusyIndicator';
+            indicator.setAttribute('aria-hidden', 'true');
+            indicator.style.display = 'inline-block';
+            indicator.style.width = '10px';
+            indicator.style.height = '10px';
+            indicator.style.borderRadius = '50%';
+            indicator.style.background = '#f59e0b';
+            indicator.style.marginLeft = '10px';
+            indicator.style.opacity = '0';
+            indicator.style.transition = 'opacity 120ms ease';
+            indicator.style.flex = '0 0 auto';
+
+            const title = header.querySelector('h2');
+            if (title && title.parentNode) {
+                title.parentNode.insertBefore(indicator, title.nextSibling);
+            } else {
+                header.appendChild(indicator);
+            }
+        }
+
+        indicator.style.opacity = isBusy ? '1' : '0';
+    };
+
+    if (!audioSettingsModal || !modalContainer) {
         console.warn('Элементы модального окна настроек аудио не найдены');
         return;
     }
+
+    if (audioSettingsModal.dataset.initialized === 'true') {
+        return;
+    }
+    audioSettingsModal.dataset.initialized = 'true';
 
     // Инициализируем панель настроек в модальном окне
     audioSettingsModalPanel = new AudioSettingsPanel({
@@ -7548,6 +8529,9 @@ function initAudioSettingsModal() {
             playSequenceSuccess = settings.success || 'ot';
             const oldValue = REQUIRED_PASSED_COUNT;
             REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
+            if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {
+                REQUIRED_PASSED_STAR_HALF = settings.required_passed_star_half;
+            }
 
             window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
             window.audioSettingsShowText = Boolean(settings.show_text);
@@ -7555,14 +8539,36 @@ function initAudioSettingsModal() {
             // Обновляем метод распознавания речи
             if (settings.speech_recognition_mode) {
                 console.log(`🔄 [onSettingsChange] Изменяем режим распознавания: ${speechRecognitionMode} -> ${settings.speech_recognition_mode}`);
+                const oldMode = speechRecognitionMode;
                 speechRecognitionMode = settings.speech_recognition_mode;
+                
+                // Если режим изменился, останавливаем старый движок и сбрасываем unifiedSpeechRecognizer,
+                // чтобы он пересоздался с новым режимом.
+                if (oldMode !== speechRecognitionMode && unifiedSpeechRecognizer) {
+                    console.log(`🔄 [onSettingsChange] Режим изменился, останавливаем и сбрасываем unifiedSpeechRecognizer для пересоздания с новым режимом`);
+                    try {
+                        if (typeof unifiedSpeechRecognizer.cleanup === 'function') {
+                            unifiedSpeechRecognizer.cleanup();
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ Ошибка cleanup UnifiedSpeechRecognition при смене режима:', e);
+                    }
+
+                    unifiedSpeechRecognizer = null;
+                }
+                
                 // Обновляем иконку режима распознавания сразу после изменения режима
                 console.log(`🔄 [onSettingsChange] Вызываем updateRecognitionModeIcon() с режимом: ${speechRecognitionMode}`);
                 updateRecognitionModeIcon();
             }
 
             // Сохраняем настройки в БД
-            await saveAudioSettingsToUser(settings);
+            setAudioSettingsBusy(true);
+            try {
+                await saveAudioSettingsToUser(settings);
+            } finally {
+                setAudioSettingsBusy(false);
+            }
 
             // Пересчитываем доступность кнопок записи
             if (oldValue !== REQUIRED_PASSED_COUNT) {
@@ -7576,45 +8582,58 @@ function initAudioSettingsModal() {
             applyAudioSettingsToUI();
         }
     });
+    audioSettingsPanel = audioSettingsModalPanel;
 
-    // Загружаем настройки из данных пользователя
+    // Загружаем настройки из данных пользователя и инициализируем панель один раз
     loadAudioSettingsFromUser().then(() => {
-        if (audioSettingsModalPanel) {
-            audioSettingsModalPanel.setSettings({
-                start: playSequenceStart,
-                typo: playSequenceTypo,
-                success: playSequenceSuccess,
-                repeats: REQUIRED_PASSED_COUNT,
-                without_entering_text: window.audioSettingsWithoutEnteringText || false,
-                show_text: window.audioSettingsShowText || false,
-                speech_recognition_mode: speechRecognitionMode
-            });
-            audioSettingsModalPanel.init();
-        }
+        if (!audioSettingsModalPanel) return;
+        audioSettingsModalPanel.setSettings({
+            start: playSequenceStart,
+            typo: playSequenceTypo,
+            success: playSequenceSuccess,
+            repeats: REQUIRED_PASSED_COUNT,
+            required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
+            without_entering_text: window.audioSettingsWithoutEnteringText || false,
+            show_text: window.audioSettingsShowText || false,
+            speech_recognition_mode: speechRecognitionMode
+        });
+        audioSettingsModalPanel.init();
     });
 
-    // Обработчик открытия модального окна
-    audioSettingsButton.addEventListener('click', () => {
+    const openModal = () => {
         audioSettingsModal.style.display = 'flex';
-        // Обновляем иконки Lucide после открытия
         if (window.lucide && window.lucide.createIcons) {
             window.lucide.createIcons();
         }
-    });
+    };
+
+    // Обработчик открытия модального окна (кнопка в таблице)
+    if (audioSettingsButton) {
+        audioSettingsButton.addEventListener('click', openModal);
+    }
+
+    // Обработчик открытия модального окна (кнопка в topbar)
+    if (topbarSettingsButton) {
+        topbarSettingsButton.addEventListener('click', openModal);
+    }
+
+    // Обработчик открытия модального окна (кнопка в шапке модального окна выбора предложений)
+    if (startModalSettingsButton) {
+        startModalSettingsButton.addEventListener('click', openModal);
+    }
 
     // Обработчик закрытия модального окна
-    closeAudioSettingsModal.addEventListener('click', () => {
-        audioSettingsModal.style.display = 'none';
-        // Обновляем иконку режима распознавания после закрытия модального окна
-        // (на случай, если настройки были изменены, но иконка не обновилась)
-        updateRecognitionModeIcon();
-    });
+    if (closeAudioSettingsModal) {
+        closeAudioSettingsModal.addEventListener('click', () => {
+            audioSettingsModal.style.display = 'none';
+            updateRecognitionModeIcon();
+        });
+    }
 
     // Закрытие по клику вне модального окна
     audioSettingsModal.addEventListener('click', (e) => {
         if (e.target === audioSettingsModal) {
             audioSettingsModal.style.display = 'none';
-            // Обновляем иконку режима распознавания после закрытия модального окна
             updateRecognitionModeIcon();
         }
     });

@@ -160,6 +160,12 @@
   margin-top: 10px;
 }
 
+.check-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .text-column {
   display: flex;
   flex-direction: column;
@@ -1917,6 +1923,65 @@ body.playing-audio::after {
   /* Выравнивает содержимое по правому краю */
 }
 
+#startModalOpenSettingsBtn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+#startModalOpenSettingsBtn i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+}
+
+#startModalOpenSettingsBtn:hover {
+  background: transparent;
+}
+
+#startModalOpenSettingsBtn:active {
+  transform: none;
+  box-shadow: none;
+}
+
+.start-modal-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.start-modal-close-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.start-modal-close-btn i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+}
+
+.start-modal-close-btn:hover {
+  background: transparent;
+}
+
+.start-modal-close-btn:active {
+  transform: none;
+  box-shadow: none;
+}
+
 
 
 
@@ -2697,7 +2762,67 @@ body.playing-audio::after {
 .play-sequence-input:focus {
     outline: none;
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 1px var(--color-border-light);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
+.required-passed-count-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.required-passed-count-input {
+  width: 60px;
+}
+
+.required-passed-star {
+  color: var(--color-button-mint);
+}
+
+.required-passed-star-half {
+  color: var(--color-button-lightgreen);
+}
+
+.required-passed-mic {
+  color: var(--color-button-purple);
+}
+
+.topbar-icon-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.topbar-icon-btn:hover {
+  background: var(--color-hover);
+}
+
+.topbar-icon-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+.topbar-icon-btn {
+  color: var(--color-text-secondary);
+}
+
+#saveBtn.save-status-clean {
+  color: var(--color-text-secondary);
+}
+
+#saveBtn.save-status-pending {
+  color: var(--color-button-text-yellow);
+}
+
+#saveBtn.save-status-syncing {
+  color: var(--color-button-text-purple);
+}
+
+#saveBtn.save-status-error {
+  color: var(--color-error);
 }
 
 .play-sequence-input:invalid {
@@ -3323,32 +3448,65 @@ body.playing-audio::after {
 .virtual-keyboard-container .vk-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   cursor: pointer;
   font-size: 14px;
-  color: var(--color-text, #343434);
+  color: var(--color-button-text-gray, #343434);
   user-select: none;
 }
 
 .virtual-keyboard-container .vk-toggle input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--color-button-yellow, #f6c343);
   cursor: pointer;
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.virtual-keyboard-container .vk-toggle .vk-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-button-gray, rgb(168, 167, 155));
+  flex: 0 0 auto;
+}
+
+.virtual-keyboard-container .vk-toggle .vk-toggle-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.virtual-keyboard-container .vk-toggle input[type="checkbox"] + .vk-toggle-icon .vk-toggle-icon-on {
+  display: none;
+}
+
+.virtual-keyboard-container .vk-toggle input[type="checkbox"]:checked + .vk-toggle-icon .vk-toggle-icon-off {
+  display: none;
+}
+
+.virtual-keyboard-container .vk-toggle input[type="checkbox"]:checked + .vk-toggle-icon .vk-toggle-icon-on {
+  display: inline-flex;
 }
 
 .virtual-keyboard {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 16px;
-  border-radius: 16px;
-  background: var(--color-panel-bg, #ffffff);
-  border: 1px solid var(--color-border-light, rgba(0, 0, 0, 0.08));
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  padding: 10px 0;
+  border-radius: 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   transition: opacity 0.25s ease, transform 0.25s ease;
   opacity: 0;
   transform: translateY(6px);
+  max-width: 720px;
+  width: fit-content;
+  margin: 0 auto;
 }
 
 .virtual-keyboard[hidden] {
@@ -3382,42 +3540,61 @@ body.playing-audio::after {
 .virtual-keyboard .vk-body {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
 }
 
 .virtual-keyboard .vk-row {
   display: flex;
-  gap: 8px;
+  gap: 4px;
+  justify-content: flex-start;
+}
+
+.virtual-keyboard .vk-row.vk-row-space {
   justify-content: center;
 }
 
 .virtual-keyboard .vk-key {
   position: relative;
-  min-width: calc(var(--vk-key-unit, 1) * 42px);
+  min-width: calc(var(--vk-key-unit, 1) * 44px);
   flex: var(--vk-key-unit, 1) 0 auto;
-  height: 56px;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   padding: 6px 10px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  color: #1a1a1a;
-  font-weight: 600;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.07);
-  background: var(--vk-key-bg, #f4f4f4);
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text, #224156);
+  font-weight: 700;
+  box-shadow: none;
+  border: none;
+  background: var(--vk-key-bg, var(--color-button-gray, #eeede8ff));
 }
 
 .virtual-keyboard .vk-key .vk-key-shift {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(0, 0, 0, 0.6);
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-button-text-transparent, rgba(0, 0, 0, 0.55));
+}
+
+.virtual-keyboard .vk-key.vk-key-shift-pressed {
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.virtual-keyboard .vk-key.vk-key-home {
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.25);
 }
 
 .virtual-keyboard .vk-key .vk-key-label {
   font-size: 16px;
   line-height: 1;
-  align-self: flex-start;
+  align-self: center;
+  text-align: center;
 }
 
 .virtual-keyboard .vk-key .vk-key-alt {
@@ -3426,52 +3603,105 @@ body.playing-audio::after {
   bottom: 6px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--color-button-text-transparent, rgba(0, 0, 0, 0.65));
+}
+
+.virtual-keyboard .vk-key.vk-key-mod {
+  background: var(--color-button-gray, #eeede8ff);
+  color: var(--color-button-text-gray, rgb(168, 167, 155));
+}
+
+.virtual-keyboard .vk-key.vk-key-mod .vk-key-label {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.virtual-keyboard .vk-key.vk-key-mod .vk-key-label:empty {
+  display: none;
+}
+
+.virtual-keyboard .vk-key .vk-key-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.virtual-keyboard .vk-key.vk-key-enter .vk-key-icon,
+.virtual-keyboard .vk-key[data-code="Backspace"] .vk-key-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.virtual-keyboard .vk-key.vk-key-space {
+  width: 400px;
+  min-width: 400px;
+  height: 40px;
+  border-radius: 12px;
+  flex: 0 0 auto;
+}
+
+.virtual-keyboard .vk-key.vk-key-tactile::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.9;
+}
+
+.virtual-keyboard .vk-key.vk-key-tactile-f::after {
+  background: rgba(0, 0, 0, 0.25);
+  opacity: 1;
 }
 
 .virtual-keyboard .vk-key.finger-unknown {
-  background: #e8e8e8;
+  background: var(--color-button-gray, #eeede8ff);
 }
 
 .virtual-keyboard .vk-key.finger-left-pinky {
-  background: #ffd8e3;
+  background: var(--color-button-pink-min, rgb(248, 238, 240));
 }
 
 .virtual-keyboard .vk-key.finger-left-ring {
-  background: #ffe8cc;
+  background: var(--color-button-orange, #f9d6a1ff);
 }
 
 .virtual-keyboard .vk-key.finger-left-middle {
-  background: #fff4c7;
+  background: var(--color-button-yellow, rgb(252, 235, 163));
 }
 
 .virtual-keyboard .vk-key.finger-left-index {
-  background: #e4f9cf;
+  background: var(--color-button-lightgreen, #bbf1caff);
 }
 
 .virtual-keyboard .vk-key.finger-left-thumb,
 .virtual-keyboard .vk-key.finger-thumbs {
-  background: #cff5ec;
+  background: var(--color-button-mint, #aae7e4ff);
 }
 
 .virtual-keyboard .vk-key.finger-right-thumb {
-  background: #d0f0ff;
+  background: var(--color-button-mint, #aae7e4ff);
 }
 
 .virtual-keyboard .vk-key.finger-right-index {
-  background: #d5e6ff;
+  background: var(--color-button-purple, #c8c9fbff);
 }
 
 .virtual-keyboard .vk-key.finger-right-middle {
-  background: #d8f3ff;
+  background: var(--color-button-purple, #c8c9fbff);
 }
 
 .virtual-keyboard .vk-key.finger-right-ring {
-  background: #e1e5ff;
+  background: var(--color-button-purple, #c8c9fbff);
 }
 
 .virtual-keyboard .vk-key.finger-right-pinky {
-  background: #eadcff;
+  background: var(--color-button-pink, #f5c0caff);
 }
 
 .virtual-keyboard .vk-empty {
@@ -3489,8 +3719,15 @@ body.playing-audio::after {
   }
 
   .virtual-keyboard .vk-key {
-    min-width: calc(var(--vk-key-unit, 1) * 36px);
-    height: 52px;
+    width: 40px;
+    height: 40px;
+    min-width: calc(var(--vk-key-unit, 1) * 40px);
+  }
+
+  .virtual-keyboard .vk-key.vk-key-space {
+    width: 182px;
+    min-width: 182px;
+    flex: 0 0 auto;
   }
 }
 
@@ -3537,10 +3774,16 @@ body.playing-audio::after {
 
 /* ==================== СТИЛИ ДЛЯ МОДАЛЬНОГО ОКНА НАСТРОЕК АУДИО ==================== */
 .audio-settings-modal-content {
-  max-width: 600px;
-  width: 90%;
+  max-width: none;
+  width: 80vw;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .audio-settings-modal-content {
+    width: 95vw;
+  }
 }
 
 .audio-settings-modal-content .modal-header {
@@ -3556,6 +3799,23 @@ body.playing-audio::after {
   font-size: 20px;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.audio-settings-modal-content .modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.audio-settings-modal-content .modal-close:hover {
+  background: var(--color-panel-bg);
 }
 
 .modal-close-btn {
@@ -3588,11 +3848,61 @@ body.playing-audio::after {
   padding: 20px;
 }
 
+.audio-settings-modal-body .audio-settings-top-panel {
+  display: grid;
+  grid-template-columns: max-content 260px;
+  column-gap: 40px;
+  align-items: start;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .play-sequence-container {
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  width: auto;
+  min-width: 0;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .play-sequence-container > label {
+  font-weight: 700;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: var(--color-background-light);
+  border-radius: 8px;
+  border: none;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-item {
+  margin-top: 8px;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-item:first-child {
+  margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .audio-settings-modal-body .audio-settings-top-panel {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .audio-settings-modal-body .audio-settings-bottom-panel {
+    width: 100%;
+  }
+}
+
 /* Стили для переключателя локальной модели Whisper */
 .toggle-switch-container {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .toggle-switch {
@@ -3687,7 +3997,7 @@ body.playing-audio::after {
   width: 32px;
   height: 32px;
   margin-left: 8px;
-  color: var(--color-button-text-purple);
+  color: var(--color-button-purple);
   cursor: default;
   flex-shrink: 0;
 }
@@ -3695,8 +4005,32 @@ body.playing-audio::after {
 .recognition-mode-icon i {
   width: 20px;
   height: 20px;
-  color: var(--color-button-text-purple);
+  color: var(--color-button-purple);
 }
+
+ .error-count-label {
+   display: inline-block;
+   min-width: 18px;
+   font-size: 13px;
+   line-height: 1;
+   color: var(--color-button-gray);
+   /* opacity: 0.55; */
+   text-align: center;
+   user-select: none;
+   font-weight: 600;
+   background: transparent;
+   border-radius: 6px;
+   padding: 0;
+ }
+
+ .error-count-label:empty {
+   display: none;
+ }
+
+ #sentences-table td.sentence-progress-cell.sentence-attempts {
+   font-size: 15px;
+   font-weight: 500;
+ }
 
 /* ============================================================
    КРИТИЧНО: Колонка с полной звездой (perfect) ДОЛЖНА быть видна!

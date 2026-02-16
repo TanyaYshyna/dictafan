@@ -102,7 +102,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -135,6 +135,8 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   perfect_count: {perfect_count}')
     print(f'   corrected_count: {corrected_count}')
     print(f'   audio_count: {audio_count}')
+    print(f'   attempts_total: {attempts_total}')
+    print(f'   error_count: {error_count}')
     print(f'   time_ms: {time_ms}')
     
     conn = get_db_connection()
@@ -143,10 +145,10 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
             # Создаем новую запись для каждого завершения диктанта
             cur.execute("""
                 INSERT INTO history_successes 
-                (user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, created_at, updated_at
-            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms))
+                (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at
+            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms))
             
             row = cur.fetchone()
             conn.commit()
@@ -158,9 +160,11 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'perfect_count': row[3],
                 'corrected_count': row[4],
                 'audio_count': row[5],
-                'time_ms': row[6],
-                'created_at': row[7].isoformat() if row[7] else None,
-                'updated_at': row[8].isoformat() if row[8] else None,
+                'attempts_total': row[6],
+                'error_count': row[7],
+                'time_ms': row[8],
+                'created_at': row[9].isoformat() if row[9] else None,
+                'updated_at': row[10].isoformat() if row[10] else None,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')
@@ -395,14 +399,16 @@ def save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sente
                     
                     cur.execute("""
                         INSERT INTO history_unclosed_dictations_sentences
-                        (user_id, dictation_id, sentence_key, perfect_count, corrected_count, audio_count, selection_state, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        (user_id, dictation_id, sentence_key, perfect_count, corrected_count, audio_count, attempts_total, error_count, selection_state, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """, (
                         user_id, dictation_id, 
                         sentence.get('sentence_key'),
                         sentence.get('perfect_count', 0),
                         sentence.get('corrected_count', 0),
                         sentence.get('audio_count', 0),
+                        sentence.get('attempts_total', 0),
+                        sentence.get('error_count', 0),
                         selection_state
                     ))
             
@@ -457,7 +463,7 @@ def get_unclosed_dictation(user_id, dictation_id):
             
             # Получаем данные по предложениям
             cur.execute("""
-                SELECT sentence_key, perfect_count, corrected_count, audio_count, selection_state
+                SELECT sentence_key, perfect_count, corrected_count, audio_count, attempts_total, error_count, selection_state
                 FROM history_unclosed_dictations_sentences
                 WHERE user_id = %s AND dictation_id = %s
                 ORDER BY sentence_key
@@ -471,7 +477,9 @@ def get_unclosed_dictation(user_id, dictation_id):
                     'perfect_count': s_row[1],
                     'corrected_count': s_row[2],
                     'audio_count': s_row[3],
-                    'selection_state': s_row[4] or 'unchecked'
+                    'attempts_total': s_row[4],
+                    'error_count': s_row[5],
+                    'selection_state': s_row[6] or 'unchecked'
                 })
             
             return {

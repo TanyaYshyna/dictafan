@@ -248,6 +248,8 @@ def get_dictation_state(dictation_id):
                 'number_of_perfect': sentence['perfect_count'],
                 'number_of_corrected': sentence['corrected_count'],
                 'number_of_audio': sentence['audio_count'],
+                'attempts_total': sentence.get('attempts_total', 0),
+                'error_count': sentence.get('error_count', 0),
                 'selection_state': selection_state
             }
         
@@ -347,6 +349,8 @@ def save_dictation_state():
                 'perfect_count': sentence_data.get('number_of_perfect', 0),
                 'corrected_count': sentence_data.get('number_of_corrected', 0),
                 'audio_count': sentence_data.get('number_of_audio', 0),
+                'attempts_total': sentence_data.get('attempts_total', 0),
+                'error_count': sentence_data.get('error_count', 0),
                 'selection_state': selection_state
             })
         
@@ -513,6 +517,8 @@ def save_success():
         perfect_count = data.get('perfect_count', 0)
         corrected_count = data.get('corrected_count', 0)
         audio_count = data.get('audio_count', 0)
+        attempts_total = data.get('attempts_total', 0)
+        error_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
         
         if not dictation_id:
@@ -529,19 +535,15 @@ def save_success():
         print(f'✅ [SAVE_SUCCESS] Найден user_id: {user_id} для email: {current_email}')
         
         # Сохраняем успех в БД (каждое завершение - отдельная запись)
-        success = add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms)
-        
-        # Сохраняем данные в незавершенные диктанты (для восстановления прогресса)
-        # Получаем данные из запроса (если есть)
-        sentences_data = data.get('sentences_data', [])
-        settings_json = data.get('settings_json')
-        
-        if sentences_data and settings_json:
-            try:
-                save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sentences_data)
-                print(f'✅ [SAVE_SUCCESS] Данные сохранены в незавершенные диктанты')
-            except Exception as e:
-                print(f'⚠️ [SAVE_SUCCESS] Ошибка сохранения в незавершенные диктанты: {e}')
+        success = add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total, error_count)
+
+        # После успешного завершения диктанта обязательно очищаем незавершенное состояние,
+        # иначе на карточке/рабочем столе будут оставаться звезды/микрофоны.
+        try:
+            delete_unclosed_dictation(user_id, dictation_id)
+            print(f'✅ [SAVE_SUCCESS] Незавершенный диктант удален из БД')
+        except Exception as e:
+            print(f'⚠️ [SAVE_SUCCESS] Ошибка удаления незавершенного диктанта: {e}')
         
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
         

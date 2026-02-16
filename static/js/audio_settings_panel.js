@@ -18,6 +18,7 @@ class AudioSettingsPanel {
             typo: 'o',
             success: 'ot',
             repeats: 3,
+            required_passed_star_half: 3,
             speech_recognition_mode: 'route' // 'route' (интернет), 'route-off' (локально, только если модель загружена)
         };
 
@@ -27,6 +28,7 @@ class AudioSettingsPanel {
             typo: this.defaults.typo,
             success: this.defaults.success,
             repeats: this.defaults.repeats,
+            required_passed_star_half: this.defaults.required_passed_star_half,
             without_entering_text: false,
             show_text: false,
             speech_recognition_mode: this.defaults.speech_recognition_mode
@@ -75,6 +77,7 @@ class AudioSettingsPanel {
                 this.settings.typo = this.defaults.typo;
                 this.settings.success = this.defaults.success;
                 this.settings.repeats = this.defaults.repeats;
+                this.settings.required_passed_star_half = this.defaults.required_passed_star_half;
             }
             return;
         }
@@ -103,6 +106,13 @@ class AudioSettingsPanel {
                     this.settings.repeats = parseInt(audioSettings.repeats, 10) || this.defaults.repeats;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.repeats = this.defaults.repeats;
+                }
+
+                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
+                    const parsed = parseInt(audioSettings.required_passed_star_half, 10);
+                    this.settings.required_passed_star_half = (!isNaN(parsed) && parsed >= 1) ? Math.min(10, parsed) : this.defaults.required_passed_star_half;
+                } else if (this.options.mode === 'user-settings') {
+                    this.settings.required_passed_star_half = this.defaults.required_passed_star_half;
                 }
                 if (audioSettings.without_entering_text !== undefined && audioSettings.without_entering_text !== null) {
                     this.settings.without_entering_text = Boolean(audioSettings.without_entering_text);
@@ -189,6 +199,13 @@ class AudioSettingsPanel {
             this.settings.repeats = parseInt(userSettings.audio_repeats, 10) || this.defaults.repeats;
         } else if (this.options.mode === 'user-settings') {
             this.settings.repeats = this.defaults.repeats;
+        }
+
+        if (userSettings.audio_required_passed_star_half !== undefined && userSettings.audio_required_passed_star_half !== null && userSettings.audio_required_passed_star_half !== '') {
+            const parsed = parseInt(userSettings.audio_required_passed_star_half, 10);
+            this.settings.required_passed_star_half = (!isNaN(parsed) && parsed >= 1) ? Math.min(10, parsed) : this.defaults.required_passed_star_half;
+        } else if (this.options.mode === 'user-settings') {
+            this.settings.required_passed_star_half = this.defaults.required_passed_star_half;
         }
 
         if (userSettings.without_entering_text !== undefined && userSettings.without_entering_text !== null) {
@@ -301,10 +318,10 @@ class AudioSettingsPanel {
                                             <input type="number" 
                                                    id="${prefix}audioRepeatsInput" 
                                                    class="play-sequence-input" 
-                                                   min="${this.settings.without_entering_text ? 1 : 0}" 
-                                                   max="${this.settings.without_entering_text ? 5 : 9}" 
+                                                   min="0" 
+                                                   max="5" 
                                                    value="${this.settings.repeats}"
-                                                   title="Количество повторов аудио (по умолчанию 3)">
+                                                   title="Всего повторов аудио (от 0 до 5)">
                                         </td>
                                     </tr>
                                     <tr>
@@ -372,53 +389,73 @@ class AudioSettingsPanel {
         ` : '';
 
         return `
-            <div class="play-sequence-container">
-                <label>Проигрываем аудио:</label>
-                <div class="play-sequence-item">
-                    <label>при старте:</label>
-                    <input type="text" 
-                           id="${prefix}playSequenceStart" 
-                           class="play-sequence-input" 
-                           maxlength="5"
-                           placeholder="oto" 
-                           pattern="[to]*"
-                           value="${this.settings.start}"
-                           title="Используйте только буквы 't' (translation) и 'o' (original)">
+            <div class="audio-settings-top-panel">
+                <div class="play-sequence-container">
+                    <label>Проигрываем аудио:</label>
+                    <div class="play-sequence-item">
+                        <label>при старте:</label>
+                        <input type="text" 
+                               id="${prefix}playSequenceStart" 
+                               class="play-sequence-input" 
+                               maxlength="5"
+                               placeholder="oto" 
+                               pattern="[to]*"
+                               value="${this.settings.start}"
+                               title="Используйте только буквы 't' (translation) и 'o' (original)">
+                    </div>
+                    <div class="play-sequence-item">
+                        <label>при ошибке:</label>
+                        <input type="text" 
+                               id="${prefix}playSequenceTypo" 
+                               class="play-sequence-input" 
+                               maxlength="5"
+                               placeholder="o" 
+                               pattern="[to]*"
+                               value="${this.settings.typo}"
+                               title="Используйте только буквы 't' (translation) и 'o' (original)">
+                    </div>
+                    <div class="play-sequence-item">
+                        <label>при успехе:</label>
+                        <input type="text" 
+                               id="${prefix}playSequenceSuccess" 
+                               class="play-sequence-input"
+                               maxlength="5" 
+                               placeholder="ot" 
+                               pattern="[to]*"
+                               value="${this.settings.success}"
+                               title="Используйте только буквы 't' (translation) и 'o' (original)">
+                    </div>
+                </div>
+                ${explanationsHTML}
+            </div>
+            <div class="audio-settings-bottom-panel">
+                <div class="play-sequence-item" id="${prefix}requiredPassedStarHalfRow" style="${this.settings.without_entering_text ? 'display: none;' : ''}">
+                    <div class="required-passed-count-control">
+                        <i data-lucide="star" class="required-passed-star"></i>
+                         = 
+                        <input type="number"
+                               id="${prefix}requiredPassedStarHalfInput"
+                               class="play-sequence-input required-passed-count-input"
+                               min="1"
+                               max="10"
+                               value="${this.settings.required_passed_star_half}"
+                               title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 1 до 10)">
+                        <i data-lucide="star-half" class="required-passed-star-half"></i>
+                    </div>
                 </div>
                 <div class="play-sequence-item">
-                    <label>при ошибке:</label>
-                    <input type="text" 
-                           id="${prefix}playSequenceTypo" 
-                           class="play-sequence-input" 
-                           maxlength="5"
-                           placeholder="o" 
-                           pattern="[to]*"
-                           value="${this.settings.typo}"
-                           title="Используйте только буквы 't' (translation) и 'o' (original)">
-                </div>
-                <div class="play-sequence-item">
-                    <label>при успехе:</label>
-                    <input type="text" 
-                           id="${prefix}playSequenceSuccess" 
-                           class="play-sequence-input"
-                           maxlength="5" 
-                           placeholder="ot" 
-                           pattern="[to]*"
-                           value="${this.settings.success}"
-                           title="Используйте только буквы 't' (translation) и 'o' (original)">
-                </div>
-                <div class="play-sequence-item">
-                    <label>
-                        <i data-lucide="mic"></i>
-                        Повторы аудио:
-                    </label>
-                    <input type="number" 
-                           id="${prefix}audioRepeatsInput" 
-                           class="play-sequence-input" 
-                           min="${this.settings.without_entering_text ? 1 : 0}" 
-                           max="${this.settings.without_entering_text ? 5 : 9}" 
-                           value="${this.settings.repeats}"
-                           title="Количество повторов аудио (по умолчанию 3)">
+                    <div class="required-passed-count-control">
+                        <i data-lucide="mic" class="required-passed-mic"></i>
+                        =
+                        <input type="number"
+                               id="${prefix}audioRepeatsInput"
+                               class="play-sequence-input required-passed-count-input"
+                               min="0"
+                               max="5"
+                               value="${this.settings.repeats}"
+                               title="Всего повторов аудио (от 0 до 5)">
+                        <i data-lucide="mic-off" class="required-passed-mic"></i>
+                    </div>
                 </div>
                 <div class="play-sequence-item">
                     <label>Только аудио (без ввода текста):</label>
@@ -449,7 +486,6 @@ class AudioSettingsPanel {
                         <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
                     </div>
                 </div>
-                ${explanationsHTML}
             </div>
         `;
     }
@@ -506,6 +542,7 @@ class AudioSettingsPanel {
         const typoInput = document.getElementById(`${prefix}playSequenceTypo`);
         const successInput = document.getElementById(`${prefix}playSequenceSuccess`);
         const repeatsInput = document.getElementById(`${prefix}audioRepeatsInput`);
+        const requiredPassedStarHalfInput = document.getElementById(`${prefix}requiredPassedStarHalfInput`);
 
         // Валидация для текстовых полей (только 't' и 'o')
         [startInput, typoInput, successInput].forEach(input => {
@@ -533,60 +570,58 @@ class AudioSettingsPanel {
             });
         });
 
-        // Обработка для поля числа (повторы аудио)
-        if (repeatsInput) {
-            const updateRepeatsValidation = () => {
-                const withoutEntering = this.settings.without_entering_text;
-                const min = withoutEntering ? 1 : 0;
-                const max = withoutEntering ? 5 : 9;
-                repeatsInput.min = min;
-                repeatsInput.max = max;
-                
-                // Корректируем значение, если оно не соответствует новым ограничениям
-                const currentValue = parseInt(repeatsInput.value, 10);
-                if (!isNaN(currentValue)) {
-                    if (currentValue < min) {
-                        repeatsInput.value = min;
-                        this._updateSetting('repeats', min);
-                    } else if (currentValue > max) {
-                        repeatsInput.value = max;
-                        this._updateSetting('repeats', max);
-                    }
-                }
+        // Обработка для required_passed_star_half (1..10)
+        if (requiredPassedStarHalfInput) {
+            const clampStarHalf = (raw) => {
+                const value = parseInt(raw, 10);
+                if (isNaN(value)) return this.defaults.required_passed_star_half;
+                return Math.min(10, Math.max(1, value));
             };
 
-            repeatsInput.addEventListener('input', (e) => {
-                const value = parseInt(e.target.value, 10);
-                const withoutEntering = this.settings.without_entering_text;
-                const min = withoutEntering ? 1 : 0;
-                const max = withoutEntering ? 5 : 9;
-                
-                if (!isNaN(value) && value >= min && value <= max) {
-                    this._updateSetting('repeats', value);
-                    this.triggerChange();
-                }
+            const applyStarHalfValue = (raw) => {
+                const v = clampStarHalf(raw);
+                requiredPassedStarHalfInput.value = v;
+                this._updateSetting('required_passed_star_half', v);
+            };
+
+            requiredPassedStarHalfInput.addEventListener('input', (e) => {
+                const v = clampStarHalf(e.target.value);
+                this._updateSetting('required_passed_star_half', v);
             });
 
-            repeatsInput.addEventListener('change', (e) => {
-                const value = parseInt(e.target.value, 10);
-                const withoutEntering = this.settings.without_entering_text;
-                const min = withoutEntering ? 1 : 0;
-                const max = withoutEntering ? 5 : 9;
-                
-                if (isNaN(value) || value < min) {
-                    e.target.value = min;
-                    this._updateSetting('repeats', min);
-                } else if (value > max) {
-                    e.target.value = max;
-                    this._updateSetting('repeats', max);
-                } else {
-                    this._updateSetting('repeats', value);
-                }
+            requiredPassedStarHalfInput.addEventListener('change', (e) => {
+                applyStarHalfValue(e.target.value);
                 this.triggerChange();
             });
 
-            // Обновляем валидацию при изменении without_entering_text
-            updateRepeatsValidation();
+            applyStarHalfValue(requiredPassedStarHalfInput.value);
+        }
+
+        // Обработка для repeats (0..5)
+        if (repeatsInput) {
+            const clampRepeats = (raw) => {
+                const value = parseInt(raw, 10);
+                if (isNaN(value)) return this.defaults.repeats;
+                return Math.min(5, Math.max(0, value));
+            };
+
+            const applyRepeatsValue = (raw) => {
+                const v = clampRepeats(raw);
+                repeatsInput.value = v;
+                this._updateSetting('repeats', v);
+            };
+
+            repeatsInput.addEventListener('input', (e) => {
+                const v = clampRepeats(e.target.value);
+                this._updateSetting('repeats', v);
+            });
+
+            repeatsInput.addEventListener('change', (e) => {
+                applyRepeatsValue(e.target.value);
+                this.triggerChange();
+            });
+
+            applyRepeatsValue(repeatsInput.value);
         }
 
         // Обработка для кнопки "Только аудио (без ввода текста)"
@@ -617,22 +652,13 @@ class AudioSettingsPanel {
                     window.lucide.createIcons();
                 }
                 this._updateSetting('without_entering_text', checked);
-                
-                // Обновляем валидацию повторов
                 if (repeatsInput) {
-                    const min = checked ? 1 : 0;
-                    const max = checked ? 5 : 9;
-                    repeatsInput.min = min;
-                    repeatsInput.max = max;
-                    
                     const currentValue = parseInt(repeatsInput.value, 10);
                     if (!isNaN(currentValue)) {
-                        if (currentValue < min) {
-                            repeatsInput.value = min;
-                            this._updateSetting('repeats', min);
-                        } else if (currentValue > max) {
-                            repeatsInput.value = max;
-                            this._updateSetting('repeats', max);
+                        const clamped = Math.min(5, Math.max(0, currentValue));
+                        if (clamped !== currentValue) {
+                            repeatsInput.value = clamped;
+                            this._updateSetting('repeats', clamped);
                         }
                     }
                 }
@@ -654,6 +680,12 @@ class AudioSettingsPanel {
                             }
                         }
                     }
+                }
+
+                // Скрываем/показываем звёздный контроль (required_passed_star_half)
+                const starHalfRow = document.getElementById(`${prefix}requiredPassedStarHalfRow`);
+                if (starHalfRow) {
+                    starHalfRow.style.display = checked ? 'none' : '';
                 }
                 
                 this.triggerChange();
@@ -809,6 +841,15 @@ class AudioSettingsPanel {
     }
 
     /**
+     * Уведомить о смене настроек
+     */
+    triggerChange() {
+        if (typeof this.options.onSettingsChange === 'function') {
+            this.options.onSettingsChange(this.getSettings());
+        }
+    }
+
+    /**
      * Проверяет наличие модели Whisper для текущего языка
      * @returns {boolean} true если модель загружена, false если нет
      */
@@ -828,19 +869,37 @@ class AudioSettingsPanel {
         }
         
         // Fallback: проверяем так же, как в hasWhisperModel (память + localStorage)
-        const modelKey = `whisper_model_${currentLang}_base`;
+        const normalizedLang = (currentLang || '').toString().trim().toLowerCase().split('-')[0] || 'en';
+        const selectedSize = (() => {
+            const key = `selected_model_${normalizedLang}_whisper`;
+            const value = localStorage.getItem(key);
+            if (!value || value === 'null' || value === 'none') return null;
+            return String(value);
+        })();
+
+        const sizes = [];
+        if (selectedSize) sizes.push(selectedSize);
+        if (!sizes.includes('base')) sizes.push('base');
         
-        // Сначала проверяем в памяти
-        if (window.WhisperModels) {
-            const storedModel = window.WhisperModels.get(modelKey);
-            if (storedModel && storedModel.isReady && storedModel.recognizer) {
+        for (const size of sizes) {
+            const modelKey = `whisper_model_${normalizedLang}_${size}`;
+
+            // Сначала проверяем в памяти
+            if (window.WhisperModels) {
+                const storedModel = window.WhisperModels.get(modelKey);
+                if (storedModel && storedModel.isReady && storedModel.recognizer) {
+                    return true;
+                }
+            }
+
+            // Если в памяти нет, проверяем localStorage (как в профиле)
+            const modelStatus = localStorage.getItem(modelKey);
+            if (modelStatus === 'downloaded' || modelStatus === 'ready') {
                 return true;
             }
         }
-        
-        // Если в памяти нет, проверяем localStorage (как в профиле)
-        const modelStatus = localStorage.getItem(modelKey);
-        return modelStatus === 'downloaded' || modelStatus === 'ready';
+
+        return false;
     }
 
     /**
@@ -879,7 +938,19 @@ class AudioSettingsPanel {
         if (settings.start !== undefined) this.settings.start = settings.start;
         if (settings.typo !== undefined) this.settings.typo = settings.typo;
         if (settings.success !== undefined) this.settings.success = settings.success;
-        if (settings.repeats !== undefined) this.settings.repeats = parseInt(settings.repeats, 10) || this.defaults.repeats;
+
+        if (settings.repeats !== undefined) {
+            const parsedRepeats = parseInt(settings.repeats, 10);
+            this.settings.repeats = !isNaN(parsedRepeats) ? parsedRepeats : this.defaults.repeats;
+        }
+
+        if (settings.required_passed_star_half !== undefined) {
+            const parsed = parseInt(settings.required_passed_star_half, 10);
+            this.settings.required_passed_star_half = (!isNaN(parsed) && parsed >= 1)
+                ? Math.min(10, parsed)
+                : this.defaults.required_passed_star_half;
+        }
+
         if (settings.without_entering_text !== undefined) this.settings.without_entering_text = Boolean(settings.without_entering_text);
         if (settings.show_text !== undefined) this.settings.show_text = Boolean(settings.show_text);
         if (settings.speech_recognition_mode !== undefined) this.settings.speech_recognition_mode = settings.speech_recognition_mode;
@@ -887,37 +958,6 @@ class AudioSettingsPanel {
         if (this.isInitialized) {
             this.render();
             this.bindEvents();
-        }
-    }
-
-    /**
-     * Получить иконку для режима распознавания речи
-     */
-    getSpeechRecognitionIcon(mode) {
-        const icons = {
-            'route': 'route',
-            'route-off': 'route-off'
-        };
-        return icons[mode] || 'route';
-    }
-
-    /**
-     * Получить лейбл для режима распознавания речи
-     */
-    getSpeechRecognitionLabel(mode) {
-        const labels = {
-            'route': 'интернет',
-            'route-off': 'локально'
-        };
-        return labels[mode] || 'интернет';
-    }
-
-    /**
-     * Вызвать callback при изменении настроек
-     */
-    triggerChange() {
-        if (typeof this.options.onSettingsChange === 'function') {
-            this.options.onSettingsChange(this.getSettings());
         }
     }
 
