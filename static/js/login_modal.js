@@ -261,12 +261,10 @@ class LoginModal {
             input.type = willShow ? 'text' : 'password';
             toggleBtn.setAttribute('aria-label', willShow ? 'Скрыть пароль' : 'Показать пароль');
 
-            const icon = toggleBtn.querySelector('i[data-lucide]');
-            if (icon) {
-                icon.setAttribute('data-lucide', willShow ? 'eye-off' : 'eye');
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
+            const iconName = willShow ? 'eye-off' : 'eye';
+            toggleBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
             }
         });
     }

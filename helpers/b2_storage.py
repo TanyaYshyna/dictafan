@@ -7,18 +7,36 @@ logger = logging.getLogger(__name__)
 
 class B2Storage:
     """Класс для работы с Backblaze B2"""
+
+    @staticmethod
+    def _parse_bool(value) -> bool:
+        if value is None:
+            return False
+        return str(value).strip().lower() in {"true", "1", "yes", "y", "on"}
     
     def __init__(self):
         self.key_id = os.getenv('B2_APPLICATION_KEY_ID')
         self.application_key = os.getenv('B2_APPLICATION_KEY')
         self.bucket_name = os.getenv('B2_BUCKET_NAME')
-        self.enabled = os.getenv('B2_ENABLED', 'false').lower() == 'true'
+        self.enabled = self._parse_bool(os.getenv('B2_ENABLED', 'false'))
         
         self.api = None
         self.bucket = None
         
-        if self.enabled and self.key_id and self.application_key:
-            self._initialize()
+        if self.enabled:
+            if not self.key_id or not self.application_key or not self.bucket_name:
+                logger.warning(
+                    "B2 Storage enabled by B2_ENABLED, but credentials/bucket are missing: "
+                    "key_id=%s application_key=%s bucket_name=%s",
+                    bool(self.key_id),
+                    bool(self.application_key),
+                    bool(self.bucket_name),
+                )
+                self.enabled = False
+            else:
+                self._initialize()
+        else:
+            logger.info("B2 Storage disabled (B2_ENABLED is not truthy)")
     
     def _initialize(self):
         """Инициализация подключения к B2"""
@@ -44,6 +62,8 @@ class B2Storage:
             URL файла или None при ошибке
         """
         if not self.enabled or not self.bucket:
+            if self.enabled and not self.bucket:
+                logger.error("B2 Storage is enabled but bucket is not initialized; cannot upload %s", remote_path)
             return None
         
         try:

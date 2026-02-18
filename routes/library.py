@@ -735,6 +735,14 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
     from helpers.b2_storage import b2_storage
 
     try:
+        logger.info(
+            "Saving book cover: book_id=%s user_id=%s filename=%s content_type=%s b2_enabled=%s",
+            book_id,
+            creator_user_id,
+            getattr(cover_file, "filename", None),
+            getattr(cover_file, "content_type", None),
+            bool(getattr(b2_storage, "enabled", False)),
+        )
         # Проверяем, что это изображение
         if not cover_file.content_type.startswith("image/"):
             logger.warning("Файл обложки не является изображением: %s", cover_file.content_type)
@@ -776,6 +784,9 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
                 cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"
                 logger.info("Обложка книги загружена в B2: %s", remote_path)
                 return cover_url
+            logger.error("Failed to upload book cover to B2: %s", remote_path)
+        else:
+            logger.info("B2 disabled; keeping book cover only in local storage")
 
         # Fallback: локальный URL
         cover_url = f"/static/data/books/book_{book_id}/cover.webp"
