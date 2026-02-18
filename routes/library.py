@@ -119,14 +119,16 @@ def api_get_book_cover():
 
         # локальный кэш
         data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
-        local_path = os.path.join(data_base, "books", f"book_{book_id}", filename)
+        # Локально всегда кэшируем под одним именем (cover.webp), чтобы не плодить варианты кэша.
+        # Параметр filename оставляем только для обратной совместимости со старым путём в B2.
+        local_path = os.path.join(data_base, "books", f"book_{book_id}", "cover.webp")
 
         # основное хранилище: B2
         if b2_storage.enabled:
-            uid = str(user_id).strip() if user_id else "unknown"
-            remote_path = f"books_covers/user_{uid}/book_{book_id}/{filename}"
-            if b2_storage.file_exists(remote_path):
-                if b2_storage.download_file(remote_path, local_path):
+            # Новый формат хранения: books_covers/<book_id>.webp
+            remote_path_new = f"books_covers/{book_id}.webp"
+            if b2_storage.file_exists(remote_path_new):
+                if b2_storage.download_file(remote_path_new, local_path):
                     return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
 
         # fallback: локальный файл (если вдруг был сохранен локально)
@@ -768,7 +770,7 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
 
         # Если включено B2 — грузим туда и возвращаем стабильный proxy URL
         if b2_storage.enabled:
-            remote_path = f"books_covers/user_{creator_user_id}/book_{book_id}/cover.webp"
+            remote_path = f"books_covers/{book_id}.webp"
             uploaded = b2_storage.upload_file(cover_path, remote_path)
             if uploaded:
                 cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"

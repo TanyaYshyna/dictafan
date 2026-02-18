@@ -1078,12 +1078,15 @@ def save_dictation_final():
             
             if os.path.exists(cover_src):
                 cover_dst = os.path.join(final_path, 'cover.webp')
+                # Создаем папку назначения
+                os.makedirs(os.path.dirname(cover_dst), exist_ok=True)
                 shutil.copy2(cover_src, cover_dst)
                 logger.info(f"✅ Ковер скопирован: {cover_src} -> {cover_dst}")
                 
                 # Загружаем обложку в B2
                 if b2_storage.enabled:
-                    remote_path = f"dictations/{dictation_id}/cover.webp"
+                    numeric_id = str(dictation_id).split('_', 1)[1] if str(dictation_id).startswith('dict_') else str(dictation_id)
+                    remote_path = f"dictations_covers/{numeric_id}.webp"
                     b2_storage.upload_file(cover_dst, remote_path)
                     logger.info(f"✅ Ковер загружен в B2: {remote_path}")
             else:

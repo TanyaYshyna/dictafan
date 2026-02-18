@@ -392,6 +392,34 @@ h2 {
     box-sizing: border-box;
 }
 
+ .password-input-wrapper {
+     position: relative;
+     width: 100%;
+ }
+
+ .password-input-wrapper input {
+     padding-right: 44px;
+ }
+
+ .password-toggle-btn {
+     position: absolute;
+     right: 10px;
+     top: 50%;
+     transform: translateY(-50%);
+     width: 34px;
+     height: 34px;
+     padding: 0;
+     display: inline-flex;
+     align-items: center;
+     justify-content: center;
+     border-radius: 8px;
+ }
+
+ .password-toggle-btn i {
+     width: 20px;
+     height: 20px;
+ }
+
 .text-input.text-input-rtl {
     text-align: right;
     direction: rtl;

@@ -777,12 +777,14 @@ def get_cover_url_for_id(dictation_id, language=None):
         p = os.path.join(dictation_path, name)
         if os.path.exists(p):
             return f"/static/data/dictations/{dictation_id}/{name}"
-        
-        # Если файла нет локально, но есть в B2, используем эндпоинт /api/cover для проксирования
-        if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
-            remote_path = f"dictations/{dictation_id}/{name}"
-            if b2_storage.file_exists(remote_path):
-                return f"/api/cover?dictation_id={dictation_id}&filename={name}"
+
+    # Если файла нет локально, но есть в B2, используем эндпоинт /api/cover для проксирования.
+    # Новый формат хранения: dictations_covers/<id>.webp
+    if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
+        numeric_id = dictation_id.split('_', 1)[1]
+        remote_path_new = f"dictations_covers/{numeric_id}.webp"
+        if b2_storage.file_exists(remote_path_new):
+            return f"/api/cover?dictation_id={dictation_id}"
 
     # --- 2) языковая обложка в /static/data/covers/ ---
     if language:
@@ -813,20 +815,21 @@ def api_get_cover():
     
     try:
         dictation_id = request.args.get('dictation_id')
-        filename = request.args.get('filename', 'cover.webp')
+        filename = request.args.get('filename')
         
         if not dictation_id:
             return jsonify({'error': 'dictation_id parameter required'}), 400
         
         data_base = _get_static_data_base_dir()
-        local_path = os.path.join(data_base, "dictations", dictation_id, filename)
+        local_path = os.path.join(data_base, "dictations", dictation_id, "cover.webp")
         
         # B2 - основное хранилище! Сначала проверяем B2
         if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
-            remote_path = f"dictations/{dictation_id}/{filename}"
-            if b2_storage.file_exists(remote_path):
+            numeric_id = dictation_id.split('_', 1)[1]
+            remote_path_new = f"dictations_covers/{numeric_id}.webp"
+            if b2_storage.file_exists(remote_path_new):
                 # Файл есть в B2 - скачиваем и кэшируем локально
-                if b2_storage.download_file(remote_path, local_path):
+                if b2_storage.download_file(remote_path_new, local_path):
                     return send_from_directory(
                         os.path.dirname(local_path),
                         os.path.basename(local_path)

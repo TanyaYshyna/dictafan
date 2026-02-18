@@ -29,12 +29,38 @@ document.addEventListener('DOMContentLoaded', async function () {
         initializeAudioSettings();
         setupFormListeners();
         initializeTopbarControls();
+        setupPasswordToggles();
 
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError('Ошибка загрузки профиля: ' + error.message);
     }
 });
+
+function setupPasswordToggles() {
+    document.addEventListener('click', (e) => {
+        const toggleBtn = e.target?.closest?.('[data-password-toggle]');
+        if (!toggleBtn) return;
+
+        const targetId = toggleBtn.getAttribute('data-target-input');
+        if (!targetId) return;
+
+        const input = document.getElementById(targetId);
+        if (!input) return;
+
+        const willShow = input.type === 'password';
+        input.type = willShow ? 'text' : 'password';
+        toggleBtn.setAttribute('aria-label', willShow ? 'Скрыть пароль' : 'Показать пароль');
+
+        const icon = toggleBtn.querySelector('i[data-lucide]');
+        if (icon) {
+            icon.setAttribute('data-lucide', willShow ? 'eye-off' : 'eye');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+    });
+}
 
 // Загрузка данных пользователя
 function loadUserData() {

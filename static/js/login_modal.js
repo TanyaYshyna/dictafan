@@ -58,15 +58,20 @@ class LoginModal {
 
                         <div class="form-row">
                             <label for="loginModalPassword">Пароль</label>
-                            <input 
-                                id="loginModalPassword" 
-                                class="text-input auth-input" 
-                                type="password" 
-                                name="password" 
-                                placeholder="Ваш пароль" 
-                                required
-                                autocomplete="current-password"
-                            >
+                            <div class="password-input-wrapper">
+                                <input 
+                                    id="loginModalPassword" 
+                                    class="text-input auth-input" 
+                                    type="password" 
+                                    name="password" 
+                                    placeholder="Ваш пароль" 
+                                    required
+                                    autocomplete="current-password"
+                                >
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="loginModalPassword">
+                                    <i data-lucide="eye"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <div id="loginModalErrorMessage" class="form-message error-message" style="display: none;"></div>
@@ -116,18 +121,23 @@ class LoginModal {
 
                         <div class="form-row">
                             <label for="registerModalPassword">Пароль</label>
-                            <input 
-                                id="registerModalPassword" 
-                                class="text-input auth-input" 
-                                type="password" 
-                                name="password" 
-                                placeholder="Минимум 6 символов" 
-                                required
-                                minlength="6"
-                                autocomplete="new-password"
-                                data-1p-ignore="true"
-                                data-lpignore="true"
-                            >
+                            <div class="password-input-wrapper">
+                                <input 
+                                    id="registerModalPassword" 
+                                    class="text-input auth-input" 
+                                    type="password" 
+                                    name="password" 
+                                    placeholder="Минимум 6 символов" 
+                                    required
+                                    minlength="6"
+                                    autocomplete="new-password"
+                                    data-1p-ignore="true"
+                                    data-lpignore="true"
+                                >
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="registerModalPassword">
+                                    <i data-lucide="eye"></i>
+                                </button>
+                            </div>
                         </div>
 
                         <div id="registerModalLanguageSelector" class="language-selector-wrapper"></div>
@@ -233,6 +243,29 @@ class LoginModal {
                 } else {
                     e.preventDefault();
                     e.stopPropagation();
+                }
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            const toggleBtn = e.target?.closest?.('[data-password-toggle]');
+            if (!toggleBtn) return;
+
+            const targetId = toggleBtn.getAttribute('data-target-input');
+            if (!targetId) return;
+
+            const input = document.getElementById(targetId);
+            if (!input) return;
+
+            const willShow = input.type === 'password';
+            input.type = willShow ? 'text' : 'password';
+            toggleBtn.setAttribute('aria-label', willShow ? 'Скрыть пароль' : 'Показать пароль');
+
+            const icon = toggleBtn.querySelector('i[data-lucide]');
+            if (icon) {
+                icon.setAttribute('data-lucide', willShow ? 'eye-off' : 'eye');
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
                 }
             }
         });
