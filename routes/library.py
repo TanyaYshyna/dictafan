@@ -1,6 +1,6 @@
 import logging
 import os
-from flask import Blueprint, render_template, jsonify, request, current_app
+from flask import Blueprint, render_template, jsonify, request, current_app, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from PIL import Image
 
@@ -102,6 +102,46 @@ def api_book_dictations(book_id: int):
     except Exception as exc:
         logger.error("Ошибка получения диктантов книги %s: %s", book_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@library_bp.route("/api/book-cover")
+def api_get_book_cover():
+    """Получение обложки книги (прокси из B2 с локальным кэшем, если включено)."""
+    from helpers.b2_storage import b2_storage
+
+    try:
+        book_id = request.args.get("book_id")
+        user_id = request.args.get("user_id")
+        filename = request.args.get("filename", "cover.webp")
+
+        if not book_id:
+            return jsonify({"error": "book_id parameter required"}), 400
+
+        # локальный кэш
+        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
+        local_path = os.path.join(data_base, "books", f"book_{book_id}", filename)
+
+        # основное хранилище: B2
+        if b2_storage.enabled:
+            uid = str(user_id).strip() if user_id else "unknown"
+            remote_path = f"books_covers/user_{uid}/book_{book_id}/{filename}"
+            if b2_storage.file_exists(remote_path):
+                if b2_storage.download_file(remote_path, local_path):
+                    return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+
+        # fallback: локальный файл (если вдруг был сохранен локально)
+        if os.path.exists(local_path):
+            return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+
+        # fallback: дефолтная обложка
+        default_path = os.path.join(data_base, "covers", "cover_en.webp")
+        if os.path.exists(default_path):
+            return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
+
+        return jsonify({"error": "Cover not found"}), 404
+    except Exception as exc:
+        logger.error("❌ Ошибка получения обложки книги: %s", exc, exc_info=True)
+        return jsonify({"error": str(exc)}), 500
 
 
 @library_bp.route("/api/book/<int:book_id>/sections", methods=["GET"])
@@ -274,7 +314,7 @@ def api_create_book():
         
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
-            cover_url = _save_book_cover(book["id"], cover_file)
+            cover_url = _save_book_cover(book["id"], user["id"], cover_file)
             if cover_url:
                 # Обновляем книгу с URL обложки
                 book = update_book(book["id"], cover_url=cover_url)
@@ -395,7 +435,7 @@ def api_update_book(book_id: int):
         
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
-            cover_url = _save_book_cover(book_id, cover_file)
+            cover_url = _save_book_cover(book_id, user["id"], cover_file)
             if cover_url:
                 # Обновляем книгу с URL обложки
                 book = update_book(book_id, cover_url=cover_url)
@@ -684,12 +724,14 @@ def api_remove_book_from_shelf(book_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
-def _save_book_cover(book_id: int, cover_file) -> str:
+def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
     """
     Сохраняет обложку книги.
     Frontend уже отправляет готовое изображение 200x200 в формате webp.
     Возвращает URL обложки или None в случае ошибки.
     """
+    from helpers.b2_storage import b2_storage
+
     try:
         # Проверяем, что это изображение
         if not cover_file.content_type.startswith("image/"):
@@ -724,9 +766,18 @@ def _save_book_cover(book_id: int, cover_file) -> str:
         cover_path = os.path.join(book_folder, "cover.webp")
         image.save(cover_path, "WEBP", quality=90)
 
-        # Возвращаем URL
+        # Если включено B2 — грузим туда и возвращаем стабильный proxy URL
+        if b2_storage.enabled:
+            remote_path = f"books_covers/user_{creator_user_id}/book_{book_id}/cover.webp"
+            uploaded = b2_storage.upload_file(cover_path, remote_path)
+            if uploaded:
+                cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"
+                logger.info("Обложка книги загружена в B2: %s", remote_path)
+                return cover_url
+
+        # Fallback: локальный URL
         cover_url = f"/static/data/books/book_{book_id}/cover.webp"
-        logger.info("Обложка книги сохранена: %s", cover_url)
+        logger.info("Обложка книги сохранена локально: %s", cover_url)
         return cover_url
 
     except Exception as exc:
