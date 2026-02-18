@@ -26,6 +26,69 @@ class WhisperModelManager {
         // Проверяем доступность Transformers.js
         this.checkTransformersJS();
     }
+
+    async _blobToAudioBuffer(blob) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) {
+            throw new Error('AudioContext не поддерживается в этом браузере');
+        }
+        const ac = new AC();
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const audioBuffer = await ac.decodeAudioData(arrayBuffer);
+            try {
+                await ac.close();
+            } catch (e) {
+            }
+            return audioBuffer;
+        } catch (e) {
+            try {
+                await ac.close();
+            } catch (err) {
+            }
+            throw e;
+        }
+    }
+
+    _audioBufferToMonoFloat32(audioBuffer) {
+        if (!audioBuffer) return new Float32Array(0);
+        const channels = audioBuffer.numberOfChannels || 1;
+        const length = audioBuffer.length || 0;
+        if (!length) return new Float32Array(0);
+        if (channels === 1) {
+            return audioBuffer.getChannelData(0);
+        }
+
+        const out = new Float32Array(length);
+        for (let ch = 0; ch < channels; ch++) {
+            const data = audioBuffer.getChannelData(ch);
+            for (let i = 0; i < length; i++) {
+                out[i] += data[i];
+            }
+        }
+        for (let i = 0; i < length; i++) {
+            out[i] /= channels;
+        }
+        return out;
+    }
+
+    _resampleLinear(input, inputSampleRate, targetSampleRate) {
+        const inArr = input instanceof Float32Array ? input : new Float32Array(input || []);
+        if (!inArr.length) return new Float32Array(0);
+        if (!inputSampleRate || inputSampleRate === targetSampleRate) return inArr;
+
+        const ratio = targetSampleRate / inputSampleRate;
+        const outLength = Math.max(1, Math.round(inArr.length * ratio));
+        const out = new Float32Array(outLength);
+        for (let i = 0; i < outLength; i++) {
+            const srcIndex = i / ratio;
+            const i0 = Math.floor(srcIndex);
+            const i1 = Math.min(i0 + 1, inArr.length - 1);
+            const t = srcIndex - i0;
+            out[i] = (1 - t) * inArr[i0] + t * inArr[i1];
+        }
+        return out;
+    }
     
     /**
      * Проверяет доступность библиотеки Transformers.js
@@ -190,6 +253,14 @@ class WhisperModelManager {
         const recognizer = storedModel.recognizer;
         
         try {
+            let audioInput = audioData;
+            if (audioData instanceof Blob) {
+                const audioBuffer = await this._blobToAudioBuffer(audioData);
+                const mono = this._audioBufferToMonoFloat32(audioBuffer);
+                const targetSr = 16000;
+                audioInput = this._resampleLinear(mono, audioBuffer.sampleRate || targetSr, targetSr);
+            }
+
             // Подготавливаем параметры для распознавания
             const options = {
                 language: languageCode.toLowerCase(),
@@ -206,7 +277,7 @@ class WhisperModelManager {
             
             // Преобразуем audioData в формат, который понимает Transformers.js
             // Может быть AudioBuffer, ArrayBuffer, Blob или URL
-            const result = await recognizer(audioData, options);
+            const result = await recognizer(audioInput, options);
             
             return result;
             

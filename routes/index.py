@@ -16,6 +16,14 @@ index_bp = Blueprint('index', __name__)
 DATA_DIR = os.path.join("static", "data") 
 
 
+def _get_static_data_base_dir() -> str:
+    override = os.getenv("STATIC_DATA_FOLDER")
+    if override:
+        return override
+    static_base = current_app.static_folder or os.path.join(current_app.root_path, "static")
+    return os.path.join(static_base, "data")
+
+
 # Вспомогательная функция для получения читабельного названия языка
 def get_language_title(lang_code: str) -> str:
     return get_language_name(lang_code)
@@ -407,9 +415,9 @@ def delete_dictation(dictation_id):
     from helpers.db_dictations import delete_dictation as delete_dictation_from_db
     from helpers.b2_storage import b2_storage
 
-    static_base = current_app.static_folder
-    dictation_path = os.path.join(static_base, "data", "dictations", dictation_id)
-    temp_path = os.path.join(static_base, "data", "temp", dictation_id)
+    data_base = _get_static_data_base_dir()
+    dictation_path = os.path.join(data_base, "dictations", dictation_id)
+    temp_path = os.path.join(data_base, "temp", dictation_id)
 
     # 1. Удаляем из categories.json
     categories_data = load_categories()
@@ -470,8 +478,8 @@ def export_dictation(dictation_id):
     if not dictation_id:
         return jsonify({"success": False, "error": "dictation_id is required"}), 400
 
-    static_base = current_app.static_folder
-    dictation_path = os.path.join(static_base, "data", "dictations", dictation_id)
+    data_base = _get_static_data_base_dir()
+    dictation_path = os.path.join(data_base, "dictations", dictation_id)
 
     if not os.path.exists(dictation_path):
         return jsonify({"success": False, "error": "Dictation not found"}), 404
@@ -557,8 +565,8 @@ def import_dictation():
             if not target_category_key:
                 return jsonify({"success": False, "error": "Не указана целевая категория"}), 400
 
-            static_base = current_app.static_folder
-            dest_path = os.path.join(static_base, "data", "dictations", dictation_id)
+            data_base = _get_static_data_base_dir()
+            dest_path = os.path.join(data_base, "dictations", dictation_id)
 
             if os.path.exists(dest_path):
                 if overwrite:
@@ -748,12 +756,18 @@ def get_cover_url_for_id(dictation_id, language=None):
     """
     from helpers.b2_storage import b2_storage
 
-    # абсолютные пути к папкам в файловой системе
-    static_base = current_app.static_folder  # <project>/static
-    
-    # Для нового формата dict_<id> используем этот ID для пути
-    dictation_path = os.path.join(static_base, "data", "dictations", dictation_id or "")
-    covers_folder = os.path.join(static_base, "data", "covers")
+    # нормализуем id (иногда с фронта/из БД прилетает числовой id)
+    raw_id = "" if dictation_id is None else str(dictation_id).strip()
+    if raw_id and not raw_id.startswith("dict_") and not raw_id.startswith("dicta_"):
+        # поддерживаем старый числовой формат: 15 -> dict_15
+        if raw_id.isdigit():
+            raw_id = f"dict_{raw_id}"
+
+    dictation_id = raw_id
+
+    data_base = _get_static_data_base_dir()
+    dictation_path = os.path.join(data_base, "dictations", dictation_id or "")
+    covers_folder = os.path.join(data_base, "covers")
 
     # допустимые расширения для обложек
     cover_names = ["cover.webp", "cover.png", "cover.jpg", "cover.jpeg"]
@@ -804,8 +818,8 @@ def api_get_cover():
         if not dictation_id:
             return jsonify({'error': 'dictation_id parameter required'}), 400
         
-        static_base = current_app.static_folder
-        local_path = os.path.join(static_base, "data", "dictations", dictation_id, filename)
+        data_base = _get_static_data_base_dir()
+        local_path = os.path.join(data_base, "dictations", dictation_id, filename)
         
         # B2 - основное хранилище! Сначала проверяем B2
         if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
@@ -826,7 +840,7 @@ def api_get_cover():
             )
         
         # Если ничего не помогло, возвращаем дефолтную обложку
-        default_path = os.path.join(static_base, "data", "covers", "cover_en.webp")
+        default_path = os.path.join(data_base, "covers", "cover_en.webp")
         if os.path.exists(default_path):
             return send_from_directory(
                 os.path.dirname(default_path),

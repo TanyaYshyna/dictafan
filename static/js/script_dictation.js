@@ -34,6 +34,35 @@ function applyInputDirection(languageCode) {
         inputField.classList.add('text-input-ltr');
     }
 }
+
+function playRecordingStartBeep() {
+    try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+
+        const ac = new AC();
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+
+        o.type = 'sine';
+        o.frequency.value = 880;
+
+        const now = ac.currentTime;
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.04, now + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+        o.connect(g);
+        g.connect(ac.destination);
+
+        o.start(now);
+        o.stop(now + 0.12);
+        o.onended = () => {
+            try { ac.close(); } catch (e) {}
+        };
+    } catch (e) {
+    }
+}
 const checkNextDiv = document.getElementById('checkNext');
 const checkPreviosDiv = document.getElementById('checkPrevios');
 const correctAnswerDiv = document.getElementById('correctAnswer'); id = "btn-new-circle"
@@ -795,6 +824,10 @@ const recordButton = document.getElementById('recordButton');
 // Инициализация кнопки
 recordButton.addEventListener('click', toggleRecording);
 
+function getCountPercentEl() {
+    return document.getElementById('count_percent');
+}
+
 const recordStateIcon = document.getElementById('recordStateIcon'); // запись/пауза
 const AUTO_STOP_ENABLED = true;
 const AUTO_STOP_THRESHOLD = 80;     // 95%
@@ -903,6 +936,16 @@ function initUnifiedSpeechRecognition() {
         srLiveText = '';
         setRecordStateIcon('pause');
         updateRecordingIndicator(true);
+        try {
+            playRecordingStartBeep();
+        } catch (e) {
+        }
+        try {
+            if (typeof setupVisualizer === 'function' && unifiedSpeechRecognizer && unifiedSpeechRecognizer._mediaStream) {
+                setupVisualizer(unifiedSpeechRecognizer._mediaStream);
+            }
+        } catch (e) {
+        }
         currentInactivityTimeout = INACTIVITY_TIMEOUT_RECORDING;
         resetInactivityTimer();
         
@@ -917,6 +960,12 @@ function initUnifiedSpeechRecognition() {
         if (rb) rb.classList.remove('recording');
         setRecordStateIcon('square');
         updateRecordingIndicator(false);
+        try {
+            if (typeof stopVisualization === 'function') {
+                stopVisualization();
+            }
+        } catch (e) {
+        }
         currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
         resetInactivityTimer();
     };
@@ -934,9 +983,10 @@ function initUnifiedSpeechRecognition() {
     
     unifiedSpeechRecognizer.callbacks.onPercentUpdate = (percent) => {
         console.log(`[onPercentUpdate] Получен процент: ${percent}%`);
-        if (count_percent) {
+        const el = getCountPercentEl();
+        if (el) {
             console.log(`[onPercentUpdate] Обновляем count_percent.textContent = ${percent}`);
-            count_percent.textContent = percent;
+            el.textContent = percent;
         } else {
             console.error(`[onPercentUpdate] count_percent элемент не найден!`);
         }
@@ -2949,10 +2999,16 @@ function updateAudioPanelVisibility() {
     if (allAudioCompleted && R > 0) {
         hide(panel);
         hide(group);
+        hide(visual);
+        hide(percent?.parentElement || percent);
+        hide(answer);
         return;
     }
 
-    count_percent.textContent = 0;
+    const percentEl = getCountPercentEl();
+    if (percentEl && (percentEl.textContent == null || String(percentEl.textContent).trim() === '')) {
+        percentEl.textContent = 0;
+    }
 
     if (R === 0) {
         // Полное скрытие всего аудио-функционала
@@ -3647,6 +3703,7 @@ function decreaseAudioCounter() {
 // Сначала объявляем stopRecording
 async function stopRecording(cause = 'manual') {
     console.log(`🔄 [stopRecording] Вызвана функция stopRecording, cause: ${cause}`);
+    console.log(`[SR#3] stopRecording enter cause=${cause} unifiedActive=${!!(unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)}`);
     
     // Делаем функцию доступной глобально для UnifiedSpeechRecognition
     if (!window.stopRecording) {
@@ -3664,8 +3721,15 @@ async function stopRecording(cause = 'manual') {
     if (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state.isRecording) {
         try {
             console.log(`🔄 [stopRecording] Вызываем unifiedSpeechRecognizer.stopRecording()`);
+            console.log(`[SR#4] calling UnifiedSpeechRecognition.stopRecording()`);
             const result = await unifiedSpeechRecognizer.stopRecording();
             console.log(`✅ [stopRecording] unifiedSpeechRecognizer.stopRecording() вернул результат:`, result);
+            try {
+                const t = (result && typeof result.text === 'string') ? result.text : '';
+                const mode = result?.mode;
+                const hasBlob = !!result?.audioBlob;
+                console.log(`[SR#5] stopRecording result mode=${mode} textLen=${t.length} hasBlob=${hasBlob}`);
+            } catch (e) {}
             
             // Сохраняем результат для использования в saveRecording
             window.lastRecognitionResult = result;
@@ -3674,6 +3738,7 @@ async function stopRecording(cause = 'manual') {
             setTimeout(() => {
                 try {
                     console.log(`🔄 [stopRecording] Вызываем saveRecording с результатом, cause: ${cause}`);
+                    console.log(`[SR#6] invoking saveRecording(cause, result)`);
                     saveRecording(cause, result);
                 } catch (error) {
                     console.error('❌ Ошибка при сохранении записи:', error);
@@ -3777,12 +3842,15 @@ async function startRecording() {
     try {
         stopAllAudios();
 
+        console.log(`[SR#1] startRecording enter mode=${speechRecognitionMode} lang=${langCodeUrl}`);
+
         setRecordStateIcon('pause');
         updateRecordingIndicator('preparing');
 
         // стартовый процент 0% (чтобы не показывало процетны из предыдущих записей)
-        if (count_percent) {
-            count_percent.textContent = 0;
+        const percentEl = getCountPercentEl();
+        if (percentEl) {
+            percentEl.textContent = 0;
         }
 
         // Инициализируем UnifiedSpeechRecognition если еще не инициализирован
@@ -3805,6 +3873,8 @@ async function startRecording() {
 
         // Начинаем запись через UnifiedSpeechRecognition
         await unifiedSpeechRecognizer.startRecording();
+
+        console.log(`[SR#2] UnifiedSpeechRecognition.startRecording resolved mode=${mode}`);
         
         // Устанавливаем начальное сообщение
         const userAudioAnswer = document.getElementById('userAudioAnswer');
@@ -3921,6 +3991,7 @@ if (typeof window !== 'undefined') {
 
 async function saveRecording(cause = undefined, recognitionResult = null) {
     console.log(`🔍 [saveRecording] Вызвана функция saveRecording, cause: ${cause}`);
+    console.log(`[SR#7] saveRecording enter cause=${cause} hasArgResult=${!!recognitionResult} hasWindowResult=${!!window.lastRecognitionResult}`);
     
     // Делаем функцию доступной глобально для UnifiedSpeechRecognition
     if (!window.saveRecording) {
@@ -3933,6 +4004,11 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         window.lastRecognitionResult = null; // очищаем
         
         console.log(`🔍 [saveRecording] Обрабатываем результат UnifiedSpeechRecognition:`, result);
+
+        try {
+            const t = (result && typeof result.text === 'string') ? result.text : '';
+            console.log(`[SR#8] using recognition result mode=${result?.mode} textLen=${t.length} textPreview="${t.slice(0, 80)}"`);
+        } catch (e) {}
         
         const audioBlob = result.audioBlob || unifiedSpeechRecognizer?.getAudioBlob();
         if (!audioBlob) {
@@ -3945,6 +4021,86 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
         // Получаем распознанный текст
         let spokenText = result.text || '';
+
+        // Если офлайн-режим (Whisper) — UnifiedSpeechRecognition не заполняет text.
+        // Тогда распознаем здесь по audioBlob.
+        if (result.mode === 'offline' && (!spokenText || !String(spokenText).trim())) {
+            try {
+                const audioBlobForWhisper = audioBlob;
+                if (audioBlobForWhisper) {
+                    const currentLang = langCodeUrl?.split('-')[0] || 'en';
+                    const selectedSize = getSelectedWhisperModelSize(currentLang);
+                    const hasModel = hasWhisperModel(currentLang, selectedSize);
+                    console.log(`🔍 [saveRecording] (unified) offline: модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
+
+                    if (hasModel) {
+                        let whisperModel = getWhisperModel(currentLang, selectedSize);
+                        if (!whisperModel) {
+                            console.log(`🔄 [saveRecording] (unified) Модель есть в localStorage, но не в памяти. Загружаем...`);
+                            const whisperManager = window.WhisperModelManager ? new window.WhisperModelManager() : null;
+                            if (whisperManager) {
+                                await whisperManager.loadLanguageModel(currentLang, selectedSize || 'base');
+                                console.log(`✅ [saveRecording] (unified) Модель загружена в память`);
+                            } else {
+                                throw new Error('WhisperModelManager не доступен');
+                            }
+                        }
+
+                        const explanation = currentSentence?.explanation || '';
+                        const originalLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
+                        const prompt = generateWhisperPrompt(explanation, originalLang);
+
+                        const whisperManager = window.WhisperModelManager ? new window.WhisperModelManager() : null;
+                        if (!whisperManager) {
+                            throw new Error('WhisperModelManager не доступен');
+                        }
+
+                        showWhisperProcessingAnimation();
+                        const progressBarId = 'whisper-progress';
+                        const progressDuration = 2000;
+                        animateProgressBar(progressBarId, progressDuration);
+
+                        console.log(`🔄 [saveRecording] (unified) Вызываем whisperManager.transcribe для языка ${currentLang}`);
+                        const whisperResult = await whisperManager.transcribe(
+                            audioBlobForWhisper,
+                            currentLang,
+                            selectedSize || 'base',
+                            prompt
+                        );
+
+                        console.log('Результат Whisper (unified, полный):', whisperResult);
+
+                        let recognizedText = '';
+                        if (whisperResult && typeof whisperResult === 'object') {
+                            if (whisperResult.text) {
+                                recognizedText = String(whisperResult.text).trim();
+                            } else if (Array.isArray(whisperResult) && whisperResult.length > 0) {
+                                const firstItem = whisperResult[0];
+                                if (firstItem && firstItem.text) {
+                                    recognizedText = String(firstItem.text).trim();
+                                } else if (typeof firstItem === 'string') {
+                                    recognizedText = firstItem.trim();
+                                }
+                            } else if (whisperResult.chunks && Array.isArray(whisperResult.chunks) && whisperResult.chunks.length > 0) {
+                                const firstChunk = whisperResult.chunks[0];
+                                if (firstChunk && firstChunk.text) {
+                                    recognizedText = String(firstChunk.text).trim();
+                                }
+                            }
+                        } else if (typeof whisperResult === 'string') {
+                            recognizedText = whisperResult.trim();
+                        }
+
+                        console.log('Whisper распознал (unified, извлеченный текст):', recognizedText);
+                        if (recognizedText) {
+                            spokenText = recognizedText;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Ошибка распознавания через Whisper (unified):', error);
+            }
+        }
         console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
         
         // Для офлайн-режима показываем анимацию печати если нужно
@@ -3974,10 +4130,16 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         // Считаем процент совпадения
         const percent = computeMatchPercentASR(originalText, spokenText);
         console.log(`🔍 [saveRecording] Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
+
+        console.log(`[SR#9] computed percent=${percent} spokenLen=${(spokenText || '').length} originalLen=${(originalText || '').length}`);
         
         // Обновляем отображение процента
-        if (count_percent) {
-            count_percent.textContent = percent;
+        const percentEl = getCountPercentEl();
+        if (percentEl) {
+            percentEl.textContent = percent;
+            console.log(`[SR#10] UI count_percent.textContent now=${percentEl.textContent}`);
+        } else {
+            console.log(`[SR#10] UI count_percent element not found`);
         }
 
         // После распознавания обычно меняется прогресс/статистика — сохраняем локально.
@@ -5642,7 +5804,7 @@ async function initializeDictation() {
 
 function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     // Очищаем предыдущую запись
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
+    if ((mediaRecorder && mediaRecorder.state === 'recording') || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {
         stopRecording('change_sentence');
     }
 
@@ -5673,6 +5835,14 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     // Актуализируем видимость панели аудио (на случай R=0)
     updateAudioPanelVisibility();
     refreshAudioUIForCurrentSentence();
+
+    try {
+        const percentEl = getCountPercentEl();
+        if (percentEl) {
+            percentEl.textContent = 0;
+        }
+    } catch (e) {
+    }
 
     // Сбрасываем состояние аудио-ответа
     userAudioAnswer.innerHTML = '';
@@ -5823,7 +5993,7 @@ function nextSentence() {
     let newSentenceIndex = currentSentenceIndex + 1; // по списку выбранных чеком ключей к предложениям
 
     if (newSentenceIndex < totalSelectedSentences) {
-        if (mediaRecorder?.state === 'recording') {stopRecording('manual');}
+        if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {stopRecording('manual');}
         currentSentenceIndex = newSentenceIndex;
         console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
         updateSimpleSentenceCounter();
@@ -5838,7 +6008,7 @@ function previousSentence() {
     let newSentenceIndex = currentSentenceIndex - 1; // по списку выбранных чеком ключей к предложениям
 
     if (newSentenceIndex >= 0) {
-        if (mediaRecorder?.state === 'recording') {stopRecording('manual');}
+        if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {stopRecording('manual');}
         currentSentenceIndex = newSentenceIndex;
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex);

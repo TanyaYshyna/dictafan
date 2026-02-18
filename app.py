@@ -8,13 +8,71 @@ import logging
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
 
-app = Flask(__name__)
+# Загружаем переменные окружения из .env файла (для локальной разработки)
+# На Railway переменные устанавливаются через веб-интерфейс
+load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
+# Важно: НЕ переопределяем весь static_folder, иначе сломаются локальные js/css.
+# Для шаринга данных используем отдельную переменную STATIC_DATA_FOLDER.
+app = Flask(
+    __name__,
+    static_folder=None,
+)
+
+# Нужен валидный app.static_folder для логики бэкенда, где используются пути
+# через current_app.static_folder (поиск обложек, экспорт/импорт и т.д.).
+_local_static_dir = os.path.join(os.path.dirname(__file__), 'static')
+app.static_folder = _local_static_dir
 
 # Логируем при запуске
 print("=" * 50, file=sys.stderr)
 print("Flask app starting...", file=sys.stderr)
 print(f"PORT: {os.getenv('PORT', 'not set')}", file=sys.stderr)
+print(f"STATIC_FOLDER: {os.getenv('STATIC_FOLDER', 'not set')}", file=sys.stderr)
+print(f"STATIC_DATA_FOLDER: {os.getenv('STATIC_DATA_FOLDER', 'not set')}", file=sys.stderr)
+print(f"app.static_folder: {app.static_folder}", file=sys.stderr)
 print("=" * 50, file=sys.stderr)
+
+
+@app.route('/static/data/<path:filename>')
+def serve_static_data(filename):
+    """Раздаём /static/data/*.
+
+    По умолчанию это <worktree>/static/data.
+    Если задан STATIC_DATA_FOLDER, то используем внешнюю папку (например из dictafan).
+    """
+    override = os.getenv('STATIC_DATA_FOLDER')
+    local_data_dir = os.path.join(_local_static_dir, 'data')
+
+    # 1) prefer shared/static data dir (if configured)
+    if override:
+        override_path = os.path.join(override, filename)
+        if os.path.exists(override_path):
+            return send_from_directory(override, filename)
+
+    # 2) fallback to local worktree static/data (for assets that are not shared)
+    local_path = os.path.join(local_data_dir, filename)
+    if os.path.exists(local_path):
+        return send_from_directory(local_data_dir, filename)
+
+    # 3) default behavior (will raise 404)
+    base_dir = override if override else local_data_dir
+    return send_from_directory(base_dir, filename)
+
+
+@app.route('/static/<path:filename>', endpoint='static')
+def serve_static_assets(filename):
+    """Раздаём /static/*.
+
+    - js/css и прочее берём из <worktree>/static
+    - /static/data/* отдаём через serve_static_data (с поддержкой STATIC_DATA_FOLDER)
+
+    Нужен endpoint='static', чтобы работало url_for('static', filename=...).
+    """
+    if filename.startswith('data/'):
+        data_filename = filename[len('data/') :]
+        return serve_static_data(data_filename)
+    return send_from_directory(_local_static_dir, filename)
 
 @app.route('/health')
 def health_check():
@@ -31,10 +89,6 @@ def health_check():
 # ================================
 from flask_jwt_extended import JWTManager
 import datetime
-
-# Загружаем переменные окружения из .env файла (для локальной разработки)
-# На Railway переменные устанавливаются через веб-интерфейс
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # Настройки JWT
 app.config['JWT_SECRET_KEY'] = os.getenv("JWT_SECRET_KEY", "fallback-secret-key-change-me")

@@ -390,7 +390,15 @@ def api_get_avatar():
             return jsonify({'error': 'Email or user_id parameter required'}), 400
 
         # Вычисляем путь к аватару по шаблону user_<id>
-        user_folder = os.path.join('static', 'data', 'users', f'user_{user_id}')
+        # В проде и при работе через git worktree данные могут жить вне репозитория,
+        # поэтому учитываем STATIC_DATA_FOLDER.
+        data_base = os.getenv('STATIC_DATA_FOLDER')
+        if not data_base:
+            # current_app.root_path тут надёжнее, чем относительный путь
+            from flask import current_app
+            data_base = os.path.join(current_app.root_path, 'static', 'data')
+
+        user_folder = os.path.join(data_base, 'users', f'user_{user_id}')
         avatar_filename = 'avatar.webp' if size == 'large' else 'avatar_min.webp'
         avatar_path = os.path.join(user_folder, avatar_filename)
         
@@ -403,11 +411,12 @@ def api_get_avatar():
         
         # Проверяем локальный кэш или дефолтный аватар
         if not os.path.exists(avatar_path):
-            default_path = os.path.join('static', 'icons', f'default-avatar-{size}.svg')
+            from flask import current_app
+            default_path = os.path.join(current_app.root_path, 'static', 'icons', f'default-avatar-{size}.svg')
             
             if not os.path.exists(default_path):
                 # Если файлов по умолчанию нет, возвращаем логотип как запасной вариант
-                default_path = os.path.join('static', 'icons', 'logo.svg')
+                default_path = os.path.join(current_app.root_path, 'static', 'icons', 'logo.svg')
                 if not os.path.exists(default_path):
                     return jsonify({'error': 'Avatar not found'}), 404
             

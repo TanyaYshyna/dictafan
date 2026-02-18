@@ -1,6 +1,6 @@
 import logging
 import os
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from PIL import Image
 
@@ -696,8 +696,10 @@ def _save_book_cover(book_id: int, cover_file) -> str:
             logger.warning("Файл обложки не является изображением: %s", cover_file.content_type)
             return None
 
+        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
+
         # Создаем папку для книги
-        book_folder = os.path.join("static", "data", "books", f"book_{book_id}")
+        book_folder = os.path.join(data_base, "books", f"book_{book_id}")
         os.makedirs(book_folder, exist_ok=True)
 
         # Открываем изображение

@@ -276,7 +276,9 @@ async function coverPath(d) {
     //   if (d.preview_image) return d.preview_image;
 
     if (d.id) {
-        const coverUrl = `/static/data/dictations/${d.id}/cover.webp`;
+        const idStr = String(d.id).trim();
+        const folderId = (idStr.startsWith('dict_') || idStr.startsWith('dicta_')) ? idStr : `dict_${idStr}`;
+        const coverUrl = `/static/data/dictations/${folderId}/cover.webp`;
         try {
             const response = await fetch(coverUrl, { method: 'HEAD' });
             if (response.ok) return coverUrl;

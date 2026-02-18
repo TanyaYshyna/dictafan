@@ -49,9 +49,9 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), nullable=False, 
                   server_default=sa.text('CURRENT_TIMESTAMP'), 
                   comment='Дата и время создания записи (используется вместо date и time)'),
-        sa.Index('idx_history_activity_user_dictation', ['user_id', 'dictation_id']),
-        sa.Index('idx_history_activity_created_at', ['created_at']),
-        sa.Index('idx_history_activity_type', ['type_activity']),
+        sa.Index('idx_history_activity_user_dictation', 'user_id', 'dictation_id'),
+        sa.Index('idx_history_activity_created_at', 'created_at'),
+        sa.Index('idx_history_activity_type', 'type_activity'),
     )
     
     # Создаём таблицу history_successes (агрегированная статистика успехов)
@@ -77,8 +77,8 @@ def upgrade() -> None:
                   server_default=sa.text('CURRENT_TIMESTAMP'), 
                   comment='Дата и время обновления записи'),
         sa.UniqueConstraint('user_id', 'dictation_id', name='uq_history_successes_user_dictation'),
-        sa.Index('idx_history_successes_user_dictation', ['user_id', 'dictation_id']),
-        sa.Index('idx_history_successes_created_at', ['created_at']),
+        sa.Index('idx_history_successes_user_dictation', 'user_id', 'dictation_id'),
+        sa.Index('idx_history_successes_created_at', 'created_at'),
     )
     
     # Создаём таблицу history_unclosed_dictations (незаконченные диктанты)
@@ -100,8 +100,8 @@ def upgrade() -> None:
                   server_default=sa.text('CURRENT_TIMESTAMP'), 
                   comment='Дата и время последнего обновления'),
         sa.UniqueConstraint('user_id', 'dictation_id', name='uq_unclosed_user_dictation'),
-        sa.Index('idx_unclosed_user_dictation', ['user_id', 'dictation_id']),
-        sa.Index('idx_unclosed_updated_at', ['updated_at']),
+        sa.Index('idx_unclosed_user_dictation', 'user_id', 'dictation_id'),
+        sa.Index('idx_unclosed_updated_at', 'updated_at'),
     )
     
     # Создаём таблицу history_unclosed_dictations_sentences (данные по предложениям незаконченных диктантов)
@@ -130,8 +130,8 @@ def upgrade() -> None:
                   comment='Дата и время обновления записи'),
         sa.UniqueConstraint('user_id', 'dictation_id', 'sentence_key', 
                           name='uq_unclosed_sentences_user_dictation_key'),
-        sa.Index('idx_unclosed_sentences_user_dictation', ['user_id', 'dictation_id']),
-        sa.Index('idx_unclosed_sentences_key', ['sentence_key']),
+        sa.Index('idx_unclosed_sentences_user_dictation', 'user_id', 'dictation_id'),
+        sa.Index('idx_unclosed_sentences_key', 'sentence_key'),
     )
 
 

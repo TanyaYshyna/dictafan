@@ -2511,6 +2511,7 @@ body.playing-audio::after {
   background: var(--color-hover);
   color: var(--color-panel-bg);
   cursor: default;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2620,6 +2621,12 @@ body.playing-audio::after {
   border-radius: 8px;
   margin-left: 5px;
   flex: 0 0 200px;
+  pointer-events: none;
+}
+
+#word_percent,
+#btn-count-percent {
+  pointer-events: none;
 }
 
 /* Центральная панель с процентажем, канвасом и play — В РЯД */

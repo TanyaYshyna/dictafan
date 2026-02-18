@@ -101,6 +101,16 @@ let isPlaying = false;
 let playheadAnimationId = null;
 
 
+function normalizeNewlines(text) {
+    if (text == null) return '';
+    return String(text)
+        .replace(/\u2028/g, '\n')
+        .replace(/\u2029/g, '\n')
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+}
+
+
 
 // ==================== сover обложка ========================================
 // Функция для настройки обработчиков cover
@@ -1534,7 +1544,8 @@ function setupTextareaHighlighting(editor) {
     editor.addEventListener('paste', (e) => {
         e.preventDefault();
         const text = (e.clipboardData || window.clipboardData).getData('text');
-        document.execCommand('insertText', false, text);
+        const normalized = normalizeNewlines(text);
+        document.execCommand('insertText', false, normalized);
         setTimeout(updateHighlight, 10);
     });
 
@@ -6343,7 +6354,9 @@ function removeSpeaker(button) {
     }
 }
 async function createDictationFromStart() {
-    const text = (document.getElementById('startTextInput').innerText || document.getElementById('startTextInput').textContent).trim();
+    const startEl = document.getElementById('startTextInput');
+    const rawText = (startEl && (startEl.innerText || startEl.textContent)) ? (startEl.innerText || startEl.textContent) : '';
+    const text = normalizeNewlines(rawText).trim();
     const delimiter = document.getElementById('translationDelimiter').value.trim();
     const isDialog = document.getElementById('isDialogCheckbox').checked;
 

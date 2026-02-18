@@ -1,5 +1,6 @@
 /* variables.css */
 :root {
+  color-scheme: light;
   --color-panel-bg: #fdfdfdff;                 /* светло-бежевый фон панели */
   --color-hover: #eeede8ff;
   --color-hover-panel: rgb(247, 246, 245);
