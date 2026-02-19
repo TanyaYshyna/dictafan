@@ -7108,14 +7108,6 @@ function playAudioSequence(sequence) {
             case 't': // перевод
                 audioPath = currentSentence.audio_tr;
                 button = window.translationPlayButton || null;
-                console.log('🔊 [playAudioSequence] Шаг "t" (перевод):', {
-                    audioPath,
-                    hasButton: !!button,
-                    currentSentence: currentSentence ? {
-                        key: currentSentence.key,
-                        audio_tr: currentSentence.audio_tr
-                    } : null
-                });
                 break;
             default:
                 console.warn('Неизвестный тип аудио в последовательности:', step);
@@ -7126,19 +7118,11 @@ function playAudioSequence(sequence) {
 
         // Если путь к аудио не найден, пропускаем этот шаг
         if (!audioPath) {
-            console.warn('⚠️ [playAudioSequence] Аудио не найдено для шага:', step, '(путь пуст)');
-            if (step === 't') {
-                console.warn('⚠️ [playAudioSequence] Проблема с переводом: audio_tr отсутствует для предложения', currentSentence?.key);
-            }
             index++;
             setTimeout(playNext, 0);
             return;
         }
-        if (!button && step === 't') {
-            // Для перевода кнопка не обязательна, можно воспроизвести без неё
-            console.warn('⚠️ [playAudioSequence] Кнопка перевода не найдена, но пытаемся воспроизвести без неё');
-        } else if (!button) {
-            console.warn('⚠️ [playAudioSequence] Аудио не найдено для шага:', step, '(кнопка управления не инициализирована)');
+        if (!button && step !== 't') {
             index++;
             setTimeout(playNext, 0);
             return;
@@ -7151,15 +7135,11 @@ function playAudioSequence(sequence) {
 
         // Для перевода, если кнопка не найдена, используем null
         const playButton = button || null;
-        console.log('▶️ [playAudioSequence] Воспроизведение шага:', step, 'путь:', audioPath, 'кнопка:', !!playButton);
-
         window.AudioManager.play(playButton, audioPath, () => {
-            console.log('✅ [playAudioSequence] Шаг завершен:', step);
             index++;
             playNext();
         });
     }
-
 
     playNext(); // Запускаем процесс
 }
