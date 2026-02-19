@@ -12,6 +12,12 @@
     return localStorage.getItem("jwt_token");
   }
 
+  function withCacheBust(url) {
+    if (!url || typeof url !== 'string') return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}v=${Date.now()}`;
+  }
+
   async function apiRequest(url, options = {}) {
     const token = getToken();
     const headers = options.headers || {};
@@ -535,7 +541,7 @@
     // Формируем HTML обложки
     let coverHtml;
     if (book.cover_url) {
-      coverHtml = `<img class="book-card-mini-cover" src="${book.cover_url}" alt="${book.title}">`;
+      coverHtml = `<img class="book-card-mini-cover" src="${withCacheBust(book.cover_url)}" alt="${book.title}">`;
     } else {
       coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
     }
@@ -727,7 +733,7 @@
 
     // Если есть ссылка на материалы автора, делаем картинку кликабельной
     const coverImage = book.cover_url 
-      ? `<img src="${book.cover_url}" alt="${book.title}">`
+      ? `<img src="${withCacheBust(book.cover_url)}" alt="${book.title}">`
       : `<div class="book-card-max-cover-placeholder"><i data-lucide="book-open"></i></div>`;
     
     const coverContent = book.author_materials_url
@@ -1881,7 +1887,7 @@
       });
     }
 
-    // Инициализация прокрутки desk
+    // Инициализируем прокрутку desk
     // Обработчики для кнопок в карточках диктантов (делегирование событий)
     document.addEventListener('click', async (e) => {
       // Кнопка раскрытия/сворачивания раздела
