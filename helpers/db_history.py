@@ -366,17 +366,30 @@ def save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sente
     try:
         with conn.cursor() as cur:
             # UPSERT для основной записи
-            cur.execute("""
-                INSERT INTO history_unclosed_dictations 
-                (user_id, dictation_id, time_ms, settings_json, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT (user_id, dictation_id) 
-                DO UPDATE SET 
-                    time_ms = %s,
-                    settings_json = %s,
-                    updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, time_ms, settings_json, created_at, updated_at
-            """, (user_id, dictation_id, time_ms, settings_json, time_ms, settings_json))
+            try:
+                cur.execute("""
+                    INSERT INTO history_unclosed_dictations 
+                    (user_id, dictation_id, time_ms, settings_json, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id, dictation_id) 
+                    DO UPDATE SET 
+                        time_ms = %s,
+                        settings_json = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id, user_id, dictation_id, time_ms, settings_json, created_at, updated_at
+                """, (user_id, dictation_id, time_ms, settings_json, time_ms, settings_json))
+            except Exception:
+                cur.execute("""
+                    INSERT INTO history_unclosed_dictations 
+                    (user_id, dictation_id, time_ms, audio_settings_json, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id, dictation_id) 
+                    DO UPDATE SET 
+                        time_ms = %s,
+                        audio_settings_json = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING id, user_id, dictation_id, time_ms, audio_settings_json, created_at, updated_at
+                """, (user_id, dictation_id, time_ms, settings_json, time_ms, settings_json))
             
             row = cur.fetchone()
             unclosed_id = row[0]
@@ -451,11 +464,18 @@ def get_unclosed_dictation(user_id, dictation_id):
     try:
         with conn.cursor() as cur:
             # Получаем основную запись
-            cur.execute("""
-                SELECT id, user_id, dictation_id, time_ms, settings_json, created_at, updated_at
-                FROM history_unclosed_dictations
-                WHERE user_id = %s AND dictation_id = %s
-            """, (user_id, dictation_id))
+            try:
+                cur.execute("""
+                    SELECT id, user_id, dictation_id, time_ms, settings_json, created_at, updated_at
+                    FROM history_unclosed_dictations
+                    WHERE user_id = %s AND dictation_id = %s
+                """, (user_id, dictation_id))
+            except Exception:
+                cur.execute("""
+                    SELECT id, user_id, dictation_id, time_ms, audio_settings_json, created_at, updated_at
+                    FROM history_unclosed_dictations
+                    WHERE user_id = %s AND dictation_id = %s
+                """, (user_id, dictation_id))
             
             row = cur.fetchone()
             if not row:
