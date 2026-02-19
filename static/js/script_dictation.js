@@ -1,5 +1,4 @@
 // console.log("👀 renderSentenceCounter вызвана");
-console.log('======================= dscript_dictation.js:');
 
 // Global audio UI/controls (ensure defined before any usage)
 // Use window-scoped references to avoid ReferenceError on early calls
@@ -982,17 +981,14 @@ function initUnifiedSpeechRecognition() {
     };
     
     unifiedSpeechRecognizer.callbacks.onPercentUpdate = (percent) => {
-        console.log(`[onPercentUpdate] Получен процент: ${percent}%`);
         const el = getCountPercentEl();
         if (el) {
-            console.log(`[onPercentUpdate] Обновляем count_percent.textContent = ${percent}`);
             el.textContent = percent;
         } else {
             console.error(`[onPercentUpdate] count_percent элемент не найден!`);
         }
     };
     
-    console.log('✅ UnifiedSpeechRecognition инициализирован, режим:', mode);
     return unifiedSpeechRecognizer;
 }
 
@@ -1065,7 +1061,6 @@ function hasWhisperModel(langCode, modelSize = null) {
         // Это важно, так как модель может быть загружена, но еще не инициализирована в памяти
         const modelStatus = localStorage.getItem(modelKey);
         const isInStorage = modelStatus === 'downloaded' || modelStatus === 'ready';
-        console.log(`🔍 [hasWhisperModel] Проверка для ключа ${modelKey} (язык ${langCode}): память=${!!(window.WhisperModels && window.WhisperModels.get(modelKey))}, localStorage=${modelStatus}, результат=${isInStorage}`);
         if (isInStorage) return true;
     }
 
@@ -1177,7 +1172,6 @@ let pauseModalEscHandler = null;
 
 function logout() {
     localStorage.removeItem('jwt_token');
-    console.log('✅✅✅✅ 4 ✅✅✅✅token', token);
     // Показываем модальное окно авторизации - гостевого режима нет!
     if (window.UM) {
         window.UM.requireAuth();
@@ -1222,9 +1216,7 @@ function setupAuthHandlers() {
 async function saveGeneratorData(generatorData) {
     try {
         const token = localStorage.getItem('jwt_token');
-        console.log('✅ 2 ✅✅✅✅✅✅token', this.token);
         if (!token) {
-            console.log('Пользователь не авторизован, данные не сохранены');
             return;
         }
 
@@ -1238,7 +1230,6 @@ async function saveGeneratorData(generatorData) {
         });
 
         if (response.ok) {
-            console.log('Данные генератора успешно сохранены');
         }
     } catch (error) {
         console.error('Ошибка при сохранении данных генератора:', error);
@@ -1248,7 +1239,6 @@ async function saveGeneratorData(generatorData) {
 async function loadGeneratorData() {
     try {
         const token = localStorage.getItem('jwt_token');
-        console.log('✅ 3 ✅✅✅✅✅✅token', this.token);
         if (!token) return null;
 
         const response = await fetch('/api/generator/load', {
@@ -1593,9 +1583,7 @@ function setupAuthHandlers() {
 async function saveProgress(progressData) {
     try {
         const token = localStorage.getItem('jwt_token');
-        console.log('✅ 4 ✅✅✅✅✅✅token', this.token);
         if (!token) {
-            console.log('Пользователь не авторизован, прогресс не сохранен');
             return;
         }
 
@@ -1609,7 +1597,6 @@ async function saveProgress(progressData) {
         });
 
         if (response.ok) {
-            console.log('Прогресс успешно сохранен');
         } else {
             console.error('Ошибка сохранения прогресса');
         }
@@ -1622,9 +1609,7 @@ async function saveProgress(progressData) {
 async function loadProgress() {
     try {
         const token = localStorage.getItem('jwt_token');
-        console.log('✅ 5 ✅✅✅✅✅✅token', this.token);
         if (!token) {
-            console.log('Пользователь не авторизован, прогресс не загружен');
             return null;
         }
 

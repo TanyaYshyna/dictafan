@@ -106,7 +106,7 @@ def api_book_dictations(book_id: int):
 
 @library_bp.route("/api/book-cover")
 def api_get_book_cover():
-    """Получение обложки книги (прокси из B2 с локальным кэшем, если включено)."""
+    """Получение обложки книги (Option A: только B2)."""
     from helpers.b2_storage import b2_storage
 
     try:
@@ -117,25 +117,38 @@ def api_get_book_cover():
         if not book_id:
             return jsonify({"error": "book_id parameter required"}), 400
 
-        # локальный кэш
-        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
-        # Локально всегда кэшируем под одним именем (cover.webp), чтобы не плодить варианты кэша.
-        # Параметр filename оставляем только для обратной совместимости со старым путём в B2.
-        local_path = os.path.join(data_base, "books", f"book_{book_id}", "cover.webp")
+        if not b2_storage.enabled:
+            return jsonify({"error": "B2 storage is disabled"}), 503
 
-        # основное хранилище: B2
-        if b2_storage.enabled:
-            # Новый формат хранения: books_covers/<book_id>.webp
-            remote_path_new = f"books_covers/{book_id}.webp"
-            if b2_storage.file_exists(remote_path_new):
-                if b2_storage.download_file(remote_path_new, local_path):
-                    return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+        remote_path_new = f"books_covers/{book_id}.webp"
+        if b2_storage.file_exists(remote_path_new):
+            import tempfile
+            from flask import after_this_request
 
-        # fallback: локальный файл (если вдруг был сохранен локально)
-        if os.path.exists(local_path):
-            return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+            tmp = tempfile.NamedTemporaryFile(prefix="book_cover_", suffix=".webp", delete=False)
+            tmp_path = tmp.name
+            tmp.close()
+
+            ok = b2_storage.download_file(remote_path_new, tmp_path)
+            if not ok:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                return jsonify({"error": "Failed to download cover from B2"}), 502
+
+            @after_this_request
+            def _cleanup_tmp(response):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                return response
+
+            return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
 
         # fallback: дефолтная обложка
+        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
         default_path = os.path.join(data_base, "covers", "cover_en.webp")
         if os.path.exists(default_path):
             return send_from_directory(os.path.dirname(default_path), os.path.basename(default_path))
@@ -313,13 +326,19 @@ def api_create_book():
             section_number=section_number_int,
             author_materials_url=author_materials_url_str,
         )
-        
+
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
+            from helpers.b2_storage import b2_storage
+            if not b2_storage.enabled:
+                return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
+
             cover_url = _save_book_cover(book["id"], user["id"], cover_file)
-            if cover_url:
-                # Обновляем книгу с URL обложки
-                book = update_book(book["id"], cover_url=cover_url)
+            if not cover_url:
+                return jsonify({"success": False, "error": "Failed to save cover"}), 502
+
+            # Обновляем книгу с URL обложки
+            book = update_book(book["id"], cover_url=cover_url)
         
         return jsonify({"success": True, "book": book})
     except Exception as exc:
@@ -422,9 +441,18 @@ def api_update_book(book_id: int):
             update_data["author_materials_url"] = payload.get("author_materials_url")
         
         # Обрабатываем строковые поля
-        for key in ["title", "original_language", "visibility", "short_description", "author_text", "theme", "author_materials_url"]:
+        for key in [
+            "title",
+            "original_language",
+            "visibility",
+            "short_description",
+            "author_text",
+            "theme",
+            "author_materials_url",
+        ]:
             if key in update_data and isinstance(update_data[key], str):
                 update_data[key] = update_data[key].strip() or None
+
         cover_file = None
 
     # На уровне БД пока нет явной проверки создателя, поэтому ограничимся простым UPDATE:
@@ -437,10 +465,16 @@ def api_update_book(book_id: int):
         
         # Обрабатываем обложку, если она была загружена
         if cover_file and cover_file.filename:
+            from helpers.b2_storage import b2_storage
+            if not b2_storage.enabled:
+                return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
+
             cover_url = _save_book_cover(book_id, user["id"], cover_file)
-            if cover_url:
-                # Обновляем книгу с URL обложки
-                book = update_book(book_id, cover_url=cover_url)
+            if not cover_url:
+                return jsonify({"success": False, "error": "Failed to save cover"}), 502
+
+            # Обновляем книгу с URL обложки
+            book = update_book(book_id, cover_url=cover_url)
         
         return jsonify({"success": True, "book": book})
     except Exception as exc:
@@ -748,11 +782,9 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
             logger.warning("Файл обложки не является изображением: %s", cover_file.content_type)
             return None
 
-        data_base = os.getenv("STATIC_DATA_FOLDER") or os.path.join(current_app.root_path, "static", "data")
-
-        # Создаем папку для книги
-        book_folder = os.path.join(data_base, "books", f"book_{book_id}")
-        os.makedirs(book_folder, exist_ok=True)
+        if not b2_storage.enabled:
+            logger.error("B2 storage is disabled; refusing to save book cover (Option A)")
+            return None
 
         # Открываем изображение
         image = Image.open(cover_file.stream)
@@ -772,26 +804,29 @@ def _save_book_cover(book_id: int, creator_user_id: int, cover_file) -> str:
         if image.size != (200, 200):
             image = image.resize((200, 200), Image.Resampling.LANCZOS)
 
-        # Сохраняем как WebP
-        cover_path = os.path.join(book_folder, "cover.webp")
-        image.save(cover_path, "WEBP", quality=90)
+        import tempfile
 
-        # Если включено B2 — грузим туда и возвращаем стабильный proxy URL
-        if b2_storage.enabled:
+        tmp = tempfile.NamedTemporaryFile(prefix=f"book_{book_id}_", suffix=".webp", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+
+        try:
+            image.save(tmp_path, "WEBP", quality=90)
+
             remote_path = f"books_covers/{book_id}.webp"
-            uploaded = b2_storage.upload_file(cover_path, remote_path)
+            uploaded = b2_storage.upload_file(tmp_path, remote_path)
             if uploaded:
                 cover_url = f"/library/api/book-cover?book_id={book_id}&user_id={creator_user_id}&filename=cover.webp"
                 logger.info("Обложка книги загружена в B2: %s", remote_path)
                 return cover_url
-            logger.error("Failed to upload book cover to B2: %s", remote_path)
-        else:
-            logger.info("B2 disabled; keeping book cover only in local storage")
 
-        # Fallback: локальный URL
-        cover_url = f"/static/data/books/book_{book_id}/cover.webp"
-        logger.info("Обложка книги сохранена локально: %s", cover_url)
-        return cover_url
+            logger.error("Failed to upload book cover to B2: %s", remote_path)
+            return None
+        finally:
+            try:
+                os.remove(tmp_path)
+            except OSError:
+                pass
 
     except Exception as exc:
         logger.error("Ошибка сохранения обложки книги %s: %s", book_id, exc)
