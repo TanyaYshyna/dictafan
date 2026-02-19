@@ -3390,8 +3390,8 @@ function updateWaveformVisibilityForMicMode() {
 
     if (sentence && sentence.audio_mic) {
         // Есть записанное аудио - загружаем и показываем волну
-        // Сначала пробуем загрузить из постоянной папки dictations
-        let audioPath = `/static/data/dictations/${currentDictation.id}/${currentDictation.language_original}/${sentence.audio_mic}`;
+        // Загружаем из текущего источника (B2 proxy для сохранённых диктантов, temp для временных)
+        let audioPath = `${getAudioPath(currentDictation.language_original)}/${sentence.audio_mic}`;
 
         // Загружаем аудио в волну
         loadAudioIntoWaveform(audioPath).then(() => {
@@ -3399,14 +3399,8 @@ function updateWaveformVisibilityForMicMode() {
                 window.waveformCanvas.show();
             }
         }).catch(error => {
-            console.warn('⚠️ Файл не найден в dictations, пробуем temp:', error);
-            // Если не найден в dictations, пробуем temp
-            audioPath = `${getAudioPath(currentDictation.language_original)}/${sentence.audio_mic}`;
-            return loadAudioIntoWaveform(audioPath);
-        }).then(() => {
-            if (window.waveformCanvas) {
-                window.waveformCanvas.show();
-            }
+            console.error('❌ Ошибка загрузки аудио в волну:', error);
+            throw error;
         }).catch(error => {
             console.error('❌ Ошибка загрузки аудио в волну:', error);
             if (window.waveformCanvas) {
@@ -6945,9 +6939,14 @@ async function autoTranslate(text, fromLanguage, toLanguage) {
  */
 function getAudioPath(language) {
     if (currentDictation.user_id && currentDictation.id.startsWith('dict_temp_')) {
-        return `/static/data/temp/${currentDictation.user_id}/${currentDictation.id}/${language}`;
+        return `/api/temp-audio/${currentDictation.user_id}/${currentDictation.id}/${language}`;
     }
-    return `/static/data/temp/${currentDictation.id}/${language}`;
+
+    if (currentDictation.id && currentDictation.id.startsWith('dict_')) {
+        return `/api/audio/${currentDictation.id}/${language}`;
+    }
+
+    return '';
 }
 
 async function generateAudioForSentence(sentence, language) {

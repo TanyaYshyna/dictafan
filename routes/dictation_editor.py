@@ -109,30 +109,43 @@ def generate_audio():
             tts.save(filepath)
             logging.info(f"Аудиофайл успешно сохранен: {filepath}")
             
-            # Загружаем в B2, если включено (только для существующих диктантов)
-            # Для временных диктантов не загружаем в B2 до сохранения
+            # Загружаем в B2, если включено.
+            # Для временных диктантов (dict_temp_*) кладём в отдельный префикс dictations_temp/<user_id>/...
             audio_url = None
-            if b2_storage.enabled and not dictation_id.startswith('dict_temp_'):
-                # Используем формат dictations/dict_<id>/<lang>/<filename>
+            if not b2_storage.enabled:
+                return jsonify({
+                    "success": False,
+                    "error": "B2 storage is disabled"
+                }), 503
+
+            if dictation_id.startswith('dict_temp_'):
+                if not user_id:
+                    return jsonify({
+                        "success": False,
+                        "error": "Missing user_id for temp dictation"
+                    }), 400
+
+                remote_path = f"dictations_temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
+                b2_url = b2_storage.upload_file(filepath, remote_path)
+                if not b2_url:
+                    return jsonify({
+                        "success": False,
+                        "error": "Failed to upload temp audio to B2"
+                    }), 502
+
+                audio_url = f"/api/temp-audio/{user_id}/{dictation_id}/{lang}/{filename_audio}"
+                logging.info(f"Сгенерированное аудио (temp) загружено в B2: {remote_path}")
+            else:
                 remote_path = f"dictations/{dictation_id}/{lang}/{filename_audio}"
                 b2_url = b2_storage.upload_file(filepath, remote_path)
-                
-                if b2_url:
-                    audio_url = b2_url
-                    logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
-                else:
-                    # Fallback на локальный путь
-                    if user_id and dictation_id.startswith('dict_temp_'):
-                        audio_url = f"/static/data/temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
-                    else:
-                        audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
-                    logging.warning(f"Не удалось загрузить в B2, используется локальный путь")
-            else:
-                # Локальный путь
-                if user_id and dictation_id.startswith('dict_temp_'):
-                    audio_url = f"/static/data/temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
-                else:
-                    audio_url = f"/static/data/temp/{dictation_id}/{lang}/{filename_audio}"
+                if not b2_url:
+                    return jsonify({
+                        "success": False,
+                        "error": "Failed to upload audio to B2"
+                    }), 502
+
+                audio_url = f"/api/audio/{dictation_id}/{lang}/{filename_audio}"
+                logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
 
             return jsonify({
                 "success": True,

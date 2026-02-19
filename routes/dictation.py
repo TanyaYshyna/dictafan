@@ -1,10 +1,118 @@
-from flask import Blueprint, abort, current_app, render_template, url_for, jsonify, request
+from flask import Blueprint, abort, after_this_request, current_app, jsonify, render_template, send_from_directory, url_for, request
+import os
+import tempfile
+from werkzeug.utils import secure_filename
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_current_user, login_required, get_safe_email
 from helpers.db_dictations import get_dictation_by_id, get_dictation_sentences
 from routes.index import get_cover_url_for_id
 
 dictation_bp = Blueprint('dictation', __name__)
+
+
+@dictation_bp.route('/api/audio/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
+def api_get_dictation_audio(dictation_id, lang, filename):
+    """Получение аудио диктанта (Option A: только B2).
+
+    Ожидаемый путь в B2:
+      dictations/<dictation_id>/<lang>/<filename>
+    где dictation_id в формате dict_<id>.
+    """
+    from helpers.b2_storage import b2_storage
+
+    if not b2_storage.enabled:
+        return jsonify({'error': 'B2 storage is disabled'}), 503
+
+    if not dictation_id or not dictation_id.startswith('dict_') or dictation_id.startswith('dict_temp_'):
+        return jsonify({'error': f'Invalid dictation_id: {dictation_id}'}), 400
+
+    safe_lang = (lang or '').strip().lower()
+    if not safe_lang:
+        return jsonify({'error': 'Missing language'}), 400
+
+    safe_name = secure_filename(filename or '')
+    if not safe_name:
+        return jsonify({'error': 'Missing filename'}), 400
+
+    remote_path = f"dictations/{dictation_id}/{safe_lang}/{safe_name}"
+    if not b2_storage.file_exists(remote_path):
+        return jsonify({'error': 'Audio file not found'}), 404
+
+    tmp = tempfile.NamedTemporaryFile(prefix='dict_audio_', suffix=f"_{safe_name}", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
+    ok = b2_storage.download_file(remote_path, tmp_path)
+    if not ok:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return jsonify({'error': 'Failed to download audio from B2'}), 502
+
+    @after_this_request
+    def _cleanup_tmp(response):
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return response
+
+    return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
+
+
+@dictation_bp.route('/api/temp-audio/<int:user_id>/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
+def api_get_temp_dictation_audio(user_id, dictation_id, lang, filename):
+    """Получение аудио для временного диктанта (Option A: только B2).
+
+    Ожидаемый путь в B2:
+      dictations_temp/<user_id>/<dictation_id>/<lang>/<filename>
+    где dictation_id в формате dict_temp_<timestamp>.
+    """
+    from helpers.b2_storage import b2_storage
+
+    if not b2_storage.enabled:
+        return jsonify({'error': 'B2 storage is disabled'}), 503
+
+    if not dictation_id or not dictation_id.startswith('dict_temp_'):
+        return jsonify({'error': f'Invalid dictation_id: {dictation_id}'}), 400
+
+    safe_lang = (lang or '').strip().lower()
+    if not safe_lang:
+        return jsonify({'error': 'Missing language'}), 400
+
+    safe_name = secure_filename(filename or '')
+    if not safe_name:
+        return jsonify({'error': 'Missing filename'}), 400
+
+    if not user_id or user_id <= 0:
+        return jsonify({'error': 'Invalid user_id'}), 400
+
+    remote_path = f"dictations_temp/{user_id}/{dictation_id}/{safe_lang}/{safe_name}"
+    if not b2_storage.file_exists(remote_path):
+        return jsonify({'error': 'Audio file not found'}), 404
+
+    tmp = tempfile.NamedTemporaryFile(prefix='dict_temp_audio_', suffix=f"_{safe_name}", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+
+    ok = b2_storage.download_file(remote_path, tmp_path)
+    if not ok:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return jsonify({'error': 'Failed to download audio from B2'}), 502
+
+    @after_this_request
+    def _cleanup_tmp(response):
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        return response
+
+    return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
 
 @dictation_bp.route('/dictation')
 def dictation():
@@ -107,11 +215,11 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
                 "key": sentence_key,
                 "text": orig_sentence.get("text", ""),
                 "translation": translated.get("text", ""),
-                "audio": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_o_file}") if audio_o_file else "",
-                "audio_a": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_a_file}") if audio_a_file else "",
-                "audio_f": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_f_file}") if audio_f_file else "",
-                "audio_m": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_m_file}") if audio_m_file else "",
-                "audio_tr": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_tr}/{audio_tr_file}") if audio_tr_file else "",
+                "audio": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
+                "audio_a": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
+                "audio_f": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
+                "audio_m": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
+                "audio_tr": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
                 "completed_correctly": False,
                 "speaker": orig_sentence.get("speaker"),
                 "explanation": translated.get("explanation", "")
@@ -201,11 +309,11 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
                 "key": sentence_key,
                 "text": orig_sentence.get("text", ""),
                 "translation": translated.get("text", ""),
-                "audio": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_o_file}") if audio_o_file else "",
-                "audio_a": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_a_file}") if audio_a_file else "",
-                "audio_f": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_f_file}") if audio_f_file else "",
-                "audio_m": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_orig}/{audio_m_file}") if audio_m_file else "",
-                "audio_tr": url_for('static', filename=f"data/dictations/{dictation_id}/{lang_tr}/{audio_tr_file}") if audio_tr_file else "",
+                "audio": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
+                "audio_a": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
+                "audio_f": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
+                "audio_m": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
+                "audio_tr": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
                 "completed_correctly": False,
                 "speaker": orig_sentence.get("speaker"),
                 "explanation": translated.get("explanation", "")
@@ -278,7 +386,7 @@ def api_get_dictation_sentences_simple(dictation_id):
             # Формируем URL для аудио
             audio_url = ''
             if audio_file:
-                audio_url = url_for('static', filename=f"data/dictations/dict_{dictation_id}/{lang_orig}/{audio_file}")
+                audio_url = url_for('dictation.api_get_dictation_audio', dictation_id=f"dict_{dictation_id}", lang=lang_orig, filename=audio_file)
             
             sentence = {
                 'sentence_key': sentence_key,
