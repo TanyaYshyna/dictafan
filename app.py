@@ -74,6 +74,11 @@ def serve_static_assets(filename):
         return serve_static_data(data_filename)
     return send_from_directory(_local_static_dir, filename)
 
+
+@app.route('/sw.js')
+def serve_service_worker():
+    return send_from_directory(os.path.dirname(__file__), 'sw.js', mimetype='application/javascript')
+
 @app.route('/health')
 def health_check():
     """Health check endpoint для Railway"""
