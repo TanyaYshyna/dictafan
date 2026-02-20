@@ -99,7 +99,26 @@ class B2Storage:
             logger.error(f"Failed to delete file from B2: {e}")
             return False
     
-    def file_exists(self, remote_path):
+    def _is_not_found_error(self, exc: Exception) -> bool:
+        status = getattr(exc, 'status', None)
+        if status == 404:
+            return True
+        code = getattr(exc, 'code', None)
+        if code and str(code).strip().lower() in {
+            'not_found',
+            'file_not_present',
+            'file_not_present_error',
+            'no_such_file',
+            'notfound',
+        }:
+            return True
+        msg = str(exc).lower()
+        if 'not found' in msg or 'no such file' in msg or 'file not present' in msg:
+            return True
+        return False
+
+
+    def file_exists(self, remote_path, raise_on_error: bool = False):
         """
         Проверяет, существует ли файл в B2
         
@@ -107,7 +126,7 @@ class B2Storage:
             remote_path: Путь к файлу в B2
         
         Returns:
-            True если файл существует, False иначе
+        True если файл существует, False иначе
         """
         if not self.enabled or not self.bucket:
             return False
@@ -115,7 +134,12 @@ class B2Storage:
         try:
             self.bucket.get_file_info_by_name(remote_path)
             return True
-        except B2Error:
+        except B2Error as e:
+            if self._is_not_found_error(e):
+                return False
+            logger.error("B2 file_exists error for %s: %s", remote_path, e, exc_info=True)
+            if raise_on_error:
+                raise
             return False
     
     def get_download_url(self, remote_path, valid_duration_seconds=3600):

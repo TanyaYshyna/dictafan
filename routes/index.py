@@ -741,8 +741,11 @@ def get_cover_url_for_id(dictation_id, language=None):
     if b2_storage.enabled and dictation_id and dictation_id.startswith('dict_'):
         numeric_id = dictation_id.split('_', 1)[1]
         remote_path_new = f"dictations_covers/{numeric_id}.webp"
-        if b2_storage.file_exists(remote_path_new):
-            return f"/api/cover?dictation_id={dictation_id}"
+        try:
+            if b2_storage.file_exists(remote_path_new, raise_on_error=True):
+                return f"/api/cover?dictation_id={dictation_id}"
+        except Exception:
+            logger.error("B2 cover check failed for %s", remote_path_new, exc_info=True)
 
     # --- 2) языковая обложка в /static/data/covers/ ---
     if language:
@@ -783,7 +786,12 @@ def api_get_cover():
         if dictation_id.startswith('dict_'):
             numeric_id = dictation_id.split('_', 1)[1]
             remote_path_new = f"dictations_covers/{numeric_id}.webp"
-            if b2_storage.file_exists(remote_path_new):
+            try:
+                exists = b2_storage.file_exists(remote_path_new, raise_on_error=True)
+            except Exception:
+                return jsonify({'error': 'B2 storage unavailable'}), 503
+
+            if exists:
                 import tempfile
                 from flask import after_this_request
 

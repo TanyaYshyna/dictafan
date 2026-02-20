@@ -35,7 +35,12 @@ def api_get_dictation_audio(dictation_id, lang, filename):
         return jsonify({'error': 'Missing filename'}), 400
 
     remote_path = f"dictations/{dictation_id}/{safe_lang}/{safe_name}"
-    if not b2_storage.file_exists(remote_path):
+    try:
+        exists = b2_storage.file_exists(remote_path, raise_on_error=True)
+    except Exception:
+        return jsonify({'error': 'B2 storage unavailable'}), 503
+
+    if not exists:
         return jsonify({'error': 'Audio file not found'}), 404
 
     tmp = tempfile.NamedTemporaryFile(prefix='dict_audio_', suffix=f"_{safe_name}", delete=False)
@@ -89,7 +94,12 @@ def api_get_temp_dictation_audio(user_id, dictation_id, lang, filename):
         return jsonify({'error': 'Invalid user_id'}), 400
 
     remote_path = f"dictations_temp/{user_id}/{dictation_id}/{safe_lang}/{safe_name}"
-    if not b2_storage.file_exists(remote_path):
+    try:
+        exists = b2_storage.file_exists(remote_path, raise_on_error=True)
+    except Exception:
+        return jsonify({'error': 'B2 storage unavailable'}), 503
+
+    if not exists:
         return jsonify({'error': 'Audio file not found'}), 404
 
     tmp = tempfile.NamedTemporaryFile(prefix='dict_temp_audio_', suffix=f"_{safe_name}", delete=False)
