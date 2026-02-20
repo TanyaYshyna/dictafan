@@ -38,11 +38,33 @@
         </div>
     </div>
 
+    <div id="offline-cache-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Оффлайн кеш</h3>
+                <button class="modal-close" id="offline-cache-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div id="offlineCacheStatus" style="opacity:0.9;">—</div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <button type="button" class="btn-secondary" id="offlineCacheRefreshBtn">Обновить</button>
+                        <button type="button" class="btn-primary" id="offlineCachePrefetchDeskBtn">Скачать диктанты со стола</button>
+                        <button type="button" class="btn-secondary" id="offlineCacheClearBtn">Очистить кеш</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="panel">
         <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
         <div class="desk-zone">
             <div class="desk-zone-header">
                 <h3><i data-lucide="clipboard"></i> Рабочий стол</h3>
+                <button id="btnOfflineCache" class="btn-icon-round" title="Оффлайн кеш">
+                    <i data-lucide="hard-drive"></i>
+                </button>
                 <button id="btnPublicLibrary" class="btn-icon-round" title="Публичная библиотека">
                     <i data-lucide="globe"></i>
                 </button>

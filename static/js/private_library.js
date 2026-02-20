@@ -52,6 +52,129 @@
   function showToast(message) {
     alert(message);
   }
+
+  function formatBytes(bytes) {
+    const n = Number(bytes) || 0;
+    if (n <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const k = 1024;
+    const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(k)));
+    const value = n / Math.pow(k, i);
+    const decimals = i === 0 ? 0 : (i === 1 ? 0 : 1);
+    return `${value.toFixed(decimals)} ${units[i]}`;
+  }
+
+  async function swRequest(action, payload = {}) {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+      throw new Error('Service Worker не активен');
+    }
+
+    return await new Promise((resolve, reject) => {
+      const channel = new MessageChannel();
+      const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+      const timeout = setTimeout(() => {
+        reject(new Error('SW timeout'));
+      }, 15000);
+
+      channel.port1.onmessage = (event) => {
+        clearTimeout(timeout);
+        const data = event.data || {};
+        if (data.requestId && data.requestId !== requestId) {
+          reject(new Error('SW invalid response'));
+          return;
+        }
+        if (data.success) {
+          resolve(data);
+        } else {
+          reject(new Error(data.error || 'SW error'));
+        }
+      };
+
+      navigator.serviceWorker.controller.postMessage(
+        { action, requestId, ...payload },
+        [channel.port2]
+      );
+    });
+  }
+
+  async function refreshOfflineCacheStatus() {
+    const statusEl = document.getElementById('offlineCacheStatus');
+    if (!statusEl) return;
+    statusEl.textContent = 'Обновляю…';
+    try {
+      const res = await swRequest('cacheStats');
+      const bytes = res.stats?.totalBytes || 0;
+      const entries = res.stats?.entries || 0;
+      statusEl.textContent = `Записей: ${entries}. Размер: ${formatBytes(bytes)}.`;
+    } catch (e) {
+      statusEl.textContent = `Ошибка: ${e && e.message ? e.message : String(e)}`;
+    }
+  }
+
+  function openOfflineCacheModal() {
+    const modal = document.getElementById('offline-cache-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    refreshOfflineCacheStatus();
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function closeOfflineCacheModal() {
+    const modal = document.getElementById('offline-cache-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+  }
+
+  async function prefetchDeskAssets() {
+    if (!deskItems || !deskItems.length) {
+      showToast('На столе пока нет диктантов');
+      return;
+    }
+
+    const urls = [];
+
+    for (const item of deskItems) {
+      try {
+        if (item.cover_url) urls.push(item.cover_url);
+
+        const dictId = `dict_${item.dictation_id}`;
+        const langOrig = item.language_code || 'en';
+        const langTr = item.language_translation || langOrig;
+        const apiUrl = `/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`;
+
+        const sentencesRes = await fetch(apiUrl);
+        if (!sentencesRes.ok) {
+          continue;
+        }
+        const sentencesData = await sentencesRes.json();
+        const sentences = sentencesData && sentencesData.sentences ? sentencesData.sentences : [];
+        for (const s of sentences) {
+          if (!s) continue;
+          const candidates = [s.audio, s.audio_a, s.audio_f, s.audio_m, s.audio_tr];
+          for (const u of candidates) {
+            if (u && typeof u === 'string') urls.push(u);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const unique = Array.from(new Set(urls));
+    const statusEl = document.getElementById('offlineCacheStatus');
+    if (statusEl) statusEl.textContent = `Скачиваю… (${unique.length} файлов)`;
+
+    try {
+      const res = await swRequest('prefetch', { urls: unique });
+      const result = res.result || {};
+      showToast(`Готово. Скачано: ${result.fetched || 0}. Уже было: ${result.skipped || 0}. Ошибок: ${result.failed || 0}.`);
+    } catch (e) {
+      showToast(`Ошибка prefetch: ${e && e.message ? e.message : String(e)}`);
+    } finally {
+      refreshOfflineCacheStatus();
+    }
+  }
   
   /**
    * Сохраняем целевую книгу/раздел для нового диктанта в sessionStorage,
@@ -1769,6 +1892,50 @@
     const publicLibraryBtn = document.getElementById("btnPublicLibrary");
     if (publicLibraryBtn) {
       publicLibraryBtn.addEventListener("click", () => openPublicLibraryModal());
+    }
+
+    const offlineCacheBtn = document.getElementById('btnOfflineCache');
+    if (offlineCacheBtn) {
+      offlineCacheBtn.addEventListener('click', () => openOfflineCacheModal());
+    }
+
+    const offlineCacheCloseBtn = document.getElementById('offline-cache-close');
+    if (offlineCacheCloseBtn) {
+      offlineCacheCloseBtn.addEventListener('click', closeOfflineCacheModal);
+    }
+
+    const offlineCacheModal = document.getElementById('offline-cache-modal');
+    if (offlineCacheModal) {
+      offlineCacheModal.addEventListener('click', (event) => {
+        if (event.target === offlineCacheModal) {
+          closeOfflineCacheModal();
+        }
+      });
+    }
+
+    const offlineCacheRefreshBtn = document.getElementById('offlineCacheRefreshBtn');
+    if (offlineCacheRefreshBtn) {
+      offlineCacheRefreshBtn.addEventListener('click', refreshOfflineCacheStatus);
+    }
+
+    const offlineCacheClearBtn = document.getElementById('offlineCacheClearBtn');
+    if (offlineCacheClearBtn) {
+      offlineCacheClearBtn.addEventListener('click', async () => {
+        if (!confirm('Очистить оффлайн кеш?')) return;
+        try {
+          await swRequest('cacheClear');
+          showToast('Кеш очищен');
+        } catch (e) {
+          showToast(`Ошибка очистки: ${e && e.message ? e.message : String(e)}`);
+        } finally {
+          refreshOfflineCacheStatus();
+        }
+      });
+    }
+
+    const offlineCachePrefetchDeskBtn = document.getElementById('offlineCachePrefetchDeskBtn');
+    if (offlineCachePrefetchDeskBtn) {
+      offlineCachePrefetchDeskBtn.addEventListener('click', prefetchDeskAssets);
     }
 
     // Инициализация перетаскивания разделителя между зонами

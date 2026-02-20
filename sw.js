@@ -96,3 +96,114 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(cacheFirst(request));
 });
+
+async function computeCacheStats() {
+  const cache = await caches.open(RUNTIME_CACHE);
+  const keys = await cache.keys();
+
+  let totalBytes = 0;
+  for (const req of keys) {
+    try {
+      const res = await cache.match(req);
+      if (!res) continue;
+
+      const len = res.headers.get('content-length');
+      if (len) {
+        const parsed = parseInt(len, 10);
+        if (!isNaN(parsed)) {
+          totalBytes += parsed;
+          continue;
+        }
+      }
+
+      const blob = await res.clone().blob();
+      totalBytes += blob.size || 0;
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return { entries: keys.length, totalBytes };
+}
+
+async function clearRuntimeCache() {
+  await caches.delete(RUNTIME_CACHE);
+  return { cleared: true };
+}
+
+async function prefetchUrls(urls) {
+  const cache = await caches.open(RUNTIME_CACHE);
+  let fetched = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const url of urls || []) {
+    try {
+      if (!url || typeof url !== 'string') {
+        failed += 1;
+        continue;
+      }
+
+      const cached = await cache.match(url);
+      if (cached) {
+        skipped += 1;
+        continue;
+      }
+
+      const res = await fetch(new Request(url, { method: 'GET' }));
+      if (res && res.ok) {
+        await cache.put(url, res.clone());
+        fetched += 1;
+      } else {
+        failed += 1;
+      }
+    } catch (e) {
+      failed += 1;
+    }
+  }
+
+  return { fetched, skipped, failed, total: (urls || []).length };
+}
+
+self.addEventListener('message', (event) => {
+  const data = event.data || {};
+  const action = data.action;
+  const requestId = data.requestId;
+
+  const respond = (payload) => {
+    try {
+      if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage({ requestId, ...payload });
+      }
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  (async () => {
+    try {
+      if (action === 'cacheStats') {
+        const stats = await computeCacheStats();
+        respond({ success: true, stats });
+        return;
+      }
+
+      if (action === 'cacheClear') {
+        const res = await clearRuntimeCache();
+        respond({ success: true, result: res });
+        return;
+      }
+
+      if (action === 'prefetch') {
+        const urls = Array.isArray(data.urls) ? data.urls : [];
+        const res = await prefetchUrls(urls);
+        respond({ success: true, result: res });
+        return;
+      }
+
+      respond({ success: false, error: 'unknown_action' });
+    } catch (e) {
+      respond({ success: false, error: String(e) });
+    }
+  })();
+});
