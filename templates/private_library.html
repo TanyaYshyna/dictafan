@@ -39,24 +39,26 @@
     </div>
 
     <div id="offline-cache-modal" class="modal" style="display: none;">
-        <div class="modal-content" style="max-width: 520px;">
-            <div class="modal-header">
+        <div class="modal-content offline-cache-modal-content" style="max-width: 520px;">
+            <div class="modal-header offline-cache-modal-header">
                 <h3>Оффлайн кеш</h3>
-                <button class="modal-close" id="offline-cache-close">&times;</button>
+                <button class="offline-cache-modal-close" id="offline-cache-close" type="button" aria-label="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
-            <div class="modal-body">
-                <div style="display:flex; flex-direction:column; gap:12px;">
-                    <div id="offlineCacheStatus" style="opacity:0.9;">—</div>
+            <div class="modal-body offline-cache-modal-body">
+                <div class="offline-cache-modal-stack">
+                    <div id="offlineCacheStatus" class="offline-cache-status">—</div>
                     <div id="offlineCacheProgressWrap" class="offline-cache-progress" style="display:none;">
                         <div class="offline-cache-progress__bar">
                             <div id="offlineCacheProgressBar" class="offline-cache-progress__bar-fill" style="width:0%;"></div>
                         </div>
                         <div id="offlineCacheProgressText" class="offline-cache-progress__text">0%</div>
                     </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                        <button type="button" class="btn-secondary" id="offlineCacheRefreshBtn">Обновить</button>
-                        <button type="button" class="btn-primary" id="offlineCachePrefetchDeskBtn">Скачать диктанты со стола</button>
+                    <div class="offline-cache-actions">
                         <button type="button" class="btn-secondary" id="offlineCacheClearBtn">Очистить кеш</button>
+                        <button type="button" class="btn-secondary" id="offlineCacheRefreshBtn">Обновить</button>
+                        <button type="button" class="btn-primary" id="offlineCachePrefetchDeskBtn">Скачать</button>
                     </div>
                 </div>
             </div>
