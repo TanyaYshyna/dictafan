@@ -19,23 +19,38 @@ function shouldHandleRequest(requestUrl) {
 }
 
 async function cacheFirst(request) {
-  const cache = await caches.open(RUNTIME_CACHE);
+  try {
+    const cache = await caches.open(RUNTIME_CACHE);
 
-  // Audio elements often send Range requests. CacheStorage matches requests including headers,
-  // so a cached full response may not be found for a different Range header later.
-  // We normalize by using the URL as the cache key and fetching without Range.
-  const hasRange = request.headers && request.headers.has('range');
-  const cacheKey = hasRange ? request.url : request;
+    const hasRange = request.headers && request.headers.has('range');
+    const cacheKey = hasRange ? request.url : request;
 
-  const cached = await cache.match(cacheKey);
-  if (cached) return cached;
+    const cached = await cache.match(cacheKey);
+    if (cached) return cached;
 
-  const networkRequest = hasRange ? new Request(request.url, { method: 'GET', headers: {} }) : request;
-  const response = await fetch(networkRequest);
-  if (response && response.ok) {
-    await cache.put(cacheKey, response.clone());
+    const response = await fetch(request);
+    if (response && response.ok && !hasRange) {
+      await cache.put(cacheKey, response.clone());
+    }
+    return response;
+  } catch (e) {
+    return fetch(request);
   }
-  return response;
+}
+
+async function cacheAudioFullFileInBackground(url) {
+  try {
+    const cache = await caches.open(RUNTIME_CACHE);
+    const cached = await cache.match(url);
+    if (cached) return;
+
+    const response = await fetch(new Request(url, { method: 'GET' }));
+    if (response && response.ok) {
+      await cache.put(url, response.clone());
+    }
+  } catch (e) {
+    // ignore
+  }
 }
 
 self.addEventListener('install', (event) => {
@@ -60,6 +75,24 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   if (!shouldHandleRequest(request.url)) return;
+
+  // For Range requests (common for <audio>), return the original network Range response,
+  // but cache the full file in background using the URL as a normalized cache key.
+  const hasRange = request.headers && request.headers.has('range');
+  if (hasRange && request.url.includes('/api/audio/')) {
+    event.waitUntil(cacheAudioFullFileInBackground(request.url));
+    event.respondWith((async () => {
+      try {
+        const cache = await caches.open(RUNTIME_CACHE);
+        const cached = await cache.match(request.url);
+        if (cached) return cached;
+      } catch (e) {
+        // ignore
+      }
+      return fetch(request);
+    })());
+    return;
+  }
 
   event.respondWith(cacheFirst(request));
 });
