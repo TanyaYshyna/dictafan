@@ -204,8 +204,7 @@ class LanguageSelector {
                 ${Object.entries(this.languageData).map(([code, data]) => {
             // Показываем ВСЕ языки, но dropdown только если есть модели
             const hasModels = data.models && (
-                (data.models.whisper && data.models.whisper.length > 0) ||
-                (data.models.tts && data.models.tts.length > 0)
+                (data.models.whisper && data.models.whisper.length > 0)
             );
 
             const isSelected = learningLangs.includes(code);
@@ -256,19 +255,14 @@ class LanguageSelector {
 
         let items = [];
 
-        // Проверяем, выбрана ли какая-то модель для каждого типа
-        const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
-        const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
-
         // Проверяем, есть ли хотя бы один тип моделей
         const hasWhisper = languageData.models.whisper && languageData.models.whisper.length > 0;
-        const hasTTS = languageData.models.tts && languageData.models.tts.length > 0;
 
-        // Добавляем ОДНУ опцию "без модели" в начало списка, если есть хотя бы один тип моделей
-        if (hasWhisper || hasTTS) {
+        // Добавляем опцию "без модели" в начало списка, если есть модели
+        if (hasWhisper) {
             items.push({
                 id: null,
-                type: 'all', // специальный тип для "без модели" всех типов
+                type: 'whisper',
                 name: 'без модели',
                 displayText: 'без модели',
                 isNone: true
@@ -289,33 +283,16 @@ class LanguageSelector {
             })));
         }
 
-        // TTS модели
-        if (hasTTS) {
-            items.push(...languageData.models.tts.map(model => ({
-                id: model.id,
-                type: 'tts',
-                name: model.name,
-                size: model.size,
-                displayText: `tts: ${model.name} ${model.size}`,
-                isNone: false
-            })));
-        }
-
         return items.map(item => {
             // Для опции "без модели" проверяем, выбрана ли какая-то модель
             let isSelected = false;
             let selectedModel = null; // Инициализируем переменную для всех случаев
 
             if (item.isNone) {
-                // "без модели" выбрана, если не выбрана ни одна модель (ни whisper, ни tts)
+                // "без модели" выбрана, если не выбрана whisper модель
                 const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
-                const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
-
                 const hasSelectedWhisper = selectedWhisper && selectedWhisper !== null && selectedWhisper !== '' && selectedWhisper !== 'none' && String(selectedWhisper).trim() !== '';
-                const hasSelectedTTS = selectedTTS && selectedTTS !== null && selectedTTS !== '' && selectedTTS !== 'none' && String(selectedTTS).trim() !== '';
-
-                // "без модели" выбрана только если не выбрана ни одна модель
-                isSelected = !hasSelectedWhisper && !hasSelectedTTS;
+                isSelected = !hasSelectedWhisper;
                 selectedModel = 'none'; // Для опции "без модели"
             } else {
                 // Для обычных моделей проверяем стандартным способом
@@ -336,7 +313,7 @@ class LanguageSelector {
                 <div class="model-dropdown-item ${isSelected ? 'selected' : ''}" 
                      data-lang="${langCode}" 
                      data-model="${item.isNone ? 'none' : item.id}" 
-                     data-type="${item.isNone ? 'all' : item.type}"
+                     data-type="${item.type}"
                      data-is-none="${item.isNone}"
                      data-is-downloaded="${isDownloaded}"
                      style="padding: 10px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; gap: 10px;">
@@ -394,7 +371,7 @@ class LanguageSelector {
                 ${models.map(model => {
             const isActive = this.isModelActive(model.langCode, model.modelId, model.modelType);
             const languageName = this.getLanguageName(model.langCode);
-            const modelTypeName = model.modelType === 'whisper' ? 'Whisper' : 'TTS';
+            const modelTypeName = 'Whisper';
 
             return `
                     <div class="model-list-item ${isActive ? 'active-model' : ''}" 
@@ -463,22 +440,6 @@ class LanguageSelector {
                         }
                     });
                 }
-
-                // TTS модели
-                if (data.models.tts) {
-                    data.models.tts.forEach(model => {
-                        if (this.isModelDownloadedWithFallback(langCode, model.id, 'tts')) {
-                            models.push({
-                                langCode,
-                                modelId: model.id,
-                                modelType: 'tts',
-                                modelName: model.name,
-                                size: model.size,
-                                isActive: this.isModelActive(langCode, model.id, 'tts')
-                            });
-                        }
-                    });
-                }
             }
         });
 
@@ -515,17 +476,6 @@ class LanguageSelector {
             }
         }
 
-        // Проверяем выбранную TTS модель
-        if (languageData.models.tts && languageData.models.tts.length > 0) {
-            const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
-            if (selectedTTS && selectedTTS !== 'none' && selectedTTS !== '') {
-                const model = languageData.models.tts.find(m => m.id === selectedTTS);
-                if (model) {
-                    selectedModels.push(`tts: ${model.name}`);
-                }
-            }
-        }
-
         return selectedModels.length > 0 ? selectedModels.join(' + ') : 'без модели';
     }
 
@@ -545,7 +495,7 @@ class LanguageSelector {
         Object.entries(this.languageData).forEach(([code, data]) => {
             // Проверяем, нужно ли учитывать этот язык
             const shouldInclude = showAllLanguages 
-                ? (data.models && ((data.models.whisper && data.models.whisper.length > 0) || (data.models.tts && data.models.tts.length > 0)))
+                ? (data.models && ((data.models.whisper && data.models.whisper.length > 0)))
                 : learningLangs.includes(code);
 
             if (shouldInclude && data.models) {
@@ -558,21 +508,6 @@ class LanguageSelector {
 
                         // Проверяем, скачана ли модель
                         if (this.isModelDownloadedWithFallback(code, model.id, 'whisper')) {
-                            downloadedCount++;
-                            totalDownloadedSizeMB += sizeMB;
-                        }
-                    });
-                }
-
-                // TTS модели
-                if (data.models.tts) {
-                    data.models.tts.forEach(model => {
-                        const sizeMB = this.parseSizeToMB(model.size);
-                        totalAvailableModels++;
-                        totalAvailableSizeMB += sizeMB;
-
-                        // Проверяем, скачана ли модель
-                        if (this.isModelDownloadedWithFallback(code, model.id, 'tts')) {
                             downloadedCount++;
                             totalDownloadedSizeMB += sizeMB;
                         }
@@ -670,9 +605,6 @@ class LanguageSelector {
             if (learningLangs.includes(code) && data.models) {
                 if (data.models.whisper) {
                     count += data.models.whisper.length;
-                }
-                if (data.models.tts) {
-                    count += data.models.tts.length;
                 }
             }
         });
@@ -1197,7 +1129,7 @@ class LanguageSelector {
 
             const languageName = this.getLanguageName(langCode);
             const modelName = modelData.name;
-            const modelTypeName = modelType === 'whisper' ? 'Whisper' : 'TTS';
+            const modelTypeName = 'Whisper';
 
             // Проверяем, активна ли эта модель
             const isActive = this.isModelActive(langCode, modelId, modelType);
@@ -1470,7 +1402,7 @@ class LanguageSelector {
 
             // Показываем модальное окно загрузки
             this.showWhisperDownloadModal(langCode);
-            this.updateWhisperDownloadModalStatus(`Загрузка ${modelType === 'whisper' ? 'Whisper' : 'TTS'} модели ${modelData.name}...`);
+            this.updateWhisperDownloadModalStatus(`Загрузка Whisper модели ${modelData.name}...`);
 
             const updateProgress = (percent) => {
                 this.updateWhisperDownloadModalProgress(percent);
@@ -1564,6 +1496,9 @@ class LanguageSelector {
                 // Обновляем информацию о хранилище и список моделей
                 this.updateStorageInfo();
                 this.updateModelsTable();
+
+                // После загрузки сразу выбираем модель
+                this.setSelectedWhisperModel(langCode, modelId);
                 
                 // Если это левая панель, обновляем также правую панель (если она существует)
                 if (window.languageModelsSelector && this.options.mode !== 'models-only') {
@@ -1756,18 +1691,14 @@ class LanguageSelector {
     async selectModel(langCode, modelId, modelType, isNone, isDownloaded) {
         // Если выбрана опция "без модели"
         if (isNone) {
-            // Снимаем выборы со всех типов моделей (whisper и tts)
             const whisperKey = `selected_model_${langCode}_whisper`;
-            const ttsKey = `selected_model_${langCode}_tts`;
 
             localStorage.removeItem(whisperKey);
-            localStorage.removeItem(ttsKey);
 
             console.log(`⭐ Снят выбор всех моделей для языка: ${langCode}`);
 
             if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
-                window.ModelManager.setSelectedModel(langCode, 'whisper', null);
-                window.ModelManager.setSelectedModel(langCode, 'tts', null);
+                window.ModelManager.setSelectedModel(langCode, null, 'whisper');
             }
             this.updateModelSelectionUI(langCode);
             return;
@@ -1816,23 +1747,7 @@ class LanguageSelector {
                             // После загрузки проверяем еще раз и выбираем модель
                             const stillDownloaded = this.isModelDownloadedWithFallback(langCode, modelId, modelType);
                             if (stillDownloaded) {
-                                // ВАЖНО: может быть выбрана только ОДНА модель (whisper ИЛИ tts)
-                                const currentKey = `selected_model_${langCode}_${modelType}`;
-                                const otherType = modelType === 'whisper' ? 'tts' : 'whisper';
-                                const otherKey = `selected_model_${langCode}_${otherType}`;
-
-                                // Сохраняем выбранную модель
-                                localStorage.setItem(currentKey, modelId);
-
-                                // Снимаем выбор с модели другого типа
-                                localStorage.removeItem(otherKey);
-
-                                if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
-                                    window.ModelManager.setSelectedModel(langCode, modelType, modelId);
-                                    // Снимаем выбор с модели другого типа
-                                    window.ModelManager.setSelectedModel(langCode, otherType, null);
-                                }
-                                this.updateModelSelectionUI(langCode);
+                                this.setSelectedWhisperModel(langCode, modelId);
                             }
                         }
                     }
@@ -1842,36 +1757,42 @@ class LanguageSelector {
         }
 
         // Если модель уже загружена - выбираем её
-        // ВАЖНО: может быть выбрана только ОДНА модель (whisper ИЛИ tts)
-        // Поэтому снимаем выбор с модели другого типа, если она была выбрана
+        this.setSelectedWhisperModel(langCode, modelId);
+    }
 
-        const currentKey = `selected_model_${langCode}_${modelType}`;
-        const otherType = modelType === 'whisper' ? 'tts' : 'whisper';
-        const otherKey = `selected_model_${langCode}_${otherType}`;
+    setSelectedWhisperModel(langCode, modelId) {
+        const currentKey = `selected_model_${langCode}_whisper`;
 
-        // Сохраняем выбранную модель
-        localStorage.setItem(currentKey, modelId);
-
-        // Снимаем выбор с модели другого типа
-        localStorage.removeItem(otherKey);
-
-        console.log(`⭐ Выбрана модель: ${langCode}/${modelType}/${modelId}`);
-        console.log(`   Снят выбор с модели другого типа: ${langCode}/${otherType}`);
+        if (!modelId || modelId === 'none') {
+            localStorage.removeItem(currentKey);
+        } else {
+            localStorage.setItem(currentKey, modelId);
+        }
 
         if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
-            window.ModelManager.setSelectedModel(langCode, modelType, modelId);
-            // Снимаем выбор с модели другого типа
-            window.ModelManager.setSelectedModel(langCode, otherType, null);
+            window.ModelManager.setSelectedModel(langCode, modelId || null, 'whisper');
         }
+
+        console.log(`⭐ Выбрана whisper модель: ${langCode}/whisper/${modelId || 'none'}`);
+
         this.updateModelSelectionUI(langCode);
+
+        if (this.options.mode === 'models-only') {
+            if (window.languageSelector) {
+                window.languageSelector.updateModelSelectionUI(langCode);
+            }
+        } else {
+            if (window.languageModelsSelector) {
+                window.languageModelsSelector.updateModelsTable();
+            }
+        }
     }
 
     // НОВЫЙ МЕТОД: обновление UI после выбора модели
     updateModelSelectionUI(langCode) {
         // Проверяем текущее состояние перед обновлением
         const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
-        const selectedTTS = this.getSelectedModelWithFallback(langCode, 'tts');
-        console.log(`🔄 Обновление UI для ${langCode}: whisper=${selectedWhisper}, tts=${selectedTTS}`);
+        console.log(`🔄 Обновление UI для ${langCode}: whisper=${selectedWhisper}`);
 
         // Обновляем выпадающий список
         const dropdown = this.options.container.querySelector(`#model-dropdown-${langCode}`);
@@ -1923,7 +1844,7 @@ class LanguageSelector {
                 align-items: center;
             `;
 
-            const modelTypeName = modelType === 'whisper' ? 'Whisper' : 'TTS';
+            const modelTypeName = 'Whisper';
             const qualityText = modelQuality ? ` (качество: ${modelQuality})` : '';
 
             modal.innerHTML = `

@@ -38,6 +38,18 @@
         </div>
     </div>
 
+    <div class="tool-palette" id="toolPalette">
+        <button id="btnHomeLibrary" class="tool-palette-btn" title="Моя библиотека">
+            <i data-lucide="home"></i>
+        </button>
+        <button id="btnPublicLibrary" class="tool-palette-btn" title="Публичная библиотека">
+            <i data-lucide="globe"></i>
+        </button>
+        <button id="btnOfflineCache" class="tool-palette-btn" title="Оффлайн кеш">
+            <i data-lucide="hard-drive"></i>
+        </button>
+    </div>
+
     <div id="offline-cache-modal" class="modal" style="display: none;">
         <div class="modal-content offline-cache-modal-content" style="max-width: 520px;">
             <div class="modal-header offline-cache-modal-header">
@@ -65,55 +77,49 @@
         </div>
     </div>
 
+    <div id="home-library-modal" class="modal" style="display: none;">
+        <div class="modal-content home-library-modal-content">
+            <div class="modal-header">
+                <h3>Моя библиотека</h3>
+                <button class="modal-close" id="home-library-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="library-content">
+                    <div class="books-zone" id="booksZone">
+                        <div class="books-zone-header">
+                            <div id="booksLanguageSelector" class="books-language-selector"></div>
+                            <h3>Мои книги</h3>
+                            <div class="books-zone-header-right">
+                                <button id="btnNewBookInZone" class="btn-new-book" title="Новая книга">
+                                    <i data-lucide="plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="books-list" id="booksList"></div>
+                    </div>
+
+                    <div class="zone-resizer" id="zoneResizer" style="display: none;"></div>
+
+                    <div class="active-book-zone" id="activeBookZone" style="display: none;">
+                        <div class="active-book-card" id="activeBookCard"></div>
+                        <div class="active-book-content">
+                            <div class="book-structure" id="bookStructure"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="panel">
         <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
         <div class="desk-zone">
             <div class="desk-zone-header">
                 <h3><i data-lucide="clipboard"></i> Рабочий стол</h3>
-                <button id="btnOfflineCache" class="btn-icon-round" title="Оффлайн кеш">
-                    <i data-lucide="hard-drive"></i>
-                </button>
-                <button id="btnPublicLibrary" class="btn-icon-round" title="Публичная библиотека">
-                    <i data-lucide="globe"></i>
-                </button>
             </div>
             <div class="desk-scroll-container">
                 <div class="desk-cards-container" id="deskCardsContainer">
                     <!-- Карточки диктантов будут загружаться через JS -->
-                </div>
-            </div>
-        </div>
-
-        <!-- ЗОНА 2 и ЗОНА 3: Двухпанельная структура -->
-        <div class="library-content">
-            <!-- ЗОНА 2: Список книг (слева) -->
-            <div class="books-zone" id="booksZone">
-                <div class="books-zone-header">
-                    <div id="booksLanguageSelector" class="books-language-selector"></div>
-                    <h3>Мои книги</h3>
-                    <div class="books-zone-header-right">
-                        <button id="btnNewBookInZone" class="btn-new-book" title="Новая книга">
-                            <i data-lucide="plus"></i>
-                        </button>
-                    </div>
-                </div>
-                <div class="books-list" id="booksList">
-                    <!-- Минимальные карточки книг будут загружаться через JS -->
-                </div>
-            </div>
-
-            <!-- Разделитель между зонами -->
-            <div class="zone-resizer" id="zoneResizer" style="display: none;"></div>
-
-            <!-- ЗОНА 3: Активная книга (справа) -->
-            <div class="active-book-zone" id="activeBookZone" style="display: none;">
-                <div class="active-book-card" id="activeBookCard">
-                    <!-- Максимальная карточка книги -->
-                </div>
-                <div class="active-book-content">
-                    <div class="book-structure" id="bookStructure">
-                        <!-- Структура книги (главы + диктанты) будет загружаться через JS -->
-                    </div>
                 </div>
             </div>
         </div>

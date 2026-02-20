@@ -137,6 +137,19 @@
     modal.style.display = 'none';
   }
 
+  function openHomeLibraryModal() {
+    const modal = document.getElementById('home-library-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function closeHomeLibraryModal() {
+    const modal = document.getElementById('home-library-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+  }
+
   async function prefetchDeskAssets() {
     if (!deskItems || !deskItems.length) {
       showToast('На столе пока нет диктантов');
@@ -1927,6 +1940,25 @@
     const newBookBtnInZone = document.getElementById("btnNewBookInZone");
     if (newBookBtnInZone) {
       newBookBtnInZone.addEventListener("click", () => openBookModal(null));
+    }
+
+    const homeLibraryBtn = document.getElementById('btnHomeLibrary');
+    if (homeLibraryBtn) {
+      homeLibraryBtn.addEventListener('click', () => openHomeLibraryModal());
+    }
+
+    const homeLibraryCloseBtn = document.getElementById('home-library-close');
+    if (homeLibraryCloseBtn) {
+      homeLibraryCloseBtn.addEventListener('click', closeHomeLibraryModal);
+    }
+
+    const homeLibraryModal = document.getElementById('home-library-modal');
+    if (homeLibraryModal) {
+      homeLibraryModal.addEventListener('click', (event) => {
+        if (event.target === homeLibraryModal) {
+          closeHomeLibraryModal();
+        }
+      });
     }
 
     // Кнопка публичной библиотеки
