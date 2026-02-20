@@ -20,12 +20,20 @@ function shouldHandleRequest(requestUrl) {
 
 async function cacheFirst(request) {
   const cache = await caches.open(RUNTIME_CACHE);
-  const cached = await cache.match(request);
+
+  // Audio elements often send Range requests. CacheStorage matches requests including headers,
+  // so a cached full response may not be found for a different Range header later.
+  // We normalize by using the URL as the cache key and fetching without Range.
+  const hasRange = request.headers && request.headers.has('range');
+  const cacheKey = hasRange ? request.url : request;
+
+  const cached = await cache.match(cacheKey);
   if (cached) return cached;
 
-  const response = await fetch(request);
+  const networkRequest = hasRange ? new Request(request.url, { method: 'GET', headers: {} }) : request;
+  const response = await fetch(networkRequest);
   if (response && response.ok) {
-    cache.put(request, response.clone());
+    await cache.put(cacheKey, response.clone());
   }
   return response;
 }
