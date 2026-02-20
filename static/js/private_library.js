@@ -69,13 +69,17 @@
       throw new Error('Service Worker не активен');
     }
 
+    const timeoutMs = typeof payload.timeoutMs === 'number' ? payload.timeoutMs : 15000;
+    const message = { action, ...payload };
+    delete message.timeoutMs;
+
     return await new Promise((resolve, reject) => {
       const channel = new MessageChannel();
       const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
       const timeout = setTimeout(() => {
         reject(new Error('SW timeout'));
-      }, 15000);
+      }, timeoutMs);
 
       channel.port1.onmessage = (event) => {
         clearTimeout(timeout);
@@ -91,11 +95,18 @@
         }
       };
 
-      navigator.serviceWorker.controller.postMessage(
-        { action, requestId, ...payload },
-        [channel.port2]
-      );
+      navigator.serviceWorker.controller.postMessage({ ...message, requestId }, [channel.port2]);
     });
+  }
+
+  function chunkArray(arr, size) {
+    const n = Array.isArray(arr) ? arr : [];
+    const s = Math.max(1, Number(size) || 1);
+    const out = [];
+    for (let i = 0; i < n.length; i += s) {
+      out.push(n.slice(i, i + s));
+    }
+    return out;
   }
 
   async function refreshOfflineCacheStatus() {
@@ -163,15 +174,45 @@
 
     const unique = Array.from(new Set(urls));
     const statusEl = document.getElementById('offlineCacheStatus');
-    if (statusEl) statusEl.textContent = `Скачиваю… (${unique.length} файлов)`;
+    const progressWrap = document.getElementById('offlineCacheProgressWrap');
+    const progressBar = document.getElementById('offlineCacheProgressBar');
+    const progressText = document.getElementById('offlineCacheProgressText');
+
+    if (statusEl) statusEl.textContent = `Скачиваю… (0/${unique.length})`;
+    if (progressWrap) progressWrap.style.display = 'flex';
+    if (progressBar) progressBar.style.width = '0%';
+    if (progressText) progressText.textContent = '0%';
 
     try {
-      const res = await swRequest('prefetch', { urls: unique });
-      const result = res.result || {};
-      showToast(`Готово. Скачано: ${result.fetched || 0}. Уже было: ${result.skipped || 0}. Ошибок: ${result.failed || 0}.`);
+      const chunks = chunkArray(unique, 25);
+      let fetched = 0;
+      let skipped = 0;
+      let failed = 0;
+      let done = 0;
+
+      for (const chunk of chunks) {
+        if (statusEl) statusEl.textContent = `Скачиваю… (${done}/${unique.length})`;
+        const percent = unique.length > 0 ? Math.round((done / unique.length) * 100) : 0;
+        if (progressBar) progressBar.style.width = `${percent}%`;
+        if (progressText) progressText.textContent = `${percent}%`;
+
+        const res = await swRequest('prefetch', { urls: chunk, timeoutMs: 120000 });
+        const result = res.result || {};
+        fetched += result.fetched || 0;
+        skipped += result.skipped || 0;
+        failed += result.failed || 0;
+        done += chunk.length;
+      }
+
+      const finalPercent = unique.length > 0 ? 100 : 0;
+      if (progressBar) progressBar.style.width = `${finalPercent}%`;
+      if (progressText) progressText.textContent = `${finalPercent}%`;
+
+      showToast(`Готово. Скачано: ${fetched}. Уже было: ${skipped}. Ошибок: ${failed}.`);
     } catch (e) {
       showToast(`Ошибка prefetch: ${e && e.message ? e.message : String(e)}`);
     } finally {
+      if (progressWrap) progressWrap.style.display = 'none';
       refreshOfflineCacheStatus();
     }
   }
