@@ -1972,6 +1972,47 @@
       offlineCacheBtn.addEventListener('click', () => openOfflineCacheModal());
     }
 
+    // ==================== Desk zoom controls ====================
+    const deskZone = document.querySelector('.desk-zone');
+    const zoomInBtn = document.getElementById('btnDeskZoomIn');
+    const zoomOutBtn = document.getElementById('btnDeskZoomOut');
+    const zoomStorageKey = 'desk_zoom';
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+    const applyDeskZoom = (zoom) => {
+      if (!deskZone) return;
+      const z = clamp(Number(zoom) || 1, 0.6, 1.8);
+      deskZone.style.setProperty('--desk-zoom', String(z));
+      try {
+        localStorage.setItem(zoomStorageKey, String(z));
+      } catch (e) {
+      }
+    };
+
+    // Apply saved zoom on load
+    try {
+      const saved = localStorage.getItem(zoomStorageKey);
+      if (saved) {
+        applyDeskZoom(saved);
+      }
+    } catch (e) {
+    }
+
+    const step = 0.1;
+    if (zoomInBtn) {
+      zoomInBtn.addEventListener('click', () => {
+        const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
+        applyDeskZoom(current + step);
+      });
+    }
+    if (zoomOutBtn) {
+      zoomOutBtn.addEventListener('click', () => {
+        const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
+        applyDeskZoom(current - step);
+      });
+    }
+
     const offlineCacheCloseBtn = document.getElementById('offline-cache-close');
     if (offlineCacheCloseBtn) {
       offlineCacheCloseBtn.addEventListener('click', closeOfflineCacheModal);
