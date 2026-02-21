@@ -53,6 +53,8 @@
     alert(message);
   }
 
+  const deskToggleInFlight = new Set();
+
   function formatBytes(bytes) {
     const n = Number(bytes) || 0;
     if (n <= 0) return '0 B';
@@ -124,6 +126,16 @@
       const bytes = res.stats?.totalBytes || 0;
       const entries = res.stats?.entries || 0;
       const maxBytes = res.stats?.maxBytes || 0;
+
+      const progressUsedEl = document.getElementById('deskCacheUsedText');
+      const progressMaxEl = document.getElementById('deskCacheMaxText');
+      const progressBarEl = document.getElementById('deskCacheProgressBar');
+      if (progressUsedEl) progressUsedEl.textContent = formatBytes(bytes);
+      if (progressMaxEl) progressMaxEl.textContent = formatBytes(maxBytes);
+      if (progressBarEl) {
+        const pct = maxBytes > 0 ? Math.max(0, Math.min(100, Math.round((bytes / maxBytes) * 100))) : 0;
+        progressBarEl.style.width = `${pct}%`;
+      }
 
       const limitInput = document.getElementById('offlineCacheLimitMb');
       if (limitInput && maxBytes) {
@@ -355,6 +367,12 @@
       });
       
       if (removeData.success) {
+        try {
+          await swRequest('purgeDictation', { dictationId });
+        } catch (e) {
+          // ignore
+        }
+
         // Очищаем незаконченные значения диктанта
         try {
           await apiRequest(`/statistics/dictation_state/${dictationId}`, {
@@ -368,6 +386,7 @@
         // Обновляем список диктантов на столе
         await loadDeskItems();
         showToast('Диктант убран со стола');
+        refreshOfflineCacheStatus();
       } else {
         showToast('Ошибка при удалении диктанта со стола');
       }
@@ -379,6 +398,11 @@
   
   // Добавляет или удаляет диктант со стола (используется кликом на карточку в библиотеке)
   async function toggleDictationOnDesk(dictationId) {
+    if (!dictationId) return;
+    const key = String(dictationId);
+    if (deskToggleInFlight.has(key)) return;
+    deskToggleInFlight.add(key);
+
     const isOnDesk = isDictationOnDesk(dictationId);
     
     if (isOnDesk) {
@@ -386,13 +410,20 @@
       const itemId = getDeskItemId(dictationId);
       if (!itemId) {
         console.error('❌ Не найден item_id для диктанта на столе:', dictationId);
+        deskToggleInFlight.delete(key);
         return;
       }
       
-      await removeFromDesk(itemId, dictationId);
+      try {
+        await removeFromDesk(itemId, dictationId);
+      } finally {
+        deskToggleInFlight.delete(key);
+      }
     } else {
       // Добавляем на стол
       try {
+        showLoadingIndicator('Скачиваю диктант для оффлайна…');
+
         // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
         // (аудио + обложка диктанта). Если не влезает — не добавляем.
         try {
@@ -414,6 +445,8 @@
           const uniqueRequired = Array.from(new Set(requiredUrls)).filter(Boolean);
           if (!uniqueRequired.length) {
             showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
+            hideLoadingIndicator();
+            deskToggleInFlight.delete(key);
             return;
           }
 
@@ -427,6 +460,8 @@
           } else {
             showToast(`Не удалось скачать диктант в оффлайн: ${msg}`);
           }
+          hideLoadingIndicator();
+          deskToggleInFlight.delete(key);
           return;
         }
 
@@ -439,14 +474,40 @@
           // Обновляем список диктантов на столе
           await loadDeskItems();
           showToast('Диктант добавлен на стол');
+          refreshOfflineCacheStatus();
         } else {
           showToast('Ошибка при добавлении диктанта на стол');
         }
       } catch (error) {
         console.error('❌ Ошибка добавления диктанта на стол:', error);
         showToast('Ошибка при добавлении диктанта на стол');
+      } finally {
+        hideLoadingIndicator();
+        deskToggleInFlight.delete(key);
       }
     }
+  }
+
+  function ensureDeskCacheIndicator() {
+    if (document.getElementById('deskCacheIndicator')) return;
+
+    const deskZone = document.querySelector('.desk-zone');
+    if (!deskZone) return;
+
+    const el = document.createElement('div');
+    el.id = 'deskCacheIndicator';
+    el.className = 'desk-cache-indicator';
+    el.innerHTML = `
+      <div class="desk-cache-text">
+        <span id="deskCacheUsedText">0 B</span>
+        <span class="desk-cache-sep">/</span>
+        <span id="deskCacheMaxText">300 MB</span>
+      </div>
+      <div class="desk-cache-bar">
+        <div id="deskCacheProgressBar" class="desk-cache-bar-fill" style="width:0%;"></div>
+      </div>
+    `;
+    deskZone.appendChild(el);
   }
 
   // Создает карточку диктанта для публичной библиотеки
@@ -665,6 +726,8 @@
       updateDictationCardsStats(container);
       updateCompletionBadges(container);
     }, 100);
+
+    ensureDeskCacheIndicator();
   }
 
 
@@ -3904,6 +3967,8 @@
 
   // Функция для загрузки данных после авторизации
   function loadLibraryData() {
+    ensureDeskCacheIndicator();
+    refreshOfflineCacheStatus();
     loadDeskItems();
     loadBooksFromAPI();
   }
@@ -3911,6 +3976,9 @@
   // Инициализация при загрузке страницы
   document.addEventListener("DOMContentLoaded", async () => {
     initEventHandlers();
+
+    ensureDeskCacheIndicator();
+    refreshOfflineCacheStatus();
     
     // Ждем пока UserManager инициализируется и завершит валидацию токена
     const waitForUserManager = setInterval(() => {
@@ -3950,6 +4018,8 @@
           // Загружаем данные только если пользователь авторизован
           if (isAuthenticated) {
             console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
+            ensureDeskCacheIndicator();
+            refreshOfflineCacheStatus();
             loadDeskItems();
             loadBooksFromAPI();
           } else {
@@ -3996,6 +4066,8 @@
         setTimeout(() => {
           initializeBooksLanguageSelector();
         }, 100);
+        ensureDeskCacheIndicator();
+        refreshOfflineCacheStatus();
         loadDeskItems();
         loadBooksFromAPI();
       }

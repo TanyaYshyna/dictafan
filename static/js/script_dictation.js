@@ -7675,14 +7675,20 @@ function isAllCompleted() {
  * Регистрирует завершенный диктант в истории и удаляет файл черновика
  */
 async function registerCompletedDictation() {
-    if (!currentDictation.id || !userManager) {
-        console.warn('[Register] Нельзя зарегистрировать: нет ID диктанта или userManager');
+    if (!currentDictation.id) {
+        console.warn('[Register] Нельзя зарегистрировать: нет ID диктанта');
+        return;
+    }
+
+    const um = window.UM || userManager;
+    if (!um || typeof um.isAuthenticated !== 'function' || !um.isAuthenticated()) {
+        console.warn('[Register] Пользователь не авторизован, пропускаем сохранение успеха');
         return;
     }
 
     try {
         // Получаем токен для API запросов
-        const token = localStorage.getItem('jwt_token');
+        const token = um?.token || localStorage.getItem('jwt_token');
         if (!token) {
             console.warn('[Register] Нет токена, пропускаем сохранение успеха');
             return;
@@ -7737,9 +7743,9 @@ async function registerCompletedDictation() {
 
         const settings_json = JSON.stringify({
             audio: {
-                start: sequences.start || playSequenceStart,
-                typo: sequences.typo || playSequenceTypo,
-                success: sequences.success || playSequenceSuccess,
+                start: (sequences.start !== undefined && sequences.start !== null) ? sequences.start : playSequenceStart,
+                typo: (sequences.typo !== undefined && sequences.typo !== null) ? sequences.typo : playSequenceTypo,
+                success: (sequences.success !== undefined && sequences.success !== null) ? sequences.success : playSequenceSuccess,
                 repeats: audioRepeats,
                 required_passed_star_half: REQUIRED_PASSED_STAR_HALF
             },

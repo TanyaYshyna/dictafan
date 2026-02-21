@@ -351,6 +351,43 @@ async function prefetchUrlsStrict(urls) {
   };
 }
 
+async function purgeDictationFromBoundedCache(dictationId) {
+  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+  const keys = await cache.keys();
+
+  const dictId = String(dictationId || '').trim();
+  const dictKey = dictId.startsWith('dict_') ? dictId : `dict_${dictId}`;
+
+  let deleted = 0;
+  for (const req of keys) {
+    try {
+      const url = new URL(req.url);
+      const path = url.pathname;
+
+      // Audio: /api/audio/dict_123/...
+      if (path.startsWith(`/api/audio/${dictKey}/`)) {
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+        continue;
+      }
+
+      // Cover: /api/cover?dictation_id=dict_123
+      if (path === '/api/cover') {
+        const coverId = url.searchParams.get('dictation_id');
+        if (coverId === dictKey) {
+          const ok = await cache.delete(req);
+          if (ok) deleted += 1;
+          continue;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return { deleted, dictationId: dictKey };
+}
+
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   const action = data.action;
@@ -371,6 +408,12 @@ self.addEventListener('message', (event) => {
       if (action === 'cacheStats') {
         const stats = await computeCacheStats();
         respond({ success: true, stats });
+        return;
+      }
+
+      if (action === 'purgeDictation') {
+        const res = await purgeDictationFromBoundedCache(data.dictationId);
+        respond({ success: true, result: res });
         return;
       }
 
