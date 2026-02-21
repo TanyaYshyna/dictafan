@@ -74,6 +74,10 @@
   flex-direction: column;
   gap: 10px;
   z-index: 10050;
+  background: var(--color-panel-bg, #fff);
+  border: 1px solid var(--color-border, #dee2e6);
+  border-radius: 14px;
+  padding: 10px;
 }
 
 .tool-palette-btn {
@@ -81,13 +85,12 @@
   height: 40px;
   border-radius: 12px;
   border: 1px solid var(--color-border, #dee2e6);
-  background: var(--color-panel-bg, #fff);
+  background: transparent;
   color: var(--color-text-secondary, #6b7280);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
   transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   padding: 0;
 }
@@ -97,6 +100,27 @@
   border-color: var(--color-text-secondary, #9ca3af);
   color: var(--color-text, #1f2933);
   transform: translateY(-1px);
+}
+
+/* РАБОЧИЙ СТОЛ: растянуть на всё окно */
+.page-index .panel {
+  min-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
+}
+
+.page-index .desk-zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+
+.page-index .desk-scroll-container {
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 .tool-palette-btn i {

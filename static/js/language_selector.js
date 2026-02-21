@@ -1031,6 +1031,11 @@ class LanguageSelector {
                     this.removeModel(langCode, modelId, modelType, slider, sliderCircle);
                 }
 
+                // Сразу синхронизируем вторую панель (пока идет загрузка/удаление и после)
+                if (typeof this.syncOtherPanel === 'function') {
+                    this.syncOtherPanel(langCode);
+                }
+
                 e.stopPropagation();
             }
         });
@@ -1533,6 +1538,14 @@ class LanguageSelector {
             // Удаляем из localStorage
             this.removeModelState(langCode, modelId, modelType);
 
+            // Если удалили активную модель — снимаем выбор (иначе галочка/селект останутся)
+            if (modelType === 'whisper') {
+                const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
+                if (String(selectedWhisper) === String(modelId)) {
+                    this.setSelectedWhisperModel(langCode, null);
+                }
+            }
+
             // Обновляем UI если переданы элементы
             if (slider) {
                 slider.classList.remove('downloaded');
@@ -1777,13 +1790,21 @@ class LanguageSelector {
 
         this.updateModelSelectionUI(langCode);
 
+        this.syncOtherPanel(langCode);
+    }
+
+    syncOtherPanel(langCode) {
+        // Главное правило: любое изменение слева/справа должно перерисовывать вторую панель
         if (this.options.mode === 'models-only') {
+            // Это правая панель (модели)
             if (window.languageSelector) {
                 window.languageSelector.updateModelSelectionUI(langCode);
             }
         } else {
+            // Это левая панель (выбор языка)
             if (window.languageModelsSelector) {
                 window.languageModelsSelector.updateModelsTable();
+                window.languageModelsSelector.updateStorageInfo();
             }
         }
     }
