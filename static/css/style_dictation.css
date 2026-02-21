@@ -2839,7 +2839,7 @@ body.playing-audio::after {
 
 .play-sequence-input::placeholder {
     color: var(--color-text-secondary);
-    opacity: 0.7;
+    opacity: 0.35;
 }
 
 /* ==================== СТИЛИ ДЛЯ НАСТРОЕК АУДИО В ПРОФИЛЕ ПОЛЬЗОВАТЕЛЯ ==================== */

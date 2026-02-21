@@ -304,9 +304,9 @@ function buildDictationDraftState() {
         const settings = audioSettingsPanel.getSettings();
         audioRepeats = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
         audioSettings = {
-            start: settings.start || 'oto',
-            typo: settings.typo || 'o',
-            success: settings.success || 'ot',
+            start: (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto',
+            typo: (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o',
+            success: (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot',
             repeats: audioRepeats,
             required_passed_star_half: settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : REQUIRED_PASSED_STAR_HALF,
             without_entering_text: Boolean(settings.without_entering_text),
@@ -315,9 +315,9 @@ function buildDictationDraftState() {
         };
     } else {
         audioSettings = {
-            start: sequences.start || playSequenceStart || 'oto',
-            typo: sequences.typo || playSequenceTypo || 'o',
-            success: sequences.success || playSequenceSuccess || 'ot',
+            start: (sequences.start !== undefined && sequences.start !== null) ? sequences.start : ((playSequenceStart !== undefined && playSequenceStart !== null) ? playSequenceStart : 'oto'),
+            typo: (sequences.typo !== undefined && sequences.typo !== null) ? sequences.typo : ((playSequenceTypo !== undefined && playSequenceTypo !== null) ? playSequenceTypo : 'o'),
+            success: (sequences.success !== undefined && sequences.success !== null) ? sequences.success : ((playSequenceSuccess !== undefined && playSequenceSuccess !== null) ? playSequenceSuccess : 'ot'),
             repeats: audioRepeats,
             required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
             without_entering_text: Boolean(window.audioSettingsWithoutEnteringText || false),
@@ -338,9 +338,9 @@ function buildDictationDraftState() {
         dictation_id: currentDictation.id,
         circle_number: circle_number,
         current_index: currentSentenceIndex || 0,
-        playSequenceStart: sequences.start || playSequenceStart,
-        playSequenceTypo: sequences.typo || playSequenceTypo,
-        playSequenceSuccess: sequences.success || playSequenceSuccess,
+        playSequenceStart: (sequences.start !== undefined && sequences.start !== null) ? sequences.start : playSequenceStart,
+        playSequenceTypo: (sequences.typo !== undefined && sequences.typo !== null) ? sequences.typo : playSequenceTypo,
+        playSequenceSuccess: (sequences.success !== undefined && sequences.success !== null) ? sequences.success : playSequenceSuccess,
         audio_repeats: audioRepeats,
         is_mixed: isMixed,
         per_sentence: perSentence,
@@ -448,9 +448,9 @@ async function saveAudioSettingsToUser(settings) {
         // Формируем JSON с настройками в новом формате settings_json
         const settingsJson = JSON.stringify({
             audio: {
-                start: settings.start || 'oto',
-                typo: settings.typo || 'o',
-                success: settings.success || 'ot',
+                start: (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto',
+                typo: (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o',
+                success: (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot',
                 repeats: settings.repeats !== undefined ? settings.repeats : 3,
                 without_entering_text: Boolean(settings.without_entering_text),
                 show_text: Boolean(settings.show_text),
@@ -515,13 +515,13 @@ async function loadAudioSettingsFromUser() {
                 const settings = JSON.parse(userData.settings_json);
                 const audioSettings = settings.audio || {};
 
-                if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
+                if (audioSettings.start !== undefined && audioSettings.start !== null) {
                     playSequenceStart = audioSettings.start;
                 }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null && audioSettings.typo !== '') {
+                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
                     playSequenceTypo = audioSettings.typo;
                 }
-                if (audioSettings.success !== undefined && audioSettings.success !== null && audioSettings.success !== '') {
+                if (audioSettings.success !== undefined && audioSettings.success !== null) {
                     playSequenceSuccess = audioSettings.success;
                 }
                 if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
@@ -556,23 +556,23 @@ async function loadAudioSettingsFromUser() {
                 }
 
                 return; // Используем настройки из JSON
-            } catch (e) {
-                console.warn('Ошибка парсинга settings_json:', e);
+            } catch (error) {
+                console.warn('Ошибка парсинга settings_json:', error);
             }
         }
 
-        // Обратная совместимость: пытаемся загрузить из audio_settings_json
+        // Затем проверяем audio_settings_json (старый формат)
         if (userData.audio_settings_json) {
             try {
                 const audioSettings = JSON.parse(userData.audio_settings_json);
 
-                if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
+                if (audioSettings.start !== undefined && audioSettings.start !== null) {
                     playSequenceStart = audioSettings.start;
                 }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null && audioSettings.typo !== '') {
+                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
                     playSequenceTypo = audioSettings.typo;
                 }
-                if (audioSettings.success !== undefined && audioSettings.success !== null && audioSettings.success !== '') {
+                if (audioSettings.success !== undefined && audioSettings.success !== null) {
                     playSequenceSuccess = audioSettings.success;
                 }
                 if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
@@ -585,7 +585,6 @@ async function loadAudioSettingsFromUser() {
                     REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
                 }
 
-                // Загружаем новые настройки
                 if (audioSettings.without_entering_text !== undefined) {
                     window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
                 }
@@ -593,28 +592,34 @@ async function loadAudioSettingsFromUser() {
                     window.audioSettingsShowText = Boolean(audioSettings.show_text);
                 }
 
-                return; // Используем настройки из JSON
-            } catch (e) {
-                console.warn('Ошибка парсинга audio_settings_json:', e);
+                if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
+                    if (audioSettings.speech_recognition_mode === 'avto') {
+                        speechRecognitionMode = 'route';
+                    } else {
+                        speechRecognitionMode = audioSettings.speech_recognition_mode;
+                    }
+                }
+            } catch (error) {
+                console.warn('Ошибка парсинга audio_settings_json:', error);
             }
         }
 
         // Fallback на старые отдельные поля (для обратной совместимости)
-        if (userData.audio_start !== undefined && userData.audio_start !== null && userData.audio_start !== '') {
+        if (userData.audio_start !== undefined && userData.audio_start !== null) {
             playSequenceStart = userData.audio_start;
         }
-        if (userData.audio_typo !== undefined && userData.audio_typo !== null && userData.audio_typo !== '') {
+        if (userData.audio_typo !== undefined && userData.audio_typo !== null) {
             playSequenceTypo = userData.audio_typo;
         }
-        if (userData.audio_success !== undefined && userData.audio_success !== null && userData.audio_success !== '') {
+        if (userData.audio_success !== undefined && userData.audio_success !== null) {
             playSequenceSuccess = userData.audio_success;
         }
         if (userData.audio_repeats !== undefined && userData.audio_repeats !== null) {
             const parsedValue = parseInt(userData.audio_repeats, 10);
-            // Используем ?? вместо ||, чтобы 0 не заменялся на 3
             REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
         }
     }
+
 }
 
 /**
@@ -7905,21 +7910,21 @@ async function loadAndApplyDraft(forceClear = false) {
             }
         }
 
-        if (audioSettingsFromDraft || draft.playSequenceStart || draft.playSequenceTypo || draft.playSequenceSuccess || draft.audio_repeats !== undefined) {
+        if (audioSettingsFromDraft || draft.playSequenceStart !== undefined || draft.playSequenceTypo !== undefined || draft.playSequenceSuccess !== undefined || draft.audio_repeats !== undefined) {
             if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
                 const settingsToApply = audioSettingsFromDraft ? {
-                    start: audioSettingsFromDraft.start || draft.playSequenceStart || playSequenceStart || 'oto',
-                    typo: audioSettingsFromDraft.typo || draft.playSequenceTypo || playSequenceTypo || 'o',
-                    success: audioSettingsFromDraft.success || draft.playSequenceSuccess || playSequenceSuccess || 'ot',
+                    start: (audioSettingsFromDraft.start !== undefined && audioSettingsFromDraft.start !== null) ? audioSettingsFromDraft.start : ((draft.playSequenceStart !== undefined && draft.playSequenceStart !== null) ? draft.playSequenceStart : ((playSequenceStart !== undefined && playSequenceStart !== null) ? playSequenceStart : 'oto')),
+                    typo: (audioSettingsFromDraft.typo !== undefined && audioSettingsFromDraft.typo !== null) ? audioSettingsFromDraft.typo : ((draft.playSequenceTypo !== undefined && draft.playSequenceTypo !== null) ? draft.playSequenceTypo : ((playSequenceTypo !== undefined && playSequenceTypo !== null) ? playSequenceTypo : 'o')),
+                    success: (audioSettingsFromDraft.success !== undefined && audioSettingsFromDraft.success !== null) ? audioSettingsFromDraft.success : ((draft.playSequenceSuccess !== undefined && draft.playSequenceSuccess !== null) ? draft.playSequenceSuccess : ((playSequenceSuccess !== undefined && playSequenceSuccess !== null) ? playSequenceSuccess : 'ot')),
                     repeats: audioSettingsFromDraft.repeats !== undefined ? audioSettingsFromDraft.repeats : (draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)),
                     required_passed_star_half: audioSettingsFromDraft.required_passed_star_half !== undefined ? audioSettingsFromDraft.required_passed_star_half : REQUIRED_PASSED_STAR_HALF,
                     without_entering_text: audioSettingsFromDraft.without_entering_text !== undefined ? Boolean(audioSettingsFromDraft.without_entering_text) : false,
                     show_text: audioSettingsFromDraft.show_text !== undefined ? Boolean(audioSettingsFromDraft.show_text) : false,
                     speech_recognition_mode: audioSettingsFromDraft.speech_recognition_mode || speechRecognitionMode || 'route'
                 } : {
-                    start: draft.playSequenceStart || playSequenceStart || 'oto',
-                    typo: draft.playSequenceTypo || playSequenceTypo || 'o',
-                    success: draft.playSequenceSuccess || playSequenceSuccess || 'ot',
+                    start: (draft.playSequenceStart !== undefined && draft.playSequenceStart !== null) ? draft.playSequenceStart : ((playSequenceStart !== undefined && playSequenceStart !== null) ? playSequenceStart : 'oto'),
+                    typo: (draft.playSequenceTypo !== undefined && draft.playSequenceTypo !== null) ? draft.playSequenceTypo : ((playSequenceTypo !== undefined && playSequenceTypo !== null) ? playSequenceTypo : 'o'),
+                    success: (draft.playSequenceSuccess !== undefined && draft.playSequenceSuccess !== null) ? draft.playSequenceSuccess : ((playSequenceSuccess !== undefined && playSequenceSuccess !== null) ? playSequenceSuccess : 'ot'),
                     repeats: draft.audio_repeats !== undefined ? draft.audio_repeats : (REQUIRED_PASSED_COUNT !== undefined ? REQUIRED_PASSED_COUNT : 3)
                 };
 
@@ -8533,9 +8538,9 @@ function initPlaySequenceInputs() {
 // Функция для получения значений
 function getPlaySequenceValues() {
     return {
-        start: playSequenceStart || 'oto',
-        typo: playSequenceTypo || 'o',
-        success: playSequenceSuccess || 'ot'
+        start: (playSequenceStart !== undefined && playSequenceStart !== null) ? playSequenceStart : 'oto',
+        typo: (playSequenceTypo !== undefined && playSequenceTypo !== null) ? playSequenceTypo : 'o',
+        success: (playSequenceSuccess !== undefined && playSequenceSuccess !== null) ? playSequenceSuccess : 'ot'
     };
 }
 
@@ -8659,9 +8664,9 @@ function initAudioSettingsModal() {
         showExplanations: true,
         onSettingsChange: async (settings) => {
             // Обновляем глобальные переменные
-            playSequenceStart = settings.start || 'oto';
-            playSequenceTypo = settings.typo || 'o';
-            playSequenceSuccess = settings.success || 'ot';
+            playSequenceStart = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
+            playSequenceTypo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
+            playSequenceSuccess = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
             const oldValue = REQUIRED_PASSED_COUNT;
             REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
             if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {

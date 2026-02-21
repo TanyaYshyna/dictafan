@@ -122,6 +122,8 @@
   min-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
+  padding-left: clamp(16px, 3vw, 32px);
+  padding-right: clamp(16px, 3vw, 32px);
 }
 
 .page-index .desk-zone {
@@ -140,6 +142,24 @@
   flex: 1;
   min-height: 0;
   height: auto;
+}
+
+/* Безопасная зона, чтобы палитра не перекрывала первую карточку */
+.page-index .desk-cards-container {
+  padding-left: 96px;
+  padding-top: 12px;
+}
+
+/* Масштабируем карточки вместе с сеткой (Railway-like zoom) */
+.page-index .desk-zone .shorts-grid {
+  zoom: var(--desk-zoom, 1);
+}
+
+@supports not (zoom: 1) {
+  .page-index .desk-zone .shorts-grid {
+    transform: scale(var(--desk-zoom, 1));
+    transform-origin: top left;
+  }
 }
 
 .tool-palette-btn i {
@@ -890,6 +910,13 @@
   scroll-behavior: smooth;
 }
 
+/* Главная: карточки на столе должны переноситься на следующую строку (как книги) */
+.page-index .desk-scroll-container {
+  height: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 /* Скроллбар для WebKit браузеров */
 .desk-scroll-container::-webkit-scrollbar {
   height: 8px;
@@ -924,6 +951,19 @@
   height: 100%;
   box-sizing: border-box;
   width: max-content; /* Ширина по содержимому - ключевой момент для прокрутки */
+}
+
+/* Главная: отключаем layout "в одну линию" и используем .shorts-grid (flex-wrap) */
+.page-index .desk-cards-container {
+  display: block;
+  width: 100%;
+  height: auto;
+  box-sizing: border-box;
+}
+
+.page-index .desk-cards-container .shorts-grid {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 

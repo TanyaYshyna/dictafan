@@ -273,6 +273,10 @@ class AudioSettingsPanel {
                                                    maxlength="5"
                                                    placeholder="oto" 
                                                    pattern="[to]*"
+                                                   autocomplete="off"
+                                                   autocapitalize="off"
+                                                   autocorrect="off"
+                                                   spellcheck="false"
                                                    value="${this.settings.start}"
                                                    title="Используйте только буквы 't' (translation) и 'o' (original)">
                                         </td>
@@ -288,6 +292,10 @@ class AudioSettingsPanel {
                                                    maxlength="5"
                                                    placeholder="o" 
                                                    pattern="[to]*"
+                                                   autocomplete="off"
+                                                   autocapitalize="off"
+                                                   autocorrect="off"
+                                                   spellcheck="false"
                                                    value="${this.settings.typo}"
                                                    title="Используйте только буквы 't' (translation) и 'o' (original)">
                                         </td>
@@ -303,6 +311,10 @@ class AudioSettingsPanel {
                                                    maxlength="5" 
                                                    placeholder="ot" 
                                                    pattern="[to]*"
+                                                   autocomplete="off"
+                                                   autocapitalize="off"
+                                                   autocorrect="off"
+                                                   spellcheck="false"
                                                    value="${this.settings.success}"
                                                    title="Используйте только буквы 't' (translation) и 'o' (original)">
                                         </td>
@@ -400,6 +412,10 @@ class AudioSettingsPanel {
                                maxlength="5"
                                placeholder="oto" 
                                pattern="[to]*"
+                               autocomplete="off"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               spellcheck="false"
                                value="${this.settings.start}"
                                title="Используйте только буквы 't' (translation) и 'o' (original)">
                     </div>
@@ -411,6 +427,10 @@ class AudioSettingsPanel {
                                maxlength="5"
                                placeholder="o" 
                                pattern="[to]*"
+                               autocomplete="off"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               spellcheck="false"
                                value="${this.settings.typo}"
                                title="Используйте только буквы 't' (translation) и 'o' (original)">
                     </div>
@@ -422,6 +442,10 @@ class AudioSettingsPanel {
                                maxlength="5" 
                                placeholder="ot" 
                                pattern="[to]*"
+                               autocomplete="off"
+                               autocapitalize="off"
+                               autocorrect="off"
+                               spellcheck="false"
                                value="${this.settings.success}"
                                title="Используйте только буквы 't' (translation) и 'o' (original)">
                     </div>
@@ -935,9 +959,9 @@ class AudioSettingsPanel {
      * Установить настройки
      */
     setSettings(settings) {
-        if (settings.start !== undefined) this.settings.start = settings.start;
-        if (settings.typo !== undefined) this.settings.typo = settings.typo;
-        if (settings.success !== undefined) this.settings.success = settings.success;
+        if (settings.start !== undefined && settings.start !== null) this.settings.start = settings.start;
+        if (settings.typo !== undefined && settings.typo !== null) this.settings.typo = settings.typo;
+        if (settings.success !== undefined && settings.success !== null) this.settings.success = settings.success;
 
         if (settings.repeats !== undefined) {
             const parsedRepeats = parseInt(settings.repeats, 10);
