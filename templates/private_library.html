@@ -38,18 +38,6 @@
         </div>
     </div>
 
-    <div class="tool-palette" id="toolPalette">
-        <button id="btnHomeLibrary" class="tool-palette-btn" title="Моя библиотека">
-            <i data-lucide="home"></i>
-        </button>
-        <button id="btnPublicLibrary" class="tool-palette-btn" title="Публичная библиотека">
-            <i data-lucide="globe"></i>
-        </button>
-        <button id="btnOfflineCache" class="tool-palette-btn" title="Оффлайн кеш">
-            <i data-lucide="hard-drive"></i>
-        </button>
-    </div>
-
     <div id="offline-cache-modal" class="modal" style="display: none;">
         <div class="modal-content offline-cache-modal-content" style="max-width: 520px;">
             <div class="modal-header offline-cache-modal-header">
@@ -114,8 +102,16 @@
     <div class="panel">
         <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
         <div class="desk-zone">
-            <div class="desk-zone-header">
-                <h3><i data-lucide="clipboard"></i> Рабочий стол</h3>
+            <div class="tool-palette tool-palette--desk" id="toolPalette">
+                <button id="btnHomeLibrary" class="tool-palette-btn" title="Моя библиотека">
+                    <i data-lucide="home"></i>
+                </button>
+                <button id="btnPublicLibrary" class="tool-palette-btn" title="Публичная библиотека">
+                    <i data-lucide="globe"></i>
+                </button>
+                <button id="btnOfflineCache" class="tool-palette-btn" title="Оффлайн кеш">
+                    <i data-lucide="hard-drive"></i>
+                </button>
             </div>
             <div class="desk-scroll-container">
                 <div class="desk-cards-container" id="deskCardsContainer">

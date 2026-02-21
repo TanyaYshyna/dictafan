@@ -80,11 +80,18 @@
   padding: 10px;
 }
 
+.tool-palette.tool-palette--desk {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  z-index: 5;
+}
+
 .tool-palette-btn {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  border: 1px solid var(--color-border, #dee2e6);
+  border: none;
   background: transparent;
   color: var(--color-text-secondary, #6b7280);
   cursor: pointer;
@@ -115,6 +122,10 @@
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
+}
+
+.page-index .desk-zone {
+  position: relative;
 }
 
 .page-index .desk-scroll-container {
@@ -828,6 +839,14 @@
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
+}
+
+.page-index .desk-zone {
+  background: var(--color-hover, #f8f9fa);
+  background-image:
+    radial-gradient(rgba(0, 0, 0, 0.12) 1px, transparent 1px);
+  background-size: 42px 42px;
+  background-position: 0 0;
 }
 
 .desk-zone-header {
