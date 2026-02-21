@@ -49,6 +49,12 @@
             <div class="modal-body offline-cache-modal-body">
                 <div class="offline-cache-modal-stack">
                     <div id="offlineCacheStatus" class="offline-cache-status">—</div>
+                    <div class="offline-cache-limit-row">
+                        <label for="offlineCacheLimitMb" class="offline-cache-limit-label">Лимит кеша (MB)</label>
+                        <input id="offlineCacheLimitMb" class="offline-cache-limit-input" type="number" min="10" step="10" value="300">
+                        <button type="button" class="btn-secondary" id="offlineCacheLimitSaveBtn">Сохранить</button>
+                    </div>
+                    <div class="offline-cache-hint">При превышении лимита новые файлы не кешируются автоматически.</div>
                     <div id="offlineCacheProgressWrap" class="offline-cache-progress" style="display:none;">
                         <div class="offline-cache-progress__bar">
                             <div id="offlineCacheProgressBar" class="offline-cache-progress__bar-fill" style="width:0%;"></div>

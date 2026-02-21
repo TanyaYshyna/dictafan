@@ -64,6 +64,12 @@
     return `${value.toFixed(decimals)} ${units[i]}`;
   }
 
+  function formatMbValue(bytes) {
+    const b = Number(bytes);
+    if (!isFinite(b) || b <= 0) return 300;
+    return Math.max(10, Math.round(b / (1024 * 1024)));
+  }
+
   async function swRequest(action, payload = {}) {
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
       throw new Error('Service Worker не активен');
@@ -117,7 +123,18 @@
       const res = await swRequest('cacheStats');
       const bytes = res.stats?.totalBytes || 0;
       const entries = res.stats?.entries || 0;
+      const maxBytes = res.stats?.maxBytes || 0;
+
+      const limitInput = document.getElementById('offlineCacheLimitMb');
+      if (limitInput && maxBytes) {
+        limitInput.value = String(formatMbValue(maxBytes));
+      }
+
+      if (maxBytes) {
+        statusEl.textContent = `Записей: ${entries}. Размер: ${formatBytes(bytes)} / ${formatBytes(maxBytes)}.`;
+      } else {
       statusEl.textContent = `Записей: ${entries}. Размер: ${formatBytes(bytes)}.`;
+      }
     } catch (e) {
       statusEl.textContent = `Ошибка: ${e && e.message ? e.message : String(e)}`;
     }
@@ -376,6 +393,43 @@
     } else {
       // Добавляем на стол
       try {
+        // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
+        // (аудио + обложка диктанта). Если не влезает — не добавляем.
+        try {
+          const requiredUrls = [];
+
+          const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
+          if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
+            requiredUrls.push(metaRes.dictation.cover_url);
+          }
+
+          const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
+          const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
+            ? sentencesRes.sentences
+            : [];
+          for (const s of sentences) {
+            if (s && s.audio) requiredUrls.push(s.audio);
+          }
+
+          const uniqueRequired = Array.from(new Set(requiredUrls)).filter(Boolean);
+          if (!uniqueRequired.length) {
+            showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
+            return;
+          }
+
+          await swRequest('prefetchStrict', { urls: uniqueRequired, timeoutMs: 180000 });
+        } catch (e) {
+          const msg = e && e.message ? e.message : String(e);
+          if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
+            showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
+          } else if (msg.includes('Service Worker не активен')) {
+            showToast('Оффлайн режим не активен. Обнови страницу или включи Service Worker.');
+          } else {
+            showToast(`Не удалось скачать диктант в оффлайн: ${msg}`);
+          }
+          return;
+        }
+
         const addData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
           method: 'POST',
           body: JSON.stringify({})
@@ -2050,6 +2104,23 @@
     const offlineCachePrefetchDeskBtn = document.getElementById('offlineCachePrefetchDeskBtn');
     if (offlineCachePrefetchDeskBtn) {
       offlineCachePrefetchDeskBtn.addEventListener('click', prefetchDeskAssets);
+    }
+
+    const offlineCacheLimitSaveBtn = document.getElementById('offlineCacheLimitSaveBtn');
+    if (offlineCacheLimitSaveBtn) {
+      offlineCacheLimitSaveBtn.addEventListener('click', async () => {
+        const input = document.getElementById('offlineCacheLimitMb');
+        const raw = input ? Number(input.value) : 300;
+        const mb = isFinite(raw) ? Math.max(10, Math.floor(raw)) : 300;
+        try {
+          await swRequest('setMaxBytes', { maxBytes: mb * 1024 * 1024 });
+          showToast('Лимит сохранён');
+        } catch (e) {
+          showToast(`Ошибка сохранения лимита: ${e && e.message ? e.message : String(e)}`);
+        } finally {
+          refreshOfflineCacheStatus();
+        }
+      });
     }
 
     // Инициализация перетаскивания разделителя между зонами
