@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
@@ -99,6 +99,14 @@ function shouldHandleRequest(requestUrl) {
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
+
+    // Offline-first dictation pages + required static assets.
+    // Dictation page loads sentences from IndexedDB; this caches only HTML/JS/CSS/media.
+    if (path.startsWith('/dictation/')) return true;
+    if (path.startsWith('/static/')) return true;
+
+    // Home page is the main desk; allow opening it offline.
+    if (path === '/') return true;
 
     return false;
   } catch (e) {

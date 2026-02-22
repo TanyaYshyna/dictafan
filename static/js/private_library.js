@@ -693,7 +693,7 @@
         showLoadingIndicator('Скачиваю диктант для оффлайна…');
 
         // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
-        // (аудио + обложка диктанта). Если не влезает — не добавляем.
+        // (HTML страница диктанта + JS/CSS + аудио + обложка). Если не влезает — не добавляем.
         try {
           const requiredUrls = [];
 
@@ -701,6 +701,37 @@
           if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
             requiredUrls.push(metaRes.dictation.cover_url);
           }
+
+          // HTML страница диктанта (нужна для оффлайн-навигации)
+          // Языки берем так же, как формируется openUrl на desk карточке.
+          const dictIdForUrl = `dict_${dictationId}`;
+          const langOrigForUrl = (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.language_code)
+            ? metaRes.dictation.language_code
+            : 'en';
+          const langTrForUrl = langOrigForUrl;
+          // Домашняя страница — это рабочий стол, тоже нужна оффлайн
+          requiredUrls.push('/');
+          requiredUrls.push(`/dictation/${dictIdForUrl}/${langOrigForUrl}/${langTrForUrl}`);
+
+          // Ключевые статические ассеты страницы диктанта.
+          // (Service Worker кеширует /static/*; здесь мы принудительно префетчим минимально нужное)
+          requiredUrls.push('/static/js/utils.js');
+          requiredUrls.push('/static/js/language_manager.js');
+          requiredUrls.push('/static/js/model_manager.js');
+          requiredUrls.push('/static/js/user_manager.js');
+          requiredUrls.push('/static/js/auth_interceptor.js');
+          requiredUrls.push('/static/js/login_modal.js');
+          requiredUrls.push('/static/js/sw_register.js');
+          requiredUrls.push('/static/js/audio_manager.js');
+          requiredUrls.push('/static/js/audio_player_visual.js');
+          requiredUrls.push('/static/js/user_activity_history.js');
+          requiredUrls.push('/static/js/dictation_statistics.js');
+          requiredUrls.push('/static/js/progress_panel.js');
+          requiredUrls.push('/static/js/audio_settings_panel.js');
+          requiredUrls.push('/static/js/statistics_report.js');
+          requiredUrls.push('/static/js/whisper-model-manager.js');
+          requiredUrls.push('/static/js/speech_recognition_unified.js');
+          requiredUrls.push('/static/js/script_dictation.js');
 
           const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
           const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
