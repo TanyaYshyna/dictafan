@@ -587,7 +587,9 @@
       const data = await apiRequest("/desk/api/items");
       if (data.success && data.items) {
         deskItems = data.items;
-        renderDeskItems();
+        if (typeof renderDeskCards === 'function') {
+          renderDeskCards(deskItems);
+        }
         // Обновляем индикаторы "в работе" в карточках диктантов
         updateInWorkIndicators();
         refreshDeskOutboxIndicator().catch(() => {});
