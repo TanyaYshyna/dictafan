@@ -4,7 +4,6 @@
 import json
 from datetime import datetime
 from psycopg2 import sql
-from psycopg2 import errors
 from helpers.db import get_db_connection
 
 
@@ -51,8 +50,6 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            used_legacy_schema = False
-
             # Определяем, какое поле обновлять (безопасно, так как значение контролируется)
             if type_activity == 'perfect':
                 update_field = 'perfect_count'
@@ -61,68 +58,36 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
             else:  # audio
                 update_field = 'audio_count'
 
-            try:
-                # Новая схема (агрегация по дням): history_activity(user_id, dictation_id, date, perfect_count, corrected_count, audio_count, ...)
-                query = sql.SQL("""
-                    INSERT INTO history_activity 
-                    (user_id, dictation_id, date, {field}, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id, dictation_id, date) 
-                    DO UPDATE SET 
-                        {field} = history_activity.{field} + %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    RETURNING id, user_id, dictation_id, date, perfect_count, corrected_count, audio_count, created_at, updated_at
-                """).format(field=sql.Identifier(update_field))
+            query = sql.SQL("""
+                INSERT INTO history_activity 
+                (user_id, dictation_id, date, {field}, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, dictation_id, date) 
+                DO UPDATE SET 
+                    {field} = history_activity.{field} + %s,
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id, user_id, dictation_id, date, perfect_count, corrected_count, audio_count, created_at, updated_at
+            """).format(field=sql.Identifier(update_field))
 
-                cur.execute(query, (user_id, dictation_id, today, number, number))
-                row = cur.fetchone()
+            cur.execute(query, (user_id, dictation_id, today, number, number))
 
-                conn.commit()
+            row = cur.fetchone()
+            conn.commit()
 
-                activity = {
-                    'id': row[0],
-                    'user_id': row[1],
-                    'dictation_id': row[2],
-                    'date': row[3].isoformat() if row[3] else None,
-                    'perfect_count': row[4],
-                    'corrected_count': row[5],
-                    'audio_count': row[6],
-                    'created_at': row[7].isoformat() if row[7] else None,
-                    'updated_at': row[8].isoformat() if row[8] else None,
-                    'legacy_schema': used_legacy_schema,
-                }
+            activity = {
+                'id': row[0],
+                'user_id': row[1],
+                'dictation_id': row[2],
+                'date': row[3].isoformat() if row[3] else None,
+                'perfect_count': row[4],
+                'corrected_count': row[5],
+                'audio_count': row[6],
+                'created_at': row[7].isoformat() if row[7] else None,
+                'updated_at': row[8].isoformat() if row[8] else None,
+            }
 
-                print(f'✅ [HISTORY_ACTIVITY] Активность сохранена: id={activity["id"]}, date={activity["date"]}, {update_field}={activity[update_field]}')
-                return activity
-            except (errors.UndefinedColumn, errors.UndefinedTable):
-                # Старая схема (как в add_dictation_history_tables.sql):
-                # history_activity(user_id, dictation_id, sentence_key, type_activity, number, created_at)
-                conn.rollback()
-                used_legacy_schema = True
-                with conn.cursor() as cur2:
-                    cur2.execute("""
-                        INSERT INTO history_activity
-                        (user_id, dictation_id, sentence_key, type_activity, number, created_at)
-                        VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-                        RETURNING id, user_id, dictation_id, sentence_key, type_activity, number, created_at
-                    """, (user_id, dictation_id, None, type_activity, number))
-
-                    row = cur2.fetchone()
-                    conn.commit()
-
-                    activity = {
-                        'id': row[0],
-                        'user_id': row[1],
-                        'dictation_id': row[2],
-                        'sentence_key': row[3],
-                        'type_activity': row[4],
-                        'number': row[5],
-                        'created_at': row[6].isoformat() if row[6] else None,
-                        'legacy_schema': used_legacy_schema,
-                    }
-
-                    print(f'✅ [HISTORY_ACTIVITY] Активность сохранена (legacy schema): id={activity["id"]}, type_activity={type_activity}, number={number}')
-                    return activity
+            print(f'✅ [HISTORY_ACTIVITY] Активность сохранена: id={activity["id"]}, date={activity["date"]}, {update_field}={activity[update_field]}')
+            return activity
     except Exception as e:
         conn.rollback()
         raise Exception(f"Failed to add activity: {e}")
@@ -170,33 +135,14 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            row = None
-            used_legacy_schema = False
+            cur.execute("""
+                INSERT INTO history_successes 
+                (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at
+            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms))
 
-            try:
-                # Новая схема: perfect_count / corrected_count / audio_count
-                cur.execute("""
-                    INSERT INTO history_successes 
-                    (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at
-                """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms))
-
-                row = cur.fetchone()
-            except errors.UndefinedColumn:
-                # Старая схема на проде/стейджинге: type_activity_* (пока миграция не применена)
-                conn.rollback()
-                used_legacy_schema = True
-                with conn.cursor() as cur2:
-                    cur2.execute("""
-                        INSERT INTO history_successes 
-                        (user_id, dictation_id, type_activity_perfect, type_activity_corrected, type_activity_audio, attempts_total, error_count, time_ms, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        RETURNING id, user_id, dictation_id, type_activity_perfect, type_activity_corrected, type_activity_audio, attempts_total, error_count, time_ms, created_at, updated_at
-                    """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms))
-
-                    row = cur2.fetchone()
-
+            row = cur.fetchone()
             conn.commit()
 
             success = {
@@ -211,7 +157,6 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'time_ms': row[8],
                 'created_at': row[9].isoformat() if row[9] else None,
                 'updated_at': row[10].isoformat() if row[10] else None,
-                'legacy_schema': used_legacy_schema,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')
