@@ -7829,6 +7829,17 @@ async function registerCompletedDictation() {
 
         // Сохраняем успех в новую таблицу history_successes
         try {
+            const dictationIdForDb = (() => {
+                const raw = String(currentDictation.id ?? '').trim();
+                const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
+                return Number.isFinite(parsed) ? parsed : null;
+            })();
+
+            if (!dictationIdForDb) {
+                console.error('[Register] ❌ Невозможно сохранить успех: некорректный dictation_id', currentDictation.id);
+                return;
+            }
+
             const totalAttempts = allSentences.reduce((sum, s) => sum + (Number(s.attempts_total) || 0), 0);
             const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.error_count) || 0), 0);
             const successResponse = await fetch('/api/statistics/success', {
@@ -7838,7 +7849,7 @@ async function registerCompletedDictation() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    dictation_id: currentDictation.id,
+                    dictation_id: dictationIdForDb,
                     perfect_count: totalPerfect,
                     corrected_count: totalCorrected,
                     audio_count: totalAudio,
@@ -7856,7 +7867,11 @@ async function registerCompletedDictation() {
                 await clearDraftFromIndexedDb();
             } else {
                 const errorText = await successResponse.text();
-                console.error('[Register] ❌ Ошибка сохранения успеха в БД:', errorText);
+                console.error('[Register] ❌ Ошибка сохранения успеха в БД:', {
+                    status: successResponse.status,
+                    statusText: successResponse.statusText,
+                    body: errorText
+                });
             }
         } catch (error) {
             console.error('[Register] ❌ Ошибка при сохранении успеха в БД:', error);
