@@ -11,6 +11,7 @@ let dictationStatistics = null; // Глобальный объект стати�
 let activityHistory = null; // История активности пользователя
 let progressPanel = null; // Панель прогресса
 let hasDraftLoaded = false; // Флаг загрузки черновика (для определения isResume в startGame)
+let dictationCompletionSaved = false; // Флаг: успех записан, черновик нужно не пересоздавать
 // let userManager = null;
 // circleBtn будет переопределен после рендера панели прогресса
 let circleBtn = document.getElementById('btn-circle-number');
@@ -165,6 +166,7 @@ function updateUnsavedIndicators() {
 
 function scheduleDraftAutosave(reason = 'unknown') {
     if (!currentDictation?.id) return;
+    if (dictationCompletionSaved) return;
     setSaveButtonStatus('pending');
     if (draftAutosaveTimer) clearTimeout(draftAutosaveTimer);
     draftAutosaveTimer = setTimeout(() => {
@@ -178,9 +180,21 @@ function scheduleDraftAutosave(reason = 'unknown') {
 
 function startDraftPeriodicAutosave() {
     if (draftPeriodicAutosaveTimer) return;
+    if (dictationCompletionSaved) return;
     draftPeriodicAutosaveTimer = setInterval(() => {
         saveDraftToIndexedDbAndQueueSync('periodic').catch(() => {});
     }, DRAFT_AUTOSAVE_INTERVAL_MS);
+}
+
+function stopDraftAutosaveTimers() {
+    if (draftAutosaveTimer) {
+        clearTimeout(draftAutosaveTimer);
+        draftAutosaveTimer = null;
+    }
+    if (draftPeriodicAutosaveTimer) {
+        clearInterval(draftPeriodicAutosaveTimer);
+        draftPeriodicAutosaveTimer = null;
+    }
 }
 
 async function openDraftDb() {
@@ -201,14 +215,30 @@ async function openDraftDb() {
 }
 
 async function clearDraftFromIndexedDb() {
-    const key = getDraftKey();
-    if (!key) return false;
+    const baseKey = getDraftKey();
+    if (!baseKey) return false;
+
+    const keysToDelete = new Set([baseKey]);
     try {
-        await idbDelete('drafts', key);
+        const rawId = String(currentDictation?.id ?? '').trim();
+        const numericId = parseInt(rawId.replace(/^dict_/, ''), 10);
+        if (Number.isFinite(numericId)) {
+            keysToDelete.add(`${getDraftUserIdForKey()}:${numericId}`);
+            keysToDelete.add(`${getDraftUserIdForKey()}:dict_${numericId}`);
+        }
+    } catch (e) {
+    }
+
+    try {
+        for (const key of keysToDelete) {
+            await idbDelete('drafts', key);
+        }
     } catch (e) {
     }
     try {
-        await idbDelete('outbox', key);
+        for (const key of keysToDelete) {
+            await idbDelete('outbox', key);
+        }
     } catch (e) {
     }
     return true;
@@ -360,6 +390,7 @@ function buildDictationDraftState() {
 }
 
 async function saveDraftToIndexedDbAndQueueSync(reason = 'unknown') {
+    if (dictationCompletionSaved) return false;
     const key = getDraftKey();
     if (!key) return false;
 
@@ -7864,6 +7895,8 @@ async function registerCompletedDictation() {
             if (successResponse.ok) {
                 const result = await successResponse.json();
                 console.log('[Register] ✅ Успех сохранен в history_successes:', result.success_data);
+                dictationCompletionSaved = true;
+                stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
             } else {
                 const errorText = await successResponse.text();
