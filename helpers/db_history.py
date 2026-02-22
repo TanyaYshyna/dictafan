@@ -7,7 +7,7 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
-def add_activity(user_id, dictation_id, type_activity, number=1):
+def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
     
@@ -36,8 +36,15 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
         except ValueError:
             raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
     
-    # Получаем текущую дату
-    today = datetime.now().date()
+    # Получаем дату (по умолчанию текущая)
+    if date_override is None:
+        target_date = datetime.now().date()
+    else:
+        if isinstance(date_override, str):
+            # ожидаем YYYY-MM-DD
+            target_date = datetime.fromisoformat(date_override).date()
+        else:
+            target_date = date_override
     
     # Временные логи для отладки
     print(f'📊 [HISTORY_ACTIVITY] Сохранение активности:')
@@ -45,7 +52,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
     print(f'   dictation_id: {dictation_id}')
     print(f'   type_activity: {type_activity}')
     print(f'   number: {number}')
-    print(f'   date: {today}')
+    print(f'   date: {target_date}')
     
     conn = get_db_connection()
     try:
@@ -69,7 +76,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1):
                 RETURNING id, user_id, dictation_id, date, perfect_count, corrected_count, audio_count, created_at, updated_at
             """).format(field=sql.Identifier(update_field))
 
-            cur.execute(query, (user_id, dictation_id, today, number, number))
+            cur.execute(query, (user_id, dictation_id, target_date, number, number))
 
             row = cur.fetchone()
             conn.commit()

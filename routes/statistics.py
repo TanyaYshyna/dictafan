@@ -237,6 +237,7 @@ def save_activity():
         dictation_id = data.get('dictation_id')  # может быть dict_<id> или integer
         type_activity = data.get('type_activity')  # 'perfect', 'corrected' или 'audio'
         number = data.get('number', 1)  # опционально, по умолчанию 1
+        activity_date = data.get('date')  # опционально: YYYY-MM-DD
         
         if not dictation_id or not type_activity:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указаны dictation_id или type_activity')
@@ -255,8 +256,8 @@ def save_activity():
         user_id = user['id']
         print(f'✅ [SAVE_ACTIVITY] Найден user_id: {user_id} для email: {current_email}')
         
-        # Сохраняем активность в БД (агрегируется по дням автоматически)
-        activity = add_activity(user_id, dictation_id, type_activity, number)
+        # Сохраняем активность в БД (агрегируется по дням)
+        activity = add_activity(user_id, dictation_id, type_activity, number, activity_date)
         
         print(f'✅ [SAVE_ACTIVITY] Активность успешно сохранена в БД')
         

@@ -199,7 +199,7 @@ function stopDraftAutosaveTimers() {
 
 async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-        const req = indexedDB.open('dictafan_drafts', 1);
+        const req = indexedDB.open('dictafan_drafts', 2);
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains('drafts')) {
@@ -207,6 +207,15 @@ async function openDraftDb() {
             }
             if (!db.objectStoreNames.contains('outbox')) {
                 db.createObjectStore('outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('activity_outbox')) {
+                db.createObjectStore('activity_outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('success_outbox')) {
+                db.createObjectStore('success_outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('dictations')) {
+                db.createObjectStore('dictations', { keyPath: 'key' });
             }
         };
         req.onsuccess = () => resolve(req.result);
@@ -277,7 +286,7 @@ async function idbPut(storeName, value) {
 async function idbDelete(storeName, key) {
     const db = await openDraftDb();
     try {
-        return await new Promise((resolve, reject) => {
+        await new Promise((resolve, reject) => {
             const tx = db.transaction(storeName, 'readwrite');
             const store = tx.objectStore(storeName);
             const req = store.delete(key);
@@ -286,6 +295,154 @@ async function idbDelete(storeName, key) {
         });
     } finally {
         db.close();
+    }
+}
+
+async function idbGetAll(storeName) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const req = store.getAll();
+            req.onsuccess = () => resolve(req.result || []);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+function getLocalDateId() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+async function enqueueOfflineActivity(type_activity, number = 1) {
+    try {
+        const userId = getDraftUserIdForKey();
+        if (!userId) return false;
+        const dateId = getLocalDateId();
+        const key = `${userId}:${dateId}`;
+        const existing = (await idbGet('activity_outbox', key)) || {
+            key,
+            userId,
+            date: dateId,
+            perfect_count: 0,
+            corrected_count: 0,
+            audio_count: 0,
+            updatedAt: 0
+        };
+
+        const n = Number(number) || 0;
+        if (type_activity === 'perfect') existing.perfect_count += n;
+        if (type_activity === 'corrected') existing.corrected_count += n;
+        if (type_activity === 'audio') existing.audio_count += n;
+        existing.updatedAt = Date.now();
+
+        await idbPut('activity_outbox', existing);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function syncOfflineActivityOutbox() {
+    try {
+        const token = window.UM?.token || localStorage.getItem('jwt_token');
+        if (!token) return false;
+
+        const rows = await idbGetAll('activity_outbox');
+        if (!rows.length) return true;
+
+        for (const row of rows) {
+            const toSend = [];
+            if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
+            if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
+            if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
+
+            let sentAll = true;
+            for (const item of toSend) {
+                const response = await fetch('/api/statistics/activity', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        dictation_id: currentDictation?.id || 'offline',
+                        date: row.date,
+                        type_activity: item.type_activity,
+                        number: item.number
+                    })
+                });
+                if (!response.ok) {
+                    sentAll = false;
+                    break;
+                }
+            }
+
+            if (sentAll) {
+                await idbDelete('activity_outbox', row.key);
+            } else {
+                return false;
+            }
+        }
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function enqueueOfflineSuccess(payload) {
+    try {
+        const userId = getDraftUserIdForKey();
+        if (!userId) return false;
+        const rawId = String(payload?.dictation_id ?? '').trim();
+        const key = `${userId}:${rawId}:${Date.now()}`;
+        await idbPut('success_outbox', {
+            key,
+            userId,
+            createdAt: Date.now(),
+            payload
+        });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+async function syncOfflineSuccessOutbox() {
+    try {
+        const token = window.UM?.token || localStorage.getItem('jwt_token');
+        if (!token) return false;
+
+        const rows = await idbGetAll('success_outbox');
+        if (!rows.length) return true;
+
+        for (const row of rows) {
+            const response = await fetch('/api/statistics/success', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(row.payload)
+            });
+            if (!response.ok) {
+                return false;
+            }
+
+            await idbDelete('success_outbox', row.key);
+        }
+
+        return true;
+    } catch (e) {
+        return false;
     }
 }
 
@@ -410,7 +567,12 @@ async function saveDraftToIndexedDbAndQueueSync(reason = 'unknown') {
 }
 
 async function syncDraftIfOnline(force = false) {
-    return true;
+    if (!force && !navigator.onLine) return false;
+    const [aOk, sOk] = await Promise.all([
+        syncOfflineActivityOutbox(),
+        syncOfflineSuccessOutbox()
+    ]);
+    return !!aOk && !!sOk;
 }
 
 window.addEventListener('online', () => {
@@ -5607,6 +5769,7 @@ async function saveActivityToDB(type_activity) {
             console.warn(`⚠️ [CLIENT] Ошибка сохранения активности ${type_activity}:`, response.status, response.statusText);
             const errorText = await response.text();
             console.warn(`⚠️ [CLIENT] Текст ошибки:`, errorText);
+            await enqueueOfflineActivity(type_activity, 1);
             return;
         }
 
@@ -5614,6 +5777,7 @@ async function saveActivityToDB(type_activity) {
         console.log(`✅ [CLIENT] Активность ${type_activity} успешно сохранена в БД:`, result);
     } catch (error) {
         console.error(`❌ [CLIENT] Ошибка при сохранении активности ${type_activity}:`, error);
+        await enqueueOfflineActivity(type_activity, 1);
         // Не прерываем выполнение, ошибка не критична
     }
 }
@@ -5711,44 +5875,34 @@ function loadDictationData() {
 
 
 /**
- * Загружает предложения диктанта из БД через API
+ * Загружает предложения диктанта ТОЛЬКО из IndexedDB (offline-first)
  */
-async function loadSentencesFromAPI() {
+async function loadSentencesFromIndexedDb() {
     if (!currentDictation.id || !currentDictation.language_original || !currentDictation.language_translation) {
         console.error('❌ Недостаточно данных для загрузки предложений:', currentDictation);
         return false;
     }
 
+    const key = `${getDraftUserIdForKey()}:${currentDictation.id}:${currentDictation.language_original}:${currentDictation.language_translation}`;
     try {
-        const url = `/api/dictation/${currentDictation.id}/${currentDictation.language_original}/${currentDictation.language_translation}/sentences`;
-        console.log('📡 Загрузка предложений из API:', url);
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        const cached = await idbGet('dictations', key);
+        const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
+        if (!sentences.length) {
+            console.warn('❌ Диктант не найден в IndexedDB (dictations):', key);
+            return false;
         }
 
-        const data = await response.json();
-        if (!data.success || !data.sentences) {
-            throw new Error('Неверный формат ответа от API');
-        }
-
-        // Загружаем предложения
-        allSentences = data.sentences;
-
-        // Инициализируем поля прогресса для всех предложений (по умолчанию 0)
-        // Поля circle_number_of_* больше не инициализируются - логика кругов убрана
+        allSentences = sentences;
         allSentences.forEach(s => {
             if (s.number_of_perfect === undefined) s.number_of_perfect = 0;
             if (s.number_of_corrected === undefined) s.number_of_corrected = 0;
             if (s.number_of_audio === undefined) s.number_of_audio = 0;
         });
 
-        console.log('✅ Загружено предложений из БД:', allSentences.length);
+        console.log('✅ Загружено предложений из IndexedDB:', allSentences.length);
         return true;
-
     } catch (error) {
-        console.error('❌ Ошибка загрузки предложений из API:', error);
+        console.error('❌ Ошибка загрузки предложений из IndexedDB:', error);
         return false;
     }
 }
@@ -5766,10 +5920,10 @@ async function initializeDictation() {
         return;
     }
 
-    // Загружаем предложения из БД через API
-    const sentencesLoaded = await loadSentencesFromAPI();
+    // Загружаем предложения ТОЛЬКО из IndexedDB
+    const sentencesLoaded = await loadSentencesFromIndexedDb();
     if (!sentencesLoaded) {
-        alert('Ошибка загрузки предложений диктанта');
+        alert('Диктант не закеширован для оффлайн-режима. Добавь его на стол и скачай оффлайн-ассеты.');
         return;
     }
 
@@ -7905,9 +8059,31 @@ async function registerCompletedDictation() {
                     statusText: successResponse.statusText,
                     body: errorText
                 });
+                await enqueueOfflineSuccess({
+                    dictation_id: dictationIdForDb,
+                    perfect_count: totalPerfect,
+                    corrected_count: totalCorrected,
+                    audio_count: totalAudio,
+                    attempts_total: totalAttempts,
+                    error_count: totalErrors,
+                    time_ms: totalTimeMs,
+                    sentences_data: sentences_data,
+                    settings_json: settings_json
+                });
             }
         } catch (error) {
             console.error('[Register] ❌ Ошибка при сохранении успеха в БД:', error);
+            await enqueueOfflineSuccess({
+                dictation_id: dictationIdForDb,
+                perfect_count: totalPerfect,
+                corrected_count: totalCorrected,
+                audio_count: totalAudio,
+                attempts_total: totalAttempts,
+                error_count: totalErrors,
+                time_ms: totalTimeMs,
+                sentences_data: sentences_data,
+                settings_json: settings_json
+            });
         }
 
         // Черновик удален с сервера, localStorage больше не используется
