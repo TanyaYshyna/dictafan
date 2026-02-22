@@ -635,17 +635,18 @@
       const langTranslation = item.language_translation || item.language_code || 'en';
       const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const coverUrl = item.cover_url || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
-      // Убеждаемся, что sentencesCount - это число, а не строка или что-то еще
-      const sentencesCount = typeof item.sentences_count === 'number' ? item.sentences_count : (parseInt(item.sentences_count, 10) || 0);
-      
+
+      const sentencesCount = typeof item.sentences_count === 'number'
+        ? item.sentences_count
+        : (parseInt(item.sentences_count, 10) || 0);
+
       return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
-          <a class="short-thumb" href="${openUrl}" target="_blank">
-            <img src="${coverUrl}" alt="${item.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
+          <a class="short-thumb" href="${openUrl}">
+            <img src="${coverUrl}" alt="" class="short-cover" loading="lazy">
+            <div class="card-progress-stats"></div>
           </a>
-          <h3 class="short-title">
-            <a href="${openUrl}" target="_blank">${item.title || 'Без названия'}</a>
-          </h3>
+          <h3 class="short-title">${item.title || 'Без названия'}</h3>
           <div class="short-id-container">
             <div class="short-sentences-count" title="Количество предложений">
               <i data-lucide="layers"></i><span>${sentencesCount}</span>

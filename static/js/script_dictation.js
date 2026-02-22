@@ -821,6 +821,65 @@ let langCodeUrl = 'en-US';
 let recognition = null;
 let textAttemptCount = 0;
 let lastRecognitionTime = 0;  // Время последнего результата распознавания для умного автостопа
+
+let inputScriptNoticeShown = false;
+
+let LATIN_TEST_REGEX = /[A-Za-z]/;
+let LATIN_REPLACE_REGEX = /[A-Za-z]/g;
+let CYRILLIC_TEST_REGEX = /[\u0400-\u04FF]/;
+let CYRILLIC_REPLACE_REGEX = /[\u0400-\u04FF]/g;
+let ARABIC_TEST_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+let ARABIC_REPLACE_REGEX = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g;
+
+// Prefer Unicode script property escapes when supported by the runtime.
+try {
+    LATIN_TEST_REGEX = new RegExp('\\p{Script=Latin}', 'u');
+    LATIN_REPLACE_REGEX = new RegExp('\\p{Script=Latin}', 'gu');
+    CYRILLIC_TEST_REGEX = new RegExp('\\p{Script=Cyrillic}', 'u');
+    CYRILLIC_REPLACE_REGEX = new RegExp('\\p{Script=Cyrillic}', 'gu');
+    ARABIC_TEST_REGEX = new RegExp('\\p{Script=Arabic}', 'u');
+    ARABIC_REPLACE_REGEX = new RegExp('\\p{Script=Arabic}', 'gu');
+} catch {
+}
+
+function getDictationScript() {
+    const raw = (langCodeUrl || currentDictation?.language_original || '').toString().trim().toLowerCase();
+    if (raw.startsWith('ru') || raw.startsWith('uk')) return 'cyrillic';
+    if (raw.startsWith('ar')) return 'arabic';
+    // en, tr, sv, etc.
+    return 'latin';
+}
+
+function getDisallowedScriptRegexes() {
+    const script = getDictationScript();
+    if (script === 'latin') {
+        return [CYRILLIC_REPLACE_REGEX, ARABIC_REPLACE_REGEX];
+    }
+    if (script === 'cyrillic') {
+        return [LATIN_REPLACE_REGEX, ARABIC_REPLACE_REGEX];
+    }
+    if (script === 'arabic') {
+        return [LATIN_REPLACE_REGEX, CYRILLIC_REPLACE_REGEX];
+    }
+    return [];
+}
+
+function hasDisallowedChars(text) {
+    if (!text) return false;
+    const script = getDictationScript();
+    if (script === 'latin') return CYRILLIC_TEST_REGEX.test(text) || ARABIC_TEST_REGEX.test(text);
+    if (script === 'cyrillic') return LATIN_TEST_REGEX.test(text) || ARABIC_TEST_REGEX.test(text);
+    if (script === 'arabic') return LATIN_TEST_REGEX.test(text) || CYRILLIC_TEST_REGEX.test(text);
+    return false;
+}
+
+function stripDisallowedChars(text) {
+    let result = text || '';
+    for (const rx of getDisallowedScriptRegexes()) {
+        result = result.replace(rx, '');
+    }
+    return result;
+}
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
 let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (только интернет), 'route-off' (только локально, только если модель загружена)
 let audioSettingsPanel = null;
@@ -3159,6 +3218,14 @@ async function loadLanguageCodes() {
             langCodeUrl = 'en-US';
         }
 
+        if (inputField) {
+            inputField.setAttribute('lang', langCodeUrl);
+            inputField.setAttribute('spellcheck', 'false');
+            inputField.setAttribute('autocapitalize', 'off');
+            inputField.setAttribute('autocorrect', 'off');
+            inputField.setAttribute('inputmode', 'text');
+        }
+
         // const response = await fetch(`/path/to/language/codes/${langCodeUrl}.json`);
         // languageCodes = await response.json();
 
@@ -3169,6 +3236,15 @@ async function loadLanguageCodes() {
         console.error('Ошибка загрузки языковых кодов:', error);
         // В случае ошибки устанавливаем язык по умолчанию
         langCodeUrl = 'en-US';
+
+        if (inputField) {
+            inputField.setAttribute('lang', langCodeUrl);
+            inputField.setAttribute('spellcheck', 'false');
+            inputField.setAttribute('autocapitalize', 'off');
+            inputField.setAttribute('autocorrect', 'off');
+            inputField.setAttribute('inputmode', 'text');
+        }
+
         initSpeechRecognition();
     }
 }
@@ -6429,15 +6505,50 @@ async function onloadInitializeDictation() {
 
 }
 
+function showInputScriptNoticeOnce() {
+    if (inputScriptNoticeShown) return;
+    inputScriptNoticeShown = true;
+    try {
+        if (typeof showSaveToast === 'function') {
+            const script = getDictationScript();
+            const hint = script === 'cyrillic' ? 'RU/UK' : (script === 'arabic' ? 'AR' : 'EN');
+            showSaveToast(`Для этого диктанта включи раскладку ${hint}`, 'error', 2000);
+        }
+    } catch {
+    }
+}
+
 inputField.addEventListener('input', function () {
-    const plainText = inputField.innerText;
-    if (inputField.innerHTML !== plainText) {
+    const html = inputField.innerHTML;
+    // Don't rewrite DOM on every keystroke. Only normalize when HTML tags appear.
+    // (e.g. browser injected <div>, <br>, etc). This keeps typing responsive.
+    if (typeof html === 'string' && html.indexOf('<') !== -1) {
+        const plainText = inputField.textContent || '';
         const cursorPos = saveCursorPosition(inputField);
-        inputField.innerHTML = plainText;
+        inputField.textContent = plainText;
         restoreCursorPosition(inputField, cursorPos);
+    }
+
+    const currentText = inputField.textContent || '';
+    if (hasDisallowedChars(currentText)) {
+        const sanitized = stripDisallowedChars(currentText);
+        const cursorPos = saveCursorPosition(inputField);
+        inputField.textContent = sanitized;
+        restoreCursorPosition(inputField, cursorPos);
+        showInputScriptNoticeOnce();
     }
     // Сбрасываем таймер бездействия при вводе текста
     resetInactivityTimer();
+});
+
+// Block Cyrillic before it is inserted (best UX). This cannot change OS keyboard,
+// but prevents "wrong" characters from appearing in the field.
+inputField.addEventListener('beforeinput', function (event) {
+    const t = event && typeof event.data === 'string' ? event.data : '';
+    if (t && hasDisallowedChars(t)) {
+        event.preventDefault();
+        showInputScriptNoticeOnce();
+    }
 });
 
 
@@ -7756,17 +7867,6 @@ async function registerCompletedDictation() {
     } catch (error) {
         console.error('[Register] ❌ Ошибка регистрации завершенного диктанта:', error);
     }
-}
-
-/**
- * Сохранение черновика диктанта
- */
-async function saveDictationDraft() {
-    console.log('[Draft] saveDictationDraft: invoked', {
-        hasStatistics: !!dictationStatistics,
-        dictationId: currentDictation?.id || null,
-        circle: circle_number
-    });
 
     if (!dictationStatistics || !currentDictation.id) {
         console.warn('Нельзя сохранить черновик: нет статистики или ID диктанта');
