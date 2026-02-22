@@ -117,6 +117,54 @@
     return out;
   }
 
+  async function openDraftDb() {
+    return await new Promise((resolve, reject) => {
+      const req = indexedDB.open('dictafan_drafts', 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('drafts')) {
+          db.createObjectStore('drafts', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('outbox')) {
+          db.createObjectStore('outbox', { keyPath: 'key' });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  async function idbGet(storeName, key) {
+    const db = await openDraftDb();
+    try {
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const req = store.get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => reject(req.error);
+      });
+    } finally {
+      db.close();
+    }
+  }
+
+  function getDraftUserIdForKey() {
+    try {
+      const um = window.UM;
+      const id = um?.userData?.id;
+      return id ? String(id) : 'anon';
+    } catch {
+      return 'anon';
+    }
+  }
+
+  function getDraftKey(dictationId) {
+    const id = dictationId ? String(dictationId) : '';
+    if (!id) return null;
+    return `${getDraftUserIdForKey()}:${id}`;
+  }
+
   async function refreshOfflineCacheStatus() {
     const statusEl = document.getElementById('offlineCacheStatus');
     if (!statusEl) return;
@@ -371,16 +419,6 @@
           await swRequest('purgeDictation', { dictationId });
         } catch (e) {
           // ignore
-        }
-
-        // Очищаем незаконченные значения диктанта
-        try {
-          await apiRequest(`/statistics/dictation_state/${dictationId}`, {
-            method: 'DELETE'
-          });
-          console.log('✅ Незаконченные значения диктанта очищены');
-        } catch (error) {
-          console.warn('⚠️ Не удалось очистить незаконченные значения:', error);
         }
         
         // Обновляем список диктантов на столе
@@ -2986,39 +3024,25 @@
       return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
     }
 
-    const token = localStorage.getItem('jwt_token');
-    const isAuthenticated = window.UM && typeof window.UM.isAuthenticated === 'function' && window.UM.isAuthenticated();
-    if (!token || !isAuthenticated) {
-      return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
-    }
-
-    try {
-      // Получаем статистику из БД через API
-      const response = await fetch(`/api/statistics/dictation_state/${dictationId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const state = data.state;
+    const loadDraftStatistics = async (dictationId) => {
+      try {
+        const key = getDraftKey(dictationId);
+        if (!key) return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+        const local = await idbGet('drafts', key);
+        const state = local && local.state ? local.state : null;
         if (state) {
-          // Вычисляем статистику из данных БД
           const draftStats = computeDraftStatistics(state);
           draftStats.hasDraft = true;
           return draftStats;
         }
-      } else if (response.status === 401) {
-        console.warn('Не авторизован для получения статистики');
+      } catch (error) {
+        console.warn('Ошибка загрузки статистики диктанта:', dictationId, error);
       }
-    } catch (error) {
-      console.warn('Ошибка загрузки статистики диктанта:', dictationId, error);
-    }
 
-    return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+      return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+    };
+
+    return loadDraftStatistics(dictationId);
   }
 
   // Вычисление статистики из состояния диктанта
@@ -3030,16 +3054,19 @@
 
     const toNumber = (value) => Number(value) || 0;
 
-    // Если есть агрегированные значения - добавляем их как базу
-    perfect += toNumber(state.number_of_perfect);
-    corrected += toNumber(state.number_of_corrected);
-    audio += toNumber(state.number_of_audio);
-
-    Object.values(perSentence).forEach(sentence => {
-      perfect += toNumber(sentence.number_of_perfect) + toNumber(sentence.circle_number_of_perfect || 0);
-      corrected += toNumber(sentence.number_of_corrected) + toNumber(sentence.circle_number_of_corrected || 0);
-      audio += toNumber(sentence.number_of_audio) + toNumber(sentence.circle_number_of_audio || 0);
-    });
+    const values = Object.values(perSentence);
+    if (values.length) {
+      values.forEach(sentence => {
+        perfect += toNumber(sentence.number_of_perfect);
+        corrected += toNumber(sentence.number_of_corrected);
+        audio += toNumber(sentence.number_of_audio);
+      });
+    } else {
+      // fallback (если черновик сохранён без per_sentence)
+      perfect = toNumber(state.number_of_perfect);
+      corrected = toNumber(state.number_of_corrected);
+      audio = toNumber(state.number_of_audio);
+    }
 
     return {
       perfect,

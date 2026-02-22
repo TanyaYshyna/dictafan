@@ -477,98 +477,21 @@ class DictationStatistics {
      * Загрузка черновика диктанта (resume state)
      */
     async loadResumeState(dictationId) {
-        try {
-            const token = this.userManager?.token;
-            if (!token) {
-                console.warn('[DictationStatistics] loadResumeState: отсутствует токен, пропускаем запрос к API');
-                return null;
-            }
-
-            const response = await fetch(`/api/statistics/dictation_state/${dictationId}`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                return data.state; // null если нет черновика
-            }
-            return null;
-        } catch (error) {
-            console.error('Ошибка загрузки черновика:', error);
-            return null;
-        }
+        return null;
     }
 
     /**
      * Сохранение черновика диктанта
      */
     async saveResumeState(dictationId, state) {
-        try {
-            const token = this.userManager?.token;
-            if (!token) {
-                console.warn('[DictationStatistics] saveResumeState: отсутствует токен, пропускаем запрос к API');
-                return false;
-            }
-
-            const response = await fetch('/api/statistics/dictation_state/save', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    dictation_id: dictationId,
-                    state: state
-                })
-            });
-
-            if (response.ok) {
-                console.log('✅ Черновик сохранен');
-                return true;
-            } else {
-                console.error('Ошибка сохранения черновика:', response.status);
-                return false;
-            }
-        } catch (error) {
-            console.error('Ошибка сохранения черновика:', error);
-            return false;
-        }
+        return true;
     }
 
     /**
      * Удаление черновика диктанта (после успешного продолжения)
      */
     async deleteResumeState(dictationId) {
-        try {
-            const token = this.userManager?.token;
-            if (!token) {
-                console.warn('[DictationStatistics] deleteResumeState: отсутствует токен, пропускаем запрос к API');
-                return false;
-            }
-
-            const response = await fetch(`/api/statistics/dictation_state/${dictationId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (response.ok) {
-                console.log('✅ Черновик удален');
-                return true;
-            } else {
-                console.error('Ошибка удаления черновика:', response.status);
-                return false;
-            }
-        } catch (error) {
-            console.error('Ошибка удаления черновика:', error);
-            return false;
-        }
+        return true;
     }
 }
 

@@ -52,8 +52,6 @@ def run_migration():
         print("   Созданы таблицы:")
         print("   - history_activity")
         print("   - history_successes")
-        print("   - history_unclosed_dictations")
-        print("   - history_unclosed_dictations_sentences")
         print("   Добавлены поля:")
         print("   - users.remember_unfinished_dictations")
         print("   - dictations.remember_unfinished_dictations")
@@ -65,9 +63,7 @@ def run_migration():
             WHERE table_schema = 'public' 
             AND table_name IN (
                 'history_activity',
-                'history_successes', 
-                'history_unclosed_dictations',
-                'history_unclosed_dictations_sentences'
+                'history_successes'
             )
             ORDER BY table_name
         """)

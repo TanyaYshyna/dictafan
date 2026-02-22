@@ -143,14 +143,7 @@ function setUnsavedStarVisible(isVisible) {
 }
 
 async function hasLocalPendingDraft() {
-    const key = getDraftKey();
-    if (!key) return false;
-    try {
-        const queued = await idbGet('outbox', key);
-        return !!(queued && queued.state);
-    } catch {
-        return false;
-    }
+    return false;
 }
 
 function updateUnsavedIndicators() {
@@ -205,6 +198,20 @@ async function openDraftDb() {
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
     });
+}
+
+async function clearDraftFromIndexedDb() {
+    const key = getDraftKey();
+    if (!key) return false;
+    try {
+        await idbDelete('drafts', key);
+    } catch (e) {
+    }
+    try {
+        await idbDelete('outbox', key);
+    } catch (e) {
+    }
+    return true;
 }
 
 async function idbGet(storeName, key) {
@@ -368,57 +375,11 @@ async function saveDraftToIndexedDbAndQueueSync(reason = 'unknown') {
         state
     });
 
-    await idbPut('outbox', {
-        key,
-        dictationId: currentDictation.id,
-        userId: getDraftUserIdForKey(),
-        updatedAt: now,
-        reason,
-        state
-    });
-
-    syncDraftIfOnline(false).catch(() => {});
     return true;
 }
 
 async function syncDraftIfOnline(force = false) {
-    if (draftSyncInFlight) return draftSyncInFlight;
-
-    draftSyncInFlight = (async () => {
-        const key = getDraftKey();
-        if (!key) return false;
-
-        if (!force && !navigator.onLine) {
-            return false;
-        }
-
-        const queued = await idbGet('outbox', key);
-        if (!queued || !queued.state) {
-            setSaveButtonStatus('clean');
-            return true;
-        }
-
-        if (!dictationStatistics || typeof dictationStatistics.saveResumeState !== 'function') {
-            return false;
-        }
-
-        setSaveButtonStatus('syncing');
-        const ok = await dictationStatistics.saveResumeState(currentDictation.id, queued.state);
-        if (ok) {
-            await idbDelete('outbox', key);
-            setSaveButtonStatus('clean');
-            return true;
-        }
-
-        setSaveButtonStatus('error');
-        return false;
-    })();
-
-    try {
-        return await draftSyncInFlight;
-    } finally {
-        draftSyncInFlight = null;
-    }
+    return true;
 }
 
 window.addEventListener('online', () => {
@@ -2268,6 +2229,8 @@ function resetDictationProgress() {
         s.number_of_perfect = 0;
         s.number_of_corrected = 0;
         s.number_of_audio = 0;
+        s.attempts_total = 0;
+        s.error_count = 0;
         // ИСПРАВЛЕНО: Убраны поля circle_number_of_* - они больше не используются
         // Сбрасываем состояние выбора - все становятся checked (кроме completed, но их не будет после сброса)
         s.selection_state = 'checked';
@@ -2299,6 +2262,7 @@ function resetDictationProgress() {
 
     renderSelectionTable();
     updateStats();
+    updateErrorCountLabel(0);
     showSaveToast('Прогресс по предложениям очищен.');
 }
 
@@ -7778,32 +7742,13 @@ async function registerCompletedDictation() {
             if (successResponse.ok) {
                 const result = await successResponse.json();
                 console.log('[Register] ✅ Успех сохранен в history_successes:', result.success_data);
+                await clearDraftFromIndexedDb();
             } else {
                 const errorText = await successResponse.text();
                 console.error('[Register] ❌ Ошибка сохранения успеха в БД:', errorText);
             }
         } catch (error) {
             console.error('[Register] ❌ Ошибка при сохранении успеха в БД:', error);
-        }
-
-        // Удаляем незавершенный диктант из БД (при успешном завершении)
-        try {
-            const deleteResponse = await fetch(`/api/statistics/dictation_state/${currentDictation.id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            if (deleteResponse.ok) {
-                console.log('[Register] ✅ Незавершенный диктант удален из БД');
-            } else {
-                const errorText = await deleteResponse.text();
-                console.warn('[Register] ⚠️ Не удалось удалить незавершенный диктант из БД:', errorText);
-            }
-        } catch (error) {
-            console.warn('[Register] ⚠️ Ошибка удаления незавершенного диктанта из БД:', error);
         }
 
         // Черновик удален с сервера, localStorage больше не используется
@@ -7844,14 +7789,8 @@ async function saveDictationDraft() {
 
     await saveDraftToIndexedDbAndQueueSync('manual');
 
-    try {
-        const result = await dictationStatistics.saveResumeState(currentDictation.id, state);
-        console.log('[Draft] saveDictationDraft: completed', { success: !!result });
-        return result;
-    } catch (error) {
-        console.error('[Draft] saveDictationDraft: error', error);
-        return false;
-    }
+    console.log('[Draft] saveDictationDraft: completed', { success: true });
+    return true;
 }
 
 /**
@@ -7866,9 +7805,7 @@ async function loadAndApplyDraft(forceClear = false) {
     // Если нужно принудительно очистить черновик
     if (forceClear) {
         clearLocalStorageDraft();
-        if (dictationStatistics && dictationStatistics.deleteResumeState) {
-            await dictationStatistics.deleteResumeState(currentDictation.id);
-        }
+        await clearDraftFromIndexedDb();
         return false;
     }
 
@@ -7892,7 +7829,11 @@ async function loadAndApplyDraft(forceClear = false) {
         }
 
         if (!draft) {
-            draft = await dictationStatistics.loadResumeState(currentDictation.id);
+            if (panel) {
+                panel.markClean();
+            }
+            setSaveButtonStatus('clean');
+            return false;
         }
 
         if (!draft) {
@@ -8190,7 +8131,6 @@ async function loadAndApplyDraft(forceClear = false) {
         }
 
         startDraftPeriodicAutosave();
-        syncDraftIfOnline(false).catch(() => {});
 
         return true;
     } finally {
@@ -8228,7 +8168,7 @@ async function handleSave() {
                 : Promise.resolve(true);
 
             await saveDraftToIndexedDbAndQueueSync('explicit-save');
-            const draftSaved = await syncDraftIfOnline(true);
+            const draftSaved = true;
             const historySaved = await historySavePromise;
             const success = !!draftSaved && historySaved !== false;
 
@@ -8270,7 +8210,7 @@ async function handleSaveAndExit() {
         : Promise.resolve(true);
 
     await saveDraftToIndexedDbAndQueueSync('save-and-exit');
-    const draftSaved = await syncDraftIfOnline(true);
+    const draftSaved = true;
     const historySaved = await historySavePromise;
     const success = !!draftSaved && historySaved !== false;
     if (panel && success) {
