@@ -708,7 +708,9 @@
           const langOrigForUrl = (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.language_code)
             ? metaRes.dictation.language_code
             : 'en';
-          const langTrForUrl = langOrigForUrl;
+          const langTrForUrl = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+            ? window.USER_LANGUAGE_DATA.nativeLanguage
+            : langOrigForUrl;
           // Домашняя страница — это рабочий стол, тоже нужна оффлайн
           requiredUrls.push('/');
           requiredUrls.push(`/dictation/${dictIdForUrl}/${langOrigForUrl}/${langTrForUrl}`);
