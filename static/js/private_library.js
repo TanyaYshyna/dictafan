@@ -94,8 +94,50 @@
     return response.json();
   }
 
-  function showToast(message) {
-    alert(message);
+  function showToast(message, opts = {}) {
+    const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1000;
+    const beepUrl = typeof opts.beepUrl === 'string' ? opts.beepUrl : null;
+
+    let el = document.getElementById('auto-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'auto-toast';
+      el.style.position = 'fixed';
+      el.style.left = '50%';
+      el.style.top = '24px';
+      el.style.transform = 'translateX(-50%)';
+      el.style.zIndex = '100000';
+      el.style.background = 'rgba(0,0,0,0.78)';
+      el.style.color = '#fff';
+      el.style.padding = '10px 14px';
+      el.style.borderRadius = '12px';
+      el.style.fontSize = '14px';
+      el.style.maxWidth = 'min(92vw, 520px)';
+      el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+      el.style.display = 'none';
+      document.body.appendChild(el);
+    }
+
+    el.textContent = message || '';
+    el.style.display = 'block';
+
+    if (beepUrl) {
+      try {
+        const a = new Audio(beepUrl);
+        a.volume = 0.7;
+        a.play().catch(() => {});
+      } catch (e) {
+      }
+    }
+
+    if (el._hideTimer) window.clearTimeout(el._hideTimer);
+    el._hideTimer = window.setTimeout(() => {
+      try {
+        const node = document.getElementById('auto-toast');
+        if (node) node.style.display = 'none';
+      } catch (e) {
+      }
+    }, Math.max(0, durationMs));
   }
 
   const deskToggleInFlight = new Set();
@@ -626,18 +668,11 @@
 
       if (localRev === serverRev) return;
 
-      const ok = confirm('Приложение обновилось. Обновить оффлайн-кеш сейчас?\n\n(Это очистит кеш страниц/ассетов и перезагрузит страницу.)');
-      if (!ok) {
-        localStorage.setItem('app_cache_revision', serverRev);
-        return;
-      }
-
       try {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
           await swRequest('cacheClear', { timeoutMs: 60000 });
         }
       } catch (e) {
-        // ignore
       }
 
       localStorage.setItem('app_cache_revision', serverRev);
@@ -739,7 +774,7 @@
         
         // Обновляем список диктантов на столе
         await loadDeskItems();
-        showToast('Диктант убран со стола');
+        showToast('Диктант убран со стола', { durationMs: 1000, beepUrl: '/static/sounds/victory/beep2.mp3' });
         refreshOfflineCacheStatus();
       } else {
         showToast('Ошибка при удалении диктанта со стола');

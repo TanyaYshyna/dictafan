@@ -403,12 +403,49 @@ async function enqueueOfflineSuccess(payload) {
         const userId = getDraftUserIdForKey();
         if (!userId) return false;
         const rawId = String(payload?.dictation_id ?? '').trim();
-        const key = `${userId}:${rawId}:${Date.now()}`;
+        const dateId = getLocalDateId();
+        const key = `${userId}:${rawId}:${dateId}`;
+
+        const existing = await idbGet('success_outbox', key);
+
+        function mergeSentencesData(prev = [], next = []) {
+            const map = new Map();
+            for (const row of Array.isArray(prev) ? prev : []) {
+                if (!row || !row.sentence_key) continue;
+                map.set(row.sentence_key, { ...row });
+            }
+            for (const row of Array.isArray(next) ? next : []) {
+                if (!row || !row.sentence_key) continue;
+                const p = map.get(row.sentence_key);
+                if (!p) {
+                    map.set(row.sentence_key, { ...row });
+                } else {
+                    p.perfect_count = (Number(p.perfect_count) || 0) + (Number(row.perfect_count) || 0);
+                    p.corrected_count = (Number(p.corrected_count) || 0) + (Number(row.corrected_count) || 0);
+                    p.audio_count = (Number(p.audio_count) || 0) + (Number(row.audio_count) || 0);
+                    map.set(row.sentence_key, p);
+                }
+            }
+            return Array.from(map.values());
+        }
+
+        const mergedPayload = existing && existing.payload ? {
+            ...existing.payload,
+            perfect_count: (Number(existing.payload.perfect_count) || 0) + (Number(payload.perfect_count) || 0),
+            corrected_count: (Number(existing.payload.corrected_count) || 0) + (Number(payload.corrected_count) || 0),
+            audio_count: (Number(existing.payload.audio_count) || 0) + (Number(payload.audio_count) || 0),
+            attempts_total: (Number(existing.payload.attempts_total) || 0) + (Number(payload.attempts_total) || 0),
+            error_count: (Number(existing.payload.error_count) || 0) + (Number(payload.error_count) || 0),
+            time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
+            sentences_data: mergeSentencesData(existing.payload.sentences_data, payload.sentences_data),
+            settings_json: payload.settings_json || existing.payload.settings_json
+        } : payload;
+
         await idbPut('success_outbox', {
             key,
             userId,
-            createdAt: Date.now(),
-            payload
+            createdAt: existing?.createdAt || Date.now(),
+            payload: mergedPayload
         });
         return true;
     } catch (e) {
@@ -8128,6 +8165,11 @@ async function registerCompletedDictation() {
                     sentences_data: sentences_data,
                     settings_json: settings_json
                 });
+
+                // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
+                dictationCompletionSaved = true;
+                stopDraftAutosaveTimers();
+                await clearDraftFromIndexedDb();
             }
         } catch (error) {
             console.error('[Register] ❌ Ошибка при сохранении успеха в БД:', error);
@@ -8142,6 +8184,11 @@ async function registerCompletedDictation() {
                 sentences_data: sentences_data,
                 settings_json: settings_json
             });
+
+            // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
+            dictationCompletionSaved = true;
+            stopDraftAutosaveTimers();
+            await clearDraftFromIndexedDb();
         }
 
         // Черновик удален с сервера, localStorage больше не используется
