@@ -142,8 +142,18 @@
 
   const deskToggleInFlight = new Set();
 
-  const PAGE_VERSION = 'private_library_0032';
-  console.log('[Version]', PAGE_VERSION);
+  const PAGE_NAME = 'private_library';
+  (async () => {
+    try {
+      const res = await fetch('/api/app-cache-revision', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const rev = data && (data.revision || data.app_cache_revision || data.value);
+      console.log('[Version]', `${PAGE_NAME}__${rev || 'unknown'}`);
+    } catch (e) {
+      console.log('[Version]', `${PAGE_NAME}__unknown`);
+    }
+  })();
 
   function formatBytes(bytes) {
     const n = Number(bytes) || 0;
