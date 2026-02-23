@@ -57,6 +57,16 @@ function normalizeCacheKey(requestOrUrl) {
   }
 }
 
+function shouldIgnoreSearchFallbackForRequest(request) {
+  try {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    return path === '/' || path.startsWith('/dictation/') || path.startsWith('/static/');
+  } catch (e) {
+    return false;
+  }
+}
+
 function isUnboundedUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
@@ -139,8 +149,7 @@ async function cacheFirstBounded(request) {
     const cacheKey = hasRange ? request.url : normalizeCacheKey(request);
 
     let cached = await cache.match(cacheKey);
-    if (!cached && !hasRange) {
-      // Backward/compat: if older entries were stored without normalization, try ignoreSearch.
+    if (!cached && !hasRange && shouldIgnoreSearchFallbackForRequest(request)) {
       cached = await cache.match(request, { ignoreSearch: true });
     }
     if (cached) return cached;
@@ -165,7 +174,7 @@ async function cacheFirstUnbounded(request) {
 
     const cacheKey = normalizeCacheKey(request);
     let cached = await cache.match(cacheKey);
-    if (!cached) {
+    if (!cached && shouldIgnoreSearchFallbackForRequest(request)) {
       cached = await cache.match(request, { ignoreSearch: true });
     }
     if (cached) return cached;

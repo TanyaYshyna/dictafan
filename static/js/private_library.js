@@ -567,6 +567,12 @@
         </div>
       `;
       document.body.appendChild(overlay);
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.right = '0';
+      overlay.style.bottom = '0';
+      overlay.style.zIndex = '99999';
     } else {
       overlay.querySelector('.loading-text').textContent = message;
     }
@@ -577,6 +583,44 @@
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
       overlay.style.display = 'none';
+    }
+  }
+
+  async function checkAppCacheRevision() {
+    try {
+      const res = await fetch('/api/app-cache-revision', { method: 'GET' });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (!data || !data.success || !data.revision) return;
+
+      const serverRev = String(data.revision);
+      const localRev = localStorage.getItem('app_cache_revision');
+
+      if (!localRev) {
+        localStorage.setItem('app_cache_revision', serverRev);
+        return;
+      }
+
+      if (localRev === serverRev) return;
+
+      const ok = confirm('Приложение обновилось. Обновить оффлайн-кеш сейчас?\n\n(Это очистит кеш страниц/ассетов и перезагрузит страницу.)');
+      if (!ok) {
+        localStorage.setItem('app_cache_revision', serverRev);
+        return;
+      }
+
+      try {
+        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+          await swRequest('cacheClear', { timeoutMs: 60000 });
+        }
+      } catch (e) {
+        // ignore
+      }
+
+      localStorage.setItem('app_cache_revision', serverRev);
+      location.reload();
+    } catch (e) {
+      // ignore
     }
   }
 
@@ -4294,6 +4338,8 @@
   // Инициализация при загрузке страницы
   document.addEventListener("DOMContentLoaded", async () => {
     initEventHandlers();
+
+    checkAppCacheRevision().catch(() => {});
 
     ensureDeskCacheIndicator();
     refreshOfflineCacheStatus();

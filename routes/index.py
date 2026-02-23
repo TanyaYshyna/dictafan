@@ -16,6 +16,16 @@ index_bp = Blueprint('index', __name__)
 DATA_DIR = os.path.join("static", "data") 
 
 
+def get_app_cache_revision() -> str:
+    try:
+        rev = os.getenv('APP_CACHE_REVISION')
+        if rev:
+            return str(rev)
+    except Exception:
+        pass
+    return '1'
+
+
 def _get_static_data_base_dir() -> str:
     override = os.getenv("STATIC_DATA_FOLDER")
     if override:
@@ -622,6 +632,14 @@ def index():
         own_books=[],
         shelf_books=[],
     )
+
+
+@index_bp.route('/api/app-cache-revision')
+def app_cache_revision():
+    return jsonify({
+        'success': True,
+        'revision': get_app_cache_revision(),
+    })
 
 
 
