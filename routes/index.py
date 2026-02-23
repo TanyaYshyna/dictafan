@@ -3,6 +3,7 @@ import io
 import json
 import os
 import shutil
+import hashlib
 import tempfile
 import zipfile
 from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory
@@ -17,6 +18,50 @@ DATA_DIR = os.path.join("static", "data")
 
 
 def get_app_cache_revision() -> str:
+    try:
+        # Prefer environment-provided build/release identifiers (best for deploys).
+        for k in (
+            'APP_CACHE_REVISION',
+            'RAILWAY_GIT_COMMIT_SHA',
+            'RAILWAY_GIT_COMMIT',
+            'GIT_COMMIT',
+            'SOURCE_VERSION',
+            'RENDER_GIT_COMMIT',
+            'VERCEL_GIT_COMMIT_SHA',
+        ):
+            v = os.getenv(k)
+            if v:
+                return str(v)
+    except Exception:
+        pass
+
+    try:
+        # Automatic fallback: compute revision from mtimes of key static assets.
+        # This changes naturally on deploy when files are updated.
+        base_dir = current_app.root_path
+        candidates = [
+            'sw.js',
+            os.path.join('static', 'js', 'private_library.js'),
+            os.path.join('static', 'js', 'script_dictation.js'),
+            os.path.join('static', 'js', 'user_manager.js'),
+            os.path.join('static', 'css', 'style_private_library.css'),
+            os.path.join('static', 'css', 'style_dictation.css'),
+        ]
+        parts = []
+        for rel in candidates:
+            try:
+                p = os.path.join(base_dir, rel)
+                st = os.stat(p)
+                parts.append(f"{rel}:{int(st.st_mtime)}:{st.st_size}")
+            except Exception:
+                continue
+
+        if parts:
+            raw = '|'.join(parts).encode('utf-8')
+            return hashlib.sha1(raw).hexdigest()[:12]
+    except Exception:
+        pass
+
     try:
         from helpers.db import get_db_cursor
 
@@ -38,13 +83,6 @@ def get_app_cache_revision() -> str:
                 conn.close()
             except Exception:
                 pass
-    except Exception:
-        pass
-
-    try:
-        rev = os.getenv('APP_CACHE_REVISION')
-        if rev:
-            return str(rev)
     except Exception:
         pass
 
