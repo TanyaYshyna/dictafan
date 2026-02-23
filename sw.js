@@ -164,7 +164,22 @@ async function cacheFirstBounded(request) {
     }
     return response;
   } catch (e) {
-    return fetch(request);
+    try {
+      const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+      const cacheKey = normalizeCacheKey(request);
+      let cached = await cache.match(cacheKey);
+      if (!cached && shouldIgnoreSearchFallbackForRequest(request)) {
+        cached = await cache.match(request, { ignoreSearch: true });
+      }
+      if (cached) return cached;
+    } catch (e2) {
+      // ignore
+    }
+
+    return new Response('Offline', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   }
 }
 
@@ -185,7 +200,22 @@ async function cacheFirstUnbounded(request) {
     }
     return response;
   } catch (e) {
-    return fetch(request);
+    try {
+      const cache = await caches.open(RUNTIME_CACHE_UNBOUNDED);
+      const cacheKey = normalizeCacheKey(request);
+      let cached = await cache.match(cacheKey);
+      if (!cached && shouldIgnoreSearchFallbackForRequest(request)) {
+        cached = await cache.match(request, { ignoreSearch: true });
+      }
+      if (cached) return cached;
+    } catch (e2) {
+      // ignore
+    }
+
+    return new Response('Offline', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   }
 }
 

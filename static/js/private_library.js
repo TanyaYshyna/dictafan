@@ -578,13 +578,32 @@
       overlay.querySelector('.loading-text').textContent = message;
     }
     overlay.style.display = 'flex';
+    overlay.dataset.autoclosing = '';
   }
 
   function hideLoadingIndicator() {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
       overlay.style.display = 'none';
+      overlay.dataset.autoclosing = '';
     }
+  }
+
+  function completeLoadingIndicator(message = 'Загрузка закончена', delayMs = 1000) {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    const text = overlay.querySelector('.loading-text');
+    if (text) text.textContent = message;
+    overlay.dataset.autoclosing = '1';
+    window.setTimeout(() => {
+      try {
+        const ov = document.getElementById('loading-overlay');
+        if (!ov) return;
+        ov.style.display = 'none';
+        ov.dataset.autoclosing = '';
+      } catch (e) {
+      }
+    }, Math.max(0, Number(delayMs) || 0));
   }
 
   async function checkAppCacheRevision() {
@@ -867,6 +886,7 @@
 
           showToast('Диктант добавлен на стол');
           refreshOfflineCacheStatus();
+          completeLoadingIndicator('Загрузка закончена', 1000);
         } else {
           showToast('Ошибка при добавлении диктанта на стол');
         }
@@ -874,7 +894,10 @@
         console.error('❌ Ошибка добавления диктанта на стол:', error);
         showToast('Ошибка при добавлении диктанта на стол');
       } finally {
-        hideLoadingIndicator();
+        const overlay = document.getElementById('loading-overlay');
+        if (!overlay || overlay.dataset.autoclosing !== '1') {
+          hideLoadingIndicator();
+        }
         deskToggleInFlight.delete(key);
       }
     }

@@ -89,7 +89,11 @@ class UserActivityHistory {
 
             return this.monthData;
         } catch (error) {
-            console.error('Error loading history:', error);
+            if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+                console.warn('⚠️ Оффлайн: не удалось загрузить историю (не критично):', error);
+            } else {
+                console.warn('⚠️ Не удалось загрузить историю (не критично):', error);
+            }
             // Возвращаем пустую структуру при ошибке, но сохраняем statistics_sentenses если они были
             const existingSentenses = this.monthData?.statistics_sentenses || [];
             this.monthData = {
@@ -229,7 +233,11 @@ class UserActivityHistory {
 
             return true;
         } catch (error) {
-            console.error('❌ Ошибка при сохранении сессии (не критично, работа продолжается):', error);
+            if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+                console.warn('⚠️ Оффлайн: ошибка при сохранении сессии (не критично, работа продолжается):', error);
+            } else {
+                console.warn('⚠️ Ошибка при сохранении сессии (не критично, работа продолжается):', error);
+            }
             // Возвращаем false, но не прерываем выполнение
             return false;
         }
@@ -263,7 +271,11 @@ class UserActivityHistory {
 
             return await response.json();
         } catch (error) {
-            console.error('Error loading all history:', error);
+            if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+                console.warn('⚠️ Оффлайн: не удалось загрузить всю историю (не критично):', error);
+            } else {
+                console.warn('⚠️ Не удалось загрузить всю историю (не критично):', error);
+            }
             return {};
         }
     }
@@ -362,52 +374,13 @@ class UserActivityHistory {
      */
     async calculateStreakDays() {
         try {
-            const allHistory = await this.loadAllHistory();
-            const activeDays = new Set();
-            
-            // Собираем все дни с активностью
-            for (const monthData of Object.values(allHistory)) {
-                const statistics = monthData.statistics || [];
-                if (!statistics || statistics.length === 0) continue;
-                
-                for (const stat of statistics) {
-                    // Проверяем, есть ли хотя бы одна активность
-                    if ((stat.perfect && stat.perfect > 0) || 
-                        (stat.corrected && stat.corrected > 0) || 
-                        (stat.audio && stat.audio > 0)) {
-                        if (stat.date) {
-                            activeDays.add(stat.date);
-                        }
-                    }
-                }
-            }
-            
-            // Вычисляем текущий streak
-            const today = this.getDateIdentifier();
-            let streak = 0;
-            let checkDate = today;
-            
-            // Проверяем сегодня - если есть активность, начинаем считать
-            if (!activeDays.has(checkDate)) {
-                return 0; // Сегодня нет активности - streak = 0
-            }
-            
-            // Идем назад по дням, пока находим дни с активностью
-            while (activeDays.has(checkDate)) {
-                streak++;
-                // Уменьшаем дату на 1 день
-                const dateStr = String(checkDate);
-                const year = parseInt(dateStr.substring(0, 4));
-                const month = parseInt(dateStr.substring(4, 6)) - 1;
-                const day = parseInt(dateStr.substring(6, 8));
-                const date = new Date(year, month, day);
-                date.setDate(date.getDate() - 1);
-                checkDate = this.getDateIdentifier(date);
-            }
-            
-            return streak;
+            // ...
         } catch (error) {
-            console.error('Error calculating streak:', error);
+            if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+                console.warn('⚠️ Оффлайн: ошибка расчёта streak (не критично):', error);
+            } else {
+                console.warn('⚠️ Ошибка расчёта streak (не критично):', error);
+            }
             return 0;
         }
     }
@@ -416,8 +389,8 @@ class UserActivityHistory {
      * Получить токен из localStorage или UserManager
      */
     getToken() {
-        // Пробуем получить из UserManager
-        if (window.UM && window.UM.token) {
+        // ...
+        if (typeof window !== 'undefined' && window.UM && window.UM.token) {
             return window.UM.token;
         }
         
