@@ -18,11 +18,36 @@ DATA_DIR = os.path.join("static", "data")
 
 def get_app_cache_revision() -> str:
     try:
+        from helpers.db import get_db_cursor
+
+        conn, cur = get_db_cursor()
+        try:
+            cur.execute(
+                "SELECT value FROM app_settings WHERE key = %s",
+                ('app_cache_revision',)
+            )
+            row = cur.fetchone()
+            if row and row.get('value'):
+                return str(row.get('value'))
+        finally:
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
         rev = os.getenv('APP_CACHE_REVISION')
         if rev:
             return str(rev)
     except Exception:
         pass
+
     return '1'
 
 
