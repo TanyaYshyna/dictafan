@@ -261,6 +261,10 @@
       if (!rows.length) return true;
 
       for (const row of rows) {
+        if (!row || !row.dictation_id) {
+          // Старые/некорректные записи: не отправляем на сервер (иначе будет 400/500)
+          continue;
+        }
         const toSend = [];
         if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
         if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
@@ -275,7 +279,7 @@
               'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify({
-              dictation_id: row.dictation_id || 'offline',
+              dictation_id: row.dictation_id,
               date: row.date,
               type_activity: item.type_activity,
               number: item.number

@@ -29,12 +29,21 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     if type_activity not in ['perfect', 'corrected', 'audio']:
         raise ValueError(f"Неверный тип активности: {type_activity}. Допустимые: perfect, corrected, audio")
     
-    # Если dictation_id в формате dict_<id>, извлекаем числовой ID
-    if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
-        try:
-            dictation_id = int(dictation_id.replace('dict_', ''))
-        except ValueError:
-            raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
+    # dictation_id должен быть integer (колонка в БД int). Разрешаем:
+    # - int
+    # - строку вида 'dict_<id>'
+    # - строку с числом
+    if isinstance(dictation_id, str):
+        if dictation_id.startswith('dict_'):
+            try:
+                dictation_id = int(dictation_id.replace('dict_', ''))
+            except ValueError:
+                raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
+        else:
+            try:
+                dictation_id = int(dictation_id)
+            except ValueError:
+                raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
     
     # Получаем дату (по умолчанию текущая)
     if date_override is None:
