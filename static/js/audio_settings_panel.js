@@ -44,6 +44,75 @@ class AudioSettingsPanel {
         };
 
         this.isInitialized = false;
+        this._noLocalModelNotified = false;
+    }
+
+    _getCurrentLangCode() {
+        let currentLang = 'en';
+        try {
+            if (typeof langCodeUrl !== 'undefined' && langCodeUrl) {
+                currentLang = langCodeUrl.split('-')[0] || 'en';
+            } else if (typeof currentDictation !== 'undefined' && currentDictation && currentDictation.language_original) {
+                currentLang = currentDictation.language_original.split('-')[0] || 'en';
+            }
+        } catch (e) {
+        }
+        return (currentLang || '').toString().trim().toLowerCase().split('-')[0] || 'en';
+    }
+
+    _getSelectedWhisperSize(langCode) {
+        const normalizedLang = (langCode || '').toString().trim().toLowerCase().split('-')[0] || 'en';
+        try {
+            const key = `selected_model_${normalizedLang}_whisper`;
+            const v = localStorage.getItem(key);
+            if (v && v !== 'null' && v !== 'none' && String(v).trim() !== '') return String(v);
+        } catch (e) {
+        }
+        try {
+            const raw = localStorage.getItem('selected_models');
+            if (raw) {
+                const obj = JSON.parse(raw);
+                const k = `${normalizedLang}_whisper`;
+                const v2 = obj && obj[k];
+                if (v2 && v2 !== 'null' && v2 !== 'none' && String(v2).trim() !== '') return String(v2);
+            }
+        } catch (e) {
+        }
+        return null;
+    }
+
+    _showAutoCloseModal(message, delayMs = 3000) {
+        try {
+            let el = document.getElementById('dictafan-auto-modal');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'dictafan-auto-modal';
+                el.style.position = 'fixed';
+                el.style.top = '0';
+                el.style.left = '0';
+                el.style.right = '0';
+                el.style.bottom = '0';
+                el.style.display = 'none';
+                el.style.alignItems = 'center';
+                el.style.justifyContent = 'center';
+                el.style.background = 'rgba(0,0,0,0.35)';
+                el.style.zIndex = '100001';
+                el.innerHTML = '<div id="dictafan-auto-modal-box" style="max-width: min(92vw, 520px); background: #fff; padding: 14px 16px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); font-size: 14px; line-height: 1.35;"></div>';
+                document.body.appendChild(el);
+            }
+            const box = document.getElementById('dictafan-auto-modal-box');
+            if (box) box.textContent = message || '';
+            el.style.display = 'flex';
+            if (el._hideTimer) window.clearTimeout(el._hideTimer);
+            el._hideTimer = window.setTimeout(() => {
+                try {
+                    const node = document.getElementById('dictafan-auto-modal');
+                    if (node) node.style.display = 'none';
+                } catch (e) {
+                }
+            }, Math.max(0, Number(delayMs) || 0));
+        } catch (e) {
+        }
     }
 
     /**
@@ -388,6 +457,25 @@ class AudioSettingsPanel {
             `;
         }
         
+        const hasModel = this.checkWhisperModelAvailable();
+        const currentLang = this._getCurrentLangCode();
+        const selectedSize = this._getSelectedWhisperSize(currentLang);
+        const isLocalMode = this.settings.speech_recognition_mode === 'route-off';
+        let modelInfoText = '';
+        let modelInfoColor = '#666';
+        if (isLocalMode) {
+            if (!hasModel) {
+                modelInfoText = 'Локальная модель не загружена';
+                modelInfoColor = '#b00020';
+            } else if (!selectedSize) {
+                modelInfoText = 'Локальная модель не выбрана';
+                modelInfoColor = '#b00020';
+            } else {
+                modelInfoText = `Whisper: ${selectedSize}`;
+                modelInfoColor = '#666';
+            }
+        }
+
         // Для inline и modal режимов - обычная структура
         const explanationsHTML = showExplanations ? `
             <div class="audio-explanations">
@@ -509,6 +597,7 @@ class AudioSettingsPanel {
                         <i data-lucide="${this.getSpeechRecognitionIcon(this.settings.speech_recognition_mode)}" class="speech-recognition-icon"></i>
                         <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
                     </div>
+                    ${isLocalMode ? `<div class="speech-recognition-model-info" style="margin-top: 6px; font-size: 12px; color: ${modelInfoColor};">${modelInfoText}</div>` : ''}
                 </div>
             </div>
         `;
@@ -523,12 +612,13 @@ class AudioSettingsPanel {
             return;
         }
 
-        // Проверяем наличие модели Whisper и принудительно устанавливаем route, если модель не загружена
-        if (this.settings.speech_recognition_mode === 'route-off') {
-            const hasModel = this.checkWhisperModelAvailable();
-            if (!hasModel) {
-                // Модель не загружена - принудительно ставим route
-                this.settings.speech_recognition_mode = 'route';
+        const hasModel = this.checkWhisperModelAvailable();
+
+        if (this.settings.speech_recognition_mode === 'route-off' && !hasModel) {
+            this.settings.repeats = 0;
+            if (!this._noLocalModelNotified) {
+                this._noLocalModelNotified = true;
+                this._showAutoCloseModal('У вас нет ни одной локальной модели распознания текста — сходите в профиль пользователя', 3000);
             }
         }
 
@@ -547,6 +637,19 @@ class AudioSettingsPanel {
             const label = speechRecognitionButton.querySelector('.speech-recognition-label');
             if (icon) icon.setAttribute('data-lucide', this.getSpeechRecognitionIcon(currentMode));
             if (label) label.textContent = this.getSpeechRecognitionLabel(currentMode);
+        }
+
+        const repeatsInput = document.getElementById(`${prefix}audioRepeatsInput`);
+        if (repeatsInput) {
+            const forceNoAudio = this.settings.speech_recognition_mode === 'route-off' && !hasModel;
+            if (forceNoAudio) {
+                repeatsInput.value = 0;
+                repeatsInput.disabled = true;
+                repeatsInput.max = '0';
+            } else {
+                repeatsInput.disabled = false;
+                repeatsInput.max = '5';
+            }
         }
 
         // Инициализируем иконки Lucide
@@ -760,6 +863,14 @@ class AudioSettingsPanel {
             const updateButtonState = () => {
                 const hasModel = checkWhisperModel();
                 const currentMode = speechRecognitionButton.dataset.mode || 'route';
+
+                const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
+                if (isDictationPanel && currentMode === 'route-off') {
+                    speechRecognitionButton.style.opacity = '0.9';
+                    speechRecognitionButton.style.cursor = 'not-allowed';
+                    speechRecognitionButton.title = 'Локальный режим: распознавание работает только локально';
+                    return;
+                }
                 
                 // Если модель не загружена, блокируем переключение на route-off
                 if (!hasModel) {
@@ -795,27 +906,29 @@ class AudioSettingsPanel {
                 e.stopPropagation();
                 
                 const hasModel = checkWhisperModel();
+
+                const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
                 
                 // Получаем текущий режим из data-mode или из настроек (для первого клика)
                 let currentMode = speechRecognitionButton.dataset.mode || this.settings.speech_recognition_mode || 'route';
+
+                // В диктанте: если уже локальный режим, не даем переключиться обратно (только локально)
+                if (isDictationPanel && currentMode === 'route-off') {
+                    return;
+                }
                 
                 // Если модель не загружена, не позволяем переключаться на route-off
                 if (!hasModel) {
-                    // Если текущий режим route-off, принудительно ставим route
-                    if (currentMode === 'route-off') {
-                        currentMode = 'route';
-                        speechRecognitionButton.dataset.mode = 'route';
-                        const icon = speechRecognitionButton.querySelector('.speech-recognition-icon');
-                        const label = speechRecognitionButton.querySelector('.speech-recognition-label');
-                        if (icon) icon.setAttribute('data-lucide', 'route');
-                        if (label) label.textContent = 'интернет';
-                        this._updateSetting('speech_recognition_mode', 'route');
-                        if (window.lucide && window.lucide.createIcons) {
-                            window.lucide.createIcons();
-                        }
-                        this.triggerChange();
+                    const repeatsInput = document.getElementById(`${prefix}audioRepeatsInput`);
+                    if (repeatsInput) {
+                        repeatsInput.value = 0;
+                        repeatsInput.disabled = true;
+                        repeatsInput.max = '0';
                     }
-                    return; // Блокируем переключение
+                    this._updateSetting('repeats', 0);
+                    this.triggerChange();
+                    this._showAutoCloseModal('У вас нет ни одной локальной модели распознания текста — сходите в профиль пользователя', 3000);
+                    return;
                 }
                 
                 // Переключаем только между route и route-off (убрали avto)

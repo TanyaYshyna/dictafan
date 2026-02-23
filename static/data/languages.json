@@ -8,6 +8,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -15,6 +16,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -22,6 +24,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -39,6 +42,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -46,6 +50,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -53,6 +58,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -70,6 +76,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -77,6 +84,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -84,6 +92,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -101,6 +110,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -108,6 +118,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -115,6 +126,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -132,6 +144,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "70%",
@@ -139,6 +152,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "80%",
@@ -146,6 +160,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "90%",
@@ -163,6 +178,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -170,6 +186,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -177,6 +194,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -194,6 +212,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -201,6 +220,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -208,6 +228,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -225,6 +246,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -232,6 +254,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -239,6 +262,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -256,6 +280,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -263,6 +288,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -270,6 +296,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -287,6 +314,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -294,6 +322,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -301,6 +330,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -318,6 +348,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -325,6 +356,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -332,6 +364,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",
@@ -349,6 +382,7 @@
       "whisper": [
         {
           "id": "tiny",
+          "hf_repo": "Xenova/whisper-tiny",
           "name": "Tiny",
           "size": "75 MB",
           "quality": "65%",
@@ -356,6 +390,7 @@
         },
         {
           "id": "base",
+          "hf_repo": "Xenova/whisper-base",
           "name": "Base",
           "size": "145 MB",
           "quality": "75%",
@@ -363,6 +398,7 @@
         },
         {
           "id": "small",
+          "hf_repo": "Xenova/whisper-small",
           "name": "Small",
           "size": "480 MB",
           "quality": "85%",

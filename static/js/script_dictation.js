@@ -6024,7 +6024,7 @@ async function initializeDictation() {
     // Загружаем предложения ТОЛЬКО из IndexedDB
     const sentencesLoaded = await loadSentencesFromIndexedDb();
     if (!sentencesLoaded) {
-        alert('Диктант не закеширован для оффлайн-режима. Добавь его на стол и скачай оффлайн-ассеты.');
+        console.warn('⚠️ Диктант не закеширован для оффлайн-режима. Предложения не найдены в IndexedDB.');
         return;
     }
 
