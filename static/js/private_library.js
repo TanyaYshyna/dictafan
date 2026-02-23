@@ -142,6 +142,9 @@
 
   const deskToggleInFlight = new Set();
 
+  const PAGE_VERSION = 'private_library_0032';
+  console.log('[Version]', PAGE_VERSION);
+
   function formatBytes(bytes) {
     const n = Number(bytes) || 0;
     if (n <= 0) return '0 B';
@@ -670,7 +673,7 @@
 
       try {
         if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          await swRequest('cacheClear', { timeoutMs: 60000 });
+          await swRequest('cacheClearAppShell', { timeoutMs: 60000 });
         }
       } catch (e) {
       }
@@ -4496,6 +4499,9 @@
             syncOfflineOutboxes().catch(() => {}); // Trigger offline outbox sync on page load after UserManager initialization
           } else {
             console.log('⚠️ Пользователь не авторизован, данные не загружаются');
+            ensureDeskCacheIndicator();
+            refreshOfflineCacheStatus();
+            loadDeskItems();
           }
         }
         // Если UserManager еще не инициализирован, продолжаем ждать

@@ -324,6 +324,44 @@ async function clearRuntimeCache() {
   return { cleared: true };
 }
 
+async function clearAppShellCacheEntries() {
+  const cachesToScan = [RUNTIME_CACHE_BOUNDED, RUNTIME_CACHE_UNBOUNDED];
+  let deleted = 0;
+  for (const cacheName of cachesToScan) {
+    try {
+      const cache = await caches.open(cacheName);
+      const keys = await cache.keys();
+      for (const req of keys) {
+        try {
+          const url = new URL(req.url);
+          const path = url.pathname;
+
+          const shouldDelete =
+            path === '/' ||
+            path === '/sw.js' ||
+            path === '/manifest.json' ||
+            path.startsWith('/static/') ||
+            path.startsWith('/private') ||
+            path.startsWith('/library') ||
+            path.startsWith('/desk') ||
+            path.startsWith('/dictation/') ||
+            path === '/dictation' ||
+            path === '/login' ||
+            path === '/logout';
+
+          if (shouldDelete) {
+            const ok = await cache.delete(req);
+            if (ok) deleted += 1;
+          }
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+  }
+  return { deleted };
+}
+
 async function prefetchUrls(urls) {
   const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
   let fetched = 0;
@@ -507,6 +545,12 @@ self.addEventListener('message', (event) => {
 
       if (action === 'cacheClear') {
         const res = await clearRuntimeCache();
+        respond({ success: true, result: res });
+        return;
+      }
+
+      if (action === 'cacheClearAppShell') {
+        const res = await clearAppShellCacheEntries();
         respond({ success: true, result: res });
         return;
       }

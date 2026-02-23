@@ -164,6 +164,9 @@ function updateUnsavedIndicators() {
     });
 }
 
+const PAGE_VERSION = 'dictation_0032';
+console.log('[Version]', PAGE_VERSION);
+
 function scheduleDraftAutosave(reason = 'unknown') {
     if (!currentDictation?.id) return;
     if (dictationCompletionSaved) return;
@@ -199,7 +202,7 @@ function stopDraftAutosaveTimers() {
 
 async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-        const req = indexedDB.open('dictafan_drafts', 2);
+        const req = indexedDB.open('dictafan_drafts', 3);
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains('drafts')) {
@@ -216,6 +219,9 @@ async function openDraftDb() {
             }
             if (!db.objectStoreNames.contains('dictations')) {
                 db.createObjectStore('dictations', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('desk_items')) {
+                db.createObjectStore('desk_items', { keyPath: 'key' });
             }
         };
         req.onsuccess = () => resolve(req.result);
