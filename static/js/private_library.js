@@ -945,9 +945,8 @@
           } catch (e) {
           }
 
-          showToast('Диктант добавлен на стол');
           refreshOfflineCacheStatus();
-          completeLoadingIndicator('Загрузка закончена', 1000);
+          completeLoadingIndicator('Диктант добавлен на рабочий стол', 1000);
         } else {
           showToast('Ошибка при добавлении диктанта на стол');
         }
