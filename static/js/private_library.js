@@ -573,6 +573,7 @@
       overlay.style.right = '0';
       overlay.style.bottom = '0';
       overlay.style.zIndex = '99999';
+      overlay.style.pointerEvents = 'auto';
     } else {
       overlay.querySelector('.loading-text').textContent = message;
     }
@@ -761,6 +762,7 @@
 
           // Ключевые статические ассеты страницы диктанта.
           // (Service Worker кеширует /static/*; здесь мы принудительно префетчим минимально нужное)
+          requiredUrls.push('/static/css/style_dictation.css');
           requiredUrls.push('/static/js/utils.js');
           requiredUrls.push('/static/js/language_manager.js');
           requiredUrls.push('/static/js/model_manager.js');
@@ -778,6 +780,11 @@
           requiredUrls.push('/static/js/whisper-model-manager.js');
           requiredUrls.push('/static/js/speech_recognition_unified.js');
           requiredUrls.push('/static/js/script_dictation.js');
+
+          // Звуки (нужны даже оффлайн: прогресс/победа)
+          requiredUrls.push('/static/sounds/success.mp3');
+          requiredUrls.push('/static/sounds/timer/timer_sounds.json');
+          requiredUrls.push('/static/sounds/victory/victory_sounds.json');
 
           const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
           const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
@@ -831,16 +838,29 @@
 
             const sentencesRes2 = await apiRequest(`/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`);
             const sentences2 = sentencesRes2 && sentencesRes2.success && Array.isArray(sentencesRes2.sentences) ? sentencesRes2.sentences : [];
-            const idbKey = `${userId}:${dictId}:${langOrig}:${langTr}`;
-            await idbPut('dictations', {
-              key: idbKey,
-              userId,
+
+            const basePayload = {
               dictationId: dictId,
               langOrig,
               langTr,
               updatedAt: Date.now(),
               meta: dictMeta,
               sentences: sentences2
+            };
+
+            // Store both under userId and under anon to survive offline token validation issues.
+            const idbKeyUser = `${userId}:${dictId}:${langOrig}:${langTr}`;
+            await idbPut('dictations', {
+              key: idbKeyUser,
+              userId,
+              ...basePayload
+            });
+
+            const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
+            await idbPut('dictations', {
+              key: idbKeyAnon,
+              userId: 'anon',
+              ...basePayload
             });
           } catch (e) {
           }

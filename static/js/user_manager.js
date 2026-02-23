@@ -44,11 +44,16 @@ class UserManager {
           // console.log('✅ Пользователь авторизован:', this.userData.username);
           this.setupAuthenticatedUser(this.userData);
         } else {
-          console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
-          localStorage.removeItem('jwt_token');
-          this.token = null;
-          // Показываем модальное окно авторизации - гостевого режима нет!
-          this.requireAuth();
+          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+            console.log('⚠️ Оффлайн режим: не можем провалидировать токен сейчас. Оставляем токен и не показываем модальное окно.');
+            // Keep token; do not require auth when offline.
+          } else {
+            console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
+            localStorage.removeItem('jwt_token');
+            this.token = null;
+            // Показываем модальное окно авторизации - гостевого режима нет!
+            this.requireAuth();
+          }
         }
       } else {
         console.log('❌ Нет токена - показываем модальное окно авторизации');
