@@ -164,7 +164,7 @@
 
   async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-      const req = indexedDB.open('dictafan_drafts', 2);
+      const req = indexedDB.open('dictafan_drafts', 3);
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains('drafts')) {
@@ -181,6 +181,9 @@
         }
         if (!db.objectStoreNames.contains('dictations')) {
           db.createObjectStore('dictations', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('desk_items')) {
+          db.createObjectStore('desk_items', { keyPath: 'key' });
         }
       };
       req.onsuccess = () => resolve(req.result);
@@ -651,14 +654,33 @@
       const data = await apiRequest("/desk/api/items");
       if (data.success && data.items) {
         deskItems = data.items;
+        try {
+          await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+        } catch (e) {
+        }
         if (typeof renderDeskCards === 'function') {
           renderDeskCards(deskItems);
         }
         // Обновляем индикаторы "в работе" в карточках диктантов
         updateInWorkIndicators();
         refreshDeskOutboxIndicator().catch(() => {});
+        return;
       }
     } catch (error) {
+      try {
+        const cached = await idbGet('desk_items', 'latest');
+        const items = cached && Array.isArray(cached.items) ? cached.items : [];
+        if (items.length) {
+          deskItems = items;
+          if (typeof renderDeskCards === 'function') {
+            renderDeskCards(deskItems);
+          }
+          updateInWorkIndicators();
+          refreshDeskOutboxIndicator().catch(() => {});
+          return;
+        }
+      } catch (e) {
+      }
       console.error("Ошибка загрузки диктантов на столе:", error);
     }
   }
@@ -804,6 +826,10 @@
           requiredUrls.push('/static/sounds/success.mp3');
           requiredUrls.push('/static/sounds/timer/timer_sounds.json');
           requiredUrls.push('/static/sounds/victory/victory_sounds.json');
+          requiredUrls.push('/static/sounds/timer/beep1.mp3');
+          requiredUrls.push('/static/sounds/timer/beep3.mp3');
+          requiredUrls.push('/static/sounds/victory/beep2.mp3');
+          requiredUrls.push('/static/sounds/victory/beep4.mp3');
 
           const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
           const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
