@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
@@ -37,6 +37,23 @@ async function getMaxBytes() {
     });
   } catch (e) {
     return DEFAULT_MAX_BYTES;
+  }
+}
+
+function normalizeCacheKey(requestOrUrl) {
+  try {
+    const raw = typeof requestOrUrl === 'string' ? requestOrUrl : requestOrUrl.url;
+    const url = new URL(raw);
+    const path = url.pathname;
+
+    // For app shell + static assets, ignore cache-busting query params like ?v=...
+    if (path === '/' || path.startsWith('/dictation/') || path.startsWith('/static/')) {
+      return `${url.origin}${path}`;
+    }
+
+    return typeof requestOrUrl === 'string' ? raw : requestOrUrl;
+  } catch (e) {
+    return typeof requestOrUrl === 'string' ? requestOrUrl : requestOrUrl;
   }
 }
 
@@ -119,9 +136,13 @@ async function cacheFirstBounded(request) {
     const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
 
     const hasRange = request.headers && request.headers.has('range');
-    const cacheKey = hasRange ? request.url : request;
+    const cacheKey = hasRange ? request.url : normalizeCacheKey(request);
 
-    const cached = await cache.match(cacheKey);
+    let cached = await cache.match(cacheKey);
+    if (!cached && !hasRange) {
+      // Backward/compat: if older entries were stored without normalization, try ignoreSearch.
+      cached = await cache.match(request, { ignoreSearch: true });
+    }
     if (cached) return cached;
 
     const response = await fetch(request);
@@ -142,12 +163,16 @@ async function cacheFirstUnbounded(request) {
   try {
     const cache = await caches.open(RUNTIME_CACHE_UNBOUNDED);
 
-    const cached = await cache.match(request);
+    const cacheKey = normalizeCacheKey(request);
+    let cached = await cache.match(cacheKey);
+    if (!cached) {
+      cached = await cache.match(request, { ignoreSearch: true });
+    }
     if (cached) return cached;
 
     const response = await fetch(request);
     if (response && response.ok) {
-      await cache.put(request, response.clone());
+      await cache.put(cacheKey, response.clone());
     }
     return response;
   } catch (e) {
@@ -277,7 +302,9 @@ async function prefetchUrls(urls) {
         continue;
       }
 
-      const cached = await cache.match(url);
+      const normalizedKey = normalizeCacheKey(new URL(url, self.location.origin).toString());
+
+      const cached = await cache.match(normalizedKey);
       if (cached) {
         skipped += 1;
         continue;
@@ -287,7 +314,7 @@ async function prefetchUrls(urls) {
       if (res && res.ok) {
         const size = await getResponseSizeBytes(res);
         if ((totalBytes + size) <= maxBytes) {
-          await cache.put(url, res.clone());
+          await cache.put(normalizedKey, res.clone());
           fetched += 1;
           totalBytes += size;
         } else {
@@ -322,7 +349,9 @@ async function prefetchUrlsStrict(urls) {
         continue;
       }
 
-      const cached = await cache.match(url);
+      const normalizedKey = normalizeCacheKey(new URL(url, self.location.origin).toString());
+
+      const cached = await cache.match(normalizedKey);
       if (cached) {
         skipped += 1;
         continue;
@@ -332,7 +361,7 @@ async function prefetchUrlsStrict(urls) {
       if (res && res.ok) {
         const size = await getResponseSizeBytes(res);
         if ((totalBytes + size) <= maxBytes) {
-          await cache.put(url, res.clone());
+          await cache.put(normalizedKey, res.clone());
           fetched += 1;
           totalBytes += size;
         } else {
