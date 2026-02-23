@@ -191,6 +191,15 @@ function scheduleDraftAutosave(reason = 'unknown') {
     }, DRAFT_AUTOSAVE_DEBOUNCE_MS);
 }
 
+async function saveDictationDraft(reason = 'manual') {
+    try {
+        return await saveDraftToIndexedDbAndQueueSync(reason);
+    } catch (e) {
+        console.warn('[Draft][IDB] saveDictationDraft failed', e);
+        return false;
+    }
+}
+
 function startDraftPeriodicAutosave() {
     if (draftPeriodicAutosaveTimer) return;
     if (dictationCompletionSaved) return;
