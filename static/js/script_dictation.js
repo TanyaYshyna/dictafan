@@ -5883,12 +5883,70 @@ async function loadSentencesFromIndexedDb() {
         return false;
     }
 
-    const key = `${getDraftUserIdForKey()}:${currentDictation.id}:${currentDictation.language_original}:${currentDictation.language_translation}`;
+    const dictId = String(currentDictation.id);
+    const langOrig = String(currentDictation.language_original);
+    const langTr = String(currentDictation.language_translation);
+
+    const rawUserId = String(getDraftUserIdForKey());
+
+    const candidateKeys = [];
+    candidateKeys.push(`${rawUserId}:${dictId}:${langOrig}:${langTr}`);
+    if (rawUserId !== 'anon') {
+        candidateKeys.push(`anon:${dictId}:${langOrig}:${langTr}`);
+    }
+
+    // Also try numeric id variants for safety.
     try {
-        const cached = await idbGet('dictations', key);
+        const numericId = parseInt(dictId.replace(/^dict_/, ''), 10);
+        if (Number.isFinite(numericId)) {
+            candidateKeys.push(`${rawUserId}:${numericId}:${langOrig}:${langTr}`);
+            candidateKeys.push(`${rawUserId}:dict_${numericId}:${langOrig}:${langTr}`);
+            candidateKeys.push(`anon:dict_${numericId}:${langOrig}:${langTr}`);
+        }
+    } catch (e) {
+    }
+
+    async function findAnyMatchingDictationEntry() {
+        try {
+            const db = await openDraftDb();
+            return await new Promise((resolve) => {
+                const tx = db.transaction('dictations', 'readonly');
+                const store = tx.objectStore('dictations');
+                const req = store.openCursor();
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor) return resolve(null);
+                    const v = cursor.value;
+                    if (v && v.dictationId === dictId && v.langOrig === langOrig && v.langTr === langTr) {
+                        return resolve(v);
+                    }
+                    cursor.continue();
+                };
+                req.onerror = () => resolve(null);
+            });
+        } catch (e) {
+            return null;
+        }
+    }
+
+    try {
+        let cached = null;
+        for (const key of candidateKeys) {
+            cached = await idbGet('dictations', key);
+            const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
+            if (sentences.length) {
+                break;
+            }
+            cached = null;
+        }
+
+        if (!cached) {
+            cached = await findAnyMatchingDictationEntry();
+        }
+
         const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
         if (!sentences.length) {
-            console.warn('❌ Диктант не найден в IndexedDB (dictations):', key);
+            console.warn('❌ Диктант не найден в IndexedDB (dictations):', candidateKeys[0]);
             return false;
         }
 

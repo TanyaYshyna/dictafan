@@ -196,6 +196,11 @@
   overflow: hidden;
 }
 
+#loading-overlay {
+  position: fixed !important;
+  z-index: 99999 !important;
+}
+
 /* Модальное окно домашней библиотеки */
 #home-library-modal {
   position: fixed !important;
@@ -203,7 +208,7 @@
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  z-index: 10001 !important;
+  z-index: 10000 !important;
   background-color: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   display: flex;

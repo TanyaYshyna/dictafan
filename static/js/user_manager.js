@@ -8,7 +8,7 @@ class UserManager {
     this.token = localStorage.getItem('jwt_token');
     this.userData = null;
     this.isInitialized = false;
-
+    this._lastTokenValidationError = null;
 
     // ✅ АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ
     this.init().then(() => {
@@ -44,9 +44,8 @@ class UserManager {
           // console.log('✅ Пользователь авторизован:', this.userData.username);
           this.setupAuthenticatedUser(this.userData);
         } else {
-          if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
-            console.log('⚠️ Оффлайн режим: не можем провалидировать токен сейчас. Оставляем токен и не показываем модальное окно.');
-            // Keep token; do not require auth when offline.
+          if (this.isLikelyOfflineError(this._lastTokenValidationError)) {
+            console.log('⚠️ Оффлайн/нет сети: не можем провалидировать токен сейчас. Оставляем токен и не показываем модальное окно.');
           } else {
             console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
             localStorage.removeItem('jwt_token');
@@ -160,6 +159,7 @@ class UserManager {
   // Валидация токена
   async validateToken(token) {
     try {
+      this._lastTokenValidationError = null;
       // console.log('🔐 Валидация токена:', token);
 
       const response = await fetch('/user/api/me', {
@@ -189,7 +189,25 @@ class UserManager {
       }
     } catch (error) {
       console.error('🚨 Ошибка валидации токена:', error);
+      this._lastTokenValidationError = error;
       return null;
+    }
+  }
+
+  isLikelyOfflineError(error) {
+    try {
+      if (!error) {
+        return typeof navigator !== 'undefined' && navigator && navigator.onLine === false;
+      }
+      const msg = String(error?.message || error || '').toLowerCase();
+      if (msg.includes('load failed')) return true;
+      if (msg.includes('failed to fetch')) return true;
+      if (msg.includes('networkerror')) return true;
+      if (msg.includes('network request failed')) return true;
+      if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return true;
+      return false;
+    } catch {
+      return false;
     }
   }
 
