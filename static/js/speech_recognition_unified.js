@@ -28,6 +28,8 @@
       this._recognition = null;
       this._finalText = '';
       this._lastText = '';
+      this._sessionId = 0;
+      this._ignoreResults = false;
     }
 
     async startRecording() {
@@ -36,6 +38,8 @@
         this._audioBlob = null;
         this._finalText = '';
         this._lastText = '';
+        this._ignoreResults = false;
+        this._sessionId = (this._sessionId || 0) + 1;
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this._mediaStream = stream;
@@ -81,9 +85,15 @@
 
     async stopRecording(cause) {
       try {
+        this._ignoreResults = true;
+
         if (this._recognition) {
           try {
-            this._recognition.stop();
+            if (typeof this._recognition.abort === 'function') {
+              this._recognition.abort();
+            } else {
+              this._recognition.stop();
+            }
           } catch (e) {
           }
         }
@@ -117,6 +127,18 @@
           cause,
         };
 
+        // Cleanup to avoid stale events in the next session.
+        try {
+          if (this._recognition) {
+            this._recognition.onresult = null;
+            this._recognition.onerror = null;
+          }
+        } catch (e) {
+        }
+        this._recognition = null;
+        this._finalText = '';
+        this._lastText = '';
+
         return result;
       } catch (e) {
         this._emitError(e);
@@ -137,11 +159,15 @@
 
       const rec = new SpeechRecognition();
       this._recognition = rec;
+      const mySessionId = this._sessionId;
       rec.lang = this.state.language;
       rec.interimResults = true;
       rec.continuous = true;
 
       rec.onresult = (event) => {
+        if (this._ignoreResults) return;
+        if (mySessionId !== this._sessionId) return;
+        if (!this.state.isRecording) return;
         let interim = '';
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
