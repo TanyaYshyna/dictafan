@@ -695,9 +695,9 @@ async function saveProfile(options = {}) {
             // Формируем settings_json в новом формате
             const settingsJson = JSON.stringify({
                 audio: {
-                    start: settings.start || 'oto',
-                    typo: settings.typo || 'o',
-                    success: settings.success || 'ot',
+                    start: (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto',
+                    typo: (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o',
+                    success: (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot',
                     repeats: settings.repeats !== undefined ? settings.repeats : 3,
                     required_passed_star_half: settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3,
                     without_entering_text: Boolean(settings.without_entering_text),
@@ -709,9 +709,9 @@ async function saveProfile(options = {}) {
             updateData.settings_json = settingsJson;
             
             // Для обратной совместимости также отправляем отдельные поля (если бэкенд их еще использует)
-            updateData.audio_start = settings.start || 'oto';
-            updateData.audio_typo = settings.typo || 'o';
-            updateData.audio_success = settings.success || 'ot';
+            updateData.audio_start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
+            updateData.audio_typo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
+            updateData.audio_success = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
             updateData.audio_repeats = settings.repeats !== undefined ? settings.repeats : 3;
             updateData.audio_required_passed_star_half = settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3;
             updateData.speech_recognition_mode = settings.speech_recognition_mode || 'route';

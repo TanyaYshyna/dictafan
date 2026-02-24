@@ -215,21 +215,29 @@ class AudioSettingsPanel {
             try {
                 const settings = JSON.parse(userSettings.settings_json);
                 const audioSettings = settings.audio || {};
-                if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
+
+                // В режиме профиля (user-settings) пустая строка тоже является валидным значением:
+                // пользователь мог намеренно очистить поле. Поэтому отличаем "нет поля" от "поле есть, но пустое".
+                const hasStart = Object.prototype.hasOwnProperty.call(audioSettings, 'start');
+                const hasTypo = Object.prototype.hasOwnProperty.call(audioSettings, 'typo');
+                const hasSuccess = Object.prototype.hasOwnProperty.call(audioSettings, 'success');
+
+                if (hasStart && audioSettings.start !== undefined && audioSettings.start !== null) {
                     this.settings.start = audioSettings.start;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.start = this.defaults.start;
                 }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null && audioSettings.typo !== '') {
+                if (hasTypo && audioSettings.typo !== undefined && audioSettings.typo !== null) {
                     this.settings.typo = audioSettings.typo;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.typo = this.defaults.typo;
                 }
-                if (audioSettings.success !== undefined && audioSettings.success !== null && audioSettings.success !== '') {
+                if (hasSuccess && audioSettings.success !== undefined && audioSettings.success !== null) {
                     this.settings.success = audioSettings.success;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.success = this.defaults.success;
                 }
+
                 if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
                     this.settings.repeats = parseInt(audioSettings.repeats, 10) || this.defaults.repeats;
                 } else if (this.options.mode === 'user-settings') {
@@ -263,21 +271,26 @@ class AudioSettingsPanel {
         if (userSettings.audio_settings_json) {
             try {
                 const audioSettings = JSON.parse(userSettings.audio_settings_json);
-                if (audioSettings.start !== undefined && audioSettings.start !== null && audioSettings.start !== '') {
+                const hasStart = Object.prototype.hasOwnProperty.call(audioSettings, 'start');
+                const hasTypo = Object.prototype.hasOwnProperty.call(audioSettings, 'typo');
+                const hasSuccess = Object.prototype.hasOwnProperty.call(audioSettings, 'success');
+
+                if (hasStart && audioSettings.start !== undefined && audioSettings.start !== null) {
                     this.settings.start = audioSettings.start;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.start = this.defaults.start;
                 }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null && audioSettings.typo !== '') {
+                if (hasTypo && audioSettings.typo !== undefined && audioSettings.typo !== null) {
                     this.settings.typo = audioSettings.typo;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.typo = this.defaults.typo;
                 }
-                if (audioSettings.success !== undefined && audioSettings.success !== null && audioSettings.success !== '') {
+                if (hasSuccess && audioSettings.success !== undefined && audioSettings.success !== null) {
                     this.settings.success = audioSettings.success;
                 } else if (this.options.mode === 'user-settings') {
                     this.settings.success = this.defaults.success;
                 }
+
                 if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
                     this.settings.repeats = parseInt(audioSettings.repeats, 10) || this.defaults.repeats;
                 } else if (this.options.mode === 'user-settings') {
@@ -462,6 +475,24 @@ class AudioSettingsPanel {
                                                    max="5" 
                                                    value="${this.settings.repeats}"
                                                    title="Всего повторов аудио (от 0 до 5)">
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="audio-settings-label">
+                                            <label>
+                                                <i data-lucide="star"></i>
+                                                =
+                                                <i data-lucide="star-half"></i>
+                                            </label>
+                                        </td>
+                                        <td class="audio-settings-input">
+                                            <input type="number"
+                                                   id="${prefix}requiredPassedStarHalfInput"
+                                                   class="play-sequence-input"
+                                                   min="1"
+                                                   max="10"
+                                                   value="${this.settings.required_passed_star_half}"
+                                                   title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 1 до 10)">
                                         </td>
                                     </tr>
                                     <tr>

@@ -267,10 +267,18 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
                 update_fields.append("settings_json = %s")
                 update_values.append(updates['settings_json'])
             else:
-                print(f"⚠️ Колонка 'settings_json' не найдена в таблице users. Пропускаем обновление.")
+                raise RuntimeError(
+                    "DB schema mismatch: column users.settings_json is missing. "
+                    "Apply migrations/add_settings_json_to_users.sql (or add the column) to persist profile settings."
+                )
         elif 'audio_settings_json' in updates and has_audio_settings_json:
             update_fields.append("audio_settings_json = %s")
             update_values.append(updates['audio_settings_json'])
+        elif 'audio_settings_json' in updates and not has_audio_settings_json:
+            raise RuntimeError(
+                "DB schema mismatch: column users.audio_settings_json is missing. "
+                "Apply migrations/add_audio_settings_json_to_users.sql (or add the column) to persist profile settings."
+            )
         
         # Обновляем updated_at
         update_fields.append("updated_at = CURRENT_TIMESTAMP")
