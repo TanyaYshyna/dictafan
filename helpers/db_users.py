@@ -3,6 +3,7 @@
 """
 
 from typing import Optional, List
+import json
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -35,27 +36,77 @@ def create_user(
 
         password_hash = generate_password_hash(password)
 
-        # Вставляем пользователя
+        # Проверяем наличие колонки settings_json (новый формат настроек)
         cur.execute(
             """
-            INSERT INTO users (
-                username, email, password_hash,
-                native_language, current_learning,
-                streak_days, role
-            )
-            VALUES (%s, %s, %s, %s, %s, 0, %s)
-            RETURNING id, username, email, native_language, current_learning, streak_days, role,
-                      created_at, updated_at
-            """,
-            (
-                username,
-                email,
-                password_hash,
-                native_language,
-                current_learning,
-                role,
-            ),
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='users' AND column_name='settings_json'
+            """
         )
+        has_settings_json = cur.fetchone() is not None
+
+        default_settings_json = json.dumps(
+            {
+                "audio": {
+                    "start": "oto",
+                    "typo": "o",
+                    "success": "ot",
+                    "repeats": 3,
+                    "required_passed_star_half": 3,
+                    "without_entering_text": False,
+                    "show_text": False,
+                    "speech_recognition_mode": "route",
+                }
+            },
+            ensure_ascii=False,
+        )
+
+        # Вставляем пользователя
+        if has_settings_json:
+            cur.execute(
+                """
+                INSERT INTO users (
+                    username, email, password_hash,
+                    native_language, current_learning,
+                    streak_days, role,
+                    settings_json
+                )
+                VALUES (%s, %s, %s, %s, %s, 0, %s, %s)
+                RETURNING id, username, email, native_language, current_learning, streak_days, role,
+                          created_at, updated_at, settings_json
+                """,
+                (
+                    username,
+                    email,
+                    password_hash,
+                    native_language,
+                    current_learning,
+                    role,
+                    default_settings_json,
+                ),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO users (
+                    username, email, password_hash,
+                    native_language, current_learning,
+                    streak_days, role
+                )
+                VALUES (%s, %s, %s, %s, %s, 0, %s)
+                RETURNING id, username, email, native_language, current_learning, streak_days, role,
+                          created_at, updated_at
+                """,
+                (
+                    username,
+                    email,
+                    password_hash,
+                    native_language,
+                    current_learning,
+                    role,
+                ),
+            )
         user_row = cur.fetchone()
 
         # Очищаем и заполняем user_learning_languages
@@ -75,7 +126,7 @@ def create_user(
 
         conn.commit()
 
-        return {
+        result = {
             "id": user_row["id"],
             "username": user_row["username"],
             "email": user_row["email"],
@@ -86,6 +137,9 @@ def create_user(
             "created_at": user_row["created_at"].isoformat() if user_row["created_at"] else None,
             "updated_at": user_row["updated_at"].isoformat() if user_row["updated_at"] else None,
         }
+        if has_settings_json and "settings_json" in user_row:
+            result["settings_json"] = user_row.get("settings_json")
+        return result
     finally:
         cur.close()
         conn.close()

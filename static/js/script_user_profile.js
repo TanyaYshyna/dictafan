@@ -183,6 +183,7 @@ function initializeAudioSettings() {
                 const settings = JSON.parse(UM.userData.settings_json);
                 const audioSettings = settings.audio || {};
                 userSettings = {
+                    settings_json: UM.userData.settings_json,
                     audio_start: audioSettings.start,
                     audio_typo: audioSettings.typo,
                     audio_success: audioSettings.success,
@@ -214,6 +215,14 @@ function initializeAudioSettings() {
                 audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
                 speech_recognition_mode: UM.userData.speech_recognition_mode
             };
+        }
+
+        if (!userSettings.settings_json && UM.userData.settings_json) {
+            userSettings.settings_json = UM.userData.settings_json;
+        }
+
+        if (!userSettings.audio_settings_json && UM.userData.audio_settings_json) {
+            userSettings.audio_settings_json = UM.userData.audio_settings_json;
         }
 
         audioSettingsPanel = new AudioSettingsPanel({
@@ -756,7 +765,7 @@ async function saveProfile(options = {}) {
         if (!audioSettings.audio_typo && updatedUser.audio_typo !== undefined) {
             audioSettings.audio_typo = updatedUser.audio_typo;
         }
-        if (!audioSettings.audio_success && updatedUser.audio_success !== undefined) {
+        if ((audioSettings.audio_success === undefined || audioSettings.audio_success === null) && updatedUser.audio_success !== undefined) {
             audioSettings.audio_success = updatedUser.audio_success;
         }
         if (audioSettings.audio_repeats === 3 && updatedUser.audio_repeats !== undefined) {
@@ -778,7 +787,7 @@ async function saveProfile(options = {}) {
         if (!audioSettings.audio_typo) {
             audioSettings.audio_typo = updateData.audio_typo || '';
         }
-        if (!audioSettings.audio_success) {
+        if (audioSettings.audio_success === undefined || audioSettings.audio_success === null) {
             audioSettings.audio_success = updateData.audio_success || '';
         }
         if (audioSettings.audio_repeats === 3 && updateData.audio_repeats !== undefined) {
