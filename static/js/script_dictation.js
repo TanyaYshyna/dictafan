@@ -1279,9 +1279,33 @@ function normalizeWhisperLangCode(langCode) {
     return raw.split('-')[0] || raw;
 }
 
+function parseWhisperSizeFromModelKey(modelKey) {
+    try {
+        const mk = (modelKey || '').toString();
+        if (!mk) return null;
+        if (!mk.startsWith('whisper:')) return null;
+        const repo = mk.slice('whisper:'.length);
+        if (repo.includes('whisper-tiny')) return 'tiny';
+        if (repo.includes('whisper-small')) return 'small';
+        if (repo.includes('whisper-base')) return 'base';
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function getSelectedWhisperModelSize(langCode) {
     const normalizedLang = normalizeWhisperLangCode(langCode);
     if (!normalizedLang) return null;
+
+    // v2 model-centric selection: selected_asr_model_v2_<lang> stores modelKey like "whisper:Xenova/whisper-small".
+    try {
+        const mk = localStorage.getItem(`selected_asr_model_v2_${normalizedLang}`);
+        const size = parseWhisperSizeFromModelKey(mk);
+        if (size) return size;
+    } catch (e) {
+    }
+
     const key = `selected_model_${normalizedLang}_whisper`;
     const value = localStorage.getItem(key);
     if (!value || value === 'null' || value === 'none') return null;
@@ -1308,6 +1332,8 @@ function getWhisperModelKeyCandidates(langCode, modelSize = null) {
     const sizes = getWhisperSizeCandidates(langCode, modelSize);
     const keys = [];
     for (const size of sizes) {
+        // Model-centric: global key per size.
+        keys.push(`whisper_model_${size}`);
         if (raw) keys.push(`whisper_model_${raw}_${size}`);
         if (normalized && normalized !== raw) keys.push(`whisper_model_${normalized}_${size}`);
     }

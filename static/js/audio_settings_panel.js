@@ -47,6 +47,21 @@ class AudioSettingsPanel {
         this._noLocalModelNotified = false;
     }
 
+    _parseWhisperSizeFromModelKey(modelKey) {
+        try {
+            const mk = (modelKey || '').toString();
+            if (!mk) return null;
+            if (!mk.startsWith('whisper:')) return null;
+            const repo = mk.slice('whisper:'.length);
+            if (repo.includes('whisper-tiny')) return 'tiny';
+            if (repo.includes('whisper-small')) return 'small';
+            if (repo.includes('whisper-base')) return 'base';
+            return null;
+        } catch (e) {
+            return null;
+        }
+    }
+
     _getCurrentLangCode() {
         let currentLang = 'en';
         try {
@@ -62,6 +77,15 @@ class AudioSettingsPanel {
 
     _getSelectedWhisperSize(langCode) {
         const normalizedLang = (langCode || '').toString().trim().toLowerCase().split('-')[0] || 'en';
+
+        // v2 model-centric selection: selected_asr_model_v2_<lang> stores modelKey like "whisper:Xenova/whisper-small".
+        try {
+            const mk = localStorage.getItem(`selected_asr_model_v2_${normalizedLang}`);
+            const size = this._parseWhisperSizeFromModelKey(mk);
+            if (size) return size;
+        } catch (e) {
+        }
+
         try {
             const key = `selected_model_${normalizedLang}_whisper`;
             const v = localStorage.getItem(key);
@@ -1032,42 +1056,37 @@ class AudioSettingsPanel {
         } else if (typeof currentDictation !== 'undefined' && currentDictation && currentDictation.language_original) {
             currentLang = currentDictation.language_original.split('-')[0] || 'en';
         }
-        
-        // Используем ту же логику проверки, что и в script_dictation.js (унифицированная проверка)
-        // Проверяем через глобальную функцию hasWhisperModel (если доступна)
-        if (typeof hasWhisperModel === 'function') {
-            return hasWhisperModel(currentLang);
-        }
-        
-        // Fallback: проверяем так же, как в hasWhisperModel (память + localStorage)
+
+        // Model-centric: whisper weights are global per size.
         const normalizedLang = (currentLang || '').toString().trim().toLowerCase().split('-')[0] || 'en';
-        const selectedSize = (() => {
-            const key = `selected_model_${normalizedLang}_whisper`;
-            const value = localStorage.getItem(key);
-            if (!value || value === 'null' || value === 'none') return null;
-            return String(value);
-        })();
+        const selectedSize = this._getSelectedWhisperSize(normalizedLang);
+        const modelSize = selectedSize || 'base';
 
-        const sizes = [];
-        if (selectedSize) sizes.push(selectedSize);
-        if (!sizes.includes('base')) sizes.push('base');
-        
-        for (const size of sizes) {
-            const modelKey = `whisper_model_${normalizedLang}_${size}`;
-
-            // Сначала проверяем в памяти
-            if (window.WhisperModels) {
-                const storedModel = window.WhisperModels.get(modelKey);
-                if (storedModel && storedModel.isReady && storedModel.recognizer) {
+        // 1) In-memory
+        try {
+            if (window.WhisperModels && window.WhisperModels.get) {
+                const inMem = window.WhisperModels.get(`whisper_model_${modelSize}`);
+                if (inMem && inMem.isReady && inMem.recognizer) {
                     return true;
                 }
             }
+        } catch (e) {
+        }
 
-            // Если в памяти нет, проверяем localStorage (как в профиле)
-            const modelStatus = localStorage.getItem(modelKey);
-            if (modelStatus === 'downloaded' || modelStatus === 'ready') {
-                return true;
-            }
+        // 2) localStorage status marker
+        try {
+            const status = localStorage.getItem(`whisper_model_${modelSize}`);
+            if (status === 'downloaded' || status === 'ready') return true;
+        } catch (e) {
+        }
+
+        // 3) models-centric downloaded state
+        try {
+            const raw = localStorage.getItem('downloaded_models_v2');
+            const obj = raw ? JSON.parse(raw) : null;
+            const mk = localStorage.getItem(`selected_asr_model_v2_${normalizedLang}`);
+            if (obj && typeof obj === 'object' && mk && obj[mk]) return true;
+        } catch (e) {
         }
 
         return false;
