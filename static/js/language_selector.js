@@ -523,6 +523,18 @@ class LanguageSelector {
     }
 
     setSelectedModelGeneric(langCode, modelId, modelType) {
+        // Only one ASR model should be active per language.
+        // If user selects a transformer_asr model, clear whisper selection for this language.
+        if (modelType === 'transformer_asr') {
+            try {
+                localStorage.removeItem(`selected_model_${langCode}_whisper`);
+            } catch (e) {
+            }
+            if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+                window.ModelManager.setSelectedModel(langCode, null, 'whisper');
+            }
+        }
+
         const currentKey = `selected_model_${langCode}_${modelType}`;
         if (!modelId || modelId === 'none') {
             localStorage.removeItem(currentKey);
@@ -1619,7 +1631,11 @@ class LanguageSelector {
                 this.updateModelsTable();
 
                 // После загрузки сразу выбираем модель
-                this.setSelectedWhisperModel(langCode, modelId);
+                if (modelType === 'whisper') {
+                    this.setSelectedWhisperModel(langCode, modelId);
+                } else {
+                    this.setSelectedModelGeneric(langCode, modelId, modelType);
+                }
                 
                 // Если это левая панель, обновляем также правую панель (если она существует)
                 if (window.languageModelsSelector && this.options.mode !== 'models-only') {
@@ -1823,15 +1839,20 @@ class LanguageSelector {
         // Если выбрана опция "без модели"
         if (isNone) {
             const whisperKey = `selected_model_${langCode}_whisper`;
+            const transformerAsrKey = `selected_model_${langCode}_transformer_asr`;
 
             localStorage.removeItem(whisperKey);
+            localStorage.removeItem(transformerAsrKey);
 
             console.log(`⭐ Снят выбор всех моделей для языка: ${langCode}`);
 
             if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
                 window.ModelManager.setSelectedModel(langCode, null, 'whisper');
+                window.ModelManager.setSelectedModel(langCode, null, 'transformer_asr');
             }
             this.updateModelSelectionUI(langCode);
+            this.updateModelsTable();
+            this.updateStorageInfo();
             return;
         }
 
@@ -1896,6 +1917,16 @@ class LanguageSelector {
     }
 
     setSelectedWhisperModel(langCode, modelId) {
+        // Only one ASR model should be active per language.
+        // If user selects a whisper model, clear transformer_asr selection for this language.
+        try {
+            localStorage.removeItem(`selected_model_${langCode}_transformer_asr`);
+        } catch (e) {
+        }
+        if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+            window.ModelManager.setSelectedModel(langCode, null, 'transformer_asr');
+        }
+
         const currentKey = `selected_model_${langCode}_whisper`;
 
         if (!modelId || modelId === 'none') {
