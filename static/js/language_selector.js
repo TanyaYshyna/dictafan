@@ -34,6 +34,22 @@ class LanguageSelector {
 
     async init() {
         try {
+            if (this.options.mode === 'models-centric') {
+                try {
+                    window.addEventListener('models-data-updated', () => {
+                        if (this.isInitialized) {
+                            this.render();
+                        }
+                    });
+                    window.addEventListener('language-data-updated', () => {
+                        if (this.isInitialized) {
+                            this.languageData = window.LanguageManager ? window.LanguageManager.getLanguageData() : this.languageData;
+                            this.render();
+                        }
+                    });
+                } catch (e) {
+                }
+            }
             this.render();
             this.isInitialized = true;
         } catch (error) {

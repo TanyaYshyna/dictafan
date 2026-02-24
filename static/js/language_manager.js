@@ -6,6 +6,16 @@ class LanguageManager {
 
         this._hydrateLanguageModels();
 
+        try {
+            if (this.modelsData && Array.isArray(this.modelsData) && this.modelsData.length > 0) {
+                window.dispatchEvent(new CustomEvent('models-data-updated'));
+            }
+            if (this.languageData && Object.keys(this.languageData).length > 0) {
+                window.dispatchEvent(new CustomEvent('language-data-updated'));
+            }
+        } catch (e) {
+        }
+
         if (!this.isInitialized) {
             this._fetchLanguageData();
         }
@@ -185,6 +195,11 @@ class LanguageManager {
                 }
 
                 this._hydrateLanguageModels();
+
+                try {
+                    window.dispatchEvent(new CustomEvent('language-data-updated'));
+                } catch (e) {
+                }
             })
             .catch(error => {
                 console.error('❌ Ошибка загрузки languages.json:', error);
@@ -216,6 +231,11 @@ class LanguageManager {
                 }
 
                 this._hydrateLanguageModels();
+
+                try {
+                    window.dispatchEvent(new CustomEvent('models-data-updated'));
+                } catch (e) {
+                }
             })
             .catch(error => {
                 console.error('❌ Ошибка загрузки models.json:', error);
