@@ -249,9 +249,22 @@ class LanguageSelector {
         `;
 
         return `
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items:start;">
-                ${left}
-                ${right}
+            <div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items:start;">
+                    ${left}
+                    ${right}
+                </div>
+                <div class="storage-info-full" style="margin-top: 16px; padding: 12px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #555;">
+                        <span style="font-weight: bold;">Хранилище браузера:</span>
+                        <span style="color: #333;" id="storage-stats-text">Загрузка информации...</span>
+                    </div>
+                    <div class="storage-progress-full" style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative;">
+                        <div class="storage-progress-fill-full" id="storage-progress-fill" style="height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s;"></div>
+                        <div class="storage-progress-text-full" id="storage-progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">0%</div>
+                    </div>
+                    <div style="font-size: 11px; color: #888; margin-top: 4px; text-align: center;" id="storage-details">Рассчитываем использование памяти...</div>
+                </div>
             </div>
         `;
     }
@@ -393,6 +406,97 @@ class LanguageSelector {
                 return;
             }
         });
+    }
+
+    calculateStorageUsageV2() {
+        const models = this._collectGlobalModels();
+        const byKey = new Map(models.map(m => [String(m.modelKey), m]));
+
+        const downloaded = this._getDownloadedModelsV2();
+        const downloadedKeys = Object.keys(downloaded || {});
+
+        let downloadedCount = 0;
+        let totalDownloadedSizeMB = 0;
+
+        for (const k of downloadedKeys) {
+            const mk = String(k);
+            const m = byKey.get(mk);
+            if (!m) continue;
+            downloadedCount += 1;
+            totalDownloadedSizeMB += this.parseSizeToMB(m.size);
+        }
+
+        return {
+            downloadedCount,
+            downloadedSizeMB: totalDownloadedSizeMB,
+        };
+    }
+
+    async updateStorageInfoV2() {
+        const storageInfo = this.calculateStorageUsageV2();
+
+        let browserQuota = null;
+        let browserUsage = null;
+        let browserAvailable = null;
+
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const estimate = await navigator.storage.estimate();
+                browserQuota = estimate.quota;
+                browserUsage = estimate.usage;
+                browserAvailable = (browserQuota != null && browserUsage != null) ? (browserQuota - browserUsage) : null;
+            } catch (e) {
+            }
+        }
+
+        const modelsSizeBytes = storageInfo.downloadedSizeMB * 1024 * 1024;
+        const displayUsage = (browserUsage != null && browserUsage > 0) ? browserUsage : modelsSizeBytes;
+
+        const storageFill = document.getElementById('storage-progress-fill');
+        const storageText = document.getElementById('storage-progress-text');
+
+        let percentage = 0;
+        if (browserQuota && displayUsage != null) {
+            percentage = Math.round((displayUsage / browserQuota) * 100);
+        }
+
+        if (storageFill) {
+            storageFill.style.width = `${percentage}%`;
+        }
+        if (storageText) {
+            storageText.textContent = `${percentage}%`;
+        }
+
+        const statsText = document.getElementById('storage-stats-text');
+        const detailsText = document.getElementById('storage-details');
+
+        if (statsText) {
+            if (browserQuota && displayUsage != null) {
+                statsText.textContent = `${this.formatSize(displayUsage / (1024 * 1024))} из ${this.formatSize(browserQuota / (1024 * 1024))}`;
+            } else {
+                statsText.textContent = `${storageInfo.downloadedCount} моделей (${this.formatSize(storageInfo.downloadedSizeMB)})`;
+            }
+        }
+
+        if (detailsText) {
+            if (browserQuota && displayUsage != null && browserAvailable != null) {
+                const displayUsageMB = displayUsage / (1024 * 1024);
+                const displayAvailableMB = browserAvailable / (1024 * 1024);
+                const modelsInfo = storageInfo.downloadedCount > 0
+                    ? ` | <strong>Модели:</strong> ${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSizeMB)})`
+                    : '';
+                detailsText.innerHTML = `
+                    <strong>Использовано:</strong> ${this.formatSize(displayUsageMB)} |
+                    <strong>Доступно:</strong> ${this.formatSize(displayAvailableMB)} |
+                    <strong>Всего:</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
+                `;
+            } else {
+                detailsText.innerHTML = `
+                    <strong>Загружено моделей:</strong> ${storageInfo.downloadedCount} |
+                    <strong>Размер моделей:</strong> ${this.formatSize(storageInfo.downloadedSizeMB)}
+                `;
+            }
+        }
     }
 
     getCountryCode(langCode) {
@@ -1329,6 +1433,12 @@ class LanguageSelector {
         if (this.options.mode === 'models-only' || this.options.mode === 'learning-list') {
             setTimeout(() => {
                 this.updateStorageInfo();
+            }, 100);
+        }
+
+        if (this.options.mode === 'models-centric') {
+            setTimeout(() => {
+                this.updateStorageInfoV2();
             }, 100);
         }
     }
