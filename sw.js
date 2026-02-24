@@ -271,7 +271,19 @@ self.addEventListener('fetch', (event) => {
   try {
     const url = new URL(request.url);
     if (url.pathname && url.pathname.endsWith('.map')) {
-      event.respondWith(new Response('', { status: 204 }));
+      const emptyMap = JSON.stringify({
+        version: 3,
+        sources: [],
+        names: [],
+        mappings: '',
+      });
+      event.respondWith(new Response(emptyMap, {
+        status: 200,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+        },
+      }));
       return;
     }
   } catch (e) {
