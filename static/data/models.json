@@ -1,0 +1,72 @@
+[
+  {
+    "modelKey": "whisper:Xenova/whisper-tiny",
+    "modelType": "whisper",
+    "id": "tiny",
+    "hf_repo": "Xenova/whisper-tiny",
+    "name": "Tiny",
+    "size": "75 MB",
+    "quality": "65%",
+    "recommended": false
+  },
+  {
+    "modelKey": "whisper:Xenova/whisper-base",
+    "modelType": "whisper",
+    "id": "base",
+    "hf_repo": "Xenova/whisper-base",
+    "name": "Base",
+    "size": "145 MB",
+    "quality": "75%",
+    "recommended": true
+  },
+  {
+    "modelKey": "whisper:Xenova/whisper-small",
+    "modelType": "whisper",
+    "id": "small",
+    "hf_repo": "Xenova/whisper-small",
+    "name": "Small",
+    "size": "480 MB",
+    "quality": "85%",
+    "recommended": false
+  },
+  {
+    "modelKey": "transformer_asr:Xenova/wav2vec2-base-960h",
+    "modelType": "transformer_asr",
+    "id": "wav2vec2-base-960h",
+    "hf_repo": "Xenova/wav2vec2-base-960h",
+    "name": "Wav2Vec2 Base 960h",
+    "size": "200 MB",
+    "quality": "75%",
+    "recommended": true
+  },
+  {
+    "modelKey": "transformer_asr:Xenova/wav2vec2-bert-CV16-en",
+    "modelType": "transformer_asr",
+    "id": "wav2vec2-bert-CV16-en",
+    "hf_repo": "Xenova/wav2vec2-bert-CV16-en",
+    "name": "Wav2Vec2-BERT CV16 (EN)",
+    "size": "400 MB",
+    "quality": "85%",
+    "recommended": false
+  },
+  {
+    "modelKey": "transformer_asr:Xenova/mms-1b-fl102",
+    "modelType": "transformer_asr",
+    "id": "mms-1b-fl102",
+    "hf_repo": "Xenova/mms-1b-fl102",
+    "name": "MMS 1B FL102",
+    "size": "1.2 GB",
+    "quality": "80%",
+    "recommended": true
+  },
+  {
+    "modelKey": "transformer_asr:Xenova/mms-1b-all",
+    "modelType": "transformer_asr",
+    "id": "mms-1b-all",
+    "hf_repo": "Xenova/mms-1b-all",
+    "name": "MMS 1B All",
+    "size": "1.6 GB",
+    "quality": "85%",
+    "recommended": false
+  }
+]

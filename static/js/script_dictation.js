@@ -9180,27 +9180,79 @@ function initAudioSettingsModal() {
         audioSettingsModalPanel.init();
     });
 
-    const openModal = () => {
+    const openModal = (sourceLabel = 'unknown', event = null) => {
+        try {
+            const target = event && event.target ? event.target : null;
+            const currentDisplay = audioSettingsModal ? audioSettingsModal.style.display : '(no modal)';
+            const computed = audioSettingsModal ? window.getComputedStyle(audioSettingsModal) : null;
+            const zIndex = computed ? computed.zIndex : '(no computed)';
+            const pointerEvents = computed ? computed.pointerEvents : '(no computed)';
+            console.log(`⚙️ [AudioSettingsModal] openModal() source=${sourceLabel}`, {
+                hasModal: !!audioSettingsModal,
+                hasContainer: !!modalContainer,
+                currentDisplay,
+                computedDisplay: computed ? computed.display : null,
+                zIndex,
+                pointerEvents,
+                targetTag: target ? target.tagName : null,
+                targetId: target ? target.id : null,
+                targetClass: target ? target.className : null
+            });
+        } catch (e) {
+        }
+
+        if (!audioSettingsModal) {
+            console.warn('⚠️ [AudioSettingsModal] openModal called but audioSettingsModal is missing');
+            return;
+        }
+
         audioSettingsModal.style.display = 'flex';
         if (window.lucide && window.lucide.createIcons) {
             window.lucide.createIcons();
         }
+
+        try {
+            const computedAfter = window.getComputedStyle(audioSettingsModal);
+            console.log(`✅ [AudioSettingsModal] opened source=${sourceLabel}`, {
+                styleDisplay: audioSettingsModal.style.display,
+                computedDisplay: computedAfter ? computedAfter.display : null,
+                zIndex: computedAfter ? computedAfter.zIndex : null
+            });
+        } catch (e) {
+        }
+    };
+
+    const bindOpenHandler = (btn, label) => {
+        if (!btn) return;
+        btn.addEventListener('click', (e) => {
+            try {
+                console.log(`🖱️ [AudioSettingsModal] click ${label}`, {
+                    targetTag: e && e.target ? e.target.tagName : null,
+                    targetId: e && e.target ? e.target.id : null,
+                    targetClass: e && e.target ? e.target.className : null,
+                    currentTargetId: e && e.currentTarget ? e.currentTarget.id : null
+                });
+            } catch (err) {
+            }
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } catch (err) {
+            }
+            openModal(label, e);
+        });
     };
 
     // Обработчик открытия модального окна (кнопка в таблице)
-    if (audioSettingsButton) {
-        audioSettingsButton.addEventListener('click', openModal);
-    }
+    bindOpenHandler(audioSettingsButton, 'table-gear');
 
     // Обработчик открытия модального окна (кнопка в topbar)
-    if (topbarSettingsButton) {
-        topbarSettingsButton.addEventListener('click', openModal);
-    }
+    bindOpenHandler(topbarSettingsButton, 'topbar-gear');
 
     // Обработчик открытия модального окна (кнопка в шапке модального окна выбора предложений)
-    if (startModalSettingsButton) {
-        startModalSettingsButton.addEventListener('click', openModal);
-    }
+    bindOpenHandler(startModalSettingsButton, 'start-modal-gear');
 
     // Обработчик закрытия модального окна
     if (closeAudioSettingsModal) {

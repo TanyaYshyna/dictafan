@@ -138,7 +138,7 @@ function initializeLanguageModelsSelector() {
 
         languageModelsSelector = new LanguageSelector({
             container: container,
-            mode: 'models-only', // Новый режим - только модели, без выбора языков
+            mode: 'models-centric',
             nativeLanguage: originalData.native_language,
             learningLanguages: originalData.learning_languages,
             currentLearning: originalData.current_learning,

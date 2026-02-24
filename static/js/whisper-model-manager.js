@@ -28,11 +28,14 @@ class WhisperModelManager {
     }
 
     _getModelKey(languageCode, modelSize) {
-        return `whisper_model_${languageCode}_${modelSize}`;
+        // Model-centric: whisper weights are global per size (multilingual).
+        // Keep languageCode for backward compatibility but do not include it in the key.
+        return `whisper_model_${modelSize}`;
     }
 
     _getAssetsKey(languageCode, modelSize) {
-        return `whisper_model_assets_${languageCode}_${modelSize}`;
+        // Model-centric: assets list is global per size.
+        return `whisper_model_assets_${modelSize}`;
     }
 
     _normalizeExternalAssetUrl(rawUrl) {
@@ -355,7 +358,7 @@ class WhisperModelManager {
      * @returns {Promise<Object>} Результат распознавания
      */
     async transcribe(audioData, languageCode, modelSize = 'base', prompt = null) {
-        const modelKey = `whisper_model_${languageCode}_${modelSize}`;
+        const modelKey = this._getModelKey(languageCode, modelSize);
         const storedModel = window.WhisperModels?.get?.(modelKey);
         
         if (!storedModel || !storedModel.recognizer) {

@@ -41,6 +41,244 @@ class LanguageSelector {
         }
     }
 
+    _getDownloadedModelsV2() {
+        try {
+            const raw = localStorage.getItem('downloaded_models_v2');
+            const parsed = raw ? JSON.parse(raw) : {};
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    _saveDownloadedModelsV2(obj) {
+        try {
+            localStorage.setItem('downloaded_models_v2', JSON.stringify(obj || {}));
+        } catch (e) {
+        }
+    }
+
+    _isDownloadedV2(modelKey) {
+        const all = this._getDownloadedModelsV2();
+        return !!(all && all[modelKey]);
+    }
+
+    _setDownloadedV2(modelKey, data) {
+        const all = this._getDownloadedModelsV2();
+        all[modelKey] = {
+            ...(all[modelKey] || {}),
+            ...(data || {}),
+            downloadedAt: new Date().toISOString()
+        };
+        this._saveDownloadedModelsV2(all);
+    }
+
+    _removeDownloadedV2(modelKey) {
+        const all = this._getDownloadedModelsV2();
+        if (all && all[modelKey]) {
+            delete all[modelKey];
+            this._saveDownloadedModelsV2(all);
+        }
+    }
+
+    _getSelectedModelKeyV2(langCode) {
+        const lc = (langCode || '').toString().trim().toLowerCase().split('-')[0] || '';
+        if (!lc) return null;
+        try {
+            const v = localStorage.getItem(`selected_asr_model_v2_${lc}`);
+            return v && v !== 'null' && v !== 'none' && String(v).trim() !== '' ? String(v) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _setSelectedModelKeyV2(langCode, modelKey) {
+        const lc = (langCode || '').toString().trim().toLowerCase().split('-')[0] || '';
+        if (!lc) return;
+        try {
+            if (!modelKey || modelKey === 'none') {
+                localStorage.removeItem(`selected_asr_model_v2_${lc}`);
+            } else {
+                localStorage.setItem(`selected_asr_model_v2_${lc}`, String(modelKey));
+            }
+        } catch (e) {
+        }
+    }
+
+    _collectGlobalModels() {
+        const lm = window.LanguageManager;
+        const raw = lm && typeof lm.getModelsData === 'function' ? lm.getModelsData() : [];
+        const models = Array.isArray(raw) ? raw.filter(Boolean).map(m => ({ ...m })) : [];
+
+        models.sort((a, b) => {
+            const tA = a.modelType === 'whisper' ? 0 : 1;
+            const tB = b.modelType === 'whisper' ? 0 : 1;
+            if (tA !== tB) return tA - tB;
+            const rA = a.recommended ? 0 : 1;
+            const rB = b.recommended ? 0 : 1;
+            if (rA !== rB) return rA - rB;
+            return String(a.name).localeCompare(String(b.name));
+        });
+
+        return models;
+    }
+
+    createModelsCentricUI() {
+        const models = this._collectGlobalModels();
+        const languages = Object.keys(this.languageData || {});
+        const downloaded = this._getDownloadedModelsV2();
+        const downloadedKeys = new Set(Object.keys(downloaded || {}));
+
+        const getApplicableDownloaded = (langCode) => {
+            const lc = (langCode || '').toString().trim().toLowerCase().split('-')[0];
+            const langEntry = (this.languageData && this.languageData[lc]) ? this.languageData[lc] : (this.languageData ? this.languageData[langCode] : null);
+            const applicableKeys = langEntry && Array.isArray(langEntry.applicable_model_keys) ? langEntry.applicable_model_keys : [];
+            const applicableKeySet = new Set(applicableKeys.map(String));
+            return models.filter(m => {
+                if (!downloadedKeys.has(m.modelKey)) return false;
+                // Whisper multilingual: if the language references it, it's applicable.
+                return applicableKeySet.has(String(m.modelKey));
+            });
+        };
+
+        const left = `
+            <div class="downloaded-models-panel" style="margin:0;">
+                <label class="language-label">Все модели</label>
+                <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
+                    ${models.map(m => {
+                        const isDownloaded = downloadedKeys.has(m.modelKey);
+                        const typeName = m.modelType === 'whisper' ? 'Whisper' : 'ASR';
+                        const langs = (m.supportedLanguages || []).includes('all') ? 'all' : (m.supportedLanguages || []).slice(0, 6).join(' ');
+                        const toggleEnabled = m.modelType === 'whisper';
+                        return `
+                            <div class="model-list-item" data-model-key="${m.modelKey}" data-model-type="${m.modelType}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f0f0;">
+                                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; min-width: 70px; color:#666; font-size:12px;">${typeName}</div>
+                                <div style="flex-grow:1; min-width:0;">
+                                    <div style="font-size:13px; font-weight:500; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.name}</div>
+                                    <div style="font-size:12px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${langs}</div>
+                                </div>
+                                <div style="flex-shrink:0; color:#666; font-size:12px; min-width:80px; text-align:right;">${m.size || ''}</div>
+                                <div style="display:flex; align-items:center; flex-shrink:0;">
+                                    <label class="model-switch" style="position: relative; display: inline-block; width: 40px; height: 20px; opacity:${toggleEnabled ? '1' : '0.35'};">
+                                        <input type="checkbox"
+                                               class="model-download-toggle-v2"
+                                               ${isDownloaded ? 'checked' : ''}
+                                               ${toggleEnabled ? '' : 'disabled'}
+                                               data-model-key="${m.modelKey}"
+                                               data-model-type="${m.modelType}"
+                                               style="opacity: 0; width: 0; height: 0;">
+                                        <span class="model-slider ${isDownloaded ? 'downloaded' : ''}"
+                                              style="position: absolute; cursor: ${toggleEnabled ? 'pointer' : 'not-allowed'}; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDownloaded ? '#8B4513' : '#ccc'}; transition: .4s; border-radius: 20px;">
+                                            <span class="model-slider-circle"
+                                                  style="position: absolute; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: ${isDownloaded ? '#FFD700' : 'white'}; transition: .4s; border-radius: 50%; ${isDownloaded ? 'transform: translateX(20px);' : ''}"></span>
+                                        </span>
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 0 4px;">Загружено: ${downloadedKeys.size}</div>
+            </div>
+        `;
+
+        const right = `
+            <div class="downloaded-models-panel" style="margin:0;">
+                <label class="language-label">Языки</label>
+                <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
+                    ${languages.map(code => {
+                        const applicable = getApplicableDownloaded(code);
+                        const selected = this._getSelectedModelKeyV2(code);
+                        const effectiveSelected = selected && applicable.some(m => m.modelKey === selected) ? selected : (applicable[0]?.modelKey || '');
+
+                        if (!selected && effectiveSelected) {
+                            try { this._setSelectedModelKeyV2(code, effectiveSelected); } catch (e) {}
+                        }
+
+                        return `
+                            <div class="language-item" data-lang="${code}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f0f0;">
+                                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                                    ${this.createFlagElement(code)}
+                                    <span style="font-weight:500;">${this.getLanguageName(code)}</span>
+                                </div>
+                                <div style="flex-grow:1; min-width:0;"></div>
+                                <div style="flex-shrink:0; min-width: 260px;">
+                                    ${applicable.length ? `
+                                        <select class="language-model-select-v2" data-lang="${code}" style="width:100%; padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
+                                            ${applicable.map(m => {
+                                                const label = m.modelType === 'whisper' ? `whisper: ${m.name}` : `asr: ${m.name}`;
+                                                return `<option value="${m.modelKey}" ${String(effectiveSelected) === String(m.modelKey) ? 'selected' : ''}>${label}</option>`;
+                                            }).join('')}
+                                        </select>
+                                    ` : `
+                                        <div style="font-size:12px; color:#999;">нет загруженных моделей</div>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+
+        return `
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items:start;">
+                ${left}
+                ${right}
+            </div>
+        `;
+    }
+
+    bindModelsCentricEvents() {
+        this.options.container.addEventListener('change', async (e) => {
+            const toggle = e.target && e.target.classList && e.target.classList.contains('model-download-toggle-v2') ? e.target : null;
+            if (toggle) {
+                const modelKey = toggle.dataset.modelKey;
+                const modelType = toggle.dataset.modelType;
+                const isChecked = !!toggle.checked;
+                if (!modelKey || !modelType) return;
+
+                if (!isChecked) {
+                    this._removeDownloadedV2(modelKey);
+                    this.render();
+                    return;
+                }
+
+                if (modelType !== 'whisper') {
+                    toggle.checked = false;
+                    return;
+                }
+
+                const parts = String(modelKey).split(':');
+                const hf = parts.length >= 2 ? parts.slice(1).join(':') : '';
+                const size = hf.includes('whisper-tiny') ? 'tiny' : (hf.includes('whisper-small') ? 'small' : 'base');
+
+                try {
+                    if (window.WhisperModelManager) {
+                        const mm = new window.WhisperModelManager();
+                        await mm.loadLanguageModel('en', size, null);
+                        this._setDownloadedV2(modelKey, { modelType, hf_repo: hf, size });
+                    }
+                } catch (err) {
+                    try { console.warn('❌ Whisper download failed:', err); } catch (e2) {}
+                    toggle.checked = false;
+                    this._removeDownloadedV2(modelKey);
+                }
+
+                this.render();
+                return;
+            }
+
+            const sel = e.target && e.target.classList && e.target.classList.contains('language-model-select-v2') ? e.target : null;
+            if (sel) {
+                const lang = sel.dataset.lang;
+                const val = sel.value;
+                this._setSelectedModelKeyV2(lang, val);
+                return;
+            }
+        });
+    }
+
     getCountryCode(langCode) {
         return window.LanguageManager.getCountryCode(langCode);
     }
@@ -436,9 +674,11 @@ class LanguageSelector {
     getDownloadedModelsList() {
         const models = [];
         const learningLangs = this.options.learningLanguages;
+        const showAllLanguages = this.options.mode === 'models-only';
 
         Object.entries(this.languageData).forEach(([langCode, data]) => {
-            if (learningLangs.includes(langCode) && data.models) {
+            const shouldInclude = showAllLanguages ? true : learningLangs.includes(langCode);
+            if (shouldInclude && data.models) {
                 // Whisper модели
                 if (data.models.whisper) {
                     data.models.whisper.forEach(model => {
@@ -955,6 +1195,9 @@ class LanguageSelector {
             case 'models-only':
                 html = this.createLearningList();
                 break;
+            case 'models-centric':
+                html = this.createModelsCentricUI();
+                break;
             default:
                 html = this.createNativeSelector();
         }
@@ -976,6 +1219,11 @@ class LanguageSelector {
 
     // Обновленные обработчики событий
     bindEvents() {
+        if (this.options.mode === 'models-centric') {
+            this.bindModelsCentricEvents();
+            return;
+        }
+
         // 1. Обработчики для кастомных селекторов
         const customSelects = this.options.container.querySelectorAll('.custom-select-wrapper');
         customSelects.forEach(select => {
@@ -1548,20 +1796,6 @@ class LanguageSelector {
                 if (window.ModelManager && typeof window.ModelManager.downloadModel === 'function') {
                     console.log(`🔄 Начинаем загрузку через ModelManager: ${langCode}/${modelType}/${modelId}`);
 
-                    // Сначала устанавливаем модель как скачанную (чтобы UI обновился сразу)
-                    window.ModelManager.setModelDownloaded(langCode, modelId, modelType, {
-                        size: this.parseSizeToMB(modelData.size) * 1024 * 1024, // в байтах
-                        name: modelData.name
-                    });
-
-                    // Обновляем UI сразу
-                    slider.classList.add('downloaded');
-                    slider.style.backgroundColor = '#8B4513';
-                    if (sliderCircle) {
-                        sliderCircle.style.backgroundColor = '#FFD700';
-                        sliderCircle.style.transform = 'translateX(20px)';
-                    }
-
                     // Пытаемся скачать (это может упасть с 404)
                     try {
                         await window.ModelManager.downloadModel(langCode, modelId, modelType, (progress) => {
@@ -1573,6 +1807,20 @@ class LanguageSelector {
 
                         console.log(`✅ ModelManager успешно загрузил модель ${langCode}/${modelType}/${modelId}`);
 
+                        // Отмечаем как скачанную только после успешной загрузки
+                        window.ModelManager.setModelDownloaded(langCode, modelId, modelType, {
+                            size: this.parseSizeToMB(modelData.size) * 1024 * 1024, // в байтах
+                            name: modelData.name
+                        });
+
+                        // Обновляем UI
+                        slider.classList.add('downloaded');
+                        slider.style.backgroundColor = '#8B4513';
+                        if (sliderCircle) {
+                            sliderCircle.style.backgroundColor = '#FFD700';
+                            sliderCircle.style.transform = 'translateX(20px)';
+                        }
+
                     } catch (downloadError) {
                         console.log(`⚠️ Ошибка загрузки модели:`, downloadError);
 
@@ -1581,9 +1829,41 @@ class LanguageSelector {
                             console.log(`ℹ️ Сервер не доступен, работаем в offline режиме`);
                             this.updateWhisperDownloadModalStatus('⚠️ Офлайн режим. Модель сохранена локально');
 
+                            // Для 404 считаем, что локальная модель уже есть (fallback-поведение как раньше)
+                            window.ModelManager.setModelDownloaded(langCode, modelId, modelType, {
+                                size: this.parseSizeToMB(modelData.size) * 1024 * 1024,
+                                name: modelData.name
+                            });
+
+                            slider.classList.add('downloaded');
+                            slider.style.backgroundColor = '#8B4513';
+                            if (sliderCircle) {
+                                sliderCircle.style.backgroundColor = '#FFD700';
+                                sliderCircle.style.transform = 'translateX(20px)';
+                            }
+
                             // Ждем немного для показа сообщения
                             await new Promise(resolve => setTimeout(resolve, 1000));
                         } else {
+                            // Любая другая ошибка: откатываем UI/состояние, чтобы не было "желтого бегунка" без реальной загрузки
+                            try {
+                                if (window.ModelManager && typeof window.ModelManager.removeModel === 'function') {
+                                    window.ModelManager.removeModel(langCode, modelId, modelType);
+                                }
+                            } catch (e) {
+                            }
+                            try {
+                                this.removeModelState(langCode, modelId, modelType);
+                            } catch (e) {
+                            }
+                            if (slider) {
+                                slider.classList.remove('downloaded');
+                                slider.style.backgroundColor = '#ccc';
+                            }
+                            if (sliderCircle) {
+                                sliderCircle.style.backgroundColor = 'white';
+                                sliderCircle.style.transform = 'translateX(0)';
+                            }
                             throw downloadError;
                         }
                     }
