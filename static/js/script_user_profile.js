@@ -75,7 +75,9 @@ function loadUserData() {
         audio_start: userData.audio_start || '',
         audio_typo: userData.audio_typo || '',
         audio_success: userData.audio_success || '',
-        audio_repeats: userData.audio_repeats || 3
+        audio_repeats: userData.audio_repeats || 3,
+        audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
+        speech_recognition_mode: userData.speech_recognition_mode || 'route'
     };
 
     document.getElementById('username').value = originalData.username;
@@ -185,8 +187,10 @@ function initializeAudioSettings() {
                     audio_typo: audioSettings.typo,
                     audio_success: audioSettings.success,
                     audio_repeats: audioSettings.repeats,
+                    audio_required_passed_star_half: audioSettings.required_passed_star_half,
                     without_entering_text: audioSettings.without_entering_text,
-                    show_text: audioSettings.show_text
+                    show_text: audioSettings.show_text,
+                    speech_recognition_mode: audioSettings.speech_recognition_mode
                 };
             } catch (e) {
                 console.warn('Ошибка парсинга settings_json:', e);
@@ -195,7 +199,9 @@ function initializeAudioSettings() {
                     audio_start: UM.userData.audio_start,
                     audio_typo: UM.userData.audio_typo,
                     audio_success: UM.userData.audio_success,
-                    audio_repeats: UM.userData.audio_repeats
+                    audio_repeats: UM.userData.audio_repeats,
+                    audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
+                    speech_recognition_mode: UM.userData.speech_recognition_mode
                 };
             }
         } else {
@@ -204,7 +210,9 @@ function initializeAudioSettings() {
                 audio_start: UM.userData.audio_start,
                 audio_typo: UM.userData.audio_typo,
                 audio_success: UM.userData.audio_success,
-                audio_repeats: UM.userData.audio_repeats
+                audio_repeats: UM.userData.audio_repeats,
+                audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
+                speech_recognition_mode: UM.userData.speech_recognition_mode
             };
         }
 
@@ -362,7 +370,9 @@ function checkForChanges() {
         currentValues.audio_start !== (originalData.audio_start || '') ||
         currentValues.audio_typo !== (originalData.audio_typo || '') ||
         currentValues.audio_success !== (originalData.audio_success || '') ||
-        currentValues.audio_repeats !== (originalData.audio_repeats || 3);
+        currentValues.audio_repeats !== (originalData.audio_repeats || 3) ||
+        currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3) ||
+        currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route');
 
     setUnsavedState(hasChanges);
 }
@@ -409,7 +419,9 @@ function getCurrentFormValues() {
         audio_start: '',
         audio_typo: '',
         audio_success: '',
-        audio_repeats: 3
+        audio_repeats: 3,
+        audio_required_passed_star_half: 3,
+        speech_recognition_mode: 'route'
     };
     
     if (audioSettingsPanel) {
@@ -418,6 +430,8 @@ function getCurrentFormValues() {
         audioSettings.audio_typo = settings.typo || '';
         audioSettings.audio_success = settings.success || '';
         audioSettings.audio_repeats = settings.repeats || 3;
+        audioSettings.audio_required_passed_star_half = settings.required_passed_star_half || 3;
+        audioSettings.speech_recognition_mode = settings.speech_recognition_mode || 'route';
     }
 
     return {
@@ -429,7 +443,9 @@ function getCurrentFormValues() {
         audio_start: audioSettings.audio_start,
         audio_typo: audioSettings.audio_typo,
         audio_success: audioSettings.audio_success,
-        audio_repeats: audioSettings.audio_repeats
+        audio_repeats: audioSettings.audio_repeats,
+        audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
+        speech_recognition_mode: audioSettings.speech_recognition_mode
     };
 }
 
@@ -643,7 +659,9 @@ async function saveProfile(options = {}) {
         (formValues.audio_start || '') !== (originalData.audio_start || '') ||
         (formValues.audio_typo || '') !== (originalData.audio_typo || '') ||
         (formValues.audio_success || '') !== (originalData.audio_success || '') ||
-        (formValues.audio_repeats || 3) !== (originalData.audio_repeats || 3)
+        (formValues.audio_repeats || 3) !== (originalData.audio_repeats || 3) ||
+        (formValues.audio_required_passed_star_half || 3) !== (originalData.audio_required_passed_star_half || 3) ||
+        (formValues.speech_recognition_mode || 'route') !== (originalData.speech_recognition_mode || 'route')
     );
 
     // Если нет изменений вообще, выходим
@@ -681,8 +699,10 @@ async function saveProfile(options = {}) {
                     typo: settings.typo || 'o',
                     success: settings.success || 'ot',
                     repeats: settings.repeats !== undefined ? settings.repeats : 3,
+                    required_passed_star_half: settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3,
                     without_entering_text: Boolean(settings.without_entering_text),
-                    show_text: Boolean(settings.show_text)
+                    show_text: Boolean(settings.show_text),
+                    speech_recognition_mode: settings.speech_recognition_mode || 'route'
                 }
             });
             
@@ -693,6 +713,8 @@ async function saveProfile(options = {}) {
             updateData.audio_typo = settings.typo || 'o';
             updateData.audio_success = settings.success || 'ot';
             updateData.audio_repeats = settings.repeats !== undefined ? settings.repeats : 3;
+            updateData.audio_required_passed_star_half = settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3;
+            updateData.speech_recognition_mode = settings.speech_recognition_mode || 'route';
         }
 
         showInfo('Сохраняем изменения...');
@@ -705,7 +727,9 @@ async function saveProfile(options = {}) {
             audio_start: '',
             audio_typo: '',
             audio_success: '',
-            audio_repeats: 3
+            audio_repeats: 3,
+            audio_required_passed_star_half: 3,
+            speech_recognition_mode: 'route'
         };
         
         if (updatedUser.settings_json) {
@@ -716,7 +740,9 @@ async function saveProfile(options = {}) {
                     audio_start: audio.start || '',
                     audio_typo: audio.typo || '',
                     audio_success: audio.success || '',
-                    audio_repeats: audio.repeats !== undefined ? audio.repeats : 3
+                    audio_repeats: audio.repeats !== undefined ? audio.repeats : 3,
+                    audio_required_passed_star_half: audio.required_passed_star_half !== undefined ? audio.required_passed_star_half : 3,
+                    speech_recognition_mode: audio.speech_recognition_mode || 'route'
                 };
             } catch (e) {
                 console.warn('Ошибка парсинга settings_json из ответа:', e);
@@ -736,6 +762,14 @@ async function saveProfile(options = {}) {
         if (audioSettings.audio_repeats === 3 && updatedUser.audio_repeats !== undefined) {
             audioSettings.audio_repeats = updatedUser.audio_repeats;
         }
+
+        if (audioSettings.audio_required_passed_star_half === 3 && updatedUser.audio_required_passed_star_half !== undefined) {
+            audioSettings.audio_required_passed_star_half = updatedUser.audio_required_passed_star_half;
+        }
+
+        if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updatedUser.speech_recognition_mode !== undefined) {
+            audioSettings.speech_recognition_mode = updatedUser.speech_recognition_mode;
+        }
         
         // Если ничего не получили, используем значения из updateData
         if (!audioSettings.audio_start) {
@@ -750,6 +784,14 @@ async function saveProfile(options = {}) {
         if (audioSettings.audio_repeats === 3 && updateData.audio_repeats !== undefined) {
             audioSettings.audio_repeats = updateData.audio_repeats;
         }
+
+        if (audioSettings.audio_required_passed_star_half === 3 && updateData.audio_required_passed_star_half !== undefined) {
+            audioSettings.audio_required_passed_star_half = updateData.audio_required_passed_star_half;
+        }
+
+        if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updateData.speech_recognition_mode !== undefined) {
+            audioSettings.speech_recognition_mode = updateData.speech_recognition_mode;
+        }
         
         originalData = {
             ...originalData,
@@ -760,7 +802,9 @@ async function saveProfile(options = {}) {
             audio_start: audioSettings.audio_start,
             audio_typo: audioSettings.audio_typo,
             audio_success: audioSettings.audio_success,
-            audio_repeats: audioSettings.audio_repeats
+            audio_repeats: audioSettings.audio_repeats,
+            audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
+            speech_recognition_mode: audioSettings.speech_recognition_mode
         };
         
         // Обновляем UM.userData, чтобы при следующей загрузке страницы данные были актуальными
@@ -789,6 +833,8 @@ async function saveProfile(options = {}) {
             UM.userData.audio_typo = originalData.audio_typo;
             UM.userData.audio_success = originalData.audio_success;
             UM.userData.audio_repeats = originalData.audio_repeats;
+            UM.userData.audio_required_passed_star_half = originalData.audio_required_passed_star_half;
+            UM.userData.speech_recognition_mode = originalData.speech_recognition_mode;
             
             // Обновляем topbar (имя пользователя и аватар, если изменились)
             // Добавляем небольшую задержку, чтобы браузер успел обработать обновление avatar
@@ -806,7 +852,9 @@ async function saveProfile(options = {}) {
                 start: originalData.audio_start,
                 typo: originalData.audio_typo,
                 success: originalData.audio_success,
-                repeats: originalData.audio_repeats
+                repeats: originalData.audio_repeats,
+                required_passed_star_half: originalData.audio_required_passed_star_half,
+                speech_recognition_mode: originalData.speech_recognition_mode
             };
             
             if (updatedUser.settings_json) {
@@ -819,7 +867,9 @@ async function saveProfile(options = {}) {
                         success: audio.success || originalData.audio_success,
                         repeats: audio.repeats !== undefined ? audio.repeats : originalData.audio_repeats,
                         without_entering_text: Boolean(audio.without_entering_text),
-                        show_text: Boolean(audio.show_text)
+                        show_text: Boolean(audio.show_text),
+                        required_passed_star_half: audio.required_passed_star_half !== undefined ? audio.required_passed_star_half : originalData.audio_required_passed_star_half,
+                        speech_recognition_mode: audio.speech_recognition_mode || originalData.speech_recognition_mode
                     };
                 } catch (e) {
                     console.warn('Ошибка парсинга settings_json для панели:', e);
