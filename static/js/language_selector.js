@@ -29,6 +29,12 @@ class LanguageSelector {
         this.flagPath = '/static/flags/';
         this.isInitialized = false;
 
+        this._modelsCentricBound = false;
+        this._modelsCentricDownloadsInFlight = new Map();
+        this._modelsCentricModalEl = null;
+        this._modelsCentricModalTextEl = null;
+        this._modelsCentricModalBarEl = null;
+
         this.init();
     }
 
@@ -245,7 +251,57 @@ class LanguageSelector {
         `;
     }
 
+    _ensureModelsCentricModal() {
+        if (this._modelsCentricModalEl) return;
+
+        const el = document.createElement('div');
+        el.style.position = 'fixed';
+        el.style.inset = '0';
+        el.style.background = 'rgba(0,0,0,0.45)';
+        el.style.zIndex = '99999';
+        el.style.display = 'none';
+        el.innerHTML = `
+            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 40px)); background:#fff; border-radius:10px; padding:18px 18px 14px 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.25);">
+                <div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">Загрузка модели</div>
+                <div data-role="models-centric-modal-text" style="font-size:13px; color:#555; margin-bottom:10px;">...</div>
+                <div style="height:10px; background:#eee; border-radius:999px; overflow:hidden;">
+                    <div data-role="models-centric-modal-bar" style="height:100%; width:0%; background:#8B4513; transition: width 0.15s;"></div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(el);
+
+        this._modelsCentricModalEl = el;
+        this._modelsCentricModalTextEl = el.querySelector('[data-role="models-centric-modal-text"]');
+        this._modelsCentricModalBarEl = el.querySelector('[data-role="models-centric-modal-bar"]');
+    }
+
+    _openModelsCentricModal(text, progress01) {
+        this._ensureModelsCentricModal();
+        if (this._modelsCentricModalTextEl) {
+            this._modelsCentricModalTextEl.textContent = text || '';
+        }
+        if (this._modelsCentricModalBarEl) {
+            const p = Math.max(0, Math.min(1, Number(progress01 || 0)));
+            this._modelsCentricModalBarEl.style.width = `${Math.round(p * 100)}%`;
+        }
+        if (this._modelsCentricModalEl) {
+            this._modelsCentricModalEl.style.display = 'block';
+        }
+    }
+
+    _closeModelsCentricModal() {
+        if (this._modelsCentricModalEl) {
+            this._modelsCentricModalEl.style.display = 'none';
+        }
+    }
+
     bindModelsCentricEvents() {
+        if (this._modelsCentricBound) {
+            return;
+        }
+        this._modelsCentricBound = true;
+
         this.options.container.addEventListener('change', async (e) => {
             const toggle = e.target && e.target.classList && e.target.classList.contains('model-download-toggle-v2') ? e.target : null;
             if (toggle) {
@@ -255,6 +311,10 @@ class LanguageSelector {
                 if (!modelKey || !modelType) return;
 
                 if (!isChecked) {
+                    if (this._modelsCentricDownloadsInFlight.has(modelKey)) {
+                        toggle.checked = true;
+                        return;
+                    }
                     this._removeDownloadedV2(modelKey);
                     this.render();
                     return;
@@ -265,20 +325,55 @@ class LanguageSelector {
                     return;
                 }
 
+                if (this._modelsCentricDownloadsInFlight.has(modelKey)) {
+                    return;
+                }
+
                 const parts = String(modelKey).split(':');
                 const hf = parts.length >= 2 ? parts.slice(1).join(':') : '';
                 const size = hf.includes('whisper-tiny') ? 'tiny' : (hf.includes('whisper-small') ? 'small' : 'base');
 
                 try {
-                    if (window.WhisperModelManager) {
+                    toggle.disabled = true;
+                } catch (e) {
+                }
+
+                this._openModelsCentricModal(`Подготовка загрузки…`, 0);
+
+                const p = (async () => {
+                    try {
+                        if (!window.WhisperModelManager) {
+                            throw new Error('WhisperModelManager not available');
+                        }
                         const mm = new window.WhisperModelManager();
-                        await mm.loadLanguageModel('en', size, null);
+                        await mm.loadLanguageModel('en', size, (info) => {
+                            try {
+                                const prog = info && typeof info.progress === 'number' ? info.progress : 0;
+                                const file = info && info.file ? String(info.file) : '';
+                                const status = info && info.status ? String(info.status) : '';
+                                const text = file ? `${status} ${file}`.trim() : (status || 'Загрузка…');
+                                this._openModelsCentricModal(text, prog);
+                            } catch (e) {
+                            }
+                        });
                         this._setDownloadedV2(modelKey, { modelType, hf_repo: hf, size });
+                    } catch (err) {
+                        try { console.warn('❌ Whisper download failed:', err); } catch (e2) {}
+                        try { toggle.checked = false; } catch (e3) {}
+                        this._removeDownloadedV2(modelKey);
+                        throw err;
+                    } finally {
+                        this._closeModelsCentricModal();
+                        try { toggle.disabled = false; } catch (e4) {}
                     }
-                } catch (err) {
-                    try { console.warn('❌ Whisper download failed:', err); } catch (e2) {}
-                    toggle.checked = false;
-                    this._removeDownloadedV2(modelKey);
+                })();
+
+                this._modelsCentricDownloadsInFlight.set(modelKey, p);
+                try {
+                    await p;
+                } catch (e) {
+                } finally {
+                    this._modelsCentricDownloadsInFlight.delete(modelKey);
                 }
 
                 this.render();
