@@ -47,6 +47,41 @@ class AudioSettingsPanel {
         this._noLocalModelNotified = false;
     }
 
+    _getSelectedModelKeyV2(langCode) {
+        const normalizedLang = (langCode || '').toString().trim().toLowerCase().split('-')[0] || 'en';
+        try {
+            const mk = localStorage.getItem(`selected_asr_model_v2_${normalizedLang}`);
+            return mk && mk !== 'null' && mk !== 'none' && String(mk).trim() !== '' ? String(mk) : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _getSelectedModelDisplayName(langCode) {
+        const mk = this._getSelectedModelKeyV2(langCode);
+        if (!mk) return '';
+
+        try {
+            if (window.LanguageManager && typeof window.LanguageManager.getModelByKey === 'function') {
+                const m = window.LanguageManager.getModelByKey(mk);
+                if (m && m.name) return String(m.name);
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (mk.startsWith('whisper:')) {
+                const size = this._parseWhisperSizeFromModelKey(mk);
+                if (size) return `Whisper ${size}`;
+                return 'Whisper';
+            }
+            const parts = mk.split(':');
+            return parts.length >= 2 ? parts.slice(1).join(':') : mk;
+        } catch (e) {
+            return '';
+        }
+    }
+
     _parseWhisperSizeFromModelKey(modelKey) {
         try {
             const mk = (modelKey || '').toString();
@@ -621,13 +656,16 @@ class AudioSettingsPanel {
                 </div>
                 <div class="play-sequence-item">
                     <label>Распознавание речи:</label>
-                    <div class="speech-recognition-toggle-button" 
-                         data-prefix="${prefix}"
-                         data-mode="${this.settings.speech_recognition_mode}">
-                        <i data-lucide="${this.getSpeechRecognitionIcon(this.settings.speech_recognition_mode)}" class="speech-recognition-icon"></i>
-                        <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <div class="speech-recognition-toggle-button" 
+                             data-prefix="${prefix}"
+                             data-mode="${this.settings.speech_recognition_mode}">
+                            <i data-lucide="${this.getSpeechRecognitionIcon(this.settings.speech_recognition_mode)}" class="speech-recognition-icon"></i>
+                            <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
+                        </div>
+                        ${isLocalMode ? `<div class="speech-recognition-model-inline" style="font-size: 12px; color: ${modelInfoColor}; white-space: nowrap;">${this._getSelectedModelDisplayName(currentLang) || modelInfoText}</div>` : ''}
                     </div>
-                    ${isLocalMode ? `<div class="speech-recognition-model-info" style="margin-top: 6px; font-size: 12px; color: ${modelInfoColor};">${modelInfoText}</div>` : ''}
+                    ${isLocalMode && (!this._getSelectedModelDisplayName(currentLang)) ? `<div class="speech-recognition-model-info" style="margin-top: 6px; font-size: 12px; color: ${modelInfoColor};">${modelInfoText}</div>` : ''}
                 </div>
             </div>
         `;
