@@ -460,6 +460,12 @@ class AudioSettingsPanel {
         const hasModel = this.checkWhisperModelAvailable();
         const currentLang = this._getCurrentLangCode();
         const selectedSize = this._getSelectedWhisperSize(currentLang);
+        const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+
+        // В диктанте оффлайн -> только локальный режим (без выбора "интернет")
+        if (isOffline && (this.options.mode === 'inline' || this.options.mode === 'modal')) {
+            this.settings.speech_recognition_mode = 'route-off';
+        }
         const isLocalMode = this.settings.speech_recognition_mode === 'route-off';
         let modelInfoText = '';
         let modelInfoColor = '#666';
@@ -612,14 +618,17 @@ class AudioSettingsPanel {
             return;
         }
 
+        const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+
+        // В диктанте оффлайн -> только локально (даже если модели нет, показываем красный лейбл)
+        if (isOffline && (this.options.mode === 'inline' || this.options.mode === 'modal')) {
+            this.settings.speech_recognition_mode = 'route-off';
+        }
+
         const hasModel = this.checkWhisperModelAvailable();
 
         if (this.settings.speech_recognition_mode === 'route-off' && !hasModel) {
             this.settings.repeats = 0;
-            if (!this._noLocalModelNotified) {
-                this._noLocalModelNotified = true;
-                this._showAutoCloseModal('У вас нет ни одной локальной модели распознания текста — сходите в профиль пользователя', 3000);
-            }
         }
 
         // Используем общий метод генерации HTML
@@ -865,6 +874,26 @@ class AudioSettingsPanel {
                 const currentMode = speechRecognitionButton.dataset.mode || 'route';
 
                 const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
+                const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+
+                if (isDictationPanel && isOffline) {
+                    // Оффлайн в диктанте -> только локально
+                    if (currentMode !== 'route-off') {
+                        speechRecognitionButton.dataset.mode = 'route-off';
+                        const icon = speechRecognitionButton.querySelector('.speech-recognition-icon');
+                        const label = speechRecognitionButton.querySelector('.speech-recognition-label');
+                        if (icon) icon.setAttribute('data-lucide', 'route-off');
+                        if (label) label.textContent = 'локально';
+                        this._updateSetting('speech_recognition_mode', 'route-off');
+                        if (window.lucide && window.lucide.createIcons) {
+                            window.lucide.createIcons();
+                        }
+                    }
+                    speechRecognitionButton.style.opacity = '0.9';
+                    speechRecognitionButton.style.cursor = 'not-allowed';
+                    speechRecognitionButton.title = 'Оффлайн: распознавание работает только локально';
+                    return;
+                }
                 if (isDictationPanel && currentMode === 'route-off') {
                     speechRecognitionButton.style.opacity = '0.9';
                     speechRecognitionButton.style.cursor = 'not-allowed';
@@ -908,9 +937,15 @@ class AudioSettingsPanel {
                 const hasModel = checkWhisperModel();
 
                 const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
+                const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
                 
                 // Получаем текущий режим из data-mode или из настроек (для первого клика)
                 let currentMode = speechRecognitionButton.dataset.mode || this.settings.speech_recognition_mode || 'route';
+
+                // В диктанте оффлайн: режим фиксированный (локально)
+                if (isDictationPanel && isOffline) {
+                    return;
+                }
 
                 // В диктанте: если уже локальный режим, не даем переключиться обратно (только локально)
                 if (isDictationPanel && currentMode === 'route-off') {
@@ -927,7 +962,6 @@ class AudioSettingsPanel {
                     }
                     this._updateSetting('repeats', 0);
                     this.triggerChange();
-                    this._showAutoCloseModal('У вас нет ни одной локальной модели распознания текста — сходите в профиль пользователя', 3000);
                     return;
                 }
                 

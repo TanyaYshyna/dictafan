@@ -27,6 +27,66 @@ class WhisperModelManager {
         this.checkTransformersJS();
     }
 
+    _getModelKey(languageCode, modelSize) {
+        return `whisper_model_${languageCode}_${modelSize}`;
+    }
+
+    _getAssetsKey(languageCode, modelSize) {
+        return `whisper_model_assets_${languageCode}_${modelSize}`;
+    }
+
+    _normalizeExternalAssetUrl(rawUrl) {
+        try {
+            if (!rawUrl || typeof rawUrl !== 'string') return rawUrl;
+            const u = new URL(rawUrl, window.location.origin);
+            // For HF/CDN assets ignore query params, same logic as SW.
+            if (u.hostname === 'huggingface.co' || u.hostname === 'cdn.jsdelivr.net') {
+                return `${u.origin}${u.pathname}`;
+            }
+            return u.toString();
+        } catch (e) {
+            return rawUrl;
+        }
+    }
+
+    async _isUrlInAnyCache(url) {
+        try {
+            const cacheNames = await caches.keys();
+            for (const name of cacheNames) {
+                try {
+                    const cache = await caches.open(name);
+                    // Try exact, then ignoreSearch fallback.
+                    const exact = await cache.match(url);
+                    if (exact) return true;
+                    const ignoreSearch = await cache.match(url, { ignoreSearch: true });
+                    if (ignoreSearch) return true;
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+        return false;
+    }
+
+    async _areModelAssetsCached(languageCode, modelSize) {
+        try {
+            const assetsKey = this._getAssetsKey(languageCode, modelSize);
+            const raw = localStorage.getItem(assetsKey);
+            const list = raw ? JSON.parse(raw) : null;
+            const urls = Array.isArray(list) ? list.filter(Boolean) : [];
+            if (!urls.length) return false;
+
+            for (const u of urls) {
+                const normalized = this._normalizeExternalAssetUrl(u);
+                const ok = await this._isUrlInAnyCache(normalized);
+                if (!ok) return false;
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async _blobToAudioBuffer(blob) {
         const AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) {
@@ -135,7 +195,7 @@ class WhisperModelManager {
      * Проверяет, загружена ли модель для языка
      */
     async isModelCached(languageCode, modelSize = 'base') {
-        const modelKey = `whisper_model_${languageCode}_${modelSize}`;
+        const modelKey = this._getModelKey(languageCode, modelSize);
         
         // Проверяем в памяти
         const storedModel = window.WhisperModels?.get?.(modelKey);
@@ -145,14 +205,31 @@ class WhisperModelManager {
         
         // Проверяем в localStorage
         const modelStatus = localStorage.getItem(modelKey);
-        return modelStatus === 'downloaded' || modelStatus === 'ready';
+        const markedDownloaded = modelStatus === 'downloaded' || modelStatus === 'ready';
+        if (!markedDownloaded) return false;
+
+        // Если мы оффлайн — модель считается доступной только если ассеты реально лежат в Cache Storage.
+        const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+        if (isOffline) {
+            const assetsOk = await this._areModelAssetsCached(languageCode, modelSize);
+            if (!assetsOk) {
+                // Сбрасываем устаревший флаг, чтобы UI не думал что модель доступна.
+                try {
+                    localStorage.removeItem(modelKey);
+                } catch (e) {
+                }
+                return false;
+            }
+        }
+
+        return true;
     }
     
     /**
      * Загружает модель для языка через Transformers.js
      */
     async loadLanguageModel(languageCode, modelSize = 'base', onProgress = null) {
-        const modelKey = `whisper_model_${languageCode}_${modelSize}`;
+        const modelKey = this._getModelKey(languageCode, modelSize);
         
         // Проверяем, есть ли уже модель
         if (await this.isModelCached(languageCode, modelSize)) {
@@ -168,6 +245,14 @@ class WhisperModelManager {
             throw new Error('Библиотека Transformers.js не загружена. Проверьте подключение скрипта.');
         }
         
+        const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+        if (isOffline) {
+            const assetsOk = await this._areModelAssetsCached(languageCode, modelSize);
+            if (!assetsOk) {
+                throw new Error('Оффлайн режим: локальная Whisper модель не найдена в кеше. Загрузите модель онлайн в профиле.');
+            }
+        }
+
         console.log(`🚀 Начинаем загрузку модели ${languageCode} (${modelSize}) через Transformers.js...`);
         
         try {
@@ -176,6 +261,8 @@ class WhisperModelManager {
             
             console.log(`📦 Загружаем модель: ${modelName}`);
             
+            const seenAssetUrls = new Set();
+
             // Функция для обновления прогресса
             const progressCallback = (progress) => {
                 if (onProgress) {
@@ -200,6 +287,21 @@ class WhisperModelManager {
                         file: progress.file
                     });
                 }
+
+                // Сохраняем URL/пути запрошенных файлов модели, чтобы потом детерминированно
+                // проверять наличие ассетов в Cache Storage для оффлайн режима.
+                try {
+                    const f = progress && progress.file ? String(progress.file) : '';
+                    if (f) {
+                        // Transformers.js иногда отдает относительные пути; иногда полные URL.
+                        // Нам важен финальный URL запроса (для SW cache).
+                        const resolved = this._normalizeExternalAssetUrl(f);
+                        if (resolved && (resolved.includes('huggingface.co') || resolved.includes('cdn.jsdelivr.net'))) {
+                            seenAssetUrls.add(resolved);
+                        }
+                    }
+                } catch (e) {
+                }
             };
             
             // Загружаем модель через pipeline
@@ -212,6 +314,16 @@ class WhisperModelManager {
             );
             
             console.log(`✅ Модель ${modelName} успешно загружена`);
+
+            // Persist asset list for offline verification.
+            try {
+                const assetsKey = this._getAssetsKey(languageCode, modelSize);
+                const arr = Array.from(seenAssetUrls);
+                if (arr.length) {
+                    localStorage.setItem(assetsKey, JSON.stringify(arr));
+                }
+            } catch (e) {
+            }
             
             // Сохраняем модель
             const modelInfo = {

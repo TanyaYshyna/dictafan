@@ -46,6 +46,11 @@ function normalizeCacheKey(requestOrUrl) {
     const url = new URL(raw);
     const path = url.pathname;
 
+    // Cache external ASR assets (Transformers.js + Whisper model files) ignoring query params.
+    if (url.hostname === 'huggingface.co' || url.hostname === 'cdn.jsdelivr.net') {
+      return `${url.origin}${path}`;
+    }
+
     // For app shell + static assets, ignore cache-busting query params like ?v=...
     if (path === '/' || path.startsWith('/dictation/') || path.startsWith('/static/')) {
       return `${url.origin}${path}`;
@@ -120,6 +125,10 @@ function shouldHandleRequest(requestUrl) {
   try {
     const url = new URL(requestUrl);
     const path = url.pathname;
+
+    // Allow offline ASR assets from external origins.
+    if (url.hostname === 'huggingface.co') return true;
+    if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/audio/')) return true;
     if (path.startsWith('/api/temp-audio/')) return true;

@@ -257,6 +257,7 @@ class LanguageSelector {
 
         // Проверяем, есть ли хотя бы один тип моделей
         const hasWhisper = languageData.models.whisper && languageData.models.whisper.length > 0;
+        const hasTransformerAsr = languageData.models.transformer_asr && languageData.models.transformer_asr.length > 0;
 
         // Добавляем опцию "без модели" в начало списка, если есть модели
         if (hasWhisper) {
@@ -279,6 +280,20 @@ class LanguageSelector {
                 size: model.size,
                 recommended: model.recommended,
                 displayText: `whisper: ${model.name} ${model.quality ? model.quality + ' ' : ''}${model.size}`,
+                isNone: false
+            })));
+        }
+
+        // Transformer ASR модели
+        if (hasTransformerAsr) {
+            items.push(...languageData.models.transformer_asr.map(model => ({
+                id: model.id,
+                type: 'transformer_asr',
+                name: model.name,
+                quality: model.quality,
+                size: model.size,
+                recommended: model.recommended,
+                displayText: `asr: ${model.name} ${model.quality ? model.quality + ' ' : ''}${model.size}`,
                 isNone: false
             })));
         }
@@ -371,7 +386,7 @@ class LanguageSelector {
                 ${models.map(model => {
             const isActive = this.isModelActive(model.langCode, model.modelId, model.modelType);
             const languageName = this.getLanguageName(model.langCode);
-            const modelTypeName = 'Whisper';
+            const modelTypeName = model.modelType === 'whisper' ? 'Whisper' : (model.modelType === 'transformer_asr' ? 'ASR' : model.modelType);
 
             return `
                     <div class="model-list-item ${isActive ? 'active-model' : ''}" 
@@ -440,6 +455,23 @@ class LanguageSelector {
                         }
                     });
                 }
+
+                // Transformer ASR модели
+                if (data.models.transformer_asr) {
+                    data.models.transformer_asr.forEach(model => {
+                        if (this.isModelDownloadedWithFallback(langCode, model.id, 'transformer_asr')) {
+                            models.push({
+                                langCode,
+                                modelId: model.id,
+                                modelType: 'transformer_asr',
+                                modelName: model.name,
+                                quality: model.quality,
+                                size: model.size,
+                                isActive: this.isModelActive(langCode, model.id, 'transformer_asr')
+                            });
+                        }
+                    });
+                }
             }
         });
 
@@ -476,7 +508,40 @@ class LanguageSelector {
             }
         }
 
+        // Проверяем выбранную Transformer ASR модель
+        if (languageData.models.transformer_asr && languageData.models.transformer_asr.length > 0) {
+            const selectedAsr = this.getSelectedModelWithFallback(langCode, 'transformer_asr');
+            if (selectedAsr && selectedAsr !== 'none' && selectedAsr !== '') {
+                const model = languageData.models.transformer_asr.find(m => m.id === selectedAsr);
+                if (model) {
+                    selectedModels.push(`asr: ${model.name}`);
+                }
+            }
+        }
+
         return selectedModels.length > 0 ? selectedModels.join(' + ') : 'без модели';
+    }
+
+    setSelectedModelGeneric(langCode, modelId, modelType) {
+        const currentKey = `selected_model_${langCode}_${modelType}`;
+        if (!modelId || modelId === 'none') {
+            localStorage.removeItem(currentKey);
+        } else {
+            localStorage.setItem(currentKey, modelId);
+        }
+
+        if (window.ModelManager && typeof window.ModelManager.setSelectedModel === 'function') {
+            window.ModelManager.setSelectedModel(langCode, modelId || null, modelType);
+        }
+
+        console.log(`⭐ Выбрана модель: ${langCode}/${modelType}/${modelId || 'none'}`);
+        this.updateModelSelectionUI(langCode);
+
+        // Обновляем таблицу моделей (правая панель) сразу
+        this.updateModelsTable();
+        this.updateStorageInfo();
+
+        this.syncOtherPanel(langCode);
     }
 
     // ОБНОВЛЕННЫЙ МЕТОД: расчет использования памяти (правильный)
@@ -508,6 +573,20 @@ class LanguageSelector {
 
                         // Проверяем, скачана ли модель
                         if (this.isModelDownloadedWithFallback(code, model.id, 'whisper')) {
+                            downloadedCount++;
+                            totalDownloadedSizeMB += sizeMB;
+                        }
+                    });
+                }
+
+                // Transformer ASR модели
+                if (data.models.transformer_asr) {
+                    data.models.transformer_asr.forEach(model => {
+                        const sizeMB = this.parseSizeToMB(model.size);
+                        totalAvailableModels++;
+                        totalAvailableSizeMB += sizeMB;
+
+                        if (this.isModelDownloadedWithFallback(code, model.id, 'transformer_asr')) {
                             downloadedCount++;
                             totalDownloadedSizeMB += sizeMB;
                         }
@@ -597,14 +676,18 @@ class LanguageSelector {
     }
 
     // ДОБАВЬТЕ НОВЫЙ МЕТОД:
-    getTotalModelCount() {
-        const learningLangs = this.options.learningLanguages;
+    countAvailableModels() {
         let count = 0;
+        const learningLangs = this.options.learningLanguages;
 
         Object.entries(this.languageData).forEach(([code, data]) => {
             if (learningLangs.includes(code) && data.models) {
                 if (data.models.whisper) {
                     count += data.models.whisper.length;
+                }
+
+                if (data.models.transformer_asr) {
+                    count += data.models.transformer_asr.length;
                 }
             }
         });
@@ -1416,6 +1499,39 @@ class LanguageSelector {
             updateProgress(0);
 
             try {
+                // Обеспечиваем, что модель реально скачана (Transformers.js + WhisperModelManager)
+                // Это нужно для оффлайн-распознавания в диктанте.
+                const ensureTransformersReady = async () => {
+                    if (typeof window.pipeline !== 'undefined') return true;
+                    await new Promise((resolve) => {
+                        let done = false;
+                        const finish = () => {
+                            if (done) return;
+                            done = true;
+                            resolve();
+                        };
+                        try {
+                            window.addEventListener('transformers-ready', finish, { once: true });
+                        } catch (e) {
+                        }
+                        setTimeout(finish, 6000);
+                    });
+                    return typeof window.pipeline !== 'undefined';
+                };
+
+                if (modelType === 'whisper') {
+                    await ensureTransformersReady();
+                    if (window.WhisperModelManager) {
+                        const mm = new window.WhisperModelManager();
+                        await mm.loadLanguageModel(langCode, modelId, (p) => {
+                            const percent = p && p.progress !== undefined ? Math.round(p.progress * 100) : null;
+                            if (percent !== null && isFinite(percent)) {
+                                updateProgress(Math.max(0, Math.min(100, percent)));
+                            }
+                        });
+                    }
+                }
+
                 // Пробуем загрузить через ModelManager
                 if (window.ModelManager && typeof window.ModelManager.downloadModel === 'function') {
                     console.log(`🔄 Начинаем загрузку через ModelManager: ${langCode}/${modelType}/${modelId}`);
@@ -1539,10 +1655,12 @@ class LanguageSelector {
             this.removeModelState(langCode, modelId, modelType);
 
             // Если удалили активную модель — снимаем выбор (иначе галочка/селект останутся)
-            if (modelType === 'whisper') {
-                const selectedWhisper = this.getSelectedModelWithFallback(langCode, 'whisper');
-                if (String(selectedWhisper) === String(modelId)) {
+            const selectedValue = this.getSelectedModelWithFallback(langCode, modelType);
+            if (String(selectedValue) === String(modelId)) {
+                if (modelType === 'whisper') {
                     this.setSelectedWhisperModel(langCode, null);
+                } else {
+                    this.setSelectedModelGeneric(langCode, null, modelType);
                 }
             }
 
@@ -1770,7 +1888,11 @@ class LanguageSelector {
         }
 
         // Если модель уже загружена - выбираем её
-        this.setSelectedWhisperModel(langCode, modelId);
+        if (modelType === 'whisper') {
+            this.setSelectedWhisperModel(langCode, modelId);
+        } else {
+            this.setSelectedModelGeneric(langCode, modelId, modelType);
+        }
     }
 
     setSelectedWhisperModel(langCode, modelId) {
@@ -1789,6 +1911,10 @@ class LanguageSelector {
         console.log(`⭐ Выбрана whisper модель: ${langCode}/whisper/${modelId || 'none'}`);
 
         this.updateModelSelectionUI(langCode);
+
+        // Обновляем таблицу моделей (правая панель) сразу, чтобы галочка активной модели появилась без перезагрузки
+        this.updateModelsTable();
+        this.updateStorageInfo();
 
         this.syncOtherPanel(langCode);
     }

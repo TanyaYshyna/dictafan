@@ -6013,6 +6013,28 @@ async function loadSentencesFromIndexedDb() {
         }
 
         allSentences = sentences;
+        // Если диктант был закеширован на другом origin (например staging), в IDB могли
+        // сохраниться абсолютные URL. Для оффлайн и для других окружений нормализуем их
+        // до относительных /api/audio/... чтобы запросы проходили через текущий origin + SW cache.
+        const audioFieldsToNormalize = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+        const normalizeAudioUrl = (raw) => {
+            if (!raw || typeof raw !== 'string') return raw;
+            if (!raw.startsWith('http://') && !raw.startsWith('https://')) return raw;
+            try {
+                const u = new URL(raw);
+                if (u.pathname && (u.pathname.startsWith('/api/audio/') || u.pathname.startsWith('/api/temp-audio/'))) {
+                    return `${u.pathname}${u.search || ''}`;
+                }
+            } catch (e) {
+            }
+            return raw;
+        };
+        allSentences.forEach(s => {
+            if (!s || typeof s !== 'object') return;
+            for (const f of audioFieldsToNormalize) {
+                if (s[f]) s[f] = normalizeAudioUrl(s[f]);
+            }
+        });
         allSentences.forEach(s => {
             if (s.number_of_perfect === undefined) s.number_of_perfect = 0;
             if (s.number_of_corrected === undefined) s.number_of_corrected = 0;
@@ -9021,24 +9043,42 @@ function initAudioSettingsModal() {
         const header = audioSettingsModal.querySelector('.modal-header');
         if (!header) return;
 
+        // Никогда не блокируем крестик закрытия: иначе модалка может выглядеть как «залипшая».
+        if (closeAudioSettingsModal) {
+            closeAudioSettingsModal.disabled = false;
+            closeAudioSettingsModal.style.pointerEvents = 'auto';
+        }
+
         let indicator = header.querySelector('#audioSettingsBusyIndicator');
         if (!indicator) {
             indicator = document.createElement('span');
             indicator.id = 'audioSettingsBusyIndicator';
             indicator.setAttribute('aria-hidden', 'true');
             indicator.style.display = 'inline-block';
-            indicator.style.width = '10px';
-            indicator.style.height = '10px';
+            indicator.style.width = '12px';
+            indicator.style.height = '12px';
             indicator.style.borderRadius = '50%';
-            indicator.style.background = '#f59e0b';
+            indicator.style.border = '2px solid #f59e0b';
+            indicator.style.borderTopColor = 'transparent';
+            indicator.style.boxSizing = 'border-box';
+            indicator.style.animation = 'dictafanAudioSettingsSpin 0.8s linear infinite';
             indicator.style.marginLeft = '10px';
             indicator.style.opacity = '0';
             indicator.style.transition = 'opacity 120ms ease';
             indicator.style.flex = '0 0 auto';
 
+            if (!document.getElementById('dictafan-audio-settings-spin-style')) {
+                const style = document.createElement('style');
+                style.id = 'dictafan-audio-settings-spin-style';
+                style.textContent = `@keyframes dictafanAudioSettingsSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+                document.head.appendChild(style);
+            }
+
             const title = header.querySelector('h2');
-            if (title && title.parentNode) {
-                title.parentNode.insertBefore(indicator, title.nextSibling);
+            if (title) {
+                // Keep indicator visually bound to the title; otherwise with justify-content: space-between
+                // it can end up in the middle of the header and look like it disappeared.
+                title.appendChild(indicator);
             } else {
                 header.appendChild(indicator);
             }
