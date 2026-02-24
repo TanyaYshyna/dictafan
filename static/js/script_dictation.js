@@ -6108,6 +6108,24 @@ async function initializeDictation() {
     const hasDraft = await loadAndApplyDraft();
     hasDraftLoaded = hasDraft; // Сохраняем флаг в глобальной переменной для использования в startGame()
 
+    // После загрузки профиля + возможного черновика синхронизируем модалку настроек,
+    // чтобы она не показывала дефолты, если реальные настройки пришли позже.
+    try {
+        if (audioSettingsModalPanel) {
+            audioSettingsModalPanel.setSettings({
+                start: playSequenceStart,
+                typo: playSequenceTypo,
+                success: playSequenceSuccess,
+                repeats: REQUIRED_PASSED_COUNT,
+                required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
+                without_entering_text: window.audioSettingsWithoutEnteringText || false,
+                show_text: window.audioSettingsShowText || false,
+                speech_recognition_mode: speechRecognitionMode
+            });
+        }
+    } catch (e) {
+    }
+
     // Всегда включаем периодическое автосохранение: даже если черновика не было,
     // прогресс должен сохраняться локально без Ctrl+S.
     setSaveButtonStatus('clean');
@@ -9190,9 +9208,10 @@ function initAudioSettingsModal() {
     });
     audioSettingsPanel = audioSettingsModalPanel;
 
-    // Загружаем настройки из данных пользователя и инициализируем панель один раз
-    loadAudioSettingsFromUser().then(() => {
-        if (!audioSettingsModalPanel) return;
+    // Инициализируем панель сразу текущими значениями.
+    // Актуализация делается каждый раз при открытии модалки (openModal),
+    // чтобы учесть настройки из черновика/профиля, которые могли прийти позже.
+    try {
         audioSettingsModalPanel.setSettings({
             start: playSequenceStart,
             typo: playSequenceTypo,
@@ -9204,7 +9223,8 @@ function initAudioSettingsModal() {
             speech_recognition_mode: speechRecognitionMode
         });
         audioSettingsModalPanel.init();
-    });
+    } catch (e) {
+    }
 
     const openModal = (sourceLabel = 'unknown', event = null) => {
         try {
@@ -9230,6 +9250,24 @@ function initAudioSettingsModal() {
         if (!audioSettingsModal) {
             console.warn('⚠️ [AudioSettingsModal] openModal called but audioSettingsModal is missing');
             return;
+        }
+
+        // Перед показом модалки всегда синхронизируем UI с текущими глобальными настройками
+        // (они могли быть обновлены из профиля или из черновика после первой инициализации).
+        try {
+            if (audioSettingsModalPanel) {
+                audioSettingsModalPanel.setSettings({
+                    start: playSequenceStart,
+                    typo: playSequenceTypo,
+                    success: playSequenceSuccess,
+                    repeats: REQUIRED_PASSED_COUNT,
+                    required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
+                    without_entering_text: window.audioSettingsWithoutEnteringText || false,
+                    show_text: window.audioSettingsShowText || false,
+                    speech_recognition_mode: speechRecognitionMode
+                });
+            }
+        } catch (e) {
         }
 
         audioSettingsModal.style.display = 'flex';
