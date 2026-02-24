@@ -861,10 +861,13 @@ async function saveProfile(options = {}) {
                 try {
                     const settings = JSON.parse(updatedUser.settings_json);
                     const audio = settings.audio || {};
+                    const hasStart = Object.prototype.hasOwnProperty.call(audio, 'start');
+                    const hasTypo = Object.prototype.hasOwnProperty.call(audio, 'typo');
+                    const hasSuccess = Object.prototype.hasOwnProperty.call(audio, 'success');
                     settingsToApply = {
-                        start: audio.start || originalData.audio_start,
-                        typo: audio.typo || originalData.audio_typo,
-                        success: audio.success || originalData.audio_success,
+                        start: (hasStart && audio.start !== undefined && audio.start !== null) ? audio.start : originalData.audio_start,
+                        typo: (hasTypo && audio.typo !== undefined && audio.typo !== null) ? audio.typo : originalData.audio_typo,
+                        success: (hasSuccess && audio.success !== undefined && audio.success !== null) ? audio.success : originalData.audio_success,
                         repeats: audio.repeats !== undefined ? audio.repeats : originalData.audio_repeats,
                         without_entering_text: Boolean(audio.without_entering_text),
                         show_text: Boolean(audio.show_text),

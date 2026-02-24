@@ -481,7 +481,7 @@ class AudioSettingsPanel {
                                         <td class="audio-settings-label">
                                             <label>
                                                 <i data-lucide="star"></i>
-                                                =
+                                                <span style="display:inline-flex; align-items:center; font-size: 18px; line-height: 1;">=</span>
                                                 <i data-lucide="star-half"></i>
                                             </label>
                                         </td>
@@ -489,10 +489,11 @@ class AudioSettingsPanel {
                                             <input type="number"
                                                    id="${prefix}requiredPassedStarHalfInput"
                                                    class="play-sequence-input"
-                                                   min="1"
-                                                   max="10"
+                                                   min="3"
+                                                   max="9"
+                                                   style="width: 56px;"
                                                    value="${this.settings.required_passed_star_half}"
-                                                   title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 1 до 10)">
+                                                   title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
                                         </td>
                                     </tr>
                                     <tr>
@@ -644,10 +645,10 @@ class AudioSettingsPanel {
                         <input type="number"
                                id="${prefix}requiredPassedStarHalfInput"
                                class="play-sequence-input required-passed-count-input"
-                               min="1"
-                               max="10"
+                               min="3"
+                               max="9"
                                value="${this.settings.required_passed_star_half}"
-                               title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 1 до 10)">
+                               title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
                         <i data-lucide="star-half" class="required-passed-star-half"></i>
                     </div>
                 </div>
@@ -804,7 +805,7 @@ class AudioSettingsPanel {
             const clampStarHalf = (raw) => {
                 const value = parseInt(raw, 10);
                 if (isNaN(value)) return this.defaults.required_passed_star_half;
-                return Math.min(10, Math.max(1, value));
+                return Math.min(9, Math.max(3, value));
             };
 
             const applyStarHalfValue = (raw) => {
