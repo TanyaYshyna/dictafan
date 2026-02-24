@@ -37,7 +37,8 @@
     "name": "Wav2Vec2 Base 960h",
     "size": "200 MB",
     "quality": "75%",
-    "recommended": true
+    "recommended": true,
+    "visible": false
   },
   {
     "modelKey": "transformer_asr:Xenova/wav2vec2-bert-CV16-en",
@@ -47,7 +48,8 @@
     "name": "Wav2Vec2-BERT CV16 (EN)",
     "size": "400 MB",
     "quality": "85%",
-    "recommended": false
+    "recommended": false,
+    "visible": false
   },
   {
     "modelKey": "transformer_asr:Xenova/mms-1b-fl102",
@@ -57,7 +59,8 @@
     "name": "MMS 1B FL102",
     "size": "1.2 GB",
     "quality": "80%",
-    "recommended": true
+    "recommended": true,
+    "visible": false
   },
   {
     "modelKey": "transformer_asr:Xenova/mms-1b-all",
@@ -67,6 +70,7 @@
     "name": "MMS 1B All",
     "size": "1.6 GB",
     "quality": "85%",
-    "recommended": false
+    "recommended": false,
+    "visible": false
   }
 ]

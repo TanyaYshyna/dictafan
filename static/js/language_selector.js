@@ -130,7 +130,12 @@ class LanguageSelector {
     _collectGlobalModels() {
         const lm = window.LanguageManager;
         const raw = lm && typeof lm.getModelsData === 'function' ? lm.getModelsData() : [];
-        const models = Array.isArray(raw) ? raw.filter(Boolean).map(m => ({ ...m })) : [];
+        const models = Array.isArray(raw)
+            ? raw
+                .filter(Boolean)
+                .filter(m => !(m && Object.prototype.hasOwnProperty.call(m, 'visible') && m.visible === false))
+                .map(m => ({ ...m }))
+            : [];
 
         models.sort((a, b) => {
             const tA = a.modelType === 'whisper' ? 0 : 1;

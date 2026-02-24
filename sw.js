@@ -268,6 +268,15 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.endsWith('.map')) {
+      event.respondWith(new Response('', { status: 204 }));
+      return;
+    }
+  } catch (e) {
+  }
+
   if (!shouldHandleRequest(request.url)) return;
 
   // For Range requests (common for <audio>), return the original network Range response,
