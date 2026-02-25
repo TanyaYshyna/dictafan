@@ -9,6 +9,78 @@ let profileTestMediaStream = null;
 let profileTestChunks = [];
 let profileTestIsRecording = false;
 
+async function swRequest(action, payload = {}) {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+        throw new Error('Service Worker не активен');
+    }
+
+    const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const timeoutMs = Math.max(1000, Number(payload.timeoutMs) || 15000);
+
+    return await new Promise((resolve, reject) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => {
+            try { channel.port1.onmessage = null; } catch (e) {}
+            reject(new Error('sw_timeout'));
+        }, timeoutMs);
+
+        channel.port1.onmessage = (event) => {
+            const data = event.data || {};
+            if (data.requestId !== requestId) return;
+            clearTimeout(timer);
+            if (data && data.success) {
+                resolve(data);
+            } else {
+                reject(new Error(data && data.error ? data.error : 'sw_error'));
+            }
+        };
+
+        try {
+            navigator.serviceWorker.controller.postMessage({ action, requestId, ...payload }, [channel.port2]);
+        } catch (e) {
+            clearTimeout(timer);
+            reject(e);
+        }
+    });
+}
+
+async function checkAppCacheRevision() {
+    try {
+        const res = await fetch('/api/app-cache-revision', { method: 'GET' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        if (!data || !data.success || !data.revision) return;
+
+        const serverRev = String(data.revision);
+        const localRev = localStorage.getItem('app_cache_revision');
+
+        if (!localRev) {
+            localStorage.setItem('app_cache_revision', serverRev);
+            return;
+        }
+
+        if (localRev === serverRev) return;
+
+        try {
+            if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                await swRequest('cacheClearAppShell', { timeoutMs: 60000 });
+            }
+        } catch (e) {
+        }
+
+        localStorage.setItem('app_cache_revision', serverRev);
+        // Guard against reload loops
+        try {
+            if (sessionStorage.getItem('profile_forced_reload_done') === serverRev) return;
+            sessionStorage.setItem('profile_forced_reload_done', serverRev);
+        } catch (e) {
+        }
+        location.reload();
+    } catch (e) {
+        // ignore
+    }
+}
+
 function bindProfileTestRecording() {
     const btn = document.getElementById('profileTestRecordingBtn');
     const statusEl = document.getElementById('profileTestRecordingStatus');
@@ -184,6 +256,25 @@ let croppedImageBlob = null;
 // Инициализация при загрузке страницы - ТОЛЬКО ОДИН ОБРАБОТЧИК
 document.addEventListener('DOMContentLoaded', async function () {
     UM = new UserManager();
+
+    try {
+        // Same scheme as desk/dictation: force reload when app cache revision changes
+        checkAppCacheRevision().catch(() => { });
+
+        // If a new SW takes control, reload once to ensure we use updated assets
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                try {
+                    const key = 'profile_controllerchange_reload';
+                    if (sessionStorage.getItem(key) === '1') return;
+                    sessionStorage.setItem(key, '1');
+                } catch (e) {
+                }
+                location.reload();
+            });
+        }
+    } catch (e) {
+    }
 
     try {
         await UM.init();
