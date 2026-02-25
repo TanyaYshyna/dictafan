@@ -541,6 +541,20 @@ class AudioSettingsPanel {
                                             </div>
                                         </td>
                                     </tr>
+                                    <tr>
+                                        <td class="audio-settings-label">
+                                            <label>Тест записи:</label>
+                                        </td>
+                                        <td class="audio-settings-input">
+                                            <div style="display:flex; flex-direction:column; gap:8px;">
+                                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                                    <button type="button" id="profileTestRecordingBtn" class="button-color-yellow" style="height: 34px; padding: 0 12px;">Записать</button>
+                                                    <span id="profileTestRecordingStatus" style="font-size: 12px; color: #666;"></span>
+                                                </div>
+                                                <textarea id="profileTestRecordingResult" rows="2" style="width: min(520px, 100%); resize: vertical;" placeholder="Распознанный текст появится тут" readonly></textarea>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 </table>
                             </div>
                         </td>

@@ -4,6 +4,178 @@ let originalData = {};
 let hasUnsavedChanges = false;
 let isSavingProfile = false;
 
+let profileTestRecorder = null;
+let profileTestMediaStream = null;
+let profileTestChunks = [];
+let profileTestIsRecording = false;
+
+function bindProfileTestRecording() {
+    const btn = document.getElementById('profileTestRecordingBtn');
+    const statusEl = document.getElementById('profileTestRecordingStatus');
+    const resultEl = document.getElementById('profileTestRecordingResult');
+    if (!btn || !statusEl || !resultEl) return;
+
+    const setStatus = (text, color = '#666') => {
+        statusEl.textContent = text || '';
+        statusEl.style.color = color;
+    };
+
+    const setResult = (text) => {
+        resultEl.value = text || '';
+    };
+
+    const getCurrentMode = () => {
+        try {
+            // Prefer current UI value from AudioSettingsPanel
+            if (audioSettingsPanel && typeof audioSettingsPanel.getSettings === 'function') {
+                const s = audioSettingsPanel.getSettings();
+                if (s && s.speech_recognition_mode) return s.speech_recognition_mode;
+            }
+        } catch (e) {
+        }
+        // Fallback to UM.userData
+        return UM && UM.userData && UM.userData.speech_recognition_mode ? UM.userData.speech_recognition_mode : 'route';
+    };
+
+    const stopAndCleanup = async () => {
+        try {
+            if (profileTestRecorder && profileTestRecorder.state !== 'inactive') {
+                profileTestRecorder.stop();
+            }
+        } catch (e) {
+        }
+        try {
+            if (profileTestMediaStream) {
+                profileTestMediaStream.getTracks().forEach(t => {
+                    try { t.stop(); } catch (e) {}
+                });
+            }
+        } catch (e) {
+        }
+        profileTestRecorder = null;
+        profileTestMediaStream = null;
+        profileTestChunks = [];
+        profileTestIsRecording = false;
+        btn.textContent = 'Записать';
+    };
+
+    btn.onclick = async () => {
+        const mode = getCurrentMode();
+
+        if (profileTestIsRecording) {
+            setStatus('Останавливаю…');
+            try {
+                if (profileTestRecorder && profileTestRecorder.state !== 'inactive') {
+                    profileTestRecorder.stop();
+                }
+            } catch (e) {
+                await stopAndCleanup();
+                setStatus('Не удалось остановить запись', '#b00020');
+            }
+            return;
+        }
+
+        if (mode !== 'route-off') {
+            setResult('');
+            setStatus('Для теста выбери режим «локально»', '#b00020');
+            return;
+        }
+
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            setStatus('Браузер не поддерживает запись с микрофона', '#b00020');
+            return;
+        }
+
+        setResult('');
+        setStatus('Запрашиваю доступ к микрофону…');
+
+        try {
+            profileTestMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+            setStatus('Нет доступа к микрофону', '#b00020');
+            return;
+        }
+
+        try {
+            profileTestChunks = [];
+            profileTestRecorder = new MediaRecorder(profileTestMediaStream);
+        } catch (e) {
+            await stopAndCleanup();
+            setStatus('MediaRecorder не поддерживается', '#b00020');
+            return;
+        }
+
+        profileTestRecorder.ondataavailable = (ev) => {
+            try {
+                if (ev && ev.data && ev.data.size > 0) {
+                    profileTestChunks.push(ev.data);
+                }
+            } catch (e) {
+            }
+        };
+
+        profileTestRecorder.onstop = async () => {
+            try {
+                profileTestIsRecording = false;
+                btn.textContent = 'Записать';
+
+                const blob = new Blob(profileTestChunks, { type: profileTestRecorder && profileTestRecorder.mimeType ? profileTestRecorder.mimeType : 'audio/webm' });
+                await stopAndCleanup();
+
+                if (!blob || blob.size === 0) {
+                    setStatus('Пустая запись', '#b00020');
+                    return;
+                }
+
+                if (!window.WhisperModelManager) {
+                    setStatus('WhisperModelManager не загружен', '#b00020');
+                    return;
+                }
+
+                const wm = new window.WhisperModelManager();
+                const lang = (originalData && originalData.current_learning) ? String(originalData.current_learning) : 'en';
+
+                // Determine selected size from model-centric selection in localStorage.
+                let size = 'base';
+                try {
+                    const mk = localStorage.getItem(`selected_asr_model_v2_${lang}`);
+                    if (mk && mk.includes('whisper-tiny')) size = 'tiny';
+                    if (mk && mk.includes('whisper-small')) size = 'small';
+                    if (mk && mk.includes('whisper-base')) size = 'base';
+                } catch (e) {
+                }
+
+                setStatus('Распознаю…');
+                const res = await wm.transcribe(blob, lang, size, null);
+                let text = '';
+                if (res && typeof res === 'object') {
+                    if (res.text) text = String(res.text).trim();
+                    else if (Array.isArray(res) && res[0] && res[0].text) text = String(res[0].text).trim();
+                } else if (typeof res === 'string') {
+                    text = res.trim();
+                }
+
+                setResult(text);
+                setStatus(text ? 'Готово' : 'Пустой результат', text ? '#1b7f3a' : '#b00020');
+            } catch (err) {
+                try { await stopAndCleanup(); } catch (e) {}
+                setResult('');
+                setStatus(err && err.message ? String(err.message) : 'Ошибка распознавания', '#b00020');
+            }
+        };
+
+        try {
+            profileTestIsRecording = true;
+            btn.textContent = 'Стоп';
+            setStatus('Идёт запись…');
+            profileTestRecorder.start();
+        } catch (e) {
+            await stopAndCleanup();
+            setStatus('Не удалось начать запись', '#b00020');
+        }
+    };
+}
+
 // Глобальные переменные для обрезки изображений
 let cropper = null;
 let croppedImageBlob = null;
@@ -22,7 +194,6 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.querySelector('.profile-container').style.display = 'none';
             return;
         }
-
         loadUserData();
         initializeLanguageSelector();
         initializeLanguageModelsSelector();
@@ -235,6 +406,14 @@ function initializeAudioSettings() {
         });
 
         audioSettingsPanel.init(userSettings);
+
+        // Bind test recording widget (rendered inside AudioSettingsPanel in user-settings mode)
+        setTimeout(() => {
+            try {
+                bindProfileTestRecording();
+            } catch (e) {
+            }
+        }, 0);
 
     } catch (error) {
         console.error('❌ Ошибка инициализации AudioSettingsPanel:', error);

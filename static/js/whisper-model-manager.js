@@ -77,7 +77,18 @@ class WhisperModelManager {
             const raw = localStorage.getItem(assetsKey);
             const list = raw ? JSON.parse(raw) : null;
             const urls = Array.isArray(list) ? list.filter(Boolean) : [];
-            if (!urls.length) return false;
+            if (!urls.length) {
+                // Heuristic fallback: Transformers.js progress callback may provide relative file names,
+                // so our persisted asset list might be empty. In this case, scan CacheStorage
+                // for any Whisper model assets.
+                const found = await this._findCachedWhisperAssetUrls(modelSize);
+                if (!found.length) return false;
+                try {
+                    localStorage.setItem(assetsKey, JSON.stringify(found));
+                } catch (e) {
+                }
+                return true;
+            }
 
             for (const u of urls) {
                 const normalized = this._normalizeExternalAssetUrl(u);
@@ -87,6 +98,53 @@ class WhisperModelManager {
             return true;
         } catch (e) {
             return false;
+        }
+    }
+
+    async _findCachedWhisperAssetUrls(modelSize) {
+        try {
+            const size = (modelSize || 'base').toString();
+            const modelName = this.modelNames[size] || this.modelNames.base;
+            const wantedNeedle = modelName.toLowerCase();
+
+            const out = [];
+            const cacheNames = await caches.keys();
+            for (const name of cacheNames) {
+                let cache;
+                try {
+                    cache = await caches.open(name);
+                } catch (e) {
+                    continue;
+                }
+
+                let keys = [];
+                try {
+                    keys = await cache.keys();
+                } catch (e) {
+                    keys = [];
+                }
+
+                for (const req of keys) {
+                    const url = (req && req.url) ? String(req.url) : '';
+                    const urlLower = url.toLowerCase();
+                    if (!urlLower) continue;
+                    if (!urlLower.includes(wantedNeedle)) continue;
+
+                    // Expect at least one heavy artifact to exist.
+                    if (
+                        urlLower.endsWith('.onnx') ||
+                        urlLower.endsWith('.bin') ||
+                        urlLower.endsWith('tokenizer.json') ||
+                        urlLower.endsWith('config.json')
+                    ) {
+                        out.push(this._normalizeExternalAssetUrl(url));
+                    }
+                }
+            }
+
+            return Array.from(new Set(out));
+        } catch (e) {
+            return [];
         }
     }
 
@@ -216,12 +274,9 @@ class WhisperModelManager {
         if (isOffline) {
             const assetsOk = await this._areModelAssetsCached(languageCode, modelSize);
             if (!assetsOk) {
-                // Сбрасываем устаревший флаг, чтобы UI не думал что модель доступна.
-                try {
-                    localStorage.removeItem(modelKey);
-                } catch (e) {
-                }
-                return false;
+                // CacheStorage may not contain the assets even if the browser HTTP cache does.
+                // Do not hard-fail here; we'll validate by attempting to load the pipeline.
+                return true;
             }
         }
 
@@ -252,7 +307,9 @@ class WhisperModelManager {
         if (isOffline) {
             const assetsOk = await this._areModelAssetsCached(languageCode, modelSize);
             if (!assetsOk) {
-                throw new Error('Оффлайн режим: локальная Whisper модель не найдена в кеше. Загрузите модель онлайн в профиле.');
+                // CacheStorage check can be a false negative (assets could live in HTTP cache).
+                // Proceed and let the actual model loading fail if assets are truly missing.
+                console.warn('⚠️ Whisper оффлайн: не нашли ассеты в CacheStorage, пробуем загрузить модель (возможно, ассеты в HTTP кеше).');
             }
         }
 
@@ -321,7 +378,10 @@ class WhisperModelManager {
             // Persist asset list for offline verification.
             try {
                 const assetsKey = this._getAssetsKey(languageCode, modelSize);
-                const arr = Array.from(seenAssetUrls);
+                let arr = Array.from(seenAssetUrls);
+                if (!arr.length) {
+                    arr = await this._findCachedWhisperAssetUrls(modelSize);
+                }
                 if (arr.length) {
                     localStorage.setItem(assetsKey, JSON.stringify(arr));
                 }
