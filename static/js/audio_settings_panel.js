@@ -482,18 +482,20 @@ class AudioSettingsPanel {
                                             <label>
                                                 <i data-lucide="star"></i>
                                                 <span style="display:inline-flex; align-items:center; font-size: 18px; line-height: 1;">=</span>
-                                                <i data-lucide="star-half"></i>
                                             </label>
                                         </td>
                                         <td class="audio-settings-input">
-                                            <input type="number"
-                                                   id="${prefix}requiredPassedStarHalfInput"
-                                                   class="play-sequence-input"
-                                                   min="3"
-                                                   max="9"
-                                                   style="width: 56px;"
-                                                   value="${this.settings.required_passed_star_half}"
-                                                   title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
+                                            <div style="display:inline-flex; align-items:center; gap:8px;">
+                                                <input type="number"
+                                                       id="${prefix}requiredPassedStarHalfInput"
+                                                       class="play-sequence-input"
+                                                       min="3"
+                                                       max="9"
+                                                       style="width: 56px;"
+                                                       value="${this.settings.required_passed_star_half}"
+                                                       title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
+                                                <i data-lucide="star-half"></i>
+                                            </div>
                                         </td>
                                     </tr>
                                     <tr>
