@@ -639,6 +639,10 @@ async function syncDraftIfOnline(force = false) {
 
 window.addEventListener('online', () => {
     syncDraftIfOnline(false).catch(() => {});
+    try {
+        updateRecognitionModeIcon();
+    } catch (e) {
+    }
 });
 
 // Legacy DOM <audio> elements were removed from HTML; keep placeholders null to avoid accidental use
@@ -1137,6 +1141,16 @@ function stripDisallowedChars(text) {
 }
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
 let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (только интернет), 'route-off' (только локально, только если модель загружена)
+
+function getEffectiveSpeechRecognitionMode() {
+    try {
+        if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+            return 'route-off';
+        }
+    } catch (e) {
+    }
+    return speechRecognitionMode;
+}
 let audioSettingsPanel = null;
 let audioSettingsModalPanel = null;  // Панель настроек в модальном окне
 
@@ -1161,10 +1175,11 @@ function initUnifiedSpeechRecognition() {
     const audioVisualizer = document.getElementById('audioVisualizer');
     
     // Определяем режим распознавания (только 'online' или 'offline')
+    const effectiveMode = getEffectiveSpeechRecognitionMode();
     let mode = 'online'; // по умолчанию онлайн
-    if (speechRecognitionMode === 'route-off') {
+    if (effectiveMode === 'route-off') {
         mode = 'offline';
-    } else if (speechRecognitionMode === 'route') {
+    } else if (effectiveMode === 'route') {
         mode = 'online';
     }
     
@@ -1251,7 +1266,7 @@ function initUnifiedSpeechRecognition() {
     
     unifiedSpeechRecognizer.callbacks.onProcessingStart = () => {
         // Показываем анимацию обработки для офлайн-режима
-        if (speechRecognitionMode === 'route-off' && userAudioAnswer) {
+        if (getEffectiveSpeechRecognitionMode() === 'route-off' && userAudioAnswer) {
             showWhisperProcessingAnimation();
         }
     };
@@ -1370,7 +1385,17 @@ function hasWhisperModel(langCode, modelSize = null) {
         if (isInStorage) return true;
     }
 
-    // Fallback #2: модель могла быть скачана через ModelManager/language_selector,
+    // Fallback #2: models-centric downloaded state (downloaded_models_v2 + selected_asr_model_v2_<lang>)
+    try {
+        const normalizedLang = normalizeWhisperLangCode(langCode);
+        const raw = localStorage.getItem('downloaded_models_v2');
+        const obj = raw ? JSON.parse(raw) : null;
+        const mk = localStorage.getItem(`selected_asr_model_v2_${normalizedLang}`);
+        if (obj && typeof obj === 'object' && mk && obj[mk]) return true;
+    } catch (e) {
+    }
+
+    // Fallback #3: модель могла быть скачана через ModelManager/language_selector,
     // где используется другая схема ключей (downloaded_models / model_<lang>_<type>_<id>)
     const normalizedLang = normalizeWhisperLangCode(langCode);
     const sizes = getWhisperSizeCandidates(langCode, modelSize);
@@ -4175,10 +4200,11 @@ async function startRecording() {
         }
         
         // Определяем режим для отображения сообщения пользователю
+        const effectiveMode = getEffectiveSpeechRecognitionMode();
         let mode = 'online'; // по умолчанию онлайн
-        if (speechRecognitionMode === 'route-off') {
+        if (effectiveMode === 'route-off') {
             mode = 'offline';
-        } else if (speechRecognitionMode === 'route') {
+        } else if (effectiveMode === 'route') {
             mode = 'online';
         }
 
@@ -4503,7 +4529,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     const currentLang = langCodeUrl?.split('-')[0] || 'en';
     const selectedSize = getSelectedWhisperModelSize(currentLang);
 
-    if (speechRecognitionMode === 'route-off') {
+    if (getEffectiveSpeechRecognitionMode() === 'route-off') {
         // Проверяем наличие модели (в памяти или в localStorage)
         const hasModel = hasWhisperModel(currentLang, selectedSize);
         console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
@@ -4806,10 +4832,12 @@ function updateRecognitionModeIcon() {
     let iconName = 'route';
     let title = 'Распознавание через интернет';
 
-    if (speechRecognitionMode === 'route') {
+    const effectiveMode = getEffectiveSpeechRecognitionMode();
+
+    if (effectiveMode === 'route') {
         iconName = 'route';
         title = 'Распознавание через интернет';
-    } else if (speechRecognitionMode === 'route-off') {
+    } else if (effectiveMode === 'route-off') {
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
         const selectedSize = getSelectedWhisperModelSize(currentLang);
         iconName = 'route-off';
@@ -4841,15 +4869,16 @@ function initSpeechRecognition() {
         return;
     }
 
-    console.log(`🔍 [initSpeechRecognition] Инициализация с режимом: ${speechRecognitionMode}`);
+    const effectiveMode = getEffectiveSpeechRecognitionMode();
+    console.log(`🔍 [initSpeechRecognition] Инициализация с режимом: ${effectiveMode}`);
 
-    if (speechRecognitionMode === 'route') {
+    if (effectiveMode === 'route') {
         // Только через интернет (Web Speech API - требует интернет)
         console.log('✅ [initSpeechRecognition] Режим: только через интернет (Web Speech API)');
         initWebSpeechRecognition();
         updateRecognitionModeIcon(); // Обновляем иконку
         return;
-    } else if (speechRecognitionMode === 'route-off') {
+    } else if (effectiveMode === 'route-off') {
         // "Только локально" - используем Whisper если модель загружена, иначе Web Speech API
         // ВАЖНО: Режим НЕ меняется автоматически - пользователь выбрал "локально"
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
@@ -4883,6 +4912,13 @@ function initSpeechRecognition() {
         return;
     }
 }
+
+window.addEventListener('offline', () => {
+    try {
+        updateRecognitionModeIcon();
+    } catch (e) {
+    }
+});
 
 function initWebSpeechRecognition() {
     // Инициализация Web Speech API

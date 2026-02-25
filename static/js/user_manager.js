@@ -9,6 +9,7 @@ class UserManager {
     this.userData = null;
     this.isInitialized = false;
     this._lastTokenValidationError = null;
+    this._userCacheKey = 'dictafan_user_cache_v1';
 
     // ✅ АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ
     this.init().then(() => {
@@ -42,10 +43,16 @@ class UserManager {
 
         if (this.userData) {
           // console.log('✅ Пользователь авторизован:', this.userData.username);
+          this._saveUserCache(this.userData);
           this.setupAuthenticatedUser(this.userData);
         } else {
           if (this.isLikelyOfflineError(this._lastTokenValidationError)) {
             console.log('⚠️ Оффлайн/нет сети: не можем провалидировать токен сейчас. Оставляем токен и не показываем модальное окно.');
+            const cached = this._loadUserCache();
+            if (cached) {
+              this.userData = cached;
+              this.setupAuthenticatedUser(this.userData);
+            }
           } else {
             console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
             localStorage.removeItem('jwt_token');
@@ -411,6 +418,8 @@ class UserManager {
         this.token = token;
         this.userData = data.user;
 
+        this._saveUserCache(this.userData);
+
         // Обновляем UI
         this.setupAuthenticatedUser(this.userData);
 
@@ -474,6 +483,8 @@ class UserManager {
         this.token = token;
         this.userData = data.user;
 
+        this._saveUserCache(this.userData);
+
         this.setupAuthenticatedUser(this.userData);
         
         // Скрываем модальное окно логина, если оно открыто
@@ -508,6 +519,7 @@ class UserManager {
       if (response.ok) {
         const updatedUser = await response.json();
         this.userData = updatedUser.user;
+        this._saveUserCache(this.userData);
         return updatedUser.user;
       } else {
         const errorData = await response.json();
@@ -516,6 +528,32 @@ class UserManager {
     } catch (error) {
       console.error('Ошибка обновления профиля:', error);
       throw error;
+    }
+  }
+
+  _saveUserCache(userData) {
+    try {
+      if (!userData || typeof userData !== 'object') return;
+      const payload = {
+        savedAt: Date.now(),
+        userData
+      };
+      localStorage.setItem(this._userCacheKey, JSON.stringify(payload));
+    } catch (e) {
+    }
+  }
+
+  _loadUserCache() {
+    try {
+      const raw = localStorage.getItem(this._userCacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const ud = parsed.userData;
+      if (!ud || typeof ud !== 'object') return null;
+      return ud;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -560,6 +598,7 @@ class UserManager {
             delete updatedUserData.password;
           }
           this.userData = updatedUserData;
+          this._saveUserCache(this.userData);
         }
         
         return result;

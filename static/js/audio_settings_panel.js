@@ -72,7 +72,9 @@ class AudioSettingsPanel {
         try {
             if (mk.startsWith('whisper:')) {
                 const size = this._parseWhisperSizeFromModelKey(mk);
-                if (size) return `Whisper ${size}`;
+                const repo = mk.slice('whisper:'.length);
+                if (size) return `Whisper ${size} (${repo})`;
+                if (repo) return `Whisper (${repo})`;
                 return 'Whisper';
             }
             const parts = mk.split(':');
@@ -570,7 +572,7 @@ class AudioSettingsPanel {
                 modelInfoText = 'Локальная модель не выбрана';
                 modelInfoColor = '#b00020';
             } else {
-                modelInfoText = `Whisper: ${selectedSize}`;
+                modelInfoText = `Whisper ${selectedSize}`;
                 modelInfoColor = '#666';
             }
         }
