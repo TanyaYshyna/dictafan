@@ -207,7 +207,7 @@ function bindProfileTestRecording() {
                 const wm = new window.WhisperModelManager();
                 const lang = (originalData && originalData.current_learning) ? String(originalData.current_learning) : 'en';
 
-                // Determine selected size from model-centric selection in localStorage.
+                // Determine model size from model-centric selection or downloaded markers.
                 let size = 'base';
                 try {
                     const mk = localStorage.getItem(`selected_asr_model_v2_${lang}`);
@@ -215,6 +215,40 @@ function bindProfileTestRecording() {
                     if (mk && mk.includes('whisper-small')) size = 'small';
                     if (mk && mk.includes('whisper-base')) size = 'base';
                 } catch (e) {
+                }
+
+                // If selected size isn't available, pick any downloaded one.
+                try {
+                    const preferred = [size, 'small', 'base', 'tiny'];
+                    let picked = null;
+                    for (const s of preferred) {
+                        const k = `whisper_model_${s}`;
+                        const v = localStorage.getItem(k);
+                        if (v === 'downloaded' || v === 'ready') {
+                            picked = s;
+                            break;
+                        }
+                    }
+                    if (picked) size = picked;
+                } catch (e) {
+                }
+
+                // Ensure model is loaded into memory (transcribe() requires recognizer in window.WhisperModels).
+                try {
+                    setStatus(`Загружаю модель Whisper (${size})…`);
+                    await wm.loadLanguageModel(lang, size, (p) => {
+                        try {
+                            if (!p) return;
+                            const percent = Math.round((Number(p.progress) || 0) * 100);
+                            if (isFinite(percent) && percent > 0 && percent < 100) {
+                                setStatus(`Загружаю модель Whisper (${size})… ${percent}%`);
+                            }
+                        } catch (e) {
+                        }
+                    });
+                } catch (e) {
+                    setStatus(e && e.message ? String(e.message) : 'Ошибка загрузки модели', '#b00020');
+                    return;
                 }
 
                 setStatus('Распознаю…');
