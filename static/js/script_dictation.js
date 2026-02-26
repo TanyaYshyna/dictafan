@@ -1142,6 +1142,112 @@ function stripDisallowedChars(text) {
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
 let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (только интернет), 'route-off' (только локально, только если модель загружена)
 
+let whisperPreloadInFlight = null;
+let whisperPreloadAfterTableDone = false;
+let whisperWasLocalOnBoot = false;
+
+function getWhisperManagerSingleton() {
+    if (!window.WhisperModelManager) return null;
+    if (!window.__dictafanWhisperModelManager) {
+        window.__dictafanWhisperModelManager = new window.WhisperModelManager();
+    }
+    return window.__dictafanWhisperModelManager;
+}
+
+function updateWhisperModelReadyBadge(state, details) {
+    const el = document.getElementById('whisperModelReadyBadge');
+    if (!el) return;
+
+    const effectiveMode = getEffectiveSpeechRecognitionMode();
+    if (effectiveMode !== 'route-off') {
+        el.style.display = 'none';
+        el.textContent = '';
+        return;
+    }
+
+    el.style.display = 'inline';
+    const text = (details || '').toString();
+    if (state === 'loading') {
+        el.textContent = text ? `${text} — идет загрузка модели…` : 'Идет загрузка модели…';
+        return;
+    }
+    if (state === 'ready') {
+        el.textContent = text ? `${text} — готова` : 'Модель готова';
+        return;
+    }
+    if (state === 'missing') {
+        el.textContent = text ? `${text} — нет модели` : 'Модель не загружена';
+        return;
+    }
+    el.textContent = text;
+}
+
+async function preloadWhisperModelIfNeeded(triggerLabel = 'unknown', force = false) {
+    try {
+        if (!force && getEffectiveSpeechRecognitionMode() !== 'route-off') {
+            updateWhisperModelReadyBadge(null, '');
+            return;
+        }
+
+        const currentLang = langCodeUrl?.split('-')[0]
+            || (typeof currentDictation !== 'undefined' && currentDictation?.language_original
+                ? currentDictation.language_original.split('-')[0]
+                : 'en');
+        const selectedSize = getSelectedWhisperModelSize(currentLang) || 'base';
+        const badgeLabel = `Whisper ${selectedSize}`;
+
+        if (!hasWhisperModel(currentLang, selectedSize)) {
+            updateWhisperModelReadyBadge('missing', badgeLabel);
+            return;
+        }
+
+        const modelKey = `whisper_model_${selectedSize}`;
+        const inMemory = window.WhisperModels && typeof window.WhisperModels.get === 'function'
+            ? window.WhisperModels.get(modelKey)
+            : null;
+        if (inMemory && inMemory.recognizer) {
+            updateWhisperModelReadyBadge('ready', badgeLabel);
+            return;
+        }
+
+        if (whisperPreloadInFlight) {
+            updateWhisperModelReadyBadge('loading', badgeLabel);
+            await whisperPreloadInFlight;
+            return;
+        }
+
+        const wm = getWhisperManagerSingleton();
+        if (!wm) {
+            updateWhisperModelReadyBadge('missing', badgeLabel);
+            return;
+        }
+
+        updateWhisperModelReadyBadge('loading', badgeLabel);
+        whisperPreloadInFlight = (async () => {
+            await wm.loadLanguageModel(currentLang, selectedSize, (p) => {
+                try {
+                    if (!p) return;
+                    const percent = Math.round((Number(p.progress) || 0) * 100);
+                    if (isFinite(percent) && percent > 0 && percent < 100) {
+                        updateWhisperModelReadyBadge('loading', `${badgeLabel} ${percent}%`);
+                    }
+                } catch (e) {
+                }
+            });
+        })();
+
+        await whisperPreloadInFlight;
+        updateWhisperModelReadyBadge('ready', badgeLabel);
+    } catch (e) {
+        try {
+            updateWhisperModelReadyBadge('missing', 'Whisper');
+        } catch (err) {
+        }
+    } finally {
+        whisperPreloadInFlight = null;
+    }
+}
+
 function getEffectiveSpeechRecognitionMode() {
     try {
         if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
@@ -2415,6 +2521,21 @@ function renderSelectionTable() {
     updateAllCheckboxState();
     initializeMixControl();
     initializeResetProgressButton();
+
+    // Start local Whisper preload only after the selection table is rendered (modal content visible).
+    // This avoids slowing down initial table load/render.
+    try {
+        if (!whisperPreloadAfterTableDone) {
+            whisperPreloadAfterTableDone = true;
+            window.setTimeout(() => {
+                try {
+                    preloadWhisperModelIfNeeded('after_selection_table', whisperWasLocalOnBoot).catch(() => { });
+                } catch (e) {
+                }
+            }, 0);
+        }
+    } catch (e) {
+    }
 }
 
 function handleSentenceTableClick(e) {
@@ -9051,6 +9172,15 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Загружаем настройки аудио из данных пользователя (асинхронно)
     await loadAudioSettingsFromUser();
 
+    // Remember the initial preference: if the user starts in local mode,
+    // we will preload once the sentence selection table is visible, even
+    // if they temporarily switch to internet while the table is loading.
+    try {
+        whisperWasLocalOnBoot = getEffectiveSpeechRecognitionMode() === 'route-off';
+    } catch (e) {
+        whisperWasLocalOnBoot = false;
+    }
+
     // Инициализируем модальное окно настроек аудио
     initAudioSettingsModal();
 });
@@ -9220,6 +9350,11 @@ function initAudioSettingsModal() {
                 // Обновляем иконку режима распознавания сразу после изменения режима
                 console.log(`🔄 [onSettingsChange] Вызываем updateRecognitionModeIcon() с режимом: ${speechRecognitionMode}`);
                 updateRecognitionModeIcon();
+
+                try {
+                    preloadWhisperModelIfNeeded('mode_switch').catch(() => { });
+                } catch (e) {
+                }
             }
 
             // Сохраняем настройки в БД

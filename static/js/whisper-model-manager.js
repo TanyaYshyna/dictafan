@@ -153,20 +153,15 @@ class WhisperModelManager {
         if (!AC) {
             throw new Error('AudioContext не поддерживается в этом браузере');
         }
-        const ac = new AC();
+        if (!window.__dictafanWhisperAudioContext) {
+            window.__dictafanWhisperAudioContext = new AC();
+        }
+        const ac = window.__dictafanWhisperAudioContext;
         try {
             const arrayBuffer = await blob.arrayBuffer();
             const audioBuffer = await ac.decodeAudioData(arrayBuffer);
-            try {
-                await ac.close();
-            } catch (e) {
-            }
             return audioBuffer;
         } catch (e) {
-            try {
-                await ac.close();
-            } catch (err) {
-            }
             throw e;
         }
     }
@@ -289,13 +284,23 @@ class WhisperModelManager {
     async loadLanguageModel(languageCode, modelSize = 'base', onProgress = null) {
         const modelKey = this._getModelKey(languageCode, modelSize);
         
-        // Проверяем, есть ли уже модель
-        if (await this.isModelCached(languageCode, modelSize)) {
-            console.log(`✅ Модель ${languageCode} (${modelSize}) уже загружена`);
+        // Проверяем, есть ли уже модель в памяти
+        try {
             const storedModel = window.WhisperModels?.get?.(modelKey);
             if (storedModel && storedModel.recognizer) {
+                console.log(`✅ Модель ${languageCode} (${modelSize}) уже загружена`);
                 return storedModel.recognizer;
             }
+        } catch (e) {
+        }
+
+        // Модель может быть скачана (кеш), но не инициализирована в текущей вкладке
+        try {
+            const cached = await this.isModelCached(languageCode, modelSize);
+            if (cached) {
+                console.log(`✅ Модель ${languageCode} (${modelSize}) найдена в кеше, инициализируем в памяти...`);
+            }
+        } catch (e) {
         }
         
         // Проверяем доступность Transformers.js

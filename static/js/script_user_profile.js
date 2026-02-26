@@ -8,6 +8,8 @@ let profileTestRecorder = null;
 let profileTestMediaStream = null;
 let profileTestChunks = [];
 let profileTestIsRecording = false;
+let profileTestTimerId = null;
+let profileTestAutoStopId = null;
 
 async function swRequest(action, payload = {}) {
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
@@ -111,6 +113,17 @@ function bindProfileTestRecording() {
 
     const stopAndCleanup = async () => {
         try {
+            if (profileTestTimerId) {
+                clearInterval(profileTestTimerId);
+                profileTestTimerId = null;
+            }
+            if (profileTestAutoStopId) {
+                clearTimeout(profileTestAutoStopId);
+                profileTestAutoStopId = null;
+            }
+        } catch (e) {
+        }
+        try {
             if (profileTestRecorder && profileTestRecorder.state !== 'inactive') {
                 profileTestRecorder.stop();
             }
@@ -204,7 +217,10 @@ function bindProfileTestRecording() {
                     return;
                 }
 
-                const wm = new window.WhisperModelManager();
+                if (!window.__dictafanWhisperModelManager) {
+                    window.__dictafanWhisperModelManager = new window.WhisperModelManager();
+                }
+                const wm = window.__dictafanWhisperModelManager;
                 const lang = (originalData && originalData.current_learning) ? String(originalData.current_learning) : 'en';
 
                 // Determine model size from model-centric selection or downloaded markers.
@@ -235,17 +251,21 @@ function bindProfileTestRecording() {
 
                 // Ensure model is loaded into memory (transcribe() requires recognizer in window.WhisperModels).
                 try {
-                    setStatus(`Загружаю модель Whisper (${size})…`);
-                    await wm.loadLanguageModel(lang, size, (p) => {
-                        try {
-                            if (!p) return;
-                            const percent = Math.round((Number(p.progress) || 0) * 100);
-                            if (isFinite(percent) && percent > 0 && percent < 100) {
-                                setStatus(`Загружаю модель Whisper (${size})… ${percent}%`);
+                    const key = (typeof wm._getModelKey === 'function') ? wm._getModelKey(lang, size) : `whisper_model_${size}`;
+                    const inMemory = window.WhisperModels && typeof window.WhisperModels.get === 'function' ? window.WhisperModels.get(key) : null;
+                    if (!inMemory || !inMemory.recognizer) {
+                        setStatus(`Загружаю модель Whisper (${size})…`);
+                        await wm.loadLanguageModel(lang, size, (p) => {
+                            try {
+                                if (!p) return;
+                                const percent = Math.round((Number(p.progress) || 0) * 100);
+                                if (isFinite(percent) && percent > 0 && percent < 100) {
+                                    setStatus(`Загружаю модель Whisper (${size})… ${percent}%`);
+                                }
+                            } catch (e) {
                             }
-                        } catch (e) {
-                        }
-                    });
+                        });
+                    }
                 } catch (e) {
                     setStatus(e && e.message ? String(e.message) : 'Ошибка загрузки модели', '#b00020');
                     return;
@@ -273,8 +293,30 @@ function bindProfileTestRecording() {
         try {
             profileTestIsRecording = true;
             btn.textContent = 'Стоп';
-            setStatus('Идёт запись…');
-            profileTestRecorder.start();
+            const startAt = Date.now();
+            const maxSeconds = 12;
+            setStatus('Идёт запись… 0с');
+
+            profileTestTimerId = setInterval(() => {
+                try {
+                    const s = Math.floor((Date.now() - startAt) / 1000);
+                    setStatus(`Идёт запись… ${s}с`);
+                } catch (e) {
+                }
+            }, 500);
+
+            profileTestAutoStopId = setTimeout(() => {
+                try {
+                    if (profileTestIsRecording && profileTestRecorder && profileTestRecorder.state !== 'inactive') {
+                        setStatus('Авто-стоп…');
+                        profileTestRecorder.stop();
+                    }
+                } catch (e) {
+                }
+            }, maxSeconds * 1000);
+
+            // timeslice makes dataavailable fire periodically (helps memory on long clips)
+            profileTestRecorder.start(1000);
         } catch (e) {
             await stopAndCleanup();
             setStatus('Не удалось начать запись', '#b00020');
