@@ -7,6 +7,7 @@ class AudioManagerClass {
         this.playheadAnimation = null;
         this._autoPlayEnabled = true;
         this._playToken = 0;
+        this._desiredStartTime = null;
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -26,6 +27,57 @@ class AudioManagerClass {
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
+
+        // If we're resuming the exact same audio element (paused), do NOT recreate it.
+        // Otherwise we lose currentTime and seeking becomes impossible.
+        if (isSameAudio && this.audio && this.audio.paused && !this.audio.ended) {
+            this.currentButton = button || null;
+            const currentAudio = this.audio;
+            const currentButton = this.currentButton;
+
+            if (this.currentButton) {
+                const originalState = this.currentButton.dataset.state || this.currentButton.dataset.originalState || 'ready';
+                const newState = (originalState === 'ready-shared' || originalState === 'playing-shared') ? 'playing-shared' : 'playing';
+                this.currentButton.dataset.state = newState;
+                if (typeof setButtonState === 'function') {
+                    setButtonState(this.currentButton, newState);
+                } else {
+                    this.updateButtonIcon(this.currentButton, "pause");
+                }
+            }
+
+            if (this.audioPlayerVisual && button === this.audioPlayerVisual.playButton) {
+                try {
+                    this.audioPlayerVisual.setAudioElement(currentAudio);
+                    this.audioPlayerVisual.setPlaying(true);
+                } catch (e) {
+                }
+            }
+
+            // Apply any deferred seek before resuming.
+            const desired = this._desiredStartTime;
+            if (desired !== null && desired !== undefined && isFinite(Number(desired)) && Number(desired) >= 0) {
+                try {
+                    currentAudio.currentTime = Number(desired);
+                } catch (e) {
+                }
+                this._desiredStartTime = null;
+            }
+
+            const startPlayback = () => {
+                if (!currentAudio) return;
+                if (!this._autoPlayEnabled || this._playToken !== playToken) return;
+                currentAudio.play().catch(() => { });
+            };
+
+            if (currentAudio.readyState >= 2) {
+                startPlayback();
+            } else {
+                currentAudio.addEventListener('canplay', startPlayback, { once: true });
+                startPlayback();
+            }
+            return;
+        }
 
         if (isSameAudio && this.audio && !this.audio.paused) {
             this.stop();
@@ -80,6 +132,29 @@ class AudioManagerClass {
             } catch (e) {
                 // Игнорируем ошибки при очистке предыдущего элемента
             }
+        }
+
+        // Apply deferred seek time for visual-player use-case (e.g., user moved the slider before first play)
+        // or when we had to recreate audio for a new URL.
+        const desiredStartTime = this._desiredStartTime;
+        if (desiredStartTime !== null && desiredStartTime !== undefined && isFinite(Number(desiredStartTime)) && Number(desiredStartTime) >= 0) {
+            const t = Number(desiredStartTime);
+            const applyStartTime = () => {
+                if (this.audio === currentAudio) {
+                    try {
+                        const duration = Number(currentAudio.duration);
+                        const next = isFinite(duration) && duration > 0 ? Math.min(t, duration) : t;
+                        currentAudio.currentTime = next;
+                    } catch (e) {
+                    }
+                }
+            };
+            if (currentAudio.readyState >= 1) {
+                applyStartTime();
+            } else {
+                currentAudio.addEventListener('loadedmetadata', applyStartTime, { once: true });
+            }
+            this._desiredStartTime = null;
         }
 
         if (this.currentButton) {
@@ -411,9 +486,13 @@ class AudioManagerClass {
     }
 
     setCurrentTime(timeSeconds) {
-        if (!this.audio) return;
         const t = Number(timeSeconds);
         if (!isFinite(t) || t < 0) return;
+
+        // Remember desired time so that seeking works even before the first play.
+        this._desiredStartTime = t;
+
+        if (!this.audio) return;
         try {
             const duration = Number(this.audio.duration);
             const next = isFinite(duration) && duration > 0 ? Math.min(t, duration) : t;

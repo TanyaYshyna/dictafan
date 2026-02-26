@@ -4252,6 +4252,19 @@ async function stopRecording(cause = 'manual') {
     isStopping = true;
     lastStopCause = cause;
 
+    // UX: при ручной остановке сразу возвращаем "квадрат" и блокируем кнопку до конца распознавания.
+    // Дальше (в конце saveRecording) разблокируем ТОЛЬКО если кнопка остается квадратом.
+    if (cause === 'manual') {
+        try {
+            setRecordStateIcon('square');
+        } catch (e) {
+        }
+        try {
+            disableRecordButton(false);
+        } catch (e) {
+        }
+    }
+
     // Используем UnifiedSpeechRecognition если доступен
     if (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state.isRecording) {
         try {
@@ -4891,6 +4904,18 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
 
     // сбрасываем буфер
     srLiveText = '';
+
+    // UX: если мы блокировали кнопку на время распознавания (manual stop),
+    // то возвращаем доступность ТОЛЬКО если кнопка должна быть квадратом (остались попытки).
+    try {
+        const remaining = getRemainingAudio(currentSentence);
+        if (remaining > 0) {
+            disableRecordButton(true);
+        } else {
+            disableRecordButton(false);
+        }
+    } catch (e) {
+    }
 }
 
 /**
