@@ -4809,6 +4809,18 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             if (isProcessingRecognition) {
                 isProcessingRecognition = false;
                 restoreRecordButtonAvailability('saveRecording unified done');
+            } else if (window.__forceFocusRecordAfterRecognition) {
+                // На некоторых ветках isProcessingRecognition может уже быть сброшен,
+                // но кнопка записи могла стать disabled и браузер уводит фокус на другой контрол (часто play оригинала).
+                // Здесь принудительно восстанавливаем доступность и фокус.
+                restoreRecordButtonAvailability('saveRecording unified post-fail focus');
+                // Дважды откладываем восстановление фокуса через анимационные кадры,
+                // чтобы избежать его перезаписи другими обновлениями UI (например, плеером аудио).
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        restoreRecordButtonAvailability('saveRecording unified post-fail focus');
+                    });
+                });
             }
         } catch (e) {
         }
@@ -5004,6 +5016,8 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         decreaseAudioCounter();
     } else {
         console.log('❌ Запись не засчитана, счетчик не уменьшается');
+        // Фокус должен остаться на записи (после восстановления доступности кнопки)
+        window.__forceFocusRecordAfterRecognition = true;
     }
 
     renderUserAudioTablo();
@@ -5015,6 +5029,10 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         if (isProcessingRecognition) {
             isProcessingRecognition = false;
             restoreRecordButtonAvailability('saveRecording fallback done');
+        } else if (window.__forceFocusRecordAfterRecognition) {
+            // В некоторых ветках флаг isProcessingRecognition может уже быть сброшен,
+            // но нужно вернуть фокус на кнопку записи.
+            restoreRecordButtonAvailability('saveRecording fallback post-fail focus');
         }
     } catch (e) {
     }
@@ -5573,7 +5591,12 @@ function restoreRecordButtonAvailability(reason = '') {
             window.__forceFocusRecordAfterRecognition = false;
             const rb = document.getElementById('recordButton');
             if (rb && !rb.disabled) {
-                setTimeout(() => rb.focus(), 0);
+                // Два кадра: переживаем перерисовки/инициализации иконок/плееров, которые могут украсть фокус.
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        try { rb.focus(); } catch (e) {}
+                    });
+                });
             }
         }
     } catch (e) {
