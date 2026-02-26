@@ -23,6 +23,78 @@ const btnNext = document.getElementById("checkNext");
 const inputField = document.getElementById('userInput');
 const RTL_LANGUAGE_PREFIXES = ['ar'];
 
+function isDictationModalOpen() {
+    try {
+        const ids = [
+            'start-modal',
+            'pauseModal',
+            'audioSettingsModal',
+            'completionModal',
+            'exitModal',
+            'noSelectionModal'
+        ];
+        for (const id of ids) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const display = (el.style && typeof el.style.display === 'string') ? el.style.display : '';
+            if (display && display !== 'none') return true;
+            const computed = window.getComputedStyle ? window.getComputedStyle(el) : null;
+            if (computed && computed.display !== 'none' && computed.visibility !== 'hidden' && computed.opacity !== '0') {
+                return true;
+            }
+        }
+    } catch (e) {
+    }
+    return false;
+}
+
+function getDictationFocusCycleElements() {
+    const ids = ['userInput', 'checkBtn', 'recordButton', 'checkNext', 'btn-new-circle'];
+    const elements = ids
+        .map((id) => document.getElementById(id))
+        .filter(Boolean)
+        .filter((el) => {
+            try {
+                const disabled = !!el.disabled;
+                const hidden = el.hidden === true;
+                const notDisplayed = el.offsetParent === null && window.getComputedStyle(el).position !== 'fixed';
+                return !disabled && !hidden && !notDisplayed;
+            } catch (e) {
+                return false;
+            }
+        });
+    return elements;
+}
+
+function installDictationTabCycle() {
+    if (window.__dictationTabCycleInstalled) return;
+    window.__dictationTabCycleInstalled = true;
+
+    document.addEventListener('keydown', (event) => {
+        try {
+            if (event.key !== 'Tab') return;
+            if (event.ctrlKey || event.metaKey || event.altKey) return;
+            if (isDictationModalOpen()) return;
+
+            const cycle = getDictationFocusCycleElements();
+            if (!cycle.length) return;
+
+            const active = document.activeElement;
+            const currentIndex = cycle.indexOf(active);
+            const step = event.shiftKey ? -1 : 1;
+            const nextIndex = (currentIndex === -1)
+                ? 0
+                : (currentIndex + step + cycle.length) % cycle.length;
+
+            event.preventDefault();
+            cycle[nextIndex].focus();
+        } catch (e) {
+        }
+    }, true);
+}
+
+installDictationTabCycle();
+
 function applyInputDirection(languageCode) {
     if (!inputField) return;
     const normalized = (languageCode || '').toLowerCase();
@@ -4229,11 +4301,13 @@ function decreaseAudioCounter() {
             }
         });
 
-        if (completedCount === selectedSentences.length) {
-            console.log("👀 [01] decreaseAudioCounter()");
+        // Фокус после успешной записи:
+        // если это последнее предложение в выбранном списке — переход на список предложений,
+        // иначе — на следующее предложение.
+        const isLastSentenceInRun = (Number(currentSentenceIndex) + 1) >= Number(totalSelectedSentences);
+        if (isLastSentenceInRun) {
             btnNewCircle.focus();
         } else {
-            console.log("👀 [02] decreaseAudioCounter()");
             checkNextDiv.focus();
         }
     } else {
@@ -4729,6 +4803,11 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             decreaseAudioCounter();
         } else {
             console.log('❌ [saveRecording] Запись не засчитана, счетчик не уменьшается');
+            // Если не засчитано — возвращаем фокус на запись
+            setTimeout(() => {
+                const rb = document.getElementById('recordButton');
+                if (rb) rb.focus();
+            }, 0);
         }
         
         renderUserAudioTablo();

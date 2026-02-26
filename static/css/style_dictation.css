@@ -317,6 +317,7 @@ body.playing-audio::after {
   bottom: 20px;
   right: 20px;
   background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
   color: white;
   padding: 10px 15px;
   border-radius: 5px;
