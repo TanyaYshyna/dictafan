@@ -4756,14 +4756,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             await typeTextAnimated(spokenText, {
                 container: userAudioAnswer,
                 speed: 50,
-                onComplete: () => {
-                    const successIndicator = document.createElement('div');
-                    successIndicator.className = 'whisper-success-indicator';
-                    successIndicator.textContent = '✅ Готово!';
-                    if (userAudioAnswer) {
-                        userAudioAnswer.appendChild(successIndicator);
-                    }
-                }
+                onComplete: () => {}
             });
         }
         
@@ -4803,11 +4796,9 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             decreaseAudioCounter();
         } else {
             console.log('❌ [saveRecording] Запись не засчитана, счетчик не уменьшается');
-            // Если не засчитано — возвращаем фокус на запись
-            setTimeout(() => {
-                const rb = document.getElementById('recordButton');
-                if (rb) rb.focus();
-            }, 0);
+            // Если не засчитано — фиксируем, что фокус должен остаться на записи
+            // (после того как кнопка снова станет enabled)
+            window.__forceFocusRecordAfterRecognition = true;
         }
         
         renderUserAudioTablo();
@@ -4969,11 +4960,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                     container: userAudioAnswer,
                     speed: 50, // мс на символ
                     onComplete: () => {
-                        // Добавляем индикатор успешного завершения
-                        const successIndicator = document.createElement('div');
-                        successIndicator.className = 'whisper-success-indicator';
-                        successIndicator.textContent = '✅ Готово!';
-                        userAudioAnswer.appendChild(successIndicator);
+                        // ничего не показываем: окончание распознавания видно по тексту
                     }
                 });
 
@@ -5579,6 +5566,15 @@ function restoreRecordButtonAvailability(reason = '') {
             disableRecordButton(true);
         } else {
             disableRecordButton(false);
+        }
+
+        // Если последняя попытка распознавания была не засчитана — оставляем фокус на записи
+        if (window.__forceFocusRecordAfterRecognition) {
+            window.__forceFocusRecordAfterRecognition = false;
+            const rb = document.getElementById('recordButton');
+            if (rb && !rb.disabled) {
+                setTimeout(() => rb.focus(), 0);
+            }
         }
     } catch (e) {
         console.warn('[restoreRecordButtonAvailability] failed', reason, e);

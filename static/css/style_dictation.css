@@ -571,7 +571,7 @@ body.playing-audio::after {
 .whisper-success-indicator {
   margin-top: 10px;
   font-size: 14px;
-  color: #10b981;
+  color: var(--color-button-purple);
   font-weight: 500;
   animation: fadeIn 0.3s ease;
 }
