@@ -1061,6 +1061,7 @@ let isRecording = false;     // идёт ли запись (для onresult)
 let autoStopTimer = null;
 let isStopping = false;        // защитимся от двойного стопа (авто + клик)
 let lastStopCause = 'manual';  // 'manual' | 'auto'
+let isProcessingRecognition = false; // ручная остановка -> идёт распознавание/обработка результата
 const VIS_BAR_COLOR =
     getComputedStyle(document.documentElement)
         .getPropertyValue('--color-button-text-purple')
@@ -1326,6 +1327,15 @@ function initUnifiedSpeechRecognition() {
         console.error('Ошибка UnifiedSpeechRecognition:', error);
         if (userAudioAnswer) {
             userAudioAnswer.innerHTML = `<span class="error">Ошибка распознавания: ${error}</span>`;
+        }
+
+        // Если кнопка была заблокирована на время распознавания — обязаны вернуть её в рабочее состояние.
+        try {
+            if (isProcessingRecognition) {
+                isProcessingRecognition = false;
+                restoreRecordButtonAvailability('unifiedSpeechRecognizer.callbacks.onError');
+            }
+        } catch (e) {
         }
     };
     
@@ -4263,6 +4273,14 @@ async function stopRecording(cause = 'manual') {
             disableRecordButton(false);
         } catch (e) {
         }
+
+        // Даем браузеру шанс отрисовать квадрат ДО тяжелых async-операций.
+        try {
+            await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        } catch (e) {
+        }
+
+        isProcessingRecognition = true;
     }
 
     // Используем UnifiedSpeechRecognition если доступен
@@ -4296,6 +4314,13 @@ async function stopRecording(cause = 'manual') {
             }, 0);
         } catch (error) {
             console.error('❌ Ошибка остановки UnifiedSpeechRecognition:', error);
+            try {
+                if (cause === 'manual') {
+                    isProcessingRecognition = false;
+                    restoreRecordButtonAvailability('stopRecording unified catch');
+                }
+            } catch (e) {
+            }
             isStopping = false;
         }
     } else {
@@ -4551,7 +4576,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     if (recognitionResult || window.lastRecognitionResult) {
         const result = recognitionResult || window.lastRecognitionResult;
         window.lastRecognitionResult = null; // очищаем
-        
+
         console.log(`🔍 [saveRecording] Обрабатываем результат UnifiedSpeechRecognition:`, result);
 
         try {
@@ -4559,22 +4584,22 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             console.log(`[SR#8] using recognition result mode=${result?.mode} textLen=${t.length} textPreview="${t.slice(0, 80)}"`);
         } catch (e) {}
         
-        const audioBlob = result.audioBlob || unifiedSpeechRecognizer?.getAudioBlob();
-        if (!audioBlob) {
-            console.warn("⚠️ [saveRecording] Нет аудиоданных для сохранения, но продолжаем обработку текста");
-            // Не возвращаемся - продолжаем обработку текста даже без blob
-        } else {
-            // Сделать последнюю запись доступной на кнопке #userPlay
-            setUserAudioBlob(audioBlob);
-        }
+            const audioBlob = result.audioBlob || unifiedSpeechRecognizer?.getAudioBlob();
+            if (!audioBlob) {
+                console.warn("⚠️ [saveRecording] Нет аудиоданных для сохранения, но продолжаем обработку текста");
+                // Не возвращаемся - продолжаем обработку текста даже без blob
+            } else {
+                // Сделать последнюю запись доступной на кнопке #userPlay
+                setUserAudioBlob(audioBlob);
+            }
         
-        // Получаем распознанный текст
-        let spokenText = result.text || '';
+            // Получаем распознанный текст
+            let spokenText = result.text || '';
 
         // Если офлайн-режим (Whisper) — UnifiedSpeechRecognition не заполняет text.
         // Тогда распознаем здесь по audioBlob.
-        if (result.mode === 'offline' && (!spokenText || !String(spokenText).trim())) {
-            try {
+            if (result.mode === 'offline' && (!spokenText || !String(spokenText).trim())) {
+                try {
                 const audioBlobForWhisper = audioBlob;
                 if (audioBlobForWhisper) {
                     const currentLang = langCodeUrl?.split('-')[0] || 'en';
@@ -4708,6 +4733,16 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
         renderUserAudioTablo();
         srLiveText = '';
+
+        // UX: если мы блокировали кнопку на время распознавания — обязаны вернуть её из disabled.
+        try {
+            if (isProcessingRecognition) {
+                isProcessingRecognition = false;
+                restoreRecordButtonAvailability('saveRecording unified done');
+            }
+        } catch (e) {
+        }
+
         return;
     }
     
@@ -4870,6 +4905,11 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                 spokenText =
                     (srLiveText && srLiveText.trim()) ? srLiveText.trim()
                         : (recognition && recognition.finalTranscript ? recognition.finalTranscript : '');
+            } finally {
+                if (isProcessingRecognition) {
+                    isProcessingRecognition = false;
+                    restoreRecordButtonAvailability('saveRecording fallback done');
+                }
             }
         }
     } else {
@@ -4905,14 +4945,10 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     // сбрасываем буфер
     srLiveText = '';
 
-    // UX: если мы блокировали кнопку на время распознавания (manual stop),
-    // то возвращаем доступность ТОЛЬКО если кнопка должна быть квадратом (остались попытки).
     try {
-        const remaining = getRemainingAudio(currentSentence);
-        if (remaining > 0) {
-            disableRecordButton(true);
-        } else {
-            disableRecordButton(false);
+        if (isProcessingRecognition) {
+            isProcessingRecognition = false;
+            restoreRecordButtonAvailability('saveRecording fallback done');
         }
     } catch (e) {
     }
@@ -5453,6 +5489,21 @@ function disableRecordButton(active) {
     // В «не записывает» показываем квадрат
     setRecordStateIcon('square');
 
+}
+
+function restoreRecordButtonAvailability(reason = '') {
+    try {
+        const remaining = getRemainingAudio(currentSentence);
+        // Визуально всегда показываем "квадрат" (а setRecordStateIcon сам покажет чек если remaining=0)
+        setRecordStateIcon('square');
+        if (remaining > 0) {
+            disableRecordButton(true);
+        } else {
+            disableRecordButton(false);
+        }
+    } catch (e) {
+        console.warn('[restoreRecordButtonAvailability] failed', reason, e);
+    }
 }
 
 function setupVisualizer(stream) {
