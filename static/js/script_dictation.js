@@ -5,8 +5,53 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0065';
+window.__DICTATION_BUILD = '2026-02-26_0066';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
+
+function installDictationBuildBadge() {
+    try {
+        if (window.__dictationBuildBadgeInstalled) return;
+        window.__dictationBuildBadgeInstalled = true;
+
+        const mount = () => {
+            try {
+                const id = 'dictation-build-badge';
+                let el = document.getElementById(id);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = id;
+                    el.setAttribute('aria-hidden', 'true');
+                    el.style.position = 'fixed';
+                    el.style.left = '6px';
+                    el.style.bottom = '6px';
+                    el.style.zIndex = '2147483647';
+                    el.style.fontSize = '10px';
+                    el.style.lineHeight = '1.2';
+                    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+                    el.style.color = 'rgba(255,255,255,0.75)';
+                    el.style.background = 'rgba(0,0,0,0.35)';
+                    el.style.padding = '2px 6px';
+                    el.style.borderRadius = '6px';
+                    el.style.pointerEvents = 'none';
+                    el.style.userSelect = 'none';
+                    document.body.appendChild(el);
+                }
+                const v = String(window.__DICTATION_BUILD || 'unknown');
+                el.textContent = `build: ${v}`;
+            } catch (e) {
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mount, { once: true });
+        } else {
+            mount();
+        }
+    } catch (e) {
+    }
+}
+
+installDictationBuildBadge();
 
 const userManager = window.UM;
 let thisNewGame = true;
