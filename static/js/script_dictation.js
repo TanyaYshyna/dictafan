@@ -95,6 +95,50 @@ function installDictationTabCycle() {
 
 installDictationTabCycle();
 
+function installDictationFailedAudioFocusGuard() {
+    if (window.__dictationFailedAudioFocusGuardInstalled) return;
+    window.__dictationFailedAudioFocusGuardInstalled = true;
+
+    const isOriginalAudioControl = (el) => {
+        try {
+            if (!el) return false;
+            if (el.id === 'originalAudioPlayer') return true;
+            if (el.closest && el.closest('#originalAudioPlayer')) return true;
+            if (window.originalAudioVisual && window.originalAudioVisual.playButton) {
+                if (el === window.originalAudioVisual.playButton) return true;
+            }
+        } catch (e) {
+        }
+        return false;
+    };
+
+    document.addEventListener('focusin', (event) => {
+        try {
+            const until = Number(window.__lockFocusOnRecordUntil || 0);
+            if (!until) return;
+            if (Date.now() > until) return;
+
+            const target = event && event.target;
+            if (!isOriginalAudioControl(target)) return;
+
+            const rb = document.getElementById('recordButton');
+            if (!rb || rb.disabled) return;
+
+            // Перехватываем попытки увести фокус на оригинальный плеер после незачтённой записи.
+            event.preventDefault?.();
+            event.stopImmediatePropagation?.();
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    try { rb.focus(); } catch (e) {}
+                });
+            });
+        } catch (e) {
+        }
+    }, true);
+}
+
+installDictationFailedAudioFocusGuard();
+
 function applyInputDirection(languageCode) {
     if (!inputField) return;
     const normalized = (languageCode || '').toLowerCase();
@@ -4799,6 +4843,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             // Если не засчитано — фиксируем, что фокус должен остаться на записи
             // (после того как кнопка снова станет enabled)
             window.__forceFocusRecordAfterRecognition = true;
+            window.__lockFocusOnRecordUntil = Date.now() + 1500;
         }
         
         renderUserAudioTablo();
@@ -5018,6 +5063,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         console.log('❌ Запись не засчитана, счетчик не уменьшается');
         // Фокус должен остаться на записи (после восстановления доступности кнопки)
         window.__forceFocusRecordAfterRecognition = true;
+        window.__lockFocusOnRecordUntil = Date.now() + 1500;
     }
 
     renderUserAudioTablo();
