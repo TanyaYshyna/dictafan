@@ -2938,6 +2938,61 @@ function getSelectedSentences() {
 }
 
 // 
+async function swDictationRequest(action, payload = {}) {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+        throw new Error('Service Worker не активен');
+    }
+
+    const requestId = `dictation_${action}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const timeoutMs = Number(payload.timeoutMs) || 15000;
+
+    return await new Promise((resolve, reject) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+        channel.port1.onmessage = (event) => {
+            clearTimeout(timer);
+            const data = event.data || {};
+            if (data.requestId && data.requestId !== requestId) {
+                reject(new Error('bad_request_id'));
+                return;
+            }
+            if (data.success) {
+                resolve(data.result);
+            } else {
+                reject(new Error(data.error || 'sw_request_failed'));
+            }
+        };
+
+        try {
+            navigator.serviceWorker.controller.postMessage({ action, requestId, ...payload }, [channel.port2]);
+        } catch (e) {
+            clearTimeout(timer);
+            reject(e);
+        }
+    });
+}
+
+async function checkDictationAudioCachedOrThrow(sentenceKeys) {
+    // все аудио должны быть из кеша
+    const keys = Array.isArray(sentenceKeys) ? sentenceKeys : [];
+    const byKey = makeByKeyMap(allSentences);
+    const urls = [];
+    for (const key of keys) {
+        const s = byKey.get(key);
+        if (!s) continue;
+        if (s.audio) urls.push(s.audio);
+    }
+    const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
+    if (!uniqueUrls.length) return;
+
+    const res = await swDictationRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
+    if (!res || res.ok !== true) {
+        const missingCount = res && Array.isArray(res.missing) ? res.missing.length : null;
+        const suffix = (missingCount !== null) ? ` (не найдено: ${missingCount})` : '';
+        throw new Error(`audio_not_cached${suffix}`);
+    }
+}
+
 function startGame(isResume = false) {
     // ИСПРАВЛЕНО: Если isResume не передан явно, проверяем глобальный флаг hasDraftLoaded
     // Это позволяет правильно определить, является ли это продолжением черновика
@@ -3034,6 +3089,29 @@ function startGame(isResume = false) {
             return;
         }
     }
+
+    // все аудио должны быть из кеша
+    // Проверяем, что все аудио для выбранных предложений уже в кеше.
+    // Если чего-то нет, игру не начинаем (и не пытаемся ничего качать).
+    (async () => {
+        try {
+            await checkDictationAudioCachedOrThrow(selectedSentences);
+        } catch (e) {
+            console.warn('[startGame] audio cache check failed', e);
+            showNoSelectionModal('Аудио не загружено в кеш. Перезагрузите диктант и дождитесь загрузки.');
+            return;
+        }
+
+        // continue original startGame flow
+        try {
+            startGameAfterCacheCheck(isResume);
+        } catch (e2) {
+            console.error('[startGame] startGameAfterCacheCheck failed', e2);
+        }
+    })();
+}
+
+function startGameAfterCacheCheck(isResume = false) {
 
     // ИСПРАВЛЕНО: Убрана логика обнуления прогресса при circle_number === 1
     // Прогресс уже загружен из черновика (если он есть) или инициализирован при загрузке предложений
@@ -6414,9 +6492,9 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     if (window.originalAudioVisual) {
         window.originalAudioVisual.setAudioPaths({
             audio: currentSentence.audio || '',
-            audio_a: currentSentence.audio_a || '',
-            audio_f: currentSentence.audio_f || '',
-            audio_m: currentSentence.audio_m || ''
+            audio_a: '',
+            audio_f: '',
+            audio_m: ''
         });
         window.originalAudioVisual.reset();
     }
@@ -6681,6 +6759,13 @@ async function onloadInitializeDictation() {
         originalAudioVisual = new AudioPlayerVisual(originalAudioContainer);
         window.originalAudioVisual = originalAudioVisual;
         originalAudioVisual.setLanguage(currentDictation.language_original);
+
+        try {
+            // Dictation uses a single canonical audio track; hide the audio-type selector.
+            const typeWrapper = originalAudioContainer.querySelector('.audio-type-select-wrapper');
+            if (typeWrapper) typeWrapper.style.display = 'none';
+        } catch (e) {
+        }
 
         // Настройка callbacks для AudioPlayerVisual
         originalAudioVisual.setOnPlayClick(() => {
@@ -7692,25 +7777,13 @@ function playAudioSequence(sequence) {
                     window.originalAudioVisual.setAudioType('o');
                 }
                 break;
-            case 'a': // автоозвучка
-                audioPath = currentSentence.audio_a;
+            case 'a': // автоозвучка (устарело в диктанте)
+            case 'f': // порезанный файл (устарело в диктанте)
+            case 'm': // микрофон (устарело в диктанте)
+                audioPath = currentSentence.audio;
                 if (window.originalAudioVisual) {
                     button = window.originalAudioVisual.playButton;
-                    window.originalAudioVisual.setAudioType('a');
-                }
-                break;
-            case 'f': // порезанный файл
-                audioPath = currentSentence.audio_f;
-                if (window.originalAudioVisual) {
-                    button = window.originalAudioVisual.playButton;
-                    window.originalAudioVisual.setAudioType('f');
-                }
-                break;
-            case 'm': // микрофон
-                audioPath = currentSentence.audio_m;
-                if (window.originalAudioVisual) {
-                    button = window.originalAudioVisual.playButton;
-                    window.originalAudioVisual.setAudioType('m');
+                    window.originalAudioVisual.setAudioType('o');
                 }
                 break;
             case 't': // перевод

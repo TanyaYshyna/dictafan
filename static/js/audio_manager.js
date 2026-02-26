@@ -5,6 +5,8 @@ class AudioManagerClass {
         this.waveformCanvas = null;
         this.audioPlayerVisual = null;
         this.playheadAnimation = null;
+        this._autoPlayEnabled = true;
+        this._playToken = 0;
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -21,6 +23,8 @@ class AudioManagerClass {
     }
 
     play(button, audioUrl, onEndedCallback = null) {
+        this._autoPlayEnabled = true;
+        const playToken = ++this._playToken;
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
 
         if (isSameAudio && this.audio && !this.audio.paused) {
@@ -180,6 +184,11 @@ class AudioManagerClass {
             if (!currentAudio) {
                 return;
             }
+
+            // If user has paused/stopped while the audio was still loading, do not auto-start.
+            if (!this._autoPlayEnabled || this._playToken !== playToken) {
+                return;
+            }
             
             // Проверяем, что URL совпадает
             const currentAudioSrc = normalizeUrl(currentAudio.src);
@@ -331,6 +340,7 @@ class AudioManagerClass {
     }
 
     pause() {
+        this._autoPlayEnabled = false;
         if (this.audio && !this.audio.paused) {
             this.audio.pause();
         }
@@ -361,6 +371,7 @@ class AudioManagerClass {
     }
 
     stop() {
+        this._autoPlayEnabled = false;
         this.stopPlayheadSync();
         if (this.audio) {
             this.audio.pause();
@@ -396,6 +407,18 @@ class AudioManagerClass {
             if (typeof lucide !== "undefined" && lucide && typeof lucide.createIcons === "function") {
                 lucide.createIcons();
             }
+        }
+    }
+
+    setCurrentTime(timeSeconds) {
+        if (!this.audio) return;
+        const t = Number(timeSeconds);
+        if (!isFinite(t) || t < 0) return;
+        try {
+            const duration = Number(this.audio.duration);
+            const next = isFinite(duration) && duration > 0 ? Math.min(t, duration) : t;
+            this.audio.currentTime = next;
+        } catch (e) {
         }
     }
 

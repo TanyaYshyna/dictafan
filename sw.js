@@ -291,11 +291,34 @@ self.addEventListener('fetch', (event) => {
 
   if (!shouldHandleRequest(request.url)) return;
 
+  // все аудио должны быть из кеша
+  // Dictation must be able to work fully offline. For /api/audio/ we never go to network.
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.startsWith('/api/audio/')) {
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+          const cached = await cache.match(request.url);
+          if (cached) return cached;
+        } catch (e) {
+        }
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })());
+      return;
+    }
+  } catch (e) {
+  }
+
   // For Range requests (common for <audio>), return the original network Range response,
   // but cache the full file in background using the URL as a normalized cache key.
   const hasRange = request.headers && request.headers.has('range');
   if (hasRange && request.url.includes('/api/audio/')) {
-    event.waitUntil(cacheAudioFullFileInBackground(request.url));
+    // все аудио должны быть из кеша
+    // Range requests for audio are also cache-only.
     event.respondWith((async () => {
       try {
         const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
@@ -304,7 +327,10 @@ self.addEventListener('fetch', (event) => {
       } catch (e) {
         // ignore
       }
-      return fetch(request);
+      return new Response('Offline', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
     })());
     return;
   }
@@ -495,6 +521,26 @@ async function prefetchUrlsStrict(urls) {
   };
 }
 
+async function checkUrlsInCache(urls) {
+  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+  const missing = [];
+  for (const url of urls || []) {
+    try {
+      if (!url || typeof url !== 'string') {
+        missing.push(String(url));
+        continue;
+      }
+      const absolute = new URL(url, self.location.origin).toString();
+      const normalizedKey = normalizeCacheKey(absolute);
+      const cached = (await cache.match(normalizedKey)) || (await cache.match(absolute));
+      if (!cached) missing.push(absolute);
+    } catch (e) {
+      missing.push(String(url));
+    }
+  }
+  return { ok: missing.length === 0, missing, total: (urls || []).length };
+}
+
 async function purgeDictationFromBoundedCache(dictationId) {
   const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
   const keys = await cache.keys();
@@ -598,8 +644,19 @@ self.addEventListener('message', (event) => {
         if (res.ok) {
           respond({ success: true, result: res });
         } else {
-          respond({ success: false, error: 'cache_limit_exceeded', result: res });
+          if (res.overLimit > 0) {
+            respond({ success: false, error: 'cache_limit_exceeded', result: res });
+          } else {
+            respond({ success: false, error: 'prefetch_failed', result: res });
+          }
         }
+        return;
+      }
+
+      if (action === 'checkCached') {
+        const urls = Array.isArray(data.urls) ? data.urls : [];
+        const res = await checkUrlsInCache(urls);
+        respond({ success: true, result: res });
         return;
       }
 
