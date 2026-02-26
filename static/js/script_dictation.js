@@ -5,6 +5,9 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
+window.__DICTATION_BUILD = '2026-02-26_0065';
+console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
+
 const userManager = window.UM;
 let thisNewGame = true;
 let dictationStatistics = null; // Глобальный объект статистики
