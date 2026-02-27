@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0079';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0080';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -36,37 +36,6 @@ function installBuildAutoReloader(buildValue, storageKey) {
         }
     } catch (e) {
     }
-}
-
-// Debug probe: capture clicks on audio buttons even if per-button listeners are not attached.
-// Enabled only when window.__DICTATION_EDITOR_AUDIO_DEBUG === true.
-try {
-    if (!window.__dictationEditorAudioClickProbeInstalled) {
-        window.__dictationEditorAudioClickProbeInstalled = true;
-        document.addEventListener('click', (e) => {
-            try {
-                if (!window.__DICTATION_EDITOR_AUDIO_DEBUG) return;
-                const btn = e && e.target && e.target.closest ? e.target.closest('button.audio-btn') : null;
-                if (!btn) return;
-                console.log('[AUDIO_BTN_CLICK_PROBE]', {
-                    id: btn.id,
-                    className: btn.className,
-                    state: btn.dataset && btn.dataset.state,
-                    create: btn.dataset && btn.dataset.create,
-                    fieldName: btn.dataset && btn.dataset.fieldName,
-                    language: btn.dataset && btn.dataset.language
-                });
-
-                if (!btn.__audioPlaybackBound) {
-                    btn.__audioPlaybackBound = true;
-                    btn.addEventListener('click', handleAudioPlayback);
-                    console.log('[AUDIO_BTN_CLICK_PROBE] bound handleAudioPlayback');
-                }
-            } catch (err) {
-            }
-        }, true);
-    }
-} catch (e) {
 }
 
 installBuildAutoReloader(window.__DICTATION_EDITOR_BUILD, 'dictafan:build:dictation_editor');
@@ -1021,13 +990,7 @@ function ensureWaveformRegionMatchesMode(currentMode) {
  */
 async function handleAudioPlayback(event) {
     console.log('WWW 1 WWWWWWWWWWWWWWWWWWWW');
-    try {
-        console.log('[handleAudioPlayback] enter', {
-            targetTag: event && event.target && event.target.tagName,
-            targetClass: event && event.target && event.target.className
-        });
-    } catch (e) {
-    }
+
     const button = event.target.closest('button.audio-btn');
     console.log('WWW 2 WWWWWWWWWWWWWWWWWWWW');
 
@@ -1059,7 +1022,7 @@ async function handleAudioPlayback(event) {
     });
 
     // 1️⃣ Определяем URL    
-    const state = button.dataset.state;
+    const initialState = button.dataset.state;
     const language = button.dataset.language; // 'en' или 'ru'
     const languageUrl = getAudioPath(language);
     console.log('WWW 5 WWWWWWWWWWWWWWWWWWWW');
@@ -1087,6 +1050,7 @@ async function handleAudioPlayback(event) {
 
         // Кнопка под волной: играем строго currentAudioFile (волна уже подготовлена внешними процедурами)
         if (isUnderWave) {
+            console.log('WWW 8.1 WWWWWWWWWWWWWWWWWWWW');
             const file = typeof currentAudioFileName !== 'undefined' ? currentAudioFileName : '';
             if (!file) {
                 console.warn('⚠️ Нет текущего файла под волной — воспроизведение отменено');
@@ -1100,15 +1064,18 @@ async function handleAudioPlayback(event) {
 
             // Не трогаем регион/волну из Play
         } else {
+            console.log('WWW 8.2 WWWWWWWWWWWWWWWWWWWW');
             fieldName = button.dataset.fieldName; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
             nameAudioFile = sentence && sentence[fieldName];
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
                 audioUrl = getDraftAudioUrl(language, nameAudioFile);
             } else {
                 audioUrl = `${languageUrl}/${nameAudioFile}`;
+            console.log('WWW 8.1 WWWWWWWWWWWWWWWWWWWW audioUrl', audioUrl);
             }
         }
     }
+
     // Если это draft диктант и у нас есть blob для этого файла — можно играть,
     // но только если кнопка НЕ находится в режиме "нужно пересоздать" (dataset.create === 'true').
     try {
@@ -1148,7 +1115,7 @@ async function handleAudioPlayback(event) {
     }
 
     // Проверяем наличие файла для состояния 'ready' (не для кнопки под волной)
-    if (state === 'ready' && button.id !== 'audioPlayBtn' && button.id !== 'playCreatedAudioBtn') {
+    if (initialState === 'ready' && button.id !== 'audioPlayBtn' && button.id !== 'playCreatedAudioBtn') {
         const hasFile = nameAudioFile && typeof nameAudioFile === 'string' && nameAudioFile.trim() !== '';
         console.log('WWW 11 WWWWWWWWWWWWWWWWWWWW');
         if (!hasFile) {
@@ -1164,18 +1131,16 @@ async function handleAudioPlayback(event) {
         }
     }
 
+    const state = button.dataset.state;
     console.log('WWW 12 WWWWWWWWWWWWWWWWWWWW state', state);
     switch (state) {
         case 'ready':
-            console.log('WWW 12.1 WWWWWWWWWWWWWWWWWWWW state', state);
-            break;
+            // fallthrough
         case 'ready_user':
-            console.log('WWW 12.2 WWWWWWWWWWWWWWWWWWWW state', state);
-            break;
+             // fallthrough
            
         case 'ready_mic':
-            console.log('WWW 12.3 WWWWWWWWWWWWWWWWWWWW state', state);
-            break;
+            // fallthrough
         case 'ready-shared':
             console.log('WWW 12.4 WWWWWWWWWWWWWWWWWWWW state', state);
             // Воспроизводим аудио
@@ -1187,9 +1152,10 @@ async function handleAudioPlayback(event) {
             audioManager.play(button, audioUrl);
             break;
         
+
         case 'playing':
             console.log('WWW 12.5 WWWWWWWWWWWWWWWWWWWW state', state);
-            break;
+            // fallthrough
 
         case 'playing-shared':
             console.log('WWW 12.6 WWWWWWWWWWWWWWWWWWWW state', state);
