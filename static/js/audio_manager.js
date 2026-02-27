@@ -357,6 +357,7 @@ class AudioManagerClass {
         };
         
         // Функция для запуска воспроизведения
+        let _didCallPlay = false;
         const startPlayback = () => {
             // Проверяем, что currentAudio существует
             if (!currentAudio) {
@@ -380,6 +381,13 @@ class AudioManagerClass {
                 __dbg('startPlayback url mismatch', { currentAudioSrc, expectedAudioUrl });
                 return;
             }
+
+            // Avoid overlapping play() calls (Safari can abort/pause if play() is called repeatedly
+            // while the first request is still pending).
+            if (_didCallPlay) {
+                return;
+            }
+            _didCallPlay = true;
             
             const p = currentAudio.play();
             if (p && typeof p.then === 'function') {
@@ -401,6 +409,17 @@ class AudioManagerClass {
                 // AbortError - нормальная ошибка, обычно означает что загрузка еще не завершена
                 // Браузер сам запустит воспроизведение когда будет готов
                 if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
+                    // Allow retry when we get actual readiness events.
+                    _didCallPlay = false;
+                    try {
+                        if (isBlobUrl) {
+                            console.log('[AUDIO_MGR] blob play AbortError (will retry)', {
+                                readyState: currentAudio && currentAudio.readyState,
+                                networkState: currentAudio && currentAudio.networkState
+                            });
+                        }
+                    } catch (e) {
+                    }
                     return;
                 }
                 
