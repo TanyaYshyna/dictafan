@@ -144,6 +144,36 @@ class AudioManagerClass {
         // Сохраняем ссылки в локальные переменные для использования в замыканиях
         const currentAudio = this.audio;
         const currentButton = this.currentButton;
+
+        if (isBlobUrl && currentAudio) {
+            try {
+                const logBlobEvent = (ev) => {
+                    try {
+                        const ae = ev && ev.currentTarget ? ev.currentTarget : currentAudio;
+                        console.log('[AUDIO_MGR] blob event', ev && ev.type, {
+                            readyState: ae && ae.readyState,
+                            networkState: ae && ae.networkState,
+                            currentTime: ae && ae.currentTime,
+                            duration: ae && ae.duration,
+                            paused: ae && ae.paused,
+                            ended: ae && ae.ended,
+                            error: ae && ae.error ? { code: ae.error.code, message: ae.error.message } : null
+                        });
+                    } catch (e) {
+                    }
+                };
+
+                const events = [
+                    'loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough',
+                    'play', 'playing', 'pause', 'ended',
+                    'waiting', 'stalled', 'suspend', 'abort', 'error', 'timeupdate'
+                ];
+                for (const evt of events) {
+                    currentAudio.addEventListener(evt, logBlobEvent);
+                }
+            } catch (e) {
+            }
+        }
         
         // Применяем скорость воспроизведения из AudioPlayerVisual если она установлена
         const applyPlaybackRate = () => {
@@ -355,6 +385,16 @@ class AudioManagerClass {
             if (p && typeof p.then === 'function') {
                 p.then(() => {
                     __dbg('play() resolved', { playToken, current: this.audio === currentAudio });
+                    try {
+                        if (isBlobUrl) {
+                            console.log('[AUDIO_MGR] blob play resolved', {
+                                readyState: currentAudio && currentAudio.readyState,
+                                currentTime: currentAudio && currentAudio.currentTime,
+                                duration: currentAudio && currentAudio.duration
+                            });
+                        }
+                    } catch (e) {
+                    }
                 }).catch(() => { });
             }
             (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
