@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0069';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0071';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installDictationEditorBuildBadge() {
@@ -922,6 +922,15 @@ function setDraftAudioUrl(language, filename, url) {
     }
 }
 
+function hasDraftAudioUrl(language, filename) {
+    try {
+        const u = getDraftAudioUrl(language, filename);
+        return !!(u && typeof u === 'string' && u.startsWith('blob:'));
+    } catch (e) {
+        return false;
+    }
+}
+
 /**
  * Гарантированно устанавливает регион волны в соответствие текущему режиму
  * - full: берёт workingData.original.audio_user_shared_start/end или весь файл
@@ -1001,6 +1010,25 @@ async function handleAudioPlayback(event) {
             }
         }
     }
+    // Если это draft диктант и у нас есть blob для этого файла — можно играть,
+    // но только если кнопка НЕ находится в режиме "нужно пересоздать" (dataset.create === 'true').
+    try {
+        const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
+        const needsRegen = String(button.dataset.create || '') === 'true';
+        if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
+            const draftUrl = getDraftAudioUrl(language, nameAudioFile);
+            if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                audioUrl = draftUrl;
+                if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
+                    button.dataset.state = 'ready';
+                    button.dataset.originalState = 'ready';
+                    setButtonState(button);
+                }
+            }
+        }
+    } catch (e) {
+    }
+
     // 2️⃣ Если что-то уже играет — остановим
     if (audioManager.currentButton && audioManager.currentButton !== button) {
         audioManager.stop();
@@ -1114,10 +1142,26 @@ async function handleAudioPlayback(event) {
             audioManager.pause();
             break;
         case 'creating':
+            // Если blob уже есть — играем, не генерим
+            if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
+                const draftUrl = getDraftAudioUrl(language, nameAudioFile);
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                    audioManager.play(button, draftUrl);
+                    break;
+                }
+            }
             // в состоянии "создание"
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_user':
+            // Если blob уже есть — играем, не генерим
+            if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
+                const draftUrl = getDraftAudioUrl(language, nameAudioFile);
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                    audioManager.play(button, draftUrl);
+                    break;
+                }
+            }
             // в состоянии "создание"
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
@@ -7246,28 +7290,34 @@ async function generateAudioForSentence(sentence, language) {
             const generatedFilename = result.filename || filename;
 
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
-                if (result && result.audio_b64) {
-                    try {
-                        const binary = atob(result.audio_b64);
-                        const bytes = new Uint8Array(binary.length);
-                        for (let i = 0; i < binary.length; i++) {
-                            bytes[i] = binary.charCodeAt(i);
-                        }
-                        const mime = result.mime || 'audio/mpeg';
-                        const blob = new Blob([bytes], { type: mime });
-                        const blobUrl = URL.createObjectURL(blob);
-
-                        if (!sentence.__draftAudioUrls) sentence.__draftAudioUrls = {};
-                        sentence.__draftAudioUrls[language] = blobUrl;
-                        sentence.__draftAudioMime = mime;
-                        sentence.__draftAudioFilename = generatedFilename;
-
-                        setDraftAudioUrl(language, generatedFilename, blobUrl);
-                    } catch (e) {
-                        console.error('❌ Не удалось создать draft audio blob url:', e);
-                    }
-                } else {
+                if (!(result && result.audio_b64)) {
                     console.warn('⚠️ generate_audio не вернул audio_b64 для draft диктанта');
+                    return null;
+                }
+
+                try {
+                    const binary = atob(result.audio_b64);
+                    const bytes = new Uint8Array(binary.length);
+                    for (let i = 0; i < binary.length; i++) {
+                        bytes[i] = binary.charCodeAt(i);
+                    }
+                    const mime = result.mime || 'audio/mpeg';
+                    const blob = new Blob([bytes], { type: mime });
+                    const blobUrl = URL.createObjectURL(blob);
+
+                    if (!sentence.__draftAudioUrls) sentence.__draftAudioUrls = {};
+                    sentence.__draftAudioUrls[language] = blobUrl;
+                    sentence.__draftAudioMime = mime;
+                    sentence.__draftAudioFilename = generatedFilename;
+
+                    setDraftAudioUrl(language, generatedFilename, blobUrl);
+                } catch (e) {
+                    console.error('❌ Не удалось создать draft audio blob url:', e);
+                    return null;
+                }
+
+                if (!hasDraftAudioUrl(language, generatedFilename)) {
+                    return null;
                 }
             }
 
@@ -7733,7 +7783,12 @@ function createTableRow(key, originalSentence, translationSentence) {
     audioBtnOriginal.dataset.language = currentDictation.language_original;
     audioBtnOriginal.dataset.fieldName = 'audio';
     // audioBtnOriginal.dataset.create = 'folse';
-    state = (!originalSentence || !originalSentence.audio) ? 'creating' : 'ready';
+    const originalAudioFilename = originalSentence ? originalSentence.audio : '';
+    if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+        state = (originalAudioFilename && hasDraftAudioUrl(currentDictation.language_original, originalAudioFilename)) ? 'ready' : 'creating';
+    } else {
+        state = (!originalSentence || !originalSentence.audio) ? 'creating' : 'ready';
+    }
     audioBtnOriginal.dataset.state = state;
     audioBtnOriginal.dataset.originalState = state; // Сохраняем исходное состояние один раз
     setButtonState(audioBtnOriginal);
@@ -7796,7 +7851,12 @@ function createTableRow(key, originalSentence, translationSentence) {
     audioBtnTranslation.dataset.language = currentDictation.language_translation;
     audioBtnTranslation.dataset.fieldName = 'audio';
     // audioBtnTranslation.dataset.create = 'folse';
-    state = (!translationSentence || !translationSentence.audio) ? 'creating' : 'ready';
+    const translationAudioFilename = translationSentence ? translationSentence.audio : '';
+    if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+        state = (translationAudioFilename && hasDraftAudioUrl(currentDictation.language_translation, translationAudioFilename)) ? 'ready' : 'creating';
+    } else {
+        state = (!translationSentence || !translationSentence.audio) ? 'creating' : 'ready';
+    }
     audioBtnTranslation.dataset.state = state;
     audioBtnTranslation.dataset.originalState = state; // Сохраняем исходное состояние один раз
     setButtonState(audioBtnTranslation);
@@ -7841,7 +7901,12 @@ function createTableRow(key, originalSentence, translationSentence) {
     audioBtnOriginalAvto.dataset.language = currentDictation.language_original;
     audioBtnOriginalAvto.dataset.fieldName = 'audio_avto';
     // audioBtnOriginalAvto.dataset.create === 'folse';
-    state = (!originalSentence || !originalSentence.audio_avto) ? 'creating' : 'ready';
+    const originalAvtoFilename = originalSentence ? originalSentence.audio_avto : '';
+    if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+        state = (originalAvtoFilename && hasDraftAudioUrl(currentDictation.language_original, originalAvtoFilename)) ? 'ready' : 'creating';
+    } else {
+        state = (!originalSentence || !originalSentence.audio_avto) ? 'creating' : 'ready';
+    }
     audioBtnOriginalAvto.dataset.state = state;
     audioBtnOriginalAvto.dataset.originalState = state; // Сохраняем исходное состояние один раз
     setButtonState(audioBtnOriginalAvto);
