@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0078';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0079';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -1075,12 +1075,14 @@ async function handleAudioPlayback(event) {
     console.log('WWW 6 WWWWWWWWWWWWWWWWWWWW');
     // Кнопка воспроизведения созданного файла
      if (button.id === 'playCreatedAudioBtn') {
+    console.log('WWW 7 WWWWWWWWWWWWWWWWWWWW');
         audioUrl = button.dataset.audioUrl;
         if (!audioUrl) {
             console.warn('⚠️ Нет URL для воспроизведения созданного файла');
             return;
         }
     } else {
+    console.log('WWW 8 WWWWWWWWWWWWWWWWWWWW');
         sentence = getSentenceForButton(button);
 
         // Кнопка под волной: играем строго currentAudioFile (волна уже подготовлена внешними процедурами)
@@ -1110,6 +1112,7 @@ async function handleAudioPlayback(event) {
     // Если это draft диктант и у нас есть blob для этого файла — можно играть,
     // но только если кнопка НЕ находится в режиме "нужно пересоздать" (dataset.create === 'true').
     try {
+    console.log('WWW 9 WWWWWWWWWWWWWWWWWWWW');
         const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
         const needsRegen = String(button.dataset.create || '') === 'true';
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
@@ -1125,8 +1128,9 @@ async function handleAudioPlayback(event) {
             }
         }
     } catch (e) {
+        console.error('Ошибка в handleAudioPlayback:', e);
     }
-
+    console.log('WWW 10 WWWWWWWWWWWWWWWWWWWW');
     __audioDbg('resolved', {
         state: button.dataset.state,
         language,
@@ -1146,6 +1150,7 @@ async function handleAudioPlayback(event) {
     // Проверяем наличие файла для состояния 'ready' (не для кнопки под волной)
     if (state === 'ready' && button.id !== 'audioPlayBtn' && button.id !== 'playCreatedAudioBtn') {
         const hasFile = nameAudioFile && typeof nameAudioFile === 'string' && nameAudioFile.trim() !== '';
+        console.log('WWW 11 WWWWWWWWWWWWWWWWWWWW');
         if (!hasFile) {
             console.warn('⚠️ Файл не найден для воспроизведения, переключаем на создание', {
                 button,
@@ -1159,12 +1164,20 @@ async function handleAudioPlayback(event) {
         }
     }
 
+    console.log('WWW 12 WWWWWWWWWWWWWWWWWWWW state', state);
     switch (state) {
         case 'ready':
+            console.log('WWW 12.1 WWWWWWWWWWWWWWWWWWWW state', state);
+            break;
         case 'ready_user':
+            console.log('WWW 12.2 WWWWWWWWWWWWWWWWWWWW state', state);
+            break;
+           
         case 'ready_mic':
+            console.log('WWW 12.3 WWWWWWWWWWWWWWWWWWWW state', state);
+            break;
         case 'ready-shared':
-        {
+            console.log('WWW 12.4 WWWWWWWWWWWWWWWWWWWW state', state);
             // Воспроизводим аудио
             if (button.id === 'audioPlayBtn' && window.waveformCanvas) {
                 // Если это кнопка под волной, передаём waveformCanvas
@@ -1173,12 +1186,18 @@ async function handleAudioPlayback(event) {
             __audioDbg('call audioManager.play', { state, audioUrl });
             audioManager.play(button, audioUrl);
             break;
-        }
+        
         case 'playing':
+            console.log('WWW 12.5 WWWWWWWWWWWWWWWWWWWW state', state);
+            break;
+
         case 'playing-shared':
+            console.log('WWW 12.6 WWWWWWWWWWWWWWWWWWWW state', state);
             audioManager.pause();
             break;
+
         case 'creating':
+
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
@@ -1193,6 +1212,7 @@ async function handleAudioPlayback(event) {
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_user':
+            console.log('WWW 12.7 WWWWWWWWWWWWWWWWWWWW state', state);
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
@@ -1207,6 +1227,12 @@ async function handleAudioPlayback(event) {
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_mic':
+            console.log('WWW 12.8 WWWWWWWWWWWWWWWWWWWW state', state);
+            // в состоянии "создание микрофона" показываем иконку микрофона
+            // TODO: реализовать создание аудио с микрофона
+            break;
+        case 'creating_shared':
+            console.log('WWW 12.9 WWWWWWWWWWWWWWWWWWWW state', state);
             // в состоянии "создание микрофона" показываем иконку микрофона
             // TODO: реализовать создание аудио с микрофона
             break;
