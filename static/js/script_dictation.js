@@ -8,6 +8,38 @@ window.translationPlayButton = window.translationPlayButton || null;
 window.__DICTATION_BUILD = '2026-02-26_0066';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
+function installBuildAutoReloader(buildValue, storageKey) {
+    try {
+        const v = String(buildValue || '');
+        if (!v) return;
+        const k = String(storageKey || 'dictafan:build');
+        const prev = String(localStorage.getItem(k) || '');
+        const onceKey = `${k}:reloaded:${v}`;
+        const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
+        if (prev && prev !== v && !alreadyReloaded) {
+            try {
+                sessionStorage.setItem(onceKey, 'true');
+            } catch (e) {
+            }
+            try {
+                localStorage.setItem(k, v);
+            } catch (e) {
+            }
+            location.reload();
+            return;
+        }
+        if (!prev) {
+            try {
+                localStorage.setItem(k, v);
+            } catch (e) {
+            }
+        }
+    } catch (e) {
+    }
+}
+
+installBuildAutoReloader(window.__DICTATION_BUILD, 'dictafan:build:dictation');
+
 function installDictationBuildBadge() {
     try {
         if (window.__dictationBuildBadgeInstalled) return;

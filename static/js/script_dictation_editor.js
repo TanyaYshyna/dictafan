@@ -8,6 +8,38 @@ const endInput = document.getElementById('audioEndTime');
 window.__DICTATION_EDITOR_BUILD = '2026-02-27_0072';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
+function installBuildAutoReloader(buildValue, storageKey) {
+    try {
+        const v = String(buildValue || '');
+        if (!v) return;
+        const k = String(storageKey || 'dictafan:build');
+        const prev = String(localStorage.getItem(k) || '');
+        const onceKey = `${k}:reloaded:${v}`;
+        const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
+        if (prev && prev !== v && !alreadyReloaded) {
+            try {
+                sessionStorage.setItem(onceKey, 'true');
+            } catch (e) {
+            }
+            try {
+                localStorage.setItem(k, v);
+            } catch (e) {
+            }
+            location.reload();
+            return;
+        }
+        if (!prev) {
+            try {
+                localStorage.setItem(k, v);
+            } catch (e) {
+            }
+        }
+    } catch (e) {
+    }
+}
+
+installBuildAutoReloader(window.__DICTATION_EDITOR_BUILD, 'dictafan:build:dictation_editor');
+
 function installDictationEditorBuildBadge() {
     try {
         if (window.__dictationEditorBuildBadgeInstalled) return;
