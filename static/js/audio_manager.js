@@ -24,6 +24,22 @@ class AudioManagerClass {
     }
 
     play(button, audioUrl, onEndedCallback = null) {
+        const __dbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
+        const __dbg = (...args) => {
+            try {
+                if (__dbgEnabled) console.warn('[AUDIO_MGR_DBG]', ...args);
+            } catch (e) {
+            }
+        };
+
+        __dbg('play()', {
+            audioUrl,
+            buttonId: button && button.id,
+            buttonState: button && button.dataset && button.dataset.state,
+            buttonOriginalState: button && button.dataset && button.dataset.originalState,
+            playTokenNext: this._playToken + 1
+        });
+
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
@@ -213,6 +229,26 @@ class AudioManagerClass {
             }
         };
 
+        try {
+            const events = ['loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'ended', 'error', 'stalled', 'waiting', 'timeupdate'];
+            events.forEach((ev) => {
+                currentAudio.addEventListener(ev, () => {
+                    __dbg(`event:${ev}`, {
+                        playToken,
+                        current: this.audio === currentAudio,
+                        readyState: currentAudio.readyState,
+                        networkState: currentAudio.networkState,
+                        paused: currentAudio.paused,
+                        ended: currentAudio.ended,
+                        currentTime: currentAudio.currentTime,
+                        duration: currentAudio.duration,
+                        src: currentAudio.src
+                    });
+                });
+            });
+        } catch (e) {
+        }
+
         // Определяем, управление идёт из кнопки под волной/общего файла
         const isUnderWave = !!(button && (button.id === 'audioPlayBtn' || (button.dataset && (button.dataset.state === 'ready-shared' || button.dataset.state === 'playing-shared'))));
 
@@ -278,13 +314,26 @@ class AudioManagerClass {
                 return;
             }
             
-            currentAudio.play().catch((error) => {
+            const p = currentAudio.play();
+            if (p && typeof p.then === 'function') {
+                p.then(() => {
+                    __dbg('play() resolved', { playToken, current: this.audio === currentAudio });
+                }).catch(() => { });
+            }
+            (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
                 // AbortError - нормальная ошибка, обычно означает что загрузка еще не завершена
                 // Браузер сам запустит воспроизведение когда будет готов
                 if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
                     return;
                 }
                 
+                __dbg('play() rejected', {
+                    name: error && error.name,
+                    message: error && error.message,
+                    code: error && error.code,
+                    playToken,
+                    current: this.audio === currentAudio
+                });
                 console.error('❌ Ошибка при запуске воспроизведения:', error, audioUrl);
                 if (currentButton) {
                     // При ошибке возвращаем состояние на 'ready' (не на 'creating'!)

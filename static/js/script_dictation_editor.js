@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0071';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0072';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installDictationEditorBuildBadge() {
@@ -960,8 +960,29 @@ async function handleAudioPlayback(event) {
     const button = event.target.closest('button.audio-btn');
 
     if (!button) {
+        console.error('❌ Кнопка не найдена!');
         return;
     }
+
+    const __audioDbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
+    const __audioDbg = (...args) => {
+        try {
+            if (__audioDbgEnabled) console.warn('[EDITOR_AUDIO_DBG]', ...args);
+        } catch (e) {
+        }
+    };
+
+    __audioDbg('click', {
+        id: button.id,
+        state: button.dataset.state,
+        originalState: button.dataset.originalState,
+        create: button.dataset.create,
+        fieldName: button.dataset.fieldName,
+        language: button.dataset.language,
+        dictationId: currentDictation && currentDictation.id,
+        sentenceId: button.dataset.sentenceId,
+        sentenceKey: button.dataset.sentenceKey
+    });
 
     // 1️⃣ Определяем URL    
     const state = button.dataset.state;
@@ -1018,6 +1039,7 @@ async function handleAudioPlayback(event) {
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
             const draftUrl = getDraftAudioUrl(language, nameAudioFile);
             if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                __audioDbg('creating but blob exists -> play', { draftUrl });
                 audioUrl = draftUrl;
                 if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
                     button.dataset.state = 'ready';
@@ -1029,6 +1051,17 @@ async function handleAudioPlayback(event) {
     } catch (e) {
     }
 
+    __audioDbg('resolved', {
+        state: button.dataset.state,
+        language,
+        fieldName,
+        nameAudioFile,
+        audioUrl,
+        isDraft: !!(currentDictation && currentDictation.id && currentDictation.id.startsWith('dict_temp_')),
+        hasDraftBlob: !!(nameAudioFile && hasDraftAudioUrl(language, nameAudioFile)),
+        create: button.dataset.create
+    });
+
     // 2️⃣ Если что-то уже играет — остановим
     if (audioManager.currentButton && audioManager.currentButton !== button) {
         audioManager.stop();
@@ -1039,101 +1072,29 @@ async function handleAudioPlayback(event) {
         const hasFile = nameAudioFile && typeof nameAudioFile === 'string' && nameAudioFile.trim() !== '';
         if (!hasFile) {
             console.warn('⚠️ Файл не найден для воспроизведения, переключаем на создание', {
-                fieldName: fieldName,
-                sentence: sentence,
-                sentenceKey: sentence?.key,
-                sentenceFieldValue: sentence?.[fieldName],
-                buttonState: button.dataset.state,
-                buttonOriginalState: button.dataset.originalState,
-                nameAudioFile: nameAudioFile,
-                audioUrl: audioUrl,
-                workingDataSentence: sentence ? workingData.original.sentences.find(s => s.key === sentence.key) : null
+                button,
+                fieldName,
+                nameAudioFile,
+                sentence,
+                state
             });
-            
-            // Проверяем, может файл есть в workingData, но не найден в sentence
-            if (sentence && sentence.key) {
-                const workingSentence = workingData.original.sentences.find(s => s.key === sentence.key);
-                if (workingSentence && workingSentence[fieldName]) {
-                    nameAudioFile = workingSentence[fieldName];
-                    if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
-                        audioUrl = getDraftAudioUrl(language, nameAudioFile);
-                    } else {
-                        audioUrl = `${languageUrl}/${nameAudioFile}`;
-                    }
-                    // Не переключаем на creating, продолжаем воспроизведение
-                } else {
-                    // Файл не найден - переключаем на создание
-                    button.dataset.state = 'creating';
-                    setButtonState(button);
-                    return;
-                }
-            } else {
-                // Файл не найден - переключаем на создание
-                button.dataset.state = 'creating';
-                setButtonState(button);
-                return;
-            }
+            button.dataset.state = 'creating';
+            setButtonState(button);
         }
     }
 
     switch (state) {
         case 'ready':
-            // Для кнопки под волной (audioPlayBtn) проверяем только audioUrl, так как nameAudioFile для неё не используется
-            if (isUnderWave) {
-                if (!audioUrl || audioUrl.includes('undefined') || audioUrl.includes('null')) {
-                    console.error('❌ ОШИБКА: URL не найден для кнопки под волной!', {
-                        audioUrl: audioUrl,
-                        currentAudioFileName: typeof currentAudioFileName !== 'undefined' ? currentAudioFileName : 'undefined'
-                    });
-                    return;
-                }
-            } else {
-                // Для остальных кнопок проверяем и nameAudioFile
-                if (!nameAudioFile || !audioUrl || audioUrl.includes('undefined') || audioUrl.includes('null')) {
-                    console.error('❌ ОШИБКА: файл не найден при воспроизведении ready!', {
-                        nameAudioFile: nameAudioFile,
-                        audioUrl: audioUrl,
-                        sentence: sentence,
-                        fieldName: fieldName
-                    });
-                    button.dataset.state = 'creating';
-                    setButtonState(button);
-                    return;
-                }
-            }
-            
-            // Для кнопки под волной нужно передать waveformCanvas в audioManager
-            if (isUnderWave && window.waveformCanvas && typeof audioManager.setWaveformCanvas === 'function') {
+        case 'ready_user':
+        case 'ready_mic':
+        case 'ready-shared':
+        {
+            // Воспроизводим аудио
+            if (button.id === 'audioPlayBtn' && window.waveformCanvas) {
+                // Если это кнопка под волной, передаём waveformCanvas
                 audioManager.setWaveformCanvas(window.waveformCanvas);
             }
-            
-            audioManager.play(button, audioUrl);
-            break;
-        case 'ready-shared': {
-            // Кнопка под волной: играем строго currentAudioFile
-            if (button.id === 'audioPlayBtn') {
-                const file = typeof currentAudioFileName !== 'undefined' ? currentAudioFileName : '';
-                if (!file) {
-                    console.warn('⚠️ Нет текущего файла под волной — воспроизведение отменено');
-                    return;
-                }
-                audioUrl = `${languageUrl}/${file}`;
-            }
-            
-            // Проверяем наличие audioUrl
-            if (!audioUrl || audioUrl.includes('undefined') || audioUrl.includes('null')) {
-                console.error('❌ ОШИБКА: URL не найден для кнопки ready-shared!', {
-                    audioUrl: audioUrl,
-                    buttonId: button.id,
-                    currentAudioFileName: typeof currentAudioFileName !== 'undefined' ? currentAudioFileName : 'undefined'
-                });
-                return;
-            }
-            
-            // Волна готовится извне; Play ничего не меняет
-            if (window.waveformCanvas && typeof audioManager.setWaveformCanvas === 'function') {
-                audioManager.setWaveformCanvas(window.waveformCanvas);
-            }
+            __audioDbg('call audioManager.play', { state, audioUrl });
             audioManager.play(button, audioUrl);
             break;
         }
@@ -1146,11 +1107,13 @@ async function handleAudioPlayback(event) {
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
                 if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                    __audioDbg('creating but blob exists -> play', { draftUrl });
                     audioManager.play(button, draftUrl);
                     break;
                 }
             }
             // в состоянии "создание"
+            __audioDbg('call createAndPlayAudio', { state, language, fieldName });
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_user':
@@ -1158,11 +1121,13 @@ async function handleAudioPlayback(event) {
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
                 if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                    __audioDbg('creating_user but blob exists -> play', { draftUrl });
                     audioManager.play(button, draftUrl);
                     break;
                 }
             }
             // в состоянии "создание"
+            __audioDbg('call createAndPlayAudio (user)', { state, language, fieldName });
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_mic':
