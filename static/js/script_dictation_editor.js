@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0076';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0077';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -36,6 +36,37 @@ function installBuildAutoReloader(buildValue, storageKey) {
         }
     } catch (e) {
     }
+}
+
+// Debug probe: capture clicks on audio buttons even if per-button listeners are not attached.
+// Enabled only when window.__DICTATION_EDITOR_AUDIO_DEBUG === true.
+try {
+    if (!window.__dictationEditorAudioClickProbeInstalled) {
+        window.__dictationEditorAudioClickProbeInstalled = true;
+        document.addEventListener('click', (e) => {
+            try {
+                if (!window.__DICTATION_EDITOR_AUDIO_DEBUG) return;
+                const btn = e && e.target && e.target.closest ? e.target.closest('button.audio-btn') : null;
+                if (!btn) return;
+                console.log('[AUDIO_BTN_CLICK_PROBE]', {
+                    id: btn.id,
+                    className: btn.className,
+                    state: btn.dataset && btn.dataset.state,
+                    create: btn.dataset && btn.dataset.create,
+                    fieldName: btn.dataset && btn.dataset.fieldName,
+                    language: btn.dataset && btn.dataset.language
+                });
+
+                if (!btn.__audioPlaybackBound) {
+                    btn.__audioPlaybackBound = true;
+                    btn.addEventListener('click', handleAudioPlayback);
+                    console.log('[AUDIO_BTN_CLICK_PROBE] bound handleAudioPlayback');
+                }
+            } catch (err) {
+            }
+        }, true);
+    }
+} catch (e) {
 }
 
 installBuildAutoReloader(window.__DICTATION_EDITOR_BUILD, 'dictafan:build:dictation_editor');
@@ -989,6 +1020,13 @@ function ensureWaveformRegionMatchesMode(currentMode) {
  * @param {Event} event - событие клика
  */
 async function handleAudioPlayback(event) {
+    try {
+        console.log('[handleAudioPlayback] enter', {
+            targetTag: event && event.target && event.target.tagName,
+            targetClass: event && event.target && event.target.className
+        });
+    } catch (e) {
+    }
     const button = event.target.closest('button.audio-btn');
 
     if (!button) {
