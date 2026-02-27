@@ -145,20 +145,66 @@ class AudioManagerClass {
         const currentAudio = this.audio;
         const currentButton = this.currentButton;
 
-        if (isBlobUrl && currentAudio) {
+        const setButtonPlayingState = () => {
+            try {
+                if (!currentButton) return;
+                // Определяем правильное состояние для кнопки
+                const originalState = currentButton.dataset.state || currentButton.dataset.originalState || 'ready';
+                const newState = (originalState === 'ready-shared' || originalState === 'playing-shared') ? 'playing-shared' : 'playing';
+                currentButton.dataset.state = newState;
+                if (typeof setButtonState === 'function') {
+                    setButtonState(currentButton, newState);
+                } else {
+                    this.updateButtonIcon(currentButton, 'pause');
+                }
+            } catch (e) {
+            }
+        };
+
+        const revertButtonReadyState = () => {
+            try {
+                if (!currentButton) return;
+                const originalState = currentButton.dataset.originalState || 'ready';
+                currentButton.dataset.state = originalState;
+                if (typeof setButtonState === 'function') {
+                    setButtonState(currentButton, originalState);
+                } else {
+                    this.updateButtonIcon(currentButton, 'play');
+                }
+            } catch (e) {
+            }
+        };
+
+        if (currentAudio) {
             try {
                 const logBlobEvent = (ev) => {
                     try {
                         const ae = ev && ev.currentTarget ? ev.currentTarget : currentAudio;
-                        console.log('[AUDIO_MGR] blob event', ev && ev.type, {
-                            readyState: ae && ae.readyState,
-                            networkState: ae && ae.networkState,
-                            currentTime: ae && ae.currentTime,
-                            duration: ae && ae.duration,
-                            paused: ae && ae.paused,
-                            ended: ae && ae.ended,
-                            error: ae && ae.error ? { code: ae.error.code, message: ae.error.message } : null
-                        });
+                        if (isBlobUrl) {
+                            console.log('[AUDIO_MGR] blob event', ev && ev.type, {
+                                readyState: ae && ae.readyState,
+                                networkState: ae && ae.networkState,
+                                currentTime: ae && ae.currentTime,
+                                duration: ae && ae.duration,
+                                paused: ae && ae.paused,
+                                ended: ae && ae.ended,
+                                error: ae && ae.error ? { code: ae.error.code, message: ae.error.message } : null
+                            });
+                        }
+
+                        // Update UI only when playback actually starts.
+                        if (ev && ev.type === 'playing') {
+                            setButtonPlayingState();
+                        }
+
+                        // Safari sometimes emits pause at t=0 while still loading; if that happens,
+                        // don't leave the UI stuck in "playing".
+                        if (isBlobUrl && ev && ev.type === 'pause') {
+                            const t = Number(ae && ae.currentTime);
+                            if (!isFinite(t) || t <= 0) {
+                                revertButtonReadyState();
+                            }
+                        }
                     } catch (e) {
                     }
                 };
@@ -235,22 +281,7 @@ class AudioManagerClass {
             this._desiredStartTime = null;
         }
 
-        if (this.currentButton) {
-            // Определяем правильное состояние для кнопки
-            // Если кнопка была в состоянии 'ready-shared', то устанавливаем 'playing-shared'
-            const originalState = this.currentButton.dataset.state || this.currentButton.dataset.originalState || 'ready';
-            const newState = (originalState === 'ready-shared' || originalState === 'playing-shared') ? 'playing-shared' : 'playing';
-            
-            // Обновляем состояние кнопки
-            this.currentButton.dataset.state = newState;
-            // Обновляем иконку через setButtonState если функция доступна
-            if (typeof setButtonState === 'function') {
-                setButtonState(this.currentButton, newState);
-            } else {
-                // Fallback: просто обновляем иконку
-                this.updateButtonIcon(this.currentButton, "pause");
-            }
-        }
+        // IMPORTANT: do not switch UI to "playing" until we actually receive playback events.
 
         // Обработка ошибок загрузки/воспроизведения
         currentAudio.onerror = (error) => {
@@ -400,6 +431,15 @@ class AudioManagerClass {
                                 currentTime: currentAudio && currentAudio.currentTime,
                                 duration: currentAudio && currentAudio.duration
                             });
+                        }
+                    } catch (e) {
+                    }
+
+                    // Some browsers resolve play() before firing 'playing'. If we are actually
+                    // not paused anymore, update the UI.
+                    try {
+                        if (currentAudio && currentAudio.paused === false) {
+                            setButtonPlayingState();
                         }
                     } catch (e) {
                     }
