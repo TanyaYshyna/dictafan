@@ -5,6 +5,54 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0069';
+console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
+
+function installDictationEditorBuildBadge() {
+    try {
+        if (window.__dictationEditorBuildBadgeInstalled) return;
+        window.__dictationEditorBuildBadgeInstalled = true;
+
+        const mount = () => {
+            try {
+                const id = 'dictation-editor-build-badge';
+                let el = document.getElementById(id);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = id;
+                    el.setAttribute('aria-hidden', 'true');
+                    el.style.position = 'fixed';
+                    el.style.left = '6px';
+                    el.style.bottom = '6px';
+                    el.style.zIndex = '2147483647';
+                    el.style.fontSize = '10px';
+                    el.style.lineHeight = '1.2';
+                    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+                    el.style.color = 'rgba(255,255,255,0.75)';
+                    el.style.background = 'rgba(0,0,0,0.35)';
+                    el.style.padding = '2px 6px';
+                    el.style.borderRadius = '6px';
+                    el.style.pointerEvents = 'none';
+                    el.style.userSelect = 'none';
+                    document.body.appendChild(el);
+                }
+                const v = String(window.__DICTATION_EDITOR_BUILD || 'unknown');
+                el.textContent = `build: ${v}`;
+            } catch (e) {
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mount, { once: true });
+        } else {
+            mount();
+        }
+    } catch (e) {
+    }
+}
+
+installDictationEditorBuildBadge();
+
 
 let currentAudioFile = null; // текущий файл в настройках аудио
 
