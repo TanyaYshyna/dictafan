@@ -32,13 +32,25 @@ class AudioManagerClass {
             }
         };
 
-        __dbg('play()', {
-            audioUrl,
-            buttonId: button && button.id,
-            buttonState: button && button.dataset && button.dataset.state,
-            buttonOriginalState: button && button.dataset && button.dataset.originalState,
-            playTokenNext: this._playToken + 1
-        });
+        const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
+        if (isBlobUrl) {
+            try {
+                console.log('[AUDIO_MGR] blob play attempt', {
+                    audioUrl,
+                    buttonId: button && button.id,
+                    state: button && button.dataset && button.dataset.state
+                });
+            } catch (e) {
+            }
+        } else {
+            __dbg('play()', {
+                audioUrl,
+                buttonId: button && button.id,
+                buttonState: button && button.dataset && button.dataset.state,
+                buttonOriginalState: button && button.dataset && button.dataset.originalState,
+                playTokenNext: this._playToken + 1
+            });
+        }
 
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
@@ -83,7 +95,27 @@ class AudioManagerClass {
             const startPlayback = () => {
                 if (!currentAudio) return;
                 if (!this._autoPlayEnabled || this._playToken !== playToken) return;
-                currentAudio.play().catch(() => { });
+                const p = currentAudio.play();
+                (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
+                    try {
+                        if (isBlobUrl) {
+                            console.error('[AUDIO_MGR] blob play rejected', error);
+                        }
+                    } catch (e) {
+                    }
+                    console.error('❌ Ошибка при запуске воспроизведения:', error, audioUrl);
+
+                    // Revert button state back to original when resume fails.
+                    if (currentButton) {
+                        const originalState = currentButton.dataset.originalState || 'ready';
+                        currentButton.dataset.state = originalState;
+                        if (typeof setButtonState === 'function') {
+                            setButtonState(currentButton, originalState);
+                        } else {
+                            this.updateButtonIcon(currentButton, "play");
+                        }
+                    }
+                });
             };
 
             if (currentAudio.readyState >= 2) {
@@ -309,8 +341,13 @@ class AudioManagerClass {
             // Проверяем, что URL совпадает
             const currentAudioSrc = normalizeUrl(currentAudio.src);
             const expectedAudioUrl = normalizeUrl(audioUrl);
-            
-            if (currentAudioSrc !== expectedAudioUrl) {
+
+            // Safari may normalize blob: URLs slightly; for blob playback we only need to ensure
+            // we're still acting on the current audio element.
+            const isBlobExpected = typeof expectedAudioUrl === 'string' && expectedAudioUrl.startsWith('blob:');
+            const isBlobCurrent = typeof currentAudioSrc === 'string' && currentAudioSrc.startsWith('blob:');
+            if (!(isBlobExpected && isBlobCurrent) && currentAudioSrc !== expectedAudioUrl) {
+                __dbg('startPlayback url mismatch', { currentAudioSrc, expectedAudioUrl });
                 return;
             }
             
@@ -334,6 +371,12 @@ class AudioManagerClass {
                     playToken,
                     current: this.audio === currentAudio
                 });
+                try {
+                    if (isBlobUrl) {
+                        console.error('[AUDIO_MGR] blob play rejected', error);
+                    }
+                } catch (e) {
+                }
                 console.error('❌ Ошибка при запуске воспроизведения:', error, audioUrl);
                 if (currentButton) {
                     // При ошибке возвращаем состояние на 'ready' (не на 'creating'!)

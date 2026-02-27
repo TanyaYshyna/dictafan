@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0081';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0082';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -936,7 +936,16 @@ function getDraftAudioUrl(language, filename) {
         if (!language || !filename) return null;
         const map = window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS;
         if (!map) return null;
-        return map[`${language}|${filename}`] || null;
+        const url = map[`${filename}`] || null;
+        try {
+            console.log('WWW DRAFT_AUDIO get', {
+                filename,
+                found: !!url,
+                url: url || null
+            });
+        } catch (e) {
+        }
+        return url;
     } catch (e) {
         return null;
     }
@@ -948,7 +957,14 @@ function setDraftAudioUrl(language, filename, url) {
         if (!window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS) {
             window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS = Object.create(null);
         }
-        window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS[`${language}|${filename}`] = url;
+        window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS[`${filename}`] = url;
+        try {
+            console.log('WWW DRAFT_AUDIO set', {
+                filename,
+                url
+            });
+        } catch (e) {
+        }
     } catch (e) {
         // noop
     }
@@ -999,27 +1015,7 @@ async function handleAudioPlayback(event) {
         return;
     }
     console.log('WWW 3 WWWWWWWWWWWWWWWWWWWW');
-
-    const __audioDbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
-    const __audioDbg = (...args) => {
-        try {
-            if (__audioDbgEnabled) console.log('[EDITOR_AUDIO_DBG]', ...args);
-        } catch (e) {
-        }
-    };
     console.log('WWW 4 WWWWWWWWWWWWWWWWWWWW');
-
-    __audioDbg('click', {
-        id: button.id,
-        state: button.dataset.state,
-        originalState: button.dataset.originalState,
-        create: button.dataset.create,
-        fieldName: button.dataset.fieldName,
-        language: button.dataset.language,
-        dictationId: currentDictation && currentDictation.id,
-        sentenceId: button.dataset.sentenceId,
-        sentenceKey: button.dataset.sentenceKey
-    });
 
     // 1️⃣ Определяем URL    
     const initialState = button.dataset.state;
@@ -1085,7 +1081,6 @@ async function handleAudioPlayback(event) {
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
             const draftUrl = getDraftAudioUrl(language, nameAudioFile);
             if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
-                __audioDbg('creating but blob exists -> play', { draftUrl });
                 audioUrl = draftUrl;
                 if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
                     button.dataset.state = 'ready';
@@ -1097,17 +1092,6 @@ async function handleAudioPlayback(event) {
     } catch (e) {
         console.error('Ошибка в handleAudioPlayback:', e);
     }
-    console.log('WWW 10 WWWWWWWWWWWWWWWWWWWW');
-    __audioDbg('resolved', {
-        state: button.dataset.state,
-        language,
-        fieldName,
-        nameAudioFile,
-        audioUrl,
-        isDraft: !!(currentDictation && currentDictation.id && currentDictation.id.startsWith('dict_temp_')),
-        hasDraftBlob: !!(nameAudioFile && hasDraftAudioUrl(language, nameAudioFile)),
-        create: button.dataset.create
-    });
 
     // 2️⃣ Если что-то уже играет — остановим
     if (audioManager.currentButton && audioManager.currentButton !== button) {
@@ -1168,13 +1152,11 @@ async function handleAudioPlayback(event) {
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
                 if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
-                    __audioDbg('creating but blob exists -> play', { draftUrl });
                     audioManager.play(button, draftUrl);
                     break;
                 }
             }
             // в состоянии "создание"
-            __audioDbg('call createAndPlayAudio', { state, language, fieldName });
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_user':
@@ -1183,13 +1165,11 @@ async function handleAudioPlayback(event) {
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
                 if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
-                    __audioDbg('creating_user but blob exists -> play', { draftUrl });
                     audioManager.play(button, draftUrl);
                     break;
                 }
             }
             // в состоянии "создание"
-            __audioDbg('call createAndPlayAudio (user)', { state, language, fieldName });
             await createAndPlayAudio(button, language, fieldName, languageUrl);
             break;
         case 'creating_mic':
