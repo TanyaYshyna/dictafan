@@ -27,7 +27,7 @@ class AudioManagerClass {
         const __dbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
         const __dbg = (...args) => {
             try {
-                if (__dbgEnabled) console.warn('[AUDIO_MGR_DBG]', ...args);
+                if (__dbgEnabled) console.log('[AUDIO_MGR_DBG]', ...args);
             } catch (e) {
             }
         };

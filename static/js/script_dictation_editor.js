@@ -967,7 +967,7 @@ async function handleAudioPlayback(event) {
     const __audioDbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
     const __audioDbg = (...args) => {
         try {
-            if (__audioDbgEnabled) console.warn('[EDITOR_AUDIO_DBG]', ...args);
+            if (__audioDbgEnabled) console.log('[EDITOR_AUDIO_DBG]', ...args);
         } catch (e) {
         }
     };
