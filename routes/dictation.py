@@ -66,7 +66,7 @@ def api_get_dictation_audio(dictation_id, lang, filename):
     return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
 
 
-@dictation_bp.route('/api/temp-audio/<int:user_id>/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
+@dictation_bp.route('/api/temp/<int:user_id>/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
 def api_get_temp_dictation_audio(user_id, dictation_id, lang, filename):
     """Получение аудио для временного диктанта (Option A: только B2).
 

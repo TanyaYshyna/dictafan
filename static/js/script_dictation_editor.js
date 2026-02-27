@@ -851,6 +851,29 @@ function initLanguageFlags(initData) {
 
 let currentPlayingButton = null;
 
+function getDraftAudioUrl(language, filename) {
+    try {
+        if (!language || !filename) return null;
+        const map = window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS;
+        if (!map) return null;
+        return map[`${language}|${filename}`] || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setDraftAudioUrl(language, filename, url) {
+    try {
+        if (!language || !filename || !url) return;
+        if (!window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS) {
+            window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS = Object.create(null);
+        }
+        window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS[`${language}|${filename}`] = url;
+    } catch (e) {
+        // noop
+    }
+}
+
 /**
  * Гарантированно устанавливает регион волны в соответствие текущему режиму
  * - full: берёт workingData.original.audio_user_shared_start/end или весь файл
@@ -913,13 +936,21 @@ async function handleAudioPlayback(event) {
                 console.warn('⚠️ Нет текущего файла под волной — воспроизведение отменено');
                 return;
             }
-            audioUrl = `${languageUrl}/${file}`;
+            if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+                audioUrl = getDraftAudioUrl(language, file);
+            } else {
+                audioUrl = `${languageUrl}/${file}`;
+            }
 
             // Не трогаем регион/волну из Play
         } else {
             fieldName = button.dataset.fieldName; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
             nameAudioFile = sentence && sentence[fieldName];
-            audioUrl = `${languageUrl}/${nameAudioFile}`;
+            if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+                audioUrl = getDraftAudioUrl(language, nameAudioFile);
+            } else {
+                audioUrl = `${languageUrl}/${nameAudioFile}`;
+            }
         }
     }
     // 2️⃣ Если что-то уже играет — остановим
@@ -948,7 +979,11 @@ async function handleAudioPlayback(event) {
                 const workingSentence = workingData.original.sentences.find(s => s.key === sentence.key);
                 if (workingSentence && workingSentence[fieldName]) {
                     nameAudioFile = workingSentence[fieldName];
-                    audioUrl = `${languageUrl}/${nameAudioFile}`;
+                    if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+                        audioUrl = getDraftAudioUrl(language, nameAudioFile);
+                    } else {
+                        audioUrl = `${languageUrl}/${nameAudioFile}`;
+                    }
                     // Не переключаем на creating, продолжаем воспроизведение
                 } else {
                     // Файл не найден - переключаем на создание
@@ -1122,7 +1157,11 @@ async function createAndPlayAudio(button, language, fieldName, languageUrl) {
 
         // Устанавливаем текущую кнопку и проигрываем созданный файл
         currentPlayingButton = button;
-        audioUrl = `${languageUrl}/${nameAudioFile}`;
+        if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+            audioUrl = getDraftAudioUrl(language, nameAudioFile);
+        } else {
+            audioUrl = `${languageUrl}/${nameAudioFile}`;
+        }
         audioManager.play(button, audioUrl);
 
     } catch (error) {
@@ -2110,6 +2149,43 @@ async function createCombinedAudioFile(customFileName = null) {
             // Обновляем интерфейс
             updateAudioFileList();
             selectAudioFileFromList(fileInfo);
+
+            try {
+                const fileResponse = await fetch(result.filepath);
+                if (!fileResponse.ok) {
+                    throw new Error(`Не удалось скачать файл: HTTP ${fileResponse.status}`);
+                }
+                const blob = await fileResponse.blob();
+
+                if (window.showSaveFilePicker) {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: result.filename,
+                        types: [
+                            {
+                                description: 'Audio',
+                                accept: {
+                                    'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.webm', '.aac', '.flac', '.mp4']
+                                }
+                            }
+                        ]
+                    });
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = result.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                }
+            } catch (e) {
+                console.error('❌ Ошибка сохранения комбинированного файла на диск:', e);
+                alert('Файл создан, но не удалось сохранить на диск: ' + (e && e.message ? e.message : e));
+            }
          } else {
             alert('Ошибка создания файла: ' + (result.error || 'Неизвестная ошибка'));
         }
@@ -4514,6 +4590,14 @@ function continueUpload(file, audioMode, durationFormatted, duration) {
     formData.append('audioFile', file);
     formData.append('language', currentDictation.language_original);
     formData.append('dictation_id', currentDictation.id);
+    formData.append('audioMode', audioMode);
+
+    if (audioMode === 'mic') {
+        const currentRow = document.querySelector('#sentences-table tbody tr.selected');
+        if (currentRow && currentRow.dataset && currentRow.dataset.key) {
+            formData.append('sentenceKey', currentRow.dataset.key);
+        }
+    }
 
     for (let [key, value] of formData.entries()) {
         console.log(`  ${key}:`, value);
@@ -4967,36 +5051,85 @@ function splitAudioIntoSeentences(row) {
     // Показываем индикатор загрузки
     showLoadingIndicator('Разрезание аудио на предложения...');
 
-    // Отправляем запрос на сервер
-    fetch('/split-audio', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-            // ,
-            // 'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-            filename: filename,
-            filepath: filepath,
-            startTime: startTime,
-            endTime: endTime,
-            language: currentDictation.language_original
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            hideLoadingIndicator();
-            if (data.success) {
-            } else {
-                console.error('❌ Ошибка разрезания аудио:', data.error);
-                alert('Ошибка разрезания аудио: ' + data.error);
+    const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
+    const isBlobPath = typeof filepath === 'string' && filepath.startsWith('blob:');
+
+    (async () => {
+        try {
+            // Берём предложения (для split-аудио по строкам)
+            const sentences = (workingData?.original?.sentences || []).map(s => ({
+                key: s.key,
+                start_time: Number(s.start) || 0,
+                end_time: Number(s.end) || 0,
+                language: currentDictation.language_original
+            })).filter(s => s.key && s.end_time > s.start_time);
+
+            const payload = {
+                filename: filename,
+                filepath: filepath,
+                dictation_id: currentDictation.id,
+                sentences: sentences
+            };
+
+            if (isDraft && isBlobPath) {
+                const resp = await fetch(filepath);
+                const buf = await resp.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                payload.audio_b64 = btoa(binary);
+                payload.mime = 'audio/mpeg';
+                delete payload.filepath;
             }
-        })
-        .catch(error => {
+
+            const response = await fetch('/split-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            hideLoadingIndicator();
+            if (!data.success) {
+                console.error('❌ Ошибка разрезания аудио:', data.error);
+                alert('Ошибка разрезания аудио: ' + (data.error || 'Неизвестная ошибка'));
+                return;
+            }
+
+            // Draft-mode: получаем base64 каждого сегмента и кладём в blob cache
+            if (isDraft && Array.isArray(data.files)) {
+                for (const f of data.files) {
+                    if (!f || !f.filename || !f.audio_b64) continue;
+                    try {
+                        const binaryOut = atob(f.audio_b64);
+                        const outBytes = new Uint8Array(binaryOut.length);
+                        for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                        const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
+                        const outUrl = URL.createObjectURL(outBlob);
+                        setDraftAudioUrl(currentDictation.language_original, f.filename, outUrl);
+
+                        // Проставим в рабочие данные имя файла как финальное "audio_user"
+                        const sentence = workingData.original.sentences.find(s => s.key === f.key);
+                        if (sentence) {
+                            sentence.audio_user = f.filename;
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ не удалось сохранить segment blob:', e);
+                    }
+                }
+
+                // Обновляем UI
+                rebuildSentencesTable();
+                markAsUnsaved();
+            }
+        } catch (error) {
             hideLoadingIndicator();
             console.error('❌ Ошибка разрезания аудио:', error);
             alert('Ошибка разрезания аудио');
-        });
+        }
+    })();
 }
 
 /**
@@ -5013,39 +5146,76 @@ function cutAudioFile(row) {
     // Показываем индикатор загрузки
     showLoadingIndicator('Обрезание аудиофайла...');
 
-    // Отправляем запрос на сервер
-    fetch('/cut-audio', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-            filename: filename,
-            filepath: filepath,
-            startTime: startTime,
-            endTime: endTime,
-            language: currentDictation.language_original
-        })
-    })
-        .then(response => response.json())
-        .then(data => {
-            hideLoadingIndicator();
-            if (data.success) {
-                // Обновляем имя файла в таблице
-                row.querySelector('.filename-text').textContent = data.newFilename;
-                row.dataset.filename = data.newFilename;
-                row.dataset.filepath = data.newFilepath;
-            } else {
-                console.error('❌ Ошибка обрезания аудио:', data.error);
-                alert('Ошибка обрезания аудио: ' + data.error);
+    const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
+    const isBlobPath = typeof filepath === 'string' && filepath.startsWith('blob:');
+
+    (async () => {
+        try {
+            const payload = {
+                filename: filename,
+                filepath: filepath,
+                startTime: startTime,
+                endTime: endTime,
+                language: currentDictation.language_original,
+                dictation_id: currentDictation.id
+            };
+
+            if (isDraft && isBlobPath) {
+                const resp = await fetch(filepath);
+                const buf = await resp.arrayBuffer();
+                const bytes = new Uint8Array(buf);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+                payload.audio_b64 = btoa(binary);
+                payload.mime = 'audio/mpeg';
+                delete payload.filepath;
             }
-        })
-        .catch(error => {
+
+            const response = await fetch('/cut-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDraft ? {} : { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` })
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            hideLoadingIndicator();
+
+            if (!data.success) {
+                console.error('❌ Ошибка обрезания аудио:', data.error);
+                alert('Ошибка обрезания аудио: ' + (data.error || 'Неизвестная ошибка'));
+                return;
+            }
+
+            if (data.audio_b64 && isDraft) {
+                const binaryOut = atob(data.audio_b64);
+                const outBytes = new Uint8Array(binaryOut.length);
+                for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                const outBlob = new Blob([outBytes], { type: data.mime || 'audio/mpeg' });
+                const outUrl = URL.createObjectURL(outBlob);
+
+                if (filepath && filepath.startsWith('blob:')) {
+                    try { URL.revokeObjectURL(filepath); } catch (e) {}
+                }
+
+                row.dataset.filepath = outUrl;
+                row.dataset.filename = data.filename || filename;
+                const el = row.querySelector('.filename-text');
+                if (el) el.textContent = row.dataset.filename;
+            } else {
+                // Старый режим: backend перезаписал файл, но структура ответа тут не согласована.
+                // Просто перезагрузим волну по текущему filepath.
+                row.dataset.filename = filename;
+                row.dataset.filepath = filepath;
+            }
+        } catch (error) {
             hideLoadingIndicator();
             console.error('❌ Ошибка обрезания аудио:', error);
             alert('Ошибка обрезания аудио');
-        });
+        }
+    })();
 }
 
 /**
@@ -6938,10 +7108,6 @@ async function autoTranslate(text, fromLanguage, toLanguage) {
  * @returns {string} - путь к папке с аудио
  */
 function getAudioPath(language) {
-    if (currentDictation.user_id && currentDictation.id.startsWith('dict_temp_')) {
-        return `/api/temp-audio/${currentDictation.user_id}/${currentDictation.id}/${language}`;
-    }
-
     if (currentDictation.id && currentDictation.id.startsWith('dict_')) {
         return `/api/audio/${currentDictation.id}/${language}`;
     }
@@ -7029,7 +7195,35 @@ async function generateAudioForSentence(sentence, language) {
 
         if (response.ok) {
             const result = await response.json();
-            return result.filename || filename; // Возвращаем имя файла
+            const generatedFilename = result.filename || filename;
+
+            if (currentDictation.id && currentDictation.id.startsWith('dict_temp_')) {
+                if (result && result.audio_b64) {
+                    try {
+                        const binary = atob(result.audio_b64);
+                        const bytes = new Uint8Array(binary.length);
+                        for (let i = 0; i < binary.length; i++) {
+                            bytes[i] = binary.charCodeAt(i);
+                        }
+                        const mime = result.mime || 'audio/mpeg';
+                        const blob = new Blob([bytes], { type: mime });
+                        const blobUrl = URL.createObjectURL(blob);
+
+                        if (!sentence.__draftAudioUrls) sentence.__draftAudioUrls = {};
+                        sentence.__draftAudioUrls[language] = blobUrl;
+                        sentence.__draftAudioMime = mime;
+                        sentence.__draftAudioFilename = generatedFilename;
+
+                        setDraftAudioUrl(language, generatedFilename, blobUrl);
+                    } catch (e) {
+                        console.error('❌ Не удалось создать draft audio blob url:', e);
+                    }
+                } else {
+                    console.warn('⚠️ generate_audio не вернул audio_b64 для draft диктанта');
+                }
+            }
+
+            return generatedFilename; // Возвращаем имя файла
         } else {
             const errorText = await response.text();
             console.error(`❌ Ошибка генерации аудио для ${filename}: ${response.status} ${errorText}`);

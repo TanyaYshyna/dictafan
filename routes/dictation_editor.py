@@ -18,6 +18,8 @@ import time
 import librosa
 import soundfile as sf
 import numpy
+import base64
+import tempfile
 from PIL import Image
 
 # from helpers.user_helpers import get_safe_email
@@ -78,39 +80,44 @@ def generate_audio():
         filename_audio  = data.get('filename_audio')
         lang = data.get('language')
 
-        # Создаем базовую директорию для хранения аудио
-        # Для новых диктантов используем temp/<user_id>/dict_temp_<timestamp>/
-        # Для существующих - temp/dict_<id>/
-        base_dir = 'static/data/temp'
-        if user_id and dictation_id.startswith('dict_temp_'):
-            # Новый диктант - используем путь temp/<user_id>/dict_temp_<timestamp>/
-            audio_dir = os.path.join(base_dir, str(user_id), dictation_id, lang)
-            logging.info(f"📁 Создаём папку для нового диктанта: {audio_dir} (user_id={user_id})")
+        is_temp_dictation = bool(dictation_id and dictation_id.startswith('dict_temp_'))
+        if is_temp_dictation:
+            tmp = tempfile.NamedTemporaryFile(prefix='dictafan_tts_', suffix='.mp3', delete=False)
+            filepath = tmp.name
+            tmp.close()
         else:
-            # Существующий диктант или user_id отсутствует - используем старый формат temp/dict_<id>/
+            base_dir = 'static/data/temp'
             audio_dir = os.path.join(base_dir, dictation_id, lang)
-            if dictation_id.startswith('dict_temp_') and not user_id:
-                logging.warning(f"⚠️ user_id отсутствует для временного диктанта, используем temp/{dictation_id}/")
-        
-        # Проверяем и создаем директории
-        try:
-            os.makedirs(audio_dir, exist_ok=True)
-            logging.info(f"Директория для аудио создана: {audio_dir}")
-        except OSError as e:
-            logging.error(f"Ошибка создания директории: {e}")
-            return jsonify({"success": False, "error": f"Ошибка создания директории: {e}"}), 500
+            try:
+                os.makedirs(audio_dir, exist_ok=True)
+                logging.info(f"Директория для аудио создана: {audio_dir}")
+            except OSError as e:
+                logging.error(f"Ошибка создания директории: {e}")
+                return jsonify({"success": False, "error": f"Ошибка создания директории: {e}"}), 500
 
-        # Генерируем имя файла
-        filepath = os.path.join(audio_dir, filename_audio)
+            filepath = os.path.join(audio_dir, filename_audio)
         
         # Генерируем аудио с обработкой ошибок
         try:
             tts = gTTS(text=text, lang=lang)
             tts.save(filepath)
             logging.info(f"Аудиофайл успешно сохранен: {filepath}")
-            
-            # Загружаем в B2, если включено.
-            # Для временных диктантов (dict_temp_*) кладём в отдельный префикс dictations_temp/<user_id>/...
+
+            if is_temp_dictation:
+                with open(filepath, 'rb') as f:
+                    audio_b64 = base64.b64encode(f.read()).decode('ascii')
+                try:
+                    os.remove(filepath)
+                except OSError:
+                    pass
+
+                return jsonify({
+                    "success": True,
+                    "filename": filename_audio,
+                    "mime": "audio/mpeg",
+                    "audio_b64": audio_b64,
+                })
+
             audio_url = None
             if not b2_storage.enabled:
                 return jsonify({
@@ -118,38 +125,21 @@ def generate_audio():
                     "error": "B2 storage is disabled"
                 }), 503
 
-            if dictation_id.startswith('dict_temp_'):
-                if not user_id:
-                    return jsonify({
-                        "success": False,
-                        "error": "Missing user_id for temp dictation"
-                    }), 400
+            remote_path = f"dictations/{dictation_id}/{lang}/{filename_audio}"
+            b2_url = b2_storage.upload_file(filepath, remote_path)
+            if not b2_url:
+                return jsonify({
+                    "success": False,
+                    "error": "Failed to upload audio to B2"
+                }), 502
 
-                remote_path = f"dictations_temp/{user_id}/{dictation_id}/{lang}/{filename_audio}"
-                b2_url = b2_storage.upload_file(filepath, remote_path)
-                if not b2_url:
-                    return jsonify({
-                        "success": False,
-                        "error": "Failed to upload temp audio to B2"
-                    }), 502
-
-                audio_url = f"/api/temp-audio/{user_id}/{dictation_id}/{lang}/{filename_audio}"
-                logging.info(f"Сгенерированное аудио (temp) загружено в B2: {remote_path}")
-            else:
-                remote_path = f"dictations/{dictation_id}/{lang}/{filename_audio}"
-                b2_url = b2_storage.upload_file(filepath, remote_path)
-                if not b2_url:
-                    return jsonify({
-                        "success": False,
-                        "error": "Failed to upload audio to B2"
-                    }), 502
-
-                audio_url = f"/api/audio/{dictation_id}/{lang}/{filename_audio}"
-                logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
+            audio_url = f"/api/audio/{dictation_id}/{lang}/{filename_audio}"
+            logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
 
             return jsonify({
                 "success": True,
-                "audio_url": audio_url
+                "audio_url": audio_url,
+                "filename": filename_audio,
             })
         except Exception as e:
             logging.error(f"Ошибка генерации аудио: {e}")
@@ -1022,6 +1012,25 @@ def save_dictation_final():
         # Для новых диктантов используем путь temp/<user_id>/dict_temp_<timestamp>/
         # Для существующих - temp/dict_<id>/
         temp_dictation_id = data.get('temp_id') or dictation_id
+
+        # В финал сохраняем только:
+        # - файлы предложений с суффиксом _audio.mp3
+        # - общий файл(ы) audio_user_shared (если указан)
+        shared_audio_names = set()
+        shared_audio_relpaths = set()
+        try:
+            for _lang, _lang_data in (data.get('sentences') or {}).items():
+                if not _lang_data:
+                    continue
+                shared_name = _lang_data.get('audio_user_shared')
+                if isinstance(shared_name, str) and shared_name.strip():
+                    shared_name = shared_name.strip()
+                    shared_audio_names.add(shared_name)
+                    if isinstance(_lang, str) and _lang.strip():
+                        shared_audio_relpaths.add(f"{_lang.strip()}/{shared_name}")
+        except Exception:
+            shared_audio_names = set()
+            shared_audio_relpaths = set()
         
         # Определяем путь к временной папке
         # Пробуем сначала temp/<user_id>/dict_temp_<timestamp>/, потом temp/dict_temp_<timestamp>/
@@ -1052,9 +1061,17 @@ def save_dictation_final():
                 for file in files:
                     # Поддерживаемые расширения: mp3, mp4, webm, wav, ogg, m4a, aac, flac
                     if file.lower().endswith(('.mp3', '.mp4', '.webm', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+                        # Фильтрация: сохраняем только финальные аудио-файлы и общий файл
+                        is_final_sentence_audio = file.lower().endswith('_audio.mp3')
                         src_file = os.path.join(root, file)
                         # Определяем относительный путь от temp папки
                         rel_path = os.path.relpath(src_file, temp_path)
+                        rel_path_posix = rel_path.replace(os.sep, '/')
+
+                        is_shared_audio = (file in shared_audio_names) or (rel_path_posix in shared_audio_relpaths)
+                        if not (is_final_sentence_audio or is_shared_audio):
+                            continue
+
                         dst_file = os.path.join(final_path, rel_path)
                         
                         # Создаем папку назначения если нужно
@@ -1314,6 +1331,7 @@ def upload_audio_file():
         language = request.form.get('language', 'en')
         dictation_id = request.form.get('dictation_id')  # Получаем ID диктанта
         sentence_key = request.form.get('sentenceKey')  # Ключ предложения (для режима микрофона)
+        audio_mode = request.form.get('audioMode', '').strip().lower()
         
         if not audio:
             return jsonify({'success': False, 'error': 'Аудиофайл не найден'}), 400
@@ -1337,8 +1355,15 @@ def upload_audio_file():
         
         os.makedirs(temp_path, exist_ok=True)
         
-        # Используем оригинальное имя файла
-        filename = audio.filename
+        # Имя файла:
+        # - для общего файла (audioMode=full) используем фиксированное имя
+        # - иначе используем оригинальное имя
+        if audio_mode == 'full':
+            _, ext = os.path.splitext(audio.filename or '')
+            ext = (ext or '.mp3').lower()
+            filename = f"audio_user_shared{ext}"
+        else:
+            filename = audio.filename
         
         filepath = os.path.join(temp_path, filename)
         audio.save(filepath)
@@ -1506,33 +1531,63 @@ def cut_audio_file():
         dictation_id = data.get('dictation_id')
         filename = data.get('filename')
         filepath = data.get('filepath')
-        start_time = float(data.get('start_time', 0))  # изменено на snake_case и преобразование в float
-        end_time = float(data.get('end_time', 0))      # изменено на snake_case и преобразование в float
+        audio_b64 = data.get('audio_b64')
+        mime = data.get('mime')
+        start_time_raw = data.get('start_time', None)
+        if start_time_raw is None:
+            start_time_raw = data.get('startTime', 0)
+        end_time_raw = data.get('end_time', None)
+        if end_time_raw is None:
+            end_time_raw = data.get('endTime', 0)
+
+        start_time = float(start_time_raw or 0)
+        end_time = float(end_time_raw or 0)
         language = data.get('language', 'en')
         
-        if not filename or not filepath:
-            logger.error("Отсутствуют filename или filepath")
+        if not filename:
+            logger.error("Отсутствует filename")
             return jsonify({'success': False, 'error': 'Не указан файл для обрезания'}), 400
+
+        physical_path = None
+        cleanup_paths = []
+
+        if audio_b64:
+            # Draft-mode: файл существует только в браузере, передан как base64
+            try:
+                ext = os.path.splitext(filename)[1].lower() or '.mp3'
+                tmp_in = tempfile.NamedTemporaryFile(prefix='dictafan_cut_in_', suffix=ext, delete=False)
+                physical_path = tmp_in.name
+                tmp_in.close()
+
+                with open(physical_path, 'wb') as f:
+                    f.write(base64.b64decode(audio_b64))
+                cleanup_paths.append(physical_path)
+            except Exception as e:
+                logger.error(f"Не удалось подготовить input файл из audio_b64: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': 'Некорректные данные audio_b64'}), 400
+        else:
+            if not filepath:
+                logger.error("Отсутствуют filepath и audio_b64")
+                return jsonify({'success': False, 'error': 'Не указан файл для обрезания'}), 400
+
+            # Server-file mode
+            physical_path = filepath.replace('/static/', 'static/')
+            logger.info(f"Физический путь к файлу: {physical_path}")
+            if not os.path.exists(physical_path):
+                logger.error(f"Файл не найден: {physical_path}")
+                return jsonify({'success': False, 'error': 'Исходный файл не найден'}), 404
         
-        # Получаем физический путь к файлу
-        physical_path = filepath.replace('/static/', 'static/')
-        logger.info(f"Физический путь к файлу: {physical_path}")
-        
-        if not os.path.exists(physical_path):
-            logger.error(f"Файл не найден: {physical_path}")
-            return jsonify({'success': False, 'error': 'Исходный файл не найден'}), 404
-        
-        # Обрезание аудио: единый путь через ffmpeg (без перекодирования)
+        # Обрезание аудио: единый путь через ffmpeg
         logger.info(f"Обрезание аудио: {filename} с {start_time} по {end_time}")
 
         try:
-            import subprocess, tempfile
-            ext = os.path.splitext(physical_path)[1].lower()
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp_out:
+            import subprocess
+            ext = os.path.splitext(filename)[1].lower() or os.path.splitext(physical_path)[1].lower() or '.mp3'
+            with tempfile.NamedTemporaryFile(prefix='dictafan_cut_out_', delete=False, suffix=ext) as tmp_out:
                 tmp_out_path = tmp_out.name
+            cleanup_paths.append(tmp_out_path)
 
-            # Команда ffmpeg: копирование дорожек без перекодирования (-c copy)
+            # Команда ffmpeg: по возможности без перекодирования (-c copy)
             cmd = [
                 'ffmpeg', '-y',
                 '-i', physical_path,
@@ -1544,16 +1599,50 @@ def cut_audio_file():
             logger.info(f"Запуск ffmpeg: {' '.join(cmd)}")
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             if proc.returncode != 0:
-                logger.error(f"ffmpeg error: {proc.stderr.decode(errors='ignore')}")
-                return jsonify({'success': False, 'error': 'ffmpeg не смог обрезать файл'}), 500
+                # Фолбек: перекодирование (более надёжно, если контейнер/тайминги не подходят)
+                logger.warning(f"ffmpeg copy failed, retry with re-encode: {proc.stderr.decode(errors='ignore')}")
+                cmd2 = [
+                    'ffmpeg', '-y',
+                    '-i', physical_path,
+                    '-ss', str(max(0.0, float(start_time))),
+                    '-to', str(max(0.0, float(end_time))),
+                    '-vn',
+                    tmp_out_path
+                ]
+                logger.info(f"Запуск ffmpeg (re-encode): {' '.join(cmd2)}")
+                proc2 = subprocess.run(cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if proc2.returncode != 0:
+                    logger.error(f"ffmpeg re-encode error: {proc2.stderr.decode(errors='ignore')}")
+                    return jsonify({'success': False, 'error': 'ffmpeg не смог обрезать файл'}), 500
 
-            # Заменяем исходный файл обрезанной версией
+            if audio_b64:
+                with open(tmp_out_path, 'rb') as f:
+                    out_b64 = base64.b64encode(f.read()).decode('ascii')
+                return jsonify({
+                    'success': True,
+                    'filename': filename,
+                    'mime': mime or 'audio/mpeg',
+                    'audio_b64': out_b64,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'message': 'Аудиофайл успешно обрезан'
+                })
+
+            # Server-file mode: перезаписываем исходный файл
             os.replace(tmp_out_path, physical_path)
             logger.info(f"Аудиофайл успешно обрезан и перезаписан (ffmpeg): {filename}")
 
         except Exception as e:
             logger.error(f"Ошибка при обрезании аудио (ffmpeg): {e}", exc_info=True)
             return jsonify({'success': False, 'error': f'Ошибка обрезания аудио: {str(e)}'}), 500
+
+        finally:
+            for p in cleanup_paths:
+                try:
+                    if p and os.path.exists(p):
+                        os.remove(p)
+                except OSError:
+                    pass
         
         return jsonify({
             'success': True,
@@ -1577,74 +1666,123 @@ def split_audio_file():
         data = request.get_json()
         filename = data.get('filename')
         filepath = data.get('filepath')
+        audio_b64 = data.get('audio_b64')
+        mime = data.get('mime')
         sentences = data.get('sentences', [])
         dictation_id = data.get('dictation_id')
         
-        if not filename or not filepath or not sentences:
+        if not filename or not sentences:
             return jsonify({'success': False, 'error': 'Не указаны необходимые параметры'}), 400
-        
-        # Получаем физический путь к файлу
-        physical_path = filepath.replace('/static/', 'static/')
-        
-        if not os.path.exists(physical_path):
-            return jsonify({'success': False, 'error': 'Исходный файл не найден'}), 404
+
+        physical_path = None
+        cleanup_paths = []
+
+        if audio_b64:
+            try:
+                ext = os.path.splitext(filename)[1].lower() or '.mp3'
+                tmp_in = tempfile.NamedTemporaryFile(prefix='dictafan_split_in_', suffix=ext, delete=False)
+                physical_path = tmp_in.name
+                tmp_in.close()
+                with open(physical_path, 'wb') as f:
+                    f.write(base64.b64decode(audio_b64))
+                cleanup_paths.append(physical_path)
+            except Exception as e:
+                logger.error(f"Не удалось подготовить input файл из audio_b64: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': 'Некорректные данные audio_b64'}), 400
+        else:
+            if not filepath:
+                return jsonify({'success': False, 'error': 'Не указан источник файла'}), 400
+
+            physical_path = filepath.replace('/static/', 'static/')
+            if not os.path.exists(physical_path):
+                return jsonify({'success': False, 'error': 'Исходный файл не найден'}), 404
         
         logger.info(f"Разрезание аудио: {filename} на {len(sentences)} предложений")
-        
+
+        created_files = []
         try:
-            import librosa
-            import soundfile as sf
-            
-            # Загружаем аудиофайл
-            y, sr = librosa.load(physical_path, sr=None)
-            
-            # Создаем директорию для обрезанных файлов
-            output_dir = os.path.dirname(physical_path)
-            
-            # Разрезаем аудио на предложения
-            created_files = []  # Список созданных файлов для ответа
-            
+            import subprocess
             for sentence in sentences:
                 key = sentence.get('key')
-                start_time = sentence.get('start_time', 0)
-                end_time = sentence.get('end_time', 0)
+                start_time_raw = sentence.get('start_time', None)
+                if start_time_raw is None:
+                    start_time_raw = sentence.get('startTime', 0)
+                end_time_raw = sentence.get('end_time', None)
+                if end_time_raw is None:
+                    end_time_raw = sentence.get('endTime', 0)
+                start_time = float(start_time_raw or 0)
+                end_time = float(end_time_raw or 0)
                 language = sentence.get('language', 'en')
-                
+
                 if not key or start_time >= end_time:
                     continue
-                
-                # Вычисляем индексы для обрезки
-                start_sample = int(start_time * sr)
-                end_sample = int(end_time * sr)
-                
-                # Обрезаем аудио
-                y_segment = y[start_sample:end_sample]
-                
-                # Создаем имя файла для предложения
+
                 segment_filename = f"{key}_{language}_user.mp3"
-                segment_path = os.path.join(output_dir, segment_filename)
-                
-                # Сохраняем обрезанный файл
-                sf.write(segment_path, y_segment, sr)
-                
-                # Добавляем информацию о созданном файле
-                created_files.append({
-                    'key': key,
-                    'filename': segment_filename,
-                    'start_time': start_time,
-                    'end_time': end_time
-                })
-                
+                with tempfile.NamedTemporaryFile(prefix='dictafan_split_out_', suffix='.mp3', delete=False) as tmp_out:
+                    tmp_out_path = tmp_out.name
+                cleanup_paths.append(tmp_out_path)
+
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', physical_path,
+                    '-ss', str(max(0.0, float(start_time))),
+                    '-to', str(max(0.0, float(end_time))),
+                    '-c', 'copy',
+                    tmp_out_path
+                ]
+                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                if proc.returncode != 0:
+                    logger.warning(f"ffmpeg copy failed for {segment_filename}, retry with re-encode")
+                    cmd2 = [
+                        'ffmpeg', '-y',
+                        '-i', physical_path,
+                        '-ss', str(max(0.0, float(start_time))),
+                        '-to', str(max(0.0, float(end_time))),
+                        '-vn',
+                        tmp_out_path
+                    ]
+                    proc2 = subprocess.run(cmd2, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    if proc2.returncode != 0:
+                        logger.error(f"ffmpeg re-encode error for {segment_filename}: {proc2.stderr.decode(errors='ignore')}")
+                        continue
+
+                if audio_b64:
+                    with open(tmp_out_path, 'rb') as f:
+                        seg_b64 = base64.b64encode(f.read()).decode('ascii')
+                    created_files.append({
+                        'key': key,
+                        'filename': segment_filename,
+                        'mime': mime or 'audio/mpeg',
+                        'audio_b64': seg_b64,
+                        'start_time': start_time,
+                        'end_time': end_time
+                    })
+                else:
+                    # Server-file mode: создаём файл рядом с исходником
+                    output_dir = os.path.dirname(physical_path)
+                    segment_path = os.path.join(output_dir, segment_filename)
+                    os.replace(tmp_out_path, segment_path)
+                    created_files.append({
+                        'key': key,
+                        'filename': segment_filename,
+                        'start_time': start_time,
+                        'end_time': end_time
+                    })
+
                 logger.info(f"Создан файл: {segment_filename} ({start_time:.2f}s - {end_time:.2f}s)")
-            
-            logger.info(f"Аудиофайл успешно разрезан на {len(sentences)} предложений")
-            
-        except ImportError:
-            logger.error("Библиотека librosa не установлена")
-            return jsonify({'success': False, 'error': 'Библиотека librosa не установлена'}), 500
+
         except Exception as e:
-            logger.error(f"Ошибка при разрезании аудио: {e}")
+            logger.error(f"Ошибка при разрезании аудио (ffmpeg): {e}", exc_info=True)
             return jsonify({'success': False, 'error': f'Ошибка разрезания аудио: {str(e)}'}), 500
+
+        finally:
+            if audio_b64:
+                for p in cleanup_paths:
+                    try:
+                        if p and os.path.exists(p):
+                            os.remove(p)
+                    except OSError:
+                        pass
         
         return jsonify({
             'success': True,

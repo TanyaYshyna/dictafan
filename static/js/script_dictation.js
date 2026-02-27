@@ -6551,7 +6551,7 @@ async function loadSentencesFromIndexedDb() {
             if (!raw.startsWith('http://') && !raw.startsWith('https://')) return raw;
             try {
                 const u = new URL(raw);
-                if (u.pathname && (u.pathname.startsWith('/api/audio/') || u.pathname.startsWith('/api/temp-audio/'))) {
+                if (u.pathname && (u.pathname.startsWith('/api/audio/') || u.pathname.startsWith('/api/temp/'))) {
                     return `${u.pathname}${u.search || ''}`;
                 }
             } catch (e) {

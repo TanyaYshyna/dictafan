@@ -2,6 +2,10 @@ const CACHE_VERSION = 'v4';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
+// Persistent cache for dictation media. Must survive SW updates so offline dictations
+// (IndexedDB tables + audio/covers) are not lost when updating HTML/JS/CSS.
+const MEDIA_CACHE_PERSIST = 'dictafan-media';
+
 const DEFAULT_MAX_BYTES = 300 * 1024 * 1024;
 
 function openMetaDb() {
@@ -84,6 +88,32 @@ function isUnboundedUrl(requestUrl) {
   }
 }
 
+function isMediaUrl(requestUrl) {
+  try {
+    const url = new URL(requestUrl);
+    const path = url.pathname;
+    if (path.startsWith('/api/audio/')) return true;
+    if (path.startsWith('/api/temp/')) return true;
+    if (path === '/api/cover') return true;
+    if (path === '/library/api/book-cover') return true;
+    if (path === '/user/api/avatar') return true;
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function pickCacheNameForRequest(requestOrUrl) {
+  try {
+    const raw = typeof requestOrUrl === 'string' ? requestOrUrl : requestOrUrl.url;
+    if (isMediaUrl(raw)) return MEDIA_CACHE_PERSIST;
+    if (isUnboundedUrl(raw)) return RUNTIME_CACHE_UNBOUNDED;
+    return RUNTIME_CACHE_BOUNDED;
+  } catch (e) {
+    return RUNTIME_CACHE_BOUNDED;
+  }
+}
+
 async function setMaxBytes(value) {
   const parsed = Number(value);
   const maxBytes = isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
@@ -131,7 +161,7 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/audio/')) return true;
-    if (path.startsWith('/api/temp-audio/')) return true;
+    if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
@@ -152,7 +182,7 @@ function shouldHandleRequest(requestUrl) {
 
 async function cacheFirstBounded(request) {
   try {
-    const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+    const cache = await caches.open(pickCacheNameForRequest(request));
 
     const hasRange = request.headers && request.headers.has('range');
     const cacheKey = hasRange ? request.url : normalizeCacheKey(request);
@@ -194,7 +224,7 @@ async function cacheFirstBounded(request) {
 
 async function cacheFirstUnbounded(request) {
   try {
-    const cache = await caches.open(RUNTIME_CACHE_UNBOUNDED);
+    const cache = await caches.open(pickCacheNameForRequest(request));
 
     const cacheKey = normalizeCacheKey(request);
     let cached = await cache.match(cacheKey);
@@ -230,7 +260,7 @@ async function cacheFirstUnbounded(request) {
 
 async function cacheAudioFullFileInBackground(url) {
   try {
-    const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+    const cache = await caches.open(MEDIA_CACHE_PERSIST);
     const cached = await cache.match(url);
     if (cached) return;
 
@@ -254,6 +284,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
+    // Delete only outdated versioned runtime caches. Keep MEDIA_CACHE_PERSIST.
     await Promise.all(keys.map((key) => {
       if (key.startsWith('dictafan-runtime-') && key !== RUNTIME_CACHE_BOUNDED && key !== RUNTIME_CACHE_UNBOUNDED) {
         return caches.delete(key);
@@ -298,7 +329,7 @@ self.addEventListener('fetch', (event) => {
     if (url.pathname && url.pathname.startsWith('/api/audio/')) {
       event.respondWith((async () => {
         try {
-          const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+          const cache = await caches.open(MEDIA_CACHE_PERSIST);
           const cached = await cache.match(request.url);
           if (cached) return cached;
         } catch (e) {
@@ -321,7 +352,7 @@ self.addEventListener('fetch', (event) => {
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {
       try {
-        const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+        const cache = await caches.open(MEDIA_CACHE_PERSIST);
         const cached = await cache.match(request.url);
         if (cached) return cached;
       } catch (e) {
@@ -522,7 +553,6 @@ async function prefetchUrlsStrict(urls) {
 }
 
 async function checkUrlsInCache(urls) {
-  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
   const missing = [];
   for (const url of urls || []) {
     try {
@@ -532,6 +562,8 @@ async function checkUrlsInCache(urls) {
       }
       const absolute = new URL(url, self.location.origin).toString();
       const normalizedKey = normalizeCacheKey(absolute);
+      const cacheName = pickCacheNameForRequest(absolute);
+      const cache = await caches.open(cacheName);
       const cached = (await cache.match(normalizedKey)) || (await cache.match(absolute));
       if (!cached) missing.push(absolute);
     } catch (e) {
@@ -542,7 +574,8 @@ async function checkUrlsInCache(urls) {
 }
 
 async function purgeDictationFromBoundedCache(dictationId) {
-  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+  // Purge dictation media from the persistent media cache.
+  const cache = await caches.open(MEDIA_CACHE_PERSIST);
   const keys = await cache.keys();
 
   const dictId = String(dictationId || '').trim();
