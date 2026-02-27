@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0077';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0078';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -1020,6 +1020,7 @@ function ensureWaveformRegionMatchesMode(currentMode) {
  * @param {Event} event - событие клика
  */
 async function handleAudioPlayback(event) {
+    console.log('WWW 1 WWWWWWWWWWWWWWWWWWWW');
     try {
         console.log('[handleAudioPlayback] enter', {
             targetTag: event && event.target && event.target.tagName,
@@ -1028,11 +1029,13 @@ async function handleAudioPlayback(event) {
     } catch (e) {
     }
     const button = event.target.closest('button.audio-btn');
+    console.log('WWW 2 WWWWWWWWWWWWWWWWWWWW');
 
     if (!button) {
         console.error('❌ Кнопка не найдена!');
         return;
     }
+    console.log('WWW 3 WWWWWWWWWWWWWWWWWWWW');
 
     const __audioDbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
     const __audioDbg = (...args) => {
@@ -1041,6 +1044,7 @@ async function handleAudioPlayback(event) {
         } catch (e) {
         }
     };
+    console.log('WWW 4 WWWWWWWWWWWWWWWWWWWW');
 
     __audioDbg('click', {
         id: button.id,
@@ -1058,6 +1062,7 @@ async function handleAudioPlayback(event) {
     const state = button.dataset.state;
     const language = button.dataset.language; // 'en' или 'ru'
     const languageUrl = getAudioPath(language);
+    console.log('WWW 5 WWWWWWWWWWWWWWWWWWWW');
     
     let fieldName = 'audio'; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
     let nameAudioFile = 'audio.mp3';
@@ -1067,6 +1072,7 @@ async function handleAudioPlayback(event) {
     // Определяем, является ли это кнопкой под волной (объявляем в начале, чтобы была доступна везде)
     const isUnderWave = button && button.id === 'audioPlayBtn';
 
+    console.log('WWW 6 WWWWWWWWWWWWWWWWWWWW');
     // Кнопка воспроизведения созданного файла
      if (button.id === 'playCreatedAudioBtn') {
         audioUrl = button.dataset.audioUrl;
