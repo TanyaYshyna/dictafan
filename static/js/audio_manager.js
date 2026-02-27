@@ -241,15 +241,20 @@ class AudioManagerClass {
             }
         }
 
-        // Функция для нормализации URL (убирает протокол и домен, оставляет только путь)
+        // Функция для нормализации URL (для http(s) убирает протокол и домен, оставляет только путь)
+        // Для blob:/data: URL считаем их "opaque" и сравниваем как есть.
         const normalizeUrl = (url) => {
             if (!url) return '';
+            const s = String(url);
+            if (s.startsWith('blob:') || s.startsWith('data:')) {
+                return s;
+            }
             try {
-                const urlObj = new URL(url, window.location.origin);
+                const urlObj = new URL(s, window.location.origin);
                 return urlObj.pathname + urlObj.search;
             } catch (e) {
                 // Если не удалось распарсить как URL, возвращаем как есть
-                return url.replace(/^https?:\/\/[^\/]+/, '');
+                return s.replace(/^https?:\/\/[^\/]+/, '');
             }
         };
         
