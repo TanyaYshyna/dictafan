@@ -455,22 +455,25 @@
     <script id="language-data" type="application/json">
     {{ language_data | tojson | safe }}
     </script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_register.js') }}"></script>
+    <script>
+        window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/user_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/login_modal.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/sw_register.js') }}?v={{ app_cache_revision }}"></script>
     <!-- Audio runtime must be loaded before UI wrapper -->
-    <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/audio_player_visual.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_player_visual.js') }}?v={{ app_cache_revision }}"></script>
     <!-- Статистика и отчеты -->
-    <script src="{{ url_for('static', filename='js/user_activity_history.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/dictation_statistics.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/progress_panel.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/statistics_report.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/dictation_statistics.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/progress_panel.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
     <!-- Unified Speech Recognition -->
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v=20260212_1"></script>
     <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v=20260212_1"></script>

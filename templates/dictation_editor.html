@@ -675,19 +675,22 @@
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
 
     <!-- Добавляем скрипты LanguageManager и LanguageSelector -->
-    <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
+    <script>
+        window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/audio_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script id="language-data" type="application/json">
     {{ language_data | tojson | safe }}
     </script>
-    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/language_selector.js') }}?v={{ app_cache_revision }}"></script>
 
     <!-- Добавляем скрипты UserManager -->
-    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_register.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/user_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/login_modal.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/sw_register.js') }}?v={{ app_cache_revision }}"></script>
 
     <script>
         // Инициализируем Lucide иконки
@@ -717,7 +720,7 @@
 
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
-    <script src="{{ url_for('static', filename='js/script_dictation_editor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/script_dictation_editor.js') }}?v={{ app_cache_revision }}"></script>
 
     <script>
         // Инициализация UserManager перед загрузкой основного скрипта

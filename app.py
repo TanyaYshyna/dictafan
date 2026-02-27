@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 import os
 import sys
 import logging
+import hashlib
 
 # Уменьшаем уровень логирования werkzeug (убираем лишние HTTP запросы)
 log = logging.getLogger('werkzeug')
@@ -18,6 +19,58 @@ app = Flask(
     __name__,
     static_folder=None,
 )
+
+
+def get_app_cache_revision() -> str:
+    try:
+        for k in (
+            'APP_CACHE_REVISION',
+            'RAILWAY_GIT_COMMIT_SHA',
+            'RAILWAY_GIT_COMMIT',
+            'GIT_COMMIT',
+            'SOURCE_VERSION',
+            'RENDER_GIT_COMMIT',
+            'VERCEL_GIT_COMMIT_SHA',
+        ):
+            v = os.getenv(k)
+            if v:
+                return str(v)
+    except Exception:
+        pass
+
+    try:
+        base_dir = os.path.dirname(__file__)
+        candidates = [
+            'sw.js',
+            os.path.join('static', 'js', 'script_dictation.js'),
+            os.path.join('static', 'js', 'script_dictation_editor.js'),
+            os.path.join('static', 'js', 'audio_manager.js'),
+            os.path.join('static', 'js', 'sw_register.js'),
+            os.path.join('static', 'css', 'style_dictation.css'),
+        ]
+        parts = []
+        for rel in candidates:
+            try:
+                p = os.path.join(base_dir, rel)
+                st = os.stat(p)
+                parts.append(f"{rel}:{int(st.st_mtime)}:{st.st_size}")
+            except Exception:
+                continue
+        if parts:
+            raw = '|'.join(parts).encode('utf-8')
+            return hashlib.sha1(raw).hexdigest()[:12]
+    except Exception:
+        pass
+
+    return '1'
+
+
+@app.context_processor
+def inject_app_cache_revision():
+    try:
+        return {'app_cache_revision': get_app_cache_revision()}
+    except Exception:
+        return {'app_cache_revision': '1'}
 
 # Нужен валидный app.static_folder для логики бэкенда, где используются пути
 # через current_app.static_folder (поиск обложек, экспорт/импорт и т.д.).

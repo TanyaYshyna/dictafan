@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
@@ -55,8 +55,20 @@ function normalizeCacheKey(requestOrUrl) {
       return `${url.origin}${path}`;
     }
 
-    // For app shell + static assets, ignore cache-busting query params like ?v=...
-    if (path === '/' || path.startsWith('/dictation/') || path.startsWith('/static/')) {
+    // For JS/CSS assets we MUST respect cache-busting query params (?v=...) so deploys can
+    // reliably ship new code even with SW runtime caching.
+    if (path.startsWith('/static/')) {
+      const isJs = path.endsWith('.js');
+      const isCss = path.endsWith('.css');
+      if (isJs || isCss) {
+        return `${url.origin}${path}${url.search}`;
+      }
+      // Other static assets can ignore query params.
+      return `${url.origin}${path}`;
+    }
+
+    // App shell: ignore query params.
+    if (path === '/' || path.startsWith('/dictation/')) {
       return `${url.origin}${path}`;
     }
 
