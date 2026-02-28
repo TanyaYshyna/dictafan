@@ -35,9 +35,9 @@ class AudioManagerClass {
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
         const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/temp/dictations/');
         const isGestureSensitiveUrl = isBlobUrl || isDraftAudioUrl;
-        if (isBlobUrl) {
+        if (isGestureSensitiveUrl) {
             try {
-                console.log('[AUDIO_MGR] blob play attempt', {
+                console.log('[AUDIO_MGR] gesture play attempt', {
                     audioUrl,
                     buttonId: button && button.id,
                     state: button && button.dataset && button.dataset.state
@@ -182,8 +182,8 @@ class AudioManagerClass {
                 const logBlobEvent = (ev) => {
                     try {
                         const ae = ev && ev.currentTarget ? ev.currentTarget : currentAudio;
-                        if (isBlobUrl) {
-                            console.log('[AUDIO_MGR] blob event', ev && ev.type, {
+                        if (isGestureSensitiveUrl) {
+                            console.log('[AUDIO_MGR] gesture event', ev && ev.type, {
                                 readyState: ae && ae.readyState,
                                 networkState: ae && ae.networkState,
                                 currentTime: ae && ae.currentTime,
@@ -201,7 +201,7 @@ class AudioManagerClass {
 
                         // Safari sometimes emits pause at t=0 while still loading; if that happens,
                         // don't leave the UI stuck in "playing".
-                        if (isBlobUrl && ev && ev.type === 'pause') {
+                        if (isGestureSensitiveUrl && ev && ev.type === 'pause') {
                             const t = Number(ae && ae.currentTime);
                             if (!isFinite(t) || t <= 0) {
                                 revertButtonReadyState();
@@ -457,14 +457,17 @@ class AudioManagerClass {
                         _didCallPlay = false;
                     }
                     try {
-                        if (isBlobUrl) {
-                            console.log('[AUDIO_MGR] blob play AbortError (click again after ready)', {
+                        if (isGestureSensitiveUrl) {
+                            console.log('[AUDIO_MGR] gesture play AbortError (click again after ready)', {
                                 readyState: currentAudio && currentAudio.readyState,
-                                networkState: currentAudio && currentAudio.networkState
+                                networkState: currentAudio && currentAudio.networkState,
+                                audioUrl,
                             });
                         }
                     } catch (e) {
                     }
+
+                    revertButtonReadyState();
                     return;
                 }
                 
