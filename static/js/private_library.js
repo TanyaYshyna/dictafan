@@ -199,7 +199,14 @@
         if (data.success) {
           resolve(data);
         } else {
-          reject(new Error(data.error || 'SW error'));
+          const baseErr = data.error || 'SW error';
+          const result = data.result || {};
+          const failedUrls = Array.isArray(result.failedUrls) ? result.failedUrls : [];
+          const overLimitUrls = Array.isArray(result.overLimitUrls) ? result.overLimitUrls : [];
+          let suffix = '';
+          if (failedUrls.length) suffix += ` | failedUrls: ${failedUrls.slice(0, 10).join(' ; ')}`;
+          if (overLimitUrls.length) suffix += ` | overLimitUrls: ${overLimitUrls.slice(0, 10).join(' ; ')}`;
+          reject(new Error(`${baseErr}${suffix}`));
         }
       };
 

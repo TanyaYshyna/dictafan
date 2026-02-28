@@ -626,6 +626,9 @@ async function prefetchUrlsStrict(urls) {
   let failed = 0;
   let overLimit = 0;
 
+  const failedUrls = [];
+  const overLimitUrls = [];
+
   const maxBytes = await getMaxBytes();
   const cacheTotals = new Map();
 
@@ -664,12 +667,26 @@ async function prefetchUrlsStrict(urls) {
           cacheTotals.set(cacheName, totalBytes);
         } else {
           overLimit += 1;
+          if (overLimitUrls.length < 10) overLimitUrls.push(absolute);
         }
       } else {
         failed += 1;
+        if (failedUrls.length < 10) {
+          const status = res ? res.status : 'no_response';
+          failedUrls.push(`${absolute} (status ${status})`);
+        }
       }
     } catch (e) {
       failed += 1;
+      if (failedUrls.length < 10) {
+        const msg = e && e.message ? e.message : String(e);
+        try {
+          const absolute = new URL(url, self.location.origin).toString();
+          failedUrls.push(`${absolute} (error ${msg})`);
+        } catch (e2) {
+          failedUrls.push(`${String(url)} (error ${msg})`);
+        }
+      }
     }
   }
 
@@ -683,6 +700,8 @@ async function prefetchUrlsStrict(urls) {
     total: (urls || []).length,
     totalBytes,
     maxBytes,
+    failedUrls,
+    overLimitUrls,
   };
 }
 
