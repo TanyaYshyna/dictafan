@@ -140,7 +140,10 @@ class AudioManagerClass {
 
         // Создаем новый аудио элемент
         const previousAudio = this.audio;
-        this.audio = new Audio(audioUrl);
+        const prewarmed = (isDraftAudioUrl && window.__DICTATION_EDITOR_PREWARM_AUDIOS)
+            ? window.__DICTATION_EDITOR_PREWARM_AUDIOS[String(audioUrl)]
+            : null;
+        this.audio = prewarmed || new Audio(audioUrl);
         this.currentButton = button || null;
 
         if (isDraftAudioUrl && this.audio) {
@@ -223,8 +226,12 @@ class AudioManagerClass {
                     'play', 'playing', 'pause', 'ended',
                     'waiting', 'stalled', 'suspend', 'abort', 'error', 'timeupdate'
                 ];
-                for (const evt of events) {
-                    currentAudio.addEventListener(evt, logBlobEvent);
+
+                if (!currentAudio.__audioMgrGestureListenersInstalled) {
+                    for (const evt of events) {
+                        currentAudio.addEventListener(evt, logBlobEvent);
+                    }
+                    currentAudio.__audioMgrGestureListenersInstalled = true;
                 }
             } catch (e) {
             }
