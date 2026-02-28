@@ -368,7 +368,53 @@ self.addEventListener('fetch', (event) => {
       try {
         const cache = await caches.open(MEDIA_CACHE_PERSIST);
         const cached = await cache.match(request.url);
-        if (cached) return cached;
+        if (cached) {
+          try {
+            const rangeHeader = request.headers.get('range');
+            if (!rangeHeader) return cached;
+
+            const m = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader.trim());
+            if (!m) return cached;
+
+            const fullBlob = await cached.clone().blob();
+            const size = fullBlob.size || 0;
+
+            let start = m[1] ? parseInt(m[1], 10) : NaN;
+            let end = m[2] ? parseInt(m[2], 10) : NaN;
+
+            if (isNaN(start)) {
+              // bytes=-N (suffix)
+              const suffix = isNaN(end) ? 0 : end;
+              start = Math.max(0, size - suffix);
+              end = size > 0 ? size - 1 : 0;
+            } else {
+              if (isNaN(end) || end >= size) end = size > 0 ? size - 1 : 0;
+            }
+
+            if (size <= 0 || start < 0 || start >= size || end < start) {
+              return new Response('Range Not Satisfiable', {
+                status: 416,
+                headers: {
+                  'Content-Range': `bytes */${size}`,
+                  'Content-Type': 'text/plain; charset=utf-8'
+                }
+              });
+            }
+
+            const chunk = fullBlob.slice(start, end + 1);
+            const headers = new Headers();
+            const ct = cached.headers.get('content-type') || cached.headers.get('Content-Type') || 'audio/mpeg';
+            headers.set('Content-Type', ct);
+            headers.set('Accept-Ranges', 'bytes');
+            headers.set('Content-Range', `bytes ${start}-${end}/${size}`);
+            headers.set('Content-Length', String((end - start + 1) || 0));
+
+            return new Response(chunk, { status: 206, headers });
+          } catch (e) {
+            // Fallback to full cached response
+            return cached;
+          }
+        }
       } catch (e) {
         // ignore
       }
