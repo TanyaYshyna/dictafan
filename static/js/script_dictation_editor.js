@@ -5,8 +5,37 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0097';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0098';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
+
+window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
+
+function prewarmDraftAudioUrl(url) {
+    try {
+        if (!url || typeof url !== 'string') return;
+        if (!url.includes('/temp/dictations/')) return;
+        const key = String(url);
+        if (window.__DICTATION_EDITOR_PREWARM_AUDIOS[key]) return;
+
+        const a = new Audio(key);
+        try { a.preload = 'auto'; } catch (e) {}
+        try { a.load(); } catch (e) {}
+        window.__DICTATION_EDITOR_PREWARM_AUDIOS[key] = a;
+    } catch (e) {
+    }
+}
+
+function prewarmAllDraftAudioUrls() {
+    try {
+        const map = window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS;
+        if (!map) return;
+        const values = Object.values(map);
+        for (const u of values) {
+            prewarmDraftAudioUrl(u);
+        }
+    } catch (e) {
+    }
+}
 
 function installBuildAutoReloader(buildValue, storageKey) {
     try {
@@ -807,6 +836,8 @@ async function loadExistingDictation(initData) {
     // Создаем таблицу
     await createTable();
 
+    prewarmAllDraftAudioUrls();
+
     // TODO: инициализировать колонки таблицы 
 
     // Инициализируем волну и информацию о файле, если есть аудио
@@ -975,10 +1006,12 @@ function setDraftAudioUrl(language, filename, url) {
             window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS = Object.create(null);
         }
         window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS[`${filename}`] = url;
+        prewarmDraftAudioUrl(url);
         try {
             console.log('WWW DRAFT_AUDIO set', {
                 filename,
-                url
+                found: !!url,
+                url: url || null
             });
         } catch (e) {
         }

@@ -142,6 +142,13 @@ class AudioManagerClass {
         const previousAudio = this.audio;
         this.audio = new Audio(audioUrl);
         this.currentButton = button || null;
+
+        if (isDraftAudioUrl && this.audio) {
+            try {
+                this.audio.preload = 'auto';
+            } catch (e) {
+            }
+        }
         
         // Сохраняем ссылки в локальные переменные для использования в замыканиях
         const currentAudio = this.audio;
@@ -465,6 +472,33 @@ class AudioManagerClass {
                             });
                         }
                     } catch (e) {
+                    }
+
+                    if (isDraftAudioUrl) {
+                        try {
+                            if (typeof showToast === 'function') {
+                                showToast('Аудио загружается… нажми Play ещё раз');
+                            }
+                        } catch (e) {
+                        }
+
+                        // Draft audio is a normal http(s) URL. Safari sometimes rejects the first play()
+                        // while metadata is still loading, but will allow starting once canplay fires.
+                        // Retry exactly once when audio becomes playable.
+                        try {
+                            _didCallPlay = false;
+                            const retryOnce = () => {
+                                try {
+                                    currentAudio.removeEventListener('canplay', retryOnce);
+                                    currentAudio.removeEventListener('loadeddata', retryOnce);
+                                } catch (e) {
+                                }
+                                startPlayback();
+                            };
+                            currentAudio.addEventListener('canplay', retryOnce, { once: true });
+                            currentAudio.addEventListener('loadeddata', retryOnce, { once: true });
+                        } catch (e) {
+                        }
                     }
 
                     revertButtonReadyState();
