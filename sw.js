@@ -336,30 +336,7 @@ self.addEventListener('fetch', (event) => {
 
   if (!shouldHandleRequest(request.url)) return;
 
-  // все аудио должны быть из кеша
-  // Dictation must be able to work fully offline. For /api/audio/ we never go to network.
-  try {
-    const url = new URL(request.url);
-    if (url.pathname && (url.pathname.startsWith('/api/audio/') || url.pathname.startsWith('/draft-audio/'))) {
-      event.respondWith((async () => {
-        try {
-          const cache = await caches.open(MEDIA_CACHE_PERSIST);
-          const cached = await cache.match(request.url);
-          if (cached) return cached;
-        } catch (e) {
-        }
-        return new Response('Offline', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-        });
-      })());
-      return;
-    }
-  } catch (e) {
-  }
-
-  // For Range requests (common for <audio>), return the original network Range response,
-  // but cache the full file in background using the URL as a normalized cache key.
+  // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
   const hasRange = request.headers && request.headers.has('range');
   if (hasRange && (request.url.includes('/api/audio/') || request.url.includes('/draft-audio/'))) {
     // все аудио должны быть из кеша
@@ -424,6 +401,28 @@ self.addEventListener('fetch', (event) => {
       });
     })());
     return;
+  }
+
+  // все аудио должны быть из кеша
+  // Dictation must be able to work fully offline. For /api/audio/ we never go to network.
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && (url.pathname.startsWith('/api/audio/') || url.pathname.startsWith('/draft-audio/'))) {
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(MEDIA_CACHE_PERSIST);
+          const cached = await cache.match(request.url);
+          if (cached) return cached;
+        } catch (e) {
+        }
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })());
+      return;
+    }
+  } catch (e) {
   }
 
   if (isUnboundedUrl(request.url)) {
