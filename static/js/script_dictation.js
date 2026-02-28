@@ -3192,11 +3192,26 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     if (!uniqueUrls.length) return;
 
     const res = await swDictationRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
-    if (!res || res.ok !== true) {
-        const missingCount = res && Array.isArray(res.missing) ? res.missing.length : null;
-        const suffix = (missingCount !== null) ? ` (не найдено: ${missingCount})` : '';
-        throw new Error(`audio_not_cached${suffix}`);
+    if (res && res.ok === true) return;
+
+    const missing = (res && Array.isArray(res.missing)) ? res.missing : [];
+    if (missing.length > 0) {
+        try {
+            await swDictationRequest('prefetchStrict', { urls: missing, timeoutMs: 180000 });
+        } catch (e) {
+        }
+
+        const res2 = await swDictationRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
+        if (res2 && res2.ok === true) return;
+
+        const missingCount2 = res2 && Array.isArray(res2.missing) ? res2.missing.length : null;
+        const suffix2 = (missingCount2 !== null) ? ` (не найдено: ${missingCount2})` : '';
+        throw new Error(`audio_not_cached${suffix2}`);
     }
+
+    const missingCount = res && Array.isArray(res.missing) ? res.missing.length : null;
+    const suffix = (missingCount !== null) ? ` (не найдено: ${missingCount})` : '';
+    throw new Error(`audio_not_cached${suffix}`);
 }
 
 function startGame(isResume = false) {

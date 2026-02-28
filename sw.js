@@ -503,6 +503,22 @@ async function computeCacheStats() {
   return { entries: keys.length, totalBytes, maxBytes };
 }
 
+async function computeCacheStatsForCache(cacheName) {
+  const resolved = cacheName || RUNTIME_CACHE_BOUNDED;
+  const cache = await caches.open(resolved);
+  const keys = await cache.keys();
+
+  let totalBytes = 0;
+  for (const req of keys) {
+    try {
+      const response = await cache.match(req);
+      totalBytes += await getResponseSizeBytes(response);
+    } catch (e) {
+    }
+  }
+  return { totalBytes, count: keys.length, cacheName: resolved };
+}
+
 async function clearRuntimeCache() {
   await Promise.all([
     caches.delete(RUNTIME_CACHE_BOUNDED),
@@ -550,14 +566,12 @@ async function clearAppShellCacheEntries() {
 }
 
 async function prefetchUrls(urls) {
-  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
   let fetched = 0;
   let skipped = 0;
   let failed = 0;
 
   const maxBytes = await getMaxBytes();
-  let stats = await computeCacheStats();
-  let totalBytes = stats.totalBytes || 0;
+  const cacheTotals = new Map();
 
   for (const url of urls || []) {
     try {
@@ -566,7 +580,17 @@ async function prefetchUrls(urls) {
         continue;
       }
 
-      const normalizedKey = normalizeCacheKey(new URL(url, self.location.origin).toString());
+      const absolute = new URL(url, self.location.origin).toString();
+      const normalizedKey = normalizeCacheKey(absolute);
+      const cacheName = pickCacheNameForRequest(absolute);
+      const cache = await caches.open(cacheName);
+
+      if (!cacheTotals.has(cacheName)) {
+        const stats = await computeCacheStatsForCache(cacheName);
+        cacheTotals.set(cacheName, stats.totalBytes || 0);
+      }
+
+      let totalBytes = cacheTotals.get(cacheName) || 0;
 
       const cached = await cache.match(normalizedKey);
       if (cached) {
@@ -581,6 +605,7 @@ async function prefetchUrls(urls) {
           await cache.put(normalizedKey, res.clone());
           fetched += 1;
           totalBytes += size;
+          cacheTotals.set(cacheName, totalBytes);
         } else {
           skipped += 1;
         }
@@ -596,15 +621,13 @@ async function prefetchUrls(urls) {
 }
 
 async function prefetchUrlsStrict(urls) {
-  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
   let fetched = 0;
   let skipped = 0;
   let failed = 0;
   let overLimit = 0;
 
   const maxBytes = await getMaxBytes();
-  const stats = await computeCacheStats();
-  let totalBytes = stats.totalBytes || 0;
+  const cacheTotals = new Map();
 
   for (const url of urls || []) {
     try {
@@ -613,7 +636,17 @@ async function prefetchUrlsStrict(urls) {
         continue;
       }
 
-      const normalizedKey = normalizeCacheKey(new URL(url, self.location.origin).toString());
+      const absolute = new URL(url, self.location.origin).toString();
+      const normalizedKey = normalizeCacheKey(absolute);
+      const cacheName = pickCacheNameForRequest(absolute);
+      const cache = await caches.open(cacheName);
+
+      if (!cacheTotals.has(cacheName)) {
+        const stats = await computeCacheStatsForCache(cacheName);
+        cacheTotals.set(cacheName, stats.totalBytes || 0);
+      }
+
+      let totalBytes = cacheTotals.get(cacheName) || 0;
 
       const cached = await cache.match(normalizedKey);
       if (cached) {
@@ -628,6 +661,7 @@ async function prefetchUrlsStrict(urls) {
           await cache.put(normalizedKey, res.clone());
           fetched += 1;
           totalBytes += size;
+          cacheTotals.set(cacheName, totalBytes);
         } else {
           overLimit += 1;
         }
