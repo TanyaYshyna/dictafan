@@ -10,9 +10,8 @@ from routes.index import get_cover_url_for_id
 dictation_bp = Blueprint('dictation', __name__)
 
 
-@dictation_bp.route('/api/audio/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
-def api_get_dictation_audio(dictation_id, lang, filename):
-    """Получение аудио диктанта (Option A: только B2).
+def _send_dictation_audio_from_b2(dictation_id, lang, filename):
+    """Получение аудио диктанта из B2.
 
     Ожидаемый путь в B2:
       dictations/<dictation_id>/<lang>/<filename>
@@ -64,6 +63,12 @@ def api_get_dictation_audio(dictation_id, lang, filename):
         return response
 
     return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
+
+
+@dictation_bp.route('/api/dictations/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
+def api_get_dictation_audio_v2(dictation_id, lang, filename):
+    """Новый endpoint: полностью дублирует структуру хранилища dictations/<dictationId>/<lang>/<filename>."""
+    return _send_dictation_audio_from_b2(dictation_id, lang, filename)
 
 
 @dictation_bp.route('/api/temp/<int:user_id>/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
@@ -225,11 +230,11 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
                 "key": sentence_key,
                 "text": orig_sentence.get("text", ""),
                 "translation": translated.get("text", ""),
-                "audio": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
-                "audio_a": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
-                "audio_f": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
-                "audio_m": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
-                "audio_tr": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
+                "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
+                "audio_a": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
+                "audio_f": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
+                "audio_m": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
+                "audio_tr": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
                 "completed_correctly": False,
                 "speaker": orig_sentence.get("speaker"),
                 "explanation": translated.get("explanation", "")
@@ -319,11 +324,11 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
                 "key": sentence_key,
                 "text": orig_sentence.get("text", ""),
                 "translation": translated.get("text", ""),
-                "audio": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
-                "audio_a": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
-                "audio_f": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
-                "audio_m": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
-                "audio_tr": url_for('dictation.api_get_dictation_audio', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
+                "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
+                "audio_a": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_a_file) if audio_a_file else "",
+                "audio_f": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
+                "audio_m": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
+                "audio_tr": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_tr, filename=audio_tr_file) if audio_tr_file else "",
                 "completed_correctly": False,
                 "speaker": orig_sentence.get("speaker"),
                 "explanation": translated.get("explanation", "")
@@ -396,7 +401,7 @@ def api_get_dictation_sentences_simple(dictation_id):
             # Формируем URL для аудио
             audio_url = ''
             if audio_file:
-                audio_url = url_for('dictation.api_get_dictation_audio', dictation_id=f"dict_{dictation_id}", lang=lang_orig, filename=audio_file)
+                audio_url = url_for('dictation.api_get_dictation_audio_v2', dictation_id=f"dict_{dictation_id}", lang=lang_orig, filename=audio_file)
             
             sentence = {
                 'sentence_key': sentence_key,

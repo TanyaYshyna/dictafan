@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0089';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0091';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -934,7 +934,7 @@ let currentPlayingButton = null;
 async function putDraftAudioToCache(dictationId, language, filename, blob, mime) {
     try {
         if (!dictationId || !language || !filename || !blob) return null;
-        const path = `/draft-audio/temp/${dictationId}/${language}/${filename}`;
+        const path = `/temp/dictations/${dictationId}/${language}/${filename}`;
         const absUrl = new URL(path, window.location.origin).toString();
         const cache = await caches.open('dictafan-media');
         const headers = new Headers();
@@ -990,7 +990,7 @@ function setDraftAudioUrl(language, filename, url) {
 function hasDraftAudioUrl(language, filename) {
     try {
         const u = getDraftAudioUrl(language, filename);
-        return !!(u && typeof u === 'string' && u.includes('/draft-audio/'));
+        return !!(u && typeof u === 'string' && u.includes('/temp/dictations/'));
     } catch (e) {
         return false;
     }
@@ -1097,7 +1097,7 @@ async function handleAudioPlayback(event) {
         const needsRegen = String(button.dataset.create || '') === 'true';
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
             const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-            if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
+            if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
                 audioUrl = draftUrl;
                 if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
                     button.dataset.state = 'ready';
@@ -1168,7 +1168,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -1181,7 +1181,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -5174,7 +5174,7 @@ function splitAudioIntoSeentences(row) {
     showLoadingIndicator('Разрезание аудио на предложения...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/draft-audio/');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/temp/dictations/');
 
     (async () => {
         try {
@@ -5271,7 +5271,7 @@ function cutAudioFile(row) {
     showLoadingIndicator('Обрезание аудиофайла...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/draft-audio/');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/temp/dictations/');
 
     (async () => {
         try {
@@ -7231,7 +7231,7 @@ async function autoTranslate(text, fromLanguage, toLanguage) {
  */
 function getAudioPath(language) {
     if (currentDictation.id && currentDictation.id.startsWith('dict_')) {
-        return `/api/audio/${currentDictation.id}/${language}`;
+        return `/api/dictations/${currentDictation.id}/${language}`;
     }
 
     return '';

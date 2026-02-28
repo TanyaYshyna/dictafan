@@ -33,7 +33,7 @@ class AudioManagerClass {
         };
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
-        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/draft-audio/');
+        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/temp/dictations/');
         const isGestureSensitiveUrl = isBlobUrl || isDraftAudioUrl;
         if (isBlobUrl) {
             try {

@@ -104,8 +104,8 @@ function isMediaUrl(requestUrl) {
   try {
     const url = new URL(requestUrl);
     const path = url.pathname;
-    if (path.startsWith('/api/audio/')) return true;
-    if (path.startsWith('/draft-audio/')) return true;
+    if (path.startsWith('/api/dictations/')) return true;
+    if (path.startsWith('/temp/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -173,8 +173,8 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'huggingface.co') return true;
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
-    if (path.startsWith('/api/audio/')) return true;
-    if (path.startsWith('/draft-audio/')) return true;
+    if (path.startsWith('/api/dictations/')) return true;
+    if (path.startsWith('/temp/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -338,7 +338,7 @@ self.addEventListener('fetch', (event) => {
 
   // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
   const hasRange = request.headers && request.headers.has('range');
-  if (hasRange && (request.url.includes('/api/audio/') || request.url.includes('/draft-audio/'))) {
+  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/temp/dictations/'))) {
     // все аудио должны быть из кеша
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {
@@ -392,6 +392,29 @@ self.addEventListener('fetch', (event) => {
             return cached;
           }
         }
+
+        // If /api/dictations is missing in cache, allow network fallback and cache it for future offline usage.
+        try {
+          const u = new URL(request.url);
+          if (u.pathname && u.pathname.startsWith('/api/dictations/')) {
+            const netRes = await fetch(request);
+            if (netRes && netRes.ok) {
+              try {
+                const fullReq = new Request(request.url, {
+                  method: 'GET',
+                  headers: new Headers({})
+                });
+                const fullRes = await fetch(fullReq);
+                if (fullRes && fullRes.ok) {
+                  await cache.put(request.url, fullRes.clone());
+                }
+              } catch (e) {
+              }
+              return netRes;
+            }
+          }
+        } catch (e) {
+        }
       } catch (e) {
         // ignore
       }
@@ -404,15 +427,33 @@ self.addEventListener('fetch', (event) => {
   }
 
   // все аудио должны быть из кеша
-  // Dictation must be able to work fully offline. For /api/audio/ we never go to network.
+  // Dictation must be able to work fully offline.
   try {
     const url = new URL(request.url);
-    if (url.pathname && (url.pathname.startsWith('/api/audio/') || url.pathname.startsWith('/draft-audio/'))) {
+    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/temp/dictations/'))) {
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
           const cached = await cache.match(request.url);
           if (cached) return cached;
+
+          // temp/dictations must exist only in cache
+          if (url.pathname && url.pathname.startsWith('/temp/dictations/')) {
+            return new Response('Offline', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+          }
+
+          // /api/dictations: if not cached yet, fetch from network and store into cache.
+          const netRes = await fetch(request);
+          if (netRes && netRes.ok) {
+            try {
+              await cache.put(request.url, netRes.clone());
+            } catch (e) {
+            }
+            return netRes;
+          }
         } catch (e) {
         }
         return new Response('Offline', {
@@ -646,8 +687,8 @@ async function purgeDictationFromBoundedCache(dictationId) {
       const url = new URL(req.url);
       const path = url.pathname;
 
-      // Audio: /api/audio/dict_123/...
-      if (path.startsWith(`/api/audio/${dictKey}/`)) {
+      // Audio: /api/dictations/dict_123/...
+      if (path.startsWith(`/api/dictations/${dictKey}/`)) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;

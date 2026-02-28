@@ -133,7 +133,7 @@ def generate_audio():
                     "error": "Failed to upload audio to B2"
                 }), 502
 
-            audio_url = f"/api/audio/{dictation_id}/{lang}/{filename_audio}"
+            audio_url = f"/api/dictations/{dictation_id}/{lang}/{filename_audio}"
             logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
 
             return jsonify({

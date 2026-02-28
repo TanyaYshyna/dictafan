@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0066';
+window.__DICTATION_BUILD = '2026-02-26_0091';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -6576,14 +6576,14 @@ async function loadSentencesFromIndexedDb() {
         allSentences = sentences;
         // Если диктант был закеширован на другом origin (например staging), в IDB могли
         // сохраниться абсолютные URL. Для оффлайн и для других окружений нормализуем их
-        // до относительных /api/audio/... чтобы запросы проходили через текущий origin + SW cache.
+        // до относительных /api/dictations/... чтобы запросы проходили через текущий origin + SW cache.
         const audioFieldsToNormalize = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
         const normalizeAudioUrl = (raw) => {
             if (!raw || typeof raw !== 'string') return raw;
             if (!raw.startsWith('http://') && !raw.startsWith('https://')) return raw;
             try {
                 const u = new URL(raw);
-                if (u.pathname && (u.pathname.startsWith('/api/audio/') || u.pathname.startsWith('/api/temp/'))) {
+                if (u.pathname && (u.pathname.startsWith('/api/dictations/') || u.pathname.startsWith('/api/temp/'))) {
                     return `${u.pathname}${u.search || ''}`;
                 }
             } catch (e) {
