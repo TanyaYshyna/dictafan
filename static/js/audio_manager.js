@@ -491,25 +491,36 @@ class AudioManagerClass {
         };
         
         // Запускаем воспроизведение, когда аудио готово
-        if (this.audio.readyState >= 2) {
-            // HAVE_CURRENT_DATA или выше - можем начинать воспроизведение
-            startPlayback();
-        } else if (this.audio.readyState >= 1) {
-            // HAVE_METADATA - ждем загрузки данных
-            this.audio.addEventListener('canplay', startPlayback, { once: true });
-            // Также запускаем сразу на всякий случай
-            startPlayback();
+        if (isBlobUrl) {
+            // Safari часто "ломает" ранний play() для blob (play→waiting→pause→AbortError),
+            // поэтому для blob стартуем только когда медиаданные готовы.
+            if (this.audio.readyState >= 2) {
+                startPlayback();
+            } else {
+                currentAudio.addEventListener('canplay', startPlayback, { once: true });
+                currentAudio.addEventListener('loadeddata', startPlayback, { once: true });
+            }
         } else {
-            // Аудио еще не загружено - ждем метаданных, а потом данных
-            currentAudio.addEventListener('canplay', startPlayback, { once: true });
-            // Fallback: если canplay не сработает, попробуем при loadeddata
-            currentAudio.addEventListener('loadeddata', () => {
-                if (currentAudio.readyState >= 2) {
-                    startPlayback();
-                }
-            }, { once: true });
-            // Запускаем сразу на всякий случай, браузер может начать воспроизведение асинхронно
-            startPlayback();
+            if (this.audio.readyState >= 2) {
+                // HAVE_CURRENT_DATA или выше - можем начинать воспроизведение
+                startPlayback();
+            } else if (this.audio.readyState >= 1) {
+                // HAVE_METADATA - ждем загрузки данных
+                this.audio.addEventListener('canplay', startPlayback, { once: true });
+                // Также запускаем сразу на всякий случай
+                startPlayback();
+            } else {
+                // Аудио еще не загружено - ждем метаданных, а потом данных
+                currentAudio.addEventListener('canplay', startPlayback, { once: true });
+                // Fallback: если canplay не сработает, попробуем при loadeddata
+                currentAudio.addEventListener('loadeddata', () => {
+                    if (currentAudio.readyState >= 2) {
+                        startPlayback();
+                    }
+                }, { once: true });
+                // Запускаем сразу на всякий случай, браузер может начать воспроизведение асинхронно
+                startPlayback();
+            }
         }
 
         if (isUnderWave) {
