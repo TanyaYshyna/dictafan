@@ -809,6 +809,8 @@
     if (deskToggleInFlight.has(key)) return;
     deskToggleInFlight.add(key);
 
+    console.log('===DESK_TOGGLE=== start', { dictationId: String(dictationId) });
+
     const isOnDesk = isDictationOnDesk(dictationId);
     
     if (isOnDesk) {
@@ -830,12 +832,19 @@
       try {
         showLoadingIndicator('Скачиваю диктант для оффлайна…');
 
+        console.log('===DESK_TOGGLE=== add flow: prefetch start', { dictationId: String(dictationId) });
+
         // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
         // (HTML страница диктанта + JS/CSS + аудио + обложка). Если не влезает — не добавляем.
         try {
           const requiredUrls = [];
 
           const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
+          console.log('===DESK_TOGGLE=== meta loaded', {
+            dictationId: String(dictationId),
+            success: Boolean(metaRes && metaRes.success),
+            hasDictation: Boolean(metaRes && metaRes.dictation),
+          });
           if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
             requiredUrls.push(metaRes.dictation.cover_url);
           }
@@ -884,6 +893,11 @@
           requiredUrls.push('/static/sounds/victory/beep4.mp3');
 
           const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
+          console.log('===DESK_TOGGLE=== sentences list loaded', {
+            dictationId: String(dictationId),
+            success: Boolean(sentencesRes && sentencesRes.success),
+            count: (sentencesRes && Array.isArray(sentencesRes.sentences)) ? sentencesRes.sentences.length : null,
+          });
           const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
             ? sentencesRes.sentences
             : [];
@@ -900,8 +914,10 @@
           }
 
           await swRequest('prefetchStrict', { urls: uniqueRequired, timeoutMs: 180000 });
+          console.log('===DESK_TOGGLE=== prefetchStrict done', { dictationId: String(dictationId), urls: uniqueRequired.length });
         } catch (e) {
           const msg = e && e.message ? e.message : String(e);
+          console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
           if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
             showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
           } else if (msg.includes('Service Worker не активен')) {
@@ -918,14 +934,21 @@
           method: 'POST',
           body: JSON.stringify({})
         });
+
+        console.log('===DESK_TOGGLE=== add-to-desk response', {
+          dictationId: String(dictationId),
+          success: Boolean(addData && addData.success),
+          error: addData && (addData.error || addData.message) ? String(addData.error || addData.message) : '',
+        });
         
         if (addData && addData.success) {
           // Обновляем список диктантов на столе
           await loadDeskItems();
+          console.log('===DESK_TOGGLE=== loadDeskItems done', { dictationId: String(dictationId) });
 
           // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
           try {
-            log('===0================Saving dictation to IndexedDB');
+            console.log('===DESK_TOGGLE=== idb save start', { dictationId: String(dictationId) });
             const dictId = `dict_${dictationId}`;
             const userId = getDraftUserIdForKey();
             const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
@@ -953,7 +976,7 @@
               userId,
               ...basePayload
             });
-            log('===1================Saving dictation to IndexedDB');
+            console.log('===DESK_TOGGLE=== idb save user ok', { dictationId: String(dictationId), key: idbKeyUser });
 
             const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
             await idbPut('dictations', {
@@ -961,14 +984,15 @@
               userId: 'anon',
               ...basePayload
             });
+            console.log('===DESK_TOGGLE=== idb save anon ok', { dictationId: String(dictationId), key: idbKeyAnon });
           } catch (e) {
-            log('===2================Saving dictation to IndexedDB', e);
+            console.log('===DESK_TOGGLE=== idb save failed', { dictationId: String(dictationId), err: (e && e.message) ? e.message : String(e) });
           }
 
           refreshOfflineCacheStatus();
           completeLoadingIndicator('Диктант добавлен на рабочий стол', 1000);
+          console.log('===DESK_TOGGLE=== done ok', { dictationId: String(dictationId) });
         } else {
-          log('===3================Saving dictation to IndexedDB');
           const apiMsg = (addData && (addData.error || addData.message))
             ? String(addData.error || addData.message)
             : '';
@@ -976,15 +1000,16 @@
           showToast(apiMsg ? `Не удалось добавить диктант на стол: ${apiMsg}` : 'Ошибка при добавлении диктанта на стол');
         }
       } catch (error) {
-        log('===4================Saving dictation to IndexedDB', error);
         const msg = error && error.message ? error.message : String(error);
         console.error('❌ Ошибка добавления диктанта на стол:', error);
         showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
+        console.log('===DESK_TOGGLE=== failed', { dictationId: String(dictationId), msg });
       } finally {
         const overlay = document.getElementById('loading-overlay');
         if (!overlay || overlay.dataset.autoclosing !== '1') {
           hideLoadingIndicator();
         }
+        console.log('===DESK_TOGGLE=== finally', { dictationId: String(dictationId) });
         deskToggleInFlight.delete(key);
       }
     }
