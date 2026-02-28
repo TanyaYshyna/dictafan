@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0085';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0086';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -931,6 +931,23 @@ function initLanguageFlags(initData) {
 
 let currentPlayingButton = null;
 
+async function putDraftAudioToCache(dictationId, language, filename, blob, mime) {
+    try {
+        if (!dictationId || !language || !filename || !blob) return null;
+        const path = `/draft-audio/temp/${dictationId}/${language}/${filename}`;
+        const absUrl = new URL(path, window.location.origin).toString();
+        const cache = await caches.open('dictafan-media');
+        const headers = new Headers();
+        headers.set('Content-Type', mime || blob.type || 'audio/mpeg');
+        headers.set('Cache-Control', 'no-store');
+        await cache.put(absUrl, new Response(blob, { status: 200, headers }));
+        return absUrl;
+    } catch (e) {
+        console.error('❌ putDraftAudioToCache failed', e);
+        return null;
+    }
+}
+
 function getDraftAudioUrl(language, filename) {
     try {
         if (!language || !filename) return null;
@@ -973,7 +990,7 @@ function setDraftAudioUrl(language, filename, url) {
 function hasDraftAudioUrl(language, filename) {
     try {
         const u = getDraftAudioUrl(language, filename);
-        return !!(u && typeof u === 'string' && u.startsWith('blob:'));
+        return !!(u && typeof u === 'string' && u.includes('/draft-audio/'));
     } catch (e) {
         return false;
     }
@@ -1080,7 +1097,7 @@ async function handleAudioPlayback(event) {
         const needsRegen = String(button.dataset.create || '') === 'true';
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
             const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-            if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+            if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
                 audioUrl = draftUrl;
                 if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
                     button.dataset.state = 'ready';
@@ -1151,7 +1168,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -1164,7 +1181,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/draft-audio/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -5157,7 +5174,7 @@ function splitAudioIntoSeentences(row) {
     showLoadingIndicator('Разрезание аудио на предложения...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isBlobPath = typeof filepath === 'string' && filepath.startsWith('blob:');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/draft-audio/');
 
     (async () => {
         try {
@@ -5176,7 +5193,7 @@ function splitAudioIntoSeentences(row) {
                 sentences: sentences
             };
 
-            if (isDraft && isBlobPath) {
+            if (isDraft && isDraftCachePath) {
                 const resp = await fetch(filepath);
                 const buf = await resp.arrayBuffer();
                 const bytes = new Uint8Array(buf);
@@ -5212,8 +5229,10 @@ function splitAudioIntoSeentences(row) {
                         const outBytes = new Uint8Array(binaryOut.length);
                         for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
                         const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
-                        const outUrl = URL.createObjectURL(outBlob);
-                        setDraftAudioUrl(currentDictation.language_original, f.filename, outUrl);
+                        const outUrl = await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, f.filename, outBlob, f.mime || 'audio/mpeg');
+                        if (outUrl) {
+                            setDraftAudioUrl(currentDictation.language_original, f.filename, outUrl);
+                        }
 
                         // Проставим в рабочие данные имя файла как финальное "audio_user"
                         const sentence = workingData.original.sentences.find(s => s.key === f.key);
@@ -5252,7 +5271,7 @@ function cutAudioFile(row) {
     showLoadingIndicator('Обрезание аудиофайла...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isBlobPath = typeof filepath === 'string' && filepath.startsWith('blob:');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/draft-audio/');
 
     (async () => {
         try {
@@ -5265,7 +5284,7 @@ function cutAudioFile(row) {
                 dictation_id: currentDictation.id
             };
 
-            if (isDraft && isBlobPath) {
+            if (isDraft && isDraftCachePath) {
                 const resp = await fetch(filepath);
                 const buf = await resp.arrayBuffer();
                 const bytes = new Uint8Array(buf);
@@ -5299,13 +5318,11 @@ function cutAudioFile(row) {
                 const outBytes = new Uint8Array(binaryOut.length);
                 for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
                 const outBlob = new Blob([outBytes], { type: data.mime || 'audio/mpeg' });
-                const outUrl = URL.createObjectURL(outBlob);
-
-                if (filepath && filepath.startsWith('blob:')) {
-                    try { URL.revokeObjectURL(filepath); } catch (e) {}
+                const outUrl = await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, data.filename, outBlob, data.mime || 'audio/mpeg');
+                if (outUrl) {
+                    setDraftAudioUrl(currentDictation.language_original, data.filename, outUrl);
                 }
 
-                row.dataset.filepath = outUrl;
                 row.dataset.filename = data.filename || filename;
                 const el = row.querySelector('.filename-text');
                 if (el) el.textContent = row.dataset.filename;
@@ -7316,14 +7333,16 @@ async function generateAudioForSentence(sentence, language) {
                     }
                     const mime = result.mime || 'audio/mpeg';
                     const blob = new Blob([bytes], { type: mime });
-                    const blobUrl = URL.createObjectURL(blob);
+                    const cacheUrl = await putDraftAudioToCache(currentDictation.id, language, generatedFilename, blob, mime);
 
                     if (!sentence.__draftAudioUrls) sentence.__draftAudioUrls = {};
-                    sentence.__draftAudioUrls[language] = blobUrl;
+                    sentence.__draftAudioUrls[language] = cacheUrl;
                     sentence.__draftAudioMime = mime;
                     sentence.__draftAudioFilename = generatedFilename;
 
-                    setDraftAudioUrl(language, generatedFilename, blobUrl);
+                    if (cacheUrl) {
+                        setDraftAudioUrl(language, generatedFilename, cacheUrl);
+                    }
                 } catch (e) {
                     console.error('❌ Не удалось создать draft audio blob url:', e);
                     return null;

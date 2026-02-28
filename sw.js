@@ -105,6 +105,7 @@ function isMediaUrl(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
     if (path.startsWith('/api/audio/')) return true;
+    if (path.startsWith('/draft-audio/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -173,6 +174,7 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/audio/')) return true;
+    if (path.startsWith('/draft-audio/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -338,7 +340,7 @@ self.addEventListener('fetch', (event) => {
   // Dictation must be able to work fully offline. For /api/audio/ we never go to network.
   try {
     const url = new URL(request.url);
-    if (url.pathname && url.pathname.startsWith('/api/audio/')) {
+    if (url.pathname && (url.pathname.startsWith('/api/audio/') || url.pathname.startsWith('/draft-audio/'))) {
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
@@ -359,7 +361,7 @@ self.addEventListener('fetch', (event) => {
   // For Range requests (common for <audio>), return the original network Range response,
   // but cache the full file in background using the URL as a normalized cache key.
   const hasRange = request.headers && request.headers.has('range');
-  if (hasRange && request.url.includes('/api/audio/')) {
+  if (hasRange && (request.url.includes('/api/audio/') || request.url.includes('/draft-audio/'))) {
     // все аудио должны быть из кеша
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {

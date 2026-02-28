@@ -449,11 +449,14 @@ class AudioManagerClass {
                 // AbortError - нормальная ошибка, обычно означает что загрузка еще не завершена
                 // Браузер сам запустит воспроизведение когда будет готов
                 if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
-                    // Allow retry when we get actual readiness events.
-                    _didCallPlay = false;
+                    // For blob: in Safari, retries from canplay/loadeddata are NOT a user gesture.
+                    // Keep the guard so we don't spam play(); user can click again once ready.
+                    if (!isBlobUrl) {
+                        _didCallPlay = false;
+                    }
                     try {
                         if (isBlobUrl) {
-                            console.log('[AUDIO_MGR] blob play AbortError (will retry)', {
+                            console.log('[AUDIO_MGR] blob play AbortError (click again after ready)', {
                                 readyState: currentAudio && currentAudio.readyState,
                                 networkState: currentAudio && currentAudio.networkState
                             });
@@ -492,14 +495,9 @@ class AudioManagerClass {
         
         // Запускаем воспроизведение, когда аудио готово
         if (isBlobUrl) {
-            // Safari часто "ломает" ранний play() для blob (play→waiting→pause→AbortError),
-            // поэтому для blob стартуем только когда медиаданные готовы.
-            if (this.audio.readyState >= 2) {
-                startPlayback();
-            } else {
-                currentAudio.addEventListener('canplay', startPlayback, { once: true });
-                currentAudio.addEventListener('loadeddata', startPlayback, { once: true });
-            }
+            // For Safari: play() must be triggered in the user gesture (click) stack.
+            // So for blob we try to start immediately; if it aborts, user clicks again once ready.
+            startPlayback();
         } else {
             if (this.audio.readyState >= 2) {
                 // HAVE_CURRENT_DATA или выше - можем начинать воспроизведение
