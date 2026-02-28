@@ -690,6 +690,15 @@ async function prefetchUrlsStrict(urls) {
     }
   }
 
+  let totalBytesAll = 0;
+  try {
+    for (const v of cacheTotals.values()) {
+      const n = Number(v);
+      if (isFinite(n) && n > 0) totalBytesAll += n;
+    }
+  } catch (e) {
+  }
+
   const ok = failed === 0 && overLimit === 0;
   return {
     ok,
@@ -698,7 +707,7 @@ async function prefetchUrlsStrict(urls) {
     failed,
     overLimit,
     total: (urls || []).length,
-    totalBytes,
+    totalBytes: totalBytesAll,
     maxBytes,
     failedUrls,
     overLimitUrls,
