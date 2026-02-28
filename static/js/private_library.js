@@ -919,12 +919,13 @@
           body: JSON.stringify({})
         });
         
-        if (addData.success) {
+        if (addData && addData.success) {
           // Обновляем список диктантов на столе
           await loadDeskItems();
 
           // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
           try {
+            log('===0================Saving dictation to IndexedDB');
             const dictId = `dict_${dictationId}`;
             const userId = getDraftUserIdForKey();
             const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
@@ -952,6 +953,7 @@
               userId,
               ...basePayload
             });
+            log('===1================Saving dictation to IndexedDB');
 
             const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
             await idbPut('dictations', {
@@ -960,16 +962,24 @@
               ...basePayload
             });
           } catch (e) {
+            log('===2================Saving dictation to IndexedDB', e);
           }
 
           refreshOfflineCacheStatus();
           completeLoadingIndicator('Диктант добавлен на рабочий стол', 1000);
         } else {
-          showToast('Ошибка при добавлении диктанта на стол');
+          log('===3================Saving dictation to IndexedDB');
+          const apiMsg = (addData && (addData.error || addData.message))
+            ? String(addData.error || addData.message)
+            : '';
+          console.warn('[toggleDictationOnDesk] add-to-desk failed', { dictationId, addData });
+          showToast(apiMsg ? `Не удалось добавить диктант на стол: ${apiMsg}` : 'Ошибка при добавлении диктанта на стол');
         }
       } catch (error) {
+        log('===4================Saving dictation to IndexedDB', error);
+        const msg = error && error.message ? error.message : String(error);
         console.error('❌ Ошибка добавления диктанта на стол:', error);
-        showToast('Ошибка при добавлении диктанта на стол');
+        showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
       } finally {
         const overlay = document.getElementById('loading-overlay');
         if (!overlay || overlay.dataset.autoclosing !== '1') {
