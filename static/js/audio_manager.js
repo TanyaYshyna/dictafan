@@ -33,6 +33,8 @@ class AudioManagerClass {
         };
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
+        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/draft-audio/');
+        const isGestureSensitiveUrl = isBlobUrl || isDraftAudioUrl;
         if (isBlobUrl) {
             try {
                 console.log('[AUDIO_MGR] blob play attempt', {
@@ -449,9 +451,9 @@ class AudioManagerClass {
                 // AbortError - нормальная ошибка, обычно означает что загрузка еще не завершена
                 // Браузер сам запустит воспроизведение когда будет готов
                 if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
-                    // For blob: in Safari, retries from canplay/loadeddata are NOT a user gesture.
-                    // Keep the guard so we don't spam play(); user can click again once ready.
-                    if (!isBlobUrl) {
+                    // For gesture-sensitive URLs (blob:/draft-audio) in Safari, retries from canplay/loadeddata
+                    // are NOT a user gesture. Keep the guard so we don't spam play(); user can click again once ready.
+                    if (!isGestureSensitiveUrl) {
                         _didCallPlay = false;
                     }
                     try {
@@ -494,9 +496,10 @@ class AudioManagerClass {
         };
         
         // Запускаем воспроизведение, когда аудио готово
-        if (isBlobUrl) {
+        if (isGestureSensitiveUrl) {
             // For Safari: play() must be triggered in the user gesture (click) stack.
-            // So for blob we try to start immediately; if it aborts, user clicks again once ready.
+            // So for gesture-sensitive URLs we try to start immediately; if it aborts,
+            // user clicks again once ready.
             startPlayback();
         } else {
             if (this.audio.readyState >= 2) {
