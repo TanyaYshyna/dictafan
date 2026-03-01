@@ -34,7 +34,6 @@ class AudioManagerClass {
         };
         
         try {
-            console.log("SSSSSSSSSSSSSSSSSSSSSSSSSS");
             const now = Date.now();
             const last = this._lastPlayRequest;
             const urlKey = typeof audioUrl === 'string' ? audioUrl : String(audioUrl);
@@ -47,25 +46,13 @@ class AudioManagerClass {
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
         const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/temp/dictations/');
-        const isGestureSensitiveUrl = isBlobUrl || isDraftAudioUrl;
-        if (isGestureSensitiveUrl) {
-            try {
-                console.log('[AUDIO_MGR] gesture play attempt', {
-                    audioUrl,
-                    buttonId: button && button.id,
-                    state: button && button.dataset && button.dataset.state
-                });
-            } catch (e) {
-            }
-        } else {
-            __dbg('play()', {
-                audioUrl,
-                buttonId: button && button.id,
-                buttonState: button && button.dataset && button.dataset.state,
-                buttonOriginalState: button && button.dataset && button.dataset.originalState,
-                playTokenNext: this._playToken + 1
-            });
-        }
+        __dbg('play()', {
+            audioUrl,
+            buttonId: button && button.id,
+            buttonState: button && button.dataset && button.dataset.state,
+            buttonOriginalState: button && button.dataset && button.dataset.originalState,
+            playTokenNext: this._playToken + 1
+        });
 
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
@@ -199,55 +186,22 @@ class AudioManagerClass {
             } catch (e) {
             }
         };
-
-        if (currentAudio) {
-            try {
-                const logBlobEvent = (ev) => {
+        // Update UI when playback actually starts.
+        try {
+            if (currentAudio && !currentAudio.__audioMgrUiListenersInstalled) {
+                currentAudio.addEventListener('playing', setButtonPlayingState);
+                currentAudio.addEventListener('pause', () => {
                     try {
-                        const ae = ev && ev.currentTarget ? ev.currentTarget : currentAudio;
-                        if (isGestureSensitiveUrl) {
-                            console.log('[AUDIO_MGR] gesture event', ev && ev.type, {
-                                readyState: ae && ae.readyState,
-                                networkState: ae && ae.networkState,
-                                currentTime: ae && ae.currentTime,
-                                duration: ae && ae.duration,
-                                paused: ae && ae.paused,
-                                ended: ae && ae.ended,
-                                error: ae && ae.error ? { code: ae.error.code, message: ae.error.message } : null
-                            });
-                        }
-
-                        // Update UI only when playback actually starts.
-                        if (ev && ev.type === 'playing') {
-                            setButtonPlayingState();
-                        }
-
-                        // Safari sometimes emits pause at t=0 while still loading; if that happens,
-                        // don't leave the UI stuck in "playing".
-                        if (isGestureSensitiveUrl && ev && ev.type === 'pause') {
-                            const t = Number(ae && ae.currentTime);
-                            if (!isFinite(t) || t <= 0) {
-                                revertButtonReadyState();
-                            }
+                        const t = Number(currentAudio && currentAudio.currentTime);
+                        if (!isFinite(t) || t <= 0) {
+                            revertButtonReadyState();
                         }
                     } catch (e) {
                     }
-                };
-
-                const events = [
-                    'loadstart', 'loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough',
-                    'play', 'playing', 'pause', 'ended',
-                    'waiting', 'stalled', 'suspend', 'abort', 'error', 'timeupdate'
-                ];
-
-                if (!currentAudio.__audioMgrGestureListenersInstalled) {
-                    for (const evt of events) {
-                        currentAudio.addEventListener(evt, logBlobEvent);
-                    }
-                    currentAudio.__audioMgrGestureListenersInstalled = true;
-                }
-            } catch (e) {
+                });
+                currentAudio.__audioMgrUiListenersInstalled = true;
             }
+        } catch (e) {
         }
         
         // Применяем скорость воспроизведения из AudioPlayerVisual если она установлена
@@ -399,23 +353,6 @@ class AudioManagerClass {
             }
         }
 
-        // Функция для нормализации URL (для http(s) убирает протокол и домен, оставляет только путь)
-        // Для blob:/data: URL считаем их "opaque" и сравниваем как есть.
-        const normalizeUrl = (url) => {
-            if (!url) return '';
-            const s = String(url);
-            if (s.startsWith('blob:') || s.startsWith('data:')) {
-                return s;
-            }
-            try {
-                const urlObj = new URL(s, window.location.origin);
-                return urlObj.pathname + urlObj.search;
-            } catch (e) {
-                // Если не удалось распарсить как URL, возвращаем как есть
-                return s.replace(/^https?:\/\/[^\/]+/, '');
-            }
-        };
-        
         // Функция для запуска воспроизведения
         let _didCallPlay = false;
         const startPlayback = () => {
@@ -429,19 +366,6 @@ class AudioManagerClass {
                 return;
             }
             
-            // Проверяем, что URL совпадает
-            const currentAudioSrc = normalizeUrl(currentAudio.src);
-            const expectedAudioUrl = normalizeUrl(audioUrl);
-
-            // Safari may normalize blob: URLs slightly; for blob playback we only need to ensure
-            // we're still acting on the current audio element.
-            const isBlobExpected = typeof expectedAudioUrl === 'string' && expectedAudioUrl.startsWith('blob:');
-            const isBlobCurrent = typeof currentAudioSrc === 'string' && currentAudioSrc.startsWith('blob:');
-            if (!(isBlobExpected && isBlobCurrent) && currentAudioSrc !== expectedAudioUrl) {
-                __dbg('startPlayback url mismatch', { currentAudioSrc, expectedAudioUrl });
-                return;
-            }
-
             // Avoid overlapping play () calls (Safari can abort/pause if play () is called repeatedly
             // while the first request is still pending).
             if (_didCallPlay) {
@@ -453,17 +377,6 @@ class AudioManagerClass {
             if (p && typeof p.then === 'function') {
                 p.then(() => {
                     __dbg('play() resolved', { playToken, current: this.audio === currentAudio });
-                    try {
-                        if (isBlobUrl) {
-                            console.log('[AUDIO_MGR] blob play resolved', {
-                                readyState: currentAudio && currentAudio.readyState,
-                                currentTime: currentAudio && currentAudio.currentTime,
-                                duration: currentAudio && currentAudio.duration
-                            });
-                        }
-                    } catch (e) {
-                    }
-
                     // Some browsers resolve play() before firing 'playing'. If we are actually
                     // not paused anymore, update the UI.
                     try {
@@ -475,55 +388,6 @@ class AudioManagerClass {
                 }).catch(() => { });
             }
             (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
-                // AbortError - нормальная ошибка, обычно означает что загрузка еще не завершена
-                // Браузер сам запустит воспроизведение когда будет готов
-                if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
-                    // For gesture-sensitive URLs (blob:/draft-audio) in Safari, retries from canplay/loadeddata
-                    // are NOT a user gesture. Keep the guard so we don't spam play (); user can click again once ready.
-                    if (!isGestureSensitiveUrl) {
-                        _didCallPlay = false;
-                    }
-                    try {
-                        if (isGestureSensitiveUrl) {
-                            console.log('[AUDIO_MGR] gesture play AbortError (click again after ready)', {
-                                readyState: currentAudio && currentAudio.readyState,
-                                networkState: currentAudio && currentAudio.networkState,
-                                audioUrl,
-                            });
-                        }
-                    } catch (e) {
-                    }
-
-                    if (isDraftAudioUrl) {
-                        try {
-                            if (typeof showToast === 'function') {
-                                showToast('Аудио загружается… нажми Play ещё раз');
-                            }
-                        } catch (e) {
-                        }
-
-                        // Draft audio is a normal http(s) URL. Safari sometimes rejects the first play()
-                        // while metadata is still loading, but will allow starting once canplay fires.
-                        // Retry exactly once when audio becomes playable.
-                        try {
-                            _didCallPlay = false;
-                            const retryOnce = () => {
-                                try {
-                                    currentAudio.removeEventListener('canplay', retryOnce);
-                                    currentAudio.removeEventListener('loadeddata', retryOnce);
-                                } catch (e) {
-                                }
-                                startPlayback();
-                            };
-                            currentAudio.addEventListener('canplay', retryOnce, { once: true });
-                            currentAudio.addEventListener('loadeddata', retryOnce, { once: true });
-                        } catch (e) {
-                        }
-                    }
-
-                    revertButtonReadyState();
-                    return;
-                }
                 
                 __dbg('play() rejected', {
                     name: error && error.name,
@@ -532,12 +396,6 @@ class AudioManagerClass {
                     playToken,
                     current: this.audio === currentAudio
                 });
-                try {
-                    if (isBlobUrl) {
-                        console.error('[AUDIO_MGR] blob play rejected', error);
-                    }
-                } catch (e) {
-                }
                 console.error('❌ Ошибка при запуске воспроизведения:', error, audioUrl);
                 if (currentButton) {
                     // При ошибке возвращаем состояние на 'ready' (не на 'creating'!)
@@ -553,32 +411,11 @@ class AudioManagerClass {
         };
         
         // Запускаем воспроизведение, когда аудио готово
-        if (isGestureSensitiveUrl) {
-            // For Safari: play() must be triggered in the user gesture (click) stack.
-            // So for gesture-sensitive URLs we try to start immediately; if it aborts,
-            // user clicks again once ready.
+        if (this.audio.readyState >= 2) {
             startPlayback();
         } else {
-            if (this.audio.readyState >= 2) {
-                // HAVE_CURRENT_DATA или выше - можем начинать воспроизведение
-                startPlayback();
-            } else if (this.audio.readyState >= 1) {
-                // HAVE_METADATA - ждем загрузки данных
-                this.audio.addEventListener('canplay', startPlayback, { once: true });
-                // Также запускаем сразу на всякий случай
-                startPlayback();
-            } else {
-                // Аудио еще не загружено - ждем метаданных, а потом данных
-                currentAudio.addEventListener('canplay', startPlayback, { once: true });
-                // Fallback: если canplay не сработает, попробуем при loadeddata
-                currentAudio.addEventListener('loadeddata', () => {
-                    if (currentAudio.readyState >= 2) {
-                        startPlayback();
-                    }
-                }, { once: true });
-                // Запускаем сразу на всякий случай, браузер может начать воспроизведение асинхронно
-                startPlayback();
-            }
+            currentAudio.addEventListener('canplay', startPlayback, { once: true });
+            startPlayback();
         }
 
         if (isUnderWave) {
