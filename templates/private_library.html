@@ -38,6 +38,24 @@
         </div>
     </div>
 
+    <div id="delete-dictation-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>Удалить диктант</h3>
+                <button class="modal-close" id="delete-dictation-close" type="button" aria-label="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="delete-dictation-question">Вы действительно хотите удалить диктант <span id="delete-dictation-name"></span>?</div>
+            </div>
+            <div class="form-actions" style="justify-content: space-between;">
+                <button type="button" class="btn-danger" id="delete-dictation-confirm">Удалить</button>
+                <div></div>
+            </div>
+        </div>
+    </div>
+
     <div id="offline-cache-modal" class="modal" style="display: none;">
         <div class="modal-content offline-cache-modal-content" style="max-width: 520px;">
             <div class="modal-header offline-cache-modal-header">

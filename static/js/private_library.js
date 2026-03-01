@@ -89,6 +89,7 @@
   let deskItems = []; // Список диктантов на столе
   let deskLoadSeq = 0;
   let deskLoadInFlight = null;
+  let pendingDeleteDictationId = null;
 
   function getToken() {
     return localStorage.getItem("jwt_token");
@@ -2380,124 +2381,6 @@
     }
   }
 
-  function renderBookContent(sections, dictations, isWorkbook = false) {
-    const container = document.getElementById("bookStructure");
-    
-    if (!container) return;
-
-    if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этой книге нет разделов и диктантов</div>';
-      return;
-    }
-
-    let html = '<div class="book-structure-list">';
-    
-    // Отображаем разделы
-    if (sections && sections.length > 0) {
-      sections.forEach(section => {
-        const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
-        console.log(`📝 Рендерю раздел ${section.id}: section_number=${section.section_number}, title="${section.title}", будет отображено: "${sectionNumber}${section.title}"`);
-        
-        // Проверяем, есть ли у раздела дочерние элементы (подразделы)
-        const hasChildSections = sections.some(s => s.parent_id === section.id);
-        
-        // Проверяем, есть ли диктанты в этом разделе
-        // Диктанты могут быть в dictations, если они привязаны к этому разделу
-        const hasDictations = dictations && dictations.some(d => {
-          // Проверяем, есть ли диктант, привязанный к этому разделу через book_dictations
-          // Но в текущем контексте dictations - это диктанты верхнего уровня книги
-          // Нужно всегда показывать кнопку, так как диктанты загружаются динамически
-          return false; // Всегда показываем кнопку, так как диктанты могут быть загружены позже
-        });
-        
-        // Кнопка показа/скрытия вложений - всегда показываем, так как диктанты загружаются динамически
-        const toggleButton = `
-              <button class="structure-item-toggle" data-section-id="${section.id}" title="Развернуть/свернуть">
-                <i data-lucide="chevron-right"></i>
-              </button>
-        `;
-        
-        console.log(`🔘 Рендерю кнопку toggle для раздела ${section.id}:`, { hasChildSections, toggleButton: toggleButton ? 'есть' : 'нет' });
-        
-        html += `
-          <div class="structure-item structure-section" data-section-id="${section.id}">
-            <div class="structure-item-header">
-              ${toggleButton}
-              <span class="structure-item-title">${sectionNumber}${section.title}</span>
-              <div class="structure-item-actions">
-                <div class="dropdown-menu-wrapper">
-                  <button class="btn-icon-sm dropdown-toggle" data-action="section-actions" data-section-id="${section.id}" title="Действия">
-                    <i data-lucide="more-vertical"></i>
-                  </button>
-                  <div class="dropdown-menu section-actions-menu" data-section-id="${section.id}" style="display: none;">
-                    <button class="dropdown-menu-item" data-action="add-subsection" data-section-id="${section.id}">
-                      <i data-lucide="plus"></i>
-                      <span>Добавить подраздел</span>
-                    </button>
-                    <button class="dropdown-menu-item" data-action="add-dictation" data-section-id="${section.id}">
-                      <i data-lucide="plus"></i>
-                      <span>Добавить диктант</span>
-                    </button>
-                    <button class="dropdown-menu-item" data-action="edit-section" data-section-id="${section.id}">
-                      <i data-lucide="edit-3"></i>
-                      <span>Редактировать раздел</span>
-                    </button>
-                    <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-section" data-section-id="${section.id}">
-                      <i data-lucide="trash-2"></i>
-                      <span>Удалить раздел</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="structure-item-content" data-section-content-id="${section.id}" style="display: none;">
-              <div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>
-            </div>
-          </div>
-        `;
-      });
-    }
-    
-    // Отображаем диктанты
-    if (dictations && dictations.length > 0) {
-      if (currentView === 'cards') {
-        html += '</div>'; // Закрываем book-structure-list
-        html += '<div class="shorts-grid">';
-        dictations.forEach(d => {
-          html += createDictationCard(d, false); // false = карточка для книги
-        });
-        html += '</div>';
-        html = html.replace('</div><div class="shorts-grid">', '<div class="shorts-grid">'); // Убираем лишний закрывающий div если нет разделов
-      } else {
-        html += '<ul class="dictations-list">';
-        dictations.forEach(d => {
-          html += `
-            <li class="dictation-list-item">
-              <span class="dictation-list-title">${d.title}</span>
-              <span class="dictation-list-meta">${d.language_code || ''} ${d.level ? `• ${d.level}` : ''}</span>
-              <a href="/editor/${d.id}" target="_blank" class="btn-outline">Открыть</a>
-            </li>
-          `;
-        });
-        html += '</ul>';
-      }
-    }
-    
-    html += '</div>';
-    container.innerHTML = html;
-    
-    // Создаём иконки Lucide
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
-    }
-    
-    // Загружаем статистику и медальки для всех карточек диктантов
-    setTimeout(() => {
-      // Статистика (звезды/полузвезды/микрофон) только на столе, не в библиотеке
-      updateCompletionBadges(container); // Медальки остаются
-    }, 100);
-  }
-
   async function toggleSection(sectionId) {
     console.log('🔄 toggleSection вызвана для раздела:', sectionId);
     const sectionItem = document.querySelector(`.structure-section[data-section-id="${sectionId}"]`);
@@ -2621,7 +2504,7 @@
               ${d.level ? `<span>Уровень: ${d.level}</span>` : ''}
             </div>
             <div class="short-actions">
-              <a href="/editor/${d.id}" target="_blank" class="btn-secondary">Открыть</a>
+              <a href="/editor/${d.id}" target="_blank" class="btn-outline">Открыть</a>
             </div>
           </div>
         `).join('')}
@@ -3233,7 +3116,7 @@
 
   // ==================== Инициализация ====================
   
-  function initEventHandlers() {
+  function installEventHandlers() {
     // Кнопка "Новая книга" в верхней панели
     const newBookBtn = document.getElementById("btnNewBook");
     if (newBookBtn) {
@@ -3756,6 +3639,27 @@
         }
       });
     }
+
+    const deleteDictationModal = document.getElementById('delete-dictation-modal');
+    const deleteDictationCloseBtn = document.getElementById('delete-dictation-close');
+    const deleteDictationConfirmBtn = document.getElementById('delete-dictation-confirm');
+    if (deleteDictationCloseBtn) {
+      deleteDictationCloseBtn.addEventListener('click', closeDeleteDictationModal);
+    }
+    if (deleteDictationConfirmBtn) {
+      deleteDictationConfirmBtn.addEventListener('click', async () => {
+        const id = pendingDeleteDictationId;
+        if (!id) return;
+        await performDeleteDictation(id);
+      });
+    }
+    if (deleteDictationModal) {
+      deleteDictationModal.addEventListener('click', (event) => {
+        if (event.target === deleteDictationModal) {
+          closeDeleteDictationModal();
+        }
+      });
+    }
   }
 
   // ==================== Перемещение диктанта ====================
@@ -4162,30 +4066,83 @@
   }
 
   async function deleteDictation(dictationId) {
-    if (!confirm("Вы уверены, что хотите удалить этот диктант? Действие необратимо.")) {
+    openDeleteDictationModal(dictationId);
+  }
+
+  function openDeleteDictationModal(dictationId) {
+    const modal = document.getElementById('delete-dictation-modal');
+    if (!modal) {
       return;
     }
+    pendingDeleteDictationId = String(dictationId || '');
 
+    const nameEl = document.getElementById('delete-dictation-name');
     try {
-      const dictIdStr = `dict_${dictationId}`;
+      const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(dictationId))}"]`);
+      const title = card ? (card.querySelector('.short-title')?.textContent || '') : '';
+      if (nameEl) {
+        nameEl.textContent = title ? `«${title.trim()}»` : '';
+      }
+    } catch (e) {
+      if (nameEl) nameEl.textContent = '';
+    }
+
+    modal.style.display = 'flex';
+    modal.classList.add('show');
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  }
+
+  function closeDeleteDictationModal() {
+    const modal = document.getElementById('delete-dictation-modal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    pendingDeleteDictationId = null;
+  }
+
+  async function performDeleteDictation(dictationId) {
+    try {
+      const idStr = String(dictationId || '');
+      if (!idStr) return;
+
+      const dictIdStr = `dict_${idStr}`;
       const response = await fetch(`/api/dictations/${encodeURIComponent(dictIdStr)}`, {
         method: 'DELETE'
       });
 
-      const data = await response.json();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = null;
+      }
 
-      if (response.ok && data.success) {
-        showToast("Диктант удалён");
-        // Перезагружаем активную книгу
+      if (response.ok && data && data.success) {
+        closeDeleteDictationModal();
+        showToast('Диктант удалён');
+
+        try {
+          const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
+          if (card) {
+            card.remove();
+          }
+        } catch (e) {
+        }
+
         if (activeBookId) {
-          await loadActiveBook(activeBookId);
+          try {
+            await loadActiveBook(activeBookId);
+          } catch (e) {
+          }
         }
       } else {
-        showToast(data.error || "Ошибка при удалении", "error");
+        showToast((data && data.error) ? data.error : 'Ошибка при удалении', 'error');
       }
     } catch (error) {
-      console.error("Ошибка удаления диктанта:", error);
-      showToast("Ошибка при удалении", "error");
+      console.error('Ошибка удаления диктанта:', error);
+      showToast('Ошибка при удалении', 'error');
     }
   }
 
