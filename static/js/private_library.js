@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0109';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0111';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -2146,6 +2146,75 @@
     } catch (error) {
       console.error("Ошибка загрузки активной книги:", error);
     }
+  }
+
+  function renderBookContent(sections, dictations, isWorkbook = false) {
+    const container = document.getElementById("bookStructure");
+    if (!container) return;
+
+    if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
+      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этой книге нет разделов и диктантов</div>';
+      return;
+    }
+
+    let html = '';
+
+    if (!isWorkbook && sections && sections.length > 0) {
+      html += '<div class="book-structure-list">';
+      sections.forEach(section => {
+        const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
+
+        html += `
+          <div class="structure-item structure-section" data-section-id="${section.id}">
+            <div class="structure-item-header">
+              <button class="structure-item-toggle" data-section-id="${section.id}" title="Развернуть/свернуть">
+                <i data-lucide="chevron-right"></i>
+              </button>
+              <span class="structure-item-title">${sectionNumber}${section.title}</span>
+              <button class="structure-item-actions" data-action="section-actions" data-section-id="${section.id}" title="Действия">
+                <i data-lucide="more-horizontal"></i>
+              </button>
+              <div class="section-actions-menu" data-section-id="${section.id}" style="display: none;">
+                <button class="dropdown-menu-item" data-action="add-subsection" data-section-id="${section.id}">
+                  <i data-lucide="folder-plus"></i><span>Добавить подраздел</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="add-dictation" data-section-id="${section.id}">
+                  <i data-lucide="plus"></i><span>Добавить диктант</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="edit-section" data-section-id="${section.id}">
+                  <i data-lucide="edit-3"></i><span>Редактировать</span>
+                </button>
+                <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-section" data-section-id="${section.id}">
+                  <i data-lucide="trash-2"></i><span>Удалить</span>
+                </button>
+              </div>
+            </div>
+            <div class="structure-item-content" data-section-content-id="${section.id}" style="display: none;">
+              <div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>
+            </div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    }
+
+    if (dictations && dictations.length > 0) {
+      html += '<div class="shorts-grid">';
+      dictations.forEach(d => {
+        html += createDictationCard(d, false);
+      });
+      html += '</div>';
+    }
+
+    container.innerHTML = html;
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+
+    setTimeout(() => {
+      updateCompletionBadges(container);
+    }, 100);
   }
 
   async function loadSectionForEdit(sectionId) {
