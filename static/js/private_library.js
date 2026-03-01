@@ -1,6 +1,86 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0103';
+  console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
+
+  function installBuildAutoReloader(buildValue, storageKey) {
+    try {
+      const v = String(buildValue || '');
+      if (!v) return;
+      const k = String(storageKey || 'dictafan:build');
+      const prev = String(localStorage.getItem(k) || '');
+      const onceKey = `${k}:reloaded:${v}`;
+      const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
+      if (prev && prev !== v && !alreadyReloaded) {
+        try {
+          sessionStorage.setItem(onceKey, 'true');
+        } catch (e) {
+        }
+        try {
+          localStorage.setItem(k, v);
+        } catch (e) {
+        }
+        location.reload();
+        return;
+      }
+      if (!prev) {
+        try {
+          localStorage.setItem(k, v);
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+  }
+
+  installBuildAutoReloader(window.__PRIVATE_LIBRARY_BUILD, 'dictafan:build:private_library');
+
+  function installPrivateLibraryBuildBadge() {
+    try {
+      if (window.__privateLibraryBuildBadgeInstalled) return;
+      window.__privateLibraryBuildBadgeInstalled = true;
+
+      const mount = () => {
+        try {
+          const id = 'private-library-build-badge';
+          let el = document.getElementById(id);
+          if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            el.setAttribute('aria-hidden', 'true');
+            el.style.position = 'fixed';
+            el.style.left = '6px';
+            el.style.bottom = '6px';
+            el.style.zIndex = '2147483647';
+            el.style.fontSize = '10px';
+            el.style.lineHeight = '1.2';
+            el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+            el.style.color = 'rgba(255,255,255,0.75)';
+            el.style.background = 'rgba(0,0,0,0.35)';
+            el.style.padding = '2px 6px';
+            el.style.borderRadius = '6px';
+            el.style.pointerEvents = 'none';
+            el.style.userSelect = 'none';
+            document.body.appendChild(el);
+          }
+          const v = String(window.__PRIVATE_LIBRARY_BUILD || 'unknown');
+          el.textContent = `build: ${v}`;
+        } catch (e) {
+        }
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', mount, { once: true });
+      } else {
+        mount();
+      }
+    } catch (e) {
+    }
+  }
+
+  installPrivateLibraryBuildBadge();
+
   let bookLanguageSelector = null;
   let activeBookId = null;
   let currentView = 'cards'; // 'cards' or 'list'
@@ -190,23 +270,22 @@
       }, timeoutMs);
 
       channel.port1.onmessage = (event) => {
-        clearTimeout(timeout);
         const data = event.data || {};
-        if (data.requestId && data.requestId !== requestId) {
-          reject(new Error('SW invalid response'));
-          return;
-        }
-        if (data.success) {
+        if (data.requestId !== requestId) return;
+        clearTimeout(timeout);
+        if (data && data.success) {
           resolve(data);
         } else {
-          const baseErr = data.error || 'SW error';
-          const result = data.result || {};
-          const failedUrls = Array.isArray(result.failedUrls) ? result.failedUrls : [];
-          const overLimitUrls = Array.isArray(result.overLimitUrls) ? result.overLimitUrls : [];
-          let suffix = '';
-          if (failedUrls.length) suffix += ` | failedUrls: ${failedUrls.slice(0, 10).join(' ; ')}`;
-          if (overLimitUrls.length) suffix += ` | overLimitUrls: ${overLimitUrls.slice(0, 10).join(' ; ')}`;
-          reject(new Error(`${baseErr}${suffix}`));
+          try {
+            const err = new Error(data && data.error ? data.error : 'sw_error');
+            err.swAction = action;
+            err.swError = data && data.error ? data.error : 'sw_error';
+            err.swResult = data && data.result ? data.result : null;
+            err.swPayload = payload || null;
+            reject(err);
+          } catch (e) {
+            reject(new Error(data && data.error ? data.error : 'sw_error'));
+          }
         }
       };
 
@@ -822,6 +901,15 @@
     
     if (isOnDesk) {
       // Удаляем со стола
+      try {
+        const ok = confirm('Вы точно хотите убрать диктант с рабочего стола?');
+        if (!ok) {
+          deskToggleInFlight.delete(key);
+          return;
+        }
+      } catch (e) {
+      }
+
       const itemId = getDeskItemId(dictationId);
       if (!itemId) {
         console.error('❌ Не найден item_id для диктанта на столе:', dictationId);
@@ -924,7 +1012,19 @@
           console.log('===DESK_TOGGLE=== prefetchStrict done', { dictationId: String(dictationId), urls: uniqueRequired.length });
         } catch (e) {
           const msg = e && e.message ? e.message : String(e);
-          console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
+          try {
+            const res = e && e.swResult ? e.swResult : null;
+            console.log('===DESK_TOGGLE=== prefetchStrict failed', {
+              dictationId: String(dictationId),
+              msg,
+              failed: res && typeof res.failed === 'number' ? res.failed : null,
+              overLimit: res && typeof res.overLimit === 'number' ? res.overLimit : null,
+              failedUrls: res && Array.isArray(res.failedUrls) ? res.failedUrls : null,
+              overLimitUrls: res && Array.isArray(res.overLimitUrls) ? res.overLimitUrls : null,
+            });
+          } catch (e2) {
+            console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
+          }
           if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
             showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
           } else if (msg.includes('Service Worker не активен')) {
@@ -1139,7 +1239,7 @@
       return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <a class="short-thumb" href="${openUrl}">
-            <img src="${coverUrl}" alt="" class="short-cover" loading="lazy">
+            <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl}" alt="" class="short-cover" loading="lazy">
             <div class="card-progress-stats"></div>
           </a>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>
@@ -1229,6 +1329,21 @@
     }
   }
 
+  function applyDeskCovers(container) {
+    try {
+      const imgs = container.querySelectorAll('.desk-card .short-cover[data-cover-url]');
+      imgs.forEach(img => {
+        if (img.dataset.coverApplied === '1') return;
+        const url = img.dataset.coverUrl;
+        if (!url) return;
+        img.dataset.coverApplied = '1';
+        img.src = url;
+      });
+    } catch (e) {
+      console.warn('[desk-render] applyDeskCovers failed', e);
+    }
+  }
+
   function renderDeskCards(items) {
     const container = document.getElementById("deskCardsContainer");
     if (!container) return;
@@ -1237,6 +1352,8 @@
       container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
       return;
     }
+
+    const t0 = performance.now();
 
     // Очищаем контейнер перед рендерингом, чтобы избежать дублирования
     container.innerHTML = '';
@@ -1251,16 +1368,31 @@
     
     container.appendChild(grid);
 
+    const t1 = performance.now();
+    console.log('[desk-render] stage1 cards (no covers/reports):', Math.round(t1 - t0), 'ms', 'items:', items.length);
+
     // Обновляем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       lucide.createIcons();
     }
-    
-    // Загружаем статистику и медальки для карточек на столе
-    setTimeout(async () => {
-      updateDictationCardsStats(container);
-      updateCompletionBadges(container);
-    }, 100);
+
+    requestAnimationFrame(() => {
+      const t2Start = performance.now();
+      applyDeskCovers(container);
+      const t2End = performance.now();
+      console.log('[desk-render] stage2 covers applied:', Math.round(t2End - t2Start), 'ms');
+
+      setTimeout(async () => {
+        const t3Start = performance.now();
+        try {
+          updateDictationCardsStats(container);
+          await updateCompletionBadges(container);
+        } finally {
+          const t3End = performance.now();
+          console.log('[desk-render] stage3 reports (stats/badges):', Math.round(t3End - t3Start), 'ms');
+        }
+      }, 0);
+    });
 
     ensureDeskCacheIndicator();
   }
