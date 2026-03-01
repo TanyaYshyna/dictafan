@@ -10,6 +10,7 @@ class UserManager {
     this.isInitialized = false;
     this._lastTokenValidationError = null;
     this._userCacheKey = 'dictafan_user_cache_v1';
+    this._requireAuthDeferred = false;
 
     // ✅ АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ
     this.init().then(() => {
@@ -87,6 +88,20 @@ class UserManager {
     }
 
     console.log('🔐 Требуем авторизацию - показываем модальное окно');
+
+    // Во время парсинга HTML теги <script> ниже текущего (включая login_modal.js)
+    // ещё не добавлены в DOM. Если мы сейчас попробуем динамически загрузить login_modal.js,
+    // то позже он загрузится второй раз из HTML и упадёт с duplicate variable.
+    if (document && document.readyState === 'loading') {
+      if (!this._requireAuthDeferred) {
+        this._requireAuthDeferred = true;
+        document.addEventListener('DOMContentLoaded', () => {
+          this._requireAuthDeferred = false;
+          this.requireAuth();
+        }, { once: true });
+      }
+      return;
+    }
 
     // Проверяем, подключен ли скрипт login_modal.js в HTML
     const scriptExists = document.querySelector('script[src*="login_modal.js"]');
