@@ -1615,6 +1615,16 @@
       if (!btn) return;
       const enabled = isDeskFreeLayoutEnabled();
       btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      btn.title = enabled
+        ? 'Свободный стол: можно таскать карточки'
+        : 'Обычный стол: карточки в ряд (таскать нельзя)';
+
+      const iconName = enabled ? 'move' : 'grip-vertical';
+      btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+
       if (enabled) {
         btn.classList.add('active');
         btn.style.background = 'rgba(0,0,0,0.08)';
@@ -1637,8 +1647,6 @@
       const btn = document.createElement('button');
       btn.id = 'btnDeskFreeLayoutToggle';
       btn.className = 'tool-palette-btn';
-      btn.title = 'Свободный стол (таскать карточки)';
-      btn.innerHTML = '<i data-lucide="move"></i>';
       btn.addEventListener('click', () => {
         const enabled = !isDeskFreeLayoutEnabled();
         setDeskFreeLayoutEnabled(enabled);
@@ -1767,14 +1775,12 @@
             offsetY,
             startX,
             startY,
-            moved: false
+            moved: false,
+            active: false,
+            pointerId: e.pointerId
           };
 
           card.style.zIndex = '999';
-          if (card.setPointerCapture) {
-            try { card.setPointerCapture(e.pointerId); } catch (err) {}
-          }
-          e.preventDefault();
         } catch (err) {
         }
       };
@@ -1787,13 +1793,21 @@
           const y = (e.clientY - gridRect.top) - dragging.offsetY;
           const nx = Math.max(-2000, Math.min(20000, x));
           const ny = Math.max(-2000, Math.min(20000, y));
-          dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
-          dragging.card.dataset.deskX = String(nx);
-          dragging.card.dataset.deskY = String(ny);
           if (Math.abs(nx - dragging.startX) > 3 || Math.abs(ny - dragging.startY) > 3) {
             dragging.moved = true;
           }
-          e.preventDefault();
+          if (dragging.moved) {
+            if (!dragging.active) {
+              dragging.active = true;
+              if (dragging.card && dragging.card.setPointerCapture) {
+                try { dragging.card.setPointerCapture(dragging.pointerId); } catch (err) {}
+              }
+            }
+            dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
+            dragging.card.dataset.deskX = String(nx);
+            dragging.card.dataset.deskY = String(ny);
+            e.preventDefault();
+          }
         } catch (err) {
         }
       };
@@ -1801,6 +1815,11 @@
       const onPointerUp = (e) => {
         try {
           if (!dragging) return;
+          if (!dragging.active) {
+            dragging.card.style.zIndex = '';
+            dragging = null;
+            return;
+          }
           const x = Number(dragging.card.dataset.deskX) || 0;
           const y = Number(dragging.card.dataset.deskY) || 0;
           writeDeskCardPos(dragging.deskItemId, x, y);
@@ -3472,7 +3491,31 @@
 
     // Инициализируем прокрутку desk
     // Обработчики для кнопок в карточках диктантов (делегирование событий)
+    document.addEventListener('dblclick', (e) => {
+      try {
+        const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+        if (!deskThumb) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const href = deskThumb.getAttribute('href');
+        if (href) {
+          window.location.href = href;
+        }
+      } catch (err) {
+      }
+    }, true);
+
     document.addEventListener('click', async (e) => {
+      try {
+        const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+        if (deskThumb) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      } catch (err) {
+      }
+
       // Кнопка раскрытия/сворачивания раздела
       if (e.target.closest('.structure-item-toggle')) {
         e.preventDefault();
