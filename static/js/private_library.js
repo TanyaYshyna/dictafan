@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0104';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0105';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -1610,6 +1610,24 @@
     }
   }
 
+  function updateDeskLayoutToggleButtonState(btn) {
+    try {
+      if (!btn) return;
+      const enabled = isDeskFreeLayoutEnabled();
+      btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      if (enabled) {
+        btn.classList.add('active');
+        btn.style.background = 'rgba(0,0,0,0.08)';
+        btn.style.border = '1px solid rgba(0,0,0,0.18)';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.border = '';
+      }
+    } catch (e) {
+    }
+  }
+
   function ensureDeskLayoutToggleButton() {
     try {
       const palette = document.getElementById('toolPalette');
@@ -1624,6 +1642,7 @@
       btn.addEventListener('click', () => {
         const enabled = !isDeskFreeLayoutEnabled();
         setDeskFreeLayoutEnabled(enabled);
+        updateDeskLayoutToggleButtonState(btn);
         try {
           loadDeskItems();
         } catch (e) {
@@ -1640,6 +1659,8 @@
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
+
+      updateDeskLayoutToggleButtonState(btn);
     } catch (e) {
     }
   }
@@ -1722,7 +1743,7 @@
           if (!thumb) return;
           const card = thumb.closest('.desk-card[data-desk-item-id]');
           if (!card) return;
-          if (e.target.closest('button') || e.target.closest('a')) return;
+          if (e.target.closest('button')) return;
 
           const deskItemId = card.getAttribute('data-desk-item-id');
           if (!deskItemId) return;
