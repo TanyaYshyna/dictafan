@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0102';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0107';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -961,6 +961,87 @@ function initLanguageFlags(initData) {
 // ============================================================================
 
 let currentPlayingButton = null;
+
+async function swEditorRequest(action, payload = {}) {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+        throw new Error('Service Worker не активен');
+    }
+
+    const requestId = `dictation_editor_${action}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    const timeoutMs = Number(payload.timeoutMs) || 15000;
+
+    return await new Promise((resolve, reject) => {
+        const channel = new MessageChannel();
+        const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
+        channel.port1.onmessage = (event) => {
+            const data = event.data || {};
+            if (data.requestId && data.requestId !== requestId) return;
+            clearTimeout(timer);
+            if (data.success) {
+                resolve(data.result);
+            } else {
+                const err = new Error(data.error || 'sw_request_failed');
+                err.swAction = action;
+                err.swError = data.error || 'sw_request_failed';
+                err.swResult = data.result || null;
+                reject(err);
+            }
+        };
+
+        try {
+            navigator.serviceWorker.controller.postMessage({ action, requestId, ...payload }, [channel.port2]);
+        } catch (e) {
+            clearTimeout(timer);
+            reject(e);
+        }
+    });
+}
+
+function buildFinalAudioUrl(dictationId, lang, anyUrlOrFilename) {
+    try {
+        if (!dictationId || !lang || !anyUrlOrFilename) return null;
+        const raw = String(anyUrlOrFilename).trim();
+        if (!raw) return null;
+        if (raw.includes('/api/dictations/')) return raw;
+        const filename = raw.split('?', 1)[0].rsplit ? raw : raw;
+    } catch (e) {
+    }
+    try {
+        const raw = String(anyUrlOrFilename).trim();
+        const name = raw.split('?', 1)[0].split('/').pop();
+        if (!name) return null;
+        return `/api/dictations/${String(dictationId)}/${String(lang)}/${name}`;
+    } catch (e) {
+        return null;
+    }
+}
+
+function collectFinalAudioUrlsForPrefetch(dictationId) {
+    const urls = [];
+    try {
+        const langs = [currentDictation.language_original, currentDictation.language_translation].filter(Boolean);
+        for (const lang of langs) {
+            const wd = (workingData && (workingData.original && workingData.original.language === lang ? workingData.original : null))
+                || (workingData && (workingData.translation && workingData.translation.language === lang ? workingData.translation : null))
+                || null;
+
+            const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
+            for (const s of sentences) {
+                if (!s) continue;
+                const candidates = [s.audio, s.audio_avto, s.audio_mic, s.audio_user];
+                for (const c of candidates) {
+                    const u = buildFinalAudioUrl(dictationId, lang, c);
+                    if (u) urls.push(u);
+                }
+            }
+
+            const shared = wd && wd.audio_user_shared ? buildFinalAudioUrl(dictationId, lang, wd.audio_user_shared) : null;
+            if (shared) urls.push(shared);
+        }
+    } catch (e) {
+    }
+    return Array.from(new Set(urls)).filter(Boolean);
+}
 
 async function putDraftAudioToCache(dictationId, language, filename, blob, mime) {
     try {
@@ -6962,12 +7043,41 @@ async function saveDictationOnly() {
                     dictationIdElement.style.display = '';
                 }
             }
+
+            try {
+                const deskDbId = (result && result.db_id) ? Number(result.db_id) : null;
+                if (deskDbId && isFinite(deskDbId) && deskDbId > 0) {
+                    await fetch(`/library/api/dictation/${deskDbId}/add-to-desk`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({})
+                    });
+                }
+            } catch (e) {
+            }
             
             // Обновляем title_translations в currentDictation
             currentDictation.title_translations = titleTranslations;
             
             // Отмечаем диктант как сохраненный
             currentDictation.isSaved = true;
+
+            try {
+                const dictIdForCache = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
+                const urls = collectFinalAudioUrlsForPrefetch(dictIdForCache);
+                if (urls.length > 0) {
+                    try {
+                        await swEditorRequest('purgeDictation', { dictationId: dictIdForCache, timeoutMs: 60000 });
+                    } catch (e) {
+                    }
+                    await swEditorRequest('prefetchStrict', { urls, timeoutMs: 180000 });
+                }
+            } catch (e) {
+                console.warn('⚠️ Offline prefetch after save failed', e);
+            }
 
             // Обновляем звездочку
             updateUnsavedStar();

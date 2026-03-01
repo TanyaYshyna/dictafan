@@ -801,6 +801,37 @@ def save_dictation_final():
                 logger.info(f"✅ Извлечен db_id из dictation_id: {db_id}")
             except (ValueError, AttributeError):
                 logger.warning(f"⚠️ Не удалось извлечь db_id из dictation_id: {dictation_id}")
+
+        # Если book_id не передали, но диктант уже принадлежит книге/разделу,
+        # то это редактирование из приватной библиотеки и мы НЕ должны добавлять его в categories.json.
+        if not target_book_id and db_id:
+            try:
+                from helpers.db import get_db_connection
+                from psycopg2.extras import RealDictCursor
+                conn = get_db_connection()
+                try:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        cur.execute(
+                            """
+                            SELECT book_id
+                            FROM book_dictations
+                            WHERE dictation_id = %s
+                            LIMIT 1
+                            """,
+                            (int(db_id),),
+                        )
+                        row = cur.fetchone()
+                        if row and row.get('book_id'):
+                            target_book_id = row.get('book_id')
+                            logger.info(
+                                "✅ book_id восстановлен из book_dictations: %s (dictation %s)",
+                                target_book_id,
+                                db_id,
+                            )
+                finally:
+                    conn.close()
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось восстановить book_id из book_dictations: {e}")
         
         # Если user_id не передан, получаем его из БД по email из токена
         if not user_id:
@@ -818,6 +849,25 @@ def save_dictation_final():
         if not dictation_id:
             logger.error("❌ Отсутствует dictation_id")
             return jsonify({"success": False, "error": "Missing dictation_id"}), 400
+
+        def _rewrite_audio_url_for_final(value, lang_code, final_dictation_id):
+            try:
+                if not value or not isinstance(value, str):
+                    return value
+                v = value.strip()
+                if not v:
+                    return value
+                if '/api/dictations/' in v:
+                    return v
+                try:
+                    filename = v.split('?', 1)[0].rsplit('/', 1)[-1]
+                except Exception:
+                    filename = None
+                if not filename:
+                    return v
+                return f"/api/dictations/{final_dictation_id}/{lang_code}/{filename}"
+            except Exception:
+                return value
         
         # category_key может быть пустым если диктант создается из приватной библиотеки (привязан к книге/разделу)
         # Используем дефолтное значение только если нет target_book_id
@@ -962,22 +1012,30 @@ def save_dictation_final():
                     )
                     
                     if has_changes:
+                        audio_final = _rewrite_audio_url_for_final(sentence.get('audio'), lang, dictation_id)
+                        audio_avto_final = _rewrite_audio_url_for_final(sentence.get('audio_avto'), lang, dictation_id)
+                        audio_mic_final = _rewrite_audio_url_for_final(sentence.get('audio_mic'), lang, dictation_id)
+                        audio_user_final = _rewrite_audio_url_for_final(sentence.get('audio_user'), lang, dictation_id)
                         # Обновляем только изменённые поля
                         update_sentence(
                             sentence_id=old_sentence['id'],
                             text=sentence.get('text', ''),
                             explanation=sentence.get('explanation'),
                             speaker=sentence.get('speaker'),
-                            audio=sentence.get('audio'),
-                            audio_avto=sentence.get('audio_avto'),
-                            audio_mic=sentence.get('audio_mic'),
-                            audio_user=sentence.get('audio_user'),
+                            audio=audio_final,
+                            audio_avto=audio_avto_final,
+                            audio_mic=audio_mic_final,
+                            audio_user=audio_user_final,
                             start=sentence.get('start'),
                             end=sentence.get('end'),
                             chain=sentence.get('chain', False),
                             checked=sentence.get('checked', False)
                         )
                 else:
+                    audio_final = _rewrite_audio_url_for_final(sentence.get('audio'), lang, dictation_id)
+                    audio_avto_final = _rewrite_audio_url_for_final(sentence.get('audio_avto'), lang, dictation_id)
+                    audio_mic_final = _rewrite_audio_url_for_final(sentence.get('audio_mic'), lang, dictation_id)
+                    audio_user_final = _rewrite_audio_url_for_final(sentence.get('audio_user'), lang, dictation_id)
                     # Новое предложение - добавляем
                     add_sentence(
                         dictation_id=db_id,
@@ -986,10 +1044,10 @@ def save_dictation_final():
                         text=sentence.get('text', ''),
                         explanation=sentence.get('explanation'),
                         speaker=sentence.get('speaker'),
-                        audio=sentence.get('audio'),
-                        audio_avto=sentence.get('audio_avto'),
-                        audio_mic=sentence.get('audio_mic'),
-                        audio_user=sentence.get('audio_user'),
+                        audio=audio_final,
+                        audio_avto=audio_avto_final,
+                        audio_mic=audio_mic_final,
+                        audio_user=audio_user_final,
                         start=sentence.get('start'),
                         end=sentence.get('end'),
                         chain=sentence.get('chain', False),
@@ -1056,6 +1114,7 @@ def save_dictation_final():
         
         if temp_path and os.path.exists(temp_path):
             logger.info(f"📁 Копируем файлы из temp папки: {temp_path}")
+            keep_rel_paths_posix = set()
             # Копируем все аудиофайлы из temp
             for root, dirs, files in os.walk(temp_path):
                 for file in files:
@@ -1073,6 +1132,10 @@ def save_dictation_final():
                             continue
 
                         dst_file = os.path.join(final_path, rel_path)
+                        try:
+                            keep_rel_paths_posix.add(rel_path_posix)
+                        except Exception:
+                            pass
                         
                         # Создаем папку назначения если нужно
                         os.makedirs(os.path.dirname(dst_file), exist_ok=True)
@@ -1089,6 +1152,22 @@ def save_dictation_final():
                                 logger.info(f"Аудиофайл загружен в B2: {remote_path}")
                             else:
                                 logger.warning(f"Не удалось загрузить в B2: {remote_path}")
+
+            try:
+                if keep_rel_paths_posix:
+                    for _root, _dirs, _files in os.walk(final_path):
+                        for _file in _files:
+                            if _file.lower().endswith(('.mp3', '.mp4', '.webm', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
+                                full = os.path.join(_root, _file)
+                                rel = os.path.relpath(full, final_path)
+                                rel_posix = rel.replace(os.sep, '/')
+                                if rel_posix not in keep_rel_paths_posix:
+                                    try:
+                                        os.remove(full)
+                                    except Exception:
+                                        pass
+            except Exception:
+                pass
             
             # Копируем обложку если есть
             cover_src = os.path.join(temp_path, 'cover.webp')

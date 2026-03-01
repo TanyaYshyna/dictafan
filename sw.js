@@ -338,7 +338,7 @@ self.addEventListener('fetch', (event) => {
 
   // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
   const hasRange = request.headers && request.headers.has('range');
-  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/temp/dictations/'))) {
+  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/api/temp/') || request.url.includes('/temp/dictations/'))) {
     // все аудио должны быть из кеша
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {
@@ -396,7 +396,7 @@ self.addEventListener('fetch', (event) => {
         // If /api/dictations is missing in cache, allow network fallback and cache it for future offline usage.
         try {
           const u = new URL(request.url);
-          if (u.pathname && u.pathname.startsWith('/api/dictations/')) {
+          if (u.pathname && (u.pathname.startsWith('/api/dictations/') || u.pathname.startsWith('/api/temp/'))) {
             const netRes = await fetch(request);
             if (netRes && netRes.ok) {
               try {
@@ -430,7 +430,7 @@ self.addEventListener('fetch', (event) => {
   // Dictation must be able to work fully offline.
   try {
     const url = new URL(request.url);
-    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/temp/dictations/'))) {
+    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/api/temp/') || url.pathname.startsWith('/temp/dictations/'))) {
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
@@ -445,7 +445,7 @@ self.addEventListener('fetch', (event) => {
             });
           }
 
-          // /api/dictations: if not cached yet, fetch from network and store into cache.
+          // /api/dictations + /api/temp: if not cached yet, fetch from network and store into cache.
           const netRes = await fetch(request);
           if (netRes && netRes.ok) {
             try {
