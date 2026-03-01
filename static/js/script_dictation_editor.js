@@ -5841,9 +5841,9 @@ function selectSentenceRow(row) {
     }
 
     // Также останавливаем через AudioManager
-    if (audioManager && audioManager.currentButton) {
-        audioManager.stop();
-    }
+    // if (audioManager && audioManager.currentButton) {
+    //     audioManager.stop();
+    // }
     
     // Сбрасываем состояние кнопки под волной в ready-shared при выборе новой строки
     const audioPlayBtn = document.getElementById('audioPlayBtn');
