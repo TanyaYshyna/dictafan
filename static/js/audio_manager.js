@@ -8,6 +8,7 @@ class AudioManagerClass {
         this._autoPlayEnabled = true;
         this._playToken = 0;
         this._desiredStartTime = null;
+        this._lastPlayRequest = null;
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -31,6 +32,18 @@ class AudioManagerClass {
             } catch (e) {
             }
         };
+        
+        try {
+            console.log("SSSSSSSSSSSSSSSSSSSSSSSSSS");
+            const now = Date.now();
+            const last = this._lastPlayRequest;
+            const urlKey = typeof audioUrl === 'string' ? audioUrl : String(audioUrl);
+            if (last && last.urlKey === urlKey && (now - last.ts) < 250) {
+                return;
+            }
+            this._lastPlayRequest = { urlKey, ts: now };
+        } catch (e) {
+        }
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
         const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/temp/dictations/');
@@ -429,7 +442,7 @@ class AudioManagerClass {
                 return;
             }
 
-            // Avoid overlapping play() calls (Safari can abort/pause if play() is called repeatedly
+            // Avoid overlapping play () calls (Safari can abort/pause if play () is called repeatedly
             // while the first request is still pending).
             if (_didCallPlay) {
                 return;
@@ -466,7 +479,7 @@ class AudioManagerClass {
                 // Браузер сам запустит воспроизведение когда будет готов
                 if (error.name === 'AbortError' || error.message === 'The operation was aborted.') {
                     // For gesture-sensitive URLs (blob:/draft-audio) in Safari, retries from canplay/loadeddata
-                    // are NOT a user gesture. Keep the guard so we don't spam play(); user can click again once ready.
+                    // are NOT a user gesture. Keep the guard so we don't spam play (); user can click again once ready.
                     if (!isGestureSensitiveUrl) {
                         _didCallPlay = false;
                     }

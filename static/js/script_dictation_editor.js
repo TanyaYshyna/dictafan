@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0099';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0100';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -1132,6 +1132,7 @@ async function handleAudioPlayback(event) {
 
     // 2️⃣ Если что-то уже играет — остановим
     if (audioManager.currentButton && audioManager.currentButton !== button) {
+        console.log("STOP STOP STOP STOP STOP")
         audioManager.stop();
     }
 
@@ -2126,7 +2127,10 @@ function setupCreateAudioHandlers() {
     // Обработчик кнопки воспроизведения созданного аудио
     const playCreatedAudioBtn = document.getElementById('playCreatedAudioBtn');
     if (playCreatedAudioBtn) {
-        playCreatedAudioBtn.addEventListener('click', handleAudioPlayback);
+        if (!playCreatedAudioBtn.dataset.audioPlaybackHandlerInstalled) {
+            playCreatedAudioBtn.addEventListener('click', handleAudioPlayback);
+            playCreatedAudioBtn.dataset.audioPlaybackHandlerInstalled = 'true';
+        }
     }
     
     // Обработчик кнопки "Отредактировать все отмеченные"
@@ -3159,7 +3163,10 @@ function setupAudioSettingsModalHandlers() {
 
     const audioPlayBtn = document.getElementById('audioPlayBtn');
     if (audioPlayBtn) {
-        audioPlayBtn.addEventListener('click', handleAudioPlayback);
+        if (!audioPlayBtn.dataset.audioPlaybackHandlerInstalled) {
+            audioPlayBtn.addEventListener('click', handleAudioPlayback);
+            audioPlayBtn.dataset.audioPlaybackHandlerInstalled = 'true';
+        }
     }
 
     const audioStartBtn = document.getElementById('audioStartBtn');
