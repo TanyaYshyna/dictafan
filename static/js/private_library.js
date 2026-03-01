@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0103';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0104';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -87,6 +87,8 @@
   let cropper = null;
   let croppedImageBlob = null;
   let deskItems = []; // Список диктантов на столе
+  let deskLoadSeq = 0;
+  let deskLoadInFlight = null;
 
   function getToken() {
     return localStorage.getItem("jwt_token");
@@ -788,9 +790,56 @@
   // ==================== ЗОНА 1: Рабочий стол ====================
   
   async function loadDeskItems() {
+    const seq = ++deskLoadSeq;
+    if (deskLoadInFlight) {
+      try {
+        await deskLoadInFlight;
+      } catch (e) {
+      }
+    }
+
+    let resolveInFlight;
+    let rejectInFlight;
+    deskLoadInFlight = new Promise((resolve, reject) => {
+      resolveInFlight = resolve;
+      rejectInFlight = reject;
+    });
+
+    const t0 = performance.now();
+    let renderedFromCache = false;
+
     try {
+      const cached = await idbGet('desk_items', 'latest');
+      const items = cached && Array.isArray(cached.items) ? cached.items : [];
+      if (items.length) {
+        if (seq !== deskLoadSeq) {
+          resolveInFlight();
+          return;
+        }
+        deskItems = items;
+        if (typeof renderDeskCards === 'function') {
+          renderDeskCards(deskItems);
+        }
+        updateInWorkIndicators();
+        refreshDeskOutboxIndicator().catch(() => {});
+        renderedFromCache = true;
+        const tCache = performance.now();
+        console.log('[desk-render] stage0 cached items:', items.length, 'time:', Math.round(tCache - t0), 'ms');
+      }
+    } catch (e) {
+    }
+
+    try {
+      const tNetStart = performance.now();
       const data = await apiRequest("/desk/api/items");
+      const tNetEnd = performance.now();
+      console.log('[desk-render] stage0 network fetch:', Math.round(tNetEnd - tNetStart), 'ms');
+
       if (data.success && data.items) {
+        if (seq !== deskLoadSeq) {
+          resolveInFlight();
+          return;
+        }
         deskItems = data.items;
         try {
           await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
@@ -802,24 +851,17 @@
         // Обновляем индикаторы "в работе" в карточках диктантов
         updateInWorkIndicators();
         refreshDeskOutboxIndicator().catch(() => {});
+        resolveInFlight();
         return;
       }
+      resolveInFlight();
     } catch (error) {
-      try {
-        const cached = await idbGet('desk_items', 'latest');
-        const items = cached && Array.isArray(cached.items) ? cached.items : [];
-        if (items.length) {
-          deskItems = items;
-          if (typeof renderDeskCards === 'function') {
-            renderDeskCards(deskItems);
-          }
-          updateInWorkIndicators();
-          refreshDeskOutboxIndicator().catch(() => {});
-          return;
-        }
-      } catch (e) {
+      rejectInFlight(error);
+      if (!renderedFromCache) {
+        console.error("Ошибка загрузки диктантов на столе:", error);
+      } else {
+        console.warn("Ошибка обновления диктантов на столе (показан кеш):", error);
       }
-      console.error("Ошибка загрузки диктантов на столе:", error);
     }
   }
   
@@ -874,9 +916,48 @@
         } catch (e) {
           // ignore
         }
-        
-        // Обновляем список диктантов на столе
-        await loadDeskItems();
+
+        try {
+          const container = document.getElementById('deskCardsContainer');
+          const card = container ? container.querySelector(`.desk-card[data-desk-item-id="${String(itemId)}"]`) : null;
+          if (card) {
+            card.remove();
+          }
+        } catch (e) {
+        }
+
+        try {
+          const before = Array.isArray(deskItems) ? deskItems.length : 0;
+          deskItems = Array.isArray(deskItems)
+            ? deskItems.filter(x => String(x.id) !== String(itemId))
+            : [];
+          const after = Array.isArray(deskItems) ? deskItems.length : 0;
+          if (before !== after) {
+            try {
+              await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+            } catch (e) {
+            }
+          }
+        } catch (e) {
+        }
+
+        try {
+          localStorage.removeItem(getDeskCardPosStorageKey(String(itemId)));
+        } catch (e) {
+        }
+
+        try {
+          const container = document.getElementById('deskCardsContainer');
+          if (container) {
+            const grid = container.querySelector('.shorts-grid');
+            const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
+            if (!remaining) {
+              container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+            }
+          }
+        } catch (e) {
+        }
+
         showToast('Диктант убран со стола', { durationMs: 1000, beepUrl: '/static/sounds/victory/beep2.mp3' });
         refreshOfflineCacheStatus();
       } else {
@@ -886,6 +967,136 @@
       console.error('❌ Ошибка удаления диктанта со стола:', error);
       showToast('Ошибка при удалении диктанта со стола');
     }
+  }
+
+  function ensureDeskGridContainer() {
+    const container = document.getElementById('deskCardsContainer');
+    if (!container) return null;
+    let grid = container.querySelector('.shorts-grid');
+    if (grid) return grid;
+
+    container.innerHTML = '';
+    grid = document.createElement('div');
+    grid.className = 'shorts-grid';
+    container.appendChild(grid);
+    return grid;
+  }
+
+  function insertDeskCardElement(item, position = 'start') {
+    const grid = ensureDeskGridContainer();
+    if (!grid) return null;
+    const html = createDictationCard(item, true);
+    if (position === 'end') {
+      grid.insertAdjacentHTML('beforeend', html);
+    } else {
+      grid.insertAdjacentHTML('afterbegin', html);
+    }
+
+    const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+    if (!el) return null;
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+
+    try {
+      const container = document.getElementById('deskCardsContainer');
+      if (container && (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container))) {
+        enableDeskFreeLayout(container);
+        installDeskDragAndDrop(container);
+      }
+    } catch (e) {
+    }
+
+    try {
+      applyDeskCovers(document.getElementById('deskCardsContainer'));
+    } catch (e) {
+    }
+
+    try {
+      const tmpWrap = document.createElement('div');
+      tmpWrap.appendChild(el.cloneNode(true));
+      updateDictationCardsStats(tmpWrap);
+      updateCompletionBadges(tmpWrap);
+      const fresh = tmpWrap.firstElementChild;
+      if (fresh) {
+        el.replaceWith(fresh);
+        return fresh;
+      }
+    } catch (e) {
+    }
+
+    return el;
+  }
+
+  async function syncDeskFromServerIncremental() {
+    const data = await apiRequest('/desk/api/items');
+    if (!data || !data.success || !Array.isArray(data.items)) {
+      return { success: false };
+    }
+
+    const next = data.items;
+    const prev = Array.isArray(deskItems) ? deskItems : [];
+
+    const prevById = new Map(prev.map(x => [String(x.id), x]));
+    const nextById = new Map(next.map(x => [String(x.id), x]));
+
+    const added = [];
+    const removed = [];
+
+    for (const item of next) {
+      if (!prevById.has(String(item.id))) {
+        added.push(item);
+      }
+    }
+    for (const item of prev) {
+      if (!nextById.has(String(item.id))) {
+        removed.push(item);
+      }
+    }
+
+    deskItems = next;
+    try {
+      await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+    } catch (e) {
+    }
+
+    const container = document.getElementById('deskCardsContainer');
+    if (!container) {
+      return { success: true, added: added.length, removed: removed.length };
+    }
+
+    // Remove cards first
+    for (const item of removed) {
+      try {
+        const card = container.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+        if (card) card.remove();
+      } catch (e) {
+      }
+      try {
+        localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
+      } catch (e) {
+      }
+    }
+
+    // Add new cards
+    for (const item of added) {
+      insertDeskCardElement(item, 'start');
+    }
+
+    // If container is empty now, render empty state
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
+      if (!remaining) {
+        container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+      }
+    } catch (e) {
+    }
+
+    updateInWorkIndicators();
+    refreshDeskOutboxIndicator().catch(() => {});
+    return { success: true, added: added.length, removed: removed.length };
   }
   
   // Добавляет или удаляет диктант со стола (используется кликом на карточку в библиотеке)
@@ -1049,9 +1260,18 @@
         });
         
         if (addData && addData.success) {
-          // Обновляем список диктантов на столе
-          await loadDeskItems();
-          console.log('===DESK_TOGGLE=== loadDeskItems done', { dictationId: String(dictationId) });
+          try {
+            const syncRes = await syncDeskFromServerIncremental();
+            console.log('===DESK_TOGGLE=== desk sync incremental done', {
+              dictationId: String(dictationId),
+              success: Boolean(syncRes && syncRes.success),
+              added: syncRes && typeof syncRes.added === 'number' ? syncRes.added : null,
+              removed: syncRes && typeof syncRes.removed === 'number' ? syncRes.removed : null,
+            });
+          } catch (e) {
+            await loadDeskItems();
+            console.log('===DESK_TOGGLE=== loadDeskItems fallback done', { dictationId: String(dictationId) });
+          }
 
           // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
           try {
@@ -1344,6 +1564,259 @@
     }
   }
 
+  function getDeskCardPosStorageKey(deskItemId) {
+    return `dictafan:desk:pos:${String(deskItemId || '')}`;
+  }
+
+  function readDeskCardPos(deskItemId) {
+    try {
+      const raw = localStorage.getItem(getDeskCardPosStorageKey(deskItemId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const x = Number(parsed.x);
+      const y = Number(parsed.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return { x, y };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeDeskCardPos(deskItemId, x, y) {
+    try {
+      const payload = { x: Number(x) || 0, y: Number(y) || 0, updatedAt: Date.now() };
+      localStorage.setItem(getDeskCardPosStorageKey(deskItemId), JSON.stringify(payload));
+    } catch (e) {
+    }
+  }
+
+  function isDeskFreeLayoutEnabled() {
+    try {
+      return String(localStorage.getItem('dictafan:desk:layout') || '') === 'free';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function setDeskFreeLayoutEnabled(enabled) {
+    try {
+      if (enabled) {
+        localStorage.setItem('dictafan:desk:layout', 'free');
+      } else {
+        localStorage.setItem('dictafan:desk:layout', 'grid');
+      }
+    } catch (e) {
+    }
+  }
+
+  function ensureDeskLayoutToggleButton() {
+    try {
+      const palette = document.getElementById('toolPalette');
+      if (!palette) return;
+      if (document.getElementById('btnDeskFreeLayoutToggle')) return;
+
+      const btn = document.createElement('button');
+      btn.id = 'btnDeskFreeLayoutToggle';
+      btn.className = 'tool-palette-btn';
+      btn.title = 'Свободный стол (таскать карточки)';
+      btn.innerHTML = '<i data-lucide="move"></i>';
+      btn.addEventListener('click', () => {
+        const enabled = !isDeskFreeLayoutEnabled();
+        setDeskFreeLayoutEnabled(enabled);
+        try {
+          loadDeskItems();
+        } catch (e) {
+        }
+      });
+
+      const sep = palette.querySelector('.tool-palette-separator');
+      if (sep && sep.parentNode === palette) {
+        palette.insertBefore(btn, sep);
+      } else {
+        palette.appendChild(btn);
+      }
+
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {
+    }
+  }
+
+  function hasAnyDeskCardPositions(container) {
+    try {
+      const cards = container.querySelectorAll('.desk-card[data-desk-item-id]');
+      for (const card of cards) {
+        const deskItemId = card.getAttribute('data-desk-item-id');
+        if (!deskItemId) continue;
+        if (readDeskCardPos(deskItemId)) return true;
+      }
+    } catch (e) {
+    }
+    return false;
+  }
+
+  function enableDeskFreeLayout(container) {
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (!grid) return null;
+      grid.dataset.deskLayoutMode = 'free';
+      grid.style.position = 'relative';
+      grid.style.display = 'block';
+      grid.style.minHeight = grid.style.minHeight || '240px';
+
+      const cards = grid.querySelectorAll('.desk-card[data-desk-item-id]');
+      let maxBottom = 0;
+
+      cards.forEach((card, idx) => {
+        const deskItemId = card.getAttribute('data-desk-item-id');
+        const pos = deskItemId ? readDeskCardPos(deskItemId) : null;
+
+        const x = pos ? pos.x : (idx * 220);
+        const y = pos ? pos.y : 0;
+
+        card.style.position = 'absolute';
+        card.style.left = '0px';
+        card.style.top = '0px';
+        card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+        card.style.willChange = 'transform';
+        card.dataset.deskX = String(x);
+        card.dataset.deskY = String(y);
+        card.style.touchAction = 'none';
+
+        try {
+          const rect = card.getBoundingClientRect();
+          const h = rect && rect.height ? rect.height : 220;
+          maxBottom = Math.max(maxBottom, y + h);
+        } catch (e) {
+          maxBottom = Math.max(maxBottom, y + 220);
+        }
+      });
+
+      if (maxBottom > 0) {
+        grid.style.minHeight = `${Math.ceil(maxBottom + 40)}px`;
+      }
+
+      return grid;
+    } catch (e) {
+      console.warn('[desk-render] enableDeskFreeLayout failed', e);
+      return null;
+    }
+  }
+
+  function installDeskDragAndDrop(container) {
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (!grid) return;
+      if (grid.dataset.deskDndInstalled === '1') return;
+      if (grid.dataset.deskLayoutMode !== 'free') return;
+      grid.dataset.deskDndInstalled = '1';
+
+      let dragging = null;
+
+      const onPointerDown = (e) => {
+        try {
+          if (!e || e.button !== undefined && e.button !== 0) return;
+          const thumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+          if (!thumb) return;
+          const card = thumb.closest('.desk-card[data-desk-item-id]');
+          if (!card) return;
+          if (e.target.closest('button') || e.target.closest('a')) return;
+
+          const deskItemId = card.getAttribute('data-desk-item-id');
+          if (!deskItemId) return;
+
+          const gridRect = grid.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          const startX = Number(card.dataset.deskX) || 0;
+          const startY = Number(card.dataset.deskY) || 0;
+          const pointerX = (e.clientX - gridRect.left);
+          const pointerY = (e.clientY - gridRect.top);
+          const cardLeft = (cardRect.left - gridRect.left);
+          const cardTop = (cardRect.top - gridRect.top);
+          const offsetX = pointerX - cardLeft;
+          const offsetY = pointerY - cardTop;
+
+          dragging = {
+            deskItemId,
+            card,
+            gridRect,
+            offsetX,
+            offsetY,
+            startX,
+            startY,
+            moved: false
+          };
+
+          card.style.zIndex = '999';
+          if (card.setPointerCapture) {
+            try { card.setPointerCapture(e.pointerId); } catch (err) {}
+          }
+          e.preventDefault();
+        } catch (err) {
+        }
+      };
+
+      const onPointerMove = (e) => {
+        try {
+          if (!dragging) return;
+          const gridRect = dragging.gridRect || grid.getBoundingClientRect();
+          const x = (e.clientX - gridRect.left) - dragging.offsetX;
+          const y = (e.clientY - gridRect.top) - dragging.offsetY;
+          const nx = Math.max(-2000, Math.min(20000, x));
+          const ny = Math.max(-2000, Math.min(20000, y));
+          dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
+          dragging.card.dataset.deskX = String(nx);
+          dragging.card.dataset.deskY = String(ny);
+          if (Math.abs(nx - dragging.startX) > 3 || Math.abs(ny - dragging.startY) > 3) {
+            dragging.moved = true;
+          }
+          e.preventDefault();
+        } catch (err) {
+        }
+      };
+
+      const onPointerUp = (e) => {
+        try {
+          if (!dragging) return;
+          const x = Number(dragging.card.dataset.deskX) || 0;
+          const y = Number(dragging.card.dataset.deskY) || 0;
+          writeDeskCardPos(dragging.deskItemId, x, y);
+          if (dragging.moved) {
+            dragging.card.dataset.deskJustDragged = '1';
+          }
+          dragging.card.style.zIndex = '';
+          dragging = null;
+          e.preventDefault();
+        } catch (err) {
+          dragging = null;
+        }
+      };
+
+      const onClickCapture = (e) => {
+        try {
+          const card = e.target && e.target.closest ? e.target.closest('.desk-card[data-desk-item-id]') : null;
+          if (!card) return;
+          const moved = card.dataset && card.dataset.deskJustDragged === '1';
+          if (moved) {
+            card.dataset.deskJustDragged = '';
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        } catch (err) {
+        }
+      };
+
+      grid.addEventListener('pointerdown', onPointerDown, { passive: false });
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp, { passive: false });
+      grid.addEventListener('click', onClickCapture, true);
+    } catch (e) {
+      console.warn('[desk-render] installDeskDragAndDrop failed', e);
+    }
+  }
+
   function renderDeskCards(items) {
     const container = document.getElementById("deskCardsContainer");
     if (!container) return;
@@ -1374,6 +1847,13 @@
     // Обновляем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       lucide.createIcons();
+    }
+
+    ensureDeskLayoutToggleButton();
+
+    if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
+      enableDeskFreeLayout(container);
+      installDeskDragAndDrop(container);
     }
 
     requestAnimationFrame(() => {
