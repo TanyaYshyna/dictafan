@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0113';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0114';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -52,6 +52,8 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
             return;
         }
 
+        console.warn('[B2 UPLOAD] start', { dictationId, urls: uniqueUrls.length });
+
         const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
             method: 'POST',
             headers: {
@@ -62,14 +64,20 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         });
 
         if (!uploadUrlResp.ok) {
+            let t = '';
+            try { t = await uploadUrlResp.text(); } catch (e) {}
+            console.warn('[B2 UPLOAD] get_upload_url failed', { status: uploadUrlResp.status, text: t });
             return;
         }
         const uploadUrlJson = await uploadUrlResp.json();
         if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
+            console.warn('[B2 UPLOAD] get_upload_url bad payload', uploadUrlJson);
             return;
         }
 
         const cache = await caches.open('dictafan-media');
+        let cacheHit = 0;
+        let uploaded = 0;
         for (const url of uniqueUrls) {
             try {
                 const u = new URL(url, location.origin);
@@ -87,8 +95,10 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
 
                 const cached = await cache.match(u.toString());
                 if (!cached) {
+                    console.warn('[B2 UPLOAD] cache miss', u.toString());
                     continue;
                 }
+                cacheHit += 1;
                 const blob = await cached.blob();
                 if (!blob || !blob.size) {
                     continue;
@@ -99,19 +109,27 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
                     method: 'POST',
                     headers: {
                         'Authorization': uploadUrlJson.uploadAuthToken,
-                        'X-Bz-File-Name': encodeURIComponent(remotePath).replace(/%2F/g, '/'),
+                        'X-Bz-File-Name': encodeURIComponent(remotePath),
                         'Content-Type': blob.type || 'b2/x-auto',
                         'X-Bz-Content-Sha1': 'do_not_verify'
                     },
                     body: blob
                 });
                 if (!b2Resp.ok) {
+                    let txt = '';
+                    try { txt = await b2Resp.text(); } catch (e) {}
+                    console.warn('[B2 UPLOAD] upload failed', { status: b2Resp.status, remotePath, text: txt });
                     continue;
                 }
+                uploaded += 1;
             } catch (e) {
+                console.warn('[B2 UPLOAD] exception', e);
             }
         }
+
+        console.warn('[B2 UPLOAD] done', { dictationId, urls: uniqueUrls.length, cacheHit, uploaded });
     } catch (e) {
+        console.warn('[B2 UPLOAD] fatal', e);
     }
 }
 

@@ -985,12 +985,17 @@ def save_dictation_final():
         
         sentences_data = data.get('sentences', {})
         logger.info(f"📝 Сохранение предложений для диктанта {dictation_id} (db_id={db_id}), языков: {list(sentences_data.keys())}")
+        added_count = 0
+        updated_count = 0
+        deleted_count = 0
+        skipped_lang_count = 0
         
         # Собираем все ключи предложений из новых данных
         new_sentence_keys = set()
         for lang, lang_data in sentences_data.items():
             if not lang_data or 'sentences' not in lang_data:
                 logger.warning(f"⚠️ Пустые данные для языка {lang}")
+                skipped_lang_count += 1
                 continue
             sentences_count = len(lang_data.get('sentences', []))
             logger.info(f"  Язык {lang}: {sentences_count} предложений")
@@ -1001,6 +1006,7 @@ def save_dictation_final():
         
         # Получаем все существующие предложения
         old_sentences = get_dictation_sentences(db_id)
+        logger.info(f"🧾 В БД сейчас предложений для dictation_id={db_id}: {len(old_sentences)}")
         old_sentences_map = {}
         for old_sentence in old_sentences:
             key = (old_sentence['language_code'], old_sentence['sentence_key'])
@@ -1063,6 +1069,7 @@ def save_dictation_final():
                             chain=sentence.get('chain', False),
                             checked=sentence.get('checked', False)
                         )
+                        updated_count += 1
                 else:
                     audio_final = _rewrite_audio_url_for_final(sentence.get('audio'), lang, dictation_id)
                     audio_avto_final = _rewrite_audio_url_for_final(sentence.get('audio_avto'), lang, dictation_id)
@@ -1085,12 +1092,26 @@ def save_dictation_final():
                         chain=sentence.get('chain', False),
                         checked=sentence.get('checked', False)
                     )
+                    added_count += 1
         
         # Удаляем только те предложения, которых нет в новых данных
         for old_sentence in old_sentences:
             key = (old_sentence['language_code'], old_sentence['sentence_key'])
             if key not in new_sentence_keys:
                 delete_sentence(old_sentence['id'])
+                deleted_count += 1
+
+        logger.info(
+            "✅ Итог сохранения предложений для dictation_id=%s (db_id=%s): new_keys=%s old=%s added=%s updated=%s deleted=%s skipped_lang=%s",
+            dictation_id,
+            db_id,
+            len(new_sentence_keys),
+            len(old_sentences),
+            added_count,
+            updated_count,
+            deleted_count,
+            skipped_lang_count,
+        )
         
         # Создаем финальную папку ТОЛЬКО для аудиофайлов и обложки (никаких JSON!)
         final_path = os.path.join('static', 'data', 'dictations', dictation_id)
