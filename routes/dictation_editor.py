@@ -169,11 +169,31 @@ def api_b2_get_upload_url():
         # Server-side validation must happen at save-time / download-time.
         try:
             upload_resp = b2_storage.bucket.get_upload_url()
-            upload_url = getattr(upload_resp, 'upload_url', None)
-            auth_token = getattr(upload_resp, 'authorization_token', None)
-        except Exception:
-            # Fallback for older b2sdk versions
-            upload_url, auth_token = b2_storage.bucket.get_upload_url()
+        except Exception as e:
+            try:
+                from b2sdk.v2.exception import B2Error
+                if isinstance(e, B2Error):
+                    logger.error("B2 get_upload_url failed: %s", e, exc_info=True)
+                    return jsonify({'success': False, 'error': f'B2 error: {e}'}), 502
+            except Exception:
+                pass
+            logger.error("get_upload_url unexpected error: %s", e, exc_info=True)
+            return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
+
+        upload_url = None
+        auth_token = None
+        try:
+            if isinstance(upload_resp, (tuple, list)) and len(upload_resp) >= 2:
+                upload_url, auth_token = upload_resp[0], upload_resp[1]
+            elif isinstance(upload_resp, dict):
+                upload_url = upload_resp.get('uploadUrl') or upload_resp.get('upload_url')
+                auth_token = upload_resp.get('authorizationToken') or upload_resp.get('authorization_token')
+            else:
+                upload_url = getattr(upload_resp, 'upload_url', None) or getattr(upload_resp, 'uploadUrl', None)
+                auth_token = getattr(upload_resp, 'authorization_token', None) or getattr(upload_resp, 'authorizationToken', None)
+        except Exception as e:
+            logger.error("Failed to parse b2 get_upload_url response: %s", e, exc_info=True)
+            return jsonify({'success': False, 'error': 'Failed to parse B2 upload url'}), 502
 
         if not upload_url or not auth_token:
             return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
@@ -185,7 +205,7 @@ def api_b2_get_upload_url():
         })
     except Exception as e:
         logger.error(f"api_b2_get_upload_url error: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Internal error'}), 500
+        return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500
 
 # ==============================================================
 # Удалено: generate_dictation_id() - теперь ID создаётся в БД через API
