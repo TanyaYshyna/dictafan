@@ -105,7 +105,6 @@ function isMediaUrl(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
-    if (path.startsWith('/temp/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -174,7 +173,6 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/dictations/')) return true;
-    if (path.startsWith('/temp/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
     if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
@@ -338,7 +336,7 @@ self.addEventListener('fetch', (event) => {
 
   // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
   const hasRange = request.headers && request.headers.has('range');
-  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/api/temp/') || request.url.includes('/temp/dictations/'))) {
+  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/api/temp/'))) {
     // все аудио должны быть из кеша
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {
@@ -396,6 +394,14 @@ self.addEventListener('fetch', (event) => {
         // If /api/dictations is missing in cache, allow network fallback and cache it for future offline usage.
         try {
           const u = new URL(request.url);
+          // /api/temp/dictations is cache-only (local draft storage)
+          if (u.pathname && u.pathname.startsWith('/api/temp/dictations/')) {
+            return new Response('Offline', {
+              status: 503,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+          }
+
           if (u.pathname && (u.pathname.startsWith('/api/dictations/') || u.pathname.startsWith('/api/temp/'))) {
             const netRes = await fetch(request);
             if (netRes && netRes.ok) {
@@ -430,15 +436,15 @@ self.addEventListener('fetch', (event) => {
   // Dictation must be able to work fully offline.
   try {
     const url = new URL(request.url);
-    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/api/temp/') || url.pathname.startsWith('/temp/dictations/'))) {
+    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/api/temp/'))) {
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
           const cached = await cache.match(request.url);
           if (cached) return cached;
 
-          // temp/dictations must exist only in cache
-          if (url.pathname && url.pathname.startsWith('/temp/dictations/')) {
+          // /api/temp/dictations must exist only in cache
+          if (url.pathname && url.pathname.startsWith('/api/temp/dictations/')) {
             return new Response('Offline', {
               status: 503,
               headers: { 'Content-Type': 'text/plain; charset=utf-8' }
@@ -773,6 +779,106 @@ async function purgeDictationFromBoundedCache(dictationId) {
   return { deleted, dictationId: dictKey };
 }
 
+async function purgeTempDraftFromMediaCache(dictationId) {
+  // Purge editor draft audio (/api/temp/dictations/<dictId>/...) from the persistent media cache.
+  const cache = await caches.open(MEDIA_CACHE_PERSIST);
+  const keys = await cache.keys();
+
+  const dictId = String(dictationId || '').trim();
+  const dictKey = (dictId.startsWith('dict_') || dictId.startsWith('dict_temp_')) ? dictId : `dict_${dictId}`;
+
+  let deleted = 0;
+  for (const req of keys) {
+    try {
+      const url = new URL(req.url);
+      const path = url.pathname;
+
+      if (path.startsWith(`/api/temp/dictations/${dictKey}/`)) {
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return { deleted, dictationId: dictKey };
+}
+
+async function promoteDraftDictationCache(fromDictationId, toDictationId) {
+  // Duplicate draft audio in cache without touching network:
+  // from: /api/temp/dictations/<fromId>/<lang>/<file>
+  // to:   /api/temp/dictations/<toId>/<lang>/<file>   (editor keeps working)
+  // and:  /api/dictations/<toId>/<lang>/<file>        (view page works offline)
+  const cache = await caches.open(MEDIA_CACHE_PERSIST);
+  const keys = await cache.keys();
+
+  const fromId = String(fromDictationId || '').trim();
+  const toIdRaw = String(toDictationId || '').trim();
+  const toId = toIdRaw.startsWith('dict_') ? toIdRaw : `dict_${toIdRaw}`;
+
+  const fromPrefix = `/api/temp/dictations/${fromId}/`;
+  const toTempPrefix = `/api/temp/dictations/${toId}/`;
+  const toFinalPrefix = `/api/dictations/${toId}/`;
+
+  let copiedTemp = 0;
+  let copiedFinal = 0;
+  let missing = 0;
+
+  for (const req of keys) {
+    try {
+      const url = new URL(req.url);
+      const path = url.pathname;
+      if (!path.startsWith(fromPrefix)) continue;
+
+      const cached = await cache.match(req);
+      if (!cached) {
+        missing += 1;
+        continue;
+      }
+
+      const rest = path.slice(fromPrefix.length);
+      const toTempUrl = new URL(toTempPrefix + rest, self.location.origin).toString();
+      const toFinalUrl = new URL(toFinalPrefix + rest, self.location.origin).toString();
+
+      // Note: Response objects are one-time readable, so clone for each put.
+      await cache.put(toTempUrl, cached.clone());
+      copiedTemp += 1;
+
+      await cache.put(toFinalUrl, cached.clone());
+      copiedFinal += 1;
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // Optionally delete the old dict_temp_* entries to avoid wasting space.
+  // We keep this behavior because temp_id is not needed after promote.
+  let deletedOld = 0;
+  for (const req of keys) {
+    try {
+      const url = new URL(req.url);
+      const path = url.pathname;
+      if (path.startsWith(fromPrefix)) {
+        const ok = await cache.delete(req);
+        if (ok) deletedOld += 1;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  return {
+    ok: true,
+    fromId,
+    toId,
+    copiedTemp,
+    copiedFinal,
+    deletedOld,
+    missing,
+  };
+}
+
 self.addEventListener('message', (event) => {
   const data = event.data || {};
   const action = data.action;
@@ -798,6 +904,18 @@ self.addEventListener('message', (event) => {
 
       if (action === 'purgeDictation') {
         const res = await purgeDictationFromBoundedCache(data.dictationId);
+        respond({ success: true, result: res });
+        return;
+      }
+
+      if (action === 'purgeTempDraft') {
+        const res = await purgeTempDraftFromMediaCache(data.dictationId);
+        respond({ success: true, result: res });
+        return;
+      }
+
+      if (action === 'promoteDraftCache') {
+        const res = await promoteDraftDictationCache(data.fromDictationId, data.toDictationId);
         respond({ success: true, result: res });
         return;
       }

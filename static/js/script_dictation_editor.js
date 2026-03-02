@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0111';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0112';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -13,7 +13,7 @@ window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUD
 function prewarmDraftAudioUrl(url) {
     try {
         if (!url || typeof url !== 'string') return;
-        if (!url.includes('/temp/dictations/')) return;
+        if (!url.includes('/api/temp/dictations/')) return;
         const key = String(url);
         if (window.__DICTATION_EDITOR_PREWARM_AUDIOS[key]) return;
 
@@ -821,6 +821,24 @@ async function loadExistingDictation(initData) {
         translation: translation_data
     };
 
+    // Ensure final dictation audio is present in cache before editing.
+    // If cache is missing some URLs, download them (B2 -> cache) via SW.
+    try {
+        const urls = collectFinalAudioUrlsForPrefetch(dictation_id);
+        const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean)));
+        if (uniqueUrls.length > 0) {
+            const res = await swEditorRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
+            const missing = (res && Array.isArray(res.missing)) ? res.missing : [];
+            if (missing.length > 0) {
+                try {
+                    await swEditorRequest('prefetchStrict', { urls: missing, timeoutMs: 180000 });
+                } catch (e) {
+                }
+            }
+        }
+    } catch (e) {
+    }
+
     // Инициализируем поле checked для всех предложений, если его нет
     if (workingData.original && workingData.original.sentences) {
         workingData.original.sentences.forEach(s => {
@@ -1046,7 +1064,7 @@ function collectFinalAudioUrlsForPrefetch(dictationId) {
 async function putDraftAudioToCache(dictationId, language, filename, blob, mime) {
     try {
         if (!dictationId || !language || !filename || !blob) return null;
-        const path = `/temp/dictations/${dictationId}/${language}/${filename}`;
+        const path = `/api/temp/dictations/${dictationId}/${language}/${filename}`;
         const absUrl = new URL(path, window.location.origin).toString();
         const cache = await caches.open('dictafan-media');
         const headers = new Headers();
@@ -1104,7 +1122,7 @@ function setDraftAudioUrl(language, filename, url) {
 function hasDraftAudioUrl(language, filename) {
     try {
         const u = getDraftAudioUrl(language, filename);
-        return !!(u && typeof u === 'string' && u.includes('/temp/dictations/'));
+        return !!(u && typeof u === 'string' && u.includes('/api/temp/dictations/'));
     } catch (e) {
         return false;
     }
@@ -1198,7 +1216,7 @@ async function handleAudioPlayback(event) {
         const needsRegen = String(button.dataset.create || '') === 'true';
         if (isDraft && !needsRegen && !isUnderWave && nameAudioFile) {
             const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-            if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
+            if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/api/temp/dictations/')) {
                 audioUrl = draftUrl;
                 if (button.dataset.state !== 'ready' && button.dataset.state !== 'playing') {
                     button.dataset.state = 'ready';
@@ -1257,7 +1275,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/api/temp/dictations/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -1269,7 +1287,7 @@ async function handleAudioPlayback(event) {
             // Если blob уже есть — играем, не генерим
             if (currentDictation.id && currentDictation.id.startsWith('dict_temp_') && String(button.dataset.create || '') !== 'true' && !isUnderWave && nameAudioFile) {
                 const draftUrl = getDraftAudioUrl(language, nameAudioFile);
-                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/temp/dictations/')) {
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.includes('/api/temp/dictations/')) {
                     audioManager.play(button, draftUrl);
                     break;
                 }
@@ -5268,7 +5286,7 @@ function splitAudioIntoSeentences(row) {
     showLoadingIndicator('Разрезание аудио на предложения...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/temp/dictations/');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/api/temp/dictations/');
 
     (async () => {
         try {
@@ -5365,7 +5383,7 @@ function cutAudioFile(row) {
     showLoadingIndicator('Обрезание аудиофайла...');
 
     const isDraft = currentDictation.id && currentDictation.id.startsWith('dict_temp_');
-    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/temp/dictations/');
+    const isDraftCachePath = typeof filepath === 'string' && filepath.includes('/api/temp/dictations/');
 
     (async () => {
         try {
@@ -7030,6 +7048,8 @@ async function saveDictationOnly() {
         const result = await response.json();
 
         if (result.success) {
+            const fromTempId = currentDictation.temp_id || currentDictation.id;
+            let promotedCache = false;
             // Если диктант был создан в БД - обновляем ID
             if (result.dictation_id && result.db_id) {
                 currentDictation.id = result.dictation_id;
@@ -7065,47 +7085,28 @@ async function saveDictationOnly() {
             // Отмечаем диктант как сохраненный
             currentDictation.isSaved = true;
 
+            // For new dictations: promote cached draft audio from dict_temp_* to dict_* under
+            // /api/temp/dictations/<dict_id>/... (editor continues) and /api/dictations/<dict_id>/... (view page).
             try {
-                const dictIdForCache = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
-                const urls = collectFinalAudioUrlsForPrefetch(dictIdForCache);
-                if (urls.length > 0) {
-                    try {
-                        await swEditorRequest('purgeDictation', { dictationId: dictIdForCache, timeoutMs: 60000 });
-                    } catch (e) {
-                    }
-                    await swEditorRequest('prefetchStrict', { urls, timeoutMs: 180000 });
+                const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
+                if (fromTempId && String(fromTempId).startsWith('dict_temp_') && toId && String(toId).startsWith('dict_')) {
+                    const promo = await swEditorRequest('promoteDraftCache', {
+                        fromDictationId: fromTempId,
+                        toDictationId: toId,
+                        timeoutMs: 60000
+                    });
+                    promotedCache = !!(promo && promo.ok);
                 }
             } catch (e) {
-                try {
-                    const swError = e && (e.swError || e.swAction) ? { swAction: e.swAction, swError: e.swError } : null;
-                    const swResult = e && e.swResult ? e.swResult : null;
-                    console.groupCollapsed('⚠️ Offline prefetch after save failed');
-                    if (swError) console.warn('SW error:', swError);
-                    console.warn('Error:', e);
-                    if (swResult) {
-                        console.warn('SW result:', swResult);
-                        if (Array.isArray(swResult.failedUrls) && swResult.failedUrls.length > 0) {
-                            console.warn('Failed URLs:', swResult.failedUrls);
-                        }
-                        if (Array.isArray(swResult.overLimitUrls) && swResult.overLimitUrls.length > 0) {
-                            console.warn('Over-limit URLs:', swResult.overLimitUrls);
-                        }
-                        if (typeof swResult.maxBytes === 'number' || typeof swResult.totalBytes === 'number') {
-                            console.warn('Cache size:', {
-                                totalBytes: swResult.totalBytes,
-                                maxBytes: swResult.maxBytes,
-                                fetched: swResult.fetched,
-                                skipped: swResult.skipped,
-                                failed: swResult.failed,
-                                overLimit: swResult.overLimit,
-                                total: swResult.total,
-                            });
-                        }
-                    }
-                    console.groupEnd();
-                } catch (e2) {
-                    console.warn('⚠️ Offline prefetch after save failed', e);
+                console.warn('⚠️ promoteDraftCache failed', e);
+            }
+
+            // Ensure we don't keep dict_temp_* references after save.
+            try {
+                if (currentDictation.id && String(currentDictation.id).startsWith('dict_')) {
+                    currentDictation.temp_id = currentDictation.id;
                 }
+            } catch (e) {
             }
 
             // Обновляем звездочку
@@ -7148,24 +7149,13 @@ async function cleanupTempAndExit() {
         // Показываем индикатор загрузки
         showLoadingIndicator('Очистка временных файлов...');
 
-        // Очищаем temp папку если это новый диктант (используем временный ID если был создан)
-        // Для нового диктанта без сохранения в БД - используем временный ID из temp если есть
-        const tempDictationId = currentDictation.temp_id || currentDictation.id;
-        if (tempDictationId && tempDictationId !== 'new' && tempDictationId.startsWith('dict_temp_')) {
-            const response = await fetch('/cleanup_temp_dictation', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${window.UM?.token || localStorage.getItem('jwt_token')}`
-                },
-                body: JSON.stringify({
-                    dictation_id: tempDictationId,
-                    user_id: currentDictation.user_id,  // Для пути temp/<user_id>/
-                    safe_email: currentDictation.safe_email
-                })
-            });
-
-            const result = await response.json();
+        // Always purge local draft audio cache for the current dictation ID.
+        try {
+            const idForPurge = currentDictation && currentDictation.id ? String(currentDictation.id) : null;
+            if (idForPurge && idForPurge !== 'new' && (idForPurge.startsWith('dict_') || idForPurge.startsWith('dict_temp_'))) {
+                await swEditorRequest('purgeTempDraft', { dictationId: idForPurge, timeoutMs: 60000 });
+            }
+        } catch (e) {
         }
 
         // Переходим на главную страницу

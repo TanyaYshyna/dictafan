@@ -45,7 +45,7 @@ class AudioManagerClass {
         }
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
-        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/temp/dictations/');
+        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/api/temp/dictations/');
         __dbg('play()', {
             audioUrl,
             buttonId: button && button.id,

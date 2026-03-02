@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0111';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0112';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
