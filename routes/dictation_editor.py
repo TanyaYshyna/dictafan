@@ -106,6 +106,7 @@ def generate_audio():
             if is_temp_dictation:
                 with open(filepath, 'rb') as f:
                     audio_b64 = base64.b64encode(f.read()).decode('ascii')
+
                 try:
                     os.remove(filepath)
                 except OSError:
@@ -154,6 +155,37 @@ def generate_audio():
             "success": False,
             "error": f"Внутренняя ошибка сервера: {e}"
         }), 500
+
+
+@editor_bp.route('/api/b2/get_upload_url', methods=['POST'])
+@jwt_required()
+def api_b2_get_upload_url():
+    try:
+        if not b2_storage.enabled or not b2_storage.bucket:
+            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+
+        # NOTE: we intentionally do not accept a path here.
+        # The client will use this upload url/token to upload specific files.
+        # Server-side validation must happen at save-time / download-time.
+        try:
+            upload_resp = b2_storage.bucket.get_upload_url()
+            upload_url = getattr(upload_resp, 'upload_url', None)
+            auth_token = getattr(upload_resp, 'authorization_token', None)
+        except Exception:
+            # Fallback for older b2sdk versions
+            upload_url, auth_token = b2_storage.bucket.get_upload_url()
+
+        if not upload_url or not auth_token:
+            return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
+
+        return jsonify({
+            'success': True,
+            'uploadUrl': upload_url,
+            'uploadAuthToken': auth_token,
+        })
+    except Exception as e:
+        logger.error(f"api_b2_get_upload_url error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Internal error'}), 500
 
 # ==============================================================
 # Удалено: generate_dictation_id() - теперь ID создаётся в БД через API

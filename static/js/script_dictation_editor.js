@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0112';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0113';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -32,6 +32,84 @@ function prewarmAllDraftAudioUrls() {
         const values = Object.values(map);
         for (const u of values) {
             prewarmDraftAudioUrl(u);
+        }
+    } catch (e) {
+    }
+}
+
+async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
+    try {
+        if (!dictationId || !String(dictationId).startsWith('dict_')) {
+            return;
+        }
+        if (!token) {
+            return;
+        }
+
+        const urls = collectFinalAudioUrlsForPrefetch(dictationId);
+        const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean)));
+        if (uniqueUrls.length === 0) {
+            return;
+        }
+
+        const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({})
+        });
+
+        if (!uploadUrlResp.ok) {
+            return;
+        }
+        const uploadUrlJson = await uploadUrlResp.json();
+        if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
+            return;
+        }
+
+        const cache = await caches.open('dictafan-media');
+        for (const url of uniqueUrls) {
+            try {
+                const u = new URL(url, location.origin);
+                // Expected: /api/dictations/<dictationId>/<lang>/<filename>
+                const m = u.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
+                if (!m) {
+                    continue;
+                }
+                const urlDictId = m[1];
+                const lang = m[2];
+                const filename = m[3];
+                if (urlDictId !== dictationId) {
+                    continue;
+                }
+
+                const cached = await cache.match(u.toString());
+                if (!cached) {
+                    continue;
+                }
+                const blob = await cached.blob();
+                if (!blob || !blob.size) {
+                    continue;
+                }
+
+                const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
+                const b2Resp = await fetch(uploadUrlJson.uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': uploadUrlJson.uploadAuthToken,
+                        'X-Bz-File-Name': encodeURIComponent(remotePath).replace(/%2F/g, '/'),
+                        'Content-Type': blob.type || 'b2/x-auto',
+                        'X-Bz-Content-Sha1': 'do_not_verify'
+                    },
+                    body: blob
+                });
+                if (!b2Resp.ok) {
+                    continue;
+                }
+            } catch (e) {
+            }
         }
     } catch (e) {
     }
@@ -7099,6 +7177,21 @@ async function saveDictationOnly() {
                 }
             } catch (e) {
                 console.warn('⚠️ promoteDraftCache failed', e);
+            }
+
+            // Offline-first: upload cached audio directly to B2 via server-provided uploadUrl/token.
+            // This must never block Save UX.
+            try {
+                const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
+                if (toId && String(toId).startsWith('dict_')) {
+                    setTimeout(() => {
+                        try {
+                            uploadDictationAudioFromCacheToB2({ dictationId: toId, token });
+                        } catch (e) {
+                        }
+                    }, 0);
+                }
+            } catch (e) {
             }
 
             // Ensure we don't keep dict_temp_* references after save.
