@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0115';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0116';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -7101,12 +7101,8 @@ async function saveDictationOnly() {
             }
         }
         
-        // Проверяем category_key только если нет book_id (новая идеология: диктант принадлежит книге/разделу, а не категории)
-        if (!saveData.book_id && !saveData.category_key) {
-            alert('Ошибка: не выбрана категория для диктанта. Пожалуйста, выберите категорию.');
-            hideLoadingIndicator();
-            return;
-        }
+        // category_key больше не обязателен на клиенте: сервер сам проставит дефолт,
+        // либо диктант будет привязан к книге/разделу через book_id
         
         // Отправляем данные на сервер для сохранения предложений и обновления диктанта
         
@@ -7328,12 +7324,8 @@ async function saveDictationAndExit() {
             return;
         }
 
-        // Проверяем category_key только если нет book_id (новая идеология: диктант принадлежит книге/разделу, а не категории)
-        if (!currentDictation.book_id && !currentDictation.category_key) {
-            alert('Ошибка: не выбрана категория для диктанта');
-            hideLoadingIndicator();
-            return;
-        }
+        // category_key больше не обязателен на клиенте: сервер сам проставит дефолт,
+        // либо диктант будет привязан к книге/разделу через book_id
 
 
         // Сохраняем диктант сразу в финальную папку и добавляем в категорию
