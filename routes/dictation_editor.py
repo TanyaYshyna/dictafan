@@ -1071,24 +1071,46 @@ def save_dictation_final():
         # Для существующих - temp/dict_<id>/
         temp_dictation_id = data.get('temp_id') or dictation_id
 
-        # В финал сохраняем только:
-        # - файлы предложений с суффиксом _audio.mp3
-        # - общий файл(ы) audio_user_shared (если указан)
-        shared_audio_names = set()
-        shared_audio_relpaths = set()
+        # В финал сохраняем только аудио, которое реально используется в сохранённых предложениях.
+        # Это критично для новых диктантов: файлы часто называются как 001_ru_avto.mp3 и т.п.,
+        # и они не оканчиваются на _audio.mp3.
+        keep_audio_relpaths = set()
+        keep_audio_names = set()
         try:
+            def _basename_from_value(v: str):
+                try:
+                    vv = str(v or '').strip()
+                    if not vv:
+                        return None
+                    vv = vv.split('?', 1)[0]
+                    return vv.rsplit('/', 1)[-1] or None
+                except Exception:
+                    return None
+
             for _lang, _lang_data in (data.get('sentences') or {}).items():
-                if not _lang_data:
+                if not isinstance(_lang, str) or not _lang.strip():
                     continue
+                lang_code = _lang.strip()
+                if not _lang_data or not isinstance(_lang_data, dict):
+                    continue
+
                 shared_name = _lang_data.get('audio_user_shared')
-                if isinstance(shared_name, str) and shared_name.strip():
-                    shared_name = shared_name.strip()
-                    shared_audio_names.add(shared_name)
-                    if isinstance(_lang, str) and _lang.strip():
-                        shared_audio_relpaths.add(f"{_lang.strip()}/{shared_name}")
+                shared_base = _basename_from_value(shared_name) if isinstance(shared_name, str) else None
+                if shared_base:
+                    keep_audio_names.add(shared_base)
+                    keep_audio_relpaths.add(f"{lang_code}/{shared_base}")
+
+                for s in (_lang_data.get('sentences') or []):
+                    if not s or not isinstance(s, dict):
+                        continue
+                    for fld in ('audio', 'audio_avto', 'audio_mic', 'audio_user'):
+                        base = _basename_from_value(s.get(fld)) if isinstance(s.get(fld), str) else None
+                        if base:
+                            keep_audio_names.add(base)
+                            keep_audio_relpaths.add(f"{lang_code}/{base}")
         except Exception:
-            shared_audio_names = set()
-            shared_audio_relpaths = set()
+            keep_audio_relpaths = set()
+            keep_audio_names = set()
         
         # Определяем путь к временной папке
         # Пробуем сначала temp/<user_id>/dict_temp_<timestamp>/, потом temp/dict_temp_<timestamp>/
@@ -1120,16 +1142,16 @@ def save_dictation_final():
                 for file in files:
                     # Поддерживаемые расширения: mp3, mp4, webm, wav, ogg, m4a, aac, flac
                     if file.lower().endswith(('.mp3', '.mp4', '.webm', '.wav', '.ogg', '.m4a', '.aac', '.flac')):
-                        # Фильтрация: сохраняем только финальные аудио-файлы и общий файл
-                        is_final_sentence_audio = file.lower().endswith('_audio.mp3')
                         src_file = os.path.join(root, file)
                         # Определяем относительный путь от temp папки
                         rel_path = os.path.relpath(src_file, temp_path)
                         rel_path_posix = rel_path.replace(os.sep, '/')
 
-                        is_shared_audio = (file in shared_audio_names) or (rel_path_posix in shared_audio_relpaths)
-                        if not (is_final_sentence_audio or is_shared_audio):
-                            continue
+                        # Фильтрация: сохраняем только то аудио, которое реально используется.
+                        # Если список пустой (не удалось собрать), то для безопасности копируем всё.
+                        if keep_audio_relpaths:
+                            if (rel_path_posix not in keep_audio_relpaths) and (file not in keep_audio_names):
+                                continue
 
                         dst_file = os.path.join(final_path, rel_path)
                         try:

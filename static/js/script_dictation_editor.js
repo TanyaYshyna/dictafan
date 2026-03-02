@@ -5,7 +5,7 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0107';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0111';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -7076,7 +7076,36 @@ async function saveDictationOnly() {
                     await swEditorRequest('prefetchStrict', { urls, timeoutMs: 180000 });
                 }
             } catch (e) {
-                console.warn('⚠️ Offline prefetch after save failed', e);
+                try {
+                    const swError = e && (e.swError || e.swAction) ? { swAction: e.swAction, swError: e.swError } : null;
+                    const swResult = e && e.swResult ? e.swResult : null;
+                    console.groupCollapsed('⚠️ Offline prefetch after save failed');
+                    if (swError) console.warn('SW error:', swError);
+                    console.warn('Error:', e);
+                    if (swResult) {
+                        console.warn('SW result:', swResult);
+                        if (Array.isArray(swResult.failedUrls) && swResult.failedUrls.length > 0) {
+                            console.warn('Failed URLs:', swResult.failedUrls);
+                        }
+                        if (Array.isArray(swResult.overLimitUrls) && swResult.overLimitUrls.length > 0) {
+                            console.warn('Over-limit URLs:', swResult.overLimitUrls);
+                        }
+                        if (typeof swResult.maxBytes === 'number' || typeof swResult.totalBytes === 'number') {
+                            console.warn('Cache size:', {
+                                totalBytes: swResult.totalBytes,
+                                maxBytes: swResult.maxBytes,
+                                fetched: swResult.fetched,
+                                skipped: swResult.skipped,
+                                failed: swResult.failed,
+                                overLimit: swResult.overLimit,
+                                total: swResult.total,
+                            });
+                        }
+                    }
+                    console.groupEnd();
+                } catch (e2) {
+                    console.warn('⚠️ Offline prefetch after save failed', e);
+                }
             }
 
             // Обновляем звездочку
