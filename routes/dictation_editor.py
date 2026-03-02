@@ -168,7 +168,14 @@ def api_b2_get_upload_url():
         # The client will use this upload url/token to upload specific files.
         # Server-side validation must happen at save-time / download-time.
         try:
-            upload_resp = b2_storage.bucket.get_upload_url()
+            if hasattr(b2_storage.bucket, 'get_upload_url'):
+                upload_resp = b2_storage.bucket.get_upload_url()
+            else:
+                # Compatibility with older b2sdk versions
+                bucket_id = getattr(b2_storage.bucket, 'id_', None) or getattr(b2_storage.bucket, 'bucket_id', None)
+                if not bucket_id:
+                    raise AttributeError("Bucket has no get_upload_url and no bucket id attribute")
+                upload_resp = b2_storage.api.session.get_upload_url(bucket_id)
         except Exception as e:
             try:
                 from b2sdk.v2.exception import B2Error
