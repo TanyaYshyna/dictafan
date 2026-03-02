@@ -178,7 +178,7 @@ def api_b2_get_upload_url():
             except Exception:
                 pass
             logger.error("get_upload_url unexpected error: %s", e, exc_info=True)
-            return jsonify({'success': False, 'error': 'Failed to get B2 upload url'}), 502
+            return jsonify({'success': False, 'error': f'get_upload_url failed: {type(e).__name__}: {e}'}), 502
 
         upload_url = None
         auth_token = None
