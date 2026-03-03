@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0123';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0124';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -115,6 +115,7 @@
 
   let bookLanguageSelector = null;
   let activeBookId = null;
+  let activeBookIsWorkbook = false;
   let currentView = 'cards'; // 'cards' or 'list'
   let cropper = null;
   let croppedImageBlob = null;
@@ -2123,6 +2124,7 @@
     if (zone) {
       zone.style.display = 'none';
       activeBookId = null;
+      activeBookIsWorkbook = false;
       
       // Скрываем разделитель и убираем класс
       const libraryContent = document.querySelector('.library-content');
@@ -2143,6 +2145,7 @@
 
   async function loadActiveBook(bookId, isWorkbook = false) {
     try {
+      activeBookIsWorkbook = !!isWorkbook;
       // Загружаем информацию о книге
       const bookData = await apiRequest(`/library/api/book/${bookId}`);
       
@@ -4239,10 +4242,12 @@
       });
 
       // If a book/section is currently open, trash means "remove from this book", not delete dictation.
+      // Workbook is a special virtual view of orphan dictations (not based on book_dictations), so here we delete globally.
       try {
         const bookIdRaw = (typeof activeBookId !== 'undefined' && activeBookId) ? String(activeBookId) : '';
         const bookIdNum = bookIdRaw ? parseInt(bookIdRaw, 10) : NaN;
-        if (bookIdNum && isFinite(bookIdNum) && bookIdNum > 0) {
+        const isWorkbookActive = (typeof activeBookIsWorkbook !== 'undefined') ? !!activeBookIsWorkbook : false;
+        if (!isWorkbookActive && bookIdNum && isFinite(bookIdNum) && bookIdNum > 0) {
           const token = getToken();
           const url = `/library/api/book/${bookIdNum}/dictation/${encodeURIComponent(idStr)}`;
           console.log('🗑️ remove-from-book request', { url, bookIdNum, dictationId: idStr });
@@ -4278,7 +4283,7 @@
             }
             if (activeBookId) {
               try {
-                await loadActiveBook(activeBookId);
+                await loadActiveBook(activeBookId, activeBookIsWorkbook);
               } catch (e) {
               }
             }
@@ -4325,7 +4330,7 @@
 
         if (activeBookId) {
           try {
-            await loadActiveBook(activeBookId);
+            await loadActiveBook(activeBookId, activeBookIsWorkbook);
           } catch (e) {
           }
         }
