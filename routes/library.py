@@ -18,6 +18,7 @@ from helpers.db_books import (
     get_or_create_workbook,
     get_orphan_dictations,
     add_dictation_to_book,
+    remove_dictation_from_book,
 )
 from helpers.db_dictations import get_dictation_sentences
 from routes.index import get_cover_url_for_id
@@ -688,6 +689,28 @@ def api_move_dictation_to_book(dictation_id: int):
         return jsonify({"success": True})
     except Exception as exc:
         logger.error("Ошибка перемещения диктанта %s в книгу %s: %s", dictation_id, book_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@library_bp.route("/api/book/<int:book_id>/dictation/<int:dictation_id>", methods=["DELETE"])
+@jwt_required()
+def api_remove_dictation_from_book(book_id: int, dictation_id: int):
+    """Убирает диктант из указанной книги/раздела (мусорник в приватной библиотеке).
+
+    НЕ удаляет диктант из БД и НЕ удаляет файлы.
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        removed = remove_dictation_from_book(dictation_id, book_id)
+        logger.info("🗑️ remove_dictation_from_book: user_id=%s book_id=%s dictation_id=%s removed=%s",
+                    user.get("id"), book_id, dictation_id, removed)
+        return jsonify({"success": True, "removed": removed})
+    except Exception as exc:
+        logger.error("Ошибка удаления диктанта %s из книги %s: %s", dictation_id, book_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

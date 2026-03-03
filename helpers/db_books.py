@@ -93,6 +93,27 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def remove_dictation_from_book(dictation_id: int, book_id: int) -> bool:
+    """Убирает диктант из книги/раздела (удаляет связь из book_dictations)."""
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            DELETE FROM book_dictations
+            WHERE book_id = %s AND dictation_id = %s
+            """,
+            (book_id, dictation_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+    finally:
+        cur.close()
+        conn.close()
+
+
 def get_book_dictations(book_id: int) -> List[Dict[str, Any]]:
     """
     Возвращает список диктантов, входящих в книгу, с базовой информацией.

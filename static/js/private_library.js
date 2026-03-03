@@ -4176,6 +4176,51 @@
       const idStr = String(dictationId || '');
       if (!idStr) return;
 
+      // If a book/section is currently open, trash means "remove from this book", not delete dictation.
+      try {
+        const bookIdRaw = (typeof activeBookId !== 'undefined' && activeBookId) ? String(activeBookId) : '';
+        const bookIdNum = bookIdRaw ? parseInt(bookIdRaw, 10) : NaN;
+        if (bookIdNum && isFinite(bookIdNum) && bookIdNum > 0) {
+          const token = getToken();
+          const response = await fetch(`/library/api/book/${bookIdNum}/dictation/${encodeURIComponent(idStr)}`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (e) {
+            data = null;
+          }
+
+          if (response.ok && data && data.success) {
+            closeDeleteDictationModal();
+            showToast('Диктант убран из книги');
+            try {
+              const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
+              if (card) {
+                card.remove();
+              }
+            } catch (e) {
+            }
+            if (activeBookId) {
+              try {
+                await loadActiveBook(activeBookId);
+              } catch (e) {
+              }
+            }
+            return;
+          }
+
+          showToast((data && data.error) ? data.error : 'Ошибка при удалении из книги', 'error');
+          return;
+        }
+      } catch (e) {
+      }
+
       const dictIdStr = `dict_${idStr}`;
       const response = await fetch(`/api/dictations/${encodeURIComponent(dictIdStr)}`, {
         method: 'DELETE'

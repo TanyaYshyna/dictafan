@@ -5,10 +5,40 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0118';
+// Offline-first схема сохранения аудио:
+// 1) черновики: /api/temp/dictations/... хранятся в Cache Storage (dictafan-media)
+// 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
+// 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
+
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0119';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
+
+window.__DICTATION_EDITOR_DIRTY = window.__DICTATION_EDITOR_DIRTY || {
+    db: false,
+    audio: false,
+    cover: false
+};
+
+function setDirtyFlags(next = {}) {
+    try {
+        const s = window.__DICTATION_EDITOR_DIRTY || (window.__DICTATION_EDITOR_DIRTY = { db: false, audio: false, cover: false });
+        if (typeof next.db === 'boolean') s.db = next.db;
+        if (typeof next.audio === 'boolean') s.audio = next.audio;
+        if (typeof next.cover === 'boolean') s.cover = next.cover;
+    } catch (e) {
+    }
+    try { updateUnsavedStar(); } catch (e) {}
+}
+
+function getDirtyFlags() {
+    try {
+        return window.__DICTATION_EDITOR_DIRTY || { db: false, audio: false, cover: false };
+    } catch (e) {
+        return { db: false, audio: false, cover: false };
+    }
+}
 
 function prewarmDraftAudioUrl(url) {
     try {
@@ -130,6 +160,71 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         console.warn('[B2 UPLOAD] done', { dictationId, urls: uniqueUrls.length, cacheHit, uploaded });
     } catch (e) {
         console.warn('[B2 UPLOAD] fatal', e);
+    }
+}
+
+async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
+    try {
+        if (!dictationId || !String(dictationId).startsWith('dict_')) {
+            return;
+        }
+        if (!token) {
+            return;
+        }
+
+        const numericId = String(dictationId).split('_', 2)[1] || '';
+        if (!numericId) return;
+
+        const cache = await caches.open('dictafan-media');
+        const coverUrl = new URL(`/api/dictations/${dictationId}/cover.webp`, location.origin).toString();
+        const cached = await cache.match(coverUrl);
+        if (!cached) {
+            return;
+        }
+
+        // The UI (desk cards, dictation header) uses /api/cover?dictation_id=dict_<id>.
+        // Keep an alias in cache so covers still work offline.
+        try {
+            const aliasUrl = new URL(`/api/cover?dictation_id=${encodeURIComponent(String(dictationId))}`, location.origin).toString();
+            await cache.put(aliasUrl, cached.clone());
+        } catch (e) {
+        }
+
+        const blob = await cached.blob();
+        if (!blob || !blob.size) {
+            return;
+        }
+
+        const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({})
+        });
+
+        if (!uploadUrlResp.ok) {
+            return;
+        }
+        const uploadUrlJson = await uploadUrlResp.json();
+        if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
+            return;
+        }
+
+        const remotePath = `dictations_covers/${numericId}.webp`;
+        await fetch(uploadUrlJson.uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': uploadUrlJson.uploadAuthToken,
+                'X-Bz-File-Name': encodeURIComponent(remotePath),
+                'Content-Type': blob.type || 'image/webp',
+                'X-Bz-Content-Sha1': 'do_not_verify'
+            },
+            body: blob
+        });
+    } catch (e) {
+        console.warn('[B2 UPLOAD] cover fatal', e);
     }
 }
 
@@ -464,36 +559,34 @@ async function handleCropConfirm() {
             coverImage.src = url;
         }
         
-        // Отправляем обрезанное изображение на сервер
+        // Offline-first: сохраняем cover.webp в Cache Storage (dictafan-media) как temp media.
+        // Дальше promoteDraftCache перенесет его в /api/dictations/<dict_id>/cover.webp,
+        // а после сохранения мы сделаем direct upload в B2 в dictations_covers/<id>.webp.
         try {
-                const formData = new FormData();
-            formData.append('cover', blob, 'cover.webp');
-                formData.append('dictation_id', currentDictation.id);
-                // Передаем user_id для правильного пути temp/<user_id>/dict_temp_<timestamp>/
-                if (currentDictation.user_id) {
-                    formData.append('user_id', currentDictation.user_id);
+            const dictationId = String(currentDictation.id || '').trim();
+            if (dictationId) {
+                const cache = await caches.open('dictafan-media');
+                const tempPath = `/api/temp/dictations/${dictationId}/cover.webp`;
+                const tempUrl = new URL(tempPath, window.location.origin).toString();
+                const headers = new Headers();
+                headers.set('Content-Type', blob.type || 'image/webp');
+                headers.set('Cache-Control', 'no-store');
+                await cache.put(tempUrl, new Response(blob, { status: 200, headers }));
+                // Если это уже сохранённый dict_<id>, кладём и final ключ для оффлайн просмотра
+                if (dictationId.startsWith('dict_')) {
+                    const finalPath = `/api/dictations/${dictationId}/cover.webp`;
+                    const finalUrl = new URL(finalPath, window.location.origin).toString();
+                    await cache.put(finalUrl, new Response(blob, { status: 200, headers }));
                 }
-
-                const response = await fetch('/api/cover', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                // Сохраняем blob в памяти для последующего сохранения
-                currentDictation.coverFile = blob;
-                // Закрываем crop modal БЕЗ очистки blob
-                closeCropModal(false);
-                } else {
-                    const error = await response.json();
-                    console.error('Ошибка сохранения cover:', error.error);
-                    alert('Ошибка сохранения изображения: ' + error.error);
-                }
-            } catch (error) {
-                console.error('Ошибка при загрузке cover:', error);
-                alert('Ошибка при загрузке изображения');
             }
+
+            currentDictation.coverFile = blob;
+            setDirtyFlags({ cover: true });
+            closeCropModal(false);
+        } catch (error) {
+            console.error('Ошибка при сохранении cover в cache:', error);
+            alert('Ошибка при сохранении изображения');
+        }
     }, 'image/webp', 0.9);
 }
 
@@ -2063,11 +2156,25 @@ function setupTabsPanel() {
         // Синхронизация из основной формы во вкладку
         titleInput.addEventListener('input', () => {
             tabTitleInput.value = titleInput.value;
+            try {
+                if (workingData && workingData.original) {
+                    workingData.original.title = titleInput.value;
+                }
+            } catch (e) {
+            }
+            setDirtyFlags({ db: true });
         });
 
         // Синхронизация из вкладки в основную форму
         tabTitleInput.addEventListener('input', () => {
             titleInput.value = tabTitleInput.value;
+            try {
+                if (workingData && workingData.original) {
+                    workingData.original.title = tabTitleInput.value;
+                }
+            } catch (e) {
+            }
+            setDirtyFlags({ db: true });
         });
     }
 
@@ -2075,11 +2182,25 @@ function setupTabsPanel() {
         // Синхронизация из основной формы во вкладку
         titleTranslationInput.addEventListener('input', () => {
             tabTitleTranslationInput.value = titleTranslationInput.value;
+            try {
+                if (workingData && workingData.translation) {
+                    workingData.translation.title = titleTranslationInput.value;
+                }
+            } catch (e) {
+            }
+            setDirtyFlags({ db: true });
         });
 
         // Синхронизация из вкладки в основную форму
         tabTitleTranslationInput.addEventListener('input', () => {
             titleTranslationInput.value = tabTitleTranslationInput.value;
+            try {
+                if (workingData && workingData.translation) {
+                    workingData.translation.title = tabTitleTranslationInput.value;
+                }
+            } catch (e) {
+            }
+            setDirtyFlags({ db: true });
         });
     }
 
@@ -2137,6 +2258,7 @@ function setupTabsPanel() {
         tabIsDialogCheckbox.addEventListener('change', () => {
             const isDialog = tabIsDialogCheckbox.checked;
             currentDictation.is_dialog = isDialog;
+            setDirtyFlags({ db: true });
 
             // Синхронизируем с основным чекбоксом
             if (isDialogCheckbox) {
@@ -3111,6 +3233,7 @@ function setupTabSpeakersHandlers() {
             addSpeakerToTabTable();
             syncSpeakersFromTab();
                 refreshAllSpeakerSelectOptions();
+            setDirtyFlags({ db: true });
         });
 
         // Обработчики для кнопок удаления спикеров
@@ -3120,6 +3243,7 @@ function setupTabSpeakersHandlers() {
                 removeSpeakerFromTabTable(btn);
                 syncSpeakersFromTab();
                 refreshAllSpeakerSelectOptions();
+                setDirtyFlags({ db: true });
             }
         });
 
@@ -3128,6 +3252,7 @@ function setupTabSpeakersHandlers() {
             if (e.target.classList.contains('speaker-name')) {
                 syncSpeakersFromTab();
                 refreshAllSpeakerSelectOptions();
+                setDirtyFlags({ db: true });
             }
         });
     }
@@ -4371,6 +4496,7 @@ async function saveRecording() {
 
             // Отмечаем что диктант изменен
             currentDictation.isSaved = false;
+            setDirtyFlags({ audio: true });
 
             // Закрываем модальное окно
             closeMicRecordModal();
@@ -5002,6 +5128,7 @@ function continueUpload(file, audioMode, durationFormatted, duration) {
 
                 // Отмечаем что диктант изменен
                 currentDictation.isSaved = false;
+                setDirtyFlags({ audio: true });
 
                 // Автосохранение JSON удалено - данные только в workingData
 
@@ -5454,6 +5581,7 @@ function splitAudioIntoSeentences(row) {
 
                 // Обновляем UI
                 rebuildSentencesTable();
+                setDirtyFlags({ audio: true });
                 markAsUnsaved();
             }
         } catch (error) {
@@ -5640,6 +5768,11 @@ function updateSentenceData(rowKey, language, field, value) {
         if (sentenceIndex !== -1) {
             workingData.translation.sentences[sentenceIndex][field] = value;
         }
+    }
+
+    try {
+        setDirtyFlags({ db: true });
+    } catch (e) {
     }
 }
 
@@ -6389,6 +6522,7 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
 
             // Отмечаем что диктант изменен
             currentDictation.isSaved = false;
+            setDirtyFlags({ audio: true });
 
             // Обновляем поля ввода
             if (startInput) startInput.value = '0.00';
@@ -6940,10 +7074,33 @@ async function handleSave() {
  * Обновляет отображение звездочки несохраненных изменений
  */
 function updateUnsavedStar() {
+    const flags = getDirtyFlags();
+    const hasUnsaved = hasUnsavedChanges();
+
     const unsavedStar = document.getElementById('unsavedStar');
     if (unsavedStar) {
-        const hasUnsaved = hasUnsavedChanges();
         unsavedStar.style.display = hasUnsaved ? 'inline-flex' : 'none';
+    }
+
+    const dbStar = document.getElementById('unsavedStarDb');
+    if (dbStar) {
+        dbStar.style.display = flags.db ? 'inline-flex' : 'none';
+        dbStar.style.color = '#2b77ff';
+        dbStar.title = 'Изменения в тексте/БД';
+    }
+
+    const audioStar = document.getElementById('unsavedStarAudio');
+    if (audioStar) {
+        audioStar.style.display = flags.audio ? 'inline-flex' : 'none';
+        audioStar.style.color = '#ff8a00';
+        audioStar.title = 'Изменения в аудио';
+    }
+
+    const coverStar = document.getElementById('unsavedStarCover');
+    if (coverStar) {
+        coverStar.style.display = flags.cover ? 'inline-flex' : 'none';
+        coverStar.style.color = '#19a64a';
+        coverStar.title = 'Изменения в обложке';
     }
 }
 
@@ -6959,27 +7116,9 @@ async function handleSaveAndExit() {
  * Проверяет есть ли несохраненные изменения
  */
 function hasUnsavedChanges() {
-    // Если диктант уже сохранен - нет несохраненных изменений
-    if (currentDictation.isSaved) {
-        return false;
-    }
-
-    // Проверяем есть ли данные в workingData
-    if (!workingData || !workingData.original) {
-        return false;
-    }
-
-    // Проверяем есть ли предложения
-    if (!workingData.original.sentences || workingData.original.sentences.length === 0) {
-        return false;
-    }
-
-    // Проверяем есть ли аудио файлы
-    const hasAudio = workingData.original.sentences.some(sentence =>
-        sentence.audio_user || sentence.audio_user_shared
-    );
-
-    return hasAudio;
+    const flags = getDirtyFlags();
+    const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
+    return !!(isNewNotSaved || flags.db || flags.audio || flags.cover);
 }
 
 /**
@@ -6989,7 +7128,7 @@ function markAsUnsaved() {
     if (currentDictation.isSaved) {
         currentDictation.isSaved = false;
     }
-    updateUnsavedStar();
+    setDirtyFlags({ db: true });
 }
 
 /**
@@ -7010,6 +7149,16 @@ async function saveDictationOnly() {
     }
     
     try {
+        const flagsBefore = { ...getDirtyFlags() };
+        const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
+        const shouldSaveDb = !!(isNewNotSaved || flagsBefore.db);
+        const shouldUploadAudio = !!flagsBefore.audio;
+        const shouldUploadCover = !!flagsBefore.cover;
+
+        if (!shouldSaveDb && !shouldUploadAudio && !shouldUploadCover) {
+            return;
+        }
+
         // Показываем индикатор загрузки
         showLoadingIndicator('Сохранение диктанта...');
 
@@ -7104,8 +7253,32 @@ async function saveDictationOnly() {
         // category_key больше не обязателен на клиенте: сервер сам проставит дефолт,
         // либо диктант будет привязан к книге/разделу через book_id
         
+        // Если изменилось только медиа — не трогаем БД/текст.
+        if (!shouldSaveDb) {
+            try {
+                const toId = currentDictation.id;
+                if (shouldUploadAudio && toId && String(toId).startsWith('dict_')) {
+                    setTimeout(() => {
+                        try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
+                    }, 0);
+                }
+                if (shouldUploadCover && toId && String(toId).startsWith('dict_')) {
+                    setTimeout(() => {
+                        try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
+                    }, 0);
+                }
+            } catch (e) {
+            }
+
+            // Считаем изменения сохраненными (БД не трогали, медиа отправили асинхронно)
+            setDirtyFlags({ audio: false, cover: false });
+            currentDictation.isSaved = true;
+            updateUnsavedStar();
+            hideLoadingIndicator();
+            return;
+        }
+
         // Отправляем данные на сервер для сохранения предложений и обновления диктанта
-        
         const response = await fetch('/save_dictation_final', {
             method: 'POST',
             headers: {
@@ -7176,6 +7349,7 @@ async function saveDictationOnly() {
             
             // Отмечаем диктант как сохраненный
             currentDictation.isSaved = true;
+            setDirtyFlags({ db: false });
 
             // For new dictations: promote cached draft audio from dict_temp_* to dict_* under
             // /api/temp/dictations/<dict_id>/... (editor continues) and /api/dictations/<dict_id>/... (view page).
@@ -7193,19 +7367,22 @@ async function saveDictationOnly() {
                 console.warn('⚠️ promoteDraftCache failed', e);
             }
 
-            // Offline-first: upload cached audio directly to B2 via server-provided uploadUrl/token.
+            // Offline-first: upload cached media directly to B2 via server-provided uploadUrl/token.
             // This must never block Save UX.
-            try {
-                const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
-                if (toId && String(toId).startsWith('dict_')) {
+            const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
+            if (toId && String(toId).startsWith('dict_')) {
+                if (shouldUploadAudio) {
                     setTimeout(() => {
-                        try {
-                            uploadDictationAudioFromCacheToB2({ dictationId: toId, token });
-                        } catch (e) {
-                        }
+                        try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
                     }, 0);
+                    setDirtyFlags({ audio: false });
                 }
-            } catch (e) {
+                if (shouldUploadCover) {
+                    setTimeout(() => {
+                        try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
+                    }, 0);
+                    setDirtyFlags({ cover: false });
+                }
             }
 
             // Ensure we don't keep dict_temp_* references after save.
@@ -8774,6 +8951,7 @@ function setupWaveformRegionCallback() {
 
         // Отмечаем что диктант изменен
         currentDictation.isSaved = false;
+        setDirtyFlags({ db: true });
     });
 }
 

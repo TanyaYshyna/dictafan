@@ -6,6 +6,11 @@ const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 // (IndexedDB tables + audio/covers) are not lost when updating HTML/JS/CSS.
 const MEDIA_CACHE_PERSIST = 'dictafan-media';
 
+// NOTE(B2 direct upload): browser uploads to Backblaze B2 require a custom CORS rule on the
+// bucket (allowedOperations: ["b2_upload_file"]). The rule must allow this app origin
+// (e.g. https://dictafan-staging001.up.railway.app) and headers used by B2 uploads:
+// authorization, x-bz-file-name, x-bz-content-sha1, content-type.
+
 const DEFAULT_MAX_BYTES = 300 * 1024 * 1024;
 
 function openMetaDb() {
