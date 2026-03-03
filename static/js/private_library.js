@@ -1,8 +1,40 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0122';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0123';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
+
+  // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
+  // (Useful when something overlays the button or stops propagation.)
+  try {
+    if (!window.__deleteModalClickDebugInstalled) {
+      window.__deleteModalClickDebugInstalled = true;
+      document.addEventListener('click', (event) => {
+        try {
+          const t = event.target;
+          if (!t) return;
+          const confirmBtn = t.closest ? t.closest('#delete-dictation-confirm') : null;
+          const closeBtn = t.closest ? t.closest('#delete-dictation-close') : null;
+          const modal = t.closest ? t.closest('#delete-dictation-modal') : null;
+          if (confirmBtn || closeBtn || (modal && t.id === 'delete-dictation-modal')) {
+            console.log('🗑️ [capture] click', {
+              targetTag: t.tagName,
+              targetId: t.id || null,
+              targetClass: (typeof t.className === 'string') ? t.className : null,
+              isConfirm: !!confirmBtn,
+              isClose: !!closeBtn,
+              isModalBackdrop: !!(modal && t.id === 'delete-dictation-modal'),
+              pendingDeleteDictationId: (typeof pendingDeleteDictationId !== 'undefined') ? pendingDeleteDictationId : null
+            });
+          }
+        } catch (e) {
+          // ignore
+        }
+      }, true);
+    }
+  } catch (e) {
+    // ignore
+  }
 
   function installBuildAutoReloader(buildValue, storageKey) {
     try {
