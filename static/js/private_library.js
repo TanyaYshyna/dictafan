@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0120';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0121';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -3611,19 +3611,20 @@
         const card = e.target.closest('.short-card[data-action="toggle-desk"]');
         // Игнорируем клики на кнопки действий и ссылки
         if (e.target.closest('.short-actions') || e.target.closest('a') || e.target.closest('button')) {
+          // Do not handle as toggle-desk, but allow other handlers below (move/delete/etc)
+        } else {
+          // Игнорируем карточки на столе (они открываются для работы)
+          if (card.classList.contains('desk-card')) {
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          const dictationId = card.getAttribute('data-dictation-id');
+          if (dictationId) {
+            toggleDictationOnDesk(dictationId);
+          }
           return;
         }
-        // Игнорируем карточки на столе (они открываются для работы)
-        if (card.classList.contains('desk-card')) {
-          return;
-        }
-        e.preventDefault();
-        e.stopPropagation();
-        const dictationId = card.getAttribute('data-dictation-id');
-        if (dictationId) {
-          toggleDictationOnDesk(dictationId);
-        }
-        return;
       }
 
       // Кнопка "Переместить в книгу"
