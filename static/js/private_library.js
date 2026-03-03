@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0121';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0122';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -3714,12 +3714,21 @@
     const deleteDictationModal = document.getElementById('delete-dictation-modal');
     const deleteDictationCloseBtn = document.getElementById('delete-dictation-close');
     const deleteDictationConfirmBtn = document.getElementById('delete-dictation-confirm');
+    console.log('🗑️ delete modal bind', {
+      hasModal: !!deleteDictationModal,
+      hasCloseBtn: !!deleteDictationCloseBtn,
+      hasConfirmBtn: !!deleteDictationConfirmBtn
+    });
     if (deleteDictationCloseBtn) {
       deleteDictationCloseBtn.addEventListener('click', closeDeleteDictationModal);
     }
     if (deleteDictationConfirmBtn) {
       deleteDictationConfirmBtn.addEventListener('click', async () => {
         const id = pendingDeleteDictationId;
+        console.log('🗑️ delete confirm click', {
+          pendingDeleteDictationId: id,
+          activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+        });
         if (!id) return;
         await performDeleteDictation(id);
       });
@@ -4137,15 +4146,22 @@
   }
 
   async function deleteDictation(dictationId) {
+    console.log('🗑️ deleteDictation()', { dictationId });
     openDeleteDictationModal(dictationId);
   }
 
   function openDeleteDictationModal(dictationId) {
     const modal = document.getElementById('delete-dictation-modal');
     if (!modal) {
+      console.warn('🗑️ openDeleteDictationModal: modal not found');
       return;
     }
     pendingDeleteDictationId = String(dictationId || '');
+
+    console.log('🗑️ openDeleteDictationModal', {
+      dictationId: pendingDeleteDictationId,
+      activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+    });
 
     const nameEl = document.getElementById('delete-dictation-name');
     try {
@@ -4157,6 +4173,13 @@
     } catch (e) {
       if (nameEl) nameEl.textContent = '';
     }
+
+    console.log('🗑️ delete modal show', {
+      displayBefore: modal.style.display,
+      classBefore: modal.className,
+      hasNameEl: !!nameEl,
+      nameText: nameEl ? nameEl.textContent : null
+    });
 
     modal.style.display = 'flex';
     modal.classList.add('show');
