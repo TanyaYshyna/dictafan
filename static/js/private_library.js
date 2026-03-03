@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0112';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-01_0120';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   function installBuildAutoReloader(buildValue, storageKey) {
@@ -3636,13 +3636,14 @@
         openMoveDictationModal(dictationId);
       }
 
-      // Кнопка "Удалить диктант"
+      // Удалить (на карточке диктанта)
       if (e.target.closest('[data-action="delete-dictation"]')) {
-        e.preventDefault();
-        e.stopPropagation();
         const btn = e.target.closest('[data-action="delete-dictation"]');
         const dictationId = btn.getAttribute('data-dictation-id');
-        console.log('🗑️ Удаляю диктант:', dictationId);
+        console.log('🗑️ click delete-dictation', {
+          dictationId,
+          activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+        });
         deleteDictation(dictationId);
       }
 
@@ -4176,13 +4177,20 @@
       const idStr = String(dictationId || '');
       if (!idStr) return;
 
+      console.log('🗑️ performDeleteDictation start', {
+        dictationId: idStr,
+        activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+      });
+
       // If a book/section is currently open, trash means "remove from this book", not delete dictation.
       try {
         const bookIdRaw = (typeof activeBookId !== 'undefined' && activeBookId) ? String(activeBookId) : '';
         const bookIdNum = bookIdRaw ? parseInt(bookIdRaw, 10) : NaN;
         if (bookIdNum && isFinite(bookIdNum) && bookIdNum > 0) {
           const token = getToken();
-          const response = await fetch(`/library/api/book/${bookIdNum}/dictation/${encodeURIComponent(idStr)}`, {
+          const url = `/library/api/book/${bookIdNum}/dictation/${encodeURIComponent(idStr)}`;
+          console.log('🗑️ remove-from-book request', { url, bookIdNum, dictationId: idStr });
+          const response = await fetch(url, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -4195,6 +4203,12 @@
           } catch (e) {
             data = null;
           }
+
+          console.log('🗑️ remove-from-book response', {
+            status: response.status,
+            ok: response.ok,
+            data
+          });
 
           if (response.ok && data && data.success) {
             closeDeleteDictationModal();
@@ -4222,7 +4236,9 @@
       }
 
       const dictIdStr = `dict_${idStr}`;
-      const response = await fetch(`/api/dictations/${encodeURIComponent(dictIdStr)}`, {
+      const deleteUrl = `/api/dictations/${encodeURIComponent(dictIdStr)}`;
+      console.log('🗑️ global delete request', { url: deleteUrl, dictationId: dictIdStr });
+      const response = await fetch(deleteUrl, {
         method: 'DELETE'
       });
 
@@ -4232,6 +4248,12 @@
       } catch (e) {
         data = null;
       }
+
+      console.log('🗑️ global delete response', {
+        status: response.status,
+        ok: response.ok,
+        data
+      });
 
       if (response.ok && data && data.success) {
         closeDeleteDictationModal();
