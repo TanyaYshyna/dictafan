@@ -122,7 +122,7 @@ git status
 git add .
 # Добавляет ВСЕ изменения в текущей папке/репоызитории в “staging” (готовит их к коммиту)
  
-git commit -m "01234"
+git commit -m "0125"
 # Создаёт коммит (снимок) из того, что в staging, с твоим сообщением
  
 git push origin develop_DB

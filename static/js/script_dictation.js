@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0091';
+window.__DICTATION_BUILD = '2026-02-26_0125';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -2557,7 +2557,7 @@ function renderSelectionTable() {
 
     tableSentences.innerHTML = '';
 
-    allSentences.forEach((s) => {
+    allSentences.forEach((s, rowIndex) => {
         const row = document.createElement('tr');
 
         // Инициализируем состояние выбора если его нет
@@ -2608,8 +2608,16 @@ function renderSelectionTable() {
 
         // Колонка номера строки (код преобразованный в число + 1) - ПЕРВАЯ
         const rowNumberCell = document.createElement('td');
-        const rowNumber = parseInt(s.key, 10) + 1;
-        rowNumberCell.textContent = rowNumber;
+        let rowNumber = NaN;
+        const keyStr = String(s.key ?? '');
+        if (/^\d+$/.test(keyStr)) {
+            rowNumber = Number(keyStr) + 1;
+        } else if (/^t_\d+$/.test(keyStr)) {
+            rowNumber = Number(keyStr.slice(2)) + 1;
+        } else {
+            rowNumber = Number(rowIndex) + 1;
+        }
+        rowNumberCell.textContent = isFinite(rowNumber) ? rowNumber : '';
         rowNumberCell.className = 'sentence-number-cell';
 
         // Колонка выбора
