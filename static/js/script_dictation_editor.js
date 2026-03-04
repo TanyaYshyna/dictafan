@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0130';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0132';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -341,18 +341,39 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         if (!dictationId || !String(dictationId).startsWith('dict_')) {
             return;
         }
-        if (!token) {
-            return;
-        }
-
-        const numericId = String(dictationId).split('_', 2)[1] || '';
+        const numericId = parseInt(String(dictationId).replace(/^dict_/, ''), 10);
         if (!numericId) return;
 
         const cache = await caches.open('dictafan-media');
         const coverUrl = new URL(`/api/dictations/${dictationId}/cover.webp`, location.origin).toString();
-        const cached = await cache.match(coverUrl);
-        if (!cached) {
+        let cached = await cache.match(coverUrl);
+        let blob = null;
+        if (cached) {
+            blob = await cached.blob();
+        }
+        if (!blob) {
+            try {
+                const inMem = currentDictation && currentDictation.coverFile ? currentDictation.coverFile : null;
+                if (inMem && typeof inMem === 'object' && typeof inMem.arrayBuffer === 'function') {
+                    blob = inMem;
+                }
+            } catch (e) {
+            }
+        }
+        if (!blob) {
             return;
+        }
+
+        // Ensure cache has final entry + alias for offline.
+        try {
+            if (!cached) {
+                const headers = new Headers();
+                headers.set('Content-Type', blob.type || 'image/webp');
+                headers.set('Cache-Control', 'no-store');
+                await cache.put(coverUrl, new Response(blob, { status: 200, headers }));
+                cached = await cache.match(coverUrl);
+            }
+        } catch (e) {
         }
 
         // The UI (desk cards, dictation header) uses /api/cover?dictation_id=dict_<id>.
@@ -363,39 +384,27 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         } catch (e) {
         }
 
-        const blob = await cached.blob();
-        if (!blob || !blob.size) {
-            return;
-        }
-
-        const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
+        const uploadUrlJson = await fetch(`/api/upload_cover_url/${numericId}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({})
-        });
-
-        if (!uploadUrlResp.ok) {
-            return;
-        }
-        const uploadUrlJson = await uploadUrlResp.json();
-        if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
-            return;
-        }
+            }
+        }).then(r => r.json());
 
         const remotePath = `dictations_covers/${numericId}.webp`;
-        await fetch(uploadUrlJson.uploadUrl, {
+        const uploadRes = await fetch(uploadUrlJson.uploadUrl, {
             method: 'POST',
             headers: {
-                'Authorization': uploadUrlJson.uploadAuthToken,
+                'Authorization': uploadUrlJson.authorizationToken,
                 'X-Bz-File-Name': encodeURIComponent(remotePath),
-                'Content-Type': blob.type || 'image/webp',
-                'X-Bz-Content-Sha1': 'do_not_verify'
+                'Content-Type': blob.type,
+                'X-Bz-Content-Sha1': 'do_not_verify', // B2 will calculate it
             },
             body: blob
         });
+        if (uploadRes && uploadRes.ok) {
+            setDirtyFlags({ cover: false });
+        }
     } catch (e) {
         console.warn('[B2 UPLOAD] cover fatal', e);
     }
@@ -731,6 +740,15 @@ async function handleCropConfirm() {
             const url = URL.createObjectURL(blob);
             coverImage.src = url;
         }
+
+        try {
+            currentDictation.coverFile = blob;
+        } catch (e) {
+        }
+        try {
+            setDirtyFlags({ cover: true });
+        } catch (e) {
+        }
         
         // Offline-first: сохраняем cover.webp в Cache Storage (dictafan-media) как temp media.
         // Дальше promoteDraftCache перенесет его в /api/dictations/<dict_id>/cover.webp,
@@ -752,13 +770,10 @@ async function handleCropConfirm() {
                     await cache.put(finalUrl, new Response(blob, { status: 200, headers }));
                 }
             }
-
-            currentDictation.coverFile = blob;
-            setDirtyFlags({ cover: true });
             closeCropModal(false);
         } catch (error) {
             console.error('Ошибка при сохранении cover в cache:', error);
-            alert('Ошибка при сохранении изображения');
+            closeCropModal(false);
         }
     }, 'image/webp', 0.9);
 }
@@ -7577,7 +7592,6 @@ async function saveDictationOnly() {
                     setTimeout(() => {
                         try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
                     }, 0);
-                    setDirtyFlags({ cover: false });
                 }
             }
 
