@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0132';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0133';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -2431,17 +2431,23 @@ function setupTabsPanel() {
         });
 
         tabCoverFile.addEventListener('change', (e) => {
-            if (coverFile && e.target.files && e.target.files[0]) {
-                // Используем тот же обработчик что и для основной кнопки
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const imgUrl = event.target.result;
-                    if (coverImage) coverImage.src = imgUrl;
-                    if (tabCoverImage) tabCoverImage.src = imgUrl;
-                };
-                reader.readAsDataURL(file);
+            const file = e.target && e.target.files ? e.target.files[0] : null;
+            if (!file) return;
+
+            if (!file.type || !String(file.type).startsWith('image/')) {
+                alert('Пожалуйста, выберите файл изображения.');
+                try { tabCoverFile.value = ''; } catch (e) {}
+                return;
             }
+
+            // Используем тот же flow что и основная кнопка: crop modal -> blob -> dirty flag.
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const imgUrl = event && event.target ? event.target.result : null;
+                if (!imgUrl) return;
+                try { openCropModal(imgUrl); } catch (e) {}
+            };
+            reader.readAsDataURL(file);
         });
     }
 
@@ -7482,7 +7488,7 @@ async function saveDictationOnly() {
             }
 
             // Считаем изменения сохраненными (БД не трогали, медиа отправили асинхронно)
-            setDirtyFlags({ audio: false, cover: false });
+            setDirtyFlags({ audio: false });
             currentDictation.isSaved = true;
             updateUnsavedStar();
             hideLoadingIndicator();
