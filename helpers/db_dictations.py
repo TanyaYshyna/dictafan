@@ -320,7 +320,7 @@ def get_dictation_by_id(dictation_id):
 
 def add_sentence(dictation_id, language_code, sentence_key, text, explanation=None,
                 speaker=None, audio=None, audio_avto=None, audio_mic=None, audio_user=None,
-                start=None, end=None, chain=False, checked=False):
+                start=None, end=None, chain=False, checked=False, position=None):
     """
     Добавляет предложение к диктанту
     
@@ -349,12 +349,12 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
             cur.execute("""
                 INSERT INTO dictation_sentences 
                 (dictation_id, language_code, sentence_key, text, explanation, speaker,
-                 audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, dictation_id, language_code, sentence_key, text, explanation,
-                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
             """, (dictation_id, language_code, sentence_key, text, explanation, speaker,
-                  audio, audio_avto, audio_mic, audio_user, start, end, chain, checked))
+                  audio, audio_avto, audio_mic, audio_user, start, end, chain, checked, position))
             
             row = cur.fetchone()
             conn.commit()
@@ -375,6 +375,7 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
                 'end': float(row[12]) if row[12] is not None else None,
                 'chain': row[13],
                 'checked': row[14],
+                'position': row[15],
             }
             
             return sentence
@@ -387,7 +388,7 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
 
 def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
                    audio=None, audio_avto=None, audio_mic=None, audio_user=None,
-                   start=None, end=None, chain=None, checked=None):
+                   start=None, end=None, chain=None, checked=None, position=None):
     """
     Обновляет предложение
     
@@ -447,6 +448,10 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
             if checked is not None:
                 updates.append("checked = %s")
                 values.append(checked)
+
+            if position is not None:
+                updates.append("position = %s")
+                values.append(position)
             
             if not updates:
                 # Ничего не обновляем
@@ -459,7 +464,7 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
                 SET {', '.join(updates)}
                 WHERE id = %s
                 RETURNING id, dictation_id, language_code, sentence_key, text, explanation,
-                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
             """
             
             cur.execute(query, values)
@@ -485,6 +490,7 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
                 'end': float(row[12]) if row[12] is not None else None,
                 'chain': row[13],
                 'checked': row[14],
+                'position': row[15],
             }
             
             return sentence
@@ -510,7 +516,7 @@ def get_sentence_by_id(sentence_id):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
                 FROM dictation_sentences
                 WHERE id = %s
             """, (sentence_id,))
@@ -536,6 +542,7 @@ def get_sentence_by_id(sentence_id):
                 'end': float(row[12]) if row[12] is not None else None,
                 'chain': row[13],
                 'checked': row[14],
+                'position': row[15],
             }
             
             return sentence
@@ -562,7 +569,7 @@ def get_sentence_by_key(dictation_id, language_code, sentence_key):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
                 FROM dictation_sentences
                 WHERE dictation_id = %s AND language_code = %s AND sentence_key = %s
             """, (dictation_id, language_code, sentence_key))
@@ -588,6 +595,7 @@ def get_sentence_by_key(dictation_id, language_code, sentence_key):
                 'end': float(row[12]) if row[12] is not None else None,
                 'chain': row[13],
                 'checked': row[14],
+                'position': row[15],
             }
             
             return sentence
@@ -614,18 +622,18 @@ def get_dictation_sentences(dictation_id, language_code=None):
             if language_code:
                 cur.execute("""
                     SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
                     FROM dictation_sentences
                     WHERE dictation_id = %s AND language_code = %s
-                    ORDER BY sentence_key
+                    ORDER BY position NULLS LAST, sentence_key
                 """, (dictation_id, language_code))
             else:
                 cur.execute("""
                     SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked
+                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
                     FROM dictation_sentences
                     WHERE dictation_id = %s
-                    ORDER BY language_code, sentence_key
+                    ORDER BY language_code, position NULLS LAST, sentence_key
                 """, (dictation_id,))
             
             rows = cur.fetchall()
@@ -648,6 +656,7 @@ def get_dictation_sentences(dictation_id, language_code=None):
                     'end': float(row[12]) if row[12] is not None else None,
                     'chain': row[13],
                     'checked': row[14],
+                    'position': row[15],
                 }
                 sentences.append(sentence)
             

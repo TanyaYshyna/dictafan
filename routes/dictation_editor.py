@@ -264,6 +264,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
                         sentences_by_lang[lang] = []
                     sentences_by_lang[lang].append({
                         "key": sentence['sentence_key'],
+                        "position": sentence.get('position'),
                         "text": sentence['text'],
                         "explanation": sentence.get('explanation'),
                         "speaker": sentence.get('speaker'),
@@ -1073,7 +1074,8 @@ def save_dictation_final():
                         not float_eq(old_sentence['start'], sentence.get('start')) or
                         not float_eq(old_sentence['end'], sentence.get('end')) or
                         old_sentence['chain'] != sentence.get('chain', False) or
-                        old_sentence['checked'] != sentence.get('checked', False)
+                        old_sentence['checked'] != sentence.get('checked', False) or
+                        (old_sentence.get('position') != sentence.get('position'))
                     )
                     
                     if has_changes:
@@ -1094,7 +1096,8 @@ def save_dictation_final():
                             start=sentence.get('start'),
                             end=sentence.get('end'),
                             chain=sentence.get('chain', False),
-                            checked=sentence.get('checked', False)
+                            checked=sentence.get('checked', False),
+                            position=sentence.get('position')
                         )
                         updated_count += 1
                 else:
@@ -1117,7 +1120,8 @@ def save_dictation_final():
                         start=sentence.get('start'),
                         end=sentence.get('end'),
                         chain=sentence.get('chain', False),
-                        checked=sentence.get('checked', False)
+                        checked=sentence.get('checked', False),
+                        position=sentence.get('position')
                     )
                     added_count += 1
         

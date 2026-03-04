@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0119';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0127';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -37,6 +37,38 @@ function getDirtyFlags() {
         return window.__DICTATION_EDITOR_DIRTY || { db: false, audio: false, cover: false };
     } catch (e) {
         return { db: false, audio: false, cover: false };
+    }
+}
+
+function getSentenceByKeySafe(list, key) {
+    try {
+        return (Array.isArray(list) ? list : []).find(s => s && s.key === key) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function recomputeSentencePositionsFromDom() {
+    try {
+        const rows = document.querySelectorAll('#sentences-table tbody tr');
+        rows.forEach((row, idx) => {
+            const key = row?.dataset?.key;
+            const pos = idx + 1;
+
+            const numberCell = row.querySelector('.col-number');
+            if (numberCell) numberCell.textContent = String(pos).padStart(2, '0');
+
+            if (key && workingData && workingData.original && Array.isArray(workingData.original.sentences)) {
+                const s = getSentenceByKeySafe(workingData.original.sentences, key);
+                if (s) s.position = pos;
+            }
+            if (key && workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
+                const s = getSentenceByKeySafe(workingData.translation.sentences, key);
+                if (s) s.position = pos;
+            }
+        });
+        updateCurrentRowNumber();
+    } catch (e) {
     }
 }
 
@@ -1041,7 +1073,15 @@ async function loadExistingDictation(initData) {
     // console.log('📊 Загруженные данные translation_data:', translation_data);
 
     // Создаем таблицу
+    try {
+        showLoadingIndicator('Загрузка таблицы...');
+    } catch (e) {
+    }
     await createTable();
+    try {
+        hideLoadingIndicator();
+    } catch (e) {
+    }
 
     prewarmAllDraftAudioUrls();
 
@@ -3826,6 +3866,11 @@ function addNewRow(referenceRow, position) {
 
     // Выделяем новую строку
     selectSentenceRow(newRow);
+
+    try {
+        setDirtyFlags({ db: true });
+    } catch (e) {
+    }
 }
 
 /**
@@ -3846,6 +3891,11 @@ function deleteRow(rowToDelete) {
         selectSentenceRow(nextRow);
     } else if (prevRow) {
         selectSentenceRow(prevRow);
+    }
+
+    try {
+        setDirtyFlags({ db: true });
+    } catch (e) {
     }
 }
 
@@ -6941,6 +6991,20 @@ async function createDictationFromStart() {
         // Парсинг текста
         const parsedData = await parseInputText(text, delimiter, isDialog, speakers);
 
+        try {
+            if (parsedData && Array.isArray(parsedData.original)) {
+                parsedData.original.forEach((s, idx) => {
+                    if (s && typeof s === 'object') s.position = idx + 1;
+                });
+            }
+            if (parsedData && Array.isArray(parsedData.translation)) {
+                parsedData.translation.forEach((s, idx) => {
+                    if (s && typeof s === 'object') s.position = idx + 1;
+                });
+            }
+        } catch (e) {
+        }
+
         // Обновить глобальные данные
         currentDictation.is_dialog = isDialog;
         currentDictation.speakers = speakers;
@@ -8056,10 +8120,22 @@ async function createTable() {
     originalSentences.forEach(s => allKeys.add(s.key));
     translationSentences.forEach(s => allKeys.add(s.key));
 
-    Array.from(allKeys).sort().forEach(key => {
+    const items = Array.from(allKeys).map((key) => {
         const originalSentence = originalSentences.find(s => s.key === key);
         const translationSentence = translationSentences.find(s => s.key === key);
+        const pos = (originalSentence && Number.isFinite(Number(originalSentence.position))) ? Number(originalSentence.position)
+            : ((translationSentence && Number.isFinite(Number(translationSentence.position))) ? Number(translationSentence.position) : null);
+        return { key, originalSentence, translationSentence, pos };
+    });
 
+    items.sort((a, b) => {
+        const ap = (a.pos !== null && a.pos !== undefined) ? Number(a.pos) : Number.POSITIVE_INFINITY;
+        const bp = (b.pos !== null && b.pos !== undefined) ? Number(b.pos) : Number.POSITIVE_INFINITY;
+        if (ap !== bp) return ap - bp;
+        return String(a.key).localeCompare(String(b.key));
+    });
+
+    items.forEach(({ key, originalSentence, translationSentence }) => {
         const row = createTableRow(key, originalSentence, translationSentence);
         tbody.appendChild(row);
     });
@@ -8090,6 +8166,9 @@ async function createTable() {
             selectSentenceRow(firstRow);
         }
     }, 100); // Небольшая задержка для завершения всех операций
+
+    // Ensure positions are consistent with DOM order.
+    recomputeSentencePositionsFromDom();
 }
 /**
  * Создать строку таблицы
@@ -8107,12 +8186,9 @@ function createTableRow(key, originalSentence, translationSentence) {
     numberCell.className = 'col-number';
     numberCell.dataset.col_id = 'col-number';
 
-    // Для табличных ключей (t_001, t_002) используем специальную логику
-    if (key.startsWith('t_')) {
-        numberCell.textContent = '00'; // Временно, будет обновлено в updateTableRowNumbers
-    } else {
-        numberCell.textContent = parseInt(key) + 1;
-    }
+    const pos = (originalSentence && Number.isFinite(Number(originalSentence.position))) ? Number(originalSentence.position)
+        : ((translationSentence && Number.isFinite(Number(translationSentence.position))) ? Number(translationSentence.position) : null);
+    numberCell.textContent = (pos !== null && pos !== undefined) ? String(pos).padStart(2, '0') : '00';
 
     row.appendChild(numberCell);
 

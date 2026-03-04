@@ -228,6 +228,7 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             # Формируем URL для аудио файлов
             sentence = {
                 "key": sentence_key,
+                "position": orig_sentence.get('position'),
                 "text": orig_sentence.get("text", ""),
                 "translation": translated.get("text", ""),
                 "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",

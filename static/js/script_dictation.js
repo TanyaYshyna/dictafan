@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0126';
+window.__DICTATION_BUILD = '2026-02-26_0127';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -2733,16 +2733,21 @@ function renderSelectionTable() {
         settingsCell.className = 'audio-settings-header-cell';
         settingsCell.style.width = '40px';
 
-        // Колонка номера строки (код преобразованный в число + 1) - ПЕРВАЯ
+        // Колонка номера строки (позиция из БД) - ПЕРВАЯ
         const rowNumberCell = document.createElement('td');
         let rowNumber = NaN;
-        const keyStr = String(s.key ?? '');
-        if (/^\d+$/.test(keyStr)) {
-            rowNumber = Number(keyStr) + 1;
-        } else if (/^t_\d+$/.test(keyStr)) {
-            rowNumber = Number(keyStr.slice(2)) + 1;
+        const posRaw = (s && s.position !== undefined && s.position !== null) ? Number(s.position) : NaN;
+        if (Number.isFinite(posRaw) && posRaw > 0) {
+            rowNumber = posRaw;
         } else {
-            rowNumber = Number(rowIndex) + 1;
+            const keyStr = String(s.key ?? '');
+            if (/^\d+$/.test(keyStr)) {
+                rowNumber = Number(keyStr) + 1;
+            } else if (/^t_\d+$/.test(keyStr)) {
+                rowNumber = Number(keyStr.slice(2)) + 1;
+            } else {
+                rowNumber = Number(rowIndex) + 1;
+            }
         }
         rowNumberCell.textContent = isFinite(rowNumber) ? rowNumber : '';
         rowNumberCell.className = 'sentence-number-cell';
