@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0124';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0131';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -1541,7 +1541,7 @@
       
       // Кнопки для карточки в книге (правый нижний угол)
       const actionButtons = `
-        <a href="${editUrl}" target="_blank" class="short-action-btn" title="Редактировать">
+        <a href="${editUrl}" class="short-action-btn" title="Редактировать">
           <i data-lucide="pencil-ruler"></i>
         </a>
         <button class="short-action-btn" data-action="move-dictation" data-dictation-id="${dbId}" title="Переместить в книгу">
@@ -2608,7 +2608,7 @@
               ${d.level ? `<span>Уровень: ${d.level}</span>` : ''}
             </div>
             <div class="short-actions">
-              <a href="/editor/${d.id}" target="_blank" class="btn-outline">Открыть</a>
+              <a href="/editor/${d.id}" class="btn-outline">Открыть</a>
             </div>
           </div>
         `).join('')}
@@ -2623,7 +2623,7 @@
           <li class="dictation-list-item">
             <span class="dictation-list-title">${d.title}</span>
             <span class="dictation-list-meta">${d.language_code || ''} ${d.level ? `• ${d.level}` : ''}</span>
-            <a href="/editor/${d.id}" target="_blank" class="btn-outline">Открыть</a>
+            <a href="/editor/${d.id}" class="btn-outline">Открыть</a>
           </li>
         `).join('')}
       </ul>
