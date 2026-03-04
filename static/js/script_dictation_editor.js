@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0128';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0130';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -3996,8 +3996,8 @@ function addNewRow(referenceRow, position) {
             tbody.insertBefore(newRow, referenceRow.nextSibling);
         }
 
-        // Обновляем нумерацию строк
-        updateTableRowNumbers();
+        // Обновляем нумерацию строк и позиции в workingData
+        recomputeSentencePositionsFromDom();
 
         // Пересоздаем иконки Lucide
         if (typeof lucide !== 'undefined') {
@@ -4021,8 +4021,8 @@ function deleteRow(rowToDelete) {
     // Удаляем строку из DOM
     rowToDelete.remove();
 
-    // Обновляем нумерацию
-    updateTableRowNumbers();
+    // Обновляем нумерацию и позиции
+    recomputeSentencePositionsFromDom();
 
     // Выделяем следующую строку или предыдущую
     const nextRow = rowToDelete.nextElementSibling;
@@ -4066,16 +4066,7 @@ function generateNewTableKey() {
  * Обновить нумерацию строк в таблице
  */
 function updateTableRowNumbers() {
-    const rows = document.querySelectorAll('#sentences-table tbody tr');
-    rows.forEach((row, index) => {
-        const numberCell = row.querySelector('.col-number');
-        if (numberCell) {
-            numberCell.textContent = String(index + 1).padStart(2, '0');
-        }
-    });
-
-    // Обновляем номер текущей строки
-    updateCurrentRowNumber();
+    recomputeSentencePositionsFromDom();
 }
 
 /**
