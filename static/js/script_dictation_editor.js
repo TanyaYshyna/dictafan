@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0127';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0128';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -29,7 +29,148 @@ function setDirtyFlags(next = {}) {
         if (typeof next.cover === 'boolean') s.cover = next.cover;
     } catch (e) {
     }
+
     try { updateUnsavedStar(); } catch (e) {}
+}
+
+async function openDraftDb() {
+    return await new Promise((resolve, reject) => {
+        const req = indexedDB.open('dictafan_drafts', 3);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains('drafts')) {
+                db.createObjectStore('drafts', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('outbox')) {
+                db.createObjectStore('outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('activity_outbox')) {
+                db.createObjectStore('activity_outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('success_outbox')) {
+                db.createObjectStore('success_outbox', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('dictations')) {
+                db.createObjectStore('dictations', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('desk_items')) {
+                db.createObjectStore('desk_items', { keyPath: 'key' });
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function getDraftUserIdForKey() {
+    try {
+        const um = window.UM;
+        const id = um && um.userData ? um.userData.id : null;
+        return id ? String(id) : 'anon';
+    } catch (e) {
+        return 'anon';
+    }
+}
+
+async function idbPut(storeName, value) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.put(value);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+function mergeWorkingDataToDictationSentences(dictationId, langOrig, langTr) {
+    const orig = workingData && workingData.original ? workingData.original : null;
+    const tr = workingData && workingData.translation ? workingData.translation : null;
+
+    const origSent = orig && Array.isArray(orig.sentences) ? orig.sentences : [];
+    const trSent = tr && Array.isArray(tr.sentences) ? tr.sentences : [];
+
+    const trByKey = new Map();
+    for (const s of trSent) {
+        if (!s) continue;
+        const k = String(s.key || s.sentence_key || '').trim();
+        if (!k) continue;
+        trByKey.set(k, s);
+    }
+
+    const safeDictationId = dictationId ? String(dictationId) : '';
+    const safeOrig = langOrig ? String(langOrig) : '';
+    const safeTr = langTr ? String(langTr) : '';
+
+    const out = [];
+    for (const s of origSent) {
+        if (!s) continue;
+        const key = String(s.key || s.sentence_key || '').trim();
+        if (!key) continue;
+        const t = trByKey.get(key) || null;
+
+        const positionRaw = (s.position !== undefined && s.position !== null) ? Number(s.position) : null;
+        const position = Number.isFinite(positionRaw) ? positionRaw : null;
+
+        out.push({
+            key,
+            position,
+            text: String(s.text || ''),
+            translation: String((t && t.text) ? t.text : ''),
+            audio: buildFinalAudioUrl(safeDictationId, safeOrig, s.audio),
+            audio_a: buildFinalAudioUrl(safeDictationId, safeOrig, s.audio_avto),
+            audio_f: buildFinalAudioUrl(safeDictationId, safeOrig, s.audio_user),
+            audio_m: buildFinalAudioUrl(safeDictationId, safeOrig, s.audio_mic),
+            audio_tr: buildFinalAudioUrl(safeDictationId, safeTr, (t && t.audio) ? t.audio : null),
+            completed_correctly: false,
+            speaker: s.speaker,
+            explanation: (t && t.explanation) ? t.explanation : ''
+        });
+    }
+
+    out.sort((a, b) => {
+        const ap = Number.isFinite(a.position) ? a.position : null;
+        const bp = Number.isFinite(b.position) ? b.position : null;
+        if (ap !== null && bp !== null) return ap - bp;
+        if (ap !== null) return -1;
+        if (bp !== null) return 1;
+        return String(a.key).localeCompare(String(b.key));
+    });
+
+    return out;
+}
+
+async function updateDictationSentencesIndexedDbCache(dictationId) {
+    try {
+        const dictId = String(dictationId || '').trim();
+        const langOrig = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim();
+        const langTr = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim();
+        if (!dictId || !langOrig || !langTr) return false;
+        if (!dictId.startsWith('dict_') || dictId.startsWith('dict_temp_')) return false;
+
+        const sentences = mergeWorkingDataToDictationSentences(dictId, langOrig, langTr);
+        if (!sentences.length) return false;
+
+        const userId = String(getDraftUserIdForKey());
+        const key = `${userId}:${dictId}:${langOrig}:${langTr}`;
+
+        await idbPut('dictations', {
+            key,
+            dictationId: dictId,
+            langOrig,
+            langTr,
+            sentences,
+            updatedAt: Date.now()
+        });
+
+        return true;
+    } catch (e) {
+        return false;
+    }
 }
 
 function getDirtyFlags() {
@@ -7459,6 +7600,11 @@ async function saveDictationOnly() {
 
             // Обновляем звездочку
             updateUnsavedStar();
+
+            try {
+                await updateDictationSentencesIndexedDbCache(currentDictation.id);
+            } catch (e) {
+            }
 
             // Скрываем индикатор загрузки
             hideLoadingIndicator();

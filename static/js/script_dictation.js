@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0127';
+window.__DICTATION_BUILD = '2026-02-26_0128';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -126,6 +126,17 @@ async function fetchSentencesFromServerAndCache() {
     if (!sentences.length) {
         throw new Error('empty_sentences');
     }
+
+    sentences.sort((a, b) => {
+        const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
+        const bp = (b && b.position !== undefined && b.position !== null && isFinite(Number(b.position))) ? Number(b.position) : null;
+        if (ap !== null && bp !== null) return ap - bp;
+        if (ap !== null) return -1;
+        if (bp !== null) return 1;
+        const ak = a && a.key ? String(a.key) : '';
+        const bk = b && b.key ? String(b.key) : '';
+        return ak.localeCompare(bk);
+    });
 
     const userId = String(getDraftUserIdForKey());
     const key = `${userId}:${dictId}:${langOrig}:${langTr}`;
@@ -6729,6 +6740,19 @@ async function loadSentencesFromIndexedDb() {
         }
 
         allSentences = sentences;
+        try {
+            allSentences.sort((a, b) => {
+                const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
+                const bp = (b && b.position !== undefined && b.position !== null && isFinite(Number(b.position))) ? Number(b.position) : null;
+                if (ap !== null && bp !== null) return ap - bp;
+                if (ap !== null) return -1;
+                if (bp !== null) return 1;
+                const ak = a && a.key ? String(a.key) : '';
+                const bk = b && b.key ? String(b.key) : '';
+                return ak.localeCompare(bk);
+            });
+        } catch (e) {
+        }
         // Если диктант был закеширован на другом origin (например staging), в IDB могли
         // сохраниться абсолютные URL. Для оффлайн и для других окружений нормализуем их
         // до относительных /api/dictations/... чтобы запросы проходили через текущий origin + SW cache.
