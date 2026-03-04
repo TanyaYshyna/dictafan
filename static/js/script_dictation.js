@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0128';
+window.__DICTATION_BUILD = '2026-02-26_0129';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -2751,14 +2751,7 @@ function renderSelectionTable() {
         if (Number.isFinite(posRaw) && posRaw > 0) {
             rowNumber = posRaw;
         } else {
-            const keyStr = String(s.key ?? '');
-            if (/^\d+$/.test(keyStr)) {
-                rowNumber = Number(keyStr) + 1;
-            } else if (/^t_\d+$/.test(keyStr)) {
-                rowNumber = Number(keyStr.slice(2)) + 1;
-            } else {
-                rowNumber = Number(rowIndex) + 1;
-            }
+            rowNumber = Number(rowIndex) + 1;
         }
         rowNumberCell.textContent = isFinite(rowNumber) ? rowNumber : '';
         rowNumberCell.className = 'sentence-number-cell';
