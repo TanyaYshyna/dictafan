@@ -631,7 +631,7 @@ async function prefetchUrls(urls) {
   return { fetched, skipped, failed, total: (urls || []).length };
 }
 
-async function prefetchUrlsStrict(urls) {
+async function prefetchUrlsStrict(urls, options = {}) {
   let fetched = 0;
   let skipped = 0;
   let failed = 0;
@@ -640,7 +640,8 @@ async function prefetchUrlsStrict(urls) {
   const failedUrls = [];
   const overLimitUrls = [];
 
-  const maxBytes = await getMaxBytes();
+  const ignoreLimit = !!(options && options.ignoreLimit);
+  const maxBytes = ignoreLimit ? Number.MAX_SAFE_INTEGER : await getMaxBytes();
   const cacheTotals = new Map();
 
   for (const url of urls || []) {
@@ -671,7 +672,7 @@ async function prefetchUrlsStrict(urls) {
       const res = await fetch(new Request(url, { method: 'GET' }));
       if (res && res.ok) {
         const size = await getResponseSizeBytes(res);
-        if ((totalBytes + size) <= maxBytes) {
+        if (options.ignoreLimit || (totalBytes + size) <= maxBytes) {
           await cache.put(normalizedKey, res.clone());
           fetched += 1;
           totalBytes += size;
@@ -886,8 +887,7 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
 
 self.addEventListener('message', (event) => {
   const data = event.data || {};
-  const action = data.action;
-  const requestId = data.requestId;
+  const { action, requestId } = data;
 
   const respond = (payload) => {
     try {
@@ -958,7 +958,7 @@ self.addEventListener('message', (event) => {
 
       if (action === 'prefetchStrict') {
         const urls = Array.isArray(data.urls) ? data.urls : [];
-        const res = await prefetchUrlsStrict(urls);
+        const res = await prefetchUrlsStrict(urls, { ignoreLimit: !!data.ignoreLimit });
         if (res.ok) {
           respond({ success: true, result: res });
         } else {

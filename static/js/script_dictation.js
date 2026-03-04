@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0125';
+window.__DICTATION_BUILD = '2026-02-26_0126';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -36,6 +36,133 @@ function installBuildAutoReloader(buildValue, storageKey) {
         }
     } catch (e) {
     }
+}
+
+function showDictationCacheFetchOverlay(text) {
+    try {
+        const id = 'dictation-cache-fetch-overlay';
+        let el = document.getElementById(id);
+        if (!el) {
+            el = document.createElement('div');
+            el.id = id;
+            el.style.position = 'fixed';
+            el.style.inset = '0';
+            el.style.background = 'rgba(0,0,0,0.45)';
+            el.style.zIndex = '2147483646';
+            el.style.display = 'flex';
+            el.style.alignItems = 'center';
+            el.style.justifyContent = 'center';
+            el.style.padding = '24px';
+
+            const card = document.createElement('div');
+            card.style.background = 'rgba(255,255,255,0.92)';
+            card.style.borderRadius = '16px';
+            card.style.padding = '18px 20px';
+            card.style.display = 'flex';
+            card.style.alignItems = 'center';
+            card.style.gap = '12px';
+            card.style.boxShadow = '0 18px 60px rgba(0,0,0,0.35)';
+
+            const spinner = document.createElement('div');
+            spinner.style.width = '18px';
+            spinner.style.height = '18px';
+            spinner.style.borderRadius = '999px';
+            spinner.style.border = '3px solid rgba(0,0,0,0.2)';
+            spinner.style.borderTopColor = 'rgba(0,0,0,0.65)';
+            spinner.style.animation = 'dictationSpin 0.9s linear infinite';
+
+            const label = document.createElement('div');
+            label.id = `${id}-label`;
+            label.style.fontSize = '14px';
+            label.style.fontWeight = '700';
+            label.style.color = '#111827';
+            label.textContent = text || 'Загрузка в кеш…';
+
+            card.appendChild(spinner);
+            card.appendChild(label);
+            el.appendChild(card);
+            document.body.appendChild(el);
+
+            const styleId = 'dictation-cache-fetch-overlay-style';
+            if (!document.getElementById(styleId)) {
+                const style = document.createElement('style');
+                style.id = styleId;
+                style.textContent = '@keyframes dictationSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}';
+                document.head.appendChild(style);
+            }
+        } else {
+            const label = document.getElementById(`${id}-label`);
+            if (label) label.textContent = text || 'Загрузка в кеш…';
+            el.style.display = 'flex';
+        }
+    } catch (e) {
+    }
+}
+
+function hideDictationCacheFetchOverlay() {
+    try {
+        const el = document.getElementById('dictation-cache-fetch-overlay');
+        if (el) el.style.display = 'none';
+    } catch (e) {
+    }
+}
+
+async function fetchSentencesFromServerAndCache() {
+    const dictId = String(currentDictation.id || '').trim();
+    const langOrig = String(currentDictation.language_original || '').trim();
+    const langTr = String(currentDictation.language_translation || '').trim();
+    if (!dictId || !langOrig || !langTr) {
+        throw new Error('missing_dictation_params');
+    }
+
+    const url = `/api/dictation/${encodeURIComponent(dictId)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langTr)}/sentences`;
+    const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`fetch_sentences_failed_${response.status}_${text}`);
+    }
+    const data = await response.json();
+    const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
+    if (!sentences.length) {
+        throw new Error('empty_sentences');
+    }
+
+    const userId = String(getDraftUserIdForKey());
+    const key = `${userId}:${dictId}:${langOrig}:${langTr}`;
+    await idbPut('dictations', {
+        key,
+        dictationId: dictId,
+        langOrig,
+        langTr,
+        sentences,
+        updatedAt: Date.now()
+    });
+
+    // Prefetch audio to Cache Storage via Service Worker.
+    // Ignore cache limit (user requested to not account for 300MB limit).
+    try {
+        const audioUrls = [];
+        const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+        for (const s of sentences) {
+            if (!s || typeof s !== 'object') continue;
+            for (const f of audioFields) {
+                const u = s[f];
+                if (u && typeof u === 'string') audioUrls.push(u);
+            }
+        }
+        const unique = Array.from(new Set(audioUrls.filter(Boolean)));
+        if (unique.length) {
+            await swDictationRequest('prefetchStrict', {
+                urls: unique,
+                ignoreLimit: true,
+                timeoutMs: 180000
+            });
+        }
+    } catch (e) {
+        // Prefetch is best-effort: sentences are already cached in IDB.
+    }
+
+    return true;
 }
 
 installBuildAutoReloader(window.__DICTATION_BUILD, 'dictafan:build:dictation');
@@ -6649,8 +6776,28 @@ async function initializeDictation() {
     // Загружаем предложения ТОЛЬКО из IndexedDB
     const sentencesLoaded = await loadSentencesFromIndexedDb();
     if (!sentencesLoaded) {
-        console.warn('⚠️ Диктант не закеширован для оффлайн-режима. Предложения не найдены в IndexedDB.');
-        return;
+        console.warn('⚠️ Диктант не найден в IndexedDB. Загружаю из интернета и сохраняю в кеш.');
+        try {
+            showSaveToast('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
+        } catch (e) {
+        }
+
+        showDictationCacheFetchOverlay('Загрузка диктанта в кеш…');
+        try {
+            await fetchSentencesFromServerAndCache();
+        } catch (e) {
+            console.error('❌ Не удалось загрузить диктант из интернета:', e);
+            hideDictationCacheFetchOverlay();
+            showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
+            return;
+        }
+
+        const loadedAgain = await loadSentencesFromIndexedDb();
+        hideDictationCacheFetchOverlay();
+        if (!loadedAgain) {
+            showNoSelectionModal('Не удалось сохранить диктант в кеш. Обнови страницу.');
+            return;
+        }
     }
 
     // Инициализируем виртуальную клавиатуру с обработкой ошибок
