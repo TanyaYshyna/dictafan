@@ -777,6 +777,13 @@ async function purgeDictationFromBoundedCache(dictationId) {
           continue;
         }
       }
+
+      // Cover: /api/dictations_covers/<id>.webp
+      if (path === `/api/dictations_covers/${dictKey.replace(/^dict_/, '')}.webp`) {
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+        continue;
+      }
     } catch (e) {
       // ignore
     }
@@ -800,6 +807,13 @@ async function purgeTempDraftFromMediaCache(dictationId) {
       const path = url.pathname;
 
       if (path.startsWith(`/api/temp/dictations/${dictKey}/`)) {
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+        continue;
+      }
+
+      // Draft cover overlay: /api/temp/dictations_covers/<id>.webp
+      if (path === `/api/temp/dictations_covers/${dictKey}.webp`) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
       }
@@ -826,6 +840,11 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
   const fromPrefix = `/api/temp/dictations/${fromId}/`;
   const toTempPrefix = `/api/temp/dictations/${toId}/`;
   const toFinalPrefix = `/api/dictations/${toId}/`;
+
+  const toNumeric = toId.replace(/^dict_/, '');
+  const fromCoverPath = `/api/temp/dictations_covers/${fromId}.webp`;
+  const toCoverTempPath = `/api/temp/dictations_covers/${toNumeric}.webp`;
+  const toCoverFinalPath = `/api/dictations_covers/${toNumeric}.webp`;
 
   let copiedTemp = 0;
   let copiedFinal = 0;
@@ -858,6 +877,20 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
     }
   }
 
+  // Promote draft cover from overlay key to numeric dictation key.
+  try {
+    const fromCoverUrl = new URL(fromCoverPath, self.location.origin).toString();
+    const cachedCover = await cache.match(fromCoverUrl);
+    if (cachedCover) {
+      const toCoverTempUrl = new URL(toCoverTempPath, self.location.origin).toString();
+      const toCoverFinalUrl = new URL(toCoverFinalPath, self.location.origin).toString();
+      await cache.put(toCoverTempUrl, cachedCover.clone());
+      await cache.put(toCoverFinalUrl, cachedCover.clone());
+    }
+  } catch (e) {
+    // ignore
+  }
+
   // Optionally delete the old dict_temp_* entries to avoid wasting space.
   // We keep this behavior because temp_id is not needed after promote.
   let deletedOld = 0;
@@ -874,6 +907,15 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
     }
   }
 
+  // Delete old draft cover key if present.
+  try {
+    const fromCoverUrl = new URL(fromCoverPath, self.location.origin).toString();
+    const ok = await cache.delete(fromCoverUrl);
+    if (ok) deletedOld += 1;
+  } catch (e) {
+    // ignore
+  }
+
   return {
     ok: true,
     fromId,
@@ -883,6 +925,31 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
     deletedOld,
     missing,
   };
+}
+
+async function commitTempCoverToBase(fromCoverKey, toNumericId) {
+  const cache = await caches.open(MEDIA_CACHE_PERSIST);
+
+  const fromKey = String(fromCoverKey || '').trim();
+  const toNum = parseInt(String(toNumericId || ''), 10);
+  if (!fromKey || !toNum || !isFinite(toNum) || toNum <= 0) {
+    return { ok: false, error: 'bad_args' };
+  }
+
+  const fromPath = `/api/temp/dictations_covers/${fromKey}.webp`;
+  const toPath = `/api/dictations_covers/${toNum}.webp`;
+
+  const fromUrl = new URL(fromPath, self.location.origin).toString();
+  const toUrl = new URL(toPath, self.location.origin).toString();
+
+  const cached = await cache.match(fromUrl);
+  if (!cached) {
+    return { ok: false, error: 'cache_miss', fromUrl, toUrl };
+  }
+
+  await cache.put(toUrl, cached.clone());
+  const deleted = await cache.delete(fromUrl);
+  return { ok: true, fromUrl, toUrl, deleted: !!deleted };
 }
 
 self.addEventListener('message', (event) => {
@@ -921,6 +988,12 @@ self.addEventListener('message', (event) => {
 
       if (action === 'promoteDraftCache') {
         const res = await promoteDraftDictationCache(data.fromDictationId, data.toDictationId);
+        respond({ success: true, result: res });
+        return;
+      }
+
+      if (action === 'commitTempCover') {
+        const res = await commitTempCoverToBase(data.fromCoverKey, data.toNumericId);
         respond({ success: true, result: res });
         return;
       }

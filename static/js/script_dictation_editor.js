@@ -10,10 +10,11 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0133';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0134';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
+window.__DICTATION_EDITOR_IS_EXITING = window.__DICTATION_EDITOR_IS_EXITING || false;
 
 window.__DICTATION_EDITOR_DIRTY = window.__DICTATION_EDITOR_DIRTY || {
     db: false,
@@ -31,11 +32,12 @@ function setDirtyFlags(next = {}) {
     }
 
     try { updateUnsavedStar(); } catch (e) {}
+    try { scheduleSaveStatusRefresh(); } catch (e) {}
 }
 
 async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-        const req = indexedDB.open('dictafan_drafts', 3);
+        const req = indexedDB.open('dictafan_drafts', 4);
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains('drafts')) {
@@ -55,6 +57,9 @@ async function openDraftDb() {
             }
             if (!db.objectStoreNames.contains('desk_items')) {
                 db.createObjectStore('desk_items', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('media_manifest')) {
+                db.createObjectStore('media_manifest', { keyPath: 'key' });
             }
         };
         req.onsuccess = () => resolve(req.result);
@@ -84,6 +89,68 @@ async function idbPut(storeName, value) {
         });
     } finally {
         db.close();
+    }
+}
+
+async function idbGet(storeName, key) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const req = store.get(key);
+            req.onsuccess = () => resolve(req.result || null);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+async function idbDelete(storeName, key) {
+    const db = await openDraftDb();
+    try {
+        return await new Promise((resolve, reject) => {
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.delete(key);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error);
+        });
+    } finally {
+        db.close();
+    }
+}
+
+function getMediaManifestKey(dictationId) {
+    const uid = getDraftUserIdForKey();
+    const did = String(dictationId || '').trim() || 'unknown';
+    return `media_manifest:${uid}:${did}`;
+}
+
+async function getMediaManifest(dictationId) {
+    try {
+        const key = getMediaManifestKey(dictationId);
+        const row = await idbGet('media_manifest', key);
+        return row && row.value ? row.value : { cover: null, audio: null };
+    } catch (e) {
+        return { cover: null, audio: null };
+    }
+}
+
+async function setMediaManifest(dictationId, nextValue) {
+    try {
+        const key = getMediaManifestKey(dictationId);
+        await idbPut('media_manifest', { key, value: nextValue, updated_at: Date.now() });
+    } catch (e) {
+    }
+}
+
+async function clearMediaManifest(dictationId) {
+    try {
+        const key = getMediaManifestKey(dictationId);
+        await idbDelete('media_manifest', key);
+    } catch (e) {
     }
 }
 
@@ -345,7 +412,7 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         if (!numericId) return;
 
         const cache = await caches.open('dictafan-media');
-        const coverUrl = new URL(`/api/dictations/${dictationId}/cover.webp`, location.origin).toString();
+        const coverUrl = new URL(`/api/dictations_covers/${numericId}.webp`, location.origin).toString();
         let cached = await cache.match(coverUrl);
         let blob = null;
         if (cached) {
@@ -377,12 +444,7 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         }
 
         // The UI (desk cards, dictation header) uses /api/cover?dictation_id=dict_<id>.
-        // Keep an alias in cache so covers still work offline.
-        try {
-            const aliasUrl = new URL(`/api/cover?dictation_id=${encodeURIComponent(String(dictationId))}`, location.origin).toString();
-            await cache.put(aliasUrl, cached.clone());
-        } catch (e) {
-        }
+        // Offline should rely on canonical /api/dictations_covers/<id>.webp.
 
         const uploadUrlJson = await fetch(`/api/upload_cover_url/${numericId}`, {
             method: 'POST',
@@ -486,6 +548,114 @@ function installDictationEditorBuildBadge() {
 }
 
 installDictationEditorBuildBadge();
+
+function installDictationEditorSaveStatusBadge() {
+    try {
+        if (window.__dictationEditorSaveStatusBadgeInstalled) return;
+        window.__dictationEditorSaveStatusBadgeInstalled = true;
+
+        const mount = () => {
+            try {
+                const id = 'dictation-editor-save-status-badge';
+                let el = document.getElementById(id);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.id = id;
+                    el.setAttribute('aria-hidden', 'true');
+                    el.style.position = 'fixed';
+                    el.style.left = '6px';
+                    el.style.bottom = '22px';
+                    el.style.zIndex = '2147483647';
+                    el.style.fontSize = '10px';
+                    el.style.lineHeight = '1.2';
+                    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+                    el.style.color = 'rgba(255,255,255,0.75)';
+                    el.style.background = 'rgba(0,0,0,0.35)';
+                    el.style.padding = '2px 6px';
+                    el.style.borderRadius = '6px';
+                    el.style.pointerEvents = 'none';
+                    el.style.userSelect = 'none';
+                    document.body.appendChild(el);
+                }
+            } catch (e) {
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', mount, { once: true });
+        } else {
+            mount();
+        }
+    } catch (e) {
+    }
+}
+
+installDictationEditorSaveStatusBadge();
+
+function setSaveStatusBadgeText(text) {
+    try {
+        const el = document.getElementById('dictation-editor-save-status-badge');
+        if (!el) return;
+        el.textContent = String(text || '').trim();
+    } catch (e) {
+    }
+}
+
+async function refreshSaveStatusBadge() {
+    try {
+        const dictationId = currentDictation && currentDictation.id ? String(currentDictation.id).trim() : '';
+        if (!dictationId) {
+            setSaveStatusBadgeText('');
+            return;
+        }
+        const m = await getMediaManifest(dictationId);
+        const pendingCover = !!(m && m.cover && m.cover.changed);
+        const pendingCoverSize = pendingCover ? Number(m.cover.size || 0) : 0;
+        const last = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || null;
+        const lastCover = last && last.cover ? last.cover : null;
+
+        const parts = [];
+        if (pendingCover) parts.push(`cover: pending(${pendingCoverSize || 0})`);
+        if (lastCover && typeof lastCover.ok === 'boolean') {
+            parts.push(`cover_commit: ${lastCover.ok ? 'ok' : 'fail'}`);
+        }
+        setSaveStatusBadgeText(parts.join(' | '));
+    } catch (e) {
+        try { setSaveStatusBadgeText(''); } catch (e2) {}
+    }
+}
+
+function scheduleSaveStatusRefresh() {
+    try {
+        if (window.__DICTATION_EDITOR_SAVE_STATUS_TMR) return;
+        window.__DICTATION_EDITOR_SAVE_STATUS_TMR = setTimeout(() => {
+            window.__DICTATION_EDITOR_SAVE_STATUS_TMR = null;
+            refreshSaveStatusBadge();
+        }, 50);
+    } catch (e) {
+    }
+}
+
+function setDictationNameTitle(title) {
+    try {
+        const h2 = document.getElementById('dictation-name');
+        if (!h2) return;
+
+        const nextTitle = String(title || '').trim();
+
+        // Preserve nested star spans (#unsavedStar*, etc). Do NOT overwrite innerHTML/textContent.
+        // Update only the first text node before the spans.
+        const first = h2.firstChild;
+        if (first && first.nodeType === Node.TEXT_NODE) {
+            first.nodeValue = nextTitle ? `${nextTitle} ` : '';
+            return;
+        }
+
+        // If there is no text node, insert one at the beginning.
+        h2.insertBefore(document.createTextNode(nextTitle ? `${nextTitle} ` : ''), h2.firstChild);
+    } catch (e) {
+    }
+}
 
 
 let currentAudioFile = null; // текущий файл в настройках аудио
@@ -751,23 +921,42 @@ async function handleCropConfirm() {
         }
         
         // Offline-first: сохраняем cover.webp в Cache Storage (dictafan-media) как temp media.
-        // Дальше promoteDraftCache перенесет его в /api/dictations/<dict_id>/cover.webp,
-        // а после сохранения мы сделаем direct upload в B2 в dictations_covers/<id>.webp.
+        // Temp overlay: /api/temp/dictations_covers/<id>.webp
+        // Base:         /api/dictations_covers/<id>.webp
+        // B2 path:      dictations_covers/<id>.webp
         try {
             const dictationId = String(currentDictation.id || '').trim();
             if (dictationId) {
                 const cache = await caches.open('dictafan-media');
-                const tempPath = `/api/temp/dictations/${dictationId}/cover.webp`;
+                const numericId = dictationId.startsWith('dict_') ? parseInt(dictationId.replace(/^dict_/, ''), 10) : null;
+                const coverKey = (numericId && isFinite(numericId) && numericId > 0) ? String(numericId) : dictationId;
+
+                const tempPath = `/api/temp/dictations_covers/${coverKey}.webp`;
                 const tempUrl = new URL(tempPath, window.location.origin).toString();
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'image/webp');
                 headers.set('Cache-Control', 'no-store');
                 await cache.put(tempUrl, new Response(blob, { status: 200, headers }));
-                // Если это уже сохранённый dict_<id>, кладём и final ключ для оффлайн просмотра
-                if (dictationId.startsWith('dict_')) {
-                    const finalPath = `/api/dictations/${dictationId}/cover.webp`;
-                    const finalUrl = new URL(finalPath, window.location.origin).toString();
-                    await cache.put(finalUrl, new Response(blob, { status: 200, headers }));
+
+                try {
+                    const currentManifest = await getMediaManifest(dictationId);
+                    currentManifest.cover = {
+                        changed: true,
+                        coverKey,
+                        size: Number(blob.size || 0),
+                        updatedAt: Date.now()
+                    };
+                    await setMediaManifest(dictationId, currentManifest);
+                } catch (e) {
+                }
+
+                try { scheduleSaveStatusRefresh(); } catch (e) {}
+
+                // If saved dictation, also put into base key + proxy alias.
+                if (numericId && isFinite(numericId) && numericId > 0) {
+                    const basePath = `/api/dictations_covers/${numericId}.webp`;
+                    const baseUrl = new URL(basePath, window.location.origin).toString();
+                    await cache.put(baseUrl, new Response(blob, { status: 200, headers }));
                 }
             }
             closeCropModal(false);
@@ -783,17 +972,23 @@ async function loadCoverForExistingDictation(dictationId, originalLanguage) {
     const coverImage = document.getElementById('coverImage');
     if (!coverImage) return;
 
-    // Пытаемся загрузить cover диктанта через proxy (B2)
-    const dictationCoverUrl = `/api/cover?dictation_id=${encodeURIComponent(dictationId)}`;
-
     try {
-        const response = await fetch(dictationCoverUrl, { method: 'HEAD' });
-        if (response.ok) {
-            coverImage.src = dictationCoverUrl;
-            return;
+        const did = String(dictationId || '').trim();
+        if (did.startsWith('dict_')) {
+            const numericId = parseInt(did.replace(/^dict_/, ''), 10);
+            if (numericId && isFinite(numericId) && numericId > 0) {
+                const url = `/api/dictations_covers/${numericId}.webp`;
+                try {
+                    const resp = await fetch(url, { method: 'HEAD' });
+                    if (resp && resp.ok) {
+                        coverImage.src = url;
+                        return;
+                    }
+                } catch (e) {
+                }
+            }
         }
-    } catch (error) {
-        // Игнорируем ошибку
+    } catch (e) {
     }
 
     // Если cover диктанта нет, используем cover по умолчанию
@@ -943,7 +1138,7 @@ async function initNewDictation(safe_email, initData) {
     // document.getElementById('text').value = ''; // TODO: Добавить элемент text в шаблон
     // document.querySelector('#sentences-table tbody').innerHTML = ''; // TODO: Добавить таблицу sentences в шаблон
     
-    document.getElementById('dictation-name').textContent = ``;
+    setDictationNameTitle('');
     
     // ==================== Открываем стартовое модальное окно для нового диктанта ========================================
 
@@ -1110,7 +1305,7 @@ async function loadExistingDictation(initData) {
     };
 
     // Обновляем заголовки
-    document.getElementById('dictation-name').textContent = title;
+    setDictationNameTitle(title);
     // Показываем ID только если он есть
     const dictationIdElement = document.getElementById('dictation-id');
     if (dictationIdElement && dictation_id) {
@@ -1283,6 +1478,8 @@ async function initDictationGenerator() {
 
     // Настраиваем обработчики для ковера
     setupCoverHandlers();
+
+    try { updateUnsavedStar(); } catch (e) {}
 
     setupStartModalHandlers(); // Настраиваем обработчики стартового модального окна
     setupTitleTranslationHandler(); // Настраиваем автоматический перевод названия
@@ -7211,6 +7408,10 @@ async function createDictationFromStart() {
 
 // Добавляем обработчик для предотвращения случайного закрытия страницы
 window.addEventListener('beforeunload', function (event) {
+    try {
+        if (window.__DICTATION_EDITOR_IS_EXITING) return;
+    } catch (e) {
+    }
     if (hasUnsavedChanges()) {
         event.preventDefault();
         event.returnValue = 'У вас есть несохраненные изменения! Вы действительно хотите покинуть страницу?';
@@ -7231,6 +7432,14 @@ function handleLogoClick() {
 function showExitModal() {
     const exitModal = document.getElementById('exitModal');
     if (!exitModal) return;
+
+    try {
+        if (window.__DICTATION_EDITOR_IS_EXITING) {
+            cleanupTempAndExit();
+            return;
+        }
+    } catch (e) {
+    }
 
     // Проверяем: новый диктант и не создан в БД = нет сохранённых данных
     const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
@@ -7588,6 +7797,45 @@ async function saveDictationOnly() {
             // This must never block Save UX.
             const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
             if (toId && String(toId).startsWith('dict_')) {
+                // If cover was set while dictation was still dict_temp_*, commit temp cover key to base cover key.
+                if (shouldUploadCover) {
+                    try {
+                        const m = await getMediaManifest(fromTempId);
+                        const cover = m && m.cover ? m.cover : null;
+                        const fromCoverKey = cover && cover.coverKey ? String(cover.coverKey) : null;
+                        const toNumericId = parseInt(String(toId).replace(/^dict_/, ''), 10);
+                        if (fromCoverKey && fromCoverKey.startsWith('dict_temp_') && toNumericId) {
+                            setTimeout(() => {
+                                try {
+                                    swEditorRequest('commitTempCover', {
+                                        fromCoverKey,
+                                        toNumericId,
+                                        timeoutMs: 60000
+                                    }).then((res) => {
+                                        try {
+                                            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+                                            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = (res && res.result) ? res.result : res;
+                                        } catch (e) {
+                                        }
+                                        try { scheduleSaveStatusRefresh(); } catch (e) {}
+                                    }).catch(() => {
+                                        try {
+                                            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+                                            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = { ok: false };
+                                        } catch (e) {
+                                        }
+                                        try { scheduleSaveStatusRefresh(); } catch (e) {}
+                                    });
+                                } catch (e) {
+                                }
+                            }, 0);
+                        }
+                        try { await clearMediaManifest(fromTempId); } catch (e) {}
+                        try { scheduleSaveStatusRefresh(); } catch (e) {}
+                    } catch (e) {
+                    }
+                }
+
                 if (shouldUploadAudio) {
                     setTimeout(() => {
                         try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
@@ -7651,6 +7899,8 @@ function showExitConfirmation() {
  */
 async function cleanupTempAndExit() {
     try {
+        try { window.__DICTATION_EDITOR_IS_EXITING = true; } catch (e) {}
+
         // Показываем индикатор загрузки
         showLoadingIndicator('Очистка временных файлов...');
 
@@ -7658,17 +7908,23 @@ async function cleanupTempAndExit() {
         try {
             const idForPurge = currentDictation && currentDictation.id ? String(currentDictation.id) : null;
             if (idForPurge && idForPurge !== 'new' && (idForPurge.startsWith('dict_') || idForPurge.startsWith('dict_temp_'))) {
-                await swEditorRequest('purgeTempDraft', { dictationId: idForPurge, timeoutMs: 60000 });
+                const p = swEditorRequest('purgeTempDraft', { dictationId: idForPurge, timeoutMs: 60000 });
+                await Promise.race([
+                    p,
+                    new Promise((resolve) => setTimeout(resolve, 7000))
+                ]);
             }
         } catch (e) {
         }
 
         // Переходим на главную страницу
+        try { hideLoadingIndicator(); } catch (e) {}
         goToMainPage();
 
     } catch (error) {
         console.error('❌ Ошибка при очистке temp папки:', error);
         // В случае ошибки все равно переходим на главную
+        try { hideLoadingIndicator(); } catch (e) {}
         goToMainPage();
     }
 }
