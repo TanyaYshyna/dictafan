@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0134';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0135';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -410,6 +410,7 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         }
         const numericId = parseInt(String(dictationId).replace(/^dict_/, ''), 10);
         if (!numericId) return;
+        if (!token) return;
 
         const cache = await caches.open('dictafan-media');
         const coverUrl = new URL(`/api/dictations_covers/${numericId}.webp`, location.origin).toString();
@@ -446,24 +447,54 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         // The UI (desk cards, dictation header) uses /api/cover?dictation_id=dict_<id>.
         // Offline should rely on canonical /api/dictations_covers/<id>.webp.
 
-        const uploadUrlJson = await fetch(`/api/upload_cover_url/${numericId}`, {
+        const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
             method: 'POST',
             headers: {
+                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
-            }
-        }).then(r => r.json());
+            },
+            body: JSON.stringify({})
+        });
+
+        if (!uploadUrlResp.ok) {
+            let t = '';
+            try { t = await uploadUrlResp.text(); } catch (e) {}
+            console.warn('[B2 UPLOAD] cover get_upload_url failed', { status: uploadUrlResp.status, text: t });
+            return;
+        }
+
+        const contentType = String(uploadUrlResp.headers.get('content-type') || '').toLowerCase();
+        if (!contentType.includes('application/json')) {
+            let t = '';
+            try { t = await uploadUrlResp.text(); } catch (e) {}
+            console.warn('[B2 UPLOAD] cover get_upload_url not json', { status: uploadUrlResp.status, contentType, text: t });
+            return;
+        }
+
+        const uploadUrlJson = await uploadUrlResp.json();
+        if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
+            console.warn('[B2 UPLOAD] cover get_upload_url bad payload', uploadUrlJson);
+            return;
+        }
 
         const remotePath = `dictations_covers/${numericId}.webp`;
         const uploadRes = await fetch(uploadUrlJson.uploadUrl, {
             method: 'POST',
             headers: {
-                'Authorization': uploadUrlJson.authorizationToken,
+                'Authorization': uploadUrlJson.uploadAuthToken,
                 'X-Bz-File-Name': encodeURIComponent(remotePath),
-                'Content-Type': blob.type,
+                'Content-Type': blob.type || 'b2/x-auto',
                 'X-Bz-Content-Sha1': 'do_not_verify', // B2 will calculate it
             },
             body: blob
         });
+        if (!uploadRes || !uploadRes.ok) {
+            let txt = '';
+            try { txt = await uploadRes.text(); } catch (e) {}
+            console.warn('[B2 UPLOAD] cover upload failed', { status: uploadRes ? uploadRes.status : 0, remotePath, text: txt });
+            return;
+        }
+
         if (uploadRes && uploadRes.ok) {
             setDirtyFlags({ cover: false });
         }
