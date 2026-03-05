@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0138';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0139';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -217,22 +217,39 @@ async function updateDictationSentencesIndexedDbCache(dictationId) {
         const langOrig = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim();
         const langTr = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim();
         if (!dictId || !langOrig || !langTr) return false;
-        if (!dictId.startsWith('dict_') || dictId.startsWith('dict_temp_')) return false;
+        if (!dictId.startsWith('dict_')) return false;
+        if (dictId.startsWith('dict_temp_')) return false;
 
         const sentences = mergeWorkingDataToDictationSentences(dictId, langOrig, langTr);
         if (!sentences.length) return false;
 
         const userId = String(getDraftUserIdForKey());
-        const key = `${userId}:${dictId}:${langOrig}:${langTr}`;
+        const updatedAt = Date.now();
 
-        await idbPut('dictations', {
-            key,
-            dictationId: dictId,
-            langOrig,
-            langTr,
-            sentences,
-            updatedAt: Date.now()
-        });
+        const keysToWrite = new Set();
+        keysToWrite.add(`${userId}:${dictId}:${langOrig}:${langTr}`);
+        keysToWrite.add(`anon:${dictId}:${langOrig}:${langTr}`);
+
+        try {
+            const numericId = parseInt(dictId.replace(/^dict_/, ''), 10);
+            if (Number.isFinite(numericId)) {
+                keysToWrite.add(`${userId}:${numericId}:${langOrig}:${langTr}`);
+                keysToWrite.add(`${userId}:dict_${numericId}:${langOrig}:${langTr}`);
+                keysToWrite.add(`anon:dict_${numericId}:${langOrig}:${langTr}`);
+            }
+        } catch (e) {
+        }
+
+        for (const key of keysToWrite) {
+            await idbPut('dictations', {
+                key,
+                dictationId: dictId,
+                langOrig,
+                langTr,
+                sentences,
+                updatedAt
+            });
+        }
 
         return true;
     } catch (e) {
@@ -2021,6 +2038,15 @@ async function createAndPlayAudio(button, language, fieldName, languageUrl) {
             filename: nameAudioFile,
             sentence: sentence
         });
+
+        try {
+            currentDictation.isSaved = false;
+        } catch (e) {
+        }
+        try {
+            setDirtyFlags({ audio: true });
+        } catch (e) {
+        }
 
         // Меняем кнопку в режим готовности к воспроизведению (файл теперь существует)
         button.dataset.state = 'playing';
@@ -7500,6 +7526,13 @@ function showExitModal() {
     if (!exitModal) return;
 
     try {
+        if (window.__DICTATION_EDITOR_IS_SAVING) {
+            return;
+        }
+    } catch (e) {
+    }
+
+    try {
         if (window.__DICTATION_EDITOR_IS_EXITING) {
             cleanupTempAndExit();
             return;
@@ -7548,11 +7581,13 @@ async function handleSave() {
         }
         
         try {
+            try { window.__DICTATION_EDITOR_IS_SAVING = true; } catch (e) {}
             await saveDictationOnly();
             updateUnsavedStar();
         } catch (error) {
             console.error('[Save] error', error);
         } finally {
+            try { window.__DICTATION_EDITOR_IS_SAVING = false; } catch (e) {}
             saveBtn.innerHTML = originalHTML;
             if (typeof lucide !== 'undefined' && lucide.createIcons) {
                 lucide.createIcons();
@@ -7646,6 +7681,18 @@ async function saveDictationOnly() {
         const shouldSaveDb = !!(isNewNotSaved || flagsBefore.db);
         const shouldUploadAudio = !!flagsBefore.audio;
         const shouldUploadCover = !!flagsBefore.cover;
+
+        // Online-first invariant:
+        // if dictation is new and has no DB id yet, we must be online to obtain the final dict_... id.
+        if (isNewNotSaved) {
+            try {
+                if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+                    alert('Сейчас нет интернета — новый диктант сохранить нельзя. Подключись к интернету и попробуй ещё раз.');
+                    return;
+                }
+            } catch (e) {
+            }
+        }
 
         if (!shouldSaveDb && !shouldUploadAudio && !shouldUploadCover) {
             return;
@@ -7763,7 +7810,7 @@ async function saveDictationOnly() {
             }
 
             // Считаем изменения сохраненными (БД не трогали, медиа отправили асинхронно)
-            setDirtyFlags({ audio: false });
+            setDirtyFlags({ audio: false, cover: false, db: false });
             currentDictation.isSaved = true;
             updateUnsavedStar();
             hideLoadingIndicator();
@@ -7914,6 +7961,9 @@ async function saveDictationOnly() {
                     }, 0);
                 }
             }
+
+            // Сохранение завершено: не блокируем выход из-за асинхронных upload/commit.
+            setDirtyFlags({ db: false, audio: false, cover: false });
 
             // Ensure we don't keep dict_temp_* references after save.
             try {

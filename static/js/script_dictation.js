@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0129';
+window.__DICTATION_BUILD = '2026-02-26_0139';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function installBuildAutoReloader(buildValue, storageKey) {
@@ -149,28 +149,33 @@ async function fetchSentencesFromServerAndCache() {
         updatedAt: Date.now()
     });
 
-    // Prefetch audio to Cache Storage via Service Worker.
+    // Prefetch audio to Cache Storage via Service Worker in background.
+    // Do NOT block UI: sentences are already saved to IndexedDB and can be used immediately.
     // Ignore cache limit (user requested to not account for 300MB limit).
     try {
-        const audioUrls = [];
-        const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
-        for (const s of sentences) {
-            if (!s || typeof s !== 'object') continue;
-            for (const f of audioFields) {
-                const u = s[f];
-                if (u && typeof u === 'string') audioUrls.push(u);
+        setTimeout(() => {
+            try {
+                const audioUrls = [];
+                const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+                for (const s of sentences) {
+                    if (!s || typeof s !== 'object') continue;
+                    for (const f of audioFields) {
+                        const u = s[f];
+                        if (u && typeof u === 'string') audioUrls.push(u);
+                    }
+                }
+                const unique = Array.from(new Set(audioUrls.filter(Boolean)));
+                if (unique.length) {
+                    swDictationRequest('prefetchStrict', {
+                        urls: unique,
+                        ignoreLimit: true,
+                        timeoutMs: 180000
+                    }).catch(() => {});
+                }
+            } catch (e) {
             }
-        }
-        const unique = Array.from(new Set(audioUrls.filter(Boolean)));
-        if (unique.length) {
-            await swDictationRequest('prefetchStrict', {
-                urls: unique,
-                ignoreLimit: true,
-                timeoutMs: 180000
-            });
-        }
+        }, 0);
     } catch (e) {
-        // Prefetch is best-effort: sentences are already cached in IDB.
     }
 
     return true;
