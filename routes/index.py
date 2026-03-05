@@ -486,6 +486,7 @@ def delete_dictation(dictation_id):
         return jsonify({"success": False, "error": "dictation_id is required"}), 400
 
     from helpers.db_dictations import delete_dictation as delete_dictation_from_db
+    from helpers.db import get_db_cursor
     from helpers.b2_storage import b2_storage
 
     data_base = _get_static_data_base_dir()
@@ -499,9 +500,27 @@ def delete_dictation(dictation_id):
 
     # 2. Удаляем из БД (если dictation_id в формате dict_<id>)
     removed_from_db = False
+    removed_desk_refs = False
+    removed_book_refs = False
     if dictation_id.startswith('dict_'):
         try:
             db_id = int(dictation_id.replace('dict_', ''))
+
+            # Remove references so the dictation cannot re-appear on any user's desk / in any book.
+            try:
+                conn, cur = get_db_cursor()
+                try:
+                    cur.execute("DELETE FROM desk_items WHERE dictation_id = %s", (db_id,))
+                    removed_desk_refs = cur.rowcount > 0
+                    cur.execute("DELETE FROM book_dictations WHERE dictation_id = %s", (db_id,))
+                    removed_book_refs = cur.rowcount > 0
+                    conn.commit()
+                finally:
+                    cur.close()
+                    conn.close()
+            except Exception as e:
+                logger.warning("Не удалось удалить ссылки из desk_items/book_dictations: %s", e)
+
             removed_from_db = delete_dictation_from_db(db_id)
         except (ValueError, Exception) as e:
             logger.warning(f"Не удалось удалить из БД: {e}")
@@ -519,6 +538,7 @@ def delete_dictation(dictation_id):
                 f"dictations/{dictation_id}/cover.webp",
                 f"dictations/{dictation_id}/cover.png",
                 f"dictations/{dictation_id}/cover.jpg",
+                f"dictations_covers/{dictation_id.replace('dict_', '')}.webp",
             ]
             for remote_path in remote_paths:
                 if b2_storage.file_exists(remote_path):
@@ -539,6 +559,8 @@ def delete_dictation(dictation_id):
     return jsonify({
         "success": True,
         "removed_references": removed_refs,
+        "removed_desk_references": removed_desk_refs,
+        "removed_book_references": removed_book_refs,
         "removed_from_db": removed_from_db,
         "removed_from_b2": removed_from_b2,
         "removed_files": removed_files

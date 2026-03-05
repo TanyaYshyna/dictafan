@@ -4199,6 +4199,7 @@
     });
 
     const nameEl = document.getElementById('delete-dictation-name');
+    const deskWarnEl = document.getElementById('delete-dictation-desk-warning');
     try {
       const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(dictationId))}"]`);
       const title = card ? (card.querySelector('.short-title')?.textContent || '') : '';
@@ -4207,6 +4208,24 @@
       }
     } catch (e) {
       if (nameEl) nameEl.textContent = '';
+    }
+
+    try {
+      const isOnDesk = typeof isDictationOnDesk === 'function' ? !!isDictationOnDesk(String(dictationId)) : false;
+      if (deskWarnEl) {
+        if (isOnDesk) {
+          deskWarnEl.style.display = 'block';
+          deskWarnEl.textContent = 'Внимание: диктант лежит на рабочем столе. При удалении он будет убран и со стола.';
+        } else {
+          deskWarnEl.style.display = 'none';
+          deskWarnEl.textContent = '';
+        }
+      }
+    } catch (e) {
+      if (deskWarnEl) {
+        deskWarnEl.style.display = 'none';
+        deskWarnEl.textContent = '';
+      }
     }
 
     console.log('🗑️ delete modal show', {
@@ -4274,6 +4293,16 @@
           if (response.ok && data && data.success) {
             closeDeleteDictationModal();
             showToast('Диктант убран из книги');
+
+            // If dictation is on desk, remove it from desk as well to avoid it becoming an orphan/workbook entry.
+            try {
+              const itemId = typeof getDeskItemId === 'function' ? getDeskItemId(idStr) : null;
+              if (itemId) {
+                await removeFromDesk(itemId, idStr);
+              }
+            } catch (e) {
+            }
+
             try {
               const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
               if (card) {
