@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0139';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0140';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -123,6 +123,7 @@
   let deskLoadSeq = 0;
   let deskLoadInFlight = null;
   let pendingDeleteDictationId = null;
+  let pendingDeleteSectionId = null;
 
   function getToken() {
     return localStorage.getItem("jwt_token");
@@ -193,6 +194,7 @@
     const response = await fetch(url, {
       ...options,
       headers,
+      cache: 'no-store',
     });
 
     if (response.status === 401 || response.status === 422) {
@@ -258,6 +260,59 @@
 
   const deskToggleInFlight = new Set();
 
+  function ensureSwStatusBar() {
+    try {
+      const id = 'swStatusBar';
+      let el = document.getElementById(id);
+      if (el) return el;
+      el = document.createElement('div');
+      el.id = id;
+      el.style.position = 'fixed';
+      el.style.left = '0';
+      el.style.right = '0';
+      el.style.bottom = '0';
+      el.style.zIndex = '2147483647';
+      el.style.padding = '6px 10px';
+      el.style.fontSize = '12px';
+      el.style.lineHeight = '1.2';
+      el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      el.style.color = 'rgba(255,255,255,0.85)';
+      el.style.background = 'rgba(0,0,0,0.55)';
+      el.style.backdropFilter = 'blur(6px)';
+      el.style.webkitBackdropFilter = 'blur(6px)';
+      el.style.display = 'none';
+      el.style.pointerEvents = 'none';
+      el.textContent = '';
+      document.body.appendChild(el);
+      return el;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function setSwStatus(message, opts = {}) {
+    try {
+      const el = ensureSwStatusBar();
+      if (!el) return;
+      el.textContent = String(message || '');
+      el.style.display = message ? 'block' : 'none';
+      if (el._hideTimer) {
+        clearTimeout(el._hideTimer);
+        el._hideTimer = null;
+      }
+      const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1500;
+      if (message && durationMs > 0) {
+        el._hideTimer = setTimeout(() => {
+          try {
+            el.style.display = 'none';
+          } catch (e) {
+          }
+        }, durationMs);
+      }
+    } catch (e) {
+    }
+  }
+
   const PAGE_NAME = 'private_library';
   (async () => {
     try {
@@ -293,6 +348,11 @@
       throw new Error('Service Worker не активен');
     }
 
+    try {
+      setSwStatus(`SW: ${String(action)} …`, { durationMs: 0 });
+    } catch (e) {
+    }
+
     const timeoutMs = typeof payload.timeoutMs === 'number' ? payload.timeoutMs : 15000;
     const message = { action, ...payload };
     delete message.timeoutMs;
@@ -310,6 +370,10 @@
         if (data.requestId !== requestId) return;
         clearTimeout(timeout);
         if (data && data.success) {
+          try {
+            setSwStatus(`SW: ${String(action)} ok`);
+          } catch (e) {
+          }
           resolve(data);
         } else {
           try {
@@ -318,8 +382,16 @@
             err.swError = data && data.error ? data.error : 'sw_error';
             err.swResult = data && data.result ? data.result : null;
             err.swPayload = payload || null;
+            try {
+              setSwStatus(`SW: ${String(action)} error`);
+            } catch (e2) {
+            }
             reject(err);
           } catch (e) {
+            try {
+              setSwStatus(`SW: ${String(action)} error`);
+            } catch (e2) {
+            }
             reject(new Error(data && data.error ? data.error : 'sw_error'));
           }
         }
@@ -4192,6 +4264,7 @@
       return;
     }
     pendingDeleteDictationId = String(dictationId || '');
+    pendingDeleteSectionId = null;
 
     console.log('🗑️ openDeleteDictationModal', {
       dictationId: pendingDeleteDictationId,
@@ -4205,6 +4278,19 @@
       const title = card ? (card.querySelector('.short-title')?.textContent || '') : '';
       if (nameEl) {
         nameEl.textContent = title ? `«${title.trim()}»` : '';
+      }
+
+      // If delete was triggered from a section (paragraph) view, remember that sectionId.
+      // Otherwise we fall back to activeBookId.
+      try {
+        const sectionContent = card ? card.closest('.structure-item-content[data-section-content-id]') : null;
+        const sectionIdAttr = sectionContent ? sectionContent.getAttribute('data-section-content-id') : '';
+        const sectionIdNum = sectionIdAttr ? parseInt(String(sectionIdAttr), 10) : NaN;
+        if (sectionIdNum && isFinite(sectionIdNum) && sectionIdNum > 0) {
+          pendingDeleteSectionId = String(sectionIdNum);
+        }
+      } catch (e2) {
+        pendingDeleteSectionId = null;
       }
     } catch (e) {
       if (nameEl) nameEl.textContent = '';
@@ -4248,6 +4334,7 @@
     modal.classList.remove('show');
     modal.style.display = 'none';
     pendingDeleteDictationId = null;
+    pendingDeleteSectionId = null;
   }
 
   async function performDeleteDictation(dictationId) {
@@ -4263,18 +4350,27 @@
       // If a book/section is currently open, trash means "remove from this book", not delete dictation.
       // Workbook is a special virtual view of orphan dictations (not based on book_dictations), so here we delete globally.
       try {
+        const sectionIdRaw = pendingDeleteSectionId ? String(pendingDeleteSectionId) : '';
+        const sectionIdNum = sectionIdRaw ? parseInt(sectionIdRaw, 10) : NaN;
+
         const bookIdRaw = (typeof activeBookId !== 'undefined' && activeBookId) ? String(activeBookId) : '';
         const bookIdNum = bookIdRaw ? parseInt(bookIdRaw, 10) : NaN;
+
+        const targetBookIdNum = (sectionIdNum && isFinite(sectionIdNum) && sectionIdNum > 0)
+          ? sectionIdNum
+          : bookIdNum;
+
         const isWorkbookActive = (typeof activeBookIsWorkbook !== 'undefined') ? !!activeBookIsWorkbook : false;
-        if (!isWorkbookActive && bookIdNum && isFinite(bookIdNum) && bookIdNum > 0) {
+        if (!isWorkbookActive && targetBookIdNum && isFinite(targetBookIdNum) && targetBookIdNum > 0) {
           const token = getToken();
-          const url = `/library/api/book/${bookIdNum}/dictation/${encodeURIComponent(idStr)}`;
-          console.log('🗑️ remove-from-book request', { url, bookIdNum, dictationId: idStr });
+          const url = `/library/api/book/${targetBookIdNum}/dictation/${encodeURIComponent(idStr)}`;
+          console.log('🗑️ remove-from-book request', { url, bookIdNum: targetBookIdNum, dictationId: idStr, sectionId: sectionIdRaw || null, activeBookId: bookIdRaw || null });
           const response = await fetch(url, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${token}`
-            }
+            },
+            cache: 'no-store'
           });
 
           let data = null;
@@ -4315,6 +4411,18 @@
                 await loadActiveBook(activeBookId, activeBookIsWorkbook);
               } catch (e) {
               }
+            }
+
+            // If deletion happened inside a section, refresh that section's list as well.
+            try {
+              const sid = sectionIdRaw ? parseInt(sectionIdRaw, 10) : NaN;
+              if (sid && isFinite(sid) && sid > 0) {
+                const content = document.querySelector(`.structure-item-content[data-section-content-id="${CSS.escape(String(sid))}"]`);
+                if (content && content.style.display !== 'none') {
+                  await loadSectionDictations(String(sid), content);
+                }
+              }
+            } catch (e) {
             }
             return;
           }

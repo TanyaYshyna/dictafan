@@ -10,8 +10,61 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0139';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0140';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
+
+function ensureSwStatusBar() {
+    try {
+        const id = 'swStatusBar';
+        let el = document.getElementById(id);
+        if (el) return el;
+        el = document.createElement('div');
+        el.id = id;
+        el.style.position = 'fixed';
+        el.style.left = '0';
+        el.style.right = '0';
+        el.style.bottom = '0';
+        el.style.zIndex = '2147483647';
+        el.style.padding = '6px 10px';
+        el.style.fontSize = '12px';
+        el.style.lineHeight = '1.2';
+        el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+        el.style.color = 'rgba(255,255,255,0.85)';
+        el.style.background = 'rgba(0,0,0,0.55)';
+        el.style.backdropFilter = 'blur(6px)';
+        el.style.webkitBackdropFilter = 'blur(6px)';
+        el.style.display = 'none';
+        el.style.pointerEvents = 'none';
+        el.textContent = '';
+        document.body.appendChild(el);
+        return el;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setSwStatus(message, opts = {}) {
+    try {
+        const el = ensureSwStatusBar();
+        if (!el) return;
+        el.textContent = String(message || '');
+        el.style.display = message ? 'block' : 'none';
+        if (el._hideTimer) {
+            clearTimeout(el._hideTimer);
+            el._hideTimer = null;
+        }
+        const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1500;
+        if (message && durationMs > 0) {
+            el._hideTimer = setTimeout(() => {
+                try {
+                    el.style.display = 'none';
+                } catch (e) {
+                }
+            }, durationMs);
+        }
+    } catch (e) {
+    }
+}
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
 window.__DICTATION_EDITOR_IS_EXITING = window.__DICTATION_EDITOR_IS_EXITING || false;
@@ -1650,6 +1703,11 @@ async function swEditorRequest(action, payload = {}) {
         throw new Error('Service Worker не активен');
     }
 
+    try {
+        setSwStatus(`SW: ${String(action)} …`, { durationMs: 0 });
+    } catch (e) {
+    }
+
     const requestId = `dictation_editor_${action}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
     const timeoutMs = Number(payload.timeoutMs) || 15000;
 
@@ -1661,12 +1719,20 @@ async function swEditorRequest(action, payload = {}) {
             if (data.requestId && data.requestId !== requestId) return;
             clearTimeout(timer);
             if (data.success) {
+                try {
+                    setSwStatus(`SW: ${String(action)} ok`);
+                } catch (e) {
+                }
                 resolve(data.result);
             } else {
                 const err = new Error(data.error || 'sw_request_failed');
                 err.swAction = action;
                 err.swError = data.error || 'sw_request_failed';
                 err.swResult = data.result || null;
+                try {
+                    setSwStatus(`SW: ${String(action)} error`);
+                } catch (e) {
+                }
                 reject(err);
             }
         };
@@ -1675,6 +1741,10 @@ async function swEditorRequest(action, payload = {}) {
             navigator.serviceWorker.controller.postMessage({ action, requestId, ...payload }, [channel.port2]);
         } catch (e) {
             clearTimeout(timer);
+            try {
+                setSwStatus(`SW: ${String(action)} error`);
+            } catch (e2) {
+            }
             reject(e);
         }
     });
