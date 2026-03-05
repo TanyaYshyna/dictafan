@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0135';
+window.__DICTATION_EDITOR_BUILD = '2026-02-27_0136';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 window.__DICTATION_EDITOR_PREWARM_AUDIOS = window.__DICTATION_EDITOR_PREWARM_AUDIOS || Object.create(null);
@@ -444,7 +444,6 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         } catch (e) {
         }
 
-        // The UI (desk cards, dictation header) uses /api/cover?dictation_id=dict_<id>.
         // Offline should rely on canonical /api/dictations_covers/<id>.webp.
 
         const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
@@ -492,14 +491,45 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
             let txt = '';
             try { txt = await uploadRes.text(); } catch (e) {}
             console.warn('[B2 UPLOAD] cover upload failed', { status: uploadRes ? uploadRes.status : 0, remotePath, text: txt });
+            try {
+                window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+                window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = {
+                    ok: false,
+                    updatedAt: Date.now(),
+                    stage: 'b2_upload',
+                    status: uploadRes ? uploadRes.status : 0
+                };
+            } catch (e) {
+            }
+            try { scheduleSaveStatusRefresh(); } catch (e) {}
             return;
         }
 
         if (uploadRes && uploadRes.ok) {
             setDirtyFlags({ cover: false });
+            try {
+                window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+                window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = {
+                    ok: true,
+                    updatedAt: Date.now(),
+                    stage: 'b2_upload'
+                };
+            } catch (e) {
+            }
+            try { scheduleSaveStatusRefresh(); } catch (e) {}
         }
     } catch (e) {
         console.warn('[B2 UPLOAD] cover fatal', e);
+        try {
+            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = {
+                ok: false,
+                updatedAt: Date.now(),
+                stage: 'b2_upload_exception'
+            };
+        } catch (e2) {
+        }
+        try { scheduleSaveStatusRefresh(); } catch (e2) {}
     }
 }
 
@@ -944,6 +974,11 @@ async function handleCropConfirm() {
 
         try {
             currentDictation.coverFile = blob;
+        } catch (e) {
+        }
+        try {
+            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = null;
         } catch (e) {
         }
         try {

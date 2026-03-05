@@ -111,7 +111,6 @@ function isMediaUrl(requestUrl) {
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
-    if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
     return false;
@@ -179,7 +178,6 @@ function shouldHandleRequest(requestUrl) {
 
     if (path.startsWith('/api/dictations/')) return true;
     if (path.startsWith('/api/temp/')) return true;
-    if (path === '/api/cover') return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
 
@@ -766,16 +764,6 @@ async function purgeDictationFromBoundedCache(dictationId) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;
-      }
-
-      // Cover: /api/cover?dictation_id=dict_123
-      if (path === '/api/cover') {
-        const coverId = url.searchParams.get('dictation_id');
-        if (coverId === dictKey) {
-          const ok = await cache.delete(req);
-          if (ok) deleted += 1;
-          continue;
-        }
       }
 
       // Cover: /api/dictations_covers/<id>.webp

@@ -824,7 +824,7 @@ def get_cover_url_for_id(dictation_id, language=None):
         remote_path_new = f"dictations_covers/{numeric_id}.webp"
         try:
             if b2_storage.file_exists(remote_path_new, raise_on_error=True):
-                return f"/api/cover?dictation_id={dictation_id}"
+                return f"/api/dictations_covers/{numeric_id}.webp"
         except Exception:
             logger.error("B2 cover check failed for %s", remote_path_new, exc_info=True)
 
@@ -850,65 +850,52 @@ def get_cover_url_for_id(dictation_id, language=None):
     # --- 4) последний-resort плейсхолдер в /static/data/covers/ ---
     return "/static/data/covers/cover_en.webp"
 
-@index_bp.route('/api/cover')
-def api_get_cover():
-    """Получение обложки диктанта (Option A: только B2)"""
+
+@index_bp.route('/api/dictations_covers/<int:numeric_id>.webp')
+def api_get_dictation_cover_webp(numeric_id: int):
+    """Получение обложки диктанта по каноническому URL (Option A: только B2)"""
     from helpers.b2_storage import b2_storage
-    
+
     try:
-        dictation_id = request.args.get('dictation_id')
-
-        if not dictation_id:
-            return jsonify({'error': 'dictation_id parameter required'}), 400
-
         if not b2_storage.enabled:
             return jsonify({'error': 'B2 storage is disabled'}), 503
 
-        if dictation_id.startswith('dict_'):
-            numeric_id = dictation_id.split('_', 1)[1]
-            remote_path_new = f"dictations_covers/{numeric_id}.webp"
-            try:
-                exists = b2_storage.file_exists(remote_path_new, raise_on_error=True)
-            except Exception:
-                return jsonify({'error': 'B2 storage unavailable'}), 503
+        if not numeric_id or numeric_id <= 0:
+            return jsonify({'error': 'numeric_id parameter required'}), 400
 
-            if exists:
-                import tempfile
-                from flask import after_this_request
+        remote_path_new = f"dictations_covers/{numeric_id}.webp"
+        try:
+            exists = b2_storage.file_exists(remote_path_new, raise_on_error=True)
+        except Exception:
+            return jsonify({'error': 'B2 storage unavailable'}), 503
 
-                tmp = tempfile.NamedTemporaryFile(prefix="dict_cover_", suffix=".webp", delete=False)
-                tmp_path = tmp.name
-                tmp.close()
+        if exists:
+            import tempfile
+            from flask import after_this_request
 
-                ok = b2_storage.download_file(remote_path_new, tmp_path)
-                if not ok:
-                    try:
-                        os.remove(tmp_path)
-                    except OSError:
-                        pass
-                    return jsonify({'error': 'Failed to download cover from B2'}), 502
+            tmp = tempfile.NamedTemporaryFile(prefix="dict_cover_", suffix=".webp", delete=False)
+            tmp_path = tmp.name
+            tmp.close()
 
-                @after_this_request
-                def _cleanup_tmp(response):
-                    try:
-                        os.remove(tmp_path)
-                    except OSError:
-                        pass
-                    return response
+            ok = b2_storage.download_file(remote_path_new, tmp_path)
+            if not ok:
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                return jsonify({'error': 'Failed to download cover from B2'}), 502
 
-                return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
+            @after_this_request
+            def _cleanup_tmp(response):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+                return response
 
-        # Если ничего не помогло, возвращаем дефолтную обложку
-        data_base = _get_static_data_base_dir()
-        default_path = os.path.join(data_base, "covers", "cover_en.webp")
-        if os.path.exists(default_path):
-            return send_from_directory(
-                os.path.dirname(default_path),
-                os.path.basename(default_path)
-            )
+            return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
 
         return jsonify({'error': 'Cover not found'}), 404
-
     except Exception as e:
-        logger.error(f"❌ Ошибка получения обложки: {e}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        logger.error("api_get_dictation_cover_webp error: %s", e, exc_info=True)
+        return jsonify({'error': 'Internal error'}), 500
