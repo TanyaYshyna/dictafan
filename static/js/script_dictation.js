@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0141';
+window.__DICTATION_BUILD = '2026-02-26_0142';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -35,6 +35,33 @@ function ensureSwStatusBar() {
         return el;
     } catch (e) {
         return null;
+    }
+}
+
+function resolveSentenceAudioUrl(sentence, fieldName) {
+    try {
+        if (!sentence || typeof sentence !== 'object') return '';
+        const raw = String(sentence[fieldName] || '').trim();
+        if (!raw) return '';
+        if (raw.startsWith('blob:')) return raw;
+        if (raw.startsWith('/api/')) return raw;
+        if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+
+        const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
+        if (!dictId) return '';
+
+        const basePath = dictId.startsWith('dict_temp_') ? '/api/temp/dictations' : '/api/dictations';
+
+        const lang = (fieldName === 'audio_tr')
+            ? String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '')
+            : String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '');
+        if (!lang) return '';
+
+        const name = raw.split('?', 1)[0].split('/').pop();
+        if (!name) return '';
+        return `${basePath}/${encodeURIComponent(dictId)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`;
+    } catch (e) {
+        return '';
     }
 }
 
@@ -224,11 +251,29 @@ async function fetchSentencesFromServerAndCache() {
             try {
                 const audioUrls = [];
                 const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+                const resolveAudioToUrl = (rawValue, lang) => {
+                    try {
+                        const v = String(rawValue || '').trim();
+                        if (!v) return null;
+                        if (v.startsWith('blob:')) return v;
+                        if (v.startsWith('/api/')) return v;
+                        if (v.startsWith('http://') || v.startsWith('https://')) return v;
+                        const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
+                        if (!dictId || !lang) return null;
+                        const name = v.split('?', 1)[0].split('/').pop();
+                        if (!name) return null;
+                        return `/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`;
+                    } catch (e) {
+                        return null;
+                    }
+                };
                 for (const s of sentences) {
                     if (!s || typeof s !== 'object') continue;
                     for (const f of audioFields) {
                         const u = s[f];
-                        if (u && typeof u === 'string') audioUrls.push(u);
+                        const lang = (f === 'audio_tr') ? (currentDictation && currentDictation.language_translation) : (currentDictation && currentDictation.language_original);
+                        const fullUrl = resolveAudioToUrl(u, lang);
+                        if (fullUrl) audioUrls.push(fullUrl);
                     }
                 }
                 const unique = Array.from(new Set(audioUrls.filter(Boolean)));
@@ -626,8 +671,8 @@ function stopDraftAutosaveTimers() {
 }
 
 async function openDraftDb() {
-    return await new Promise((resolve, reject) => {
-        const req = indexedDB.open('dictafan_drafts', 3);
+    const openWith = (mode) => new Promise((resolve, reject) => {
+        const req = indexedDB.open('dictafan_drafts');
         req.onupgradeneeded = () => {
             const db = req.result;
             if (!db.objectStoreNames.contains('drafts')) {
@@ -648,10 +693,22 @@ async function openDraftDb() {
             if (!db.objectStoreNames.contains('desk_items')) {
                 db.createObjectStore('desk_items', { keyPath: 'key' });
             }
+            if (!db.objectStoreNames.contains('media_manifest')) {
+                db.createObjectStore('media_manifest', { keyPath: 'key' });
+            }
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
     });
+
+    try {
+        return await openWith();
+    } catch (e) {
+        if (e && e.name === 'VersionError') {
+            return await openWith();
+        }
+        throw e;
+    }
 }
 
 async function clearDraftFromIndexedDb() {
@@ -3426,10 +3483,32 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     const keys = Array.isArray(sentenceKeys) ? sentenceKeys : [];
     const byKey = makeByKeyMap(allSentences);
     const urls = [];
+    const resolveAudioToUrl = (rawValue, lang) => {
+        try {
+            const v = String(rawValue || '').trim();
+            if (!v) return null;
+            if (v.startsWith('blob:')) return v;
+            if (v.startsWith('/api/')) return v;
+            if (v.startsWith('http://') || v.startsWith('https://')) return v;
+            const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
+            if (!dictId || !lang) return null;
+            const name = v.split('?', 1)[0].split('/').pop();
+            if (!name) return null;
+            return `/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`;
+        } catch (e) {
+            return null;
+        }
+    };
+    const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
     for (const key of keys) {
         const s = byKey.get(key);
         if (!s) continue;
-        if (s.audio) urls.push(s.audio);
+        for (const f of audioFields) {
+            const u = s[f];
+            const lang = (f === 'audio_tr') ? (currentDictation && currentDictation.language_translation) : (currentDictation && currentDictation.language_original);
+            const fullUrl = resolveAudioToUrl(u, lang);
+            if (fullUrl) urls.push(fullUrl);
+        }
     }
     const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
     if (!uniqueUrls.length) return;
@@ -6845,28 +6924,6 @@ async function loadSentencesFromIndexedDb() {
             });
         } catch (e) {
         }
-        // Если диктант был закеширован на другом origin (например staging), в IDB могли
-        // сохраниться абсолютные URL. Для оффлайн и для других окружений нормализуем их
-        // до относительных /api/dictations/... чтобы запросы проходили через текущий origin + SW cache.
-        const audioFieldsToNormalize = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
-        const normalizeAudioUrl = (raw) => {
-            if (!raw || typeof raw !== 'string') return raw;
-            if (!raw.startsWith('http://') && !raw.startsWith('https://')) return raw;
-            try {
-                const u = new URL(raw);
-                if (u.pathname && (u.pathname.startsWith('/api/dictations/') || u.pathname.startsWith('/api/temp/'))) {
-                    return `${u.pathname}${u.search || ''}`;
-                }
-            } catch (e) {
-            }
-            return raw;
-        };
-        allSentences.forEach(s => {
-            if (!s || typeof s !== 'object') return;
-            for (const f of audioFieldsToNormalize) {
-                if (s[f]) s[f] = normalizeAudioUrl(s[f]);
-            }
-        });
         allSentences.forEach(s => {
             if (s.number_of_perfect === undefined) s.number_of_perfect = 0;
             if (s.number_of_corrected === undefined) s.number_of_corrected = 0;
@@ -7082,7 +7139,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     // Обновляем AudioPlayerVisual с путями к аудио текущего предложения
     if (window.originalAudioVisual) {
         window.originalAudioVisual.setAudioPaths({
-            audio: currentSentence.audio || '',
+            audio: resolveSentenceAudioUrl(currentSentence, 'audio'),
             audio_a: '',
             audio_f: '',
             audio_m: ''
@@ -7416,7 +7473,7 @@ async function onloadInitializeDictation() {
         translationPlayButton.addEventListener('click', () => {
             if (!currentSentence) return;
 
-            const translationPath = currentSentence.audio_tr;
+            const translationPath = resolveSentenceAudioUrl(currentSentence, 'audio_tr');
             if (!translationPath) return;
 
             const isPlaying = (window.AudioManager && typeof window.AudioManager.isPlaying === 'function')
@@ -8362,7 +8419,7 @@ function playAudioSequence(sequence) {
         // Определяем путь к аудио и кнопку в зависимости от типа
         switch (step) {
             case 'o': // оригинал
-                audioPath = currentSentence.audio;
+                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio');
                 if (window.originalAudioVisual) {
                     button = window.originalAudioVisual.playButton;
                     window.originalAudioVisual.setAudioType('o');
@@ -8371,14 +8428,14 @@ function playAudioSequence(sequence) {
             case 'a': // автоозвучка (устарело в диктанте)
             case 'f': // порезанный файл (устарело в диктанте)
             case 'm': // микрофон (устарело в диктанте)
-                audioPath = currentSentence.audio;
+                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio');
                 if (window.originalAudioVisual) {
                     button = window.originalAudioVisual.playButton;
                     window.originalAudioVisual.setAudioType('o');
                 }
                 break;
             case 't': // перевод
-                audioPath = currentSentence.audio_tr;
+                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio_tr');
                 button = window.translationPlayButton || null;
                 break;
             default:

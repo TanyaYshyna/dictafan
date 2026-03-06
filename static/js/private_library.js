@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0141';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0142';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -426,7 +426,7 @@
 
   async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-      const req = indexedDB.open('dictafan_drafts', 3);
+      const req = indexedDB.open('dictafan_drafts');
       req.onupgradeneeded = () => {
         const db = req.result;
         if (!db.objectStoreNames.contains('drafts')) {
@@ -446,6 +446,9 @@
         }
         if (!db.objectStoreNames.contains('desk_items')) {
           db.createObjectStore('desk_items', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('media_manifest')) {
+          db.createObjectStore('media_manifest', { keyPath: 'key' });
         }
       };
       req.onsuccess = () => resolve(req.result);
