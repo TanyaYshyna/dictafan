@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0146';
+window.__DICTATION_BUILD = '2026-02-26_0147';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -38,14 +38,71 @@ function ensureSwStatusBar() {
     }
 }
 
+function normalizeDictationMediaUrl(rawUrl) {
+    try {
+        let v = String(rawUrl || '').trim();
+        if (!v) return '';
+        if (v.startsWith('blob:')) return v;
+
+        try {
+            if (v.startsWith('http://') || v.startsWith('https://')) {
+                const u = new URL(v);
+                // If page is https, never keep an http absolute URL.
+                const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol) ? location.protocol : u.protocol;
+                if (desiredProtocol === 'https:' && u.protocol === 'http:') {
+                    u.protocol = 'https:';
+                }
+
+                // Prefer returning a relative URL for same-origin requests.
+                try {
+                    if (typeof location !== 'undefined' && location && u.origin === location.origin) {
+                        v = `${u.pathname}${u.search || ''}`;
+                    } else {
+                        v = u.toString();
+                    }
+                } catch (e) {
+                    v = `${u.pathname}${u.search || ''}`;
+                }
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
+                v = `https://${v.slice('http://'.length)}`;
+            }
+        } catch (e) {
+        }
+
+        const markers = ['/api/dictations/', '/api/temp/dictations/'];
+        for (const m of markers) {
+            const first = v.indexOf(m);
+            if (first >= 0) {
+                const second = v.indexOf(m, first + m.length);
+                if (second >= 0) {
+                    v = v.slice(second);
+                }
+            }
+        }
+
+        if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
+            v = `/${v}`;
+        }
+
+        return v;
+    } catch (e) {
+        return String(rawUrl || '').trim();
+    }
+}
+
 function resolveSentenceAudioUrl(sentence, fieldName) {
     try {
         if (!sentence || typeof sentence !== 'object') return '';
         const raw = String(sentence[fieldName] || '').trim();
         if (!raw) return '';
         if (raw.startsWith('blob:')) return raw;
-        if (raw.startsWith('/api/')) return raw;
-        if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+        if (raw.startsWith('/api/')) return normalizeDictationMediaUrl(raw);
+        if (raw.startsWith('http://') || raw.startsWith('https://')) return normalizeDictationMediaUrl(raw);
 
         const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
         if (!dictId) return '';
@@ -59,7 +116,7 @@ function resolveSentenceAudioUrl(sentence, fieldName) {
 
         const name = raw.split('?', 1)[0].split('/').pop();
         if (!name) return '';
-        return `${basePath}/${encodeURIComponent(dictId)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`;
+        return normalizeDictationMediaUrl(`${basePath}/${encodeURIComponent(dictId)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`);
     } catch (e) {
         return '';
     }
@@ -256,13 +313,13 @@ async function fetchSentencesFromServerAndCache() {
                         const v = String(rawValue || '').trim();
                         if (!v) return null;
                         if (v.startsWith('blob:')) return v;
-                        if (v.startsWith('/api/')) return v;
-                        if (v.startsWith('http://') || v.startsWith('https://')) return v;
+                        if (v.startsWith('/api/')) return normalizeDictationMediaUrl(v);
+                        if (v.startsWith('http://') || v.startsWith('https://')) return normalizeDictationMediaUrl(v);
                         const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
                         if (!dictId || !lang) return null;
                         const name = v.split('?', 1)[0].split('/').pop();
                         if (!name) return null;
-                        return `/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`;
+                        return normalizeDictationMediaUrl(`/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`);
                     } catch (e) {
                         return null;
                     }
@@ -3504,13 +3561,13 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
             const v = String(rawValue || '').trim();
             if (!v) return null;
             if (v.startsWith('blob:')) return v;
-            if (v.startsWith('/api/')) return v;
-            if (v.startsWith('http://') || v.startsWith('https://')) return v;
+            if (v.startsWith('/api/')) return normalizeDictationMediaUrl(v);
+            if (v.startsWith('http://') || v.startsWith('https://')) return normalizeDictationMediaUrl(v);
             const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
             if (!dictId || !lang) return null;
             const name = v.split('?', 1)[0].split('/').pop();
             if (!name) return null;
-            return `/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`;
+            return normalizeDictationMediaUrl(`/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`);
         } catch (e) {
             return null;
         }
