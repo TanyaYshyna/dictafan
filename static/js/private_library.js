@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0140';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0141';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -178,6 +178,19 @@
     if (!url || typeof url !== 'string') return url;
     const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}v=${Date.now()}`;
+  }
+
+  function maybeCacheBustDictationCover(url) {
+    try {
+      const u = String(url || '');
+      if (!u) return u;
+      if (u.startsWith('/api/dictations_covers/') || u.startsWith('/api/temp/dictations_covers/')) {
+        return withCacheBust(u);
+      }
+      return u;
+    } catch (e) {
+      return url;
+    }
   }
 
   async function apiRequest(url, options = {}) {
@@ -1556,7 +1569,7 @@
       const langOriginal = item.language_code || 'en';
       const langTranslation = item.language_translation || item.language_code || 'en';
       const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
-      const coverUrl = item.cover_url || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
+      const coverUrl = maybeCacheBustDictationCover(item.cover_url) || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
 
       const sentencesCount = typeof item.sentences_count === 'number'
         ? item.sentences_count
@@ -1663,7 +1676,7 @@
         const url = img.dataset.coverUrl;
         if (!url) return;
         img.dataset.coverApplied = '1';
-        img.src = url;
+        img.src = maybeCacheBustDictationCover(url);
       });
     } catch (e) {
       console.warn('[desk-render] applyDeskCovers failed', e);

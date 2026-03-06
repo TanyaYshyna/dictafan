@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0140';
+window.__DICTATION_BUILD = '2026-02-26_0141';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -35,6 +35,20 @@ function ensureSwStatusBar() {
         return el;
     } catch (e) {
         return null;
+    }
+}
+
+function maybeCacheBustDictationCover(url) {
+    try {
+        const u = String(url || '');
+        if (!u) return u;
+        if (u.startsWith('/api/dictations_covers/') || u.startsWith('/api/temp/dictations_covers/')) {
+            const sep = u.includes('?') ? '&' : '?';
+            return `${u}${sep}v=${Date.now()}`;
+        }
+        return u;
+    } catch (e) {
+        return url;
     }
 }
 
@@ -2497,8 +2511,18 @@ function pauseGame(isInactivityPause = false) {
         }
     }
 
-    // Останавливаем основной таймер
-    stopTimer();
+    // Устанавливаем обработчики для кнопок
+    setupEventListeners();
+
+    try {
+        const coverImg = document.querySelector('img.dictation-cover, #dictation-cover, #coverImage, .dictation-cover-img');
+        if (coverImg && coverImg.getAttribute) {
+            const src = coverImg.getAttribute('src') || '';
+            const next = maybeCacheBustDictationCover(src);
+            if (next && next !== src) coverImg.setAttribute('src', next);
+        }
+    } catch (e) {
+    }
 
     const timerSnapshot = getProgressTimerSnapshot();
     const displayMs = getTimerDisplayMs(timerSnapshot);
