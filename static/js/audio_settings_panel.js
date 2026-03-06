@@ -1006,12 +1006,6 @@ class AudioSettingsPanel {
                     speechRecognitionButton.title = 'Оффлайн: распознавание работает только локально';
                     return;
                 }
-                if (isDictationPanel && currentMode === 'route-off') {
-                    speechRecognitionButton.style.opacity = '0.9';
-                    speechRecognitionButton.style.cursor = 'not-allowed';
-                    speechRecognitionButton.title = 'Локальный режим: распознавание работает только локально';
-                    return;
-                }
                 
                 // Если модель не загружена, блокируем переключение на route-off
                 if (!hasModel) {
@@ -1056,11 +1050,6 @@ class AudioSettingsPanel {
 
                 // В диктанте оффлайн: режим фиксированный (локально)
                 if (isDictationPanel && isOffline) {
-                    return;
-                }
-
-                // В диктанте: если уже локальный режим, не даем переключиться обратно (только локально)
-                if (isDictationPanel && currentMode === 'route-off') {
                     return;
                 }
                 

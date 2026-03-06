@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0142';
+window.__DICTATION_BUILD = '2026-02-26_0143';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -1716,6 +1716,22 @@ function getEffectiveSpeechRecognitionMode() {
     try {
         if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
             return 'route-off';
+        }
+    } catch (e) {
+    }
+    try {
+        // If user selected local-only but there is no local model, and we are online,
+        // fall back to internet recognition.
+        if (speechRecognitionMode === 'route-off') {
+            const currentLang = langCodeUrl?.split('-')[0]
+                || (typeof currentDictation !== 'undefined' && currentDictation?.language_original
+                    ? currentDictation.language_original.split('-')[0]
+                    : 'en');
+            const selectedSize = getSelectedWhisperModelSize(currentLang);
+            const hasModel = hasWhisperModel(currentLang, selectedSize);
+            if (!hasModel) {
+                return 'route';
+            }
         }
     } catch (e) {
     }
