@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0145';
+window.__DICTATION_BUILD = '2026-02-26_0146';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -3652,20 +3652,44 @@ function startGame(isResume = false) {
     // все аудио должны быть из кеша
     // Проверяем, что все аудио для выбранных предложений уже в кеше.
     // Если чего-то нет, игру не начинаем (и не пытаемся ничего качать).
+    let isOffline = false;
+    try {
+        isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
+    } catch (e) {
+    }
+
+    if (isOffline) {
+        (async () => {
+            try {
+                await checkDictationAudioCachedOrThrow(selectedSentences);
+            } catch (e) {
+                console.warn('[startGame] audio cache check failed (offline)', e);
+                showNoSelectionModal('Аудио не загружено в кеш. Перезагрузите диктант и дождитесь загрузки.');
+                return;
+            }
+
+            // continue original startGame flow
+            try {
+                startGameAfterCacheCheck(isResume);
+            } catch (e2) {
+                console.error('[startGame] startGameAfterCacheCheck failed', e2);
+            }
+        })();
+        return;
+    }
+
+    // Online: start immediately; cache check/prefetch is best-effort and should not block the flow.
+    try {
+        startGameAfterCacheCheck(isResume);
+    } catch (e2) {
+        console.error('[startGame] startGameAfterCacheCheck failed', e2);
+    }
+
     (async () => {
         try {
             await checkDictationAudioCachedOrThrow(selectedSentences);
         } catch (e) {
-            console.warn('[startGame] audio cache check failed', e);
-            showNoSelectionModal('Аудио не загружено в кеш. Перезагрузите диктант и дождитесь загрузки.');
-            return;
-        }
-
-        // continue original startGame flow
-        try {
-            startGameAfterCacheCheck(isResume);
-        } catch (e2) {
-            console.error('[startGame] startGameAfterCacheCheck failed', e2);
+            console.warn('[startGame] audio cache check failed (online, ignored)', e);
         }
     })();
 }
