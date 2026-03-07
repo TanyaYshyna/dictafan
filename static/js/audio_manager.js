@@ -34,12 +34,7 @@ class AudioManagerClass {
         };
 
         const __seqMode = !!onEndedCallback;
-        const __seqLog = (...args) => {
-            try {
-                if (__seqMode) console.log('[AUDIO_MGR_SEQ]', ...args);
-            } catch (e) {
-            }
-        };
+        const __seqLog = () => { };
 
         let _finishCallbackCalled = false;
         const finishCallbackOnce = () => {
@@ -77,15 +72,8 @@ class AudioManagerClass {
             playTokenNext: this._playToken + 1
         });
 
-        __seqLog('play()', {
-            audioUrl,
-            buttonId: button && button.id,
-            playTokenNext: this._playToken + 1
-        });
-
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
-        __seqLog('token', { playToken, audioUrl });
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
 
         // If we're resuming the exact same audio element (paused), do NOT recreate it.
@@ -129,18 +117,14 @@ class AudioManagerClass {
                 if (!this._autoPlayEnabled || this._playToken !== playToken) return;
                 let p;
                 try {
-                    __seqLog('play() invoke', { playToken, audioUrl });
                     p = currentAudio.play();
                 } catch (e) {
-                    __seqLog('play() throw', { playToken, audioUrl, name: e && e.name, message: e && e.message });
                     throw e;
                 }
                 try {
                     if (p && typeof p.then === 'function') {
                         p.then(() => {
-                            __seqLog('play() resolved', { playToken, audioUrl });
                         }).catch((error) => {
-                            __seqLog('play() rejected', { playToken, audioUrl, name: error && error.name, message: error && error.message, code: error && error.code });
                         });
                     }
                 } catch (e) {
@@ -181,13 +165,11 @@ class AudioManagerClass {
         }
 
         if (isSameAudio && this.audio && !this.audio.paused) {
-            __seqLog('early:return:same_audio_playing', { playToken, audioUrl });
             this.stop();
             return;
         }
 
         if (this.audio && this.audio.src && !this.audio.src.includes(audioUrl)) {
-            __seqLog('stop:previous_different_src', { playToken, audioUrl, prevSrc: this.audio && this.audio.src });
             // IMPORTANT: stop() disables autoplay; when switching tracks programmatically
             // (e.g., dictation sequence 'oto'), we must keep autoplay enabled for the next track.
             this.stop();
@@ -202,14 +184,6 @@ class AudioManagerClass {
         this.audio = prewarmed || new Audio(audioUrl);
         this.currentButton = button || null;
 
-        __seqLog('audio:created', {
-            playToken,
-            audioUrl,
-            usedPrewarmed: !!prewarmed,
-            readyState: this.audio && this.audio.readyState,
-            networkState: this.audio && this.audio.networkState
-        });
-
         if (isDraftAudioUrl && this.audio) {
             try {
                 this.audio.preload = 'auto';
@@ -223,20 +197,6 @@ class AudioManagerClass {
 
         try {
             if (__seqMode && currentAudio && !currentAudio.__audioMgrSeqListenersInstalled) {
-                currentAudio.addEventListener('playing', () => {
-                    __seqLog('event:playing', { playToken, audioUrl });
-                });
-                currentAudio.addEventListener('ended', () => {
-                    __seqLog('event:ended', { playToken, audioUrl });
-                });
-                currentAudio.addEventListener('error', () => {
-                    __seqLog('event:error', {
-                        playToken,
-                        audioUrl,
-                        code: currentAudio && currentAudio.error && currentAudio.error.code,
-                        message: currentAudio && currentAudio.error && currentAudio.error.message
-                    });
-                });
                 currentAudio.__audioMgrSeqListenersInstalled = true;
             }
         } catch (e) {
@@ -450,35 +410,29 @@ class AudioManagerClass {
         const startPlayback = () => {
             // Проверяем, что currentAudio существует
             if (!currentAudio) {
-                __seqLog('startPlayback:abort:no_audio', { playToken, audioUrl });
                 return;
             }
 
             // If user has paused/stopped while the audio was still loading, do not auto-start.
             if (!this._autoPlayEnabled || this._playToken !== playToken) {
-                __seqLog('startPlayback:abort:token_or_autoplay', { playToken, audioUrl, autoPlayEnabled: this._autoPlayEnabled, currentToken: this._playToken });
                 return;
             }
             
             // Avoid overlapping play () calls (Safari can abort/pause if play () is called repeatedly
             // while the first request is still pending).
             if (_didCallPlay) {
-                __seqLog('startPlayback:abort:didCallPlay', { playToken, audioUrl });
                 return;
             }
             _didCallPlay = true;
             
             let p;
             try {
-                __seqLog('play() invoke', { playToken, audioUrl });
                 p = currentAudio.play();
             } catch (e) {
-                __seqLog('play() throw', { playToken, audioUrl, name: e && e.name, message: e && e.message });
                 throw e;
             }
             if (p && typeof p.then === 'function') {
                 p.then(() => {
-                    __seqLog('play() resolved', { playToken, audioUrl });
                     __dbg('play() resolved', { playToken, current: this.audio === currentAudio });
                     // Some browsers resolve play() before firing 'playing'. If we are actually
                     // not paused anymore, update the UI.
@@ -489,7 +443,6 @@ class AudioManagerClass {
                     } catch (e) {
                     }
                 }).catch((error) => {
-                    __seqLog('play() rejected', { playToken, audioUrl, name: error && error.name, message: error && error.message, code: error && error.code });
                 });
             }
             (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {

@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0159';
+window.__DICTATION_BUILD = '2026-02-26_0161';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -7385,16 +7385,6 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     disableRecordButton(true);
 
     // Воспроизводим последовательность аудио по схеме
-    try {
-        console.log('[DICTATION_AUDIO_SCHEME]', {
-            kind: 'start',
-            sequence: playSequenceStart,
-            sentenceKey: currentSentence && currentSentence.key,
-            currentSentenceIndex,
-            totalSelectedSentences
-        });
-    } catch (e) {
-    }
     setTimeout(() => playAudioSequence(playSequenceStart), 300);
 }
 
@@ -8527,12 +8517,7 @@ function playAudioSequence(sequence) {
     const seqSentence = currentSentence;
     const seqSentenceKey = seqSentence && seqSentence.key;
 
-    const __seqLog = (...args) => {
-        try {
-            console.log('[DICTATION_AUDIO_SEQ]', ...args);
-        } catch (e) {
-        }
-    };
+    const __seqLog = () => { };
 
     const steps = sequence.toLowerCase().split(''); // Разбиваем строку на массив
     let index = 0;
@@ -9027,16 +9012,6 @@ function checkText() {
         correctAnswerDiv.style.color = 'var(--color-button-gray)';
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
-        try {
-            console.log('[DICTATION_AUDIO_SCHEME]', {
-                kind: 'success',
-                sequence: playSequenceSuccess,
-                sentenceKey: currentSentence && currentSentence.key,
-                currentSentenceIndex,
-                totalSelectedSentences
-            });
-        } catch (e) {
-        }
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
         updateTableRowStatus(currentSentence);
     } else {
@@ -9110,20 +9085,10 @@ document.getElementById("userInput").addEventListener("input", function () {
 
         if (!isShowTextHint) {
             // Воспроизводим последовательность O, тут может в дальнейшем быть условие от пользователя воспроизводить или нет
-            try {
-                console.log('[DICTATION_AUDIO_SCHEME]', {
-                    kind: 'typo',
-                    sequence: playSequenceTypo,
-                    sentenceKey: currentSentence && currentSentence.key,
-                    currentSentenceIndex,
-                    totalSelectedSentences
-                });
-            } catch (e) {
-            }
-            playAudioSequence(playSequenceTypo); // "t"
-            correctAnswer.style.display = "none";
-            //document.getElementById("translation").style.display = "none";
+            playAudioSequence(playSequenceTypo);
         }
+        correctAnswer.style.display = "none";
+        //document.getElementById("translation").style.display = "none";
     }
 });
 
