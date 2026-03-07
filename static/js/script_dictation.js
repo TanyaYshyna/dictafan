@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0153';
+window.__DICTATION_BUILD = '2026-02-26_0154';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -8509,6 +8509,9 @@ function playAudioSequence(sequence) {
         return;
     }
 
+    const seqSentence = currentSentence;
+    const seqSentenceKey = seqSentence && seqSentence.key;
+
     const __seqLog = (...args) => {
         try {
             console.log('[DICTATION_AUDIO_SEQ]', ...args);
@@ -8529,12 +8532,27 @@ function playAudioSequence(sequence) {
         let audioPath = null;
         let button = null;
 
-        __seqLog('step', { sequence, index, step, currentSentenceIndex, totalSelectedSentences });
+        __seqLog('step', {
+            sequence,
+            index,
+            step,
+            currentSentenceIndex,
+            totalSelectedSentences,
+            seqSentenceKey,
+            currentSentenceKey: currentSentence && currentSentence.key
+        });
+
+        if ((currentSentence && currentSentence.key) !== seqSentenceKey) {
+            __seqLog('warn:sentence_changed', {
+                seqSentenceKey,
+                currentSentenceKey: currentSentence && currentSentence.key
+            });
+        }
 
         // Определяем путь к аудио и кнопку в зависимости от типа
         switch (step) {
             case 'o': // оригинал
-                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio');
+                audioPath = resolveSentenceAudioUrl(seqSentence, 'audio');
                 if (window.originalAudioVisual) {
                     button = window.originalAudioVisual.playButton;
                     window.originalAudioVisual.setAudioType('o');
@@ -8543,14 +8561,14 @@ function playAudioSequence(sequence) {
             case 'a': // автоозвучка (устарело в диктанте)
             case 'f': // порезанный файл (устарело в диктанте)
             case 'm': // микрофон (устарело в диктанте)
-                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio');
+                audioPath = resolveSentenceAudioUrl(seqSentence, 'audio');
                 if (window.originalAudioVisual) {
                     button = window.originalAudioVisual.playButton;
                     window.originalAudioVisual.setAudioType('o');
                 }
                 break;
             case 't': // перевод
-                audioPath = resolveSentenceAudioUrl(currentSentence, 'audio_tr');
+                audioPath = resolveSentenceAudioUrl(seqSentence, 'audio_tr');
                 button = window.translationPlayButton || null;
                 break;
             default:
