@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0152';
+window.__DICTATION_BUILD = '2026-02-26_0153';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -7371,15 +7371,13 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
     // Воспроизводим последовательность аудио по схеме
     try {
-        if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
-            console.log('[DICTATION_AUDIO_SCHEME]', {
-                kind: 'start',
-                sequence: playSequenceStart,
-                sentenceKey: currentSentence && currentSentence.key,
-                currentSentenceIndex,
-                totalSelectedSentences
-            });
-        }
+        console.log('[DICTATION_AUDIO_SCHEME]', {
+            kind: 'start',
+            sequence: playSequenceStart,
+            sentenceKey: currentSentence && currentSentence.key,
+            currentSentenceIndex,
+            totalSelectedSentences
+        });
     } catch (e) {
     }
     setTimeout(() => playAudioSequence(playSequenceStart), 300);
@@ -8511,10 +8509,9 @@ function playAudioSequence(sequence) {
         return;
     }
 
-    const __seqDbg = !!window.__DICTATION_AUDIO_SEQ_DEBUG;
     const __seqLog = (...args) => {
         try {
-            if (__seqDbg) console.log('[DICTATION_AUDIO_SEQ]', ...args);
+            console.log('[DICTATION_AUDIO_SEQ]', ...args);
         } catch (e) {
         }
     };
@@ -8998,15 +8995,13 @@ function checkText() {
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
         try {
-            if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
-                console.log('[DICTATION_AUDIO_SCHEME]', {
-                    kind: 'success',
-                    sequence: playSequenceSuccess,
-                    sentenceKey: currentSentence && currentSentence.key,
-                    currentSentenceIndex,
-                    totalSelectedSentences
-                });
-            }
+            console.log('[DICTATION_AUDIO_SCHEME]', {
+                kind: 'success',
+                sequence: playSequenceSuccess,
+                sentenceKey: currentSentence && currentSentence.key,
+                currentSentenceIndex,
+                totalSelectedSentences
+            });
         } catch (e) {
         }
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
@@ -9083,15 +9078,13 @@ document.getElementById("userInput").addEventListener("input", function () {
         if (!isShowTextHint) {
             // Воспроизводим последовательность O, тут может в дальнейшем быть условие от пользователя воспроизводить или нет
             try {
-                if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
-                    console.log('[DICTATION_AUDIO_SCHEME]', {
-                        kind: 'typo',
-                        sequence: playSequenceTypo,
-                        sentenceKey: currentSentence && currentSentence.key,
-                        currentSentenceIndex,
-                        totalSelectedSentences
-                    });
-                }
+                console.log('[DICTATION_AUDIO_SCHEME]', {
+                    kind: 'typo',
+                    sequence: playSequenceTypo,
+                    sentenceKey: currentSentence && currentSentence.key,
+                    currentSentenceIndex,
+                    totalSelectedSentences
+                });
             } catch (e) {
             }
             playAudioSequence(playSequenceTypo); // "t"
