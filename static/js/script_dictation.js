@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0154';
+window.__DICTATION_BUILD = '2026-02-26_0155';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2652,7 +2652,12 @@ function pauseGame(isInactivityPause = false) {
     }
 
     // Устанавливаем обработчики для кнопок
-    setupEventListeners();
+    try {
+        if (typeof setupEventListeners === 'function') {
+            setupEventListeners();
+        }
+    } catch (e) {
+    }
 
     try {
         const coverImg = document.querySelector('img.dictation-cover, #dictation-cover, #coverImage, .dictation-cover-img');
@@ -2771,6 +2776,16 @@ function resetInactivityTimer() {
     // Запускаем новый таймер только если игра активна и не на паузе
     if (pauseModal.style.display !== 'flex' && startModal.style.display !== 'flex') {
         inactivityTimer = setTimeout(() => {
+            try {
+                const isPlaying = (window.AudioManager && typeof window.AudioManager.isPlaying === 'function')
+                    ? window.AudioManager.isPlaying()
+                    : !!(window.AudioManager && window.AudioManager.audio && !window.AudioManager.audio.paused && !window.AudioManager.audio.ended);
+                if (isPlaying) {
+                    resetInactivityTimer();
+                    return;
+                }
+            } catch (e) {
+            }
             console.log('⏱️ Таймер бездействия: открываем модальное окно паузы');
             pauseGame(true); // Передаем true, чтобы указать, что пауза из-за бездействия
         }, currentInactivityTimeout);

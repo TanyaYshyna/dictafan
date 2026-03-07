@@ -33,6 +33,14 @@ class AudioManagerClass {
             }
         };
 
+        const __seqMode = !!onEndedCallback;
+        const __seqLog = (...args) => {
+            try {
+                if (__seqMode) console.log('[AUDIO_MGR_SEQ]', ...args);
+            } catch (e) {
+            }
+        };
+
         let _finishCallbackCalled = false;
         const finishCallbackOnce = () => {
             try {
@@ -66,6 +74,12 @@ class AudioManagerClass {
             buttonId: button && button.id,
             buttonState: button && button.dataset && button.dataset.state,
             buttonOriginalState: button && button.dataset && button.dataset.originalState,
+            playTokenNext: this._playToken + 1
+        });
+
+        __seqLog('play()', {
+            audioUrl,
+            buttonId: button && button.id,
             playTokenNext: this._playToken + 1
         });
 
@@ -132,6 +146,10 @@ class AudioManagerClass {
                             this.updateButtonIcon(currentButton, "play");
                         }
                     }
+                    try {
+                        finishCallbackOnce();
+                    } catch (e) {
+                    }
                 });
             };
 
@@ -171,6 +189,27 @@ class AudioManagerClass {
         // Сохраняем ссылки в локальные переменные для использования в замыканиях
         const currentAudio = this.audio;
         const currentButton = this.currentButton;
+
+        try {
+            if (__seqMode && currentAudio && !currentAudio.__audioMgrSeqListenersInstalled) {
+                currentAudio.addEventListener('playing', () => {
+                    __seqLog('event:playing', { playToken, audioUrl });
+                });
+                currentAudio.addEventListener('ended', () => {
+                    __seqLog('event:ended', { playToken, audioUrl });
+                });
+                currentAudio.addEventListener('error', () => {
+                    __seqLog('event:error', {
+                        playToken,
+                        audioUrl,
+                        code: currentAudio && currentAudio.error && currentAudio.error.code,
+                        message: currentAudio && currentAudio.error && currentAudio.error.message
+                    });
+                });
+                currentAudio.__audioMgrSeqListenersInstalled = true;
+            }
+        } catch (e) {
+        }
 
         const setButtonPlayingState = () => {
             try {
@@ -428,6 +467,13 @@ class AudioManagerClass {
                     } else {
                         this.updateButtonIcon(currentButton, "play");
                     }
+                }
+
+                // IMPORTANT: allow callers (e.g., dictation play sequence) to continue
+                // even if a particular play() attempt is blocked/rejected.
+                try {
+                    finishCallbackOnce();
+                } catch (e) {
                 }
             });
         };
