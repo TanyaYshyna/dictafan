@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0149';
+window.__DICTATION_BUILD = '2026-02-26_0150';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -98,7 +98,17 @@ function normalizeDictationMediaUrl(rawUrl) {
 function resolveSentenceAudioUrl(sentence, fieldName) {
     try {
         if (!sentence || typeof sentence !== 'object') return '';
-        const raw = String(sentence[fieldName] || '').trim();
+        let raw = String(sentence[fieldName] || '').trim();
+        if (!raw && fieldName === 'audio_tr') {
+            raw = String(
+                sentence.audio_translation ||
+                sentence.audio_translation_url ||
+                sentence.audio_translation_path ||
+                sentence.audio_tr_url ||
+                sentence.audio_tr_path ||
+                ''
+            ).trim();
+        }
         if (!raw) return '';
         if (raw.startsWith('blob:')) return raw;
         if (raw.startsWith('/api/')) return normalizeDictationMediaUrl(raw);
@@ -4859,10 +4869,7 @@ function decreaseAudioCounter() {
             }
         });
 
-        // Фокус после успешной записи:
-        // если это последнее предложение в выбранном списке — переход на список предложений,
-        // иначе — на следующее предложение.
-        const isLastSentenceInRun = (Number(currentSentenceIndex) + 1) >= Number(totalSelectedSentences);
+        const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
         if (isLastSentenceInRun) {
             btnNewCircle.focus();
         } else {
@@ -8350,16 +8357,8 @@ function renderResult(original, userVerified) {
             const sum = sumRez();
             console.log("👀 [10] decreaseAudioCounter() maxIndTablo", maxIndTablo);
             console.log("👀 [10] decreaseAudioCounter() sum", sum);
-            // ИСПРАВЛЕНО: Убрано использование circle_number_of_* полей
-            // Проверяем, все ли предложения выполнены
-            let completedCount = 0;
-            selectedSentences.forEach(key => {
-                const s = allSentences.find(s => s.key === key);
-                if (s && (s.number_of_perfect > 0 || s.number_of_corrected > 0)) {
-                    completedCount++;
-                }
-            });
-            if (completedCount === totalSelectedSentences) {
+            const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
+            if (isLastSentenceInRun) {
                 console.log("👀 [11] decreaseAudioCounter()");
                 btnNewCircle.focus();
             } else {
@@ -8500,6 +8499,14 @@ function playAudioSequence(sequence) {
         return;
     }
 
+    const __seqDbg = !!window.__DICTATION_AUDIO_SEQ_DEBUG;
+    const __seqLog = (...args) => {
+        try {
+            if (__seqDbg) console.log('[DICTATION_AUDIO_SEQ]', ...args);
+        } catch (e) {
+        }
+    };
+
     const steps = sequence.toLowerCase().split(''); // Разбиваем строку на массив
     let index = 0;
 
@@ -8512,6 +8519,8 @@ function playAudioSequence(sequence) {
         const step = steps[index];
         let audioPath = null;
         let button = null;
+
+        __seqLog('step', { sequence, index, step, currentSentenceIndex, totalSelectedSentences });
 
         // Определяем путь к аудио и кнопку в зависимости от типа
         switch (step) {
@@ -8544,11 +8553,13 @@ function playAudioSequence(sequence) {
 
         // Если путь к аудио не найден, пропускаем этот шаг
         if (!audioPath) {
+            __seqLog('skip:no_audio', { index, step, audioPath });
             index++;
             setTimeout(playNext, 0);
             return;
         }
         if (!button && step !== 't') {
+            __seqLog('skip:no_button', { index, step, audioPath });
             index++;
             setTimeout(playNext, 0);
             return;
@@ -8561,7 +8572,9 @@ function playAudioSequence(sequence) {
 
         // Для перевода, если кнопка не найдена, используем null
         const playButton = button || null;
+        __seqLog('play', { index, step, audioPath, hasButton: !!playButton });
         window.AudioManager.play(playButton, audioPath, () => {
+            __seqLog('ended', { index, step, audioPath });
             index++;
             playNext();
         });

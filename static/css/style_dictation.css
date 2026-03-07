@@ -91,6 +91,16 @@
     top: 3px;
 }
 
+.topbar {
+    position: relative;
+    z-index: 20;
+}
+
+.user-section {
+    position: relative;
+    z-index: 21;
+}
+
 /* По умолчанию мини-логотип скрыт */
 .logo-min {
     display: none;
@@ -2807,6 +2817,9 @@ body.playing-audio::after {
   padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
+  position: relative;
+  z-index: 22;
+  pointer-events: auto;
 }
 
 .topbar-icon-btn:hover {
