@@ -7370,6 +7370,18 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     disableRecordButton(true);
 
     // Воспроизводим последовательность аудио по схеме
+    try {
+        if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
+            console.log('[DICTATION_AUDIO_SCHEME]', {
+                kind: 'start',
+                sequence: playSequenceStart,
+                sentenceKey: currentSentence && currentSentence.key,
+                currentSentenceIndex,
+                totalSelectedSentences
+            });
+        }
+    } catch (e) {
+    }
     setTimeout(() => playAudioSequence(playSequenceStart), 300);
 }
 
@@ -8985,6 +8997,18 @@ function checkText() {
         correctAnswerDiv.style.color = 'var(--color-button-gray)';
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
+        try {
+            if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
+                console.log('[DICTATION_AUDIO_SCHEME]', {
+                    kind: 'success',
+                    sequence: playSequenceSuccess,
+                    sentenceKey: currentSentence && currentSentence.key,
+                    currentSentenceIndex,
+                    totalSelectedSentences
+                });
+            }
+        } catch (e) {
+        }
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
         updateTableRowStatus(currentSentence);
     } else {
@@ -9058,6 +9082,18 @@ document.getElementById("userInput").addEventListener("input", function () {
 
         if (!isShowTextHint) {
             // Воспроизводим последовательность O, тут может в дальнейшем быть условие от пользователя воспроизводить или нет
+            try {
+                if (window.__DICTATION_AUDIO_SCHEME_DEBUG) {
+                    console.log('[DICTATION_AUDIO_SCHEME]', {
+                        kind: 'typo',
+                        sequence: playSequenceTypo,
+                        sentenceKey: currentSentence && currentSentence.key,
+                        currentSentenceIndex,
+                        totalSelectedSentences
+                    });
+                }
+            } catch (e) {
+            }
             playAudioSequence(playSequenceTypo); // "t"
             correctAnswer.style.display = "none";
             //document.getElementById("translation").style.display = "none";

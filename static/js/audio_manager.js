@@ -43,15 +43,20 @@ class AudioManagerClass {
             }
         };
         
-        try {
-            const now = Date.now();
-            const last = this._lastPlayRequest;
-            const urlKey = typeof audioUrl === 'string' ? audioUrl : String(audioUrl);
-            if (last && last.urlKey === urlKey && (now - last.ts) < 250) {
-                return;
+        // Debounce: avoid accidental double-clicks on the same button.
+        // IMPORTANT: do not debounce when a completion callback is provided.
+        // Audio sequences legitimately call play() repeatedly (e.g., 'oto' can repeat 'o').
+        if (!onEndedCallback) {
+            try {
+                const now = Date.now();
+                const last = this._lastPlayRequest;
+                const urlKey = typeof audioUrl === 'string' ? audioUrl : String(audioUrl);
+                if (last && last.urlKey === urlKey && (now - last.ts) < 250) {
+                    return;
+                }
+                this._lastPlayRequest = { urlKey, ts: now };
+            } catch (e) {
             }
-            this._lastPlayRequest = { urlKey, ts: now };
-        } catch (e) {
         }
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
