@@ -188,7 +188,10 @@ class AudioManagerClass {
 
         if (this.audio && this.audio.src && !this.audio.src.includes(audioUrl)) {
             __seqLog('stop:previous_different_src', { playToken, audioUrl, prevSrc: this.audio && this.audio.src });
+            // IMPORTANT: stop() disables autoplay; when switching tracks programmatically
+            // (e.g., dictation sequence 'oto'), we must keep autoplay enabled for the next track.
             this.stop();
+            this._autoPlayEnabled = true;
         }
 
         // Создаем новый аудио элемент
