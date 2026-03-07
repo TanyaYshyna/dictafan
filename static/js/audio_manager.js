@@ -126,7 +126,24 @@ class AudioManagerClass {
             const startPlayback = () => {
                 if (!currentAudio) return;
                 if (!this._autoPlayEnabled || this._playToken !== playToken) return;
-                const p = currentAudio.play();
+                let p;
+                try {
+                    __seqLog('play() invoke', { playToken, audioUrl });
+                    p = currentAudio.play();
+                } catch (e) {
+                    __seqLog('play() throw', { playToken, audioUrl, name: e && e.name, message: e && e.message });
+                    throw e;
+                }
+                try {
+                    if (p && typeof p.then === 'function') {
+                        p.then(() => {
+                            __seqLog('play() resolved', { playToken, audioUrl });
+                        }).catch((error) => {
+                            __seqLog('play() rejected', { playToken, audioUrl, name: error && error.name, message: error && error.message, code: error && error.code });
+                        });
+                    }
+                } catch (e) {
+                }
                 (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
                     try {
                         if (isBlobUrl) {
@@ -434,9 +451,17 @@ class AudioManagerClass {
             }
             _didCallPlay = true;
             
-            const p = currentAudio.play();
+            let p;
+            try {
+                __seqLog('play() invoke', { playToken, audioUrl });
+                p = currentAudio.play();
+            } catch (e) {
+                __seqLog('play() throw', { playToken, audioUrl, name: e && e.name, message: e && e.message });
+                throw e;
+            }
             if (p && typeof p.then === 'function') {
                 p.then(() => {
+                    __seqLog('play() resolved', { playToken, audioUrl });
                     __dbg('play() resolved', { playToken, current: this.audio === currentAudio });
                     // Some browsers resolve play() before firing 'playing'. If we are actually
                     // not paused anymore, update the UI.
@@ -446,7 +471,9 @@ class AudioManagerClass {
                         }
                     } catch (e) {
                     }
-                }).catch(() => { });
+                }).catch((error) => {
+                    __seqLog('play() rejected', { playToken, audioUrl, name: error && error.name, message: error && error.message, code: error && error.code });
+                });
             }
             (p && typeof p.catch === 'function' ? p : Promise.resolve()).catch((error) => {
                 
