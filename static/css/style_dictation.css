@@ -2649,6 +2649,8 @@ body.playing-audio::after {
   align-items: center; /* выравнивание по вертикали */
   gap: 8px; /* отступ между элементами */
   flex-wrap: wrap; /* Разрешаем перенос на новую строку */
+  position: relative;
+  z-index: 5;
 }
 
 /* Минимальная ширина для счетчика предложений */
@@ -2669,6 +2671,9 @@ body.playing-audio::after {
   height: 50px;
   padding: 0; /* убираем внутренние отступы */
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 #checkPrevios.hidden,

@@ -32,6 +32,16 @@ class AudioManagerClass {
             } catch (e) {
             }
         };
+
+        let _finishCallbackCalled = false;
+        const finishCallbackOnce = () => {
+            try {
+                if (_finishCallbackCalled) return;
+                _finishCallbackCalled = true;
+                if (onEndedCallback) onEndedCallback();
+            } catch (e) {
+            }
+        };
         
         try {
             const now = Date.now();
@@ -303,6 +313,13 @@ class AudioManagerClass {
                 this.currentButton = null;
                 this.audio = null;
             }
+
+            // IMPORTANT: allow callers (e.g., dictation play sequence) to continue
+            // even if a particular audio file is missing/unplayable.
+            try {
+                finishCallbackOnce();
+            } catch (e) {
+            }
         };
 
         try {
@@ -465,9 +482,7 @@ class AudioManagerClass {
 
         this.audio.onended = () => {
             // Вызываем пользовательский callback если есть
-            if (onEndedCallback) {
-                onEndedCallback();
-            }
+            finishCallbackOnce();
             
             // По окончании возвращаем playhead в начало региона
             if (this.waveformCanvas) {

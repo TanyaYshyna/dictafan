@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0147';
+window.__DICTATION_BUILD = '2026-02-26_0149';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -8359,7 +8359,7 @@ function renderResult(original, userVerified) {
                     completedCount++;
                 }
             });
-            if (completedCount === selectedSentences.length) {
+            if (completedCount === totalSelectedSentences) {
                 console.log("👀 [11] decreaseAudioCounter()");
                 btnNewCircle.focus();
             } else {
