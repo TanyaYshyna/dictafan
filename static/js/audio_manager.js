@@ -85,6 +85,7 @@ class AudioManagerClass {
 
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
+        __seqLog('token', { playToken, audioUrl });
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
 
         // If we're resuming the exact same audio element (paused), do NOT recreate it.
@@ -180,11 +181,13 @@ class AudioManagerClass {
         }
 
         if (isSameAudio && this.audio && !this.audio.paused) {
+            __seqLog('early:return:same_audio_playing', { playToken, audioUrl });
             this.stop();
             return;
         }
 
         if (this.audio && this.audio.src && !this.audio.src.includes(audioUrl)) {
+            __seqLog('stop:previous_different_src', { playToken, audioUrl, prevSrc: this.audio && this.audio.src });
             this.stop();
         }
 
@@ -195,6 +198,14 @@ class AudioManagerClass {
             : null;
         this.audio = prewarmed || new Audio(audioUrl);
         this.currentButton = button || null;
+
+        __seqLog('audio:created', {
+            playToken,
+            audioUrl,
+            usedPrewarmed: !!prewarmed,
+            readyState: this.audio && this.audio.readyState,
+            networkState: this.audio && this.audio.networkState
+        });
 
         if (isDraftAudioUrl && this.audio) {
             try {
@@ -436,17 +447,20 @@ class AudioManagerClass {
         const startPlayback = () => {
             // Проверяем, что currentAudio существует
             if (!currentAudio) {
+                __seqLog('startPlayback:abort:no_audio', { playToken, audioUrl });
                 return;
             }
 
             // If user has paused/stopped while the audio was still loading, do not auto-start.
             if (!this._autoPlayEnabled || this._playToken !== playToken) {
+                __seqLog('startPlayback:abort:token_or_autoplay', { playToken, audioUrl, autoPlayEnabled: this._autoPlayEnabled, currentToken: this._playToken });
                 return;
             }
             
             // Avoid overlapping play () calls (Safari can abort/pause if play () is called repeatedly
             // while the first request is still pending).
             if (_didCallPlay) {
+                __seqLog('startPlayback:abort:didCallPlay', { playToken, audioUrl });
                 return;
             }
             _didCallPlay = true;
