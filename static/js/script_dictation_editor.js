@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0166';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0167';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -40,6 +40,20 @@ function ensureSwStatusBar() {
         return el;
     } catch (e) {
         return null;
+    }
+}
+
+async function waitCoverPendingBeforeSave(timeoutMs = 2500) {
+    try {
+        const startedAt = Date.now();
+        while (true) {
+            let pending = false;
+            try { pending = window.__DICTATION_EDITOR_COVER_PENDING === true; } catch (e) { pending = false; }
+            if (!pending) return;
+            if (Date.now() - startedAt > (Number(timeoutMs) || 0)) return;
+            await new Promise((r) => setTimeout(r, 30));
+        }
+    } catch (e) {
     }
 }
 
@@ -1052,6 +1066,11 @@ async function handleCropConfirm() {
             alert('Ошибка создания изображения');
             return;
         }
+
+        try {
+            window.__DICTATION_EDITOR_COVER_PENDING = true;
+        } catch (e) {
+        }
         
         croppedImageBlob = blob;
         
@@ -1131,6 +1150,11 @@ async function handleCropConfirm() {
         } catch (error) {
             console.error('Ошибка при сохранении cover в cache:', error);
             closeCropModal(false);
+        } finally {
+            try {
+                window.__DICTATION_EDITOR_COVER_PENDING = false;
+            } catch (e) {
+            }
         }
     }, 'image/webp', 0.9);
 }
@@ -7755,6 +7779,10 @@ function markAsUnsaved() {
  * Сохраняет диктант без выхода со страницы
  */
 async function saveDictationOnly() {
+    try {
+        await waitCoverPendingBeforeSave(2500);
+    } catch (e) {
+    }
     // Синхронизируем данные из вкладок перед сохранением
     syncSpeakersFromTab();
     const tabIsDialogCheckbox = document.getElementById('tabIsDialogCheckbox');
@@ -8201,6 +8229,10 @@ function goToMainPage() {
 // Функция saveSentencesJsonToServer() удалена - нет автосохранения JSON
 
 async function saveDictationAndExit() {
+    try {
+        await waitCoverPendingBeforeSave(2500);
+    } catch (e) {
+    }
     // Синхронизируем данные из вкладок перед сохранением
     syncSpeakersFromTab();
     const tabIsDialogCheckbox = document.getElementById('tabIsDialogCheckbox');
