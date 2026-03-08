@@ -727,7 +727,7 @@ body.playing-audio::after {
 }
 
 .exit-modal-content {
-  max-width: 420px !important;
+  max-width: 640px !important;
   width: 90% !important;
   text-align: center;
   padding: 20px;
@@ -735,15 +735,16 @@ body.playing-audio::after {
 
 .exit-modal-buttons {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 10px;
   justify-content: center;
   margin-top: 20px;
 }
 
 .exit-modal-buttons button {
-  flex: 1 1 160px;
-  min-width: 140px;
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 .exit-modal-buttons button.disabled {

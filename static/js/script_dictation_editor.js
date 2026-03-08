@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0165';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0166';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -1089,6 +1089,18 @@ async function handleCropConfirm() {
 
                 const tempPath = `/api/temp/dictations_covers/${coverKey}.webp`;
                 const tempUrl = new URL(tempPath, window.location.origin).toString();
+                try {
+                    console.log('[COVER][CACHE PUT] crop-confirm', {
+                        dictationId,
+                        numericId: (numericId && isFinite(numericId) && numericId > 0) ? numericId : null,
+                        coverKey,
+                        tempPath,
+                        tempUrl,
+                        blobType: blob.type || null,
+                        blobSize: blob.size || 0
+                    });
+                } catch (e) {
+                }
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'image/webp');
                 headers.set('Cache-Control', 'no-store');
@@ -7976,12 +7988,23 @@ async function saveDictationOnly() {
             try {
                 const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
                 if (fromTempId && String(fromTempId).startsWith('dict_temp_') && toId && String(toId).startsWith('dict_')) {
+                    try {
+                        console.log('[SW][promoteDraftCache] request', {
+                            fromTempId,
+                            toId
+                        });
+                    } catch (e) {
+                    }
                     const promo = await swEditorRequest('promoteDraftCache', {
                         fromDictationId: fromTempId,
                         toDictationId: toId,
                         timeoutMs: 60000
                     });
                     promotedCache = !!(promo && promo.ok);
+                    try {
+                        console.log('[SW][promoteDraftCache] result', promo);
+                    } catch (e) {
+                    }
                 }
             } catch (e) {
                 console.warn('⚠️ promoteDraftCache failed', e);
@@ -7998,6 +8021,17 @@ async function saveDictationOnly() {
                         const cover = m && m.cover ? m.cover : null;
                         const fromCoverKey = cover && cover.coverKey ? String(cover.coverKey) : null;
                         const toNumericId = parseInt(String(toId).replace(/^dict_/, ''), 10);
+                        try {
+                            console.log('[SW][commitTempCover] preflight', {
+                                shouldUploadCover,
+                                fromTempId,
+                                toId,
+                                fromCoverKey,
+                                toNumericId,
+                                manifestCover: cover || null
+                            });
+                        } catch (e) {
+                        }
                         if (fromCoverKey && fromCoverKey.startsWith('dict_temp_') && toNumericId) {
                             setTimeout(() => {
                                 try {
@@ -8007,12 +8041,20 @@ async function saveDictationOnly() {
                                         timeoutMs: 60000
                                     }).then((res) => {
                                         try {
+                                            console.log('[SW][commitTempCover] result', res);
+                                        } catch (e) {
+                                        }
+                                        try {
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = (res && res.result) ? res.result : res;
                                         } catch (e) {
                                         }
                                         try { scheduleSaveStatusRefresh(); } catch (e) {}
                                     }).catch(() => {
+                                        try {
+                                            console.log('[SW][commitTempCover] failed');
+                                        } catch (e) {
+                                        }
                                         try {
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = { ok: false };

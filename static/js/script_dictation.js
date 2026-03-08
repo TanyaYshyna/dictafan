@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-02-26_0161';
+window.__DICTATION_BUILD = '2026-02-26_0166';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -1315,6 +1315,9 @@ async function saveAudioSettingsToUser(settings) {
                 typo: (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o',
                 success: (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot',
                 repeats: settings.repeats !== undefined ? settings.repeats : 3,
+                required_passed_star_half: (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null)
+                    ? settings.required_passed_star_half
+                    : REQUIRED_PASSED_STAR_HALF,
                 without_entering_text: Boolean(settings.without_entering_text),
                 show_text: Boolean(settings.show_text),
                 speech_recognition_mode: settings.speech_recognition_mode || 'route'
@@ -2299,7 +2302,7 @@ function setupExitHandlers() {
         });
     }
 
-    // Обработчик кнопки "Вернуться к списку диктантов"
+    // Обработчик кнопки "Вернуться на рабочий стол"
     const exitToIndexBtn = document.getElementById('exitToIndexBtn');
     if (exitToIndexBtn) {
         exitToIndexBtn.addEventListener('click', async () => {
