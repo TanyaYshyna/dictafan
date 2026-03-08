@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-02-27_0142';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0162';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -4387,6 +4387,23 @@ function addNewRow(referenceRow, position) {
  * Удалить строку
  */
 function deleteRow(rowToDelete) {
+    const deletedKey = rowToDelete && rowToDelete.dataset ? rowToDelete.dataset.key : null;
+
+    // Удаляем строку из workingData, иначе при сохранении она вернётся обратно
+    // (saveDictationOnly отправляет workingData на сервер; сервер удаляет только те ключи,
+    // которых нет в payload).
+    if (deletedKey) {
+        try {
+            if (workingData && workingData.original && Array.isArray(workingData.original.sentences)) {
+                workingData.original.sentences = workingData.original.sentences.filter(s => s && s.key !== deletedKey);
+            }
+            if (workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
+                workingData.translation.sentences = workingData.translation.sentences.filter(s => s && s.key !== deletedKey);
+            }
+        } catch (e) {
+        }
+    }
+
     // Удаляем строку из DOM
     rowToDelete.remove();
 
