@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0142';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-03_0143';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -156,6 +156,23 @@
       });
     } finally {
       db.close();
+    }
+  }
+
+  async function idbDeleteDictationCache(dictationId) {
+    try {
+      const dictId = String(dictationId || '').trim();
+      if (!dictId) return;
+      const rows = await idbGetAll('dictations');
+      for (const row of rows || []) {
+        try {
+          if (row && String(row.dictationId || '') === dictId && row.key) {
+            await idbDelete('dictations', row.key);
+          }
+        } catch (e) {
+        }
+      }
+    } catch (e) {
     }
   }
 
@@ -1040,6 +1057,11 @@
         }
 
         try {
+          await idbDeleteDictationCache(`dict_${dictationId}`);
+        } catch (e) {
+        }
+
+        try {
           const container = document.getElementById('deskCardsContainer');
           const card = container ? container.querySelector(`.desk-card[data-desk-item-id="${String(itemId)}"]`) : null;
           if (card) {
@@ -1572,7 +1594,18 @@
       const langOriginal = item.language_code || 'en';
       const langTranslation = item.language_translation || item.language_code || 'en';
       const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+      const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const coverUrl = maybeCacheBustDictationCover(item.cover_url) || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
+
+      let canEdit = false;
+      try {
+        const me = (window.UM && typeof window.UM.getCurrentUser === 'function') ? window.UM.getCurrentUser() : null;
+        const myId = me && me.id ? Number(me.id) : null;
+        const ownerId = item && item.owner_id ? Number(item.owner_id) : null;
+        canEdit = !!(myId && ownerId && myId === ownerId);
+      } catch (e) {
+        canEdit = false;
+      }
 
       const sentencesCount = typeof item.sentences_count === 'number'
         ? item.sentences_count
@@ -1597,6 +1630,10 @@
           <div class="short-meta">
             <span class="short-lang-flags">${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}</span>
             <span class="short-level">${item.level || '—'}</span>
+            ${canEdit ? `
+            <a class="short-action-btn" href="${editUrl}" title="Редактировать" onclick="event.stopPropagation();">
+              <i data-lucide="pencil-ruler"></i>
+            </a>` : ''}
             <button class="short-action-btn" data-action="remove-from-desk" data-desk-item-id="${item.id}" data-dictation-id="${dictationId}" title="Убрать со стола">
               <i data-lucide="arrow-big-down-dash"></i>
             </button>
@@ -4472,6 +4509,16 @@
       if (response.ok && data && data.success) {
         closeDeleteDictationModal();
         showToast('Диктант удалён');
+
+        try {
+          await swRequest('purgeDictation', { dictationId: idStr, timeoutMs: 60000 });
+        } catch (e) {
+        }
+
+        try {
+          await idbDeleteDictationCache(`dict_${idStr}`);
+        } catch (e) {
+        }
 
         try {
           const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);

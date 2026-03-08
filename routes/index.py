@@ -529,21 +529,23 @@ def delete_dictation(dictation_id):
     removed_from_b2 = False
     if b2_storage.enabled:
         try:
-            # Удаляем всю папку диктанта из B2
-            # Нужно удалить все файлы в папке dictations/{dictation_id}/
-            # B2 не поддерживает удаление папок, нужно удалять файлы по одному
-            # Для простоты удаляем основные файлы (обложка и основные аудио)
-            # В будущем можно добавить рекурсивное удаление всех файлов
-            remote_paths = [
-                f"dictations/{dictation_id}/cover.webp",
-                f"dictations/{dictation_id}/cover.png",
-                f"dictations/{dictation_id}/cover.jpg",
-                f"dictations_covers/{dictation_id.replace('dict_', '')}.webp",
-            ]
-            for remote_path in remote_paths:
-                if b2_storage.file_exists(remote_path):
-                    b2_storage.delete_file(remote_path)
+            # Удаляем все файлы диктанта в B2 по prefix (B2 не умеет папки, удаляем по одному)
+            try:
+                deleted_media = b2_storage.delete_prefix(f"dictations/{dictation_id}/")
+                if deleted_media and deleted_media > 0:
                     removed_from_b2 = True
+            except Exception:
+                pass
+
+            # Удаляем каноническую обложку
+            try:
+                numeric_id = dictation_id.replace('dict_', '')
+                cover_path = f"dictations_covers/{numeric_id}.webp"
+                if b2_storage.file_exists(cover_path):
+                    if b2_storage.delete_file(cover_path):
+                        removed_from_b2 = True
+            except Exception:
+                pass
         except Exception as e:
             logger.warning(f"Не удалось удалить из B2: {e}")
 

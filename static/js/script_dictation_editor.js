@@ -8043,6 +8043,17 @@ async function saveDictationOnly() {
                 }
             }
 
+            // For new dictations audio can live only in SW cache (dict_temp_ generation returns base64).
+            // Ensure we always attempt a best-effort B2 upload after Save.
+            try {
+                if (toId && String(toId).startsWith('dict_')) {
+                    setTimeout(() => {
+                        try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
+                    }, 0);
+                }
+            } catch (e) {
+            }
+
             // Сохранение завершено: не блокируем выход из-за асинхронных upload/commit.
             setDirtyFlags({ db: false, audio: false, cover: false });
 

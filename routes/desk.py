@@ -42,6 +42,7 @@ def api_desk_items():
                 di.planned_date,
                 d.title,
                 d.language_code,
+                d.owner_id,
                 d.level,
                 (SELECT COUNT(*) FROM dictation_sentences WHERE dictation_id = d.id AND language_code = d.language_code) as sentences_count,
                 (SELECT DISTINCT language_code 
@@ -80,6 +81,7 @@ def api_desk_items():
                     "title": row["title"],
                     "language_code": row["language_code"],
                     "language_translation": row["language_translation"] or row["language_code"],
+                    "owner_id": row.get("owner_id"),
                     "level": row["level"],
                     "sentences_count": row["sentences_count"] or 0,
                     "cover_url": cover_url,

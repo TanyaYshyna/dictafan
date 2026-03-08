@@ -191,6 +191,45 @@ class B2Storage:
         except Exception:
             return False
 
+    def list_files(self, path_prefix: str = ""):
+        """Возвращает список файлов в B2, начинающихся с prefix."""
+        if not self.enabled or not self.bucket:
+            return []
+        prefix = str(path_prefix or "")
+        out = []
+        try:
+            for file_version, folder_name in self.bucket.ls(folder_to_list=prefix, recursive=True):
+                try:
+                    name = getattr(file_version, 'file_name', None) or getattr(file_version, 'fileName', None)
+                    if not name:
+                        continue
+                    if prefix and not str(name).startswith(prefix):
+                        continue
+                    out.append(str(name))
+                except Exception:
+                    continue
+        except B2Error as e:
+            logger.error("B2 list_files failed for %s: %s", prefix, e, exc_info=True)
+            return []
+        except Exception as e:
+            logger.error("B2 list_files unexpected error for %s: %s", prefix, e, exc_info=True)
+            return []
+        return out
+
+    def delete_prefix(self, path_prefix: str = ""):
+        """Удаляет все файлы в B2 с данным prefix. Возвращает количество удалённых."""
+        if not self.enabled or not self.bucket:
+            return 0
+        prefix = str(path_prefix or "")
+        deleted = 0
+        for name in self.list_files(prefix):
+            try:
+                if self.delete_file(name):
+                    deleted += 1
+            except Exception:
+                continue
+        return deleted
+
 # Глобальный экземпляр
 b2_storage = B2Storage()
 
