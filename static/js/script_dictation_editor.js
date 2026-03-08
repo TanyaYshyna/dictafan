@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0167';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0168';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -601,8 +601,9 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                     ok: false,
                     updatedAt: Date.now(),
                     stage: 'b2_upload',
-                    status: uploadRes ? uploadRes.status : 0
+                    remotePath
                 };
+                persistLastMediaCommit();
             } catch (e) {
             }
             try { scheduleSaveStatusRefresh(); } catch (e) {}
@@ -618,6 +619,7 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                     updatedAt: Date.now(),
                     stage: 'b2_upload'
                 };
+                persistLastMediaCommit();
             } catch (e) {
             }
             try { scheduleSaveStatusRefresh(); } catch (e) {}
@@ -631,11 +633,32 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                 updatedAt: Date.now(),
                 stage: 'b2_upload_exception'
             };
+            persistLastMediaCommit();
         } catch (e2) {
         }
         try { scheduleSaveStatusRefresh(); } catch (e2) {}
     }
 }
+
+function loadLastMediaCommit() {
+    try {
+        const stored = localStorage.getItem('dictafan:lastMediaCommit');
+        if (stored) {
+            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = JSON.parse(stored);
+        }
+    } catch (e) {
+    }
+}
+
+function persistLastMediaCommit() {
+    try {
+        const json = JSON.stringify(window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT);
+        localStorage.setItem('dictafan:lastMediaCommit', json);
+    } catch (e) {
+    }
+}
+
+loadLastMediaCommit();
 
 function installBuildAutoReloader(buildValue, storageKey) {
     try {
@@ -8075,6 +8098,7 @@ async function saveDictationOnly() {
                                         try {
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = (res && res.result) ? res.result : res;
+                                            try { persistLastMediaCommit(); } catch (e) {}
                                         } catch (e) {
                                         }
                                         try { scheduleSaveStatusRefresh(); } catch (e) {}
@@ -8086,6 +8110,7 @@ async function saveDictationOnly() {
                                         try {
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
                                             window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = { ok: false };
+                                            try { persistLastMediaCommit(); } catch (e) {}
                                         } catch (e) {
                                         }
                                         try { scheduleSaveStatusRefresh(); } catch (e) {}
