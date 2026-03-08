@@ -77,8 +77,22 @@ def generate_audio():
 
         text = data.get('text')
         tipe_audio  = data.get('tipe_audio') or 'avto'
-        filename_audio  = data.get('filename_audio')
+        filename_audio  = data.get('filename_audio') or data.get('filename')
         lang = data.get('language')
+
+        try:
+            from werkzeug.utils import secure_filename
+            raw_name = (filename_audio or '').strip()
+            if raw_name:
+                raw_name = os.path.basename(raw_name)
+                filename_audio = secure_filename(raw_name)
+        except Exception:
+            pass
+
+        if not filename_audio:
+            return jsonify({"success": False, "error": "Отсутствует имя файла аудио"}), 400
+        if not lang:
+            return jsonify({"success": False, "error": "Отсутствует язык"}), 400
 
         is_temp_dictation = bool(dictation_id and dictation_id.startswith('dict_temp_'))
         if is_temp_dictation:
