@@ -38,6 +38,119 @@ function ensureSwStatusBar() {
     }
 }
 
+function applyAudioSettingsFromUserData(userData) {
+    try {
+        if (!userData) return false;
+
+        if (userData.settings_json) {
+            try {
+                const settings = JSON.parse(userData.settings_json);
+                const audioSettings = settings.audio || {};
+
+                if (audioSettings.start !== undefined && audioSettings.start !== null) {
+                    playSequenceStart = audioSettings.start;
+                }
+                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
+                    playSequenceTypo = audioSettings.typo;
+                }
+                if (audioSettings.success !== undefined && audioSettings.success !== null) {
+                    playSequenceSuccess = audioSettings.success;
+                }
+                if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
+                    const parsedValue = parseInt(audioSettings.repeats, 10);
+                    REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
+                }
+
+                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
+                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
+                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
+                }
+
+                if (audioSettings.without_entering_text !== undefined) {
+                    window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
+                }
+                if (audioSettings.show_text !== undefined) {
+                    window.audioSettingsShowText = Boolean(audioSettings.show_text);
+                }
+
+                if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
+                    if (audioSettings.speech_recognition_mode === 'avto') {
+                        speechRecognitionMode = 'route';
+                    } else {
+                        speechRecognitionMode = audioSettings.speech_recognition_mode;
+                    }
+                }
+
+                return true;
+            } catch (error) {
+                console.warn('Ошибка парсинга settings_json:', error);
+            }
+        }
+
+        if (userData.audio_settings_json) {
+            try {
+                const audioSettings = JSON.parse(userData.audio_settings_json);
+
+                if (audioSettings.start !== undefined && audioSettings.start !== null) {
+                    playSequenceStart = audioSettings.start;
+                }
+                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
+                    playSequenceTypo = audioSettings.typo;
+                }
+                if (audioSettings.success !== undefined && audioSettings.success !== null) {
+                    playSequenceSuccess = audioSettings.success;
+                }
+                if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
+                    const parsedValue = parseInt(audioSettings.repeats, 10);
+                    REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
+                }
+
+                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
+                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
+                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
+                }
+
+                if (audioSettings.without_entering_text !== undefined) {
+                    window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
+                }
+                if (audioSettings.show_text !== undefined) {
+                    window.audioSettingsShowText = Boolean(audioSettings.show_text);
+                }
+
+                if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
+                    if (audioSettings.speech_recognition_mode === 'avto') {
+                        speechRecognitionMode = 'route';
+                    } else {
+                        speechRecognitionMode = audioSettings.speech_recognition_mode;
+                    }
+                }
+
+                return true;
+            } catch (error) {
+                console.warn('Ошибка парсинга audio_settings_json:', error);
+            }
+        }
+
+        if (userData.audio_start !== undefined && userData.audio_start !== null) {
+            playSequenceStart = userData.audio_start;
+        }
+        if (userData.audio_typo !== undefined && userData.audio_typo !== null) {
+            playSequenceTypo = userData.audio_typo;
+        }
+        if (userData.audio_success !== undefined && userData.audio_success !== null) {
+            playSequenceSuccess = userData.audio_success;
+        }
+        if (userData.audio_repeats !== undefined && userData.audio_repeats !== null) {
+            const parsedValue = parseInt(userData.audio_repeats, 10);
+            REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
+        }
+
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function normalizeDictationMediaUrl(rawUrl) {
     try {
         let v = String(rawUrl || '').trim();
@@ -1257,119 +1370,27 @@ async function loadAudioSettingsFromUser() {
     }
 
     if (um && um.userData) {
-        const userData = um.userData;
-
-        // Сначала пытаемся загрузить из settings_json (новый формат)
-        if (userData.settings_json) {
-            try {
-                const settings = JSON.parse(userData.settings_json);
-                const audioSettings = settings.audio || {};
-
-                if (audioSettings.start !== undefined && audioSettings.start !== null) {
-                    playSequenceStart = audioSettings.start;
-                }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
-                    playSequenceTypo = audioSettings.typo;
-                }
-                if (audioSettings.success !== undefined && audioSettings.success !== null) {
-                    playSequenceSuccess = audioSettings.success;
-                }
-                if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
-                    const parsedValue = parseInt(audioSettings.repeats, 10);
-                    REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
-                }
-
-                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
-                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
-                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
-                }
-
-                // Загружаем новые настройки
-                if (audioSettings.without_entering_text !== undefined) {
-                    window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
-                }
-                if (audioSettings.show_text !== undefined) {
-                    window.audioSettingsShowText = Boolean(audioSettings.show_text);
-                }
-
-                // Загружаем режим распознавания речи (конвертируем старый 'avto' в 'route')
-                if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
-                    if (audioSettings.speech_recognition_mode === 'avto') {
-                        console.log(`🔄 [loadAudioSettingsFromUser] Конвертируем старый режим 'avto' в 'route'`);
-                        speechRecognitionMode = 'route';
-                    } else {
-                        console.log(`🔄 [loadAudioSettingsFromUser] Загружаем режим распознавания: ${audioSettings.speech_recognition_mode}`);
-                        speechRecognitionMode = audioSettings.speech_recognition_mode;
-                    }
-                } else {
-                    console.log(`🔄 [loadAudioSettingsFromUser] Режим распознавания не найден в настройках, используем значение по умолчанию: ${speechRecognitionMode}`);
-                }
-
-                return; // Используем настройки из JSON
-            } catch (error) {
-                console.warn('Ошибка парсинга settings_json:', error);
-            }
-        }
-
-        // Затем проверяем audio_settings_json (старый формат)
-        if (userData.audio_settings_json) {
-            try {
-                const audioSettings = JSON.parse(userData.audio_settings_json);
-
-                if (audioSettings.start !== undefined && audioSettings.start !== null) {
-                    playSequenceStart = audioSettings.start;
-                }
-                if (audioSettings.typo !== undefined && audioSettings.typo !== null) {
-                    playSequenceTypo = audioSettings.typo;
-                }
-                if (audioSettings.success !== undefined && audioSettings.success !== null) {
-                    playSequenceSuccess = audioSettings.success;
-                }
-                if (audioSettings.repeats !== undefined && audioSettings.repeats !== null) {
-                    const parsedValue = parseInt(audioSettings.repeats, 10);
-                    REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
-                }
-
-                if (audioSettings.required_passed_star_half !== undefined && audioSettings.required_passed_star_half !== null) {
-                    const parsedStarHalf = parseInt(audioSettings.required_passed_star_half, 10);
-                    REQUIRED_PASSED_STAR_HALF = (!isNaN(parsedStarHalf) && parsedStarHalf >= 1) ? Math.min(10, parsedStarHalf) : 3;
-                }
-
-                if (audioSettings.without_entering_text !== undefined) {
-                    window.audioSettingsWithoutEnteringText = Boolean(audioSettings.without_entering_text);
-                }
-                if (audioSettings.show_text !== undefined) {
-                    window.audioSettingsShowText = Boolean(audioSettings.show_text);
-                }
-
-                if (audioSettings.speech_recognition_mode !== undefined && audioSettings.speech_recognition_mode !== null) {
-                    if (audioSettings.speech_recognition_mode === 'avto') {
-                        speechRecognitionMode = 'route';
-                    } else {
-                        speechRecognitionMode = audioSettings.speech_recognition_mode;
-                    }
-                }
-            } catch (error) {
-                console.warn('Ошибка парсинга audio_settings_json:', error);
-            }
-        }
-
-        // Fallback на старые отдельные поля (для обратной совместимости)
-        if (userData.audio_start !== undefined && userData.audio_start !== null) {
-            playSequenceStart = userData.audio_start;
-        }
-        if (userData.audio_typo !== undefined && userData.audio_typo !== null) {
-            playSequenceTypo = userData.audio_typo;
-        }
-        if (userData.audio_success !== undefined && userData.audio_success !== null) {
-            playSequenceSuccess = userData.audio_success;
-        }
-        if (userData.audio_repeats !== undefined && userData.audio_repeats !== null) {
-            const parsedValue = parseInt(userData.audio_repeats, 10);
-            REQUIRED_PASSED_COUNT = (!isNaN(parsedValue) && parsedValue >= 0) ? parsedValue : 3;
-        }
+        const ok = applyAudioSettingsFromUserData(um.userData);
+        if (ok) return;
     }
 
+    try {
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return;
+        const res = await fetch('/user/api/me', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            cache: 'no-store'
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const userData = data && (data.user || data);
+        if (!userData) return;
+        applyAudioSettingsFromUserData(userData);
+    } catch (e) {
+    }
 }
 
 /**

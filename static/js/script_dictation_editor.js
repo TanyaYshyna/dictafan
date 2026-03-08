@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0164';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0165';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -8049,6 +8049,17 @@ async function saveDictationOnly() {
                 if (toId && String(toId).startsWith('dict_')) {
                     setTimeout(() => {
                         try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
+                    }, 0);
+                }
+            } catch (e) {
+            }
+
+            // Cover can be selected while dictation still has dict_temp_* id.
+            // Ensure we always attempt best-effort cover upload after Save.
+            try {
+                if (toId && String(toId).startsWith('dict_')) {
+                    setTimeout(() => {
+                        try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
                     }, 0);
                 }
             } catch (e) {
