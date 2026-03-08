@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0162';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0164';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -7687,7 +7687,7 @@ function updateUnsavedStar() {
 
     const unsavedStar = document.getElementById('unsavedStar');
     if (unsavedStar) {
-        unsavedStar.style.display = hasUnsaved ? 'inline-flex' : 'none';
+        unsavedStar.style.display = 'none';
     }
 
     const dbStar = document.getElementById('unsavedStarDb');
