@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0172';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0173';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -1261,8 +1261,8 @@ async function initNewDictation(safe_email, initData) {
     // Получаем информацию о категории и языках из sessionStorage
     const categoryDataStr = sessionStorage.getItem('selectedCategoryForDictation');
     const categoryInfo = categoryDataStr ? JSON.parse(categoryDataStr) : {};
-    const language_original = categoryInfo.language_original || 'en';
-    const language_translation = categoryInfo.language_translation || 'ru';
+    const language_original = categoryInfo.language_original || (initData && initData.original_language) || 'en';
+    const language_translation = categoryInfo.language_translation || (initData && initData.translation_language) || 'ru';
 
     const initialLevel = (initData && initData.level) ? initData.level : 'A1';
 
