@@ -7,13 +7,18 @@ import json
 import shutil
 from datetime import datetime
 import uuid
-from flask import Blueprint, request, jsonify, render_template, send_file
+from flask import Blueprint, request, jsonify, render_template, send_file, redirect, make_response
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
     get_jwt_identity,
     set_access_cookies,
 )
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+from urllib.parse import urlencode
+import secrets
+import requests
+from flask import render_template_string
 
 # Импортируем из helpers
 from helpers.language_data import load_language_data
@@ -27,6 +32,31 @@ from helpers.db_users import (
 from helpers.b2_storage import b2_storage
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
+
+
+def _google_oauth_serializer() -> URLSafeTimedSerializer:
+    secret = os.getenv('JWT_SECRET_KEY', 'fallback-secret-key-change-me')
+    return URLSafeTimedSerializer(secret_key=secret, salt='google-oauth-state')
+
+
+def _build_external_url(path: str) -> str:
+    base = (request.url_root or '').rstrip('/')
+    if not path.startswith('/'):
+        path = '/' + path
+    return base + path
+
+
+def _get_google_redirect_uri() -> str:
+    explicit = os.getenv('GOOGLE_OAUTH_REDIRECT_URI')
+    if explicit:
+        return explicit
+    return _build_external_url('/user/auth/google/callback')
+
+
+def _get_google_client() -> tuple[str, str]:
+    client_id = os.getenv('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
+    return client_id, client_secret
 
 # ==================== ФУНКЦИИ ДЛЯ ГЕНЕРАЦИИ ID ====================
 
@@ -105,6 +135,152 @@ def api_register():
     })
     # Куки нужны для работы @jwt_required() на обычных HTML-страницах (напр. /library/private)
     set_access_cookies(response, access_token)
+    return response
+
+
+@user_bp.route('/auth/google/start', methods=['GET'])
+def google_oauth_start():
+    client_id, client_secret = _get_google_client()
+    if not client_id or not client_secret:
+        return jsonify({'error': 'Google OAuth is not configured'}), 500
+
+    next_url = (request.args.get('next') or '/').strip() or '/'
+    if next_url.startswith('http://') or next_url.startswith('https://') or next_url.startswith('//'):
+        next_url = '/'
+
+    state_payload = {
+        'next': next_url,
+        'nonce': secrets.token_urlsafe(16),
+    }
+    state = _google_oauth_serializer().dumps(state_payload)
+
+    redirect_uri = _get_google_redirect_uri()
+    params = {
+        'client_id': client_id,
+        'redirect_uri': redirect_uri,
+        'response_type': 'code',
+        'scope': 'openid email profile',
+        'access_type': 'online',
+        'prompt': 'select_account',
+        'state': state,
+    }
+
+    url = 'https://accounts.google.com/o/oauth2/v2/auth?' + urlencode(params)
+    return redirect(url)
+
+
+@user_bp.route('/auth/google/callback', methods=['GET'])
+def google_oauth_callback():
+    err = request.args.get('error')
+    if err:
+        return jsonify({'error': f'Google OAuth error: {err}'}), 400
+
+    code = request.args.get('code')
+    state = request.args.get('state')
+    if not code or not state:
+        return jsonify({'error': 'Missing code/state'}), 400
+
+    try:
+        state_payload = _google_oauth_serializer().loads(state, max_age=10 * 60)
+    except SignatureExpired:
+        return jsonify({'error': 'OAuth state expired'}), 400
+    except BadSignature:
+        return jsonify({'error': 'Invalid OAuth state'}), 400
+
+    next_url = (state_payload or {}).get('next') or '/'
+    if next_url.startswith('http://') or next_url.startswith('https://') or next_url.startswith('//'):
+        next_url = '/'
+
+    client_id, client_secret = _get_google_client()
+    if not client_id or not client_secret:
+        return jsonify({'error': 'Google OAuth is not configured'}), 500
+
+    redirect_uri = _get_google_redirect_uri()
+
+    token_resp = requests.post(
+        'https://oauth2.googleapis.com/token',
+        data={
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code',
+        },
+        timeout=20,
+    )
+
+    if token_resp.status_code != 200:
+        return jsonify({'error': 'Failed to exchange code', 'details': token_resp.text}), 400
+
+    token_data = token_resp.json() or {}
+    access_token_google = token_data.get('access_token')
+    if not access_token_google:
+        return jsonify({'error': 'Google did not return access_token'}), 400
+
+    userinfo_resp = requests.get(
+        'https://openidconnect.googleapis.com/v1/userinfo',
+        headers={'Authorization': f'Bearer {access_token_google}'},
+        timeout=20,
+    )
+    if userinfo_resp.status_code != 200:
+        return jsonify({'error': 'Failed to fetch user info', 'details': userinfo_resp.text}), 400
+
+    userinfo = userinfo_resp.json() or {}
+    email = (userinfo.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'Google userinfo did not contain email'}), 400
+
+    existing_user = get_user_by_email(email)
+    if existing_user:
+        user_response = existing_user
+    else:
+        username = (userinfo.get('name') or userinfo.get('given_name') or '').strip()
+        if not username:
+            username = email.split('@')[0]
+
+        language_data = load_language_data()
+        available_languages = set(language_data.keys())
+        native_language = 'ru' if 'ru' in available_languages else next(iter(available_languages), 'ru')
+        learning_language = 'en' if 'en' in available_languages else native_language
+        if learning_language == native_language:
+            learning_language = next((x for x in ('en', 'ru') if x != native_language and x in available_languages), native_language)
+        learning_languages = [learning_language]
+
+        random_password = secrets.token_urlsafe(24)
+        user_response = create_user(
+            email=email,
+            username=username,
+            password=random_password,
+            native_language=native_language,
+            current_learning=learning_language,
+            learning_languages=learning_languages,
+        )
+
+    app_token = create_access_token(identity=email)
+
+    html = render_template_string(
+        """
+        <!doctype html>
+        <html lang=\"ru\">
+        <meta charset=\"utf-8\"/>
+        <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>
+        <title>Вход...</title>
+        <body>
+        <script>
+        try {
+          localStorage.setItem('jwt_token', {{ token|tojson }});
+        } catch (e) {}
+        window.location.replace({{ next_url|tojson }});
+        </script>
+        </body>
+        </html>
+        """,
+        token=app_token,
+        next_url=next_url,
+    )
+
+    response = make_response(html)
+    set_access_cookies(response, app_token)
     return response
 
 

@@ -82,6 +82,14 @@ class LoginModal {
                             </button>
                         </div>
 
+
+                        <div class="login-form-actions" style="margin-top: 10px;">
+                            <button type="button" class="button-color-gray auth-submit" id="loginWithGoogleBtn">
+                                <i data-lucide="chrome"></i>
+                                Google
+                            </button>
+                        </div>
+
                         <p class="form-note">
                             Нет аккаунта? <a href="#" id="switchToRegisterLink">Зарегистрироваться</a>
                         </p>
@@ -150,6 +158,14 @@ class LoginModal {
                             </button>
                         </div>
 
+
+                        <div class="login-form-actions" style="margin-top: 10px;">
+                            <button type="button" class="button-color-gray auth-submit" id="registerWithGoogleBtn">
+                                <i data-lucide="chrome"></i>
+                                Google
+                            </button>
+                        </div>
+
                         <p class="form-note">
                             Уже зарегистрированы? <a href="#" id="switchToLoginLink">Войти</a>
                         </p>
@@ -189,6 +205,30 @@ class LoginModal {
             registerForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleRegister();
+            });
+        }
+
+        const loginWithGoogleBtn = document.getElementById('loginWithGoogleBtn');
+        if (loginWithGoogleBtn) {
+            loginWithGoogleBtn.addEventListener('click', () => {
+                try {
+                    const next = window.location.pathname + window.location.search + window.location.hash;
+                    window.location.href = '/user/auth/google/start?next=' + encodeURIComponent(next);
+                } catch (e) {
+                    window.location.href = '/user/auth/google/start';
+                }
+            });
+        }
+
+        const registerWithGoogleBtn = document.getElementById('registerWithGoogleBtn');
+        if (registerWithGoogleBtn) {
+            registerWithGoogleBtn.addEventListener('click', () => {
+                try {
+                    const next = window.location.pathname + window.location.search + window.location.hash;
+                    window.location.href = '/user/auth/google/start?next=' + encodeURIComponent(next);
+                } catch (e) {
+                    window.location.href = '/user/auth/google/start';
+                }
             });
         }
 
@@ -267,6 +307,10 @@ class LoginModal {
                 lucide.createIcons();
             }
         });
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     /**

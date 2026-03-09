@@ -108,6 +108,14 @@ Railway - основной хостинг:
 Backblaze B2 - хранилище для аудио:
 🔗 https://www.backblaze.com/b2/cloud-storage.html
 
+# Какая ветка сейчас активна
+git status
+
+# Как убедиться на 100% перед пушем
+git branch --show-current
+# Должно показать develop_DB.
+# И безопасная проверка “куда пойдёт push”:
+git push -n
 
 git checkout develop_DB
 # Переключает тебя на ветку develop_DB (код/файлы в папке станут как в этой ветке)
@@ -122,7 +130,7 @@ git status
 git add .
 # Добавляет ВСЕ изменения в текущей папке/репоызитории в “staging” (готовит их к коммиту)
  
-git commit -m "0169"
+git commit -m "0171"
 # Создаёт коммит (снимок) из того, что в staging, с твоим сообщением
  
 git push origin develop_DB
