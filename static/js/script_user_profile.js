@@ -611,14 +611,10 @@ function initializeTopbarControls() {
     
     // Обработчики для модального окна обрезки
     const cropClose = document.getElementById('crop-close');
-    const cropCancel = document.getElementById('crop-cancel');
     const cropConfirm = document.getElementById('crop-confirm');
 
     if (cropClose) {
         cropClose.addEventListener('click', () => closeCropModal(true));
-    }
-    if (cropCancel) {
-        cropCancel.addEventListener('click', () => closeCropModal(true));
     }
     if (cropConfirm) {
         cropConfirm.addEventListener('click', handleCropConfirm);
@@ -716,12 +712,24 @@ function handleAvatarFileSelection(event) {
 function checkForChanges() {
     const currentValues = getCurrentFormValues();
 
+    // Аватар: сравниваем только базовые URL (без timestamp), чтобы после сохранения звёздочка гасла
+    const avatarChanged = (() => {
+        try {
+            const a = normalizeAvatarForCompare(UM && UM.userData ? UM.userData.avatar : null);
+            const b = normalizeAvatarForCompare(originalData ? originalData.avatar : null);
+            return a.large !== b.large || a.small !== b.small;
+        } catch (e) {
+            return false;
+        }
+    })();
+
     const hasChanges =
         currentValues.username !== originalData.username ||
         currentValues.password !== '' ||
         currentValues.native_language !== originalData.native_language ||
         JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages) ||
         currentValues.current_learning !== originalData.current_learning ||
+        avatarChanged ||
         currentValues.audio_start !== (originalData.audio_start || '') ||
         currentValues.audio_typo !== (originalData.audio_typo || '') ||
         currentValues.audio_success !== (originalData.audio_success || '') ||
@@ -817,6 +825,15 @@ function openCropModal(imageSrc) {
     // Показываем модальное окно
     modal.style.display = "flex";
     modal.classList.add("show");
+
+    // Фокус по умолчанию на "Сохранить" (кнопка crop-confirm)
+    try {
+        const btn = document.getElementById('crop-confirm');
+        if (btn) {
+            setTimeout(() => btn.focus(), 0);
+        }
+    } catch (e) {
+    }
     
     // Уничтожаем предыдущий cropper если есть
     if (cropper) {
@@ -914,7 +931,7 @@ async function handleCropConfirm() {
             showSuccess('Аватар успешно загружен! Для применения изменений нажмите "Сохранить"');
             
             // Отмечаем, что есть несохраненные изменения (аватар уже загружен, но нужно сохранить)
-            checkForChanges();
+            setUnsavedState(true);
             
             // Закрываем crop modal БЕЗ очистки blob
             closeCropModal(false);
@@ -929,6 +946,14 @@ async function handleCropConfirm() {
             showError('Ошибка загрузки аватара: ' + error.message);
         }
     }, 'image/webp', 0.9);
+}
+
+function normalizeAvatarForCompare(avatar) {
+    if (!avatar || typeof avatar !== 'object') return { large: '', small: '' };
+    return {
+        large: String(avatar.large || avatar.medium || avatar.original || ''),
+        small: String(avatar.small || avatar.medium || avatar.original || '')
+    };
 }
 
 // Загрузка аватара - РЕАЛЬНАЯ отправка на сервер (старая функция, теперь не используется напрямую)
@@ -1075,6 +1100,17 @@ async function saveProfile(options = {}) {
         showInfo('Сохраняем изменения...');
 
         const updatedUser = await UM.updateProfile(updateData);
+
+        // Если бэкенд вернул avatar в ответе — синхронизируем, иначе оставляем текущий.
+        // Это важно, чтобы после сохранения `checkForChanges()` мог корректно потушить "звёздочку".
+        try {
+            if (updatedUser && updatedUser.avatar) {
+                originalData.avatar = updatedUser.avatar;
+            } else if (UM && UM.userData && UM.userData.avatar) {
+                originalData.avatar = UM.userData.avatar;
+            }
+        } catch (e) {
+        }
 
         // Обновляем originalData полностью, включая настройки аудио из ответа сервера
         // Сначала пытаемся получить настройки из settings_json (новый формат)
@@ -1295,8 +1331,10 @@ function showExitModal() {
     }
 
     exitModal.style.display = 'flex';
+    const saveBtn = document.getElementById('exitWithSavingBtn');
     const stayBtn = document.getElementById('exitStayBtn');
-    if (stayBtn) stayBtn.focus();
+    if (hasUnsavedChanges && saveBtn) saveBtn.focus();
+    else if (stayBtn) stayBtn.focus();
 }
 
 /**

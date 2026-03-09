@@ -127,3 +127,11 @@ git commit -m "0169"
  
 git push origin develop_DB
 # Отправляет твои новые коммиты в ветку develop_DB на GitHub (origin)
+
+B2 CORS (prod bucket)
+
+- Production домен для браузера: https://dictafan.com
+- Railway internal домен (dictafan.railway.internal) не является браузерным origin и для CORS не нужен.
+- В B2 UI для bucket dictafan-prod можно выбрать:
+  - "Share everything in this bucket with all HTTPS origins" (самый простой вариант),
+  - или "Share everything in this bucket with this one origin" и указать https://dictafan.com (если нужен строгий доступ).

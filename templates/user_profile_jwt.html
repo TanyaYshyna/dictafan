@@ -116,7 +116,7 @@
 
         <!-- Языковые модели-->
         <div class="form-section">
-            <h3>Настройки языковых моделей </h3>
+            <h3>Настройки автономных языковых моделей </h3>
             <div id="languageSelectorModelsContainer"></div>
         </div>
 
@@ -145,8 +145,14 @@
                 <p id="exitModalMessage">Что сделать с текущими изменениями?</p>
                 <div class="exit-modal-buttons">
                     <button id="exitStayBtn" class="button-secondary">Остаться</button>
-                    <button id="exitWithoutSavingBtn" class="button-color-green">Выйти</button>
-                    <button id="exitWithSavingBtn" class="button-color-yellow" style="display: none;">Сохранить и выйти</button>
+                    <button id="exitWithoutSavingBtn" class="button-color-green">
+                        <i data-lucide="save-off"></i>
+                        Выйти
+                    </button>
+                    <button id="exitWithSavingBtn" class="button-color-yellow" style="display: none;">
+                        <i data-lucide="save"></i>
+                        Выйти
+                    </button>
                 </div>
             </div>
         </div>
@@ -156,15 +162,18 @@
             <div class="modal-content crop-modal-content">
                 <div class="modal-header">
                     <h3>Обрезка аватара</h3>
-                    <button class="modal-close" id="crop-close">&times;</button>
+                    <div class="crop-modal-actions">
+                        <button type="button" class="button-color-yellow crop-modal-save" id="crop-confirm" title="Сохранить">
+                            <i data-lucide="save"></i>
+                        </button>
+                        <button class="modal-close" id="crop-close" title="Закрыть">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="modal-body crop-modal-body">
                     <div class="crop-container">
                         <img id="crop-image" src="" alt="Crop">
-                    </div>
-                    <div class="crop-actions">
-                        <button type="button" class="btn-secondary" id="crop-cancel">Отмена</button>
-                        <button type="button" class="btn-primary" id="crop-confirm">Применить</button>
                     </div>
                 </div>
             </div>

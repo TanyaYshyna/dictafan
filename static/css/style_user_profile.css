@@ -557,6 +557,12 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     white-space: nowrap;
 }
 
+.exit-modal-buttons button i[data-lucide] {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+}
+
 .exit-modal-buttons button.disabled {
     opacity: 0.5;
     pointer-events: none;
@@ -634,6 +640,58 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     align-items: center;
     gap: 8px;
     padding: 10px 16px;
+}
+
+/* Crop avatar modal */
+.crop-modal-content {
+    max-width: 520px;
+}
+
+.crop-modal-content .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 12px 16px;
+}
+
+.crop-modal-content .modal-header h3 {
+    margin: 0;
+    padding-left: 6px;
+}
+
+.crop-modal-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+}
+
+.crop-modal-save,
+.crop-modal-content .modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+}
+
+.crop-modal-save i[data-lucide],
+.crop-modal-content .modal-close i[data-lucide] {
+    width: 20px;
+    height: 20px;
+}
+
+.crop-modal-body {
+    padding: 0 16px 16px 16px;
+    max-height: calc(90vh - 72px);
+    overflow: auto;
+}
+
+.crop-container {
+    width: 100%;
 }
 
 /* Финальное переопределение для audio-explanations-column - максимальная специфичность */
