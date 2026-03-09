@@ -370,10 +370,23 @@ def dictation_editor_new():
         # Получаем пользователя
         current_user = get_current_user()
         safe_email = get_safe_email_from_token()
-        
-        # Языки по умолчанию (будут переопределены в JavaScript из глобальной переменной)
-        language_original = 'en'
-        language_translation = 'ru'
+
+        language_data = load_language_data()
+        available_languages = set(language_data.keys())
+
+        # Языки по умолчанию: берем из профиля пользователя.
+        # original = изучаемый язык, translation = родной язык.
+        language_original = (current_user or {}).get('current_learning') or 'en'
+        language_translation = (current_user or {}).get('native_language') or 'ru'
+
+        language_original = str(language_original).lower()
+        language_translation = str(language_translation).lower()
+
+        if language_original not in available_languages:
+            language_original = 'en' if 'en' in available_languages else next(iter(available_languages), 'en')
+
+        if language_translation not in available_languages:
+            language_translation = 'ru' if 'ru' in available_languages else next(iter(available_languages), 'ru')
 
         cover_url = get_cover_url_for_id(None, language_original)
         
@@ -409,7 +422,7 @@ def dictation_editor_new():
                 "path": ""
             },
             cover_url=cover_url,
-            language_data=load_language_data()
+            language_data=language_data
         )
         
     except Exception as e:
