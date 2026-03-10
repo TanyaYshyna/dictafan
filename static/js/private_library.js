@@ -4553,14 +4553,32 @@
 
     const loadDraftStatistics = async (dictationId) => {
       try {
-        const key = getDraftKey(dictationId);
-        if (!key) return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
-        const local = await idbGet('drafts', key);
-        const state = local && local.state ? local.state : null;
-        if (state) {
-          const draftStats = computeDraftStatistics(state);
-          draftStats.hasDraft = true;
-          return draftStats;
+        const userId = getDraftUserIdForKey();
+        const rawId = dictationId ? String(dictationId) : '';
+        if (!rawId) return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+
+        const numericId = parseInt(rawId.replace(/^dict_/, ''), 10);
+        const variants = [];
+        variants.push(rawId);
+        if (!rawId.startsWith('dict_')) variants.push(`dict_${rawId}`);
+        if (Number.isFinite(numericId)) {
+          variants.push(String(numericId));
+          variants.push(`dict_${numericId}`);
+        }
+
+        const tried = new Set();
+        for (const v of variants) {
+          if (!v) continue;
+          const k = `${userId}:${v}`;
+          if (tried.has(k)) continue;
+          tried.add(k);
+          const local = await idbGet('drafts', k);
+          const state = local && local.state ? local.state : null;
+          if (state) {
+            const draftStats = computeDraftStatistics(state);
+            draftStats.hasDraft = true;
+            return draftStats;
+          }
         }
       } catch (error) {
         console.warn('Ошибка загрузки статистики диктанта:', dictationId, error);

@@ -133,6 +133,9 @@
                                 <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
                                     <i data-lucide="settings"></i>
                                 </button>
+                                <button id="startModalExitToIndexBtn" class="button-color-yellow start-modal-exit-btn" title="Выйти из диктанта">
+                                    <i data-lucide="log-out"></i>
+                                </button>
                                 <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
                                     <i data-lucide="x"></i>
                                 </button>
@@ -258,6 +261,10 @@
             </div>
             <p class="completion-message">Вы успешно завершили диктант!</p>
             <div class="completion-buttons">
+                <button id="completionResultsBtn" class="button-color-lightgreen">
+                    <i data-lucide="list-check"></i>
+                    Посмотреть результаты
+                </button>
                 <button id="completionExitBtn" class="button-color-yellow">
                     <i data-lucide="log-out"></i>
                     Выйти

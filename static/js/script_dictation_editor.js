@@ -950,6 +950,13 @@ function normalizeNewlines(text) {
         .replace(/\r/g, '\n');
 }
 
+function normalizeDictationInvisibleChars(text) {
+    return (text || '')
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        .replace(/\u00AD/g, '');
+}
+
 
 
 // ==================== сover обложка ========================================
@@ -1889,6 +1896,38 @@ async function putDraftAudioToCache(dictationId, language, filename, blob, mime)
     } catch (e) {
         console.error('❌ putDraftAudioToCache failed', e);
         return null;
+    }
+}
+
+async function refreshFinalAudioCacheEntry(dictationId, language, filename) {
+    try {
+        const id = String(dictationId || '').trim();
+        const lang = String(language || '').trim();
+        const name = String(filename || '').trim();
+        if (!id || !lang || !name) return false;
+        if (!id.startsWith('dict_') || id.startsWith('dict_temp_')) return false;
+
+        const rel = buildDictationAudioUrl(id, lang, name, { isTemp: false });
+        if (!rel) return false;
+        const baseUrl = new URL(rel, window.location.origin).toString();
+        const bustUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
+
+        const res = await fetch(bustUrl, { cache: 'no-store' });
+        if (!res || !res.ok) return false;
+
+        const blob = await res.blob();
+        if (!blob || !blob.size) return false;
+
+        const cache = await caches.open('dictafan-media');
+        try { await cache.delete(baseUrl); } catch (e) {}
+
+        const headers = new Headers();
+        headers.set('Content-Type', blob.type || res.headers.get('content-type') || 'audio/mpeg');
+        headers.set('Cache-Control', 'no-store');
+        await cache.put(baseUrl, new Response(blob, { status: 200, headers }));
+        return true;
+    } catch (e) {
+        return false;
     }
 }
 
@@ -7574,7 +7613,7 @@ function removeSpeaker(button) {
 async function createDictationFromStart() {
     const startEl = document.getElementById('startTextInput');
     const rawText = (startEl && (startEl.innerText || startEl.textContent)) ? (startEl.innerText || startEl.textContent) : '';
-    const text = normalizeNewlines(rawText).trim();
+    const text = normalizeDictationInvisibleChars(normalizeNewlines(rawText)).trim();
     const delimiter = document.getElementById('translationDelimiter').value.trim();
     const isDialog = document.getElementById('isDialogCheckbox').checked;
 
@@ -8662,6 +8701,14 @@ async function generateAudioForSentence(sentence, language) {
                 }
             }
 
+            try {
+                const dictationId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
+                if (dictationId && dictationId.startsWith('dict_') && !dictationId.startsWith('dict_temp_')) {
+                    await refreshFinalAudioCacheEntry(dictationId, language, generatedFilename);
+                }
+            } catch (e) {
+            }
+
             return generatedFilename; // Возвращаем имя файла
         } else {
             const errorText = await response.text();
@@ -8679,7 +8726,10 @@ async function generateAudioForSentence(sentence, language) {
  */
 async function parseInputText(text, delimiter, isDialog, speakers) {
     // Удалить пустые строки
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    const lines = normalizeDictationInvisibleChars(text)
+        .split('\n')
+        .map(line => normalizeDictationInvisibleChars(line).trim())
+        .filter(line => line.length > 0);
 
     if (lines.length === 0) {
         return { original: [], translation: [] };
@@ -8698,7 +8748,7 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
         // !!! дивимось одночасно поточний рядок і наступний рядок
 
         // поточний рядок - оригінальний текст
-        original_line = lines[i];
+        original_line = normalizeDictationInvisibleChars(lines[i]);
         if (original_line.startsWith(delimiter)) {
             // пропущено оригінальний текст, пропускаємо цей рядок 
             // але зберемо помилки перекладу без оригіналу
@@ -8739,17 +8789,17 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
         if (i_next < lines.length) {
             if (lines[i_next].startsWith(delimiter)) {
                 // есть перевод, берем его и переводить не надо
-                translation_line = lines[i_next].substring(2).trim(); // удалить /*;
+                translation_line = normalizeDictationInvisibleChars(lines[i_next].substring(2)).trim(); // удалить /*;
                 i++;
                 hasTranslationLine = true;
             }
             else {
                 // перекладу немає, робимо автопереклад
-                translation_line = await autoTranslate(original_line, language_original, language_translation);
+                translation_line = normalizeDictationInvisibleChars(await autoTranslate(original_line, language_original, language_translation));
             }
         } else {
             // останній рядок і перекладу немає, робимо автопереклад
-            translation_line = await autoTranslate(original_line, language_original, language_translation);
+            translation_line = normalizeDictationInvisibleChars(await autoTranslate(original_line, language_original, language_translation));
         }
 
         const s_translation = {

@@ -2212,6 +2212,20 @@ function setupAuthHandlers() {
         });
     }
 
+    const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
+    if (startModalExitBtn) {
+        startModalExitBtn.addEventListener('click', async (e) => {
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } catch (e2) {
+            }
+            await showExitModal(() => window.location.href = "/");
+        });
+    }
+
     if (registerBtn) {
         registerBtn.addEventListener('click', () => {
             // Показываем модальное окно регистрации
@@ -2461,10 +2475,33 @@ function hideCompletionModal() {
 function setupCompletionModalHandlers() {
     const completionModal = document.getElementById('completionModal');
     const exitBtn = document.getElementById('completionExitBtn');
+    const resultsBtn = document.getElementById('completionResultsBtn');
  
     if (!completionModal || !exitBtn ) {
         console.warn('Элементы модального окна завершения не найдены');
         return;
+    }
+
+    if (resultsBtn) {
+        resultsBtn.addEventListener('click', () => {
+            hideCompletionModal();
+            try {
+                renderSelectionTable();
+            } catch (e) {
+            }
+            try {
+                if (startModal) {
+                    startModal.style.display = 'flex';
+                }
+            } catch (e) {
+            }
+            try {
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons();
+                }
+            } catch (e) {
+            }
+        });
     }
 
     // Обработчик кнопки "Выйти"
@@ -8157,9 +8194,8 @@ function areWordSequencesEquivalent(word, words) {
 
 function simplifyText(text) {
     const originalText = text || "";
-    let result = originalText
+    let result = normalizeDictationInvisibleChars(originalText)
         .normalize('NFKC')          // унификация Юникода
-        .replace(/\u00A0/g, ' ')    // NBSP → пробел
         .toLowerCase();
 
     // Явно удаляем все варианты кавычек перед применением PUNCTUATION_REGEX
@@ -8182,10 +8218,22 @@ function simplifyText(text) {
     return words;
 }
 
+function normalizeDictationInvisibleChars(text) {
+    return (text || "")
+        // Different non-breaking / fixed-width spaces -> regular space
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        // Zero-width and BOM-like characters that break string comparison
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        // Soft hyphen
+        .replace(/\u00AD/g, '');
+}
+
 function splitWordsForDisplay(text) {
     return (text || "")
         .normalize('NFKC')
-        .replace(/\u00A0/g, ' ')
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        .replace(/\u00AD/g, '')
         .replace(DASHES, ' ')   // режем по тире
         .trim()
         .split(/\s+/);
@@ -8196,7 +8244,9 @@ function splitWordsForDisplay(text) {
 function splitUserWords(text) {
     return (text || "")
         .normalize('NFKC')
-        .replace(/\u00A0/g, ' ')
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        .replace(/\u00AD/g, '')
         .replace(DASHES, ' ')   // режем по тире
         .replace(PUNCTUATION_REGEX, '') // удаляем пунктуацию из слов
         .trim()
@@ -8235,7 +8285,9 @@ function maskNumbersToNumToken(text) {
     if (!text) return "";
     let t = text
         .normalize('NFKC')          // унификация Юникода
-        .replace(/\u00A0/g, ' ')    // NBSP → пробел
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        .replace(/\u00AD/g, '')
         .replace(DASHES, ' - ')     // КЛЮЧ: любой «тире» делаем разделителем
         .replace(CURLY_APOS, "'");  // «умные» апострофы → обычный
 
@@ -8259,7 +8311,9 @@ function compressNumRuns(t) {
 function normalizeForASR(text) {
     let s = (text || "")
         .normalize('NFKC')
-        .replace(/\u00A0/g, ' ')
+        .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
+        .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
+        .replace(/\u00AD/g, '')
         .replace(DASHES, ' ')   // КЛЮЧ: «more—that's» → "more that's"
         .toLowerCase();
 
