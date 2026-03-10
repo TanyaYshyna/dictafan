@@ -123,9 +123,13 @@ git checkout develop_DB
 git pull origin develop_DB
 # Скачивает последние изменения с GitHub (origin) и сразу “вливает” их в твою локальную ветку develop_DB
 # (обновляет её до актуального состояния)
- 
+git pull origin develop_DB
+
 git status
 # Показывает текущее состояние: какие файлы изменены, какие добавлены, что готово к коммиту (staged)
+
+
+git checkout develop_DB
  
 git add .
 # Добавляет ВСЕ изменения в текущей папке/репоызитории в “staging” (готовит их к коммиту)
@@ -135,6 +139,12 @@ git commit -m "0174"
  
 git push origin develop_DB
 # Отправляет твои новые коммиты в ветку develop_DB на GitHub (origin)
+
+git checkout production
+git add .
+git commit -m "0174"
+git push origin production
+
 
 B2 CORS (prod bucket)
 
