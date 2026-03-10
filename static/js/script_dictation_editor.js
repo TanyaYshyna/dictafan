@@ -1380,8 +1380,6 @@ async function initNewDictation(safe_email, initData) {
     // Показываем путь к категории если есть
     if (currentDictation.category_path) {
         updateCategoryPathDisplay(currentDictation.category_path);
-    } else {
-        console.log('❌ Путь категории пустой!');
     }
     
     // Обновляем отображение пути к диктанту

@@ -153,3 +153,25 @@ B2 CORS (prod bucket)
 - В B2 UI для bucket dictafan-prod можно выбрать:
   - "Share everything in this bucket with all HTTPS origins" (самый простой вариант),
   - или "Share everything in this bucket with this one origin" и указать https://dictafan.com (если нужен строгий доступ).
+
+
+
+# Шаг 0 — убедись, что ты на develop_DB
+git checkout develop_DB
+git status
+
+# Шаг 2 — коммит и push в develop_DB
+git add .
+git commit -m "0175"
+git push origin develop_DB
+
+# Деплой в production (после того как develop_DB запушен)
+# Шаг 3 — перейти на production и обновить её
+git checkout production
+git pull origin production
+
+# Шаг 4 — влить develop_DB в production
+git merge origin/develop_DB
+
+# Шаг 5 — push production
+git push origin production

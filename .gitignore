@@ -77,3 +77,6 @@ venv*/
 static/data/dictations/
 static/data/temp/
 static/data/users/
+
+
+cors_rules_prod.json
