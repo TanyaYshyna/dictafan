@@ -73,18 +73,56 @@ def get_current_user():
         if token and token.startswith('Bearer '):
             token = token[7:]
         else:
+            token = request.cookies.get(current_app.config.get('JWT_ACCESS_COOKIE_NAME', 'access_token_cookie'))
+
+        if not token:
             return None
 
-        # Делаем запрос к API
-        with current_app.test_client() as client:
-            response = client.get('/user/api/me', 
-                                headers={'Authorization': f'Bearer {token}'})
-            
-            if response.status_code == 200:
-                return response.get_json()
-            else:
-                print(f'❌ API вернул ошибку: {response.status_code}')
-                return None
+        # Если токен пришёл через Authorization header, используем API как и раньше.
+        # Для HTML-страниц токен обычно в cookie, и проще декодировать его напрямую.
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            with current_app.test_client() as client:
+                response = client.get(
+                    '/user/api/me',
+                    headers={'Authorization': f'Bearer {token}'}
+                )
+
+                if response.status_code == 200:
+                    return response.get_json()
+                else:
+                    print(f'❌ API вернул ошибку: {response.status_code}')
+                    return None
+
+        try:
+            payload = jwt.decode(
+                token,
+                current_app.config.get('JWT_SECRET_KEY'),
+                algorithms=['HS256']
+            )
+        except Exception as e:
+            print(f'❌ Ошибка декодирования JWT: {e}')
+            return None
+
+        email = payload.get('sub') or payload.get('identity')
+        if not email:
+            return None
+
+        user = get_user_by_email(email)
+        if not user:
+            return None
+
+        try:
+            user = dict(user)
+        except Exception:
+            pass
+
+        if not user.get('email'):
+            user['email'] = email
+        if not user.get('safe_email'):
+            user['safe_email'] = email.replace('@', '_at_').replace('.', '_dot_')
+
+        return user
                 
     except Exception as e:
         print(f'❌ Ошибка при получении пользователя через API: {e}')

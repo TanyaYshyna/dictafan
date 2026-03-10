@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0173';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0174';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -1261,8 +1261,20 @@ async function initNewDictation(safe_email, initData) {
     // Получаем информацию о категории и языках из sessionStorage
     const categoryDataStr = sessionStorage.getItem('selectedCategoryForDictation');
     const categoryInfo = categoryDataStr ? JSON.parse(categoryDataStr) : {};
-    const language_original = categoryInfo.language_original || (initData && initData.original_language) || 'en';
-    const language_translation = categoryInfo.language_translation || (initData && initData.translation_language) || 'ru';
+    const init_original = (initData && initData.original_language) ? String(initData.original_language).toLowerCase() : '';
+    const init_translation = (initData && initData.translation_language) ? String(initData.translation_language).toLowerCase() : '';
+    const stored_original = categoryInfo.language_original ? String(categoryInfo.language_original).toLowerCase() : '';
+    const stored_translation = categoryInfo.language_translation ? String(categoryInfo.language_translation).toLowerCase() : '';
+
+    // Важно: selectedCategoryForDictation может быть «устаревшим» (например, остался en от прошлого диктанта).
+    // Поэтому дефолт берем из initData (профиль пользователя), а sessionStorage используем только если он
+    // не противоречит initData или initData отсутствует.
+    const language_original = (stored_original && (!init_original || stored_original === init_original))
+        ? stored_original
+        : (init_original || 'en');
+    const language_translation = (stored_translation && (!init_translation || stored_translation === init_translation))
+        ? stored_translation
+        : (init_translation || 'ru');
 
     const initialLevel = (initData && initData.level) ? initData.level : 'A1';
 
@@ -1734,8 +1746,17 @@ function initLanguageFlags(initData) {
             const categoryDataStr = sessionStorage.getItem('selectedCategoryForDictation');
             if (categoryDataStr) {
                 const categoryData = JSON.parse(categoryDataStr);
-                language_original = categoryData.language_original || language_original;
-                language_translation = categoryData.language_translation || language_translation;
+                const initOriginal = language_original ? String(language_original).toLowerCase() : '';
+                const initTranslation = language_translation ? String(language_translation).toLowerCase() : '';
+                const storedOriginal = categoryData.language_original ? String(categoryData.language_original).toLowerCase() : '';
+                const storedTranslation = categoryData.language_translation ? String(categoryData.language_translation).toLowerCase() : '';
+
+                if (storedOriginal && (!initOriginal || storedOriginal === initOriginal)) {
+                    language_original = storedOriginal;
+                }
+                if (storedTranslation && (!initTranslation || storedTranslation === initTranslation)) {
+                    language_translation = storedTranslation;
+                }
             }
         }
 
