@@ -7,10 +7,12 @@ import hashlib
 import tempfile
 import zipfile
 from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory
+from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
 
 logger = logging.getLogger(__name__)
 from helpers.language_data import load_language_data, get_language_name
+from helpers.db_users import get_user_by_email
 
 index_bp = Blueprint('index', __name__)
 
@@ -480,12 +482,13 @@ def move_dictation_between_categories():
 
 
 @index_bp.route("/api/dictations/<string:dictation_id>", methods=["DELETE"])
+@jwt_required()
 def delete_dictation(dictation_id):
     dictation_id = dictation_id.strip()
     if not dictation_id:
         return jsonify({"success": False, "error": "dictation_id is required"}), 400
 
-    from helpers.db_dictations import delete_dictation as delete_dictation_from_db
+    from helpers.db_dictations import get_dictation_by_id, delete_dictation as delete_dictation_from_db
     from helpers.db import get_db_cursor
     from helpers.b2_storage import b2_storage
 
@@ -506,10 +509,44 @@ def delete_dictation(dictation_id):
         try:
             db_id = int(dictation_id.replace('dict_', ''))
 
+            # Ownership check
+            try:
+                current_email = get_jwt_identity()
+                user = get_user_by_email(current_email) if current_email else None
+                if not user:
+                    return jsonify({"success": False, "error": "User not found"}), 404
+
+                d = get_dictation_by_id(db_id)
+                if not d:
+                    return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+                owner_id = d.get('owner_id')
+                if not owner_id or int(owner_id) != int(user.get('id')):
+                    return jsonify({"success": False, "error": "Forbidden"}), 403
+            except Exception as e:
+                logger.warning("delete_dictation ownership check failed: %s", e)
+                return jsonify({"success": False, "error": "Forbidden"}), 403
+
             # Remove references so the dictation cannot re-appear on any user's desk / in any book.
             try:
                 conn, cur = get_db_cursor()
                 try:
+                    # Remove user progress/history
+                    try:
+                        cur.execute("DELETE FROM history_successes WHERE dictation_id = %s", (db_id,))
+                    except Exception:
+                        pass
+                    try:
+                        cur.execute("DELETE FROM history_activity WHERE dictation_id = %s", (db_id,))
+                    except Exception:
+                        pass
+
+                    # Remove sentences explicitly in case DB is missing ON DELETE CASCADE.
+                    try:
+                        cur.execute("DELETE FROM dictation_sentences WHERE dictation_id = %s", (db_id,))
+                    except Exception:
+                        pass
+
                     cur.execute("DELETE FROM desk_items WHERE dictation_id = %s", (db_id,))
                     removed_desk_refs = cur.rowcount > 0
                     cur.execute("DELETE FROM book_dictations WHERE dictation_id = %s", (db_id,))

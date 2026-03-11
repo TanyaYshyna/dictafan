@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0185';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0186';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -956,6 +956,7 @@
 
     const t0 = performance.now();
     let renderedFromCache = false;
+    let cachedItemsSnapshot = [];
 
     try {
       const cached = await idbGet('desk_items', 'latest');
@@ -966,6 +967,7 @@
           return;
         }
         deskItems = items;
+        cachedItemsSnapshot = items;
         if (typeof renderDeskCards === 'function') {
           renderDeskCards(deskItems);
         }
@@ -989,6 +991,34 @@
           resolveInFlight();
           return;
         }
+
+        // If desk was rendered from cache, reconcile removed items and purge their cached dictation media.
+        // This is important for cross-tab/cross-device cleanup after a dictation is deleted on the server.
+        try {
+          const prev = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
+          const next = Array.isArray(data.items) ? data.items : [];
+          if (renderedFromCache && prev.length) {
+            const nextSet = new Set(next.map(x => String(x && x.dictation_id)));
+            const removed = prev.filter(x => x && !nextSet.has(String(x.dictation_id)));
+            for (const item of removed) {
+              try {
+                const did = item && item.dictation_id ? String(item.dictation_id) : '';
+                if (!did) continue;
+                try {
+                  await swRequest('purgeDictation', { dictationId: did, timeoutMs: 60000 });
+                } catch (e) {
+                }
+                try {
+                  await idbDeleteDictationCache(`dict_${did}`);
+                } catch (e) {
+                }
+              } catch (e) {
+              }
+            }
+          }
+        } catch (e) {
+        }
+
         deskItems = data.items;
         try {
           await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
@@ -4410,97 +4440,16 @@
         activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
       });
 
-      // If a book/section is currently open, trash means "remove from this book", not delete dictation.
-      // Workbook is a special virtual view of orphan dictations (not based on book_dictations), so here we delete globally.
-      try {
-        const sectionIdRaw = pendingDeleteSectionId ? String(pendingDeleteSectionId) : '';
-        const sectionIdNum = sectionIdRaw ? parseInt(sectionIdRaw, 10) : NaN;
-
-        const bookIdRaw = (typeof activeBookId !== 'undefined' && activeBookId) ? String(activeBookId) : '';
-        const bookIdNum = bookIdRaw ? parseInt(bookIdRaw, 10) : NaN;
-
-        const targetBookIdNum = (sectionIdNum && isFinite(sectionIdNum) && sectionIdNum > 0)
-          ? sectionIdNum
-          : bookIdNum;
-
-        const isWorkbookActive = (typeof activeBookIsWorkbook !== 'undefined') ? !!activeBookIsWorkbook : false;
-        if (!isWorkbookActive && targetBookIdNum && isFinite(targetBookIdNum) && targetBookIdNum > 0) {
-          const token = getToken();
-          const url = `/library/api/book/${targetBookIdNum}/dictation/${encodeURIComponent(idStr)}`;
-          console.log('🗑️ remove-from-book request', { url, bookIdNum: targetBookIdNum, dictationId: idStr, sectionId: sectionIdRaw || null, activeBookId: bookIdRaw || null });
-          const response = await fetch(url, {
-            method: 'DELETE',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            },
-            cache: 'no-store'
-          });
-
-          let data = null;
-          try {
-            data = await response.json();
-          } catch (e) {
-            data = null;
-          }
-
-          console.log('🗑️ remove-from-book response', {
-            status: response.status,
-            ok: response.ok,
-            data
-          });
-
-          if (response.ok && data && data.success) {
-            closeDeleteDictationModal();
-            showToast('Диктант убран из книги');
-
-            // If dictation is on desk, remove it from desk as well to avoid it becoming an orphan/workbook entry.
-            try {
-              const itemId = typeof getDeskItemId === 'function' ? getDeskItemId(idStr) : null;
-              if (itemId) {
-                await removeFromDesk(itemId, idStr);
-              }
-            } catch (e) {
-            }
-
-            try {
-              const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
-              if (card) {
-                card.remove();
-              }
-            } catch (e) {
-            }
-            if (activeBookId) {
-              try {
-                await loadActiveBook(activeBookId, activeBookIsWorkbook);
-              } catch (e) {
-              }
-            }
-
-            // If deletion happened inside a section, refresh that section's list as well.
-            try {
-              const sid = sectionIdRaw ? parseInt(sectionIdRaw, 10) : NaN;
-              if (sid && isFinite(sid) && sid > 0) {
-                const content = document.querySelector(`.structure-item-content[data-section-content-id="${CSS.escape(String(sid))}"]`);
-                if (content && content.style.display !== 'none') {
-                  await loadSectionDictations(String(sid), content);
-                }
-              }
-            } catch (e) {
-            }
-            return;
-          }
-
-          showToast((data && data.error) ? data.error : 'Ошибка при удалении из книги', 'error');
-          return;
-        }
-      } catch (e) {
-      }
-
       const dictIdStr = `dict_${idStr}`;
       const deleteUrl = `/api/dictations/${encodeURIComponent(dictIdStr)}`;
       console.log('🗑️ global delete request', { url: deleteUrl, dictationId: dictIdStr });
+      const token = getToken();
       const response = await fetch(deleteUrl, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        cache: 'no-store'
       });
 
       let data = null;
@@ -4534,6 +4483,15 @@
           const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
           if (card) {
             card.remove();
+          }
+        } catch (e) {
+        }
+
+        // If dictation is on desk, remove it from desk list as well.
+        try {
+          const itemId = typeof getDeskItemId === 'function' ? getDeskItemId(idStr) : null;
+          if (itemId) {
+            await removeFromDesk(itemId, idStr);
           }
         } catch (e) {
         }
