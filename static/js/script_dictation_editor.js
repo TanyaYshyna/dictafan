@@ -10,7 +10,7 @@ const endInput = document.getElementById('audioEndTime');
 // 2) при сохранении: promoteDraftCache копирует temp -> /api/dictations/... (final cache)
 // 3) после сохранения: браузер делает direct upload в B2 (без проксирования через сервер)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-08_0175';
+window.__DICTATION_EDITOR_BUILD = '2026-03-08_0177';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -420,6 +420,19 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
             return;
         }
 
+        // Guard against multiple concurrent uploads for the same dictation.
+        // This function can be triggered from multiple places after Save; without a guard
+        // it causes multiple uploads of the same filenames -> B2 creates extra versions.
+        try {
+            window.__B2_AUDIO_UPLOAD_INFLIGHT = window.__B2_AUDIO_UPLOAD_INFLIGHT || {};
+            const k = String(dictationId);
+            if (window.__B2_AUDIO_UPLOAD_INFLIGHT[k]) {
+                return;
+            }
+            window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = true;
+        } catch (e) {
+        }
+
         const urls = collectFinalAudioUrlsForPrefetch(dictationId);
         const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean)));
         if (uniqueUrls.length === 0) {
@@ -504,6 +517,14 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         console.warn('[B2 UPLOAD] done', { dictationId, urls: uniqueUrls.length, cacheHit, uploaded });
     } catch (e) {
         console.warn('[B2 UPLOAD] fatal', e);
+    } finally {
+        try {
+            const k = String(dictationId || '');
+            if (k && window.__B2_AUDIO_UPLOAD_INFLIGHT) {
+                window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = false;
+            }
+        } catch (e) {
+        }
     }
 }
 
@@ -8194,28 +8215,6 @@ async function saveDictationOnly() {
                         try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
                     }, 0);
                 }
-            }
-
-            // For new dictations audio can live only in SW cache (dict_temp_ generation returns base64).
-            // Ensure we always attempt a best-effort B2 upload after Save.
-            try {
-                if (toId && String(toId).startsWith('dict_')) {
-                    setTimeout(() => {
-                        try { uploadDictationAudioFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
-                    }, 0);
-                }
-            } catch (e) {
-            }
-
-            // Cover can be selected while dictation still has dict_temp_* id.
-            // Ensure we always attempt best-effort cover upload after Save.
-            try {
-                if (toId && String(toId).startsWith('dict_')) {
-                    setTimeout(() => {
-                        try { uploadDictationCoverFromCacheToB2({ dictationId: toId, token }); } catch (e) {}
-                    }, 0);
-                }
-            } catch (e) {
             }
 
             // Сохранение завершено: не блокируем выход из-за асинхронных upload/commit.
