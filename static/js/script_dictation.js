@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0176';
+window.__DICTATION_BUILD = '2026-03-08_0180';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -479,6 +479,16 @@ function installDictationBuildBadge() {
     try {
         if (window.__dictationBuildBadgeInstalled) return;
         window.__dictationBuildBadgeInstalled = true;
+
+        try {
+            if (typeof window.setSwBarInfo === 'function') {
+                window.setSwBarInfo('build', String(window.__DICTATION_BUILD || '').trim() || 'unknown');
+            }
+        } catch (e) {
+        }
+
+        // Legacy fixed badge overlay is disabled; use the global status bar instead.
+        return;
 
         const mount = () => {
             try {

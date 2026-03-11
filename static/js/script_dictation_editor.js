@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0179';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0180';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -894,6 +894,16 @@ function installDictationEditorBuildBadge() {
     try {
         if (window.__dictationEditorBuildBadgeInstalled) return;
         window.__dictationEditorBuildBadgeInstalled = true;
+
+        try {
+            if (typeof window.setSwBarInfo === 'function') {
+                window.setSwBarInfo('build', String(window.__DICTATION_EDITOR_BUILD || '').trim() || 'unknown');
+            }
+        } catch (e) {
+        }
+
+        // Legacy fixed badge overlay is disabled; use the global status bar instead.
+        return;
 
         const mount = () => {
             try {

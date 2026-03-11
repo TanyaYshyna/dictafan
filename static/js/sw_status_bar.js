@@ -9,6 +9,13 @@
       timer: null,
     };
 
+    // Public page-published info shown on the right.
+    // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
+    var pageInfo = {
+      meta: '',
+      kv: {},
+    };
+
     function getBuildValue() {
       try {
         var candidates = [
@@ -24,6 +31,38 @@
       } catch (e) {
       }
       return '';
+    }
+
+    function buildMetaText() {
+      try {
+        if (pageInfo && pageInfo.meta) {
+          var forced = String(pageInfo.meta || '').trim();
+          if (forced) return forced;
+        }
+      } catch (e) {
+      }
+
+      var parts = [];
+      try {
+        var build = getBuildValue();
+        if (build) parts.push('build: ' + build);
+      } catch (e) {
+      }
+
+      try {
+        var kv = (pageInfo && pageInfo.kv) ? pageInfo.kv : {};
+        var keys = Object.keys(kv || {});
+        for (var i = 0; i < keys.length; i++) {
+          var k = String(keys[i] || '').trim();
+          if (!k) continue;
+          var v = String(kv[k] || '').trim();
+          if (!v) continue;
+          parts.push(k + ': ' + v);
+        }
+      } catch (e) {
+      }
+
+      return parts.join(' | ');
     }
 
     function ensureStyle() {
@@ -81,8 +120,7 @@
         var meta = document.createElement('div');
         meta.className = 'swbar-meta';
         meta.id = BAR_ID + '__meta';
-        var build = getBuildValue();
-        meta.textContent = build ? ('build: ' + build) : '';
+        meta.textContent = buildMetaText();
 
         var btn = document.createElement('button');
         btn.type = 'button';
@@ -141,11 +179,64 @@
         // keep meta refreshed (some pages set build var after scripts)
         var meta = document.getElementById(BAR_ID + '__meta');
         if (meta) {
-          var build = getBuildValue();
-          meta.textContent = build ? ('build: ' + build) : '';
+          meta.textContent = buildMetaText();
         }
       } catch (e) {
       }
+    }
+
+    function refreshMeta() {
+      try {
+        var meta = document.getElementById(BAR_ID + '__meta');
+        if (!meta) return;
+        var text = buildMetaText();
+        meta.textContent = text;
+        if (!text) {
+          // keep DOM clean
+          try {
+            if (meta.parentNode) meta.parentNode.removeChild(meta);
+          } catch (e2) {
+          }
+        }
+      } catch (e) {
+      }
+    }
+
+    // Public API
+    try {
+      window.setSwBarMeta = function (text) {
+        try {
+          pageInfo.meta = String(text || '').trim();
+        } catch (e) {
+          pageInfo.meta = '';
+        }
+        try {
+          ensureBar();
+        } catch (e) {
+        }
+        refreshMeta();
+      };
+
+      window.setSwBarInfo = function (key, value) {
+        try {
+          var k = String(key || '').trim();
+          if (!k) return;
+          var v = String(value || '').trim();
+          if (!pageInfo.kv) pageInfo.kv = {};
+          if (!v) {
+            try { delete pageInfo.kv[k]; } catch (e2) {}
+          } else {
+            pageInfo.kv[k] = v;
+          }
+        } catch (e) {
+        }
+        try {
+          ensureBar();
+        } catch (e) {
+        }
+        refreshMeta();
+      };
+    } catch (e) {
     }
 
     function hideLegacyBuildBadges() {

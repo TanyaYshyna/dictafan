@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0178';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0180';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -72,6 +72,16 @@
     try {
       if (window.__privateLibraryBuildBadgeInstalled) return;
       window.__privateLibraryBuildBadgeInstalled = true;
+
+      try {
+        if (typeof window.setSwBarInfo === 'function') {
+          window.setSwBarInfo('build', String(window.__PRIVATE_LIBRARY_BUILD || '').trim() || 'unknown');
+        }
+      } catch (e) {
+      }
+
+      // Legacy fixed badge overlay is disabled; use the global status bar instead.
+      return;
 
       const mount = () => {
         try {

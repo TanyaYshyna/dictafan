@@ -556,8 +556,10 @@ def api_get_orphan_dictations():
 @jwt_required()
 def api_get_dictation_book(dictation_id: int):
     """
-    Возвращает ID корневой книги (без parent_id), к которой принадлежит диктант.
-    Если диктант находится в разделе, находит главную книгу, содержащую этот раздел.
+    Возвращает book_id из book_dictations (прямую привязку: книга ИЛИ раздел).
+
+    Дополнительно возвращает root_book_id (корневую книгу без parent_id) для UI,
+    но root_book_id НЕ должен использоваться как место хранения диктанта.
     """
     try:
         from helpers.db import get_db_connection
@@ -605,15 +607,18 @@ def api_get_dictation_book(dictation_id: int):
                 
                 if not book_row:
                     logger.warning("⚠️ Книга/раздел %s не найдена в БД", book_id)
-                    return jsonify({"success": False, "book_id": None})
+                    return jsonify({"success": False, "book_id": None, "root_book_id": None})
                 
                 logger.info("📖 Книга/раздел %s: title='%s', parent_id=%s", 
                           book_id, book_row.get("title"), book_row["parent_id"])
                 
-                # Если это уже корневая книга (parent_id IS NULL), возвращаем её
+                # Всегда возвращаем прямой book_id (книга или раздел)
+                direct_book_id = book_id
+
+                # Если это уже корневая книга (parent_id IS NULL), возвращаем и как root
                 if book_row["parent_id"] is None:
                     logger.info("✅ Найдена корневая книга %s для диктанта %s", book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": book_id})
+                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": direct_book_id})
                 
                 # Иначе ищем корневую книгу, идя вверх по иерархии
                 # Используем рекурсивный CTE для поиска корневой книги
@@ -643,7 +648,7 @@ def api_get_dictation_book(dictation_id: int):
                     root_book_id = root_book_row["id"]
                     logger.info("✅ Найдена корневая книга %s (через раздел %s) для диктанта %s", 
                               root_book_id, book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": root_book_id})
+                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": root_book_id})
                 else:
                     logger.warning("⚠️ Не удалось найти корневую книгу для раздела %s (диктант %s)", 
                                  book_id, dictation_id)
@@ -657,7 +662,7 @@ def api_get_dictation_book(dictation_id: int):
                     logger.info("🔍 Всего связанных книг/разделов: %s", len(all_related))
                     for r in all_related:
                         logger.info("  - id=%s, parent_id=%s, title='%s'", r["id"], r["parent_id"], r.get("title"))
-                    return jsonify({"success": False, "book_id": None})
+                    return jsonify({"success": False, "book_id": None, "root_book_id": None})
         finally:
             conn.close()
     except Exception as exc:
