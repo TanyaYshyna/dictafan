@@ -421,6 +421,12 @@ self.addEventListener('fetch', (event) => {
               }
               return netRes;
             }
+
+            // IMPORTANT: if network responded (even with an error), return it.
+            // Do not mask real backend status codes with synthetic Offline 503.
+            if (netRes) {
+              return netRes;
+            }
           }
         } catch (e) {
         }
@@ -461,6 +467,12 @@ self.addEventListener('fetch', (event) => {
               await cache.put(request.url, netRes.clone());
             } catch (e) {
             }
+            return netRes;
+          }
+
+          // IMPORTANT: if network responded (even with an error), return it.
+          // Do not mask real backend status codes with synthetic Offline 503.
+          if (netRes) {
             return netRes;
           }
         } catch (e) {
