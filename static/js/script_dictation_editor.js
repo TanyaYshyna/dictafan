@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0183';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0184';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -3160,7 +3160,9 @@ function setupTabsPanel() {
                 }
             } catch (e) {
             }
+            try { setDictationNameTitle(titleInput.value); } catch (e) {}
             setDirtyFlags({ db: true });
+            try { updateUnsavedStar(); } catch (e) {}
         });
 
         // Синхронизация из вкладки в основную форму
@@ -3172,7 +3174,9 @@ function setupTabsPanel() {
                 }
             } catch (e) {
             }
+            try { setDictationNameTitle(tabTitleInput.value); } catch (e) {}
             setDirtyFlags({ db: true });
+            try { updateUnsavedStar(); } catch (e) {}
         });
     }
 
@@ -7973,6 +7977,21 @@ async function createDictationFromStart() {
             speakers: speakers,
             sentences: parsedData.translation
         };
+
+        // Mark as changed: both text/structure and generated media are new.
+        try {
+            setDirtyFlags({ db: true, audio: true });
+            markAsUnsaved();
+            updateUnsavedStar();
+        } catch (e) {
+        }
+
+        // Immediately reflect title in the header near stars.
+        try {
+            const t = document.getElementById('title') ? document.getElementById('title').value : '';
+            setDictationNameTitle(t);
+        } catch (e) {
+        }
 
         // Показать кнопку "Внести заново"
         const reenterTextSection = document.getElementById('reenterTextSection');
