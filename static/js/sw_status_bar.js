@@ -116,6 +116,7 @@
 
         var right = document.createElement('div');
         right.className = 'swbar-right';
+        right.id = BAR_ID + '__right';
 
         var meta = document.createElement('div');
         meta.className = 'swbar-meta';
@@ -177,10 +178,7 @@
         }
 
         // keep meta refreshed (some pages set build var after scripts)
-        var meta = document.getElementById(BAR_ID + '__meta');
-        if (meta) {
-          meta.textContent = buildMetaText();
-        }
+        refreshMeta();
       } catch (e) {
       }
     }
@@ -188,8 +186,23 @@
     function refreshMeta() {
       try {
         var meta = document.getElementById(BAR_ID + '__meta');
-        if (!meta) return;
+        var right = document.getElementById(BAR_ID + '__right');
         var text = buildMetaText();
+        if (!meta && text) {
+          // Meta didn't exist at initial render (e.g. build var was set later).
+          // Create it lazily when we finally have something to show.
+          meta = document.createElement('div');
+          meta.className = 'swbar-meta';
+          meta.id = BAR_ID + '__meta';
+          meta.textContent = text;
+          if (right) {
+            right.appendChild(meta);
+          }
+          return;
+        }
+
+        if (!meta) return;
+
         meta.textContent = text;
         if (!text) {
           // keep DOM clean
