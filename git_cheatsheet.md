@@ -134,7 +134,7 @@ git checkout develop_DB
 git add .
 # Добавляет ВСЕ изменения в текущей папке/репоызитории в “staging” (готовит их к коммиту)
  
-git commit -m "0182"
+git commit -m "0183"
 # Создаёт коммит (снимок) из того, что в staging, с твоим сообщением
  
 git push origin develop_DB

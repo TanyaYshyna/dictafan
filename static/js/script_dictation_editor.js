@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0182';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0183';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -626,6 +626,29 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
 
                 const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
 
+                // If this file does NOT exist as an in-memory draft blob URL, we assume it is unchanged.
+                // In that case, skip uploading whenever we have a previous successful upload record.
+                // This prevents B2 version increments for unchanged audio when you only edit text/structure.
+                let hasDraft = false;
+                try {
+                    hasDraft = hasDraftAudioUrl(lang, filename) === true;
+                } catch (e) {
+                    hasDraft = false;
+                }
+
+                if (!hasDraft) {
+                    try {
+                        const prevNoDraft = await getB2Ledger(remotePath);
+                        if (prevNoDraft && Number(prevNoDraft.size || 0) === Number(blob.size || 0)) {
+                            // Ensure we don't keep stale draft urls around.
+                            try { clearDraftAudioUrl(lang, filename); } catch (e0) {}
+                            skipped += 1;
+                            continue;
+                        }
+                    } catch (e) {
+                    }
+                }
+
                 // Dedupe: skip uploading if SHA-256 matches ledger.
                 let sha256 = null;
                 try {
@@ -638,6 +661,7 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
                     try {
                         const prev = await getB2Ledger(remotePath);
                         if (prev && prev.sha256 && String(prev.sha256) === String(sha256) && Number(prev.size || 0) === Number(blob.size || 0)) {
+                            try { clearDraftAudioUrl(lang, filename); } catch (e0) {}
                             skipped += 1;
                             continue;
                         }
@@ -673,6 +697,9 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
                     });
                 } catch (e) {
                 }
+
+                // After a successful upload, draft audio is no longer needed.
+                try { clearDraftAudioUrl(lang, filename); } catch (e) {}
             } catch (e) {
                 console.warn('[B2 UPLOAD] exception', e);
                 failed += 1;
@@ -2197,6 +2224,29 @@ function setDraftAudioUrl(language, filename, url) {
     }
 }
 
+function clearDraftAudioUrl(language, filename) {
+    try {
+        const lang = String(language || '').trim();
+        const name = String(filename || '').trim();
+        if (!lang || !name) return;
+        const map = window.__DICTATION_EDITOR_DRAFT_AUDIO_URLS;
+        if (!map || !map[lang] || !map[lang][name]) return;
+        const prev = map[lang][name];
+        try {
+            if (typeof prev === 'string' && prev.startsWith('blob:')) {
+                URL.revokeObjectURL(prev);
+            }
+        } catch (e2) {
+        }
+        try {
+            delete map[lang][name];
+        } catch (e3) {
+            map[lang][name] = '';
+        }
+    } catch (e) {
+    }
+}
+
 function hasDraftAudioUrl(language, filename) {
     try {
         const u = getDraftAudioUrl(language, filename);
@@ -2260,6 +2310,9 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
                 headers.set('Content-Type', blob.type || 'audio/mpeg');
                 headers.set('Cache-Control', 'no-store');
                 await cache.put(item.finalUrl, new Response(blob, { status: 200, headers }));
+
+                // Once committed to final cache, it's no longer a draft.
+                try { clearDraftAudioUrl(item.lang, item.filename); } catch (e) {}
             } catch (e) {
             }
         }
