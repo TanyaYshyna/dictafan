@@ -55,6 +55,7 @@
         for (var i = 0; i < keys.length; i++) {
           var k = String(keys[i] || '').trim();
           if (!k) continue;
+          if (k === 'build') continue;
           var v = String(kv[k] || '').trim();
           if (!v) continue;
           parts.push(k + ': ' + v);

@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0180';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0182';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -9234,6 +9234,11 @@ function createTableRow(key, originalSentence, translationSentence) {
             const cleanId = newIdWithColon ? String(newIdWithColon).replace(':', '') : '';
             originalSentence.speaker = cleanId || undefined;
         }
+        // Changing speaker affects DB payload -> mark as unsaved
+        try {
+            markAsUnsaved();
+        } catch (e) {
+        }
     });
     // Первоначальная видимость берётся из текущего состояния чекбокса
     speakerCell.style.display = (currentDictation.is_dialog ? 'table-cell' : 'none');
@@ -9261,6 +9266,12 @@ function createTableRow(key, originalSentence, translationSentence) {
             } catch (e) {
             }
             originalSentence.text = v;
+        }
+
+        // Text edit affects DB payload -> mark as unsaved
+        try {
+            markAsUnsaved();
+        } catch (e) {
         }
 
         // Меняем кнопку воспроизведения в режим создания
@@ -9353,6 +9364,12 @@ function createTableRow(key, originalSentence, translationSentence) {
             }
             translationSentence.text = v;
         }
+
+        // Translation edit affects DB payload -> mark as unsaved
+        try {
+            markAsUnsaved();
+        } catch (e) {
+        }
         // Меняем кнопку воспроизведения в режим создания (кнопка перевода создается позже)
         const audioBtn = row.querySelector(`.btn-col-tr-audio`);
         if (audioBtn) {
@@ -9409,6 +9426,12 @@ function createTableRow(key, originalSentence, translationSentence) {
             } catch (e) {
             }
             translationSentence.explanation = v;
+        }
+
+        // Explanation edit affects DB payload -> mark as unsaved
+        try {
+            markAsUnsaved();
+        } catch (e) {
         }
     });
     
