@@ -6,7 +6,7 @@ import shutil
 import pathlib
 
 from flask import Blueprint, Flask,jsonify, logging, render_template, request, send_file, url_for
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from googletrans import Translator
 from gtts import gTTS
 from flask import current_app
@@ -94,67 +94,31 @@ def generate_audio():
         if not lang:
             return jsonify({"success": False, "error": "Отсутствует язык"}), 400
 
-        is_temp_dictation = bool(dictation_id and dictation_id.startswith('dict_temp_'))
-        if is_temp_dictation:
-            tmp = tempfile.NamedTemporaryFile(prefix='dictafan_tts_', suffix='.mp3', delete=False)
-            filepath = tmp.name
-            tmp.close()
-        else:
-            base_dir = 'static/data/temp'
-            audio_dir = os.path.join(base_dir, dictation_id, lang)
-            try:
-                os.makedirs(audio_dir, exist_ok=True)
-                logging.info(f"Директория для аудио создана: {audio_dir}")
-            except OSError as e:
-                logging.error(f"Ошибка создания директории: {e}")
-                return jsonify({"success": False, "error": f"Ошибка создания директории: {e}"}), 500
-
-            filepath = os.path.join(audio_dir, filename_audio)
+        # IMPORTANT: generation must never publish to B2.
+        # We always generate into a temporary file and return audio bytes to the client.
+        tmp = tempfile.NamedTemporaryFile(prefix='dictafan_tts_', suffix='.mp3', delete=False)
+        filepath = tmp.name
+        tmp.close()
         
         # Генерируем аудио с обработкой ошибок
         try:
             tts = gTTS(text=text, lang=lang)
             tts.save(filepath)
-            logging.info(f"Аудиофайл успешно сохранен: {filepath}")
+            logging.info(f"Аудиофайл успешно сгенерирован: {filepath}")
 
-            if is_temp_dictation:
-                with open(filepath, 'rb') as f:
-                    audio_b64 = base64.b64encode(f.read()).decode('ascii')
+            with open(filepath, 'rb') as f:
+                audio_b64 = base64.b64encode(f.read()).decode('ascii')
 
-                try:
-                    os.remove(filepath)
-                except OSError:
-                    pass
-
-                return jsonify({
-                    "success": True,
-                    "filename": filename_audio,
-                    "mime": "audio/mpeg",
-                    "audio_b64": audio_b64,
-                })
-
-            audio_url = None
-            if not b2_storage.enabled:
-                return jsonify({
-                    "success": False,
-                    "error": "B2 storage is disabled"
-                }), 503
-
-            remote_path = f"dictations/{dictation_id}/{lang}/{filename_audio}"
-            b2_url = b2_storage.upload_file(filepath, remote_path)
-            if not b2_url:
-                return jsonify({
-                    "success": False,
-                    "error": "Failed to upload audio to B2"
-                }), 502
-
-            audio_url = f"/api/dictations/{dictation_id}/{lang}/{filename_audio}"
-            logging.info(f"Сгенерированное аудио загружено в B2: {remote_path}")
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
 
             return jsonify({
                 "success": True,
-                "audio_url": audio_url,
                 "filename": filename_audio,
+                "mime": "audio/mpeg",
+                "audio_b64": audio_b64,
             })
         except Exception as e:
             logging.error(f"Ошибка генерации аудио: {e}")
@@ -226,6 +190,88 @@ def api_b2_get_upload_url():
         })
     except Exception as e:
         logger.error(f"api_b2_get_upload_url error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500
+
+
+@editor_bp.route('/api/b2/cleanup_dictation_audio', methods=['POST'])
+@jwt_required()
+def api_b2_cleanup_dictation_audio():
+    """Удаляет из B2 файлы аудио диктанта, которых нет в keep_remote_paths.
+
+    Expected remote paths:
+      dictations/<dictation_id>/<lang>/<filename>
+    where dictation_id is in format dict_<id>.
+    """
+    try:
+        if not b2_storage.enabled or not b2_storage.bucket:
+            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+
+        data = request.get_json(silent=True) or {}
+        dictation_id = str(data.get('dictation_id') or '').strip()
+        keep_remote_paths = data.get('keep_remote_paths')
+
+        if not dictation_id or not dictation_id.startswith('dict_'):
+            return jsonify({'success': False, 'error': 'dictation_id is required'}), 400
+        if not isinstance(keep_remote_paths, list):
+            return jsonify({'success': False, 'error': 'keep_remote_paths must be a list'}), 400
+
+        # Ownership check: only owner may cleanup.
+        try:
+            db_id = int(dictation_id.replace('dict_', ''))
+        except Exception:
+            return jsonify({'success': False, 'error': 'Invalid dictation_id'}), 400
+
+        current_email = get_jwt_identity()
+        user_db = get_user_by_email(current_email) if current_email else None
+        if not user_db:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+
+        dictation = get_dictation_by_id(db_id)
+        if not dictation:
+            return jsonify({'success': False, 'error': 'Dictation not found'}), 404
+
+        owner_id = dictation.get('owner_id')
+        if not owner_id or int(owner_id) != int(user_db.get('id')):
+            return jsonify({'success': False, 'error': 'Forbidden'}), 403
+
+        prefix = f"dictations/{dictation_id}/"
+
+        # Sanitize keep list to prevent deleting outside of prefix.
+        keep_set = set()
+        for p in keep_remote_paths:
+            try:
+                s = str(p or '').strip()
+                if not s:
+                    continue
+                if not s.startswith(prefix):
+                    continue
+                keep_set.add(s)
+            except Exception:
+                continue
+
+        existing = b2_storage.list_files(prefix)
+        deleted = 0
+        skipped = 0
+        for name in existing:
+            try:
+                if name in keep_set:
+                    skipped += 1
+                    continue
+                if b2_storage.delete_file(name):
+                    deleted += 1
+            except Exception:
+                continue
+
+        return jsonify({
+            'success': True,
+            'prefix': prefix,
+            'existing': len(existing),
+            'keep': len(keep_set),
+            'deleted': deleted,
+            'skipped': skipped,
+        })
+    except Exception as e:
+        logger.error('api_b2_cleanup_dictation_audio error: %s', e, exc_info=True)
         return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500
 
 # ==============================================================

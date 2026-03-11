@@ -9042,11 +9042,23 @@ function check(original, userInput, currentKey) {
 function checkText() {
     const userInput = inputField.innerText;
     const original = currentSentence.text;
-    if (userInput.length === 0) {
+    let userNorm = '';
+    let origNorm = '';
+    try {
+        userNorm = normalizeDictationInvisibleChars(String(userInput || '')).replace(/\s+/g, ' ').trim();
+    } catch (e) {
+        userNorm = String(userInput || '').trim();
+    }
+    try {
+        origNorm = normalizeDictationInvisibleChars(String(original || '')).replace(/\s+/g, ' ').trim();
+    } catch (e) {
+        origNorm = String(original || '').trim();
+    }
+    if (userNorm.length === 0) {
         console.log('хоть какой-то текст введи!!!');
         return;
     }    
-    if (userInput.length <= Math.floor(original.length / 2)) {
+    if (userNorm.length <= Math.floor(origNorm.length / 2)) {
         console.log('Хоть половину текста введи!!!');
         return;
     }
