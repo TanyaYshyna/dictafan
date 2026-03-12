@@ -388,10 +388,9 @@
 
 #home-library-modal .library-content {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   gap: 0;
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   overflow: hidden;
   position: relative;
 }
@@ -872,15 +871,15 @@
 
 .short-completion-badge {
   position: absolute;
-  top: 105px;
-  right: 4px;
-  display: inline-flex;
+  top: 10px;
+  right: 10px;
+  display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--color-button-yellow, #fbbf24);
-  color: var(--color-button-text-yellow, #1f2933);
-  border-radius: 12px;
-  padding: 4px 8px;
+  padding: 3px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  color: #7a1f2b;
   font-size: 12px;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -895,6 +894,14 @@
 
 .short-completion-badge .completion-count {
   line-height: 1;
+}
+
+.desk-show-in-book-highlight {
+  outline: 2px solid rgba(122, 31, 43, 0.55);
+  outline-offset: 3px;
+  box-shadow: 0 10px 26px rgba(122, 31, 43, 0.18);
+  border-radius: 16px;
+  transition: outline-color 0.2s ease;
 }
 
 .short-stats {
@@ -1232,48 +1239,6 @@
   transition: flex-basis 0.2s ease;
 }
 
-/* Когда активная книга показана, фиксируем ширину */
-.library-content.has-active-book .books-zone {
-  flex: 0 0 var(--books-zone-width, 280px);
-  border-radius: 12px 0 0 12px;
-  min-width: 200px;
-  max-width: 50%;
-}
-
-/* Разделитель между зонами */
-.zone-resizer {
-  width: 4px;
-  background: var(--color-border, #dee2e6);
-  cursor: col-resize;
-  position: relative;
-  flex-shrink: 0;
-  user-select: none;
-  transition: background 0.2s ease;
-}
-
-.zone-resizer:hover {
-  background: var(--color-border-hover, #adb5bd);
-}
-
-.zone-resizer::before {
-  content: '';
-  position: absolute;
-  left: -2px;
-  top: 0;
-  width: 8px;
-  height: 100%;
-  cursor: col-resize;
-}
-
-.zone-resizer.resizing {
-  background: var(--color-primary, #3b82f6);
-}
-
-/* Скрываем разделитель когда активная книга не показана */
-.library-content:not(.has-active-book) .zone-resizer {
-  display: none !important;
-}
-
 .books-zone-header {
   display: flex;
   align-items: center;
@@ -1493,8 +1458,8 @@
   z-index: 1000;
 }
 
-/* ЗОНА 3: Активная книга */
-.active-book-zone {
+/* ЗОНА 3: Активная книга (публичная библиотека) */
+.public-library-content .active-book-zone {
   flex: 1;
   background: var(--color-hover, #f8f9fa);
   border-radius: 0 12px 12px 0;
@@ -1868,72 +1833,6 @@
 /* .book-structure - стили для структуры книги (главы + диктанты) будут добавлены позже */
 
 /* Адаптивность */
-@media (max-width: 1024px) {
-  .library-content {
-    flex-direction: column !important;
-  }
-  
-  .books-zone {
-    flex: 1 1 auto; /* Растягивается по высоте, не фиксированная */
-    min-height: 300px; /* Минимальная высота для нормального отображения */
-    border-radius: 12px 12px 0 0;
-    width: 100% !important; /* Полная ширина на узких экранах */
-    max-width: 100% !important; /* Без ограничений по ширине */
-  }
-  
-  .books-list {
-    width: 100% !important; /* Полная ширина списка */
-    max-width: 100% !important;
-  }
-  
-  .books-zone::after {
-    display: none;
-  }
-  
-  .active-book-zone {
-    flex: 1;
-    border-radius: 0 0 12px 12px;
-    margin-left: 0;
-    margin-top: 4px;
-  }
-}
-
-/* Когда есть активная книга (ЗОНА 2 узкая), скрываем заголовок "Мои книги", но оставляем кнопку */
-.library-content.has-active-book .books-zone-header h3 {
-  display: none;
-}
-
-.library-content.has-active-book .books-zone-header {
-  justify-content: flex-start; /* Выравниваем по левому краю */
-  gap: 8px; /* Уменьшаем отступы */
-}
-
-.library-content.has-active-book .books-zone-header-right {
-  margin-left: auto; /* Кнопка остается справа */
-}
-
-/* На узких экранах тоже скрываем заголовок */
-@media (max-width: 768px) {
-  .books-zone-header h3 {
-    display: none;
-  }
-  
-  .books-zone-header {
-    justify-content: flex-start; /* Выравниваем по левому краю */
-    gap: 8px; /* Уменьшаем отступы */
-  }
-  
-  .books-zone-header-right {
-    margin-left: auto; /* Кнопка остается справа */
-  }
-  
-  /* Уменьшаем размеры селектора языка на очень узких экранах */
-  @media (max-width: 480px) {
-    .books-language-selector {
-      min-width: 80px;
-    }
-  }
-}
 
 /* ===================
    МОДАЛЬНОЕ ОКНО РЕДАКТИРОВАНИЯ КНИГИ
@@ -1996,12 +1895,108 @@
   padding: 4px;
   border-radius: 6px;
   transition: background-color 0.2s ease;
-  font-size: 24px;
   line-height: 1;
+}
+
+#book-edit-modal .modal-close i {
+  width: 18px;
+  height: 18px;
 }
 
 #book-edit-modal .modal-close:hover {
   background: var(--color-panel-bg, #fff);
+}
+
+/* ===================
+   МОДАЛЬНОЕ ОКНО ПРОСМОТРА КНИГИ (СТРУКТУРА)
+   =================== */
+#book-view-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+#book-view-modal[style*="flex"],
+#book-view-modal.show {
+  display: flex !important;
+}
+
+#book-view-modal .book-view-modal-content {
+  position: relative;
+  z-index: 10001;
+  margin: auto;
+  max-width: 95vw;
+  width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-panel-bg, #fff);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+#book-view-modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-border-light, #e2e8f0);
+  flex-shrink: 0;
+}
+
+#book-view-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+#book-view-modal .modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #dee2e6);
+  background: var(--color-panel-bg, #fff);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+#book-view-modal .modal-close:hover {
+  background: var(--color-hover, #f8f9fa);
+}
+
+#book-view-modal .modal-close i {
+  width: 18px;
+  height: 18px;
+}
+
+#book-view-modal .book-view-modal-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#book-view-modal #bookViewCard {
+  flex-shrink: 0;
+}
+
+#book-view-modal #bookViewStructure {
+  flex: 1;
 }
 
 /* Структура формы с обложкой слева */

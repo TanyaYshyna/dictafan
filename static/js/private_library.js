@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0186';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0191';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -126,6 +126,7 @@
   let bookLanguageSelector = null;
   let activeBookId = null;
   let activeBookIsWorkbook = false;
+  let bookViewActiveBookId = null;
   let currentView = 'cards'; // 'cards' or 'list'
   let cropper = null;
   let croppedImageBlob = null;
@@ -302,55 +303,26 @@
 
   function ensureSwStatusBar() {
     try {
-      const id = 'swStatusBar';
-      let el = document.getElementById(id);
-      if (el) return el;
-      el = document.createElement('div');
-      el.id = id;
-      el.style.position = 'fixed';
-      el.style.left = '0';
-      el.style.right = '0';
-      el.style.bottom = '0';
-      el.style.zIndex = '2147483647';
-      el.style.padding = '6px 10px';
-      el.style.fontSize = '12px';
-      el.style.lineHeight = '1.2';
-      el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-      el.style.color = 'rgba(255,255,255,0.85)';
-      el.style.background = 'rgba(0,0,0,0.55)';
-      el.style.backdropFilter = 'blur(6px)';
-      el.style.webkitBackdropFilter = 'blur(6px)';
-      el.style.display = 'none';
-      el.style.pointerEvents = 'none';
-      el.textContent = '';
-      document.body.appendChild(el);
-      return el;
+      const old = document.getElementById('swStatusBar');
+      if (old && old.parentNode) {
+        old.parentNode.removeChild(old);
+      }
     } catch (e) {
-      return null;
     }
+    return null;
   }
 
   function setSwStatus(message, opts = {}) {
     try {
-      const el = ensureSwStatusBar();
-      if (!el) return;
-      el.textContent = String(message || '');
-      el.style.display = message ? 'block' : 'none';
-      if (el._hideTimer) {
-        clearTimeout(el._hideTimer);
-        el._hideTimer = null;
-      }
-      const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1500;
-      if (message && durationMs > 0) {
-        el._hideTimer = setTimeout(() => {
-          try {
-            el.style.display = 'none';
-          } catch (e) {
-          }
-        }, durationMs);
+      // Route to the global status bar (sw_status_bar.js)
+      if (typeof window.setSwStatus === 'function') {
+        window.setSwStatus(message, opts);
+        return;
       }
     } catch (e) {
     }
+    // If global bar is not available, ensure we don't show legacy bar.
+    try { ensureSwStatusBar(); } catch (e2) {}
   }
 
   const PAGE_NAME = 'private_library';
@@ -756,6 +728,175 @@
     const modal = document.getElementById('home-library-modal');
     if (!modal) return;
     modal.style.display = 'none';
+  }
+
+  function openBookViewModal() {
+    const modal = document.getElementById('book-view-modal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
+  }
+
+  function closeBookViewModal() {
+    const modal = document.getElementById('book-view-modal');
+    if (!modal) return;
+    modal.style.display = 'none';
+    bookViewActiveBookId = null;
+    activeBookId = null;
+    activeBookIsWorkbook = false;
+    const card = document.getElementById('bookViewCard');
+    const structure = document.getElementById('bookViewStructure');
+    if (card) card.innerHTML = '';
+    if (structure) structure.innerHTML = '';
+  }
+
+  async function openBookViewBook(bookId, isWorkbook = false) {
+    const idNum = parseInt(String(bookId || ''), 10);
+    if (!idNum || !isFinite(idNum)) return;
+
+    openBookViewModal();
+
+    bookViewActiveBookId = idNum;
+    activeBookId = idNum;
+    activeBookIsWorkbook = !!isWorkbook;
+
+    const card = document.getElementById('bookViewCard');
+    const structure = document.getElementById('bookViewStructure');
+    if (!card || !structure) return;
+
+    // Загружаем книгу
+    const bookData = await apiRequest(`/library/api/book/${idNum}`);
+    if (bookData && bookData.success && bookData.book) {
+      const titleEl = document.getElementById('book-view-title');
+      if (titleEl) titleEl.textContent = bookData.book.title || 'Книга';
+      renderActiveBookCard(bookData.book, card, { onClose: closeBookViewModal });
+    }
+
+    // Загружаем структуру
+    let sections = [];
+    let dictations = [];
+    if (isWorkbook) {
+      const orphanData = await apiRequest(`/library/api/orphan-dictations`);
+      dictations = orphanData.success ? orphanData.dictations : [];
+    } else {
+      const sectionsData = await apiRequest(`/library/api/book/${idNum}/sections`);
+      const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
+      sections = sectionsData.success ? sectionsData.sections : [];
+      dictations = dictationsData.success ? dictationsData.dictations : [];
+      window.currentBookSections = sections;
+    }
+
+    renderBookContentTo(structure, sections, dictations, isWorkbook);
+  }
+
+  async function toggleSectionInContainer(sectionId, rootContainer) {
+    if (!rootContainer) return;
+    const sectionItem = rootContainer.querySelector(`.structure-section[data-section-id="${String(sectionId)}"]`);
+    if (!sectionItem) return;
+
+    const toggleBtn = sectionItem.querySelector('.structure-item-toggle');
+    const contentDiv = sectionItem.querySelector(`.structure-item-content[data-section-content-id="${String(sectionId)}"]`);
+    if (!toggleBtn || !contentDiv) return;
+
+    const icon = toggleBtn.querySelector('i[data-lucide]');
+    const expanded = contentDiv.style.display !== 'none';
+
+    if (expanded) {
+      contentDiv.style.display = 'none';
+      if (icon) icon.setAttribute('data-lucide', 'chevron-right');
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+      return;
+    }
+
+    contentDiv.style.display = 'block';
+    if (icon) icon.setAttribute('data-lucide', 'chevron-down');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
+    if (!existingContent || existingContent.classList.contains('section-dictations-loading')) {
+      await loadSectionDictations(sectionId, contentDiv);
+    }
+  }
+
+  async function showDeskDictationInBook(dictationId) {
+    const idNum = parseInt(String(dictationId || ''), 10);
+    if (!idNum || !isFinite(idNum)) return;
+
+    const t0 = performance.now();
+
+    try {
+      const token = window.UM?.token || localStorage.getItem('jwt_token');
+      if (!token) {
+        console.warn('[show-in-book] no token');
+        return;
+      }
+
+      const res = await fetch(`/library/api/dictation/${idNum}/book`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!res.ok) {
+        console.warn('[show-in-book] api_get_dictation_book failed', res.status);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      if (!data || !data.success || !data.book_id) {
+        console.log('[show-in-book] dictation is not in any book');
+        return;
+      }
+
+      const directBookId = Number(data.book_id);
+      const rootBookId = Number(data.root_book_id || data.book_id);
+
+      await openBookViewBook(rootBookId);
+
+      if (directBookId && rootBookId && directBookId !== rootBookId) {
+        try {
+          await toggleSectionInContainer(String(directBookId), document.getElementById('bookViewStructure'));
+        } catch (e) {
+          console.warn('[show-in-book] toggleSectionInContainer failed', e);
+        }
+      }
+
+      const findTarget = () => {
+        const structure = document.getElementById('bookViewStructure');
+        if (!structure) return null;
+        return structure.querySelector(`.short-card[data-dictation-id="${String(idNum)}"]`);
+      };
+
+      const scrollToTarget = () => {
+        const el = findTarget();
+        if (!el) return false;
+        try {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch (e) {
+          try {
+            el.scrollIntoView();
+          } catch (e2) {
+          }
+        }
+        try {
+          el.classList.add('desk-show-in-book-highlight');
+          setTimeout(() => el.classList.remove('desk-show-in-book-highlight'), 1600);
+        } catch (e) {
+        }
+        return true;
+      };
+
+      if (!scrollToTarget()) {
+        setTimeout(() => {
+          scrollToTarget();
+        }, 350);
+      }
+    } finally {
+      const t1 = performance.now();
+      console.log('[show-in-book] done', { ms: Math.round(t1 - t0), dictationId: idNum });
+    }
   }
 
   async function prefetchDeskAssets() {
@@ -1637,16 +1778,6 @@
       const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const coverUrl = maybeCacheBustDictationCover(item.cover_url) || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
 
-      let canEdit = false;
-      try {
-        const me = (window.UM && typeof window.UM.getCurrentUser === 'function') ? window.UM.getCurrentUser() : null;
-        const myId = me && me.id ? Number(me.id) : null;
-        const ownerId = item && item.owner_id ? Number(item.owner_id) : null;
-        canEdit = !!(myId && ownerId && myId === ownerId);
-      } catch (e) {
-        canEdit = false;
-      }
-
       const sentencesCount = typeof item.sentences_count === 'number'
         ? item.sentences_count
         : (parseInt(item.sentences_count, 10) || 0);
@@ -1670,10 +1801,12 @@
           <div class="short-meta">
             <span class="short-lang-flags">${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}</span>
             <span class="short-level">${item.level || '—'}</span>
-            ${canEdit ? `
             <a class="short-action-btn" href="${editUrl}" title="Редактировать" onclick="event.stopPropagation();">
               <i data-lucide="pencil-ruler"></i>
-            </a>` : ''}
+            </a>
+            <button class="short-action-btn" data-action="show-in-book" data-dictation-id="${dictationId}" title="Покажи диктант в книге">
+              <i data-lucide="book-marked"></i>
+            </button>
             <button class="short-action-btn" data-action="remove-from-desk" data-desk-item-id="${item.id}" data-dictation-id="${dictationId}" title="Убрать со стола">
               <i data-lucide="arrow-big-down-dash"></i>
             </button>
@@ -1748,16 +1881,62 @@
     }
   }
 
-  function applyDeskCovers(container) {
+  function normalizeCoverCacheUrl(rawUrl) {
+    try {
+      const u = new URL(String(rawUrl || ''), location.origin);
+      u.search = '';
+      return u.toString();
+    } catch (e) {
+      return String(rawUrl || '');
+    }
+  }
+
+  async function applyDeskCovers(container) {
     try {
       const imgs = container.querySelectorAll('.desk-card .short-cover[data-cover-url]');
-      imgs.forEach(img => {
-        if (img.dataset.coverApplied === '1') return;
+
+      let cacheHits = 0;
+      let cacheMisses = 0;
+
+      let cache = null;
+      try {
+        if ('caches' in window) {
+          cache = await caches.open('dictafan-media');
+        }
+      } catch (e) {
+        cache = null;
+      }
+
+      for (const img of imgs) {
+        if (img.dataset.coverApplied === '1') continue;
         const url = img.dataset.coverUrl;
-        if (!url) return;
+        if (!url) continue;
+
         img.dataset.coverApplied = '1';
-        img.src = maybeCacheBustDictationCover(url);
-      });
+
+        const src = maybeCacheBustDictationCover(url);
+
+        if (cache) {
+          try {
+            const probeUrl = normalizeCoverCacheUrl(src);
+            const hit = await cache.match(probeUrl);
+            if (hit) cacheHits += 1;
+            else cacheMisses += 1;
+          } catch (e) {
+            cacheMisses += 1;
+          }
+        }
+
+        img.src = src;
+      }
+
+      if (cache) {
+        console.log('[desk-render] stage2 covers source:', {
+          cacheHits,
+          networkOrB2: cacheMisses,
+          total: cacheHits + cacheMisses,
+        });
+      }
     } catch (e) {
       console.warn('[desk-render] applyDeskCovers failed', e);
     }
@@ -2081,7 +2260,10 @@
     container.appendChild(grid);
 
     const t1 = performance.now();
-    console.log('[desk-render] stage1 cards (no covers/reports):', Math.round(t1 - t0), 'ms', 'items:', items.length);
+    console.log('[desk-render] stage1 cards:', {
+      ms: Math.round(t1 - t0),
+      items: items.length,
+    });
 
     // Обновляем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -2096,21 +2278,23 @@
     }
 
     requestAnimationFrame(() => {
-      const t2Start = performance.now();
-      applyDeskCovers(container);
-      const t2End = performance.now();
-      console.log('[desk-render] stage2 covers applied:', Math.round(t2End - t2Start), 'ms');
+      (async () => {
+        const t2Start = performance.now();
+        await applyDeskCovers(container);
+        const t2End = performance.now();
+        console.log('[desk-render] stage2 covers applied:', { ms: Math.round(t2End - t2Start) });
 
-      setTimeout(async () => {
-        const t3Start = performance.now();
-        try {
-          updateDictationCardsStats(container);
-          await updateCompletionBadges(container);
-        } finally {
-          const t3End = performance.now();
-          console.log('[desk-render] stage3 reports (stats/badges):', Math.round(t3End - t3Start), 'ms');
-        }
-      }, 0);
+        setTimeout(async () => {
+          const t3Start = performance.now();
+          try {
+            updateDictationCardsStats(container);
+            await updateCompletionBadges(container);
+          } finally {
+            const t3End = performance.now();
+            console.log('[desk-render] stage3 stats/badges:', { ms: Math.round(t3End - t3Start) });
+          }
+        }, 0);
+      })().catch(() => {});
     });
 
     ensureDeskCacheIndicator();
@@ -2190,15 +2374,12 @@
       const bookId = parseInt(card.getAttribute('data-book-id'));
       const book = allBooks.find(b => b.id === bookId);
       
-      // Одиночный клик - выделить
-      card.addEventListener('click', (e) => {
-        setActiveBook(bookId);
-      });
-      
-      // Двойной клик - открыть зону 3
-      card.addEventListener('dblclick', (e) => {
-        setActiveBook(bookId);
-        openActiveBookZone(book);
+      card.addEventListener('click', async (e) => {
+        try {
+          setActiveBook(bookId);
+          await openBookViewBook(bookId, !!(book && book.is_workbook));
+        } catch (err) {
+        }
       });
     });
   }
@@ -2255,57 +2436,16 @@
     });
   }
 
-  // ==================== ЗОНА 3: Активная книга ====================
-  
+  // ==================== ЗОНА 3: Активная книга (устарело, заменено на book-view-modal) ====================
   async function openActiveBookZone(book) {
-    const zone = document.getElementById("activeBookZone");
-    if (!zone) return;
-
-    zone.style.display = 'flex';
-    
-    // Показываем разделитель и добавляем класс для изменения стилей
-    const libraryContent = document.querySelector('.library-content');
-    const resizer = document.getElementById('zoneResizer');
-    if (libraryContent) {
-      libraryContent.classList.add('has-active-book');
-    }
-    if (resizer) {
-      resizer.style.display = 'block';
-    }
-    
-    // Загружаем информацию о книге
-    const bookId = book.id || book;
-    const isWorkbook = book.is_workbook || false;
-    await loadActiveBook(bookId, isWorkbook);
-    
-    // Обновляем иконки
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
+    const bookId = book && typeof book === 'object' ? (book.id || null) : book;
+    if (bookId) {
+      await openBookViewBook(bookId, !!(book && book.is_workbook));
     }
   }
 
   function closeActiveBookZone() {
-    const zone = document.getElementById("activeBookZone");
-    if (zone) {
-      zone.style.display = 'none';
-      activeBookId = null;
-      activeBookIsWorkbook = false;
-      
-      // Скрываем разделитель и убираем класс
-      const libraryContent = document.querySelector('.library-content');
-      const resizer = document.getElementById('zoneResizer');
-      if (libraryContent) {
-        libraryContent.classList.remove('has-active-book');
-      }
-      if (resizer) {
-        resizer.style.display = 'none';
-      }
-      
-      // Убираем выделение
-      document.querySelectorAll('.book-card-mini').forEach(card => {
-        card.classList.remove('active');
-      });
-    }
+    closeBookViewModal();
   }
 
   async function loadActiveBook(bookId, isWorkbook = false) {
@@ -2315,7 +2455,16 @@
       const bookData = await apiRequest(`/library/api/book/${bookId}`);
       
       if (bookData.success && bookData.book) {
-        renderActiveBookCard(bookData.book, isWorkbook);
+        const viewCard = document.getElementById('bookViewCard');
+        const viewStructure = document.getElementById('bookViewStructure');
+
+        if (viewCard && viewStructure) {
+          openBookViewModal();
+          bookViewActiveBookId = bookId;
+          renderActiveBookCard(bookData.book, viewCard, { onClose: closeBookViewModal });
+        } else {
+          renderActiveBookCard(bookData.book);
+        }
       }
       
       let sections = [];
@@ -2342,14 +2491,16 @@
         window.currentBookSections = sections;
       }
       
-      renderBookContent(sections, dictations, isWorkbook);
+      const viewStructure = document.getElementById('bookViewStructure');
+      if (viewStructure) {
+        renderBookContentTo(viewStructure, sections, dictations, isWorkbook);
+      }
     } catch (error) {
       console.error("Ошибка загрузки активной книги:", error);
     }
   }
 
-  function renderBookContent(sections, dictations, isWorkbook = false) {
-    const container = document.getElementById("bookStructure");
+  function renderBookContentTo(container, sections, dictations, isWorkbook = false) {
     if (!container) return;
 
     if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
@@ -2442,8 +2593,10 @@
     }
   }
 
-  function renderActiveBookCard(book, targetContainer = null) {
-    const container = targetContainer || document.getElementById("activeBookCard");
+  function renderActiveBookCard(book, targetContainer = null, options = {}) {
+    const container = targetContainer
+      || document.getElementById("bookViewCard")
+      ;
     if (!container) return;
 
     console.log('📖 Рендерю большую карточку книги:', {
@@ -2501,7 +2654,7 @@
     
     // Кнопка закрытия книги
     const closeButton = `
-      <button class="book-card-max-close-btn" id="btnCloseActiveBook" title="Закрыть книгу">
+      <button class="book-card-max-close-btn btn-close-active-book" title="Закрыть книгу">
         <i data-lucide="arrow-left-to-line"></i>
       </button>
     `;
@@ -2536,10 +2689,10 @@
           ${book.short_description ? `<p class="book-card-max-description">${book.short_description}</p>` : ''}
           <div class="book-card-max-actions">
             <div class="dropdown-menu-wrapper">
-              <button class="book-card-max-btn dropdown-toggle" id="btnBookActions" title="Действия">
+              <button class="book-card-max-btn dropdown-toggle btn-book-actions" title="Действия">
                 <i data-lucide="more-vertical"></i>
               </button>
-              <div class="dropdown-menu" id="bookActionsMenu" style="display: none;">
+              <div class="dropdown-menu book-actions-menu" style="display: none;">
                 <button class="dropdown-menu-item" data-action="add-section">
                   <i data-lucide="plus"></i>
                   <span>Добавить раздел</span>
@@ -2564,18 +2717,22 @@
     `;
 
     // Обработчик кнопки закрытия книги
-    const closeBtn = document.getElementById("btnCloseActiveBook");
+    const closeBtn = container.querySelector(".btn-close-active-book");
     if (closeBtn) {
       closeBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        closeActiveBookZone();
+        if (typeof options.onClose === 'function') {
+          options.onClose();
+        } else {
+          closeActiveBookZone();
+        }
       });
     }
 
     // Обработчики выпадающего меню действий книги
-    const bookActionsBtn = document.getElementById("btnBookActions");
-    const bookActionsMenu = document.getElementById("bookActionsMenu");
+    const bookActionsBtn = container.querySelector(".btn-book-actions");
+    const bookActionsMenu = container.querySelector(".book-actions-menu");
     
     if (bookActionsBtn && bookActionsMenu) {
       // Открытие/закрытие меню
@@ -2598,17 +2755,17 @@
           
           // Закрываем меню при клике вне его
           setTimeout(() => {
-            const closeMenuHandler = function(e) {
-              if (!bookActionsMenu.contains(e.target) && !bookActionsBtn.contains(e.target)) {
-                bookActionsMenu.classList.remove('show');
-                bookActionsMenu.style.display = 'none';
-                document.removeEventListener('click', closeMenuHandler);
-              }
-            };
-            document.addEventListener('click', closeMenuHandler);
-          }, 0);
-        }
-      });
+          const closeMenuHandler = function(e) {
+            if (!bookActionsMenu.contains(e.target) && !bookActionsBtn.contains(e.target)) {
+              bookActionsMenu.classList.remove('show');
+              bookActionsMenu.style.display = 'none';
+              document.removeEventListener('click', closeMenuHandler);
+            }
+          };
+          document.addEventListener('click', closeMenuHandler);
+        }, 0);
+      }
+    });
       
       // Обработчики пунктов меню
       bookActionsMenu.addEventListener("click", (e) => {
@@ -2647,70 +2804,6 @@
     // Обновляем иконки
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
-    }
-  }
-
-  async function toggleSection(sectionId) {
-    console.log('🔄 toggleSection вызвана для раздела:', sectionId);
-    const sectionItem = document.querySelector(`.structure-section[data-section-id="${sectionId}"]`);
-    if (!sectionItem) {
-      console.error('❌ Раздел не найден в DOM:', sectionId);
-      return;
-    }
-
-    const toggleBtn = sectionItem.querySelector('.structure-item-toggle');
-    const contentDiv = sectionItem.querySelector(`.structure-item-content[data-section-content-id="${sectionId}"]`);
-    
-    console.log('🔍 Элементы раздела:', { 
-      sectionItem: !!sectionItem, 
-      toggleBtn: !!toggleBtn, 
-      contentDiv: !!contentDiv
-    });
-    
-    if (!contentDiv) {
-      console.error('❌ contentDiv не найден для раздела:', sectionId);
-      return;
-    }
-    if (!toggleBtn) {
-      console.error('❌ toggleBtn не найден для раздела:', sectionId);
-      return;
-    }
-
-    const isExpanded = contentDiv.style.display !== 'none';
-    
-    // Ищем иконку - может быть внутри кнопки или как дочерний элемент
-    let icon = toggleBtn.querySelector('i[data-lucide]');
-    if (!icon) {
-      // Если иконка не найдена, создаем её
-      icon = document.createElement('i');
-      icon.setAttribute('data-lucide', 'chevron-right');
-      toggleBtn.innerHTML = '';
-      toggleBtn.appendChild(icon);
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-    }
-    
-    if (isExpanded) {
-      // Сворачиваем
-      contentDiv.style.display = 'none';
-      icon.setAttribute('data-lucide', 'chevron-right');
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-    } else {
-      // Раскрываем и загружаем диктанты
-      contentDiv.style.display = 'block';
-      icon.setAttribute('data-lucide', 'chevron-down');
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-      
-      // Проверяем, загружены ли уже диктанты
-      const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
-      if (!existingContent || existingContent.classList.contains('section-dictations-loading')) {
-        await loadSectionDictations(sectionId, contentDiv);
-      }
     }
   }
 
@@ -3325,64 +3418,6 @@
     }
   }
 
-  // ==================== Разделитель между зонами ====================
-  
-  function initZoneResizer() {
-    const resizer = document.getElementById('zoneResizer');
-    const booksZone = document.getElementById('booksZone');
-    const libraryContent = document.querySelector('.library-content');
-    
-    if (!resizer || !booksZone || !libraryContent) return;
-
-    let isResizing = false;
-    let startX = 0;
-    let startWidth = 0;
-
-    // Восстанавливаем сохраненную ширину
-    const savedWidth = localStorage.getItem('books-zone-width');
-    if (savedWidth) {
-      document.documentElement.style.setProperty('--books-zone-width', savedWidth + 'px');
-    }
-
-    const startResize = (e) => {
-      isResizing = true;
-      startX = e.clientX || e.touches[0].clientX;
-      startWidth = booksZone.offsetWidth;
-      resizer.classList.add('resizing');
-      document.body.style.cursor = 'col-resize';
-      document.body.style.userSelect = 'none';
-      e.preventDefault();
-    };
-
-    const doResize = (e) => {
-      if (!isResizing) return;
-      
-      const currentX = e.clientX || e.touches[0].clientX;
-      const diff = currentX - startX;
-      const newWidth = Math.max(200, Math.min(startWidth + diff, libraryContent.offsetWidth * 0.5));
-      
-      document.documentElement.style.setProperty('--books-zone-width', newWidth + 'px');
-      localStorage.setItem('books-zone-width', newWidth.toString());
-    };
-
-    const stopResize = () => {
-      if (!isResizing) return;
-      isResizing = false;
-      resizer.classList.remove('resizing');
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-
-    resizer.addEventListener('mousedown', startResize);
-    resizer.addEventListener('touchstart', startResize, { passive: false });
-    
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('touchmove', doResize, { passive: false });
-    
-    document.addEventListener('mouseup', stopResize);
-    document.addEventListener('touchend', stopResize);
-  }
-
   // ==================== Инициализация ====================
   
   function installEventHandlers() {
@@ -3525,13 +3560,24 @@
       });
     }
 
-    // Инициализация перетаскивания разделителя между зонами
-    initZoneResizer();
-
     // Закрытие модального окна публичной библиотеки
     const publicLibraryCloseBtn = document.getElementById("public-library-close");
     if (publicLibraryCloseBtn) {
       publicLibraryCloseBtn.addEventListener("click", closePublicLibraryModal);
+    }
+
+    const bookViewCloseBtn = document.getElementById('book-view-close');
+    if (bookViewCloseBtn) {
+      bookViewCloseBtn.addEventListener('click', closeBookViewModal);
+    }
+
+    const bookViewModal = document.getElementById('book-view-modal');
+    if (bookViewModal) {
+      bookViewModal.addEventListener('click', (event) => {
+        if (event.target === bookViewModal) {
+          closeBookViewModal();
+        }
+      });
     }
 
     const publicLibraryModal = document.getElementById("public-library-modal");
@@ -3674,9 +3720,21 @@
         e.stopPropagation();
         const btn = e.target.closest('.structure-item-toggle');
         const sectionId = btn.getAttribute('data-section-id');
-        if (sectionId) {
-          await toggleSection(sectionId);
+        if (!sectionId) return;
+
+        // Book view overlay
+        if (btn.closest && btn.closest('#bookViewStructure')) {
+          await toggleSectionInContainer(sectionId, document.getElementById('bookViewStructure'));
+          return;
         }
+
+        // Public library right pane
+        if (btn.closest && btn.closest('#publicBookStructure')) {
+          await togglePublicSection(sectionId);
+          return;
+        }
+
+        // Legacy / no-op
       }
 
       // Выпадающее меню действий раздела
@@ -3695,7 +3753,7 @@
               m.style.display = 'none';
             }
           });
-          document.querySelectorAll('#bookActionsMenu').forEach(m => {
+          document.querySelectorAll('.book-actions-menu').forEach(m => {
             m.classList.remove('show');
             m.style.display = 'none';
           });
@@ -3857,6 +3915,16 @@
         const dictationId = btn.getAttribute('data-dictation-id');
         if (itemId && dictationId) {
           removeFromDesk(itemId, dictationId);
+        }
+      }
+
+      if (e.target.closest('[data-action="show-in-book"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const btn = e.target.closest('[data-action="show-in-book"]');
+        const dictationId = btn.getAttribute('data-dictation-id');
+        if (dictationId) {
+          await showDeskDictationInBook(dictationId);
         }
       }
 
@@ -4305,15 +4373,8 @@
         showToast("Книга удалена");
         // Перезагружаем список книг
         await loadBooksFromAPI();
-        // Очищаем активную книгу
-        activeBookId = null;
-        const container = document.getElementById("activeBookCard");
-        if (container) {
-          container.innerHTML = '';
-        }
-        const structureContainer = document.getElementById("bookStructure");
-        if (structureContainer) {
-          structureContainer.innerHTML = '';
+        if (String(bookViewActiveBookId || '') === String(bookId || '') || String(activeBookId || '') === String(bookId || '')) {
+          closeBookViewModal();
         }
       } else {
         showToast(data.error || "Ошибка при удалении книги", "error");
@@ -4984,27 +5045,16 @@
     window.currentPublicBook = book;
     
     // Используем существующую функцию renderActiveBookCard для единообразия
-    await renderActiveBookCard(book, container);
+    await renderActiveBookCard(book, container, { onClose: closePublicActiveBookZone });
     
     // Загружаем разделы и диктанты
     await loadPublicBookContent(book.id);
     
-    // Меняем обработчик кнопки закрытия - закрываем только активную книгу в модальном окне
-    const closeBtn = container.querySelector('#btnCloseActiveBook');
-    if (closeBtn) {
-      closeBtn.onclick = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        closePublicActiveBookZone();
-      };
-    }
-    
     // Заменяем меню действий на кнопку "Добавить на полку"
-    const actionsBtn = container.querySelector('#btnBookActions');
-    const actionsMenu = container.querySelector('#bookActionsMenu');
+    const actionsBtn = container.querySelector('.btn-book-actions');
+    const actionsMenu = container.querySelector('.book-actions-menu');
     if (actionsBtn && actionsMenu) {
       // Удаляем старое меню и создаем простое
-      actionsBtn.onclick = null;
       actionsMenu.innerHTML = '';
       
       const addToShelfBtn = document.createElement('button');
@@ -5014,26 +5064,6 @@
         await addPublicBookToShelf(book.id);
       });
       actionsMenu.appendChild(addToShelfBtn);
-      
-      // Восстанавливаем обработчик меню
-      actionsBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const isVisible = actionsMenu.style.display === 'block';
-        actionsMenu.style.display = isVisible ? 'none' : 'block';
-        
-        if (!isVisible) {
-          setTimeout(() => {
-            const closeMenuHandler = function(e) {
-              if (!actionsMenu.contains(e.target) && !actionsBtn.contains(e.target)) {
-                actionsMenu.style.display = 'none';
-                document.removeEventListener('click', closeMenuHandler);
-              }
-            };
-            document.addEventListener('click', closeMenuHandler);
-          }, 0);
-        }
-      });
     }
     
     if (typeof lucide !== 'undefined') {
@@ -5444,11 +5474,10 @@
         closePublicLibraryModal();
         // Обновляем список книг
         await loadBooksFromAPI();
-        // Открываем книгу в основной библиотеке
-        const bookData = await apiRequest(`/library/api/book/${bookId}`);
-        if (bookData.success && bookData.book) {
+        try {
           setActiveBook(bookId);
-          openActiveBookZone(bookData.book);
+          await openBookViewBook(bookId);
+        } catch (e) {
         }
         showToast('Книга добавлена на вашу полку');
       } else {
