@@ -217,17 +217,43 @@ class B2Storage:
         return out
 
     def delete_prefix(self, path_prefix: str = ""):
-        """Удаляет все файлы в B2 с данным prefix. Возвращает количество удалённых."""
+        """Удаляет все версии файлов в B2 с данным prefix. Возвращает количество удалённых.
+
+        В B2 у файла могут быть версии (UI показывает "(2)", "(3)").
+        delete_file() через get_file_info_by_name удаляет только текущую версию.
+        Поэтому здесь мы удаляем КАЖДУЮ версию, возвращаемую bucket.ls().
+        """
         if not self.enabled or not self.bucket:
             return 0
+
         prefix = str(path_prefix or "")
         deleted = 0
-        for name in self.list_files(prefix):
-            try:
-                if self.delete_file(name):
+        try:
+            for file_version, folder_name in self.bucket.ls(folder_to_list=prefix, recursive=True):
+                try:
+                    if not file_version:
+                        continue
+                    name = getattr(file_version, 'file_name', None) or getattr(file_version, 'fileName', None)
+                    if not name:
+                        continue
+                    if prefix and not str(name).startswith(prefix):
+                        continue
+                    # Delete this exact version.
+                    file_version.delete()
                     deleted += 1
-            except Exception:
-                continue
+                except B2Error as e:
+                    logger.error("Failed to delete B2 file version under prefix %s: %s", prefix, e, exc_info=True)
+                    continue
+                except Exception as e:
+                    logger.error("Unexpected error deleting B2 file version under prefix %s: %s", prefix, e, exc_info=True)
+                    continue
+        except B2Error as e:
+            logger.error("B2 delete_prefix ls failed for %s: %s", prefix, e, exc_info=True)
+            return deleted
+        except Exception as e:
+            logger.error("B2 delete_prefix unexpected ls error for %s: %s", prefix, e, exc_info=True)
+            return deleted
+
         return deleted
 
 # Глобальный экземпляр

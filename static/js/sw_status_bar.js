@@ -9,6 +9,13 @@
       timer: null,
     };
 
+    var progressState = {
+      active: false,
+      label: '',
+      percent: null,
+      updatedAt: 0,
+    };
+
     // Public page-published info shown on the right.
     // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
     var pageInfo = {
@@ -75,6 +82,13 @@
           "#" + BAR_ID + "{box-sizing:border-box;}" +
           "#" + BAR_ID + " .swbar-inner{display:flex;align-items:center;justify-content:space-between;gap:10px;}" +
           "#" + BAR_ID + " .swbar-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+          "#" + BAR_ID + " .swbar-left-wrap{display:flex;align-items:center;gap:10px;min-width:0;}" +
+          "#" + BAR_ID + " .swbar-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+          "#" + BAR_ID + " .swbar-progress{display:none;align-items:center;gap:8px;flex:0 0 auto;}" +
+          "#" + BAR_ID + " .swbar-progress.on{display:flex;}" +
+          "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.10);overflow:hidden;}" +
+          "#" + BAR_ID + " .swbar-progress-bar{height:100%;width:0%;background:rgba(25,166,74,0.85);transition:width 120ms linear;}" +
+          "#" + BAR_ID + " .swbar-progress-pct{opacity:0.85;}" +
           "#" + BAR_ID + " .swbar-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-meta{opacity:0.75;}" +
           "#" + BAR_ID + " .swbar-btn{pointer-events:auto;cursor:pointer;border:1px solid rgba(0,0,0,0.18);background:rgba(255,255,255,0.7);color:rgba(0,0,0,0.8);border-radius:8px;padding:2px 8px;font-size:12px;line-height:18px;}" +
@@ -113,7 +127,42 @@
         var left = document.createElement('div');
         left.className = 'swbar-left';
         left.id = BAR_ID + '__left';
-        left.textContent = 'SW: idle';
+
+        var leftWrap = document.createElement('div');
+        leftWrap.className = 'swbar-left-wrap';
+
+        var msg = document.createElement('div');
+        msg.className = 'swbar-msg';
+        msg.id = BAR_ID + '__msg';
+        msg.textContent = 'SW: idle';
+
+        var prog = document.createElement('div');
+        prog.className = 'swbar-progress';
+        prog.id = BAR_ID + '__progress';
+
+        var progLabel = document.createElement('div');
+        progLabel.id = BAR_ID + '__progressLabel';
+        progLabel.textContent = '';
+
+        var track = document.createElement('div');
+        track.className = 'swbar-progress-track';
+        var bar = document.createElement('div');
+        bar.className = 'swbar-progress-bar';
+        bar.id = BAR_ID + '__progressBar';
+        track.appendChild(bar);
+
+        var pct = document.createElement('div');
+        pct.className = 'swbar-progress-pct';
+        pct.id = BAR_ID + '__progressPct';
+        pct.textContent = '';
+
+        prog.appendChild(progLabel);
+        prog.appendChild(track);
+        prog.appendChild(pct);
+
+        leftWrap.appendChild(msg);
+        leftWrap.appendChild(prog);
+        left.appendChild(leftWrap);
 
         var right = document.createElement('div');
         right.className = 'swbar-right';
@@ -159,9 +208,43 @@
         inner.appendChild(right);
         el.appendChild(inner);
         document.body.appendChild(el);
+
+        // reflect any pending progress state
+        try {
+          if (progressState && progressState.active) {
+            updateProgressUi(progressState.label, progressState.percent);
+          }
+        } catch (e) {
+        }
         return el;
       } catch (e) {
         return null;
+      }
+    }
+
+    function updateProgressUi(label, percent) {
+      try {
+        var prog = document.getElementById(BAR_ID + '__progress');
+        if (!prog) return;
+        var lbl = document.getElementById(BAR_ID + '__progressLabel');
+        var bar = document.getElementById(BAR_ID + '__progressBar');
+        var pct = document.getElementById(BAR_ID + '__progressPct');
+
+        var text = String(label || '').trim();
+        if (lbl) lbl.textContent = text;
+
+        var p = (percent === 0 || percent) ? Number(percent) : NaN;
+        var hasPct = isFinite(p) && p >= 0;
+        if (pct) pct.textContent = hasPct ? (Math.min(100, Math.max(0, Math.round(p))) + '%') : '';
+        if (bar) bar.style.width = hasPct ? (Math.min(100, Math.max(0, p)) + '%') : '12%';
+
+        if (text || hasPct) {
+          prog.classList.add('on');
+        } else {
+          prog.classList.remove('on');
+          if (bar) bar.style.width = '0%';
+        }
+      } catch (e) {
       }
     }
 
@@ -171,11 +254,16 @@
         if (!el) return;
         var msg = String(message || '').trim();
         if (!msg) msg = 'SW: idle';
-        var left = document.getElementById(BAR_ID + '__left');
-        if (left) {
-          left.textContent = msg;
+        var msgEl = document.getElementById(BAR_ID + '__msg');
+        if (msgEl) {
+          msgEl.textContent = msg;
         } else {
-          el.textContent = msg;
+          var left = document.getElementById(BAR_ID + '__left');
+          if (left) {
+            left.textContent = msg;
+          } else {
+            el.textContent = msg;
+          }
         }
 
         // keep meta refreshed (some pages set build var after scripts)
@@ -249,6 +337,29 @@
         } catch (e) {
         }
         refreshMeta();
+      };
+
+      window.setSwBarProgress = function (label, percent) {
+        try {
+          var l = String(label || '').trim();
+          var p = (percent === 0 || percent) ? Number(percent) : null;
+          if (!(p === null || (isFinite(p) && p >= 0))) {
+            p = null;
+          }
+          progressState.active = !!(l || (p === 0 || p));
+          progressState.label = l;
+          progressState.percent = p;
+          progressState.updatedAt = Date.now();
+        } catch (e) {
+          progressState.active = false;
+          progressState.label = '';
+          progressState.percent = null;
+        }
+        try {
+          ensureBar();
+        } catch (e) {
+        }
+        updateProgressUi(progressState.label, progressState.percent);
       };
     } catch (e) {
     }

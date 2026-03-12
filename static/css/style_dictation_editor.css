@@ -441,6 +441,27 @@ button.audio-btn i[data-lucide] {
     flex-shrink: 0;  /* Верхние элементы не сжимаются */
 }
 
+.start-modal-title-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.start-modal-language-group {
+    flex: 0 0 auto;
+    min-width: 150px;
+}
+
+.start-modal-title-group {
+    flex: 1 1 auto;
+    min-width: 220px;
+}
+
+.start-modal-language-group #startModalOriginalLanguage {
+    display: flex;
+    align-items: center;
+}
+
 .start-modal .speakers-table {
     flex-shrink: 0;  /* Таблица спикеров не сжимается */
 }
@@ -479,6 +500,44 @@ button.audio-btn i[data-lucide] {
 .start-modal textarea {
     resize: vertical;
     min-height: 120px;
+}
+
+.topbar-icon-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    z-index: 22;
+    pointer-events: auto;
+    color: var(--color-text-secondary);
+}
+
+.topbar-icon-btn:hover {
+    background: var(--color-hover);
+}
+
+.topbar-icon-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+#saveBtn.save-status-clean {
+    color: var(--color-text-secondary);
+}
+
+#saveBtn.save-status-pending {
+    color: var(--color-button-text-yellow);
+}
+
+#saveBtn.save-status-syncing {
+    color: var(--color-button-text-purple);
+}
+
+#saveBtn.save-status-error {
+    color: var(--color-error);
 }
 
 /* Таблица спикеров */

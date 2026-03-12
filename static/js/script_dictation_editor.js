@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0185';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0188';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -1085,6 +1085,8 @@ const audioTableActionBtn = document.getElementById('audioTableActionBtn');
 // Модальные окна для новой архитектуры
 let startModal = null; // стартовое модальное окно
 let audioSettingsModal = null; // модальное окно настроек аудио
+
+let startModalLanguageSelector = null;
 
 
 let data = [];
@@ -2892,6 +2894,27 @@ function setButtonState(button, state = '') {
 // ============================================================================
 
 function showLoadingIndicator(message = 'Загрузка...') {
+    try {
+        if (typeof window.setSwBarProgress === 'function') {
+            const msg = String(message || '').trim();
+            let pct = null;
+            try {
+                const m = msg.match(/(\d+)\s*(?:из|of)\s*(\d+)/i);
+                if (m) {
+                    const cur = Number(m[1]);
+                    const total = Number(m[2]);
+                    if (isFinite(cur) && isFinite(total) && total > 0) {
+                        pct = Math.round((cur / total) * 100);
+                    }
+                }
+            } catch (e2) {
+                pct = null;
+            }
+            window.setSwBarProgress(msg, pct);
+        }
+    } catch (e) {
+    }
+
     // Создаем overlay
     let overlay = document.getElementById('loading-overlay');
     if (!overlay) {
@@ -2911,6 +2934,13 @@ function showLoadingIndicator(message = 'Загрузка...') {
 }
 
 function hideLoadingIndicator() {
+    try {
+        if (typeof window.setSwBarProgress === 'function') {
+            window.setSwBarProgress('', null);
+        }
+    } catch (e) {
+    }
+
     const overlay = document.getElementById('loading-overlay');
     if (overlay) {
         overlay.style.display = 'none';
@@ -7681,6 +7711,44 @@ function setupStartModalHandlers() {
         createDictationBtn.addEventListener('click', createDictationFromStart);
     }
 
+    // Title field inside start modal: mirror to main title and auto-translate.
+    const startTitleInput = document.getElementById('startTitleInput');
+    if (startTitleInput) {
+        startTitleInput.addEventListener('input', () => {
+            try {
+                const titleInput = document.getElementById('title');
+                if (titleInput) {
+                    titleInput.value = startTitleInput.value;
+                }
+                const tabTitleInput = document.getElementById('tabTitle');
+                if (tabTitleInput) {
+                    tabTitleInput.value = startTitleInput.value;
+                }
+                try { setDictationNameTitle(startTitleInput.value); } catch (e) {}
+                try {
+                    if (workingData && workingData.original) {
+                        workingData.original.title = startTitleInput.value;
+                    }
+                } catch (e) {
+                }
+                setDirtyFlags({ db: true });
+                updateUnsavedStar();
+            } catch (e) {
+            }
+        });
+
+        startTitleInput.addEventListener('keydown', async (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                await autoTranslateTitleIntoMainFields(startTitleInput.value);
+            }
+        });
+
+        startTitleInput.addEventListener('blur', async () => {
+            await autoTranslateTitleIntoMainFields(startTitleInput.value);
+        });
+    }
+
     // Кнопка "Внести текст заново"
     const refillTableBtn = document.getElementById('refillTableBtn');
     if (refillTableBtn) {
@@ -7790,8 +7858,141 @@ function openStartModal() {
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
 
+        try {
+            initStartModalLanguageSelector();
+        } catch (e) {
+        }
+
     } else {
         console.error('❌ Элемент startModal не найден!');
+    }
+}
+
+function initStartModalLanguageSelector() {
+    try {
+        const container = document.getElementById('startModalOriginalLanguage');
+        if (!container) return;
+
+        const initSelector = () => {
+            try {
+                if (!window.LanguageManager || !window.LanguageManager.isInitialized) {
+                    setTimeout(initSelector, 100);
+                    return;
+                }
+
+                const languageData = window.LanguageManager.getLanguageData();
+                if (!languageData) {
+                    setTimeout(initSelector, 100);
+                    return;
+                }
+
+                // Default original language: from current dictation/category or user profile.
+                let defaultLearning = '';
+                try {
+                    defaultLearning = (currentDictation && currentDictation.language_original) ? String(currentDictation.language_original) : '';
+                } catch (e0) {
+                    defaultLearning = '';
+                }
+                if (!defaultLearning) {
+                    try {
+                        defaultLearning = (window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage))
+                            ? String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage)
+                            : '';
+                    } catch (e1) {
+                        defaultLearning = '';
+                    }
+                }
+                if (!defaultLearning) {
+                    defaultLearning = 'en';
+                }
+
+                // Translation language stays fixed from the dictation/category.
+                let nativeLang = '';
+                try {
+                    nativeLang = (currentDictation && currentDictation.language_translation) ? String(currentDictation.language_translation) : '';
+                } catch (e2) {
+                    nativeLang = '';
+                }
+                if (!nativeLang) nativeLang = 'ru';
+
+                // Reset container to avoid duplicated DOM.
+                container.innerHTML = '';
+
+                if (typeof window.initLanguageSelector === 'function') {
+                    startModalLanguageSelector = window.initLanguageSelector('startModalOriginalLanguage', {
+                        mode: 'learning-selector-compact',
+                        nativeLanguage: nativeLang,
+                        currentLearning: defaultLearning,
+                        learningLanguages: Object.keys(languageData || {}),
+                        languageData: languageData,
+                        onLanguageChange: function (values) {
+                            try {
+                                const next = values && values.currentLearning ? String(values.currentLearning) : '';
+                                if (!next) return;
+                                currentDictation.language_original = next;
+                                try {
+                                    initLanguageFlags({
+                                        original_language: currentDictation.language_original,
+                                        translation_language: currentDictation.language_translation,
+                                        dictation_id: 'new'
+                                    });
+                                } catch (e3) {
+                                }
+                            } catch (e4) {
+                            }
+                        }
+                    });
+                }
+            } catch (e) {
+            }
+        };
+
+        initSelector();
+    } catch (e) {
+    }
+}
+
+function getStartModalOriginalLanguage() {
+    try {
+        if (startModalLanguageSelector && typeof startModalLanguageSelector.getValues === 'function') {
+            const v = startModalLanguageSelector.getValues();
+            const lang = v && v.currentLearning ? String(v.currentLearning).trim() : '';
+            if (lang) return lang;
+        }
+    } catch (e) {
+    }
+    try {
+        return currentDictation && currentDictation.language_original ? String(currentDictation.language_original).trim() : '';
+    } catch (e) {
+        return '';
+    }
+}
+
+async function autoTranslateTitleIntoMainFields(originalTitle) {
+    try {
+        const titleInput = document.getElementById('title');
+        const translationTitleInput = document.getElementById('title_translation');
+        if (!titleInput || !translationTitleInput) return;
+
+        const t = String(originalTitle || '').trim();
+        if (!t) return;
+
+        const translatedTitle = await translateTextForEditing(
+            t,
+            currentDictation.language_original,
+            currentDictation.language_translation
+        );
+        translationTitleInput.value = translatedTitle;
+        try {
+            updateTitlesInWorkingData();
+        } catch (e) {
+        }
+        try {
+            setDirtyFlags({ db: true });
+            updateUnsavedStar();
+        } catch (e) {
+        }
+    } catch (e) {
     }
 }
 
@@ -7921,6 +8122,46 @@ async function createDictationFromStart() {
     const text = normalizeDictationInvisibleChars(normalizeNewlines(rawText)).trim();
     const delimiter = document.getElementById('translationDelimiter').value.trim();
     const isDialog = document.getElementById('isDialogCheckbox').checked;
+
+    // Apply selected language + title from modal.
+    try {
+        const modalLang = getStartModalOriginalLanguage();
+        if (modalLang) {
+            currentDictation.language_original = modalLang;
+            try {
+                initLanguageFlags({
+                    original_language: currentDictation.language_original,
+                    translation_language: currentDictation.language_translation,
+                    dictation_id: 'new'
+                });
+            } catch (e) {
+            }
+        }
+    } catch (e) {
+    }
+
+    try {
+        const startTitleInput = document.getElementById('startTitleInput');
+        const titleVal = startTitleInput ? String(startTitleInput.value || '') : '';
+        const titleInput = document.getElementById('title');
+        if (titleInput) {
+            titleInput.value = titleVal;
+        }
+        const tabTitleInput = document.getElementById('tabTitle');
+        if (tabTitleInput) {
+            tabTitleInput.value = titleVal;
+        }
+        try { setDictationNameTitle(titleVal); } catch (e2) {}
+        try {
+            if (workingData && workingData.original) {
+                workingData.original.title = titleVal;
+            }
+        } catch (e3) {
+        }
+        // Ensure translation title exists by auto translating on create.
+        await autoTranslateTitleIntoMainFields(titleVal);
+    } catch (e) {
+    }
 
     if (!text) {
         alert('Введите текст диктанта');
