@@ -1934,7 +1934,7 @@
   height: calc(100% - var(--topbar-height, 56px));
   justify-content: flex-end;
   align-items: stretch;
-  z-index: 10000;
+  z-index: 10020 !important;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
   overflow-x: hidden;
@@ -1947,7 +1947,7 @@
 
 #book-view-modal .book-view-modal-content {
   position: relative;
-  z-index: 10001;
+  z-index: 10021 !important;
   margin: 0;
   max-width: 75vw;
   width: 75vw;
