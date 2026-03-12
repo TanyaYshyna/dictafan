@@ -453,16 +453,18 @@
     <!-- Стартовое модальное окно -->
     <div id="startModal" class="modal-overlay" style="display: none;">
         <div class="modal-content start-modal">
-            <h2>Создание диктанта</h2>
-
-            <div class="form-group-line start-modal-title-row">
-                <div class="form-group start-modal-language-group">
-                    <label>Язык:</label>
+            <div class="start-modal-header-row">
+                <div class="start-modal-header-left">
                     <div id="startModalOriginalLanguage"></div>
                 </div>
-                <div class="form-group start-modal-title-group">
-                    <label for="startTitleInput">Название:</label>
-                    <input type="text" id="startTitleInput" placeholder="Введите название...">
+                <div class="start-modal-header-center">
+                    <h2>Создание диктанта</h2>
+                </div>
+                <div class="start-modal-header-actions">
+                    <button type="button" id="createDictationBtn">Сформировать диктант</button>
+                    <button type="button" id="cancelStartBtn" title="Закрыть">
+                        <i data-lucide="x"></i>
+                    </button>
                 </div>
             </div>
 
@@ -479,6 +481,11 @@
                     <!-- Старое значение: value="/*" -->
                     <input type="text" id="translationDelimiter" value="//" placeholder="//">
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label for="startTitleInput">Название:</label>
+                <input type="text" id="startTitleInput" placeholder="Введите название...">
             </div>
             <div id="speakersTable" class="speakers-table" style="display: none;">
                 <h3>Спикеры</h3>
@@ -510,18 +517,11 @@
                     <i data-lucide="user-plus"></i>
                 </button>
             </div>
-
-
-            <div class="modal-buttons">
-                <button type="button" id="cancelStartBtn">Отмена</button>
-                <button type="button" id="createDictationBtn">Сформировать диктант</button>
-            </div>
-
-
             <div class="form-group">
-                <label for="startTextInput">Текст диктанта:</label>
-                <div id="startTextInput" contenteditable="true" class="start-text-editor" rows="10"
-                    placeholder="Введите текст диктанта..."></div>
+                <label>Текст диктанта:</label>
+            </div>
+            <div class="form-group">
+                <div id="startTextInput" contenteditable="true" class="start-text-editor" rows="10" placeholder="Введите текст диктанта..."></div>
             </div>
         </div>
     </div>

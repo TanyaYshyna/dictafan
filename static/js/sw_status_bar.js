@@ -13,6 +13,7 @@
       active: false,
       label: '',
       percent: null,
+      kind: '',
       updatedAt: 0,
     };
 
@@ -88,6 +89,8 @@
           "#" + BAR_ID + " .swbar-progress.on{display:flex;}" +
           "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.10);overflow:hidden;}" +
           "#" + BAR_ID + " .swbar-progress-bar{height:100%;width:0%;background:rgba(25,166,74,0.85);transition:width 120ms linear;}" +
+          "#" + BAR_ID + " .swbar-progress.is-db .swbar-progress-bar{background:var(--color-button-text-lightgreen, rgba(25,166,74,0.85));}" +
+          "#" + BAR_ID + " .swbar-progress.is-audio .swbar-progress-bar{background:var(--color-button-text-purple, rgba(126,34,206,0.85));}" +
           "#" + BAR_ID + " .swbar-progress-pct{opacity:0.85;}" +
           "#" + BAR_ID + " .swbar-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-meta{opacity:0.75;}" +
@@ -212,7 +215,7 @@
         // reflect any pending progress state
         try {
           if (progressState && progressState.active) {
-            updateProgressUi(progressState.label, progressState.percent);
+            updateProgressUi(progressState.label, progressState.percent, progressState.kind);
           }
         } catch (e) {
         }
@@ -222,7 +225,7 @@
       }
     }
 
-    function updateProgressUi(label, percent) {
+    function updateProgressUi(label, percent, kind) {
       try {
         var prog = document.getElementById(BAR_ID + '__progress');
         if (!prog) return;
@@ -232,6 +235,14 @@
 
         var text = String(label || '').trim();
         if (lbl) lbl.textContent = text;
+
+        try {
+          prog.classList.remove('is-db', 'is-audio');
+          var k = String(kind || '').trim();
+          if (k === 'db') prog.classList.add('is-db');
+          else if (k === 'audio') prog.classList.add('is-audio');
+        } catch (e0) {
+        }
 
         var p = (percent === 0 || percent) ? Number(percent) : NaN;
         var hasPct = isFinite(p) && p >= 0;
@@ -339,27 +350,30 @@
         refreshMeta();
       };
 
-      window.setSwBarProgress = function (label, percent) {
+      window.setSwBarProgress = function (label, percent, kind) {
         try {
           var l = String(label || '').trim();
           var p = (percent === 0 || percent) ? Number(percent) : null;
+          var k = String(kind || '').trim();
           if (!(p === null || (isFinite(p) && p >= 0))) {
             p = null;
           }
           progressState.active = !!(l || (p === 0 || p));
           progressState.label = l;
           progressState.percent = p;
+          progressState.kind = k;
           progressState.updatedAt = Date.now();
         } catch (e) {
           progressState.active = false;
           progressState.label = '';
           progressState.percent = null;
+          progressState.kind = '';
         }
         try {
           ensureBar();
         } catch (e) {
         }
-        updateProgressUi(progressState.label, progressState.percent);
+        updateProgressUi(progressState.label, progressState.percent, progressState.kind);
       };
     } catch (e) {
     }

@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0188';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0189';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -569,6 +569,13 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
 
         console.warn('[B2 UPLOAD] start', { dictationId, urls: uniqueUrls.length });
 
+        try {
+            if (typeof window.setSwBarProgress === 'function') {
+                window.setSwBarProgress(`B2 audio: 0 из ${uniqueUrls.length}`, 0, 'audio');
+            }
+        } catch (e) {
+        }
+
         const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
             method: 'POST',
             headers: {
@@ -597,8 +604,18 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         let failed = 0;
         let cacheMiss = 0;
         let hashed = 0;
+        let processed = 0;
         for (const url of uniqueUrls) {
             try {
+                processed += 1;
+                try {
+                    if (typeof window.setSwBarProgress === 'function') {
+                        const pct = uniqueUrls.length ? Math.round((processed / uniqueUrls.length) * 100) : null;
+                        window.setSwBarProgress(`B2 audio: ${processed} из ${uniqueUrls.length}`, pct, 'audio');
+                    }
+                } catch (e0) {
+                }
+
                 const u = new URL(url, location.origin);
                 // Expected: /api/dictations/<dictationId>/<lang>/<filename>
                 const m = u.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
@@ -612,6 +629,8 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
                     continue;
                 }
 
+                const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
+
                 const cached = await cache.match(u.toString());
                 if (!cached) {
                     console.warn('[B2 UPLOAD] cache miss', u.toString());
@@ -623,8 +642,6 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
                 if (!blob || !blob.size) {
                     continue;
                 }
-
-                const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
 
                 // If this file does NOT exist as an in-memory draft blob URL, we assume it is unchanged.
                 // Only upload truly dirty (draft) blobs; this prevents B2 version increments for unchanged audio
@@ -700,6 +717,12 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         }
 
         console.warn('[B2 UPLOAD] done', { dictationId, urls: uniqueUrls.length, cacheHit, uploaded, skipped, failed, cacheMiss, hashed });
+        try {
+            if (typeof window.setSwBarProgress === 'function') {
+                window.setSwBarProgress('', null, '');
+            }
+        } catch (e) {
+        }
         return {
             ok: failed === 0 && cacheMiss === 0,
             dictationId,
@@ -715,6 +738,12 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         console.warn('[B2 UPLOAD] fatal', e);
         return { ok: false, reason: 'fatal', error: String(e && e.message ? e.message : e) };
     } finally {
+        try {
+            if (typeof window.setSwBarProgress === 'function') {
+                window.setSwBarProgress('', null, '');
+            }
+        } catch (e) {
+        }
         try {
             const k = String(dictationId || '');
             if (k && window.__B2_AUDIO_UPLOAD_INFLIGHT) {
@@ -2898,6 +2927,7 @@ function showLoadingIndicator(message = 'Загрузка...') {
         if (typeof window.setSwBarProgress === 'function') {
             const msg = String(message || '').trim();
             let pct = null;
+            let kind = '';
             try {
                 const m = msg.match(/(\d+)\s*(?:из|of)\s*(\d+)/i);
                 if (m) {
@@ -2910,7 +2940,17 @@ function showLoadingIndicator(message = 'Загрузка...') {
             } catch (e2) {
                 pct = null;
             }
-            window.setSwBarProgress(msg, pct);
+            try {
+                const lower = msg.toLowerCase();
+                if (lower.includes('аудио') || lower.includes('audio') || lower.includes('b2')) {
+                    kind = 'audio';
+                } else {
+                    kind = 'db';
+                }
+            } catch (e3) {
+                kind = '';
+            }
+            window.setSwBarProgress(msg, pct, kind);
         }
     } catch (e) {
     }
@@ -2936,7 +2976,7 @@ function showLoadingIndicator(message = 'Загрузка...') {
 function hideLoadingIndicator() {
     try {
         if (typeof window.setSwBarProgress === 'function') {
-            window.setSwBarProgress('', null);
+            window.setSwBarProgress('', null, '');
         }
     } catch (e) {
     }
