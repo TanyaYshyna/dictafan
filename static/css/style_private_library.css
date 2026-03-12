@@ -2787,7 +2787,7 @@
   left: 0 !important;
   width: 100% !important;
   height: calc(100% - var(--topbar-height, 56px)) !important;
-  z-index: 10001 !important;
+  z-index: 9999 !important;
   background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;

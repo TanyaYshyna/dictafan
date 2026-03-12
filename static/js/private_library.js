@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0194';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0195';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -2294,14 +2294,24 @@
 
     container.innerHTML = allBooks.map(book => createMiniBookCard(book)).join('');
 
+    hydrateMiniBookCardImages(container);
+
     // Обработчики событий
     container.querySelectorAll('.book-card-mini').forEach(card => {
       const bookId = parseInt(card.getAttribute('data-book-id'));
       const book = allBooks.find(b => b.id === bookId);
-      
-      card.addEventListener('click', async (e) => {
+
+      card.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveBook(bookId, container);
+      });
+
+      card.addEventListener('dblclick', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         try {
-          setActiveBook(bookId);
+          setActiveBook(bookId, container);
           await openBookViewBook(bookId, !!(book && book.is_workbook));
         } catch (err) {
         }
@@ -2309,15 +2319,26 @@
     });
   }
 
+  function hydrateMiniBookCardImages(root) {
+    if (!root) return;
+    root.querySelectorAll('img[data-src]').forEach(img => {
+      const src = img.getAttribute('data-src');
+      if (!src) return;
+      img.setAttribute('src', src);
+      img.removeAttribute('data-src');
+    });
+  }
+
   function createMiniBookCard(book) {
     const foreignClass = book.isOwn ? '' : 'foreign';
     const activeClass = activeBookId === book.id ? 'active' : '';
+    const blankImg = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
     
     // Формируем URL аватара создателя
     let creatorAvatarHtml = '';
     if (book.creator_user_id) {
       const avatarUrl = `/user/api/avatar?user_id=${book.creator_user_id}&size=small&t=${Date.now()}`;
-      creatorAvatarHtml = `<img src="${avatarUrl}" alt="Creator" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`;
+      creatorAvatarHtml = `<img src="${blankImg}" data-src="${avatarUrl}" alt="Creator" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`;
     } else {
       creatorAvatarHtml = '<i data-lucide="user"></i>';
     }
@@ -2327,7 +2348,7 @@
     // Формируем HTML обложки
     let coverHtml;
     if (book.cover_url) {
-      coverHtml = `<img class="book-card-mini-cover" src="${withCacheBust(book.cover_url)}" alt="${book.title}">`;
+      coverHtml = `<img class="book-card-mini-cover" src="${blankImg}" data-src="${withCacheBust(book.cover_url)}" alt="${book.title}">`;
     } else {
       coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
     }
@@ -2348,11 +2369,11 @@
     `;
   }
 
-  function setActiveBook(bookId) {
+  function setActiveBook(bookId, root = document) {
     activeBookId = bookId;
     
     // Обновляем выделение в списке
-    document.querySelectorAll('.book-card-mini').forEach(card => {
+    root.querySelectorAll('.book-card-mini').forEach(card => {
       if (parseInt(card.getAttribute('data-book-id')) === bookId) {
         card.classList.add('active');
       } else {
@@ -4797,6 +4818,8 @@
         
         // Используем функцию createMiniBookCard для единообразия
         list.innerHTML = data.books.map(book => createMiniBookCard(book)).join('');
+
+        hydrateMiniBookCardImages(list);
         
         // Обновляем иконки Lucide
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -4808,25 +4831,22 @@
           const bookId = parseInt(card.getAttribute('data-book-id'));
           const book = data.books.find(b => b.id === bookId);
 
-          const open = async () => {
-            try {
-              await openBookViewBook(bookId, !!(book && book.is_workbook));
-            } catch (e) {
-            }
-          };
-
-          // Одиночный клик - открыть книгу (как в приватной)
+          // 1 клик: только выделяем (обводка)
           card.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            open();
+            setActiveBook(bookId, list);
           });
 
-          // Двойной клик тоже открывает
-          card.addEventListener('dblclick', (e) => {
+          // 2 клика: открываем книгу
+          card.addEventListener('dblclick', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            open();
+            try {
+              setActiveBook(bookId, list);
+              await openBookViewBook(bookId, !!(book && book.is_workbook));
+            } catch (e2) {
+            }
           });
         });
       } else {
