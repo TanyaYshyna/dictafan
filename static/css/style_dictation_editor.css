@@ -525,6 +525,23 @@ button.audio-btn i[data-lucide] {
     margin-top: auto; /* Кнопки прижимаются вниз */
 }
 
+.start-modal .form-group:has(#startTitleInput) {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.start-modal .form-group:has(#startTitleInput) label {
+    margin: 0;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.start-modal .form-group:has(#startTitleInput) #startTitleInput {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .start-modal .form-group:has(#startTextInput) {
     flex: 1 1 auto;      /* Может расти, но не больше родителя */
     min-height: 0;       /* Важно для flex-контейнера */

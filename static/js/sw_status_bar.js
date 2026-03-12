@@ -120,7 +120,7 @@
         el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
         el.style.color = 'rgba(0,0,0,0.75)';
         el.style.background = 'rgba(240,240,240,0.95)';
-        el.style.borderTop = '1px solid rgba(0,0,0,0.08)';
+        el.style.borderTop = '0';
         el.style.backdropFilter = 'blur(6px)';
         el.style.webkitBackdropFilter = 'blur(6px)';
         el.style.pointerEvents = 'none';

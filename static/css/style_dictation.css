@@ -2863,11 +2863,11 @@ body.playing-audio::after {
 }
 
 #saveBtn.save-status-pending {
-  color: var(--color-button-text-yellow);
+  color: var(--color-text-secondary);
 }
 
 #saveBtn.save-status-syncing {
-  color: var(--color-button-text-purple);
+  color: var(--color-text-secondary);
 }
 
 #saveBtn.save-status-error {
