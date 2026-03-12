@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0197';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0198';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -212,7 +212,8 @@
   function withCacheBust(url) {
     if (!url || typeof url !== 'string') return url;
     const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}v=${Date.now()}`;
+    const v = (window && window.__PRIVATE_LIBRARY_BUILD) ? String(window.__PRIVATE_LIBRARY_BUILD) : '1';
+    return `${url}${sep}v=${encodeURIComponent(v)}`;
   }
 
   function maybeCacheBustDictationCover(url) {
@@ -2418,9 +2419,10 @@
     const container = document.getElementById("booksList");
     if (!container) return;
 
-    const filterLang = currentBooksFilterLanguage
+    const rawFilterLang = currentBooksFilterLanguage
       || window.USER_LANGUAGE_DATA?.currentLearning
       || null;
+    const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
 
     const normalizeBookLang = (b) => {
       if (!b) return '';
@@ -2489,7 +2491,7 @@
     // Формируем URL аватара создателя
     let creatorAvatarHtml = '';
     if (book.creator_user_id) {
-      const avatarUrl = `/user/api/avatar?user_id=${book.creator_user_id}&size=small&t=${Date.now()}`;
+      const avatarUrl = withCacheBust(`/user/api/avatar?user_id=${book.creator_user_id}&size=small`);
       creatorAvatarHtml = `<img src="${blankImg}" data-src="${avatarUrl}" alt="Creator" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`;
     } else {
       creatorAvatarHtml = '<i data-lucide="user"></i>';
@@ -4956,24 +4958,34 @@
       const container = document.getElementById('publicBooksLanguageSelector');
       if (!container) return;
 
+      container.innerHTML = '';
+
       const userSettings = window.USER_LANGUAGE_DATA;
       if (!userSettings) return;
+
+      const baseLanguageData = window.LanguageManager.getLanguageData();
+      const languageData = {
+        all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
+        ...(baseLanguageData || {})
+      };
 
       if (typeof window.initLanguageSelector === 'function') {
         const options = {
           mode: 'learning-selector-compact',
-          currentLearning: userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en',
+          currentLearning: (currentPublicBooksFilterLanguage != null ? currentPublicBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
           learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
-          languageData: window.LanguageManager.getLanguageData(),
+          languageData,
           onLanguageChange: function (values) {
-            currentPublicBooksFilterLanguage = values && values.currentLearning ? values.currentLearning : null;
+            const v = values && values.currentLearning ? String(values.currentLearning) : '';
+            currentPublicBooksFilterLanguage = v || 'all';
             renderPublicBooksList();
           }
         };
 
         publicBooksLanguageSelectorInstance = window.initLanguageSelector('publicBooksLanguageSelector', options);
         if (!currentPublicBooksFilterLanguage) {
-          currentPublicBooksFilterLanguage = options.currentLearning;
+          const v = String(options.currentLearning || '');
+          currentPublicBooksFilterLanguage = v || 'all';
         }
       }
     } catch (e) {
@@ -4984,9 +4996,10 @@
     const list = document.getElementById('publicBooksList');
     if (!list) return;
 
-    const filterLang = currentPublicBooksFilterLanguage
+    const rawFilterLang = currentPublicBooksFilterLanguage
       || window.USER_LANGUAGE_DATA?.currentLearning
       || null;
+    const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
 
     const normalizeBookLang = (b) => {
       if (!b) return '';
@@ -5105,6 +5118,8 @@
         return;
       }
 
+      container.innerHTML = '';
+
       const userSettings = window.USER_LANGUAGE_DATA;
       
       if (!userSettings) {
@@ -5113,14 +5128,20 @@
       }
 
       if (typeof window.initLanguageSelector === 'function') {
+        const baseLanguageData = window.LanguageManager.getLanguageData();
+        const languageData = {
+          all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
+          ...(baseLanguageData || {})
+        };
         const options = {
           mode: 'learning-selector-compact',
-          currentLearning: userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en',
+          currentLearning: (currentBooksFilterLanguage != null ? currentBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
           learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
-          languageData: window.LanguageManager.getLanguageData(),
+          languageData,
           onLanguageChange: function (values) {
             console.log('🔄 Изменение языка изучения в панели "Мои книги":', values);
-            currentBooksFilterLanguage = values && values.currentLearning ? values.currentLearning : null;
+            const v = values && values.currentLearning ? String(values.currentLearning) : '';
+            currentBooksFilterLanguage = v || 'all';
             renderBooksList(lastOwnBooks, lastShelfBooks);
           }
         };
@@ -5129,7 +5150,8 @@
         booksLanguageSelectorInstance = window.initLanguageSelector('booksLanguageSelector', options);
 
         if (!currentBooksFilterLanguage) {
-          currentBooksFilterLanguage = options.currentLearning;
+          const v = String(options.currentLearning || '');
+          currentBooksFilterLanguage = v || 'all';
         }
         
         if (booksLanguageSelectorInstance) {
