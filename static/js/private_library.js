@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0191';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0192';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -1784,10 +1784,10 @@
 
       return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
-          <a class="short-thumb" href="${openUrl}">
+          <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
             <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl}" alt="" class="short-cover" loading="lazy">
             <div class="card-progress-stats"></div>
-          </a>
+          </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>
           <div class="short-id-container">
             <div class="short-sentences-count" title="Количество предложений">
@@ -3695,7 +3695,7 @@
         if (!deskThumb) return;
         e.preventDefault();
         e.stopPropagation();
-        const href = deskThumb.getAttribute('href');
+        const href = deskThumb.getAttribute('data-href') || deskThumb.getAttribute('href');
         if (href) {
           window.location.href = href;
         }
