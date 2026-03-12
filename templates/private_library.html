@@ -297,21 +297,6 @@
                             <!-- Публичные книги будут загружаться через JS -->
                         </div>
                     </div>
-                    
-                    <!-- Разделитель между зонами -->
-                    <div id="publicZoneResizer" class="zone-resizer"></div>
-                    
-                    <!-- ЗОНА 3: Активная книга (справа) -->
-                    <div class="active-book-zone" id="publicActiveBookZone" style="display: none;">
-                        <div class="active-book-card" id="publicActiveBookCard">
-                            <!-- Максимальная карточка книги -->
-                        </div>
-                        <div class="active-book-content">
-                            <div class="book-structure" id="publicBookStructure">
-                                <!-- Структура книги (главы + диктанты) будет загружаться через JS -->
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -343,42 +328,6 @@
                         <button type="submit" class="btn-secondary move-dictation-submit">Выбрать</button>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно просмотра диктанта -->
-    <div id="view-dictation-modal" class="modal" style="display: none;">
-        <div class="modal-content view-dictation-modal-content">
-            <div class="view-dictation-header">
-                <div class="view-dictation-header-left">
-                    <img id="view-dictation-cover-img" src="" alt="Обложка диктанта" class="view-dictation-cover-img-small">
-                    <div class="view-dictation-title-author">
-                        <h3 id="view-dictation-title">Просмотр диктанта</h3>
-                        <a id="view-dictation-materials-link" href="#" target="_blank" class="view-dictation-materials-link" style="display: none;">
-                            <i data-lucide="external-link"></i> Материалы автора
-                        </a>
-                    </div>
-                </div>
-                <button class="modal-close view-dictation-close" id="view-dictation-close" type="button" aria-label="Закрыть" title="Закрыть">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <div class="view-dictation-body">
-                <div class="view-dictation-sentences">
-                    <table class="view-dictation-table">
-                        <thead>
-                            <tr>
-                                <th>№</th>
-                                <th>Предложение в оригинале</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody id="view-dictation-sentences-tbody">
-                            <!-- Предложения будут загружены через JS -->
-                        </tbody>
-                    </table>
-                </div>
             </div>
         </div>
     </div>

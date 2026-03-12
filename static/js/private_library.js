@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0193';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0194';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -1687,81 +1687,6 @@
       </div>
     `;
     deskZone.appendChild(el);
-  }
-
-  // Создает карточку диктанта для публичной библиотеки
-  // item - объект с данными диктанта
-  // book - объект с данными книги (для проверки, является ли книга своей)
-  function createPublicDictationCard(item, book) {
-    const d = item;
-    const coverUrl = d.cover_url || '/static/data/covers/cover_en.webp';
-    
-    const langOriginal = d.language_original || d.language_code || 'en';
-    const langTranslation = d.language_translation || d.language_code || 'en';
-    
-    const dictationId = d.dictation_id || `dict_${d.id}`;
-    const dbId = d.db_id || d.id;
-    
-    // Проверяем, является ли книга своей
-    let isOwnBook = false;
-    if (window.UM && window.UM.isAuthenticated()) {
-      const currentUser = window.UM.getCurrentUser();
-      if (currentUser && book && book.creator_user_id) {
-        isOwnBook = currentUser.id === book.creator_user_id;
-      }
-    }
-    
-    // Проверяем, есть ли книга в библиотеке пользователя
-    // Для публичной библиотеки всегда считаем, что книги чужие (кроме своих)
-    // Проверку наличия в библиотеке можно добавить через API, но пока используем простую логику
-    let isBookInLibrary = false;
-    if (!isOwnBook && window.UM && window.UM.isAuthenticated()) {
-      // TODO: можно добавить проверку через API /library/api/user-books
-      // Пока используем простую логику - если книга не своя, считаем что её нет в библиотеке
-      isBookInLibrary = false;
-    }
-    
-    // Кнопки для публичной библиотеки
-    const actionButtons = [];
-    
-    // Кнопка "Взять в работу" - только для чужих книг
-    if (!isOwnBook && book && book.id) {
-      const notebookIcon = isBookInLibrary ? 'notebook-pen' : 'notebook';
-      actionButtons.push(`
-        <button class="short-action-btn" data-action="add-to-work" data-dictation-id="${dbId}" data-book-id="${book.id}" title="Взять в работу">
-          <i data-lucide="${notebookIcon}"></i>
-        </button>
-      `);
-    }
-    
-    // Кнопка "Просмотреть диктант" - для всех
-    actionButtons.push(`
-      <button class="short-action-btn" data-action="view-dictation" data-dictation-id="${dbId}" data-book-id="${book ? book.id : ''}" title="Просмотреть диктант">
-        <i data-lucide="eye"></i>
-      </button>
-    `);
-    
-    return `
-      <div class="short-card" data-dictation-id="${dbId}">
-        <div class="short-thumb">
-          <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
-        </div>
-        <h3 class="short-title">${d.title || 'Без названия'}</h3>
-        <div class="short-id-container">
-          <div class="short-sentences-count" title="Количество предложений">
-            <i data-lucide="layers"></i><span>${d.sentences_count || 0}</span>
-          </div>
-          <div class="short-dikt-number">${dictationId}</div>
-        </div>
-        <div class="short-meta">
-          <span class="short-lang-flags">${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}</span>
-          <span class="short-level">${d.level || '—'}</span>
-        </div>
-        <div class="short-actions">
-          ${actionButtons.join('')}
-        </div>
-      </div>
-    `;
   }
 
   // Создает карточку диктанта (для стола или для книги)
@@ -3589,26 +3514,6 @@
       });
     }
 
-    // Закрытие модального окна просмотра диктанта
-    const viewDictationCloseBtn = document.getElementById("view-dictation-close");
-    if (viewDictationCloseBtn) {
-      viewDictationCloseBtn.addEventListener("click", () => {
-        const modal = document.getElementById("view-dictation-modal");
-        if (modal) {
-          modal.style.display = "none";
-        }
-      });
-    }
-
-    const viewDictationModal = document.getElementById("view-dictation-modal");
-    if (viewDictationModal) {
-      viewDictationModal.addEventListener("click", (event) => {
-        if (event.target === viewDictationModal) {
-          viewDictationModal.style.display = "none";
-        }
-      });
-    }
-
     // Переключатель вида диктантов удален - всегда используем вид "cards"
     currentView = 'cards';
 
@@ -3728,13 +3633,11 @@
           return;
         }
 
-        // Public library right pane
-        if (btn.closest && btn.closest('#publicBookStructure')) {
-          await togglePublicSection(sectionId);
+        // Default: book view modal
+        if (container && container.id === 'bookViewStructure') {
+          await toggleSectionInContainer(String(sectionId), container);
           return;
         }
-
-        // Legacy / no-op
       }
 
       // Выпадающее меню действий раздела
@@ -4849,85 +4752,13 @@
     if (!modal) return;
     
     modal.style.display = "flex";
-    
-    // Закрываем активную книгу, если она была открыта
-    closePublicActiveBookZone();
-    
+
     // Загружаем публичные книги
     await loadPublicBooks();
-    
-    // Инициализация перетаскивания разделителя для публичной библиотеки
-    initPublicZoneResizer();
     
     // Обновляем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       lucide.createIcons();
-    }
-  }
-
-  function initPublicZoneResizer() {
-    const resizer = document.getElementById('publicZoneResizer');
-    const libraryContent = document.querySelector('.public-library-content');
-    if (!resizer || !libraryContent) return;
-    
-    let isResizing = false;
-    let startX = 0;
-    let startWidth = 0;
-    
-    const startResize = (e) => {
-      isResizing = true;
-      startX = e.clientX || (e.touches && e.touches[0].clientX);
-      const booksZone = libraryContent.querySelector('.public-books-zone');
-      if (booksZone) {
-        startWidth = booksZone.offsetWidth;
-      }
-      libraryContent.classList.add('resizing');
-      resizer.classList.add('resizing');
-      e.preventDefault();
-    };
-    
-    const doResize = (e) => {
-      if (!isResizing) return;
-      const currentX = e.clientX || (e.touches && e.touches[0].clientX);
-      const diff = startX - currentX;
-      const newWidth = startWidth + diff;
-      const minWidth = 200;
-      const maxWidth = libraryContent.offsetWidth * 0.7;
-      const finalWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
-      
-      libraryContent.style.setProperty('--public-books-zone-width', `${finalWidth}px`);
-      e.preventDefault();
-    };
-    
-    const stopResize = () => {
-      if (isResizing) {
-        isResizing = false;
-        libraryContent.classList.remove('resizing');
-        resizer.classList.remove('resizing');
-        
-        // Сохраняем ширину в localStorage
-        const booksZone = libraryContent.querySelector('.public-books-zone');
-        if (booksZone) {
-          localStorage.setItem('publicBooksZoneWidth', booksZone.offsetWidth.toString());
-        }
-      }
-    };
-    
-    resizer.addEventListener('mousedown', startResize);
-    resizer.addEventListener('touchstart', startResize, { passive: false });
-    
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('touchmove', doResize, { passive: false });
-    
-    document.addEventListener('mouseup', stopResize);
-    document.addEventListener('touchend', stopResize);
-    
-    // Восстанавливаем сохраненную ширину
-    const savedWidth = localStorage.getItem('publicBooksZoneWidth');
-    if (savedWidth) {
-      libraryContent.style.setProperty('--public-books-zone-width', `${savedWidth}px`);
-    } else {
-      libraryContent.style.setProperty('--public-books-zone-width', '280px');
     }
   }
 
@@ -4936,8 +4767,6 @@
     if (modal) {
       modal.style.display = "none";
     }
-    // Закрываем активную книгу при закрытии модального окна
-    closePublicActiveBookZone();
   }
 
   let publicBooks = []; // Список публичных книг
@@ -4978,27 +4807,26 @@
         list.querySelectorAll('.book-card-mini').forEach(card => {
           const bookId = parseInt(card.getAttribute('data-book-id'));
           const book = data.books.find(b => b.id === bookId);
-          
-          // Одиночный клик - выделить и показать детали
-          card.addEventListener('click', async (e) => {
-            if (e.target.closest('button')) return; // Игнорируем клики на кнопки
-            setPublicActiveBook(bookId);
-            // Загружаем полные данные книги через API
+
+          const open = async () => {
             try {
-              const bookData = await apiRequest(`/library/api/book/${bookId}`);
-              if (bookData.success && bookData.book) {
-                openPublicActiveBookZone(bookData.book);
-              } else if (book) {
-                // Fallback на данные из списка
-                openPublicActiveBookZone(book);
-              }
-            } catch (error) {
-              console.error("Ошибка загрузки данных книги:", error);
-              // Fallback на данные из списка
-              if (book) {
-                openPublicActiveBookZone(book);
-              }
+              await openBookViewBook(bookId, !!(book && book.is_workbook));
+            } catch (e) {
             }
+          };
+
+          // Одиночный клик - открыть книгу (как в приватной)
+          card.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            open();
+          });
+
+          // Двойной клик тоже открывает
+          card.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            open();
           });
         });
       } else {
@@ -5007,458 +4835,6 @@
     } catch (error) {
       console.error("Ошибка загрузки публичных книг:", error);
       list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
-    }
-  }
-
-  function setPublicActiveBook(bookId) {
-    // Обновляем выделение в списке
-    const list = document.getElementById("publicBooksList");
-    if (list) {
-      list.querySelectorAll('.book-card-mini').forEach(card => {
-        if (parseInt(card.getAttribute('data-book-id')) === bookId) {
-          card.classList.add('active');
-        } else {
-          card.classList.remove('active');
-        }
-      });
-    }
-  }
-
-  async function openPublicActiveBookZone(book) {
-    const zone = document.getElementById("publicActiveBookZone");
-    const container = document.getElementById("publicActiveBookCard");
-    if (!zone || !container) return;
-
-    zone.style.display = 'flex';
-    
-    // Показываем разделитель
-    const libraryContent = document.querySelector('.public-library-content');
-    const resizer = document.getElementById('publicZoneResizer');
-    if (libraryContent) {
-      libraryContent.classList.add('has-active-book');
-    }
-    if (resizer) {
-      resizer.style.display = 'block';
-    }
-    
-    // Сохраняем данные книги в глобальной переменной для использования в карточках диктантов
-    window.currentPublicBook = book;
-    
-    // Используем существующую функцию renderActiveBookCard для единообразия
-    await renderActiveBookCard(book, container, { onClose: closePublicActiveBookZone });
-    
-    // Загружаем разделы и диктанты
-    await loadPublicBookContent(book.id);
-    
-    // Заменяем меню действий на кнопку "Добавить на полку"
-    const actionsBtn = container.querySelector('.btn-book-actions');
-    const actionsMenu = container.querySelector('.book-actions-menu');
-    if (actionsBtn && actionsMenu) {
-      // Удаляем старое меню и создаем простое
-      actionsMenu.innerHTML = '';
-      
-      const addToShelfBtn = document.createElement('button');
-      addToShelfBtn.className = 'dropdown-menu-item';
-      addToShelfBtn.innerHTML = '<i data-lucide="plus"></i><span>Добавить на мою полку</span>';
-      addToShelfBtn.addEventListener('click', async () => {
-        await addPublicBookToShelf(book.id);
-      });
-      actionsMenu.appendChild(addToShelfBtn);
-    }
-    
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
-    }
-  }
-
-  async function loadPublicBookContent(bookId) {
-    try {
-      // Загружаем разделы и диктанты
-      const sectionsData = await apiRequest(`/library/api/book/${bookId}/sections`);
-      const dictationsData = await apiRequest(`/library/api/book/${bookId}/dictations`);
-      
-      const sections = sectionsData.success ? sectionsData.sections : [];
-      const dictations = dictationsData.success ? dictationsData.dictations : [];
-      
-      // Используем функцию renderBookContent, но с другим контейнером
-      renderPublicBookContent(sections, dictations);
-    } catch (error) {
-      console.error("Ошибка загрузки содержимого публичной книги:", error);
-    }
-  }
-
-  function renderPublicBookContent(sections, dictations) {
-    const container = document.getElementById("publicBookStructure");
-    if (!container) return;
-    
-    // Используем ту же логику, что и в renderBookContent, но без кнопок редактирования
-    if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этой книге нет разделов и диктантов</div>';
-      return;
-    }
-
-    let html = '<div class="book-structure-list">';
-    
-    // Отображаем разделы (без кнопок редактирования)
-    if (sections && sections.length > 0) {
-      sections.forEach(section => {
-        const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
-        
-        const toggleButton = `
-              <button class="structure-item-toggle" data-section-id="${section.id}" title="Развернуть/свернуть">
-                <i data-lucide="chevron-right"></i>
-              </button>
-        `;
-        
-        html += `
-          <div class="structure-item structure-section" data-section-id="${section.id}">
-            <div class="structure-item-header">
-              ${toggleButton}
-              <span class="structure-item-title">${sectionNumber}${section.title}</span>
-            </div>
-            <div class="structure-item-content" data-section-content-id="${section.id}" style="display: none;">
-              <div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>
-            </div>
-          </div>
-        `;
-      });
-    }
-    
-    // Отображаем диктанты
-    if (dictations && dictations.length > 0) {
-      html += '</div>'; // Закрываем book-structure-list
-      html += '<div class="shorts-grid">';
-      // Получаем данные книги из контекста
-      const bookData = window.currentPublicBook || null;
-      dictations.forEach(d => {
-        html += createPublicDictationCard(d, bookData);
-      });
-      html += '</div>';
-    } else {
-      html += '</div>';
-    }
-    
-    container.innerHTML = html;
-    
-    // Создаём иконки Lucide
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
-    }
-    
-    // Добавляем обработчики для раскрытия разделов
-    container.querySelectorAll('.structure-item-toggle').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const sectionId = parseInt(btn.getAttribute('data-section-id'));
-        await togglePublicSection(sectionId);
-      });
-    });
-    
-    // Добавляем обработчики для кнопок карточек диктантов
-    attachPublicDictationCardHandlers(container);
-    
-    // Загружаем статистику и медальки для всех карточек диктантов
-    setTimeout(() => {
-      updateCompletionBadges(container);
-    }, 100);
-  }
-
-  async function togglePublicSection(sectionId) {
-    const sectionItem = document.querySelector(`#publicBookStructure .structure-section[data-section-id="${sectionId}"]`);
-    if (!sectionItem) return;
-
-    const toggleBtn = sectionItem.querySelector('.structure-item-toggle');
-    const contentDiv = sectionItem.querySelector(`.structure-item-content[data-section-content-id="${sectionId}"]`);
-    
-    if (!contentDiv || !toggleBtn) return;
-
-    const isExpanded = contentDiv.style.display !== 'none';
-    
-    let icon = toggleBtn.querySelector('i[data-lucide]');
-    if (!icon) {
-      icon = document.createElement('i');
-      icon.setAttribute('data-lucide', 'chevron-right');
-      toggleBtn.innerHTML = '';
-      toggleBtn.appendChild(icon);
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-    }
-    
-    if (isExpanded) {
-      contentDiv.style.display = 'none';
-      icon.setAttribute('data-lucide', 'chevron-right');
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-    } else {
-      contentDiv.style.display = 'block';
-      icon.setAttribute('data-lucide', 'chevron-down');
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-      
-      const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
-      if (!existingContent || existingContent.classList.contains('section-dictations-loading')) {
-        await loadPublicSectionDictations(sectionId, contentDiv);
-      }
-    }
-  }
-
-  async function loadPublicSectionDictations(sectionId, container) {
-    try {
-      const dictationsData = await apiRequest(`/library/api/book/${sectionId}/dictations`);
-      const dictations = dictationsData.success ? dictationsData.dictations : [];
-      
-      const loadingDiv = container.querySelector('.section-dictations-loading');
-      if (loadingDiv) {
-        loadingDiv.remove();
-      }
-      
-      if (dictations.length === 0) {
-        container.innerHTML = '<div class="section-dictations-empty" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">В этом разделе нет диктантов</div>';
-        return;
-      }
-      
-      // Рендерим диктанты как карточки (используем функцию для публичной библиотеки)
-      let html = '<div class="section-dictations-grid shorts-grid">';
-      // Получаем данные книги из контекста
-      const bookData = window.currentPublicBook || null;
-      dictations.forEach(d => {
-        html += createPublicDictationCard(d, bookData);
-      });
-      html += '</div>';
-      
-      container.innerHTML = html;
-      
-      // Обновляем иконки и медальки
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-      }
-      setTimeout(() => {
-        updateCompletionBadges(container);
-      }, 100);
-    } catch (error) {
-      console.error("Ошибка загрузки диктантов раздела:", error);
-      container.innerHTML = '<div class="section-dictations-error" style="padding: 20px; text-align: center; color: var(--color-error);">Ошибка загрузки диктантов</div>';
-    }
-  }
-
-  function attachPublicDictationCardHandlers(container) {
-    // Обработчик кнопки "Взять в работу"
-    container.querySelectorAll('[data-action="add-to-work"]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const dictationId = parseInt(btn.getAttribute('data-dictation-id'));
-        const bookId = parseInt(btn.getAttribute('data-book-id'));
-        await addDictationToWork(dictationId, bookId);
-      });
-    });
-    
-    // Обработчик кнопки "Просмотреть диктант"
-    container.querySelectorAll('[data-action="view-dictation"]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const dictationId = parseInt(btn.getAttribute('data-dictation-id'));
-        const bookIdAttr = btn.getAttribute('data-book-id');
-        const bookId = bookIdAttr && bookIdAttr !== '' ? parseInt(bookIdAttr) : null;
-        await openViewDictationModal(dictationId, bookId);
-      });
-    });
-  }
-
-  async function addDictationToWork(dictationId, bookId) {
-    try {
-      // Сначала добавляем книгу в библиотеку, если её там нет
-      const bookData = await apiRequest(`/library/api/book/${bookId}/add-to-my`, {
-        method: "POST",
-        body: JSON.stringify({})
-      });
-      
-      if (bookData.success) {
-        // Теперь добавляем диктант на стол
-        const deskData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
-          method: "POST",
-          body: JSON.stringify({})
-        });
-        
-        if (deskData.success) {
-          showToast('Диктант добавлен в работу');
-          // Обновляем иконку кнопки
-          const btn = document.querySelector(`[data-action="add-to-work"][data-dictation-id="${dictationId}"]`);
-          if (btn) {
-            const icon = btn.querySelector('i[data-lucide]');
-            if (icon) {
-              icon.setAttribute('data-lucide', 'notebook-pen');
-              if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-              }
-            }
-          }
-        } else {
-          showToast('Ошибка при добавлении диктанта в работу', 'error');
-        }
-      } else {
-        showToast('Ошибка при добавлении книги в библиотеку', 'error');
-      }
-    } catch (error) {
-      console.error("Ошибка добавления диктанта в работу:", error);
-      showToast('Ошибка при добавлении диктанта в работу', 'error');
-    }
-  }
-
-  async function openViewDictationModal(dictationId, bookId = null) {
-    const modal = document.getElementById("view-dictation-modal");
-    if (!modal) {
-      console.error("Модальное окно view-dictation-modal не найдено");
-      return;
-    }
-    
-    modal.style.display = "flex";
-    
-    // Показываем индикатор загрузки
-    const tbody = document.getElementById("view-dictation-sentences-tbody");
-    if (tbody) {
-      tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px;">Загрузка...</td></tr>';
-    }
-    
-    try {
-      console.log('📖 Загружаю данные диктанта:', dictationId);
-      
-      // Загружаем данные диктанта
-      const dictationData = await apiRequest(`/api/dictation/${dictationId}`);
-      console.log('📖 Данные диктанта получены:', dictationData);
-      
-      if (dictationData.success && dictationData.dictation) {
-        const d = dictationData.dictation;
-        
-        // Устанавливаем заголовок
-        const titleEl = document.getElementById("view-dictation-title");
-        if (titleEl) {
-          titleEl.textContent = d.title || 'Без названия';
-        }
-        
-        // Устанавливаем обложку
-        const coverImg = document.getElementById("view-dictation-cover-img");
-        if (coverImg) {
-          coverImg.src = d.cover_url || '/static/data/covers/cover_en.webp';
-          coverImg.alt = d.title || 'Обложка диктанта';
-        }
-        
-        
-        // Устанавливаем ссылку на материалы автора
-        const materialsLink = document.getElementById("view-dictation-materials-link");
-        if (materialsLink) {
-          if (d.author_materials_url) {
-            materialsLink.href = d.author_materials_url;
-            materialsLink.style.display = 'inline-flex';
-          } else {
-            materialsLink.style.display = 'none';
-          }
-        }
-        
-        // Загружаем предложения
-        console.log('📖 Загружаю предложения диктанта:', dictationId);
-        const sentencesData = await apiRequest(`/api/dictation/${dictationId}/sentences`);
-        console.log('📖 Предложения получены:', sentencesData);
-        
-        if (sentencesData.success && sentencesData.sentences && sentencesData.sentences.length > 0) {
-          if (tbody) {
-            tbody.innerHTML = sentencesData.sentences.map((sentence, index) => {
-              const audioUrl = sentence.audio || '';
-              return `
-                <tr>
-                  <td>${index + 1}</td>
-                  <td>${sentence.text || ''}</td>
-                  <td>
-                    ${audioUrl ? `
-                      <button class="btn-play-audio" data-audio-url="${audioUrl}" title="Проиграть">
-                        <i data-lucide="play"></i>
-                      </button>
-                    ` : ''}
-                  </td>
-                </tr>
-              `;
-            }).join('');
-            
-            // Добавляем обработчики для кнопок проигрывания через AudioManager
-            // AudioManager доступен глобально после загрузки audio_manager.js
-            const audioMgr = typeof audioManager !== 'undefined' ? audioManager : (typeof window.AudioManager !== 'undefined' ? window.AudioManager : null);
-            if (audioMgr && typeof audioMgr.play === 'function') {
-              tbody.querySelectorAll('.btn-play-audio').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  const audioUrl = btn.getAttribute('data-audio-url');
-                  if (audioUrl) {
-                    audioMgr.play(btn, audioUrl);
-                  }
-                });
-              });
-            } else {
-              console.warn('AudioManager не найден, используем стандартное воспроизведение');
-              tbody.querySelectorAll('.btn-play-audio').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                  e.preventDefault();
-                  const audioUrl = btn.getAttribute('data-audio-url');
-                  if (audioUrl) {
-                    const audio = new Audio(audioUrl);
-                    audio.play().catch(err => console.error("Ошибка воспроизведения:", err));
-                  }
-                });
-              });
-            }
-          }
-        } else {
-          if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--color-text-secondary);">В диктанте нет предложений</td></tr>';
-          }
-        }
-        
-        // Обновляем иконки
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons();
-        }
-      } else {
-        console.error("Некорректные данные диктанта:", dictationData);
-        if (tbody) {
-          tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--color-error);">Ошибка загрузки данных диктанта</td></tr>';
-        }
-        showToast('Ошибка загрузки данных диктанта', 'error');
-      }
-    } catch (error) {
-      console.error("Ошибка загрузки данных диктанта:", error);
-      if (tbody) {
-        tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; padding: 20px; color: var(--color-error);">Ошибка: ${error.message || 'Неизвестная ошибка'}</td></tr>`;
-      }
-      showToast(`Ошибка загрузки данных диктанта: ${error.message || 'Неизвестная ошибка'}`, 'error');
-    }
-  }
-
-  function closePublicActiveBookZone() {
-    const zone = document.getElementById("publicActiveBookZone");
-    if (zone) {
-      zone.style.display = 'none';
-    }
-    
-    const libraryContent = document.querySelector('.public-library-content');
-    const resizer = document.getElementById('publicZoneResizer');
-    if (libraryContent) {
-      libraryContent.classList.remove('has-active-book');
-    }
-    if (resizer) {
-      resizer.style.display = 'none';
-    }
-    
-    // Убираем выделение
-    const list = document.getElementById("publicBooksList");
-    if (list) {
-      list.querySelectorAll('.book-card-mini').forEach(card => {
-        card.classList.remove('active');
-      });
     }
   }
 
