@@ -892,8 +892,8 @@
   padding: 3px 6px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
-  color: #b45309;
-  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.65);
   font-size: 12px;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -904,6 +904,7 @@
   width: 16px;
   height: 16px;
   stroke-width: 2.5;
+  color: #f59e0b;
 }
 
 .short-completion-badge .completion-count {

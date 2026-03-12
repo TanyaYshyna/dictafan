@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0195';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0196';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -124,6 +124,8 @@
   installPrivateLibraryBuildBadge();
 
   let bookLanguageSelector = null;
+  let booksLanguageSelectorInstance = null;
+  let publicBooksLanguageSelectorInstance = null;
   let activeBookId = null;
   let activeBookIsWorkbook = false;
   let bookViewActiveBookId = null;
@@ -134,6 +136,11 @@
   let deskLoadSeq = 0;
   let deskLoadInFlight = null;
   let pendingDeleteDictationId = null;
+
+  let lastOwnBooks = [];
+  let lastShelfBooks = [];
+  let currentBooksFilterLanguage = null;
+  let currentPublicBooksFilterLanguage = null;
   let pendingDeleteSectionId = null;
 
   function getToken() {
@@ -1078,6 +1085,120 @@
   }
 
   // ==================== ЗОНА 1: Рабочий стол ====================
+  function areDeskItemEffectivelyEqual(a, b) {
+    const x = a || {};
+    const y = b || {};
+    return (
+      String(x.id || '') === String(y.id || '')
+      && String(x.dictation_id || '') === String(y.dictation_id || '')
+      && String(x.cover_url || '') === String(y.cover_url || '')
+      && String(x.title || '') === String(y.title || '')
+      && String(x.language_code || '') === String(y.language_code || '')
+      && String(x.language_translation || '') === String(y.language_translation || '')
+      && String(x.level || '') === String(y.level || '')
+      && String(x.sentences_count || '') === String(y.sentences_count || '')
+    );
+  }
+
+  function applyDeskItemsIncremental(prevItems, nextItems) {
+    const container = document.getElementById('deskCardsContainer');
+    if (!container) return { applied: false };
+
+    const grid = container.querySelector('.shorts-grid');
+    if (!grid) return { applied: false };
+
+    const prev = Array.isArray(prevItems) ? prevItems : [];
+    const next = Array.isArray(nextItems) ? nextItems : [];
+
+    const prevById = new Map(prev.map(x => [String(x && x.id), x]));
+    const nextById = new Map(next.map(x => [String(x && x.id), x]));
+
+    const removed = [];
+    const added = [];
+    const updated = [];
+
+    for (const item of prev) {
+      const id = String(item && item.id);
+      if (!nextById.has(id)) removed.push(item);
+    }
+    for (const item of next) {
+      const id = String(item && item.id);
+      if (!prevById.has(id)) {
+        added.push(item);
+      } else {
+        const prevItem = prevById.get(id);
+        if (!areDeskItemEffectivelyEqual(prevItem, item)) {
+          updated.push(item);
+        }
+      }
+    }
+
+    for (const item of removed) {
+      try {
+        const card = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+        if (card) card.remove();
+      } catch (e) {
+      }
+      try {
+        localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
+      } catch (e) {
+      }
+    }
+
+    for (const item of updated) {
+      try {
+        const existing = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+        if (!existing) continue;
+        const wrap = document.createElement('div');
+        wrap.innerHTML = createDictationCard(item, true);
+        const fresh = wrap.firstElementChild;
+        if (fresh) {
+          existing.replaceWith(fresh);
+        }
+      } catch (e) {
+      }
+    }
+
+    for (const item of added) {
+      insertDeskCardElement(item, 'start');
+    }
+
+    try {
+      const remaining = grid.querySelectorAll('.desk-card').length;
+      if (!remaining) {
+        container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
+        enableDeskFreeLayout(container);
+        installDeskDragAndDrop(container);
+      }
+    } catch (e) {
+    }
+
+    requestAnimationFrame(() => {
+      (async () => {
+        try {
+          await applyDeskCovers(container);
+          updateDictationCardsStats(container);
+          await updateCompletionBadges(container);
+        } catch (e) {
+        }
+      })().catch(() => {});
+    });
+
+    return { applied: true, added: added.length, removed: removed.length, updated: updated.length };
+  }
   
   async function loadDeskItems() {
     const seq = ++deskLoadSeq;
@@ -1133,6 +1254,9 @@
           return;
         }
 
+        const prevSnapshot = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
+        const nextSnapshot = Array.isArray(data.items) ? data.items : [];
+
         // If desk was rendered from cache, reconcile removed items and purge their cached dictation media.
         // This is important for cross-tab/cross-device cleanup after a dictation is deleted on the server.
         try {
@@ -1165,8 +1289,18 @@
           await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
         } catch (e) {
         }
-        if (typeof renderDeskCards === 'function') {
-          renderDeskCards(deskItems);
+
+        if (renderedFromCache && prevSnapshot.length) {
+          const res = applyDeskItemsIncremental(prevSnapshot, nextSnapshot);
+          if (!res || !res.applied) {
+            if (typeof renderDeskCards === 'function') {
+              renderDeskCards(deskItems);
+            }
+          }
+        } else {
+          if (typeof renderDeskCards === 'function') {
+            renderDeskCards(deskItems);
+          }
         }
         // Обновляем индикаторы "в работе" в карточках диктантов
         updateInWorkIndicators();
@@ -1701,7 +1835,7 @@
       const langTranslation = item.language_translation || item.language_code || 'en';
       const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
-      const coverUrl = maybeCacheBustDictationCover(item.cover_url) || `/static/data/covers/cover_${langOriginal || 'en'}.webp`;
+      const coverUrl = maybeCacheBustDictationCover(item.cover_url);
 
       const sentencesCount = typeof item.sentences_count === 'number'
         ? item.sentences_count
@@ -1710,7 +1844,7 @@
       return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
-            <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl}" alt="" class="short-cover" loading="lazy">
+            <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="lazy">
             <div class="card-progress-stats"></div>
           </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>
@@ -2259,6 +2393,8 @@
         const data = await response.json();
         console.log('📦 Данные книг получены от API:', data);
         if (data.success) {
+          lastOwnBooks = Array.isArray(data.own_books) ? data.own_books : [];
+          lastShelfBooks = Array.isArray(data.shelf_books) ? data.shelf_books : [];
           renderBooksList(data.own_books, data.shelf_books);
         } else {
           console.error("❌ Ошибка загрузки книг:", data.error);
@@ -2282,10 +2418,26 @@
     const container = document.getElementById("booksList");
     if (!container) return;
 
-    const allBooks = [
+    const filterLang = currentBooksFilterLanguage
+      || window.USER_LANGUAGE_DATA?.currentLearning
+      || null;
+
+    const normalizeBookLang = (b) => {
+      if (!b) return '';
+      return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
+    };
+
+    const allBooksRaw = [
       ...(ownBooks || []).map(book => ({ ...book, isOwn: true })),
       ...(shelfBooks || []).map(book => ({ ...book, isOwn: false }))
     ];
+
+    const allBooks = filterLang
+      ? allBooksRaw.filter(b => {
+          const lang = normalizeBookLang(b);
+          return !lang || lang === String(filterLang).toLowerCase();
+        })
+      : allBooksRaw;
 
     if (allBooks.length === 0) {
       container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Нет книг</div>';
@@ -4774,8 +4926,14 @@
     
     modal.style.display = "flex";
 
+    initializePublicBooksLanguageSelector();
+
     // Загружаем публичные книги
-    await loadPublicBooks();
+    if (Array.isArray(publicBooks) && publicBooks.length > 0 && (Date.now() - publicBooksLoadedAt) < 5 * 60 * 1000) {
+      renderPublicBooksList();
+    } else {
+      await loadPublicBooks();
+    }
     
     // Обновляем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -4791,6 +4949,90 @@
   }
 
   let publicBooks = []; // Список публичных книг
+  let publicBooksLoadedAt = 0;
+
+  function initializePublicBooksLanguageSelector() {
+    try {
+      const container = document.getElementById('publicBooksLanguageSelector');
+      if (!container) return;
+
+      const userSettings = window.USER_LANGUAGE_DATA;
+      if (!userSettings) return;
+
+      if (typeof window.initLanguageSelector === 'function') {
+        const options = {
+          mode: 'learning-selector-compact',
+          currentLearning: userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en',
+          learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
+          languageData: window.LanguageManager.getLanguageData(),
+          onLanguageChange: function (values) {
+            currentPublicBooksFilterLanguage = values && values.currentLearning ? values.currentLearning : null;
+            renderPublicBooksList();
+          }
+        };
+
+        publicBooksLanguageSelectorInstance = window.initLanguageSelector('publicBooksLanguageSelector', options);
+        if (!currentPublicBooksFilterLanguage) {
+          currentPublicBooksFilterLanguage = options.currentLearning;
+        }
+      }
+    } catch (e) {
+    }
+  }
+
+  function renderPublicBooksList() {
+    const list = document.getElementById('publicBooksList');
+    if (!list) return;
+
+    const filterLang = currentPublicBooksFilterLanguage
+      || window.USER_LANGUAGE_DATA?.currentLearning
+      || null;
+
+    const normalizeBookLang = (b) => {
+      if (!b) return '';
+      return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
+    };
+
+    const items = filterLang
+      ? publicBooks.filter(b => {
+          const lang = normalizeBookLang(b);
+          return !lang || lang === String(filterLang).toLowerCase();
+        })
+      : publicBooks;
+
+    if (!items.length) {
+      list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Публичных книг пока нет</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(book => createMiniBookCard(book)).join('');
+    hydrateMiniBookCardImages(list);
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+
+    list.querySelectorAll('.book-card-mini').forEach(card => {
+      const bookId = parseInt(card.getAttribute('data-book-id'));
+      const book = items.find(b => b.id === bookId) || publicBooks.find(b => b.id === bookId);
+
+      card.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setActiveBook(bookId, list);
+      });
+
+      card.addEventListener('dblclick', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          setActiveBook(bookId, list);
+          await openBookViewBook(bookId, !!(book && book.is_workbook));
+        } catch (e2) {
+        }
+      });
+    });
+  }
 
   async function loadPublicBooks() {
     const list = document.getElementById("publicBooksList");
@@ -4802,6 +5044,7 @@
       const data = await apiRequest("/library/api/public-books?limit=200");
       if (data.success && data.books) {
         publicBooks = data.books;
+        publicBooksLoadedAt = Date.now();
         console.log('📚 Загружены публичные книги:', data.books.length);
         if (data.books.length > 0) {
           console.log('📚 Первая книга:', {
@@ -4811,44 +5054,11 @@
           });
         }
         
-        if (data.books.length === 0) {
-          list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Публичных книг пока нет</div>';
-          return;
+        if (!currentPublicBooksFilterLanguage) {
+          currentPublicBooksFilterLanguage = window.USER_LANGUAGE_DATA?.currentLearning || null;
         }
-        
-        // Используем функцию createMiniBookCard для единообразия
-        list.innerHTML = data.books.map(book => createMiniBookCard(book)).join('');
 
-        hydrateMiniBookCardImages(list);
-        
-        // Обновляем иконки Lucide
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          lucide.createIcons();
-        }
-        
-        // Добавляем обработчики кликов на карточки
-        list.querySelectorAll('.book-card-mini').forEach(card => {
-          const bookId = parseInt(card.getAttribute('data-book-id'));
-          const book = data.books.find(b => b.id === bookId);
-
-          // 1 клик: только выделяем (обводка)
-          card.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setActiveBook(bookId, list);
-          });
-
-          // 2 клика: открываем книгу
-          card.addEventListener('dblclick', async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            try {
-              setActiveBook(bookId, list);
-              await openBookViewBook(bookId, !!(book && book.is_workbook));
-            } catch (e2) {
-            }
-          });
-        });
+        renderPublicBooksList();
       } else {
         list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
       }
@@ -4910,14 +5120,19 @@
           languageData: window.LanguageManager.getLanguageData(),
           onLanguageChange: function (values) {
             console.log('🔄 Изменение языка изучения в панели "Мои книги":', values);
-            // Здесь можно добавить логику обновления фильтрации книг по языку
+            currentBooksFilterLanguage = values && values.currentLearning ? values.currentLearning : null;
+            renderBooksList(lastOwnBooks, lastShelfBooks);
           }
         };
 
         console.log('🎯 Создаем LanguageSelector для панели "Мои книги"');
-        const selector = window.initLanguageSelector('booksLanguageSelector', options);
+        booksLanguageSelectorInstance = window.initLanguageSelector('booksLanguageSelector', options);
+
+        if (!currentBooksFilterLanguage) {
+          currentBooksFilterLanguage = options.currentLearning;
+        }
         
-        if (selector) {
+        if (booksLanguageSelectorInstance) {
           console.log('✅ Селектор языка успешно инициализирован');
         } else {
           console.warn('❌ LanguageSelector не был создан');
