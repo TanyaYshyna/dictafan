@@ -57,39 +57,6 @@
         </div>
     </div>
 
-    <div id="offline-cache-modal" class="modal" style="display: none;">
-        <div class="modal-content offline-cache-modal-content" style="max-width: 520px;">
-            <div class="modal-header offline-cache-modal-header">
-                <h3>Оффлайн кеш</h3>
-                <button class="offline-cache-modal-close" id="offline-cache-close" type="button" aria-label="Закрыть">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <div class="modal-body offline-cache-modal-body">
-                <div class="offline-cache-modal-stack">
-                    <div id="offlineCacheStatus" class="offline-cache-status">—</div>
-                    <div class="offline-cache-limit-row">
-                        <label for="offlineCacheLimitMb" class="offline-cache-limit-label">Лимит кеша (MB)</label>
-                        <input id="offlineCacheLimitMb" class="offline-cache-limit-input" type="number" min="10" step="10" value="300">
-                        <button type="button" class="btn-secondary" id="offlineCacheLimitSaveBtn">Сохранить</button>
-                    </div>
-                    <div class="offline-cache-hint">При превышении лимита новые файлы не кешируются автоматически.</div>
-                    <div id="offlineCacheProgressWrap" class="offline-cache-progress" style="display:none;">
-                        <div class="offline-cache-progress__bar">
-                            <div id="offlineCacheProgressBar" class="offline-cache-progress__bar-fill" style="width:0%;"></div>
-                        </div>
-                        <div id="offlineCacheProgressText" class="offline-cache-progress__text">0%</div>
-                    </div>
-                    <div class="offline-cache-actions">
-                        <button type="button" class="btn-secondary" id="offlineCacheClearBtn">Очистить кеш</button>
-                        <button type="button" class="btn-secondary" id="offlineCacheRefreshBtn">Обновить</button>
-                        <button type="button" class="btn-primary" id="offlineCachePrefetchDeskBtn">Скачать</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div id="home-library-modal" class="modal" style="display: none;">
         <div class="modal-content home-library-modal-content">
             <div class="modal-header">
@@ -126,9 +93,6 @@
                 </button>
                 <button id="btnPublicLibrary" class="tool-palette-btn" title="Публичная библиотека">
                     <i data-lucide="globe"></i>
-                </button>
-                <button id="btnOfflineCache" class="tool-palette-btn" title="Оффлайн кеш">
-                    <i data-lucide="hard-drive"></i>
                 </button>
                 <div class="tool-palette-separator"></div>
                 <button id="btnDeskZoomIn" class="tool-palette-btn" title="Приблизить">

@@ -87,10 +87,11 @@
           "#" + BAR_ID + " .swbar-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
           "#" + BAR_ID + " .swbar-progress{display:none;align-items:center;gap:8px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-progress.on{display:flex;}" +
-          "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.10);overflow:hidden;}" +
-          "#" + BAR_ID + " .swbar-progress-bar{height:100%;width:0%;background:rgba(25,166,74,0.85);transition:width 120ms linear;}" +
+          "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.06);overflow:hidden;}" +
+          "#" + BAR_ID + " .swbar-progress-bar{height:100%;width:0%;background:rgba(0,0,0,0.12);transition:none;}" +
           "#" + BAR_ID + " .swbar-progress.is-db .swbar-progress-bar{background:var(--color-button-text-lightgreen, rgba(25,166,74,0.85));}" +
           "#" + BAR_ID + " .swbar-progress.is-audio .swbar-progress-bar{background:var(--color-button-text-purple, rgba(126,34,206,0.85));}" +
+          "#" + BAR_ID + " .swbar-progress.is-cache .swbar-progress-bar{background:rgba(0,0,0,0.14);}" +
           "#" + BAR_ID + " .swbar-progress-pct{opacity:0.85;}" +
           "#" + BAR_ID + " .swbar-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-meta{opacity:0.75;}" +
@@ -159,12 +160,7 @@
         pct.id = BAR_ID + '__progressPct';
         pct.textContent = '';
 
-        prog.appendChild(progLabel);
-        prog.appendChild(track);
-        prog.appendChild(pct);
-
         leftWrap.appendChild(msg);
-        leftWrap.appendChild(prog);
         left.appendChild(leftWrap);
 
         var right = document.createElement('div');
@@ -176,35 +172,11 @@
         meta.id = BAR_ID + '__meta';
         meta.textContent = buildMetaText();
 
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'swbar-btn';
-        btn.id = BAR_ID + '__cacheBtn';
-        btn.textContent = 'Cache';
-        btn.title = 'Оффлайн кеш / отладка хранилища';
-        btn.addEventListener('click', function () {
-          try {
-            // 1) If desk modal helper exists
-            if (typeof window.openOfflineCacheModal === 'function') {
-              window.openOfflineCacheModal();
-              return;
-            }
-            // 2) Try to open modal by id (if present)
-            var m = document.getElementById('offline-cache-modal');
-            if (m) {
-              m.style.display = 'flex';
-              return;
-            }
-            // 3) If dictation overlay exists, show it
-            if (typeof window.showDictationCacheFetchOverlay === 'function') {
-              window.showDictationCacheFetchOverlay('offline cache');
-              return;
-            }
-          } catch (e) {
-          }
-        });
+        prog.appendChild(progLabel);
+        prog.appendChild(track);
+        prog.appendChild(pct);
 
-        right.appendChild(btn);
+        right.appendChild(prog);
         if (meta.textContent) right.appendChild(meta);
 
         inner.appendChild(left);
@@ -237,16 +209,25 @@
         if (lbl) lbl.textContent = text;
 
         try {
-          prog.classList.remove('is-db', 'is-audio');
+          prog.classList.remove('is-db', 'is-audio', 'is-cache');
           var k = String(kind || '').trim();
           if (k === 'db') prog.classList.add('is-db');
           else if (k === 'audio') prog.classList.add('is-audio');
+          else if (k === 'cache') prog.classList.add('is-cache');
         } catch (e0) {
         }
 
         var p = (percent === 0 || percent) ? Number(percent) : NaN;
         var hasPct = isFinite(p) && p >= 0;
-        if (pct) pct.textContent = hasPct ? (Math.min(100, Math.max(0, Math.round(p))) + '%') : '';
+        var k2 = String(kind || '').trim();
+        if (pct) {
+          if (k2 === 'cache') {
+            pct.textContent = text;
+            if (lbl) lbl.textContent = '';
+          } else {
+            pct.textContent = hasPct ? (Math.min(100, Math.max(0, Math.round(p))) + '%') : '';
+          }
+        }
         if (bar) bar.style.width = hasPct ? (Math.min(100, Math.max(0, p)) + '%') : '12%';
 
         if (text || hasPct) {

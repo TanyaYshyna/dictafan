@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0201';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0202';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -677,52 +677,39 @@
   }
 
   async function refreshOfflineCacheStatus() {
-    const statusEl = document.getElementById('offlineCacheStatus');
-    if (!statusEl) return;
-    statusEl.textContent = 'Обновляю…';
+    try {
+      if (typeof window.setSwBarProgress === 'function') {
+        window.setSwBarProgress('', null, 'cache');
+      }
+    } catch (e0) {
+    }
     try {
       const res = await swRequest('cacheStats');
       const bytes = res.stats?.totalBytes || 0;
       const entries = res.stats?.entries || 0;
       const maxBytes = res.stats?.maxBytes || 0;
 
-      const progressUsedEl = document.getElementById('deskCacheUsedText');
-      const progressMaxEl = document.getElementById('deskCacheMaxText');
-      const progressBarEl = document.getElementById('deskCacheProgressBar');
-      if (progressUsedEl) progressUsedEl.textContent = formatBytes(bytes);
-      if (progressMaxEl) progressMaxEl.textContent = formatBytes(maxBytes);
-      if (progressBarEl) {
-        const pct = maxBytes > 0 ? Math.max(0, Math.min(100, Math.round((bytes / maxBytes) * 100))) : 0;
-        progressBarEl.style.width = `${pct}%`;
-      }
-
-      const limitInput = document.getElementById('offlineCacheLimitMb');
-      if (limitInput && maxBytes) {
-        limitInput.value = String(formatMbValue(maxBytes));
-      }
-
-      if (maxBytes) {
-        statusEl.textContent = `Записей: ${entries}. Размер: ${formatBytes(bytes)} / ${formatBytes(maxBytes)}.`;
-      } else {
-      statusEl.textContent = `Записей: ${entries}. Размер: ${formatBytes(bytes)}.`;
+      try {
+        if (typeof window.setSwBarProgress === 'function') {
+          const mb = 1024 * 1024;
+          const usedMb = Math.max(0, bytes) / mb;
+          const maxMb = Math.max(0, maxBytes) / mb;
+          const usedText = (usedMb >= 10) ? String(Math.round(usedMb)) : usedMb.toFixed(1);
+          const maxText = maxMb > 0 ? String(Math.round(maxMb)) : '0';
+          const label = `${usedText}/${maxText}`;
+          const pct = maxBytes > 0 ? Math.max(0, Math.min(100, (bytes / maxBytes) * 100)) : null;
+          window.setSwBarProgress(label, pct, 'cache');
+        }
+      } catch (e1) {
       }
     } catch (e) {
-      statusEl.textContent = `Ошибка: ${e && e.message ? e.message : String(e)}`;
+      try {
+        if (typeof window.setSwBarProgress === 'function') {
+          window.setSwBarProgress('', null, 'cache');
+        }
+      } catch (e2) {
+      }
     }
-  }
-
-  function openOfflineCacheModal() {
-    const modal = document.getElementById('offline-cache-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    refreshOfflineCacheStatus();
-    if (window.lucide) lucide.createIcons();
-  }
-
-  function closeOfflineCacheModal() {
-    const modal = document.getElementById('offline-cache-modal');
-    if (!modal) return;
-    modal.style.display = 'none';
   }
 
   function openHomeLibraryModal() {
@@ -821,169 +808,12 @@
     if (typeof lucide !== 'undefined') lucide.createIcons();
 
     const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
-    if (!existingContent || existingContent.classList.contains('section-dictations-loading')) {
+    if (existingContent) return;
+
+    try {
       await loadSectionDictations(sectionId, contentDiv);
-    }
-  }
-
-  async function showDeskDictationInBook(dictationId) {
-    const idNum = parseInt(String(dictationId || ''), 10);
-    if (!idNum || !isFinite(idNum)) return;
-
-    const t0 = performance.now();
-
-    try {
-      const token = window.UM?.token || localStorage.getItem('jwt_token');
-      if (!token) {
-        console.warn('[show-in-book] no token');
-        return;
-      }
-
-      const res = await fetch(`/library/api/dictation/${idNum}/book`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!res.ok) {
-        console.warn('[show-in-book] api_get_dictation_book failed', res.status);
-        return;
-      }
-
-      const data = await res.json().catch(() => null);
-      if (!data || !data.success || !data.book_id) {
-        console.log('[show-in-book] dictation is not in any book');
-        return;
-      }
-
-      const directBookId = Number(data.book_id);
-      const rootBookId = Number(data.root_book_id || data.book_id);
-
-      await openBookViewBook(rootBookId);
-
-      if (directBookId && rootBookId && directBookId !== rootBookId) {
-        try {
-          await toggleSectionInContainer(String(directBookId), document.getElementById('bookViewStructure'));
-        } catch (e) {
-          console.warn('[show-in-book] toggleSectionInContainer failed', e);
-        }
-      }
-
-      const findTarget = () => {
-        const structure = document.getElementById('bookViewStructure');
-        if (!structure) return null;
-        return structure.querySelector(`.short-card[data-dictation-id="${String(idNum)}"]`);
-      };
-
-      const scrollToTarget = () => {
-        const el = findTarget();
-        if (!el) return false;
-        try {
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-        } catch (e) {
-          try {
-            el.scrollIntoView();
-          } catch (e2) {
-          }
-        }
-        try {
-          el.classList.add('desk-show-in-book-highlight');
-          setTimeout(() => el.classList.remove('desk-show-in-book-highlight'), 1600);
-        } catch (e) {
-        }
-        return true;
-      };
-
-      if (!scrollToTarget()) {
-        setTimeout(() => {
-          scrollToTarget();
-        }, 350);
-      }
-    } finally {
-      const t1 = performance.now();
-      console.log('[show-in-book] done', { ms: Math.round(t1 - t0), dictationId: idNum });
-    }
-  }
-
-  async function prefetchDeskAssets() {
-    if (!deskItems || !deskItems.length) {
-      showToast('На столе пока нет диктантов');
-      return;
-    }
-
-    const urls = [];
-
-    for (const item of deskItems) {
-      try {
-        if (item.cover_url) urls.push(item.cover_url);
-
-        const dictId = `dict_${item.dictation_id}`;
-        const langOrig = item.language_code || 'en';
-        const langTr = item.language_translation || langOrig;
-        const apiUrl = `/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`;
-
-        const sentencesRes = await fetch(apiUrl);
-        if (!sentencesRes.ok) {
-          continue;
-        }
-        const sentencesData = await sentencesRes.json();
-        const sentences = sentencesData && sentencesData.sentences ? sentencesData.sentences : [];
-        for (const s of sentences) {
-          if (!s) continue;
-          const candidates = [s.audio, s.audio_a, s.audio_f, s.audio_m, s.audio_tr];
-          for (const u of candidates) {
-            if (u && typeof u === 'string') urls.push(u);
-          }
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    const unique = Array.from(new Set(urls));
-    const statusEl = document.getElementById('offlineCacheStatus');
-    const progressWrap = document.getElementById('offlineCacheProgressWrap');
-    const progressBar = document.getElementById('offlineCacheProgressBar');
-    const progressText = document.getElementById('offlineCacheProgressText');
-
-    if (statusEl) statusEl.textContent = `Скачиваю… (0/${unique.length})`;
-    if (progressWrap) progressWrap.style.display = 'flex';
-    if (progressBar) progressBar.style.width = '0%';
-    if (progressText) progressText.textContent = '0%';
-
-    try {
-      const chunks = chunkArray(unique, 25);
-      let fetched = 0;
-      let skipped = 0;
-      let failed = 0;
-      let done = 0;
-
-      for (const chunk of chunks) {
-        if (statusEl) statusEl.textContent = `Скачиваю… (${done}/${unique.length})`;
-        const percent = unique.length > 0 ? Math.round((done / unique.length) * 100) : 0;
-        if (progressBar) progressBar.style.width = `${percent}%`;
-        if (progressText) progressText.textContent = `${percent}%`;
-
-        const res = await swRequest('prefetch', { urls: chunk, timeoutMs: 120000 });
-        const result = res.result || {};
-        fetched += result.fetched || 0;
-        skipped += result.skipped || 0;
-        failed += result.failed || 0;
-        done += chunk.length;
-      }
-
-      const finalPercent = unique.length > 0 ? 100 : 0;
-      if (progressBar) progressBar.style.width = `${finalPercent}%`;
-      if (progressText) progressText.textContent = `${finalPercent}%`;
-
-      showToast(`Готово. Скачано: ${fetched}. Уже было: ${skipped}. Ошибок: ${failed}.`);
     } catch (e) {
-      showToast(`Ошибка prefetch: ${e && e.message ? e.message : String(e)}`);
-    } finally {
-      if (progressWrap) progressWrap.style.display = 'none';
-      refreshOfflineCacheStatus();
+      console.warn('[toggleSectionInContainer] loadSectionDictations failed', e);
     }
   }
   
@@ -1802,28 +1632,6 @@
     }
   }
 
-  function ensureDeskCacheIndicator() {
-    if (document.getElementById('deskCacheIndicator')) return;
-
-    const deskZone = document.querySelector('.desk-zone');
-    if (!deskZone) return;
-
-    const el = document.createElement('div');
-    el.id = 'deskCacheIndicator';
-    el.className = 'desk-cache-indicator';
-    el.innerHTML = `
-      <div class="desk-cache-text">
-        <span id="deskCacheUsedText">0 B</span>
-        <span class="desk-cache-sep">/</span>
-        <span id="deskCacheMaxText">300 MB</span>
-      </div>
-      <div class="desk-cache-bar">
-        <div id="deskCacheProgressBar" class="desk-cache-bar-fill" style="width:0%;"></div>
-      </div>
-    `;
-    deskZone.appendChild(el);
-  }
-
   // Создает карточку диктанта (для стола или для книги)
   // item - объект с данными диктанта
   // isDeskCard - true для карточки на столе, false для карточки в книге
@@ -2356,8 +2164,6 @@
         }, 0);
       })().catch(() => {});
     });
-
-    ensureDeskCacheIndicator();
   }
 
 
@@ -3558,11 +3364,6 @@
       publicLibraryBtn.addEventListener("click", () => openPublicLibraryModal());
     }
 
-    const offlineCacheBtn = document.getElementById('btnOfflineCache');
-    if (offlineCacheBtn) {
-      offlineCacheBtn.addEventListener('click', () => openOfflineCacheModal());
-    }
-
     // ==================== Desk zoom controls ====================
     const deskZone = document.querySelector('.desk-zone');
     const zoomInBtn = document.getElementById('btnDeskZoomIn');
@@ -3601,62 +3402,6 @@
       zoomOutBtn.addEventListener('click', () => {
         const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
         applyDeskZoom(current - step);
-      });
-    }
-
-    const offlineCacheCloseBtn = document.getElementById('offline-cache-close');
-    if (offlineCacheCloseBtn) {
-      offlineCacheCloseBtn.addEventListener('click', closeOfflineCacheModal);
-    }
-
-    const offlineCacheModal = document.getElementById('offline-cache-modal');
-    if (offlineCacheModal) {
-      offlineCacheModal.addEventListener('click', (event) => {
-        if (event.target === offlineCacheModal) {
-          closeOfflineCacheModal();
-        }
-      });
-    }
-
-    const offlineCacheRefreshBtn = document.getElementById('offlineCacheRefreshBtn');
-    if (offlineCacheRefreshBtn) {
-      offlineCacheRefreshBtn.addEventListener('click', refreshOfflineCacheStatus);
-    }
-
-    const offlineCacheClearBtn = document.getElementById('offlineCacheClearBtn');
-    if (offlineCacheClearBtn) {
-      offlineCacheClearBtn.addEventListener('click', async () => {
-        if (!confirm('Очистить оффлайн кеш?')) return;
-        try {
-          await swRequest('cacheClear');
-          showToast('Кеш очищен');
-        } catch (e) {
-          showToast(`Ошибка очистки: ${e && e.message ? e.message : String(e)}`);
-        } finally {
-          refreshOfflineCacheStatus();
-        }
-      });
-    }
-
-    const offlineCachePrefetchDeskBtn = document.getElementById('offlineCachePrefetchDeskBtn');
-    if (offlineCachePrefetchDeskBtn) {
-      offlineCachePrefetchDeskBtn.addEventListener('click', prefetchDeskAssets);
-    }
-
-    const offlineCacheLimitSaveBtn = document.getElementById('offlineCacheLimitSaveBtn');
-    if (offlineCacheLimitSaveBtn) {
-      offlineCacheLimitSaveBtn.addEventListener('click', async () => {
-        const input = document.getElementById('offlineCacheLimitMb');
-        const raw = input ? Number(input.value) : 300;
-        const mb = isFinite(raw) ? Math.max(10, Math.floor(raw)) : 300;
-        try {
-          await swRequest('setMaxBytes', { maxBytes: mb * 1024 * 1024 });
-          showToast('Лимит сохранён');
-        } catch (e) {
-          showToast(`Ошибка сохранения лимита: ${e && e.message ? e.message : String(e)}`);
-        } finally {
-          refreshOfflineCacheStatus();
-        }
       });
     }
 
@@ -5184,7 +4929,6 @@
   }
 
   function loadLibraryData() {
-    ensureDeskCacheIndicator();
     refreshOfflineCacheStatus();
     triggerDeskLoadOnce();
     triggerBooksLoadOnce();
@@ -5196,7 +4940,6 @@
 
     checkAppCacheRevision().catch(() => {});
 
-    ensureDeskCacheIndicator();
     refreshOfflineCacheStatus();
     
     // Ждем пока UserManager инициализируется и завершит валидацию токена
@@ -5241,14 +4984,12 @@
           // Загружаем данные только если пользователь авторизован
           if (isAuthenticated) {
             console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
-            ensureDeskCacheIndicator();
             refreshOfflineCacheStatus();
             triggerDeskLoadOnce();
             triggerBooksLoadOnce();
             syncOfflineOutboxes().catch(() => {}); // Trigger offline outbox sync on page load after UserManager initialization
           } else {
             console.log('⚠️ Пользователь не авторизован, данные не загружаются');
-            ensureDeskCacheIndicator();
             refreshOfflineCacheStatus();
             triggerDeskLoadOnce();
           }
@@ -5285,50 +5026,7 @@
     // этот watchdog можно удалить при чистке кода.
     // setTimeout(() => {
     //   clearInterval(waitForUserManager);
-    //   try {
-    //     if (!window.UM || typeof window.UM.isAuthenticated !== 'function') {
-    //       showToast('Ошибка инициализации пользователя. Обнови страницу.');
-    //       return;
-    //     }
-    //
-    //     if (!window.UM.isInitialized) {
-    //       showToast('Авторизация еще не готова. Обнови страницу.');
-    //       return;
-    //     }
-    //
-    //     const isAuthenticated = window.UM.isAuthenticated();
-    //     if (!isAuthenticated) {
-    //       if (typeof window.UM.requireAuth === 'function') {
-    //         window.UM.requireAuth();
-    //       }
-    //       showToast('Требуется авторизация');
-    //       return;
-    //     }
-    //
-    //     if (!window.USER_LANGUAGE_DATA) {
-    //       const user = window.UM.getCurrentUser && window.UM.getCurrentUser();
-    //       if (!user) {
-    //         showToast('Не удалось получить данные пользователя. Обнови страницу.');
-    //         return;
-    //       }
-    //       window.USER_LANGUAGE_DATA = {
-    //         nativeLanguage: user.native_language || 'ru',
-    //         learningLanguages: user.learning_languages || ['en'],
-    //         currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
-    //         isAuthenticated: true
-    //       };
-    //       setTimeout(() => {
-    //         initializeBooksLanguageSelector();
-    //       }, 100);
-    //     }
-    //
-    //     ensureDeskCacheIndicator();
-    //     refreshOfflineCacheStatus();
-    //     triggerDeskLoadOnce();
-    //     triggerBooksLoadOnce();
-    //   } catch (e) {
-    //     showToast('Ошибка инициализации. Обнови страницу.');
-    //   }
+    //   ...
     // }, 5000);
   });
 })();
