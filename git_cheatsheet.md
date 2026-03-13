@@ -146,7 +146,7 @@ git commit -m "0174"
 git push origin production
 
 
-B2 CORS (prod bucket)
+# B2 CORS (prod bucket)
 
 - Production домен для браузера: https://dictafan.com
 - Railway internal домен (dictafan.railway.internal) не является браузерным origin и для CORS не нужен.
@@ -156,22 +156,9 @@ B2 CORS (prod bucket)
 
 
 
-# Шаг 0 — убедись, что ты на develop_DB
-git checkout develop_DB
-git status
-
-# Шаг 2 — коммит и push в develop_DB
-git add .
-git commit -m "0175"
-git push origin develop_DB
-
-# Деплой в production (после того как develop_DB запушен)
-# Шаг 3 — перейти на production и обновить её
+# Правильные команды (минимально)
+# Сделай ровно так:
 git checkout production
 git pull origin production
-
-# Шаг 4 — влить develop_DB в production
 git merge origin/develop_DB
-
-# Шаг 5 — push production
 git push origin production

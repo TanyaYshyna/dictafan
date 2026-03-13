@@ -1,5 +1,6 @@
 from flask import Blueprint, abort, after_this_request, current_app, jsonify, render_template, send_from_directory, url_for, request
 import os
+import re
 import tempfile
 from werkzeug.utils import secure_filename
 from helpers.language_data import load_language_data
@@ -8,6 +9,26 @@ from helpers.db_dictations import get_dictation_by_id, get_dictation_sentences
 from routes.index import get_cover_url_for_id
 
 dictation_bp = Blueprint('dictation', __name__)
+
+
+def _infer_lang_from_audio_filename(filename, fallback=''):
+    try:
+        name = secure_filename(filename or '')
+        if not name:
+            return (fallback or '').strip().lower()
+        base = name.rsplit('/', 1)[-1]
+        base = base.rsplit('.', 1)[0]
+        parts = [p.strip().lower() for p in base.split('_') if p.strip()]
+        if len(parts) >= 2:
+            cand = parts[1]
+            if re.match(r'^[a-z]{2,5}$', cand):
+                return cand
+        for p in parts:
+            if re.match(r'^[a-z]{2,5}$', p):
+                return p
+    except Exception:
+        pass
+    return (fallback or '').strip().lower()
 
 
 def _send_dictation_audio_from_b2(dictation_id, lang, filename):
@@ -38,6 +59,18 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
         exists = b2_storage.file_exists(remote_path, raise_on_error=True)
     except Exception:
         return jsonify({'error': 'B2 storage unavailable'}), 503
+
+    if not exists:
+        inferred_lang = _infer_lang_from_audio_filename(safe_name, fallback=safe_lang)
+        if inferred_lang and inferred_lang != safe_lang:
+            remote_path2 = f"dictations/{dictation_id}/{inferred_lang}/{safe_name}"
+            try:
+                exists2 = b2_storage.file_exists(remote_path2, raise_on_error=True)
+            except Exception:
+                return jsonify({'error': 'B2 storage unavailable'}), 503
+            if exists2:
+                remote_path = remote_path2
+                exists = True
 
     if not exists:
         return jsonify({'error': 'Audio file not found'}), 404
