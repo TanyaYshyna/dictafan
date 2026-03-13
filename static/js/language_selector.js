@@ -1647,13 +1647,6 @@ class LanguageSelector {
             }
         }
 
-        // 5. Отладочная кнопка для тестирования
-        const debugBtn = document.createElement('button');
-        debugBtn.textContent = '🔄 Отладка хранилища';
-        debugBtn.style.cssText = 'position: fixed; bottom: 10px; right: 10px; padding: 5px 10px; background: #333; color: white; border: none; border-radius: 4px; cursor: pointer; z-index: 9999; font-size: 11px;';
-        debugBtn.onclick = () => this.debugStorage();
-        document.body.appendChild(debugBtn);
-
         // Обновляем иконки Lucide
         if (window.lucide && window.lucide.createIcons) {
             setTimeout(() => {
@@ -2639,35 +2632,6 @@ class LanguageSelector {
     }
 
     destroy() {
-        if (this.options.container) {
-            this.options.container.innerHTML = '';
-        }
-    }
-
-    // ДОБАВЬТЕ В КЛАСС LanguageSelector:
-    debugStorage() {
-        console.log('🔍 Отладочная информация о хранилище:');
-
-        // Проверяем localStorage
-        console.log('📁 LocalStorage:');
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key.includes('model_') || key.includes('selected_model_')) {
-                console.log(`  ${key}:`, localStorage.getItem(key));
-            }
-        }
-
-        // Проверяем ModelManager
-        if (window.ModelManager) {
-            console.log('📊 ModelManager:');
-            console.log('  Выбранные модели:', window.ModelManager.selectedModels);
-            console.log('  Загруженные модели:', window.ModelManager.downloadedModels);
-            console.log('  Всего загружено:', window.ModelManager.getAllDownloadedModels().length);
-        }
-
-        // Информация о текущих расчетах
-        const storageInfo = this.calculateStorageUsage();
-        console.log('📈 Расчет использования памяти:', storageInfo);
     }
 }
 
