@@ -54,6 +54,16 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     if not safe_name:
         return jsonify({'error': 'Missing filename'}), 400
 
+    try:
+        current_app.logger.info(
+            "[dictation_audio] request dictation_id=%s lang=%s filename=%s",
+            dictation_id,
+            safe_lang,
+            safe_name,
+        )
+    except Exception:
+        pass
+
     remote_path = f"dictations/{dictation_id}/{safe_lang}/{safe_name}"
     try:
         exists = b2_storage.file_exists(remote_path, raise_on_error=True)
@@ -72,7 +82,28 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
                 remote_path = remote_path2
                 exists = True
 
+    try:
+        current_app.logger.info(
+            "[dictation_audio] resolve dictation_id=%s requested_lang=%s remote_path=%s exists=%s",
+            dictation_id,
+            safe_lang,
+            remote_path,
+            bool(exists),
+        )
+    except Exception:
+        pass
+
     if not exists:
+        try:
+            current_app.logger.warning(
+                "[dictation_audio] NOT FOUND dictation_id=%s lang=%s filename=%s remote_path=%s",
+                dictation_id,
+                safe_lang,
+                safe_name,
+                remote_path,
+            )
+        except Exception:
+            pass
         return jsonify({'error': 'Audio file not found'}), 404
 
     tmp = tempfile.NamedTemporaryFile(prefix='dict_audio_', suffix=f"_{safe_name}", delete=False)
@@ -81,6 +112,15 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
 
     ok = b2_storage.download_file(remote_path, tmp_path)
     if not ok:
+        try:
+            current_app.logger.warning(
+                "[dictation_audio] download failed dictation_id=%s remote_path=%s tmp_path=%s",
+                dictation_id,
+                remote_path,
+                tmp_path,
+            )
+        except Exception:
+            pass
         try:
             os.remove(tmp_path)
         except OSError:

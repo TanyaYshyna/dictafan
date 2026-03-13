@@ -249,6 +249,18 @@ def api_b2_cleanup_dictation_audio():
             except Exception:
                 continue
 
+        # Guardrail: never allow "delete everything" via cleanup.
+        if len(keep_set) == 0:
+            try:
+                logger.warning(
+                    "[b2_cleanup_dictation_audio] refused: empty keep_set (dictation_id=%s, keep_remote_paths=%s)",
+                    dictation_id,
+                    len(keep_remote_paths) if isinstance(keep_remote_paths, list) else None,
+                )
+            except Exception:
+                pass
+            return jsonify({'success': False, 'error': 'Refusing to cleanup: keep list is empty'}), 400
+
         existing = b2_storage.list_files(prefix)
         deleted = 0
         skipped = 0
@@ -261,6 +273,18 @@ def api_b2_cleanup_dictation_audio():
                     deleted += 1
             except Exception:
                 continue
+
+        try:
+            logger.info(
+                "[b2_cleanup_dictation_audio] done dictation_id=%s existing=%s keep=%s deleted=%s skipped=%s",
+                dictation_id,
+                len(existing),
+                len(keep_set),
+                deleted,
+                skipped,
+            )
+        except Exception:
+            pass
 
         return jsonify({
             'success': True,
