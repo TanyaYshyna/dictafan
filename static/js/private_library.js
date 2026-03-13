@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0200';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0201';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -5168,11 +5168,26 @@
   }
 
   // Функция для загрузки данных после авторизации
+  let __initialDeskLoadTriggered = false;
+  let __initialBooksLoadTriggered = false;
+
+  function triggerDeskLoadOnce() {
+    if (__initialDeskLoadTriggered) return;
+    __initialDeskLoadTriggered = true;
+    loadDeskItems();
+  }
+
+  function triggerBooksLoadOnce() {
+    if (__initialBooksLoadTriggered) return;
+    __initialBooksLoadTriggered = true;
+    loadBooksFromAPI();
+  }
+
   function loadLibraryData() {
     ensureDeskCacheIndicator();
     refreshOfflineCacheStatus();
-    loadDeskItems();
-    loadBooksFromAPI();
+    triggerDeskLoadOnce();
+    triggerBooksLoadOnce();
   }
 
   // Инициализация при загрузке страницы
@@ -5228,14 +5243,14 @@
             console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
             ensureDeskCacheIndicator();
             refreshOfflineCacheStatus();
-            loadDeskItems();
-            loadBooksFromAPI();
+            triggerDeskLoadOnce();
+            triggerBooksLoadOnce();
             syncOfflineOutboxes().catch(() => {}); // Trigger offline outbox sync on page load after UserManager initialization
           } else {
             console.log('⚠️ Пользователь не авторизован, данные не загружаются');
             ensureDeskCacheIndicator();
             refreshOfflineCacheStatus();
-            loadDeskItems();
+            triggerDeskLoadOnce();
           }
         }
         // Если UserManager еще не инициализирован, продолжаем ждать
@@ -5265,25 +5280,56 @@
       }
     });
     
-    // Таймаут на случай, если UserManager не загрузится
-    setTimeout(() => {
-      clearInterval(waitForUserManager);
-      if (!window.USER_LANGUAGE_DATA) {
-        window.USER_LANGUAGE_DATA = {
-          nativeLanguage: 'ru',
-          learningLanguages: ['en'],
-          currentLearning: 'en',
-          isAuthenticated: false
-        };
-        setTimeout(() => {
-          initializeBooksLanguageSelector();
-        }, 100);
-        ensureDeskCacheIndicator();
-        refreshOfflineCacheStatus();
-        loadDeskItems();
-        loadBooksFromAPI();
-      }
-    }, 5000);
+    // ВРЕМЕННО ОТКЛЮЧЕНО (диагностика двойной инициализации стола/книг).
+    // Если после нескольких деплоев все стабильно (нет "очистилось и по новой" и нет зависаний),
+    // этот watchdog можно удалить при чистке кода.
+    // setTimeout(() => {
+    //   clearInterval(waitForUserManager);
+    //   try {
+    //     if (!window.UM || typeof window.UM.isAuthenticated !== 'function') {
+    //       showToast('Ошибка инициализации пользователя. Обнови страницу.');
+    //       return;
+    //     }
+    //
+    //     if (!window.UM.isInitialized) {
+    //       showToast('Авторизация еще не готова. Обнови страницу.');
+    //       return;
+    //     }
+    //
+    //     const isAuthenticated = window.UM.isAuthenticated();
+    //     if (!isAuthenticated) {
+    //       if (typeof window.UM.requireAuth === 'function') {
+    //         window.UM.requireAuth();
+    //       }
+    //       showToast('Требуется авторизация');
+    //       return;
+    //     }
+    //
+    //     if (!window.USER_LANGUAGE_DATA) {
+    //       const user = window.UM.getCurrentUser && window.UM.getCurrentUser();
+    //       if (!user) {
+    //         showToast('Не удалось получить данные пользователя. Обнови страницу.');
+    //         return;
+    //       }
+    //       window.USER_LANGUAGE_DATA = {
+    //         nativeLanguage: user.native_language || 'ru',
+    //         learningLanguages: user.learning_languages || ['en'],
+    //         currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
+    //         isAuthenticated: true
+    //       };
+    //       setTimeout(() => {
+    //         initializeBooksLanguageSelector();
+    //       }, 100);
+    //     }
+    //
+    //     ensureDeskCacheIndicator();
+    //     refreshOfflineCacheStatus();
+    //     triggerDeskLoadOnce();
+    //     triggerBooksLoadOnce();
+    //   } catch (e) {
+    //     showToast('Ошибка инициализации. Обнови страницу.');
+    //   }
+    // }, 5000);
   });
 })();
 
