@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0214';
+window.__DICTATION_BUILD = '2026-03-08_0215';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2243,8 +2243,8 @@ function setupAuthHandlers() {
             window.__DICTATION_EXIT_BTN_DELEGATE_BOUND = true;
             document.addEventListener('click', async (e) => {
                 try {
-                    const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
-                    if (!btn) return;
+                    // const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
+                    // if (!btn) return;
                     console.log('🚪 [exit] click captured', {
                         targetTag: e && e.target ? e.target.tagName : null,
                         targetId: e && e.target ? (e.target.id || null) : null,
