@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0212';
+window.__DICTATION_BUILD = '2026-03-08_0213';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2222,19 +2222,19 @@ function setupAuthHandlers() {
         });
     }
 
-    const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
-    if (startModalExitBtn) {
-        startModalExitBtn.addEventListener('click', async (e) => {
-            try {
-                if (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            } catch (e2) {
-            }
-            await showExitModal(() => window.location.href = "/");
-        });
-    }
+    // const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
+    // if (startModalExitBtn) {
+    //     startModalExitBtn.addEventListener('click', async (e) => {
+    //         try {
+    //             if (e) {
+    //                 e.preventDefault();
+    //                 e.stopPropagation();
+    //             }
+    //         } catch (e2) {
+    //         }
+    //         await showExitModal(() => window.location.href = "/");
+    //     });
+    // }
 
     // Extra safety: use event delegation (capture) so the button works even if something overlays it
     // or stops bubbling in inner handlers.
@@ -2343,21 +2343,21 @@ function setupExitHandlers() {
     const exitWithSavingBtn = document.getElementById('exitWithSavingBtn');
     window.pendingExitAction = null;
 
-    // Кнопка выхода из диктанта в шапке стартового модального окна
-    // (setupAuthHandlers() может не вызываться на этой странице)
-    const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
-    if (startModalExitBtn) {
-        startModalExitBtn.addEventListener('click', async (e) => {
-            try {
-                if (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            } catch (e2) {
-            }
-            await showExitModal(() => window.location.href = "/");
-        });
-    }
+    // // Кнопка выхода из диктанта в шапке стартового модального окна
+    // // (setupAuthHandlers() может не вызываться на этой странице)
+    // const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
+    // if (startModalExitBtn) {
+    //     startModalExitBtn.addEventListener('click', async (e) => {
+    //         try {
+    //             if (e) {
+    //                 e.preventDefault();
+    //                 e.stopPropagation();
+    //             }
+    //         } catch (e2) {
+    //         }
+    //         await showExitModal(() => window.location.href = "/");
+    //     });
+    // }
 
     // Обработчик для кнопки "На главную" (только для #btnBackToMain, #btnBackToList имеет свою функцию clickBtnBackToList)
     const btnBackToMain = document.getElementById('btnBackToMain');
@@ -10250,6 +10250,7 @@ function initAudioSettingsModal() {
     const audioSettingsButton = document.getElementById('audioSettingsButton');
     const topbarSettingsButton = document.getElementById('openDictationSettingsBtn');
     const startModalSettingsButton = document.getElementById('startModalOpenSettingsBtn');
+    const startModalExitButton = document.getElementById('startModalExitToIndexBtn');
     const closeAudioSettingsModal = document.getElementById('closeAudioSettingsModal');
     const modalContainer = document.getElementById('audioSettingsModalContainer');
 
@@ -10301,6 +10302,24 @@ function initAudioSettingsModal() {
 
         indicator.style.opacity = isBusy ? '1' : '0';
     };
+
+    // Кнопка выхода из диктанта в шапке стартового модального окна
+    // (setupAuthHandlers() может не вызываться на этой странице)
+    if (startModalExitButton) {
+        startModalExitButton.addEventListener('click', async (e) => {
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } catch (e2) {
+            }
+            await showExitModal(() => window.location.href = "/");
+        });
+    }
+
+
+
 
     if (!audioSettingsModal || !modalContainer) {
         console.warn('Элементы модального окна настроек аудио не найдены');
