@@ -510,10 +510,13 @@ button.audio-btn i[data-lucide] {
 }
 
 .start-modal-language-arrow {
-    font-size: 14px;
-    font-weight: 800;
-    opacity: 0.8;
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1;
+    opacity: 0.85;
     user-select: none;
+    position: relative;
+    top: -1px;
 }
 
 .start-modal-title-row {

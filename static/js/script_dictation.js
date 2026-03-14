@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0209';
+window.__DICTATION_BUILD = '2026-03-08_0210';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2234,6 +2234,25 @@ function setupAuthHandlers() {
             }
             await showExitModal(() => window.location.href = "/");
         });
+    }
+
+    // Extra safety: use event delegation (capture) so the button works even if something overlays it
+    // or stops bubbling in inner handlers.
+    try {
+        if (!window.__DICTATION_EXIT_BTN_DELEGATE_BOUND) {
+            window.__DICTATION_EXIT_BTN_DELEGATE_BOUND = true;
+            document.addEventListener('click', async (e) => {
+                try {
+                    const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
+                    if (!btn) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    await showExitModal(() => window.location.href = "/");
+                } catch (e2) {
+                }
+            }, true);
+        }
+    } catch (e) {
     }
 
     if (registerBtn) {
