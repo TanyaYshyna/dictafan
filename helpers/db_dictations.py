@@ -5,6 +5,8 @@ import json
 from datetime import datetime
 from helpers.db import get_db_connection
 
+from helpers.language_data import load_language_data
+
 
 def create_dictation(title, language_code, level=None, owner_id=None, is_public=True, 
                     speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None):
@@ -96,6 +98,84 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
     except Exception as e:
         conn.rollback()
         raise Exception(f"Failed to create dictation: {e}")
+    finally:
+        conn.close()
+
+
+def refresh_dictation_translation_flags(dictation_id: int) -> None:
+    """Recompute dictations.tr_* flags for a dictation.
+
+    Safe behavior:
+    - If tr_* columns are not present (migration not applied) -> no-op.
+    - Only updates columns that exist in DB.
+
+    Rules:
+    - language_code in dictations is the ORIGINAL language.
+    - tr_<lang> flags represent presence of TRANSLATION content (sentences) on that lang.
+      Original language is never considered a translation.
+    """
+    if not dictation_id:
+        return
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Determine which tr_* columns exist in this database.
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'dictations'
+                  AND column_name LIKE 'tr\\_%'
+                """
+            )
+            cols = [r[0] for r in (cur.fetchall() or []) if r and r[0]]
+            if not cols:
+                return
+
+            # Read original language.
+            cur.execute("SELECT language_code FROM dictations WHERE id = %s", (int(dictation_id),))
+            row = cur.fetchone()
+            original_lang = (str(row[0]).strip().lower() if row and row[0] else '')
+
+            # Supported languages from languages.json.
+            lang_data = load_language_data() or {}
+            languages = sorted([str(k).lower() for k in lang_data.keys() if isinstance(k, str)])
+
+            # Only update columns that both exist in DB and correspond to known languages.
+            to_update = []
+            values = []
+            for lang in languages:
+                if not lang:
+                    continue
+                if original_lang and lang == original_lang:
+                    # Original language is not a translation flag.
+                    continue
+
+                col = f"tr_{lang}"
+                if col not in cols:
+                    continue
+
+                # Translation exists if there is at least 1 sentence for that language.
+                to_update.append(
+                    f"{col} = EXISTS (SELECT 1 FROM dictation_sentences s WHERE s.dictation_id = %s AND s.language_code = %s)"
+                )
+                values.extend([int(dictation_id), lang])
+
+            if not to_update:
+                return
+
+            query = f"UPDATE dictations SET {', '.join(to_update)} WHERE id = %s"
+            values.append(int(dictation_id))
+            cur.execute(query, values)
+            conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        # Do not break save flow if flags refresh fails.
+        return
     finally:
         conn.close()
 

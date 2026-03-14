@@ -1572,7 +1572,10 @@
             const dictMeta = metaRes && metaRes.success ? metaRes.dictation : null;
             const deskItem = Array.isArray(deskItems) ? deskItems.find(x => String(x.dictation_id) === String(dictationId)) : null;
             const langOrig = (deskItem && (deskItem.language_code || deskItem.language_original)) || (dictMeta && dictMeta.language_code) || 'en';
-            const langTr = (deskItem && deskItem.language_translation) || langOrig;
+            const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+              ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+              : '';
+            const langTr = (deskItem && deskItem.language_translation) || nativeLang || langOrig;
 
             const sentencesRes2 = await apiRequest(`/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`);
             const sentences2 = sentencesRes2 && sentencesRes2.success && Array.isArray(sentencesRes2.sentences) ? sentencesRes2.sentences : [];
@@ -1641,7 +1644,10 @@
       const dictationId = item.dictation_id;
       const dictationIdFormatted = `dict_${dictationId}`;
       const langOriginal = item.language_code || 'en';
-      const langTranslation = item.language_translation || item.language_code || 'en';
+      const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+        ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+        : '';
+      const langTranslation = item.language_translation || nativeLang || item.language_code || 'en';
       const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
       const coverUrl = maybeCacheBustDictationCover(item.cover_url);
@@ -1688,7 +1694,10 @@
       
       // Определяем языки для URL
       const langOriginal = d.language_original || d.language_code || 'en';
-      const langTranslation = d.language_translation || d.language_code || 'en';
+      const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+        ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+        : '';
+      const langTranslation = d.language_translation || nativeLang || d.language_code || 'en';
       
       // ID в формате dict_X для URL
       const dictationId = d.dictation_id || `dict_${d.id}`;

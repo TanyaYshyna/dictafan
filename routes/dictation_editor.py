@@ -1165,6 +1165,14 @@ def save_dictation_final():
             deleted_count,
             skipped_lang_count,
         )
+
+        # Refresh cached translation flags (tr_*) for fast filtering.
+        # Safe: if columns are not present yet, helper is a no-op.
+        try:
+            from helpers.db_dictations import refresh_dictation_translation_flags
+            refresh_dictation_translation_flags(int(db_id))
+        except Exception:
+            pass
         
         # Создаем финальную папку ТОЛЬКО для аудиофайлов и обложки (никаких JSON!)
         final_path = os.path.join('static', 'data', 'dictations', dictation_id)
