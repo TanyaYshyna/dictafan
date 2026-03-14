@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0207';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0208';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -2959,11 +2959,20 @@
     const titleInput = document.getElementById("section-title-input");
 
     const sectionId = idInput.value ? parseInt(idInput.value, 10) : null;
-    const parentId = parseInt(parentIdInput.value, 10);
+    const parentIdRaw = parentIdInput ? String(parentIdInput.value || '').trim() : '';
+    const parentId = parentIdRaw ? parseInt(parentIdRaw, 10) : null;
     const sectionNumber = numberInput.value ? parseInt(numberInput.value, 10) : null;
 
     if (!titleInput.value.trim()) {
       showToast("Введите название раздела");
+      return;
+    }
+
+    // Safety: section must have a valid parent book/section.
+    // If parentId is invalid, JSON.stringify(NaN) becomes null and server will create a top-level book,
+    // which looks like "section didn't add".
+    if (!parentId || Number.isNaN(parentId)) {
+      showToast("Ошибка: не выбрана книга для раздела", { durationMs: 2500 });
       return;
     }
 

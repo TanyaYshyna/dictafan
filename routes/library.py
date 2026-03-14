@@ -334,12 +334,7 @@ def api_create_book():
             if not b2_storage.enabled:
                 return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
 
-            cover_url = _save_book_cover(book["id"], user["id"], cover_file)
-            if not cover_url:
-                return jsonify({"success": False, "error": "Failed to save cover"}), 502
-
-            # Обновляем книгу с URL обложки
-            book = update_book(book["id"], cover_url=cover_url)
+            _save_book_cover(book["id"], user["id"], cover_file)
         
         return jsonify({"success": True, "book": book})
     except Exception as exc:
@@ -470,12 +465,7 @@ def api_update_book(book_id: int):
             if not b2_storage.enabled:
                 return jsonify({"success": False, "error": "B2 storage is disabled"}), 503
 
-            cover_url = _save_book_cover(book_id, user["id"], cover_file)
-            if not cover_url:
-                return jsonify({"success": False, "error": "Failed to save cover"}), 502
-
-            # Обновляем книгу с URL обложки
-            book = update_book(book_id, cover_url=cover_url)
+            _save_book_cover(book_id, user["id"], cover_file)
         
         return jsonify({"success": True, "book": book})
     except Exception as exc:

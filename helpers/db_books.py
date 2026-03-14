@@ -8,6 +8,10 @@ from typing import List, Optional, Dict, Any, Tuple
 from .db import get_db_cursor
 
 
+def _calc_book_cover_url(book_id: int) -> str:
+    return f"/library/api/book-cover?book_id={book_id}&filename=cover.webp"
+
+
 def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
     """
     Возвращает список публичных книг с краткой информацией:
@@ -22,7 +26,6 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
             SELECT
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.short_description,
                 b.original_language,
@@ -46,7 +49,6 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
             GROUP BY
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.short_description,
                 b.original_language,
@@ -68,7 +70,7 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
                 {
                     "id": row["id"],
                     "title": row["title"],
-                    "cover_url": row["cover_url"],
+                    "cover_url": _calc_book_cover_url(int(row["id"])),
                     "author_text": row["author_text"],
                     "short_description": row["short_description"],
                     "original_language": row["original_language"],
@@ -313,7 +315,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             SELECT
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.creator_user_id,
                 b.short_description,
@@ -339,7 +340,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             GROUP BY
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.creator_user_id,
                 b.short_description,
@@ -375,7 +375,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                     {
                         "id": row["id"],
                         "title": row["title"],
-                        "cover_url": row["cover_url"],
+                        "cover_url": _calc_book_cover_url(int(row["id"])),
                         "author_text": row["author_text"],
                         "creator_user_id": row["creator_user_id"],
                         "short_description": row["short_description"],
@@ -405,7 +405,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             SELECT
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.creator_user_id,
                 b.short_description,
@@ -435,7 +434,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             GROUP BY
                 b.id,
                 b.title,
-                b.cover_url,
                 b.author_text,
                 b.creator_user_id,
                 b.short_description,
@@ -474,7 +472,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 {
                     "id": row["id"],
                     "title": row["title"],
-                    "cover_url": row["cover_url"],
+                    "cover_url": _calc_book_cover_url(int(row["id"])),
                     "author_text": row["author_text"],
                     "creator_user_id": row["creator_user_id"],
                     "short_description": row["short_description"],
@@ -531,7 +529,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                 SELECT
                     b.id,
                     b.title,
-                    b.cover_url,
                     b.author_text,
                     b.creator_user_id,
                     b.original_language,
@@ -554,7 +551,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                 SELECT
                     b.id,
                     b.title,
-                    b.cover_url,
                     b.author_text,
                     b.creator_user_id,
                     b.original_language,
@@ -577,7 +573,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                 SELECT
                     b.id,
                     b.title,
-                    b.cover_url,
                     b.author_text,
                     b.creator_user_id,
                     b.original_language,
@@ -600,7 +595,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                 SELECT
                     b.id,
                     b.title,
-                    b.cover_url,
                     b.author_text,
                     b.creator_user_id,
                     b.original_language,
@@ -633,7 +627,7 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
         return {
             "id": row["id"],
             "title": row["title"],
-            "cover_url": row["cover_url"],
+            "cover_url": _calc_book_cover_url(int(row["id"])),
             "author_text": row["author_text"],
             "creator_user_id": row["creator_user_id"],
             "creator_username": row["creator_username"] if row["creator_username"] else None,
@@ -755,7 +749,6 @@ def create_book(
                 """
                 INSERT INTO books (
                     title,
-                    cover_url,
                     author_text,
                     creator_user_id,
                     original_language,
@@ -767,8 +760,8 @@ def create_book(
                     section_number,
                     author_materials_url
                 )
-                VALUES (%s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id, title, cover_url, author_text, creator_user_id,
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, title, author_text, creator_user_id,
                           original_language, visibility, short_description, theme,
                           parent_id, order_index, section_number, author_materials_url, created_at, updated_at
                 """,
@@ -791,7 +784,6 @@ def create_book(
                 """
                 INSERT INTO books (
                     title,
-                    cover_url,
                     author_text,
                     creator_user_id,
                     original_language,
@@ -802,8 +794,8 @@ def create_book(
                     order_index,
                     section_number
                 )
-                VALUES (%s, NULL, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id, title, cover_url, author_text, creator_user_id,
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id, title, author_text, creator_user_id,
                           original_language, visibility, short_description, theme,
                           parent_id, order_index, section_number, created_at, updated_at
                 """,
@@ -826,7 +818,7 @@ def create_book(
         return {
             "id": row["id"],
             "title": row["title"],
-            "cover_url": row["cover_url"],
+            "cover_url": _calc_book_cover_url(int(row["id"])),
             "author_text": row["author_text"],
             "creator_user_id": row["creator_user_id"],
             "original_language": row["original_language"],
@@ -853,7 +845,6 @@ def update_book(
     short_description: Optional[str] = None,
     author_text: Optional[str] = None,
     theme: Optional[str] = None,
-    cover_url: Optional[str] = None,
     order_index: Optional[int] = None,
     section_number: Optional[int] = None,
     author_materials_url: Optional[str] = None,
@@ -892,9 +883,6 @@ def update_book(
         if theme is not None:
             updates.append("theme = %s")
             values.append(theme)
-        if cover_url is not None:
-            updates.append("cover_url = %s")
-            values.append(cover_url)
         if order_index is not None:
             updates.append("order_index = %s")
             values.append(order_index)
@@ -920,7 +908,7 @@ def update_book(
             UPDATE books
             SET {', '.join(updates)}
             WHERE id = %s
-            RETURNING id, title, cover_url, author_text, creator_user_id,
+            RETURNING id, title, author_text, creator_user_id,
                       original_language, visibility, short_description, theme,
                       parent_id, order_index, created_at, updated_at
         """
@@ -934,7 +922,7 @@ def update_book(
         return {
             "id": row["id"],
             "title": row["title"],
-            "cover_url": row["cover_url"],
+            "cover_url": _calc_book_cover_url(int(row["id"])),
             "author_text": row["author_text"],
             "creator_user_id": row["creator_user_id"],
             "original_language": row["original_language"],
@@ -960,7 +948,7 @@ def get_or_create_workbook(user_id: int) -> Dict[str, Any]:
         # Проверяем, есть ли уже такая книга
         cur.execute(
             """
-            SELECT id, title, cover_url, author_text, creator_user_id,
+            SELECT id, title, author_text, creator_user_id,
                    original_language, visibility, short_description, theme,
                    parent_id, order_index, created_at, updated_at
             FROM books
@@ -975,7 +963,7 @@ def get_or_create_workbook(user_id: int) -> Dict[str, Any]:
             return {
                 "id": row["id"],
                 "title": row["title"],
-                "cover_url": row["cover_url"],
+                "cover_url": _calc_book_cover_url(int(row["id"])),
                 "author_text": row["author_text"],
                 "creator_user_id": row["creator_user_id"],
                 "original_language": row["original_language"],
