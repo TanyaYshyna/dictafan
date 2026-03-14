@@ -133,7 +133,7 @@
                                 <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
                                     <i data-lucide="settings"></i>
                                 </button>
-                                <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта">
+                                <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
                                     <i data-lucide="log-out"></i>
                                 </button>
                                 <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">

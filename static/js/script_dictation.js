@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0213';
+window.__DICTATION_BUILD = '2026-03-08_0214';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -10303,24 +10303,6 @@ function initAudioSettingsModal() {
         indicator.style.opacity = isBusy ? '1' : '0';
     };
 
-    // Кнопка выхода из диктанта в шапке стартового модального окна
-    // (setupAuthHandlers() может не вызываться на этой странице)
-    if (startModalExitButton) {
-        startModalExitButton.addEventListener('click', async (e) => {
-            try {
-                if (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }
-            } catch (e2) {
-            }
-            await showExitModal(() => window.location.href = "/");
-        });
-    }
-
-
-
-
     if (!audioSettingsModal || !modalContainer) {
         console.warn('Элементы модального окна настроек аудио не найдены');
         return;
@@ -10504,6 +10486,33 @@ function initAudioSettingsModal() {
         });
     };
 
+    const bindExitHandler = (btn, label) => {
+        if (!btn) return;
+        btn.addEventListener('click', async (e) => {
+            try {
+                console.log(`🖱️ [Exit] click ${label}`, {
+                    targetTag: e && e.target ? e.target.tagName : null,
+                    targetId: e && e.target ? e.target.id : null,
+                    targetClass: e && e.target ? e.target.className : null,
+                    currentTargetId: e && e.currentTarget ? e.currentTarget.id : null
+                });
+            } catch (err) {
+            }
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } catch (err) {
+            }
+            try {
+                await showExitModal(() => window.location.href = "/");
+            } catch (err) {
+                window.location.href = "/";
+            }
+        });
+    };
+
     // Обработчик открытия модального окна (кнопка в таблице)
     bindOpenHandler(audioSettingsButton, 'table-gear');
 
@@ -10512,6 +10521,9 @@ function initAudioSettingsModal() {
 
     // Обработчик открытия модального окна (кнопка в шапке модального окна выбора предложений)
     bindOpenHandler(startModalSettingsButton, 'start-modal-gear');
+
+    // Обработчик выхода (кнопка рядом с шестерёнкой в шапке стартового модального окна)
+    bindExitHandler(startModalExitButton, 'start-modal-exit');
 
     // Обработчик закрытия модального окна
     if (closeAudioSettingsModal) {
