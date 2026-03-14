@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0215';
+window.__DICTATION_BUILD = '2026-03-08_0216';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2242,6 +2242,7 @@ function setupAuthHandlers() {
         if (!window.__DICTATION_EXIT_BTN_DELEGATE_BOUND) {
             window.__DICTATION_EXIT_BTN_DELEGATE_BOUND = true;
             document.addEventListener('click', async (e) => {
+                console.log('WWWWWWWWWWWWWWWWW');
                 try {
                     // const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
                     // if (!btn) return;
@@ -2255,10 +2256,10 @@ function setupAuthHandlers() {
                     e.preventDefault();
                     e.stopPropagation();
                     // If exit modal isn't present for some reason, still allow leaving.
-                    if (!document.getElementById('exitModal')) {
-                        window.location.href = "/";
-                        return;
-                    }
+                    // if (!document.getElementById('exitModal')) {
+                    //     window.location.href = "/";
+                    //     return;
+                    // }
                     await showExitModal(() => window.location.href = "/");
                 } catch (e2) {
                 }
