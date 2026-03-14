@@ -1968,7 +1968,25 @@ body.playing-audio::after {
   vertical-align: middle;
 }
 
+#startModalExitToIndexBtn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  vertical-align: middle;
+  pointer-events: auto;
+}
+
 #startModalOpenSettingsBtn i {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+}
+
+#startModalExitToIndexBtn i {
   width: 20px;
   height: 20px;
   color: var(--color-text-secondary);
@@ -1978,7 +1996,16 @@ body.playing-audio::after {
   background: transparent;
 }
 
+#startModalExitToIndexBtn:hover {
+  background: transparent;
+}
+
 #startModalOpenSettingsBtn:active {
+  transform: none;
+  box-shadow: none;
+}
+
+#startModalExitToIndexBtn:active {
   transform: none;
   box-shadow: none;
 }
