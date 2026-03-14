@@ -111,6 +111,18 @@ def api_get_book_cover():
     from helpers.b2_storage import b2_storage
 
     try:
+        from flask import after_this_request
+
+        @after_this_request
+        def _no_cache_headers(response):
+            try:
+                response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+                response.headers["Pragma"] = "no-cache"
+                response.headers["Expires"] = "0"
+            except Exception:
+                pass
+            return response
+
         book_id = request.args.get("book_id")
         user_id = request.args.get("user_id")
         filename = request.args.get("filename", "cover.webp")

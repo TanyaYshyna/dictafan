@@ -1662,7 +1662,7 @@
   height: 100%;
   justify-content: center;
   align-items: center;
-  z-index: 10000;
+  z-index: 10081;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
   overflow-x: hidden;
@@ -1675,7 +1675,7 @@
 
 #book-edit-modal .book-edit-modal-content {
   position: relative;
-  z-index: 10001;
+  z-index: 10081;
   margin: auto;
   max-width: 900px;
   width: 90%;
@@ -2019,7 +2019,7 @@
   height: 100%;
   justify-content: center;
   align-items: center;
-  z-index: 10020;
+  z-index: 10082;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
 }
@@ -2031,7 +2031,7 @@
 
 .section-edit-modal-content {
   position: relative;
-  z-index: 10021;
+  z-index: 10083;
   margin: auto;
   max-width: 500px;
   width: 90%;

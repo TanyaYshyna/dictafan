@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0180';
+window.__DICTATION_BUILD = '2026-03-08_0209';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2311,6 +2311,22 @@ function setupExitHandlers() {
     const exitWithoutSavingBtn = document.getElementById('exitWithoutSavingBtn');
     const exitWithSavingBtn = document.getElementById('exitWithSavingBtn');
     window.pendingExitAction = null;
+
+    // Кнопка выхода из диктанта в шапке стартового модального окна
+    // (setupAuthHandlers() может не вызываться на этой странице)
+    const startModalExitBtn = document.getElementById('startModalExitToIndexBtn');
+    if (startModalExitBtn) {
+        startModalExitBtn.addEventListener('click', async (e) => {
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            } catch (e2) {
+            }
+            await showExitModal(() => window.location.href = "/");
+        });
+    }
 
     // Обработчик для кнопки "На главную" (только для #btnBackToMain, #btnBackToList имеет свою функцию clickBtnBackToList)
     const btnBackToMain = document.getElementById('btnBackToMain');

@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0208';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0209';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
@@ -213,6 +213,15 @@
     if (!url || typeof url !== 'string') return url;
     const sep = url.includes('?') ? '&' : '?';
     const v = (window && window.__PRIVATE_LIBRARY_BUILD) ? String(window.__PRIVATE_LIBRARY_BUILD) : '1';
+    return `${url}${sep}v=${encodeURIComponent(v)}`;
+  }
+
+  function withCacheBustVersion(url, version) {
+    if (!url || typeof url !== 'string') return url;
+    const v = (version !== undefined && version !== null && String(version).trim())
+      ? String(version).trim()
+      : ((window && window.__PRIVATE_LIBRARY_BUILD) ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
+    const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}v=${encodeURIComponent(v)}`;
   }
 
@@ -2317,7 +2326,10 @@
     // Формируем HTML обложки
     let coverHtml;
     if (book.cover_url) {
-      coverHtml = `<img class="book-card-mini-cover" src="${blankImg}" data-src="${withCacheBust(book.cover_url)}" alt="${book.title}">`;
+      const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
+        ? (book.updated_at || Date.now())
+        : (window && window.__PRIVATE_LIBRARY_BUILD ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
+      coverHtml = `<img class="book-card-mini-cover" src="${blankImg}" data-src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`;
     } else {
       coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
     }
@@ -2551,8 +2563,11 @@
       : '';
 
     // Если есть ссылка на материалы автора, делаем картинку кликабельной
+    const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
+      ? (book.updated_at || Date.now())
+      : (window && window.__PRIVATE_LIBRARY_BUILD ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
     const coverImage = book.cover_url 
-      ? `<img src="${withCacheBust(book.cover_url)}" alt="${book.title}">`
+      ? `<img src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`
       : `<div class="book-card-max-cover-placeholder"><i data-lucide="book-open"></i></div>`;
     
     const coverContent = book.author_materials_url
