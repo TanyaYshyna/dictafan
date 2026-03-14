@@ -364,6 +364,14 @@ body.playing-audio::after {
   z-index: 1000;
 }
 
+#exitModal {
+  z-index: 1300;
+}
+
+#exitModal .modal-content {
+  z-index: 1301;
+}
+
 /* кнопка стартар по центру */
 #confirmStartBtn {
   /* padding: 12px 24px; */
