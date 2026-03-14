@@ -5,7 +5,7 @@
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
 
-window.__DICTATION_BUILD = '2026-03-08_0210';
+window.__DICTATION_BUILD = '2026-03-08_0211';
 console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
@@ -2245,8 +2245,20 @@ function setupAuthHandlers() {
                 try {
                     const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
                     if (!btn) return;
+                    console.log('🚪 [exit] click captured', {
+                        targetTag: e && e.target ? e.target.tagName : null,
+                        targetId: e && e.target ? (e.target.id || null) : null,
+                        targetClass: e && e.target ? (typeof e.target.className === 'string' ? e.target.className : null) : null,
+                        btnDisabled: !!btn.disabled,
+                        btnTitle: btn.getAttribute('title') || null
+                    });
                     e.preventDefault();
                     e.stopPropagation();
+                    // If exit modal isn't present for some reason, still allow leaving.
+                    if (!document.getElementById('exitModal')) {
+                        window.location.href = "/";
+                        return;
+                    }
                     await showExitModal(() => window.location.href = "/");
                 } catch (e2) {
                 }

@@ -1,8 +1,18 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0210';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0211';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
+
+  let bookEditDirty = false;
+
+  function setBookEditDirty(nextDirty) {
+    bookEditDirty = !!nextDirty;
+    const star = document.getElementById('book-edit-unsaved-star');
+    if (star) {
+      star.style.display = bookEditDirty ? 'inline' : 'none';
+    }
+  }
 
   // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
   // (Useful when something overlays the button or stops propagation.)
@@ -2823,6 +2833,8 @@
   function openBookModal(book) {
     // Очищаем предыдущий cropped blob
     croppedImageBlob = null;
+
+    setBookEditDirty(false);
     
     const modal = document.getElementById("book-edit-modal");
     const titleEl = document.getElementById("book-edit-title");
@@ -2882,6 +2894,27 @@
     modal.classList.add("show");
     
     initBookLanguageSelector(book ? book.original_language : null);
+
+    // Track unsaved edits in inputs/selects.
+    try {
+      const trackIds = [
+        'book-title-input',
+        'book-author-text-input',
+        'book-author-materials-url-input',
+        'book-theme-input',
+        'book-visibility-input',
+        'book-description-input'
+      ];
+      trackIds.forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.dataset && el.dataset.bookDirtyBound === '1') return;
+        if (el.dataset) el.dataset.bookDirtyBound = '1';
+        el.addEventListener('input', () => setBookEditDirty(true));
+        el.addEventListener('change', () => setBookEditDirty(true));
+      });
+    } catch (e) {
+    }
     
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
@@ -2894,6 +2927,8 @@
       modal.style.display = "none";
       modal.classList.remove("show");
     }
+
+    setBookEditDirty(false);
   }
 
   // ==================== Модальное окно раздела ====================
@@ -3173,6 +3208,8 @@
       closeCropModal(false);
       
       showToast('Обложка готова к сохранению');
+
+      setBookEditDirty(true);
     }, 'image/webp', 0.95);
   }
 
@@ -3229,6 +3266,8 @@
       }
     };
     reader.readAsDataURL(file);
+
+    setBookEditDirty(true);
   }
 
   async function handleSaveBook(event) {
@@ -3336,6 +3375,8 @@
         showToast(data.error || "Ошибка сохранения книги");
         return;
       }
+
+      setBookEditDirty(false);
 
       // Очищаем cropped blob
       croppedImageBlob = null;
