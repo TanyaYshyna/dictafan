@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0218';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0220';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -2014,6 +2014,10 @@ async function initDictationGenerator() {
 
     // Инициализируем панель вкладок
     setupTabsPanel();
+    try {
+        initTranslationsTab();
+    } catch (e) {
+    }
     // Обработчики навигации по строкам таблицы
     setupTableControlsHandlers();
 
@@ -4898,6 +4902,31 @@ function addNewRow(referenceRow, position) {
         workingData.translation.sentences.push(translationSentence);
     }
 
+    // Also create corresponding rows for all additional translation buckets.
+    try {
+        if (workingData && typeof workingData === 'object') {
+            Object.keys(workingData).forEach((k) => {
+                if (k === 'original' || k === 'translation') return;
+                if (!isLanguageCodeLike(k)) return;
+                const bucket = workingData[k];
+                if (!bucket || typeof bucket !== 'object') return;
+                if (!Array.isArray(bucket.sentences)) bucket.sentences = [];
+                bucket.sentences.push({
+                    key: newKey,
+                    text: '',
+                    audio: '',
+                    audio_avto: '',
+                    audio_user: '',
+                    audio_mic: '',
+                    start: 0,
+                    end: 0,
+                    chain: false
+                });
+            });
+        }
+    } catch (e) {
+    }
+
     // Теперь создаем DOM-элемент с данными
     const newRow = createTableRow(newKey, originalSentence, translationSentence);
 
@@ -4944,6 +4973,18 @@ function deleteRow(rowToDelete) {
             }
             if (workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
                 workingData.translation.sentences = workingData.translation.sentences.filter(s => s && s.key !== deletedKey);
+            }
+
+            // Remove from all additional translation buckets.
+            if (workingData && typeof workingData === 'object') {
+                Object.keys(workingData).forEach((k) => {
+                    if (k === 'original' || k === 'translation') return;
+                    if (!isLanguageCodeLike(k)) return;
+                    const bucket = workingData[k];
+                    if (bucket && typeof bucket === 'object' && Array.isArray(bucket.sentences)) {
+                        bucket.sentences = bucket.sentences.filter(s => s && s.key !== deletedKey);
+                    }
+                });
             }
         } catch (e) {
         }
@@ -8174,6 +8215,213 @@ function closeStartModal() {
     }
 }
 
+let translationsTabLanguageSelector = null;
+
+function getTranslationLanguagesSelected() {
+    try {
+        if (translationsTabLanguageSelector && typeof translationsTabLanguageSelector.getValues === 'function') {
+            const v = translationsTabLanguageSelector.getValues();
+            const langs = v && Array.isArray(v.learningLanguages) ? v.learningLanguages : [];
+            return langs
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean);
+        }
+    } catch (e) {
+    }
+    return [];
+}
+
+function isReservedWorkingDataKey(k) {
+    return k === 'original' || k === 'translation';
+}
+
+function isLanguageCodeLike(k) {
+    try {
+        const s = String(k || '').trim().toLowerCase();
+        if (!s) return false;
+        if (s === 'original' || s === 'translation') return false;
+        // allow 'en', 'ru', 'pt-br' etc.
+        return /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(s);
+    } catch (e) {
+        return false;
+    }
+}
+
+function ensureTranslationBucket(lang) {
+    try {
+        const code = String(lang || '').trim().toLowerCase();
+        if (!code) return null;
+        if (!workingData || typeof workingData !== 'object') return null;
+        if (code === String(currentDictation && currentDictation.language_original || '').trim().toLowerCase()) return null;
+
+        if (workingData.translation && String(workingData.translation.language || '').trim().toLowerCase() === code) {
+            return workingData.translation;
+        }
+
+        if (workingData[code] && typeof workingData[code] === 'object') {
+            if (!Array.isArray(workingData[code].sentences)) workingData[code].sentences = [];
+            workingData[code].language = code;
+            return workingData[code];
+        }
+
+        workingData[code] = {
+            language: code,
+            title: '',
+            speakers: {},
+            sentences: [],
+            audio_user_shared: '',
+            audio_user_shared_start: 0,
+            audio_user_shared_end: 0
+        };
+        return workingData[code];
+    } catch (e) {
+        return null;
+    }
+}
+
+function syncTranslationBucketsWithSelectedLanguages() {
+    try {
+        const selected = new Set(getTranslationLanguagesSelected());
+        const orig = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+        if (orig) selected.delete(orig);
+
+        // Ensure bucket exists for each selected language.
+        for (const lang of selected) {
+            ensureTranslationBucket(lang);
+        }
+
+        // Remove buckets that are not selected.
+        if (workingData && typeof workingData === 'object') {
+            Object.keys(workingData).forEach((k) => {
+                if (isReservedWorkingDataKey(k)) return;
+                if (!isLanguageCodeLike(k)) return;
+                const code = String(k).trim().toLowerCase();
+                if (!selected.has(code)) {
+                    try {
+                        delete workingData[k];
+                    } catch (e) {
+                    }
+                }
+            });
+        }
+
+        // Active translation must be one of selected languages.
+        const active = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim().toLowerCase();
+        if (active && !selected.has(active)) {
+            const first = Array.from(selected)[0] || '';
+            if (first) {
+                currentDictation.language_translation = first;
+                if (workingData && workingData.translation) {
+                    workingData.translation.language = first;
+                }
+            }
+        }
+    } catch (e) {
+    }
+}
+
+function initTranslationsTab() {
+    try {
+        const container = document.getElementById('translationLanguagesList');
+        if (!container) return;
+
+        const initSelector = () => {
+            try {
+                if (!window.LanguageManager || !window.LanguageManager.isInitialized) {
+                    setTimeout(initSelector, 100);
+                    return;
+                }
+                const languageData = window.LanguageManager.getLanguageData();
+                if (!languageData) {
+                    setTimeout(initSelector, 100);
+                    return;
+                }
+
+                // Determine initial selected translation languages: from existing workingData buckets + active translation.
+                const activeTr = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim().toLowerCase();
+                const orig = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+                const existing = new Set();
+                if (workingData && typeof workingData === 'object') {
+                    Object.keys(workingData).forEach((k) => {
+                        if (isReservedWorkingDataKey(k)) return;
+                        if (isLanguageCodeLike(k)) existing.add(String(k).trim().toLowerCase());
+                    });
+                }
+                if (activeTr) existing.add(activeTr);
+                if (orig) existing.delete(orig);
+                const initial = Array.from(existing);
+
+                container.innerHTML = '';
+                translationsTabLanguageSelector = new LanguageSelector({
+                    container,
+                    mode: 'learning-list',
+                    nativeLanguage: activeTr || (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase() : 'ru'),
+                    learningLanguages: initial.length ? initial : (activeTr ? [activeTr] : []),
+                    currentLearning: activeTr || (initial[0] || ''),
+                    languageData,
+                    onLanguageChange: function (values) {
+                        try {
+                            // Keep active translation aligned with selector currentLearning.
+                            const nextActive = values && values.currentLearning ? String(values.currentLearning).trim().toLowerCase() : '';
+                            if (nextActive) {
+                                // If we have a dedicated bucket for this language, make it the active translation view.
+                                try {
+                                    const prevActive = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim().toLowerCase();
+                                    if (prevActive && prevActive !== nextActive) {
+                                        // Persist current active translation sentences into its bucket (if not the main translation bucket language).
+                                        try {
+                                            if (workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
+                                                const prevBucket = ensureTranslationBucket(prevActive);
+                                                if (prevBucket && prevBucket !== workingData.translation) {
+                                                    prevBucket.sentences = workingData.translation.sentences;
+                                                }
+                                            }
+                                        } catch (ePersist) {
+                                        }
+
+                                        // Load next active bucket sentences into workingData.translation.
+                                        try {
+                                            const nextBucket = ensureTranslationBucket(nextActive);
+                                            if (nextBucket && nextBucket !== workingData.translation) {
+                                                workingData.translation.sentences = Array.isArray(nextBucket.sentences) ? nextBucket.sentences : [];
+                                                workingData.translation.language = nextActive;
+                                            }
+                                        } catch (eSwap) {
+                                        }
+                                    }
+                                } catch (eBuckets) {
+                                }
+
+                                currentDictation.language_translation = nextActive;
+                                try {
+                                    if (workingData && workingData.translation) {
+                                        workingData.translation.language = nextActive;
+                                    }
+                                } catch (e0) {
+                                }
+                            }
+                            syncTranslationBucketsWithSelectedLanguages();
+                            // Re-render table translation column for the new active language.
+                            try { renderTableFromWorkingData(); } catch (e1) {}
+                            try { applyTableViewForTab(currentTabName); } catch (e2) {}
+                            try { setDirtyFlags({ db: true }); } catch (e3) {}
+                            try { updateUnsavedStar(); } catch (e4) {}
+                        } catch (e) {
+                        }
+                    }
+                });
+
+                // Ensure buckets exist after initialization.
+                syncTranslationBucketsWithSelectedLanguages();
+            } catch (e) {
+            }
+        };
+
+        initSelector();
+    } catch (e) {
+    }
+}
+
 async function cancelDictationCreation() {
     try {
         // console.log('🚫 Отмена создания диктанта...');
@@ -8362,10 +8610,9 @@ async function createDictationFromStart() {
         } catch (e) {
         }
 
+        // Always clear ALL translations (including passive buckets).
         try {
-            const chk = document.getElementById('clearAllTranslationsCheckbox');
-            const clearAll = !!(chk && chk.checked);
-            if (clearAll && workingData && typeof workingData === 'object') {
+            if (workingData && typeof workingData === 'object') {
                 Object.keys(workingData).forEach((k) => {
                     if (k === 'original' || k === 'translation') return;
                     const bucket = workingData[k];
@@ -8446,6 +8693,43 @@ async function createDictationFromStart() {
             speakers: speakers,
             sentences: parsedData.translation
         };
+
+        // For all selected translation languages, create corresponding empty buckets
+        // with the same keys/positions. UI shows only the active translation language,
+        // but data must exist for all translations to keep +/delete/save consistent.
+        try {
+            const origLang = String(currentDictation.language_original || '').trim().toLowerCase();
+            const activeTr = String(currentDictation.language_translation || '').trim().toLowerCase();
+            const selected = new Set(getTranslationLanguagesSelected());
+            if (origLang) selected.delete(origLang);
+
+            const origSent = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+                ? workingData.original.sentences
+                : [];
+            for (const lang of selected) {
+                const code = String(lang || '').trim().toLowerCase();
+                if (!code) continue;
+                if (code === activeTr) continue; // active translation already has data
+                const bucket = ensureTranslationBucket(code);
+                if (!bucket) continue;
+                bucket.language = code;
+                bucket.speakers = speakers;
+                bucket.sentences = origSent.map((s) => ({
+                    key: s && (s.key || s.sentence_key) ? String(s.key || s.sentence_key) : '',
+                    position: (s && s.position !== undefined && s.position !== null) ? s.position : null,
+                    text: '',
+                    audio: '',
+                    audio_avto: '',
+                    audio_user: '',
+                    audio_mic: '',
+                    start: 0,
+                    end: 0,
+                    chain: false,
+                    explanation: ''
+                })).filter(x => x && x.key);
+            }
+        } catch (e) {
+        }
 
         // Mark as changed: both text/structure and generated media are new.
         try {
@@ -8747,6 +9031,41 @@ async function saveDictationOnly() {
         const authorMaterialsUrlInput = document.getElementById('dictation-author-materials-url-input');
         const authorMaterialsUrl = authorMaterialsUrlInput ? authorMaterialsUrlInput.value.trim() || null : null;
         
+        // Build sentences payload for ALL selected translations.
+        const sentencesPayload = (() => {
+            try {
+                const out = {};
+                const origLang = String(currentDictation.language_original || '').trim().toLowerCase();
+                const activeTr = String(currentDictation.language_translation || '').trim().toLowerCase();
+
+                if (origLang && workingData && workingData.original) {
+                    out[origLang] = workingData.original;
+                }
+                if (activeTr && workingData && workingData.translation) {
+                    out[activeTr] = workingData.translation;
+                }
+
+                if (workingData && typeof workingData === 'object') {
+                    Object.keys(workingData).forEach((k) => {
+                        if (k === 'original' || k === 'translation') return;
+                        if (!isLanguageCodeLike(k)) return;
+                        const code = String(k).trim().toLowerCase();
+                        if (!code || code === origLang) return;
+                        const bucket = workingData[k];
+                        if (!bucket || typeof bucket !== 'object') return;
+                        out[code] = bucket;
+                    });
+                }
+
+                return out;
+            } catch (e) {
+                return {
+                    [currentDictation.language_original]: workingData.original,
+                    [currentDictation.language_translation]: workingData.translation
+                };
+            }
+        })();
+
         // Подготавливаем данные для сохранения
         const saveData = {
             id: currentDictation.id,
@@ -8761,10 +9080,7 @@ async function saveDictationOnly() {
             is_dialog: currentDictation.is_dialog || false,
             speakers: currentDictation.speakers || {},
             author_materials_url: authorMaterialsUrl,  // Ссылка на материалы автора
-            sentences: {
-                [currentDictation.language_original]: workingData.original,
-                [currentDictation.language_translation]: workingData.translation
-            },
+            sentences: sentencesPayload,
             category_key: currentDictation.category_key,
             // Если диктант создан из приватной библиотеки, сюда попадёт ID книги/раздела
             book_id: currentDictation.book_id || null
