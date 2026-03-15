@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0218';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0219';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   let bookEditDirty = false;
@@ -954,6 +954,66 @@
   }
 
   // ==================== ЗОНА 1: Рабочий стол ====================
+  function normalizeUrlForSwPrefetch(rawUrl) {
+    try {
+      let v = String(rawUrl || '').trim();
+      if (!v) return '';
+      if (v.startsWith('blob:')) return v;
+
+      // Normalize absolute URLs: enforce https on https pages and prefer same-origin relative path.
+      try {
+        if (v.startsWith('http://') || v.startsWith('https://')) {
+          const u = new URL(v);
+          const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol)
+            ? location.protocol
+            : u.protocol;
+          if (desiredProtocol === 'https:' && u.protocol === 'http:') {
+            u.protocol = 'https:';
+          }
+          try {
+            if (typeof location !== 'undefined' && location && u.origin === location.origin) {
+              v = `${u.pathname}${u.search || ''}`;
+            } else {
+              v = u.toString();
+            }
+          } catch (e) {
+            v = `${u.pathname}${u.search || ''}`;
+          }
+        }
+      } catch (e) {
+      }
+
+      // Safety: never keep plain http URL on an https page.
+      try {
+        if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
+          v = `https://${v.slice('http://'.length)}`;
+        }
+      } catch (e) {
+      }
+
+      // Fix accidental duplication like .../api/dictations/.../api/dictations/...
+      const markers = ['/api/dictations/', '/api/temp/dictations/'];
+      for (const m of markers) {
+        const first = v.indexOf(m);
+        if (first >= 0) {
+          const second = v.indexOf(m, first + m.length);
+          if (second >= 0) {
+            v = v.slice(second);
+          }
+        }
+      }
+
+      // Ensure leading slash for same-origin relative requests.
+      if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
+        v = `/${v}`;
+      }
+
+      return v;
+    } catch (e) {
+      return String(rawUrl || '').trim();
+    }
+  }
+
   function areDeskItemEffectivelyEqual(a, b) {
     const x = a || {};
     const y = b || {};
@@ -1534,7 +1594,7 @@
             hasDictation: Boolean(metaRes && metaRes.dictation),
           });
           if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
-            requiredUrls.push(metaRes.dictation.cover_url);
+            requiredUrls.push(normalizeUrlForSwPrefetch(metaRes.dictation.cover_url));
           }
 
           // HTML страница диктанта (нужна для оффлайн-навигации)
@@ -1590,10 +1650,10 @@
             ? sentencesRes.sentences
             : [];
           for (const s of sentences) {
-            if (s && s.audio) requiredUrls.push(s.audio);
+            if (s && s.audio) requiredUrls.push(normalizeUrlForSwPrefetch(s.audio));
           }
 
-          const uniqueRequired = Array.from(new Set(requiredUrls)).filter(Boolean);
+          const uniqueRequired = Array.from(new Set(requiredUrls.map(normalizeUrlForSwPrefetch))).filter(Boolean);
           if (!uniqueRequired.length) {
             showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
             hideLoadingIndicator();
@@ -1620,14 +1680,18 @@
           }
           if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
             showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
-          } else if (msg.includes('Service Worker не активен')) {
-            showToast('Оффлайн режим не активен. Обнови страницу или включи Service Worker.');
+            hideLoadingIndicator();
+            deskToggleInFlight.delete(key);
+            return;
           } else {
-            showToast(`Не удалось скачать диктант в оффлайн: ${msg}`);
+            // Soft-fail: allow adding dictation to desk even if offline prefetch fails
+            // (mixed content, transient network, etc.). We'll still try caching sentences later.
+            if (msg.includes('Service Worker не активен')) {
+              showToast('Оффлайн режим не активен. Диктант добавлю на стол, но оффлайн может не работать.');
+            } else {
+              showToast(`Не удалось скачать диктант в оффлайн: ${msg}. Добавляю на стол без оффлайна.`);
+            }
           }
-          hideLoadingIndicator();
-          deskToggleInFlight.delete(key);
-          return;
         }
 
         const addData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
