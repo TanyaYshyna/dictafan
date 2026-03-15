@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0217';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0218';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   let bookEditDirty = false;
@@ -11,6 +11,25 @@
     const star = document.getElementById('book-edit-unsaved-star');
     if (star) {
       star.style.display = bookEditDirty ? 'inline' : 'none';
+    }
+  }
+
+  function getDefaultOriginalLanguageForNewBook() {
+    try {
+      const fromFilter = (typeof currentBooksFilterLanguage !== 'undefined')
+        ? currentBooksFilterLanguage
+        : null;
+      const fromSelector = (booksLanguageSelectorInstance && typeof booksLanguageSelectorInstance.getValues === 'function')
+        ? (booksLanguageSelectorInstance.getValues() || {}).currentLearning
+        : null;
+      const fromUser = window.USER_LANGUAGE_DATA?.currentLearning || null;
+      const raw = fromFilter || fromSelector || fromUser || null;
+      if (!raw) return null;
+      const v = String(raw).trim().toLowerCase();
+      if (!v || v === 'all') return null;
+      return v;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -1134,7 +1153,36 @@
         } catch (e) {
         }
 
-        deskItems = data.items;
+        // Merge with locally cached items to avoid wiping the desk if the server
+        // temporarily returns an incomplete list (e.g. dictations missing in JOIN,
+        // offline-only cached items, etc.).
+        const serverItems = Array.isArray(data.items) ? data.items : [];
+        const prevItems = Array.isArray(deskItems) ? deskItems : [];
+        const merged = (() => {
+          try {
+            const byDictationId = new Map();
+            // Prefer server items first (authoritative), then keep any local-only items.
+            for (const it of serverItems) {
+              if (!it) continue;
+              const k = String(it.dictation_id ?? it.id ?? '');
+              if (!k) continue;
+              byDictationId.set(k, it);
+            }
+            for (const it of prevItems) {
+              if (!it) continue;
+              const k = String(it.dictation_id ?? it.id ?? '');
+              if (!k) continue;
+              if (!byDictationId.has(k)) {
+                byDictationId.set(k, { ...it, __local_only: true });
+              }
+            }
+            return Array.from(byDictationId.values());
+          } catch (e) {
+            return serverItems.length ? serverItems : prevItems;
+          }
+        })();
+
+        deskItems = merged;
         try {
           await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
         } catch (e) {
@@ -1347,6 +1395,31 @@
     const next = data.items;
     const prev = Array.isArray(deskItems) ? deskItems : [];
 
+    // Same safety merge as in loadDeskItems(): keep local cached items that are missing
+    // from server response, so desk UI won't suddenly lose cards.
+    const nextMerged = (() => {
+      try {
+        const byDictationId = new Map();
+        for (const it of next) {
+          if (!it) continue;
+          const k = String(it.dictation_id ?? it.id ?? '');
+          if (!k) continue;
+          byDictationId.set(k, it);
+        }
+        for (const it of prev) {
+          if (!it) continue;
+          const k = String(it.dictation_id ?? it.id ?? '');
+          if (!k) continue;
+          if (!byDictationId.has(k)) {
+            byDictationId.set(k, { ...it, __local_only: true });
+          }
+        }
+        return Array.from(byDictationId.values());
+      } catch (e) {
+        return next;
+      }
+    })();
+
     const prevById = new Map(prev.map(x => [String(x.id), x]));
     const nextById = new Map(next.map(x => [String(x.id), x]));
 
@@ -1364,7 +1437,7 @@
       }
     }
 
-    deskItems = next;
+    deskItems = nextMerged;
     try {
       await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
     } catch (e) {
@@ -1568,6 +1641,9 @@
           error: addData && (addData.error || addData.message) ? String(addData.error || addData.message) : '',
         });
         
+        // Treat "added: false" (already exists) as non-error, but don't claim it was added.
+        const wasAdded = !!(addData && addData.success && (addData.added === true || addData.added === 1));
+
         if (addData && addData.success) {
           try {
             const syncRes = await syncDeskFromServerIncremental();
@@ -1629,7 +1705,7 @@
           }
 
           refreshOfflineCacheStatus();
-          completeLoadingIndicator('Диктант добавлен на рабочий стол', 1000);
+          completeLoadingIndicator(wasAdded ? 'Диктант добавлен на рабочий стол' : 'Диктант уже на рабочем столе', 1000);
           console.log('===DESK_TOGGLE=== done ok', { dictationId: String(dictationId) });
         } else {
           const apiMsg = (addData && (addData.error || addData.message))
@@ -2893,7 +2969,8 @@
     modal.style.display = "flex";
     modal.classList.add("show");
     
-    initBookLanguageSelector(book ? book.original_language : null);
+    const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
+    initBookLanguageSelector(defaultLang);
 
     // Track unsaved edits in inputs/selects.
     try {
