@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0225';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0226';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -53,21 +53,7 @@ function initTranslationsTabV2() {
     }
 
     try {
-        const tl = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        if (!tl) {
-            setHeaderNoTranslationMode();
-        }
-    } catch (e) {
-    }
-
-    try {
-        // Keep translation flags in sync for header rendering.
-        if (currentDictation) {
-            currentDictation.translation_flags = currentDictation.translation_flags || {};
-            for (const k of Object.keys(currentDictation.translation_flags || {})) {
-                currentDictation.translation_flags[k] = false;
-            }
-        }
+        syncTranslationsFromDictationMeta();
     } catch (e) {
     }
 
@@ -115,61 +101,27 @@ function getFlagHtml(langCode) {
     }
 }
 
-function initAllLanguageFromWorkingData() {
+function syncTranslationsFromDictationMeta() {
     try {
-        all_language = Array.isArray(all_language) ? all_language : [];
-        if (all_language.length > 0) return;
-        const tl = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        if (!tl) return;
-        if (!workingData || !workingData.translation) return;
-        const entry = ensureTranslationEntry(tl);
-        if (!entry) return;
-        entry.active = true;
-        entry.language = tl;
-        entry.title = workingData.translation.title || '';
-        entry.speakers = workingData.translation.speakers || {};
-        entry.sentences = Array.isArray(workingData.translation.sentences) ? workingData.translation.sentences : [];
-    } catch (e) {
-    }
-}
-
-function syncAllLanguageFromDictationMeta() {
-    try {
-        all_language = Array.isArray(all_language) ? all_language : [];
-
         const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
-        const activeFromHeader = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        if (activeFromHeader && (!orig || activeFromHeader !== orig)) {
-            const e = ensureTranslationEntry(activeFromHeader);
-            if (e) e.active = true;
-        }
-
-        // Prefer DB translation flags (dictations.tr_*) from initData.
         const tf = (currentDictation && currentDictation.translation_flags) ? currentDictation.translation_flags : {};
         if (tf && typeof tf === 'object') {
             for (const k of Object.keys(tf)) {
                 const lang = normalizeLangCode(k);
                 if (!lang || (orig && lang === orig)) continue;
                 if (tf[k] === true) {
-                    const e = ensureTranslationEntry(lang);
-                    if (e) e.active = true;
+                    ensureTranslation(lang);
                 }
             }
         }
-    } catch (e) {
-    }
-}
 
-function getActiveTranslationLanguagesList() {
-    try {
-        const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
-        return (Array.isArray(all_language) ? all_language : [])
-            .filter(x => x && x.active === true)
-            .map(x => normalizeLangCode(x.language))
-            .filter(Boolean)
-            .filter(l => !orig || l !== orig);
+        // Ensure current translation pointer matches selected language.
+        const currentTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
+        if (currentTr) {
+            ensureTranslation(currentTr);
+            setCurrentTranslationPointer(currentTr);
+        }
     } catch (e) {
-        return [];
     }
 }
 
@@ -208,7 +160,8 @@ function renderHeaderLangPairWithManager() {
         if (!languageData) return;
 
         const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
-        const activeTranslations = getActiveTranslationLanguagesList()
+        try { syncTranslationsFromDictationMeta(); } catch (e) {}
+        const activeTranslations = listExistingTranslationLangs()
             .filter(l => !orig || l !== orig);
 
         const preferred = normalizeLangCode(currentDictation && currentDictation.preferred_translation_language);
@@ -219,6 +172,17 @@ function renderHeaderLangPairWithManager() {
 
         // Keep currentDictation in sync.
         try { currentDictation.language_translation = tr; } catch (e) {}
+
+        // Keep workingData.translation pointer in sync with selected translation.
+        try {
+            if (tr) {
+                ensureTranslation(tr);
+                setCurrentTranslationPointer(tr);
+            } else {
+                setCurrentTranslationPointer('');
+            }
+        } catch (e) {
+        }
 
         container.innerHTML = '';
 
@@ -238,10 +202,25 @@ function renderHeaderLangPairWithManager() {
                 container.appendChild(label);
             } catch (e) {}
             try {
+                const tl = document.getElementById('translationLanguageLabel');
+                if (tl) tl.textContent = 'без перевода:';
+                const inp = document.getElementById('title_translation');
+                if (inp) inp.style.display = 'none';
+            } catch (e) {
+            }
+            try {
                 updateHeaderNativeMismatchLabel({ preferred, selected: tr, hasTranslations: false });
             } catch (e) {
             }
             return;
+        }
+
+        try {
+            const tl = document.getElementById('translationLanguageLabel');
+            if (tl) tl.textContent = `${tr}:`;
+            const inp = document.getElementById('title_translation');
+            if (inp) inp.style.display = '';
+        } catch (e) {
         }
 
         if (activeTranslations.length === 1) {
@@ -288,16 +267,16 @@ function renderTranslationsTabV2() {
     try {
         const container = document.getElementById('translationLanguagesList');
         if (!container) return;
-        syncAllLanguageFromDictationMeta();
-        initAllLanguageFromWorkingData();
+        syncTranslationsFromDictationMeta();
 
         const activeLang = normalizeLangCode(currentDictation && currentDictation.language_translation);
         const available = getAvailableTranslationLanguages();
 
         let html = '<div class="translations-v2-list">';
         for (const lang of available) {
-            const entry = getTranslationEntry(lang);
-            const isChecked = !!(entry && entry.active === true);
+            const code = normalizeLangCode(lang);
+            const entry = (workingData && workingData.translations && code) ? workingData.translations[code] : null;
+            const isChecked = !!entry;
             const isCurrent = !!(activeLang && activeLang === normalizeLangCode(lang));
             const iconName = isChecked ? 'circle-check-big' : 'circle';
             html += `
@@ -364,21 +343,19 @@ function openRemoveTranslationLangModal(lang) {
 
         const select = document.getElementById('removeTranslationNextActiveSelect');
         if (select) {
-            const opts = (Array.isArray(all_language) ? all_language : []).filter(x => x && x.active === true && normalizeLangCode(x.language) !== code);
             const current = normalizeLangCode(currentDictation && currentDictation.language_translation);
-            const list = opts.map(x => normalizeLangCode(x.language));
-            select.innerHTML = '';
-            const emptyOpt = document.createElement('option');
-            emptyOpt.value = '';
-            emptyOpt.textContent = 'без перевода';
-            select.appendChild(emptyOpt);
-            for (const l of list) {
-                const o = document.createElement('option');
-                o.value = l;
-                o.textContent = getLanguageNameSafe(l);
-                select.appendChild(o);
+            const list = listExistingTranslationLangs().filter(l => l && l !== code);
+            if (current && current !== code && list.includes(current) === false) {
+                list.unshift(current);
             }
-            // Default selection: current if it is not the removed language, else first remaining.
+            select.innerHTML = '';
+            for (const l of list) {
+                const opt = document.createElement('option');
+                opt.value = l;
+                opt.textContent = getLanguageNameSafe(l);
+                if (l === current) opt.selected = true;
+                select.appendChild(opt);
+            }
             if (current && current !== code) {
                 select.value = current;
             } else {
@@ -394,21 +371,16 @@ async function createTranslationLanguage(lang) {
     if (!code) return;
 
     try {
-        // Persist current working translation before switching
-        persistWorkingTranslationToAllLanguage();
-    } catch (e) {
-    }
-
-    try {
         showLoadingIndicator(`Создание переводов (${code})...`);
     } catch (e) {
     }
 
     try {
-        const entry = ensureTranslationEntry(code);
-        entry.active = true;
-        entry.language = code;
-        entry.speakers = (workingData && workingData.original) ? (workingData.original.speakers || {}) : {};
+        const entry = ensureTranslation(code);
+        if (entry) {
+            entry.language = code;
+            entry.speakers = (workingData && workingData.original) ? (workingData.original.speakers || {}) : {};
+        }
 
         const origSent = (workingData && workingData.original && Array.isArray(workingData.original.sentences)) ? workingData.original.sentences : [];
         const out = [];
@@ -448,9 +420,10 @@ async function createTranslationLanguage(lang) {
             await generateAudioForSentence(trSentence, code);
             out.push(trSentence);
         }
-        entry.sentences = out;
+        if (entry) {
+            entry.sentences = out;
+        }
 
-        overwriteWorkingTranslationFromEntry(entry);
         setHeaderTranslationLanguage(code);
 
         try {
@@ -474,19 +447,19 @@ async function createTranslationLanguage(lang) {
 function markTranslationInactive(lang, nextActiveLang) {
     const code = normalizeLangCode(lang);
     try {
-        persistWorkingTranslationToAllLanguage();
-        const entry = getTranslationEntry(code);
-        if (entry) entry.active = false;
+        if (workingData && workingData.translations && code && workingData.translations[code]) {
+            delete workingData.translations[code];
+        }
+        try {
+            if (currentDictation && currentDictation.translation_flags) {
+                currentDictation.translation_flags[code] = false;
+            }
+        } catch (e) {
+        }
 
         const next = normalizeLangCode(nextActiveLang);
-        if (next) {
-            const nextEntry = getTranslationEntry(next);
-            if (nextEntry && nextEntry.active === true) {
-                overwriteWorkingTranslationFromEntry(nextEntry);
-                setHeaderTranslationLanguage(next);
-            } else {
-                setHeaderNoTranslationMode();
-            }
+        if (next && workingData && workingData.translations && workingData.translations[next]) {
+            setHeaderTranslationLanguage(next);
         } else {
             setHeaderNoTranslationMode();
         }
@@ -512,13 +485,9 @@ function selectTranslationLanguageAsCurrent(lang) {
     if (!code) return;
 
     try {
-        const entry = getTranslationEntry(code);
-        if (!entry || entry.active !== true) {
+        if (!workingData || !workingData.translations || !workingData.translations[code]) {
             return;
         }
-
-        persistWorkingTranslationToAllLanguage();
-        overwriteWorkingTranslationFromEntry(entry);
         setHeaderTranslationLanguage(code);
 
         try {
@@ -569,8 +538,8 @@ function bindTranslationsTabV2Handlers() {
             clickTimer = null;
         }
 
-        const entry = getTranslationEntry(lang);
-        const isActive = !!(entry && entry.active === true);
+        const code = normalizeLangCode(lang);
+        const isActive = !!(workingData && workingData.translations && code && workingData.translations[code]);
         if (!isActive) {
             openCreateTranslationLangModal(lang);
         } else {
@@ -1775,6 +1744,11 @@ let workingData = {
         audio_user_shared_start: 0,
         audio_user_shared_end: 0
     },
+    // Single source of truth for translations.
+    // Each key is a language code: workingData.translations['ru'], workingData.translations['uk'], ...
+    translations: {},
+    // Backward-compatible pointer used across the editor table logic.
+    // It is always a reference to workingData.translations[currentDictation.language_translation].
     translation: {
         language: '',
         title: '',
@@ -1786,67 +1760,68 @@ let workingData = {
     }
 };
 
-let mas_language = {
-    active: true,
-    language: '',
-    title: '',
-    speakers: {},
-    sentences: [],
-    audio_user_shared: '',
-    audio_user_shared_start: 0,
-    audio_user_shared_end: 0
-};
-
-let all_language = [];
-
 function normalizeLangCode(code) {
     return String(code || '').trim().toLowerCase();
 }
 
-function getTranslationEntry(lang) {
+function createEmptyTranslationObject(lang) {
     const code = normalizeLangCode(lang);
-    if (!code) return null;
-    return (Array.isArray(all_language) ? all_language : []).find(x => x && normalizeLangCode(x.language) === code) || null;
+    return {
+        language: code,
+        title: '',
+        speakers: (workingData && workingData.original) ? (workingData.original.speakers || {}) : {},
+        sentences: [],
+        audio_user_shared: '',
+        audio_user_shared_start: 0,
+        audio_user_shared_end: 0
+    };
 }
 
-function ensureTranslationEntry(lang) {
+function ensureTranslation(lang) {
     const code = normalizeLangCode(lang);
     if (!code) return null;
-    let entry = getTranslationEntry(code);
-    if (entry) return entry;
-    entry = JSON.parse(JSON.stringify(mas_language));
-    entry.active = true;
-    entry.language = code;
-    entry.title = '';
-    entry.speakers = (workingData && workingData.original) ? (workingData.original.speakers || {}) : {};
-    entry.sentences = [];
-    all_language.push(entry);
-    return entry;
+    if (!workingData) return null;
+    workingData.translations = (workingData.translations && typeof workingData.translations === 'object') ? workingData.translations : {};
+    if (!workingData.translations[code]) {
+        workingData.translations[code] = createEmptyTranslationObject(code);
+    }
+    return workingData.translations[code];
 }
 
-function persistWorkingTranslationToAllLanguage() {
+function listExistingTranslationLangs() {
     try {
-        const lang = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        if (!lang) return;
-        const entry = ensureTranslationEntry(lang);
-        if (!entry) return;
-        entry.active = true;
-        entry.title = workingData && workingData.translation ? (workingData.translation.title || entry.title) : entry.title;
-        entry.speakers = workingData && workingData.translation ? (workingData.translation.speakers || entry.speakers) : entry.speakers;
-        entry.sentences = workingData && workingData.translation ? (Array.isArray(workingData.translation.sentences) ? workingData.translation.sentences : []) : (entry.sentences || []);
+        if (!workingData || !workingData.translations || typeof workingData.translations !== 'object') return [];
+        return Object.keys(workingData.translations)
+            .map(normalizeLangCode)
+            .filter(Boolean);
+    } catch (e) {
+        return [];
+    }
+}
+
+function setCurrentTranslationPointer(lang) {
+    try {
+        const code = normalizeLangCode(lang);
+        if (!code) {
+            workingData.translation = createEmptyTranslationObject('');
+            workingData.translation.language = '';
+            workingData.translation.sentences = [];
+            return;
+        }
+        const obj = ensureTranslation(code);
+        if (obj) {
+            workingData.translation = obj;
+        }
     } catch (e) {
     }
 }
 
-function overwriteWorkingTranslationFromEntry(entry) {
+function getActiveTranslationLanguagesList() {
     try {
-        if (!entry || entry.active !== true) return;
-        if (!workingData || !workingData.translation) return;
-        workingData.translation.language = normalizeLangCode(entry.language);
-        workingData.translation.title = entry.title || (workingData.translation.title || 'Перевод');
-        workingData.translation.speakers = entry.speakers || {};
-        workingData.translation.sentences = Array.isArray(entry.sentences) ? entry.sentences : [];
+        const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
+        return listExistingTranslationLangs().filter(l => !orig || l !== orig);
     } catch (e) {
+        return [];
     }
 }
 
@@ -1867,9 +1842,9 @@ function setHeaderNoTranslationMode() {
     }
 
     try {
-        if (workingData && workingData.translation) {
-            workingData.translation.language = '';
-            workingData.translation.sentences = [];
+        try {
+            setCurrentTranslationPointer('');
+        } catch (e) {
         }
     } catch (e) {
     }
@@ -1893,18 +1868,15 @@ function setHeaderTranslationLanguage(lang) {
         setHeaderNoTranslationMode();
         return;
     }
+
     try {
         currentDictation.language_translation = code;
     } catch (e) {
     }
 
-    // Switch working translation data to selected language so the table updates.
     try {
-        persistWorkingTranslationToAllLanguage();
-        const entry = getTranslationEntry(code);
-        if (entry && entry.active === true) {
-            overwriteWorkingTranslationFromEntry(entry);
-        }
+        ensureTranslation(code);
+        setCurrentTranslationPointer(code);
     } catch (e) {
     }
 
@@ -2564,6 +2536,7 @@ async function loadExistingDictation(initData) {
         level,
         original_data,
         translation_data,
+        translation_flags,
         audio_file,
         audio_words,
         safe_email,
@@ -2595,6 +2568,7 @@ async function loadExistingDictation(initData) {
         safe_email: safe_email,
         language_original: original_language,
         language_translation: translation_language,
+        translation_flags: translation_flags || initData.translation_flags || {},
         level: resolvedLevel,
         audio_words: audio_words,
         category_key: categoryInfo.key || '',
@@ -2675,10 +2649,56 @@ async function loadExistingDictation(initData) {
     }, 100);
 
     // Создаём таблицу с предложениями из загруженных данных
-    workingData = {
-        original: original_data,
-        translation: translation_data
-    };
+    try {
+        workingData = (workingData && typeof workingData === 'object') ? workingData : {};
+
+        // Preserve SSOT container
+        workingData.translations = (workingData.translations && typeof workingData.translations === 'object') ? workingData.translations : {};
+
+        // Original
+        workingData.original = original_data || workingData.original || {};
+        try {
+            if (workingData.original) {
+                workingData.original.language = normalizeLangCode(original_language);
+            }
+        } catch (e) {
+        }
+
+        // Main translation (selected in header)
+        const tl = normalizeLangCode(translation_language);
+        if (tl) {
+            // Use server-provided translation_data as is (it already contains sentences/audio/etc.)
+            workingData.translations[tl] = translation_data || workingData.translations[tl] || createEmptyTranslationObject(tl);
+            try {
+                workingData.translations[tl].language = tl;
+            } catch (e) {
+            }
+            setCurrentTranslationPointer(tl);
+        } else {
+            setCurrentTranslationPointer('');
+        }
+
+        // Ensure all translations declared by DB flags exist in SSOT.
+        try {
+            syncTranslationsFromDictationMeta();
+        } catch (e) {
+        }
+    } catch (e) {
+        // Fallback: at least keep old fields to avoid runtime crash
+        try {
+            workingData.original = original_data;
+        } catch (e2) {
+        }
+        try {
+            const tl = normalizeLangCode(translation_language);
+            if (tl) {
+                workingData.translations = workingData.translations || {};
+                workingData.translations[tl] = translation_data;
+                setCurrentTranslationPointer(tl);
+            }
+        } catch (e3) {
+        }
+    }
 
     // Инициализируем поле checked для всех предложений, если его нет
     if (workingData.original && workingData.original.sentences) {
@@ -2832,7 +2852,7 @@ function initLanguageFlags(initData) {
         } catch (e) {
         }
 
-        try { syncAllLanguageFromDictationMeta(); } catch (e) {}
+        try { syncTranslationsFromDictationMeta(); } catch (e) {}
         renderHeaderLangPairWithManager();
 
     } catch (error) {
@@ -8891,36 +8911,13 @@ function ensureTranslationBucket(lang) {
     try {
         const code = String(lang || '').trim().toLowerCase();
         if (!code) return null;
-        if (!workingData || typeof workingData !== 'object') return null;
-        if (code === String(currentDictation && currentDictation.language_original || '').trim().toLowerCase()) return null;
 
-        if (workingData.translation && String(workingData.translation.language || '').trim().toLowerCase() === code) {
-            return workingData.translation;
-        }
-
-        if (workingData[code] && typeof workingData[code] === 'object') {
-            if (!Array.isArray(workingData[code].sentences)) workingData[code].sentences = [];
-            workingData[code].language = code;
-            return workingData[code];
-        }
-
-        workingData[code] = {
-            language: code,
-            title: '',
-            speakers: {},
-            sentences: [],
-            audio_user_shared: '',
-            audio_user_shared_start: 0,
-            audio_user_shared_end: 0
-        };
-        return workingData[code];
+        // Backward compatibility: translations are stored in workingData.translations (SSOT)
+        // and this function is kept only because older codepaths still call it.
+        return ensureTranslation(code);
     } catch (e) {
         return null;
     }
-}
-
-function syncTranslationBucketsWithSelectedLanguages() {
-    return;
 }
 
 function initTranslationsTab() {
@@ -9195,12 +9192,22 @@ async function createDictationFromStart() {
             sentences: parsedData.original
         };
 
-        workingData.translation = {
-            language: currentDictation.language_translation,
-            title: document.getElementById('title_translation').value || 'Перевод',
-            speakers: speakers,
-            sentences: parsedData.translation
-        };
+        try {
+            const activeTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
+            if (activeTr) {
+                const trObj = ensureTranslation(activeTr);
+                if (trObj) {
+                    trObj.language = activeTr;
+                    trObj.title = document.getElementById('title_translation').value || 'Перевод';
+                    trObj.speakers = speakers;
+                    trObj.sentences = parsedData.translation;
+                }
+                setCurrentTranslationPointer(activeTr);
+            } else {
+                setCurrentTranslationPointer('');
+            }
+        } catch (e) {
+        }
 
         // For all selected translation languages, create corresponding empty buckets
         // with the same keys/positions. UI shows only the active translation language,
@@ -9218,7 +9225,7 @@ async function createDictationFromStart() {
                 const code = String(lang || '').trim().toLowerCase();
                 if (!code) continue;
                 if (code === activeTr) continue; // active translation already has data
-                const bucket = ensureTranslationBucket(code);
+                const bucket = ensureTranslation(code);
                 if (!bucket) continue;
                 bucket.language = code;
                 bucket.speakers = speakers;
@@ -9543,7 +9550,7 @@ async function saveDictationOnly() {
         const authorMaterialsUrlInput = document.getElementById('dictation-author-materials-url-input');
         const authorMaterialsUrl = authorMaterialsUrlInput ? authorMaterialsUrlInput.value.trim() || null : null;
         
-        // Build sentences payload using the new translations model (all_language).
+        // Build sentences payload using the translations SSOT model (workingData.translations).
         const sentencesPayload = (() => {
             try {
                 const out = {};
@@ -9552,14 +9559,16 @@ async function saveDictationOnly() {
                     out[origLang] = workingData.original;
                 }
 
-                const activeList = (Array.isArray(all_language) ? all_language : []).filter(x => x && x.active === true);
-                for (const entry of activeList) {
-                    const lang = normalizeLangCode(entry.language);
-                    if (!lang || lang === origLang) continue;
-                    out[lang] = entry;
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const lang = normalizeLangCode(k);
+                        if (!lang || lang === origLang) continue;
+                        const obj = workingData.translations[k];
+                        if (obj) out[lang] = obj;
+                    }
                 }
 
-                // Ensure current working translation is saved even if list not yet initialized.
+                // Ensure current translation pointer is saved.
                 const activeTr = normalizeLangCode(currentDictation.language_translation);
                 if (activeTr && workingData && workingData.translation) {
                     out[activeTr] = workingData.translation;
