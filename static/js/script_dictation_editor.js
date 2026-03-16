@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0224';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0225';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -1898,6 +1898,16 @@ function setHeaderTranslationLanguage(lang) {
     } catch (e) {
     }
 
+    // Switch working translation data to selected language so the table updates.
+    try {
+        persistWorkingTranslationToAllLanguage();
+        const entry = getTranslationEntry(code);
+        if (entry && entry.active === true) {
+            overwriteWorkingTranslationFromEntry(entry);
+        }
+    } catch (e) {
+    }
+
     try {
         // Keep translation flags in sync with selected language.
         currentDictation.translation_flags = currentDictation.translation_flags || {};
@@ -1915,6 +1925,12 @@ function setHeaderTranslationLanguage(lang) {
         if (label) label.textContent = `${code}:`;
         const inp = document.getElementById('title_translation');
         if (inp) inp.style.display = '';
+    } catch (e) {
+    }
+
+    try {
+        renderTableFromWorkingData();
+        applyTableViewForTab(currentTabName);
     } catch (e) {
     }
 
