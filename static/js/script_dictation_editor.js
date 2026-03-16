@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0222';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0223';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -299,11 +299,12 @@ function renderTranslationsTabV2() {
             const entry = getTranslationEntry(lang);
             const isChecked = !!(entry && entry.active === true);
             const isCurrent = !!(activeLang && activeLang === normalizeLangCode(lang));
+            const iconName = isChecked ? 'circle-check-big' : 'circle';
             html += `
                 <div class="translations-v2-item${isCurrent ? ' translations-v2-item--current' : ''}" data-lang="${lang}">
                     <label class="checkbox-label translations-v2-checkbox" style="cursor: pointer;">
                         <input type="checkbox" class="translations-v2-input" ${isChecked ? 'checked' : ''} style="display: none;">
-                        <i data-lucide="circle" class="checkbox-icon"></i>
+                        <i data-lucide="${iconName}" class="checkbox-icon"></i>
                     </label>
                     <div class="translations-v2-flag">${getFlagHtml(lang)}</div>
                     <div class="translations-v2-name">${getLanguageNameSafe(lang)}</div>
