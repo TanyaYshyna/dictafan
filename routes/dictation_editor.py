@@ -317,6 +317,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
     original_data = {"language": language_original, "title": "", "sentences": []}
     translation_data = {"language": language_translation, "title": "", "sentences": []}
     
+    translation_flags = {}
     if dictation_id.startswith('dict_') and not dictation_id.startswith('dict_temp_'):
         try:
             # Извлекаем ID из формата dict_<id>
@@ -335,6 +336,12 @@ def dictation_editor(dictation_id, language_original, language_translation):
                     "author_materials_url": dictation.get('author_materials_url')
                 }
                 logger.info(f"✅ Загружен диктант из БД: id={db_id}, title={info.get('title')}, title_translations={title_translations}")
+
+                try:
+                    from helpers.db_dictations import get_dictation_translation_flags
+                    translation_flags = get_dictation_translation_flags(db_id) or {}
+                except Exception:
+                    translation_flags = {}
                 
                 # Загружаем предложения из БД
                 from helpers.db_dictations import get_dictation_sentences
@@ -416,6 +423,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
         translation_language=language_translation,
         title=info.get("title", ""),
         title_translations=info.get("title_translations", {}),
+        translation_flags=translation_flags,
         level=info.get("level", "A1"),
         is_dialog=info.get("is_dialog", False),
         speakers=info.get("speakers", {}),
@@ -469,6 +477,7 @@ def dictation_editor_new():
             level="A1",
             is_dialog=False,
             speakers={},
+            translation_flags={},
             original_data={
                 "language": language_original,
                 "title": "",

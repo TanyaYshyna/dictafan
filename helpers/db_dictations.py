@@ -120,7 +120,102 @@ def refresh_dictation_translation_flags(dictation_id: int) -> None:
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Determine which tr_* columns exist in this database.
+            # Read original language.
+            cur.execute("SELECT language_code FROM dictations WHERE id = %s", (int(dictation_id),))
+            row = cur.fetchone()
+            original_lang = (str(row[0]).strip().lower() if row and row[0] else '')
+
+            # Supported languages from languages.json.
+            lang_data = load_language_data() or {}
+            languages = sorted([str(k).lower() for k in lang_data.keys() if isinstance(k, str)])
+
+            flags = {}
+            for lang in languages:
+                if not lang:
+                    continue
+                if original_lang and lang == original_lang:
+                    continue
+
+                cur.execute(
+                    "SELECT EXISTS (SELECT 1 FROM dictation_sentences s WHERE s.dictation_id = %s AND s.language_code = %s)",
+                    (int(dictation_id), lang),
+                )
+                ex = cur.fetchone()
+                flags[lang] = bool(ex and ex[0])
+
+        set_dictation_translation_flags(int(dictation_id), flags)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return
+    finally:
+        conn.close()
+
+
+def get_dictation_translation_flags(dictation_id: int) -> dict:
+    """Return existing dictations.tr_* flags as {lang: bool}.
+
+    Safe behavior:
+    - If tr_* columns are not present -> returns {}.
+    - Only returns columns that exist.
+    """
+    if not dictation_id:
+        return {}
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'dictations'
+                  AND column_name LIKE 'tr\\_%'
+                """
+            )
+            cols = [r[0] for r in (cur.fetchall() or []) if r and r[0]]
+            if not cols:
+                return {}
+
+            cur.execute(f"SELECT {', '.join(cols)} FROM dictations WHERE id = %s", (int(dictation_id),))
+            row = cur.fetchone()
+            if not row:
+                return {}
+
+            out = {}
+            for i, col in enumerate(cols):
+                try:
+                    lang = str(col).replace('tr_', '').strip().lower()
+                except Exception:
+                    lang = ''
+                if not lang:
+                    continue
+                out[lang] = bool(row[i])
+            return out
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        return {}
+    finally:
+        conn.close()
+
+
+def set_dictation_translation_flags(dictation_id: int, flags: dict) -> None:
+    """Update dictations.tr_* flags. Only updates columns that exist in DB."""
+    if not dictation_id:
+        return
+
+    flags = flags or {}
+    if not isinstance(flags, dict):
+        return
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
             cur.execute(
                 """
                 SELECT column_name
@@ -133,40 +228,24 @@ def refresh_dictation_translation_flags(dictation_id: int) -> None:
             if not cols:
                 return
 
-            # Read original language.
-            cur.execute("SELECT language_code FROM dictations WHERE id = %s", (int(dictation_id),))
-            row = cur.fetchone()
-            original_lang = (str(row[0]).strip().lower() if row and row[0] else '')
-
-            # Supported languages from languages.json.
-            lang_data = load_language_data() or {}
-            languages = sorted([str(k).lower() for k in lang_data.keys() if isinstance(k, str)])
-
-            # Only update columns that both exist in DB and correspond to known languages.
-            to_update = []
+            updates = []
             values = []
-            for lang in languages:
+            for col in cols:
+                try:
+                    lang = str(col).replace('tr_', '').strip().lower()
+                except Exception:
+                    lang = ''
                 if not lang:
                     continue
-                if original_lang and lang == original_lang:
-                    # Original language is not a translation flag.
-                    continue
+                v = bool(flags.get(lang, False))
+                updates.append(f"{col} = %s")
+                values.append(v)
 
-                col = f"tr_{lang}"
-                if col not in cols:
-                    continue
-
-                # Translation exists if there is at least 1 sentence for that language.
-                to_update.append(
-                    f"{col} = EXISTS (SELECT 1 FROM dictation_sentences s WHERE s.dictation_id = %s AND s.language_code = %s)"
-                )
-                values.extend([int(dictation_id), lang])
-
-            if not to_update:
+            if not updates:
                 return
 
-            query = f"UPDATE dictations SET {', '.join(to_update)} WHERE id = %s"
             values.append(int(dictation_id))
+            query = f"UPDATE dictations SET {', '.join(updates)} WHERE id = %s"
             cur.execute(query, values)
             conn.commit()
     except Exception:
@@ -174,7 +253,6 @@ def refresh_dictation_translation_flags(dictation_id: int) -> None:
             conn.rollback()
         except Exception:
             pass
-        # Do not break save flow if flags refresh fails.
         return
     finally:
         conn.close()

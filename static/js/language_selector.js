@@ -14,6 +14,7 @@ class LanguageSelector {
             mode: 'native-selector', // 'native-selector', 'learning-selector', 'learning-list', 'flag-combo', 'header-selector', 'profile-panels'
             selectorType: 'native',
             nativeLanguage: 'en',
+            nativeLanguages: [],
             learningLanguages: ['en'],
             currentLearning: 'en',
             languageData: null,
@@ -1334,6 +1335,86 @@ class LanguageSelector {
         `;
     }
 
+    createFlagSingle() {
+        const lang = this.options.currentLearning || this.options.nativeLanguage;
+        return `
+            <div class="flag-single">
+                ${this.createFlagElement(lang)}
+            </div>
+        `;
+    }
+
+    createFlagPairFixed() {
+        const leftLang = this.options.currentLearning;
+        const rightLang = this.options.nativeLanguage;
+        return `
+            <div class="flag-pair-combo" data-mode="flag-pair-fixed">
+                <div class="flag-pair-side flag-pair-side--left">${this.createFlagElement(leftLang)}</div>
+                <i data-lucide="arrow-big-right"></i>
+                <div class="flag-pair-side flag-pair-side--right">${this.createFlagElement(rightLang)}</div>
+            </div>
+        `;
+    }
+
+    createFlagPairDropdown({ leftDropdown = false, rightDropdown = false } = {}) {
+        const leftLang = this.options.currentLearning;
+        const rightLang = this.options.nativeLanguage;
+        const leftList = Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : [];
+        const rightList = Array.isArray(this.options.nativeLanguages) ? this.options.nativeLanguages : [];
+
+        const leftHtml = `
+            <div class="flag-pair-side flag-pair-side--left" ${leftDropdown ? 'data-side="left"' : ''}>
+                ${this.createFlagElement(leftLang)}
+            </div>
+        `;
+
+        const rightHtml = `
+            <div class="flag-pair-side flag-pair-side--right" ${rightDropdown ? 'data-side="right"' : ''}>
+                ${this.createFlagElement(rightLang)}
+            </div>
+        `;
+
+        const leftDropdownHtml = leftDropdown
+            ? `
+                <div class="header-selector-dropdown flag-pair-dropdown" data-side="left" style="display: none;">
+                    <div class="header-dropdown-options">
+                        ${leftList.map(code => `
+                            <div class="header-dropdown-option ${code === leftLang ? 'selected' : ''}" data-side="left" data-value="${code}">
+                                ${this.createFlagElement(code)}
+                                <span class="header-option-text">${this.getLanguageName(code)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `
+            : '';
+
+        const rightDropdownHtml = rightDropdown
+            ? `
+                <div class="header-selector-dropdown flag-pair-dropdown" data-side="right" style="display: none;">
+                    <div class="header-dropdown-options">
+                        ${rightList.map(code => `
+                            <div class="header-dropdown-option ${code === rightLang ? 'selected' : ''}" data-side="right" data-value="${code}">
+                                ${this.createFlagElement(code)}
+                                <span class="header-option-text">${this.getLanguageName(code)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `
+            : '';
+
+        return `
+            <div class="flag-pair-combo" data-mode="flag-pair-dropdown">
+                ${leftHtml}
+                <i data-lucide="arrow-big-right"></i>
+                ${rightHtml}
+            </div>
+            ${leftDropdownHtml}
+            ${rightDropdownHtml}
+        `;
+    }
+
     createHeaderSelector() {
         const nativeLang = this.options.nativeLanguage;
         const learningLang = this.options.currentLearning;
@@ -1399,6 +1480,21 @@ class LanguageSelector {
                 break;
             case 'flag-combo':
                 html = this.createFlagCombo();
+                break;
+            case 'flag-single':
+                html = this.createFlagSingle();
+                break;
+            case 'flag-pair-fixed':
+                html = this.createFlagPairFixed();
+                break;
+            case 'flag-pair-dropdown-both':
+                html = this.createFlagPairDropdown({ leftDropdown: true, rightDropdown: true });
+                break;
+            case 'flag-pair-dropdown-right':
+                html = this.createFlagPairDropdown({ leftDropdown: false, rightDropdown: true });
+                break;
+            case 'flag-pair-dropdown-left':
+                html = this.createFlagPairDropdown({ leftDropdown: true, rightDropdown: false });
                 break;
             case 'header-selector':
                 html = this.createHeaderSelector();
@@ -1642,6 +1738,76 @@ class LanguageSelector {
                 document.addEventListener('click', (e) => {
                     if (!headerCombo.contains(e.target) && !headerDropdown.contains(e.target)) {
                         headerDropdown.style.display = 'none';
+                    }
+                });
+            }
+        }
+
+        // 5. Обработчики для режимов flag-pair-dropdown-*
+        if (this.options.mode === 'flag-pair-dropdown-both'
+            || this.options.mode === 'flag-pair-dropdown-right'
+            || this.options.mode === 'flag-pair-dropdown-left') {
+
+            const combo = this.options.container.querySelector('.flag-pair-combo');
+            const dropdowns = this.options.container.querySelectorAll('.flag-pair-dropdown');
+
+            const closeAll = () => {
+                dropdowns.forEach(d => {
+                    try { d.style.display = 'none'; } catch (e) {}
+                });
+            };
+
+            const openSide = (side) => {
+                if (!side) return;
+                dropdowns.forEach(d => {
+                    if (d && d.dataset && d.dataset.side === side) {
+                        const isVisible = d.style.display === 'block';
+                        d.style.display = isVisible ? 'none' : 'block';
+                    } else {
+                        try { if (d) d.style.display = 'none'; } catch (e) {}
+                    }
+                });
+            };
+
+            if (combo) {
+                combo.addEventListener('click', (e) => {
+                    const sideEl = e.target.closest('[data-side]');
+                    const side = sideEl ? sideEl.dataset.side : '';
+                    if (!side) {
+                        closeAll();
+                        return;
+                    }
+                    e.stopPropagation();
+                    openSide(side);
+                });
+            }
+
+            dropdowns.forEach(d => {
+                if (!d) return;
+                d.querySelectorAll('.header-dropdown-option').forEach(opt => {
+                    opt.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const side = opt.dataset.side;
+                        const value = opt.dataset.value;
+                        if (side === 'left') {
+                            this.options.currentLearning = value;
+                        } else if (side === 'right') {
+                            this.options.nativeLanguage = value;
+                        }
+                        this.render();
+                        this.triggerChange();
+                    });
+                });
+            });
+
+            if (!this._flagPairDropdownBound) {
+                this._flagPairDropdownBound = true;
+                document.addEventListener('click', (e) => {
+                    try {
+                        if (this.options.container && !this.options.container.contains(e.target)) {
+                            closeAll();
+                        }
+                    } catch (e2) {
                     }
                 });
             }

@@ -61,11 +61,18 @@ function initTranslationsTabV2() {
     }
 
     try {
-        initLanguageFlags({
-            original_language: currentDictation.language_original,
-            translation_language: currentDictation.language_translation,
-            dictation_id: currentDictation.id || 'new'
-        });
+        // Keep translation flags in sync for header rendering.
+        if (currentDictation) {
+            currentDictation.translation_flags = currentDictation.translation_flags || {};
+            for (const k of Object.keys(currentDictation.translation_flags || {})) {
+                currentDictation.translation_flags[k] = false;
+            }
+        }
+    } catch (e) {
+    }
+
+    try {
+        renderHeaderLangPairWithManager();
     } catch (e) {
     }
 }
@@ -126,10 +133,162 @@ function initAllLanguageFromWorkingData() {
     }
 }
 
+function syncAllLanguageFromDictationMeta() {
+    try {
+        all_language = Array.isArray(all_language) ? all_language : [];
+
+        const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
+        const activeFromHeader = normalizeLangCode(currentDictation && currentDictation.language_translation);
+        if (activeFromHeader && (!orig || activeFromHeader !== orig)) {
+            const e = ensureTranslationEntry(activeFromHeader);
+            if (e) e.active = true;
+        }
+
+        // Prefer DB translation flags (dictations.tr_*) from initData.
+        const tf = (currentDictation && currentDictation.translation_flags) ? currentDictation.translation_flags : {};
+        if (tf && typeof tf === 'object') {
+            for (const k of Object.keys(tf)) {
+                const lang = normalizeLangCode(k);
+                if (!lang || (orig && lang === orig)) continue;
+                if (tf[k] === true) {
+                    const e = ensureTranslationEntry(lang);
+                    if (e) e.active = true;
+                }
+            }
+        }
+    } catch (e) {
+    }
+}
+
+function getActiveTranslationLanguagesList() {
+    try {
+        const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
+        return (Array.isArray(all_language) ? all_language : [])
+            .filter(x => x && x.active === true)
+            .map(x => normalizeLangCode(x.language))
+            .filter(Boolean)
+            .filter(l => !orig || l !== orig);
+    } catch (e) {
+        return [];
+    }
+}
+
+let headerLangPairSelector = null;
+
+function updateHeaderNativeMismatchLabel({ preferred, selected, hasTranslations }) {
+    try {
+        const container = document.getElementById('langPair');
+        if (!container) return;
+
+        const prev = container.querySelector('.header-native-mismatch');
+        if (prev) prev.remove();
+
+        const p = normalizeLangCode(preferred);
+        const s = normalizeLangCode(selected);
+
+        if (!hasTranslations) return;
+        if (!p || !s) return;
+        if (p === s) return;
+
+        const label = document.createElement('div');
+        label.className = 'header-native-mismatch';
+        label.textContent = 'это не твой родной язык';
+        container.appendChild(label);
+    } catch (e) {
+    }
+}
+
+function renderHeaderLangPairWithManager() {
+    try {
+        const container = document.getElementById('langPair');
+        if (!container) return;
+        if (!window.LanguageManager || typeof window.initLanguageSelector !== 'function') return;
+
+        const languageData = window.LanguageManager.getLanguageData();
+        if (!languageData) return;
+
+        const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
+        const activeTranslations = getActiveTranslationLanguagesList()
+            .filter(l => !orig || l !== orig);
+
+        const preferred = normalizeLangCode(currentDictation && currentDictation.preferred_translation_language);
+        const currentTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
+        const tr = (preferred && activeTranslations.includes(preferred))
+            ? preferred
+            : ((currentTr && activeTranslations.includes(currentTr)) ? currentTr : (activeTranslations[0] || ''));
+
+        // Keep currentDictation in sync.
+        try { currentDictation.language_translation = tr; } catch (e) {}
+
+        container.innerHTML = '';
+
+        if (activeTranslations.length === 0) {
+            headerLangPairSelector = window.initLanguageSelector('langPair', {
+                mode: 'flag-single',
+                currentLearning: orig,
+                nativeLanguage: orig,
+                languageData
+            });
+            // Add label "без перевода"
+            try {
+                const label = document.createElement('span');
+                label.className = 'flag-separator';
+                label.style.marginLeft = '8px';
+                label.textContent = 'без перевода';
+                container.appendChild(label);
+            } catch (e) {}
+            try {
+                updateHeaderNativeMismatchLabel({ preferred, selected: tr, hasTranslations: false });
+            } catch (e) {
+            }
+            return;
+        }
+
+        if (activeTranslations.length === 1) {
+            headerLangPairSelector = window.initLanguageSelector('langPair', {
+                mode: 'flag-pair-fixed',
+                currentLearning: orig,
+                nativeLanguage: tr,
+                languageData
+            });
+            try {
+                updateHeaderNativeMismatchLabel({ preferred, selected: tr, hasTranslations: true });
+            } catch (e) {
+            }
+            return;
+        }
+
+        headerLangPairSelector = window.initLanguageSelector('langPair', {
+            mode: 'flag-pair-dropdown-right',
+            currentLearning: orig,
+            nativeLanguage: tr,
+            nativeLanguages: activeTranslations,
+            learningLanguages: [orig],
+            languageData,
+            onLanguageChange: function (values) {
+                try {
+                    const next = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
+                    if (!next) return;
+                    setHeaderTranslationLanguage(next);
+                    renderTranslationsTabV2();
+                } catch (e) {
+                }
+            }
+        });
+
+        try {
+            updateHeaderNativeMismatchLabel({ preferred, selected: tr, hasTranslations: true });
+        } catch (e) {
+        }
+    } catch (e) {
+    }
+}
+
 function renderTranslationsTabV2() {
     try {
         const container = document.getElementById('translationLanguagesList');
         if (!container) return;
+        syncAllLanguageFromDictationMeta();
         initAllLanguageFromWorkingData();
 
         const activeLang = normalizeLangCode(currentDictation && currentDictation.language_translation);
@@ -448,6 +607,23 @@ function bindTranslationsTabV2Handlers() {
                 closeRemoveTranslationLangModal();
                 if (!lang) return;
                 markTranslationInactive(lang, next);
+            });
+        }
+    } catch (e) {
+    }
+
+    // Close translation modals by clicking on overlay
+    try {
+        const cm = document.getElementById('createTranslationLangModal');
+        if (cm) {
+            cm.addEventListener('click', (e) => {
+                if (e.target === cm) closeCreateTranslationLangModal();
+            });
+        }
+        const rm = document.getElementById('removeTranslationLangModal');
+        if (rm) {
+            rm.addEventListener('click', (e) => {
+                if (e.target === rm) closeRemoveTranslationLangModal();
             });
         }
     } catch (e) {
@@ -1678,6 +1854,17 @@ function setHeaderNoTranslationMode() {
         currentDictation.language_translation = '';
     } catch (e) {
     }
+
+    try {
+        if (currentDictation) {
+            currentDictation.translation_flags = currentDictation.translation_flags || {};
+            for (const k of Object.keys(currentDictation.translation_flags || {})) {
+                currentDictation.translation_flags[k] = false;
+            }
+        }
+    } catch (e) {
+    }
+
     try {
         if (workingData && workingData.translation) {
             workingData.translation.language = '';
@@ -1694,11 +1881,7 @@ function setHeaderNoTranslationMode() {
     }
 
     try {
-        initLanguageFlags({
-            original_language: currentDictation.language_original,
-            translation_language: currentDictation.language_translation,
-            dictation_id: currentDictation.id || 'new'
-        });
+        renderHeaderLangPairWithManager();
     } catch (e) {
     }
 }
@@ -1711,6 +1894,13 @@ function setHeaderTranslationLanguage(lang) {
     }
     try {
         currentDictation.language_translation = code;
+    } catch (e) {
+    }
+
+    try {
+        // Keep translation flags in sync with selected language.
+        currentDictation.translation_flags = currentDictation.translation_flags || {};
+        currentDictation.translation_flags[code] = true;
     } catch (e) {
     }
     try {
@@ -1728,11 +1918,7 @@ function setHeaderTranslationLanguage(lang) {
     }
 
     try {
-        initLanguageFlags({
-            original_language: currentDictation.language_original,
-            translation_language: currentDictation.language_translation,
-            dictation_id: currentDictation.id || 'new'
-        });
+        renderHeaderLangPairWithManager();
     } catch (e) {
     }
 }
@@ -2621,35 +2807,16 @@ function initLanguageFlags(initData) {
             return;
         }
 
-        const orig = normalizeLangCode(language_original);
-        const tr = normalizeLangCode(language_translation);
-        if (orig && !tr) {
-            let cc = '';
-            try {
-                cc = String(window.LanguageManager.getCountryCode(orig) || '').trim().toLowerCase();
-            } catch (e) {
-                cc = '';
-            }
-            const flagHtml = cc
-                ? `<img src="/static/flags/${cc}.svg" alt="${orig}" class="language-flag" onerror="this.style.display='none'">`
-                : '';
-            langPairContainer.innerHTML = `
-                <div class="flag-combo">
-                    ${flagHtml}
-                    <span class="flag-separator" style="margin-left: 6px;">без перевода</span>
-                </div>
-            `;
-            return;
+        try {
+            currentDictation.language_original = normalizeLangCode(language_original);
+            currentDictation.language_translation = normalizeLangCode(language_translation);
+            currentDictation.preferred_translation_language = normalizeLangCode(language_translation);
+            currentDictation.translation_flags = (initData && initData.translation_flags) ? initData.translation_flags : (currentDictation.translation_flags || {});
+        } catch (e) {
         }
 
-        // Создаем флаги с помощью LanguageSelector
-        const flagCombo = new LanguageSelector({
-            container: langPairContainer,
-            mode: 'flag-combo',
-            nativeLanguage: language_translation, // родной язык (перевод)
-            currentLearning: language_original,   // изучаемый язык (оригинал)
-            languageData: languageData
-        });
+        try { syncAllLanguageFromDictationMeta(); } catch (e) {}
+        renderHeaderLangPairWithManager();
 
     } catch (error) {
         console.error('Ошибка при инициализации флагов языков:', error);
@@ -8420,7 +8587,7 @@ function openStartModal() {
 
 function initStartModalLanguageSelector() {
     try {
-        const container = document.getElementById('startModalOriginalLanguage');
+        const container = document.getElementById('startModalLangPair');
         if (!container) return;
 
         const initSelector = () => {
@@ -8465,22 +8632,41 @@ function initStartModalLanguageSelector() {
                 }
                 if (!nativeLang) nativeLang = 'ru';
 
-                // Reset container to avoid duplicated DOM.
+                // New UI: use manager mode (2) flag dropdown - arrow - flag dropdown.
+                const rightDefault = nativeLang;
+                const leftDefault = defaultLearning;
+                const baseData = window.LanguageManager ? window.LanguageManager.getLanguageData() : null;
+                if (!baseData) return;
+
+                // Exclude original language from translation list; exclude translation from original list.
+                const rightList = Object.keys(baseData)
+                    .map(x => String(x || '').toLowerCase())
+                    .filter(Boolean)
+                    .filter(x => x !== leftDefault);
+                const leftList = Object.keys(baseData)
+                    .map(x => String(x || '').toLowerCase())
+                    .filter(Boolean)
+                    .filter(x => x !== rightDefault);
+
                 container.innerHTML = '';
 
-                if (typeof window.initLanguageSelector === 'function') {
-                    startModalLanguageSelector = window.initLanguageSelector('startModalOriginalLanguage', {
-                        mode: 'learning-selector-compact',
-                        nativeLanguage: nativeLang,
-                        currentLearning: defaultLearning,
-                        languageData: window.LanguageManager ? window.LanguageManager.getLanguageData() : null
-                    });
-                }
-
-                try {
-                    initStartModalTranslationLanguageSelector();
-                } catch (e) {
-                }
+                startModalLanguageSelector = window.initLanguageSelector('startModalLangPair', {
+                    mode: 'flag-pair-dropdown-both',
+                    currentLearning: leftDefault,
+                    nativeLanguage: rightDefault,
+                    learningLanguages: leftList,
+                    nativeLanguages: rightList,
+                    languageData: baseData,
+                    onLanguageChange: function (values) {
+                        try {
+                            const left = values && values.currentLearning ? String(values.currentLearning).toLowerCase() : '';
+                            const right = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
+                            if (left) currentDictation.language_original = left;
+                            if (right) currentDictation.language_translation = right;
+                        } catch (e) {
+                        }
+                    }
+                });
             } catch (e) {
             }
         };
@@ -8492,8 +8678,8 @@ function initStartModalLanguageSelector() {
 
 function initStartModalTranslationLanguageSelector() {
     try {
-        const container = document.getElementById('startModalTranslationLanguage');
-        if (!container) return;
+        // Now handled by initStartModalLanguageSelector via flag-pair-dropdown-both
+        return;
 
         const initSelector = () => {
             try {
@@ -8589,8 +8775,8 @@ function getStartModalOriginalLanguage() {
 
 function getStartModalTranslationLanguage() {
     try {
-        if (startModalTranslationLanguageSelector && typeof startModalTranslationLanguageSelector.getValues === 'function') {
-            const v = startModalTranslationLanguageSelector.getValues();
+        if (startModalLanguageSelector && typeof startModalLanguageSelector.getValues === 'function') {
+            const v = startModalLanguageSelector.getValues();
             const lang = v && v.nativeLanguage ? String(v.nativeLanguage).trim().toLowerCase() : '';
             if (lang) return lang;
         }

@@ -521,9 +521,7 @@
             </div>
 
             <div class="start-modal-language-row">
-                <div id="startModalOriginalLanguage"></div>
-                <div class="start-modal-language-arrow">=&gt;</div>
-                <div id="startModalTranslationLanguage"></div>
+                <div id="startModalLangPair"></div>
             </div>
 
             <div class="form-group-line">
@@ -786,6 +784,7 @@
         "audio_file": audio_file,
         "title": title,
         "title_translations": title_translations|default({}),
+        "translation_flags": translation_flags|default({}),
         "level": level,
         "audio_words": audio_words,
         "safe_email": safe_email,

@@ -319,6 +319,113 @@ button i[data-lucide] {
     color: var(--color-text-secondary);
 }
 
+/* ------------------------- Dropdown selector for translations in header -------------------*/
+#langPair {
+    position: relative;
+}
+
+#langPair .header-flag-combo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+#langPair .header-flag-combo i[data-lucide] {
+    width: 18px;
+    height: 18px;
+    color: var(--color-text-secondary);
+}
+
+#langPair .header-selector-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1100;
+    min-width: 200px;
+    max-width: 280px;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    overflow: hidden;
+}
+
+#langPair .header-dropdown-options {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+#langPair .header-dropdown-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+#langPair .header-dropdown-option:hover {
+    background: var(--color-hover);
+}
+
+#langPair .header-dropdown-option.selected {
+    background: rgba(249, 198, 9, 0.18);
+}
+
+#langPair .header-option-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.header-native-mismatch {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.2;
+    color: #d0342c;
+}
+
+.header-selector-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1100;
+    min-width: 200px;
+    max-width: 280px;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    overflow: hidden;
+}
+
+.header-dropdown-options {
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.header-dropdown-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    cursor: pointer;
+}
+
+.header-dropdown-option:hover {
+    background: var(--color-hover);
+}
+
+.header-dropdown-option.selected {
+    background: rgba(249, 198, 9, 0.18);
+}
+
+.header-option-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 
 /* Стили для кнопок воспроизведения аудио в таблице */
 /* button.audio-btn {
@@ -1122,6 +1229,8 @@ label[for="startTextInput"] {
 .translations-v2-list {
     max-height: 220px; /* примерно 4 строки */
     overflow-y: auto;
+    display: inline-block;
+    max-width: 120px;
     padding: 4px;
     border: 1px solid var(--color-border-light);
     border-radius: 10px;
