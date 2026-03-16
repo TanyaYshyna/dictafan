@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0223';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0224';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -213,9 +213,9 @@ function renderHeaderLangPairWithManager() {
 
         const preferred = normalizeLangCode(currentDictation && currentDictation.preferred_translation_language);
         const currentTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        const tr = (preferred && activeTranslations.includes(preferred))
-            ? preferred
-            : ((currentTr && activeTranslations.includes(currentTr)) ? currentTr : (activeTranslations[0] || ''));
+        const tr = (currentTr && activeTranslations.includes(currentTr))
+            ? currentTr
+            : ((preferred && activeTranslations.includes(preferred)) ? preferred : (activeTranslations[0] || ''));
 
         // Keep currentDictation in sync.
         try { currentDictation.language_translation = tr; } catch (e) {}
