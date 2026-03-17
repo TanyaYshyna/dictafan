@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0227';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0228';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -9004,37 +9004,42 @@ async function createDictationFromStart() {
         isRefill = false;
     }
 
-    // Apply selected language + title from modal.
+    // Apply selected languages from modal.
+    let modalLang = '';
+    let modalTr = '';
     try {
-        const modalLang = getStartModalOriginalLanguage();
-        if (modalLang) {
-            currentDictation.language_original = modalLang;
-            try {
-                initLanguageFlags({
-                    original_language: currentDictation.language_original,
-                    translation_language: currentDictation.language_translation,
-                    dictation_id: 'new'
-                });
-            } catch (e) {
-            }
+        modalLang = normalizeLangCode(getStartModalOriginalLanguage());
+    } catch (e) {
+        modalLang = '';
+    }
+    try {
+        modalTr = normalizeLangCode(getStartModalTranslationLanguage());
+    } catch (e) {
+        modalTr = '';
+    }
+    try {
+        if (modalLang) currentDictation.language_original = modalLang;
+        if (modalTr) currentDictation.language_translation = modalTr;
+    } catch (e) {
+    }
+
+    // IMPORTANT: ensure translation bucket exists BEFORE rendering header flags.
+    // Otherwise header render may wipe currentDictation.language_translation when activeTranslations is empty.
+    try {
+        if (modalTr) {
+            ensureTranslation(modalTr);
+            currentDictation.translation_flags = currentDictation.translation_flags || {};
+            currentDictation.translation_flags[modalTr] = true;
         }
     } catch (e) {
     }
 
-    // Apply selected translation language from modal.
     try {
-        const modalTr = getStartModalTranslationLanguage();
-        if (modalTr) {
-            currentDictation.language_translation = modalTr;
-            try {
-                initLanguageFlags({
-                    original_language: currentDictation.language_original,
-                    translation_language: currentDictation.language_translation,
-                    dictation_id: 'new'
-                });
-            } catch (e) {
-            }
-        }
+        initLanguageFlags({
+            original_language: currentDictation.language_original,
+            translation_language: currentDictation.language_translation,
+            dictation_id: 'new'
+        });
     } catch (e) {
     }
 
