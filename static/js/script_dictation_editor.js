@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0226';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0227';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -59,6 +59,13 @@ function initTranslationsTabV2() {
 
     try {
         renderHeaderLangPairWithManager();
+    } catch (e) {
+    }
+}
+
+async function renderTableFromWorkingData() {
+    try {
+        await createTable();
     } catch (e) {
     }
 }
@@ -114,13 +121,6 @@ function syncTranslationsFromDictationMeta() {
                 }
             }
         }
-
-        // Ensure current translation pointer matches selected language.
-        const currentTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        if (currentTr) {
-            ensureTranslation(currentTr);
-            setCurrentTranslationPointer(currentTr);
-        }
     } catch (e) {
     }
 }
@@ -166,23 +166,20 @@ function renderHeaderLangPairWithManager() {
 
         const preferred = normalizeLangCode(currentDictation && currentDictation.preferred_translation_language);
         const currentTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
-        const tr = (currentTr && activeTranslations.includes(currentTr))
-            ? currentTr
-            : ((preferred && activeTranslations.includes(preferred)) ? preferred : (activeTranslations[0] || ''));
+        let userNative = '';
+        try {
+            userNative = normalizeLangCode(window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang));
+        } catch (e) {
+            userNative = '';
+        }
+        const tr = (userNative && activeTranslations.includes(userNative))
+            ? userNative
+            : ((preferred && activeTranslations.includes(preferred))
+                ? preferred
+                : ((currentTr && activeTranslations.includes(currentTr)) ? currentTr : (activeTranslations[0] || '')));
 
         // Keep currentDictation in sync.
         try { currentDictation.language_translation = tr; } catch (e) {}
-
-        // Keep workingData.translation pointer in sync with selected translation.
-        try {
-            if (tr) {
-                ensureTranslation(tr);
-                setCurrentTranslationPointer(tr);
-            } else {
-                setCurrentTranslationPointer('');
-            }
-        } catch (e) {
-        }
 
         container.innerHTML = '';
 
@@ -632,11 +629,13 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
             }
         };
 
+        const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
         const langs = [currentDictation && currentDictation.language_original, currentDictation && currentDictation.language_translation].filter(Boolean);
         for (const lang of langs) {
-            const wd = (workingData && (workingData.original && workingData.original.language === lang ? workingData.original : null))
-                || (workingData && (workingData.translation && workingData.translation.language === lang ? workingData.translation : null))
-                || null;
+            const l = normalizeLangCode(lang);
+            const wd = (l && origLang && l === origLang)
+                ? (workingData && workingData.original ? workingData.original : null)
+                : getTranslationData(l);
             const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
             for (const s of sentences) {
                 if (!s) continue;
@@ -915,7 +914,7 @@ async function clearMediaManifest(dictationId) {
 
 function mergeWorkingDataToDictationSentences(dictationId, langOrig, langTr) {
     const orig = workingData && workingData.original ? workingData.original : null;
-    const tr = workingData && workingData.translation ? workingData.translation : null;
+    const tr = getTranslationData(langTr);
 
     const origSent = orig && Array.isArray(orig.sentences) ? orig.sentences : [];
     const trSent = tr && Array.isArray(tr.sentences) ? tr.sentences : [];
@@ -1065,8 +1064,9 @@ function recomputeSentencePositionsFromDom() {
                 const s = getSentenceByKeySafe(workingData.original.sentences, key);
                 if (s) s.position = pos;
             }
-            if (key && workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
-                const s = getSentenceByKeySafe(workingData.translation.sentences, key);
+            const tr = getCurrentTranslationData({ createIfMissing: false });
+            if (key && tr && Array.isArray(tr.sentences)) {
+                const s = getSentenceByKeySafe(tr.sentences, key);
                 if (s) s.position = pos;
             }
         });
@@ -1746,18 +1746,7 @@ let workingData = {
     },
     // Single source of truth for translations.
     // Each key is a language code: workingData.translations['ru'], workingData.translations['uk'], ...
-    translations: {},
-    // Backward-compatible pointer used across the editor table logic.
-    // It is always a reference to workingData.translations[currentDictation.language_translation].
-    translation: {
-        language: '',
-        title: '',
-        speakers: {}, // словарь спикеров {"1": "Таня", "2": "Ваня"}
-        sentences: [], // {key, speaker, text, audio, shared_audio, start, end, chain}
-        audio_user_shared: '',
-        audio_user_shared_start: 0,
-        audio_user_shared_end: 0
-    }
+    translations: {}
 };
 
 function normalizeLangCode(code) {
@@ -1775,6 +1764,35 @@ function createEmptyTranslationObject(lang) {
         audio_user_shared_start: 0,
         audio_user_shared_end: 0
     };
+}
+
+function getTranslationData(lang, { createIfMissing = false } = {}) {
+    try {
+        const code = normalizeLangCode(lang);
+        if (!code) return null;
+        if (!workingData) return null;
+        workingData.translations = (workingData.translations && typeof workingData.translations === 'object') ? workingData.translations : {};
+        if (!workingData.translations[code] && createIfMissing) {
+            workingData.translations[code] = createEmptyTranslationObject(code);
+        }
+        return workingData.translations[code] || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function getCurrentTranslationLang() {
+    try {
+        return normalizeLangCode(currentDictation && currentDictation.language_translation);
+    } catch (e) {
+        return '';
+    }
+}
+
+function getCurrentTranslationData({ createIfMissing = false } = {}) {
+    const code = getCurrentTranslationLang();
+    if (!code) return null;
+    return getTranslationData(code, { createIfMissing });
 }
 
 function ensureTranslation(lang) {
@@ -1799,23 +1817,6 @@ function listExistingTranslationLangs() {
     }
 }
 
-function setCurrentTranslationPointer(lang) {
-    try {
-        const code = normalizeLangCode(lang);
-        if (!code) {
-            workingData.translation = createEmptyTranslationObject('');
-            workingData.translation.language = '';
-            workingData.translation.sentences = [];
-            return;
-        }
-        const obj = ensureTranslation(code);
-        if (obj) {
-            workingData.translation = obj;
-        }
-    } catch (e) {
-    }
-}
-
 function getActiveTranslationLanguagesList() {
     try {
         const orig = normalizeLangCode(currentDictation && currentDictation.language_original);
@@ -1828,24 +1829,6 @@ function getActiveTranslationLanguagesList() {
 function setHeaderNoTranslationMode() {
     try {
         currentDictation.language_translation = '';
-    } catch (e) {
-    }
-
-    try {
-        if (currentDictation) {
-            currentDictation.translation_flags = currentDictation.translation_flags || {};
-            for (const k of Object.keys(currentDictation.translation_flags || {})) {
-                currentDictation.translation_flags[k] = false;
-            }
-        }
-    } catch (e) {
-    }
-
-    try {
-        try {
-            setCurrentTranslationPointer('');
-        } catch (e) {
-        }
     } catch (e) {
     }
     try {
@@ -1876,7 +1859,6 @@ function setHeaderTranslationLanguage(lang) {
 
     try {
         ensureTranslation(code);
-        setCurrentTranslationPointer(code);
     } catch (e) {
     }
 
@@ -1884,12 +1866,6 @@ function setHeaderTranslationLanguage(lang) {
         // Keep translation flags in sync with selected language.
         currentDictation.translation_flags = currentDictation.translation_flags || {};
         currentDictation.translation_flags[code] = true;
-    } catch (e) {
-    }
-    try {
-        if (workingData && workingData.translation) {
-            workingData.translation.language = code;
-        }
     } catch (e) {
     }
     try {
@@ -2673,9 +2649,7 @@ async function loadExistingDictation(initData) {
                 workingData.translations[tl].language = tl;
             } catch (e) {
             }
-            setCurrentTranslationPointer(tl);
         } else {
-            setCurrentTranslationPointer('');
         }
 
         // Ensure all translations declared by DB flags exist in SSOT.
@@ -2694,7 +2668,6 @@ async function loadExistingDictation(initData) {
             if (tl) {
                 workingData.translations = workingData.translations || {};
                 workingData.translations[tl] = translation_data;
-                setCurrentTranslationPointer(tl);
             }
         } catch (e3) {
         }
@@ -2921,11 +2894,13 @@ async function swEditorRequest(action, payload = {}) {
 function collectFinalAudioUrlsForPrefetch(dictationId) {
     const urls = [];
     try {
+        const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
         const langs = [currentDictation.language_original, currentDictation.language_translation].filter(Boolean);
         for (const lang of langs) {
-            const wd = (workingData && (workingData.original && workingData.original.language === lang ? workingData.original : null))
-                || (workingData && (workingData.translation && workingData.translation.language === lang ? workingData.translation : null))
-                || null;
+            const l = normalizeLangCode(lang);
+            const wd = (l && origLang && l === origLang)
+                ? (workingData && workingData.original ? workingData.original : null)
+                : getTranslationData(l);
 
             const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
             for (const s of sentences) {
@@ -3099,11 +3074,13 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
         };
 
         try {
+            const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
             const langs = [currentDictation && currentDictation.language_original, currentDictation && currentDictation.language_translation].filter(Boolean);
             for (const lang of langs) {
-                const wd = (workingData && (workingData.original && workingData.original.language === lang ? workingData.original : null))
-                    || (workingData && (workingData.translation && workingData.translation.language === lang ? workingData.translation : null))
-                    || null;
+                const l = normalizeLangCode(lang);
+                const wd = (l && origLang && l === origLang)
+                    ? (workingData && workingData.original ? workingData.original : null)
+                    : getTranslationData(l);
                 const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
                 for (const s of sentences) {
                     if (!s) continue;
@@ -3556,12 +3533,13 @@ function getSentenceForButton(button) {
             return workingData.original.sentences.find(s => s.key === key);
         }
     } else {
+        const trBucket = getTranslationData(language);
         if (button.dataset.state === 'ready-shared') {
-            return workingData.translation;
+            return trBucket;
         } else {
             const row = button.closest('tr');
             const key = row.dataset.key;
-            return workingData.translation.sentences.find(s => s.key === key);
+            return trBucket && Array.isArray(trBucket.sentences) ? trBucket.sentences.find(s => s.key === key) : null;
         }
     }
 }
@@ -3954,9 +3932,8 @@ function setupTabsPanel() {
         titleTranslationInput.addEventListener('input', () => {
             tabTitleTranslationInput.value = titleTranslationInput.value;
             try {
-                if (workingData && workingData.translation) {
-                    workingData.translation.title = titleTranslationInput.value;
-                }
+                const tr = getCurrentTranslationData({ createIfMissing: false });
+                if (tr) tr.title = titleTranslationInput.value;
             } catch (e) {
             }
             setDirtyFlags({ db: true });
@@ -3966,9 +3943,8 @@ function setupTabsPanel() {
         tabTitleTranslationInput.addEventListener('input', () => {
             titleTranslationInput.value = tabTitleTranslationInput.value;
             try {
-                if (workingData && workingData.translation) {
-                    workingData.translation.title = tabTitleTranslationInput.value;
-                }
+                const tr = getCurrentTranslationData({ createIfMissing: false });
+                if (tr) tr.title = tabTitleTranslationInput.value;
             } catch (e) {
             }
             setDirtyFlags({ db: true });
@@ -4325,7 +4301,10 @@ async function createCombinedAudioFile(customFileName = null) {
     
     for (const sentence of selectedSentences) {
         // Находим соответствующее предложение перевода
-        const translationSentence = workingData.translation.sentences.find(s => s.key === sentence.key);
+        const trBucket = getCurrentTranslationData({ createIfMissing: false });
+        const translationSentence = (trBucket && Array.isArray(trBucket.sentences))
+            ? trBucket.sentences.find(s => s.key === sentence.key)
+            : null;
         
         // Для каждого элемента паттерна получаем файл или паузу
         for (const element of patternElements) {
@@ -5565,7 +5544,8 @@ function addNewRow(referenceRow, position) {
         workingData.original.sentences.push(originalSentence);
     }
 
-    if (workingData && workingData.translation) {
+    const trBucket = getCurrentTranslationData({ createIfMissing: false });
+    if (trBucket) {
         translationSentence = {
             key: newKey,
             text: '',
@@ -5577,7 +5557,7 @@ function addNewRow(referenceRow, position) {
             end: 0,
             chain: false
         };
-        workingData.translation.sentences.push(translationSentence);
+        trBucket.sentences.push(translationSentence);
     }
 
     // Теперь создаем DOM-элемент с данными
@@ -5624,8 +5604,9 @@ function deleteRow(rowToDelete) {
             if (workingData && workingData.original && Array.isArray(workingData.original.sentences)) {
                 workingData.original.sentences = workingData.original.sentences.filter(s => s && s.key !== deletedKey);
             }
-            if (workingData && workingData.translation && Array.isArray(workingData.translation.sentences)) {
-                workingData.translation.sentences = workingData.translation.sentences.filter(s => s && s.key !== deletedKey);
+            const trBucket = getCurrentTranslationData({ createIfMissing: false });
+            if (trBucket && Array.isArray(trBucket.sentences)) {
+                trBucket.sentences = trBucket.sentences.filter(s => s && s.key !== deletedKey);
             }
         } catch (e) {
         }
@@ -7534,9 +7515,12 @@ function updateSentenceData(rowKey, language, field, value) {
             workingData.original.sentences[sentenceIndex][field] = v;
         }
     } else if (language === 'translation') {
-        const sentenceIndex = workingData.translation.sentences.findIndex(s => s.key === rowKey);
-        if (sentenceIndex !== -1) {
-            workingData.translation.sentences[sentenceIndex][field] = v;
+        const trBucket = getCurrentTranslationData({ createIfMissing: false });
+        if (trBucket && Array.isArray(trBucket.sentences)) {
+            const sentenceIndex = trBucket.sentences.findIndex(s => s.key === rowKey);
+            if (sentenceIndex !== -1) {
+                trBucket.sentences[sentenceIndex][field] = v;
+            }
         }
     }
 
@@ -7744,15 +7728,21 @@ async function splitAudioIntoSentences() {
                 workingData.original.sentences[sentenceIndex].audio_user = `${sentence.key}_${currentDictation.language_original}_user.mp3`;
             }
 
-            // Обновляем данные в translation, если есть
-            if (workingData.translation && workingData.translation.sentences) {
-                const translationIndex = workingData.translation.sentences.findIndex(s => s.key === sentence.key);
-                if (translationIndex !== -1) {
-                    workingData.translation.sentences[translationIndex].start = startTime;
-                    workingData.translation.sentences[translationIndex].end = endTime;
-                    workingData.translation.sentences[translationIndex].chain = true;
-                    workingData.translation.sentences[translationIndex].audio_user = `${sentence.key}_${currentDictation.language_translation}_user.mp3`;
+            // Обновляем данные во всех переводах (ключи одинаковые)
+            try {
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const bucket = workingData.translations[k];
+                        if (!bucket || !Array.isArray(bucket.sentences)) continue;
+                        const idx = bucket.sentences.findIndex(s => s && s.key === sentence.key);
+                        if (idx === -1) continue;
+                        bucket.sentences[idx].start = startTime;
+                        bucket.sentences[idx].end = endTime;
+                        bucket.sentences[idx].chain = true;
+                        bucket.sentences[idx].audio_user = `${sentence.key}_${normalizeLangCode(bucket.language)}_user.mp3`;
+                    }
                 }
+            } catch (e) {
             }
         }
 
@@ -8279,33 +8269,7 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
         const data = await response.json();
 
         if (data.success) {
-
-            // Обновляем значения в workingData ТОЛЬКО для режима "общий файл"
-            const audioModeEl = document.querySelector('input[name="audioMode"]:checked');
-            const currentMode = audioModeEl ? audioModeEl.value : 'full';
-            if (currentMode === 'full' && workingData && workingData.original) {
-                workingData.original.audio_user_shared = data.filename;
-                workingData.original.audio_user_shared_start = 0; // После обрезки начинаем с 0
-                workingData.original.audio_user_shared_end = data.end_time - data.start_time; // Новая длительность
-            }
-            // if (workingData && workingData.translation) {
-            //     workingData.translation.audio_user_shared = data.filename;
-            //     workingData.translation.audio_user_shared_start = 0;
-            //     workingData.translation.audio_user_shared_end = data.end_time - data.start_time;
-            // }
-
-            // Отмечаем что диктант изменен
-            currentDictation.isSaved = false;
-            setDirtyFlags({ audio: true });
-
-            // Обновляем поля ввода
-            if (startInput) startInput.value = '0.00';
-            if (endInput) endInput.value = (data.end_time - data.start_time).toFixed(2);
-
-            // Перезагружаем волну с обрезанным файлом
-            if (data.filepath) {
-                loadWaveformForFile(data.filepath);
-            }
+            loadWaveformForFile(data.filepath);
 
             // Автосохранение JSON удалено - данные только в workingData
 
@@ -8892,31 +8856,18 @@ function getTranslationLanguagesSelected() {
 }
 
 function isReservedWorkingDataKey(k) {
-    return k === 'original' || k === 'translation';
+    return k === 'original' || k === 'translations';
 }
 
 function isLanguageCodeLike(k) {
     try {
         const s = String(k || '').trim().toLowerCase();
         if (!s) return false;
-        if (s === 'original' || s === 'translation') return false;
+        if (s === 'original' || s === 'translations') return false;
         // allow 'en', 'ru', 'pt-br' etc.
         return /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(s);
     } catch (e) {
         return false;
-    }
-}
-
-function ensureTranslationBucket(lang) {
-    try {
-        const code = String(lang || '').trim().toLowerCase();
-        if (!code) return null;
-
-        // Backward compatibility: translations are stored in workingData.translations (SSOT)
-        // and this function is kept only because older codepaths still call it.
-        return ensureTranslation(code);
-    } catch (e) {
-        return null;
     }
 }
 
@@ -9109,18 +9060,14 @@ async function createDictationFromStart() {
             if (workingData && workingData.original) {
                 workingData.original.sentences = [];
             }
-            if (workingData && workingData.translation) {
-                workingData.translation.sentences = [];
-            }
         } catch (e) {
         }
 
         // Always clear ALL translations (including passive buckets).
         try {
-            if (workingData && typeof workingData === 'object') {
-                Object.keys(workingData).forEach((k) => {
-                    if (k === 'original' || k === 'translation') return;
-                    const bucket = workingData[k];
+            if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                Object.keys(workingData.translations).forEach((k) => {
+                    const bucket = workingData.translations[k];
                     if (bucket && typeof bucket === 'object' && Array.isArray(bucket.sentences)) {
                         bucket.sentences = [];
                     }
@@ -9202,9 +9149,6 @@ async function createDictationFromStart() {
                     trObj.speakers = speakers;
                     trObj.sentences = parsedData.translation;
                 }
-                setCurrentTranslationPointer(activeTr);
-            } else {
-                setCurrentTranslationPointer('');
             }
         } catch (e) {
         }
@@ -9568,16 +9512,11 @@ async function saveDictationOnly() {
                     }
                 }
 
-                // Ensure current translation pointer is saved.
-                const activeTr = normalizeLangCode(currentDictation.language_translation);
-                if (activeTr && workingData && workingData.translation) {
-                    out[activeTr] = workingData.translation;
-                }
                 return out;
             } catch (e) {
                 return {
                     [currentDictation.language_original]: workingData.original,
-                    [currentDictation.language_translation]: workingData.translation
+                    [currentDictation.language_translation]: getCurrentTranslationData({ createIfMissing: true })
                 };
             }
         })();
@@ -9908,7 +9847,7 @@ async function saveDictationAndExit() {
             speakers: currentDictation.speakers,
             sentences: {
                 [currentDictation.language_original]: workingData.original,
-                [currentDictation.language_translation]: workingData.translation
+                [currentDictation.language_translation]: getCurrentTranslationData({ createIfMissing: true })
             }
         };
 
@@ -10472,7 +10411,8 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
 async function preloadAudioFiles() {
 
     const originalSentences = workingData.original.sentences || [];
-    const translationSentences = workingData.translation.sentences || [];
+    const trBucket = getCurrentTranslationData({ createIfMissing: false });
+    const translationSentences = (trBucket && Array.isArray(trBucket.sentences)) ? trBucket.sentences : [];
 
     // Загружаем аудио для оригинального языка
     for (const sentence of originalSentences) {
@@ -10519,7 +10459,8 @@ async function createTable() {
 
     // Создать строки для оригинального языка
     const originalSentences = workingData.original.sentences || [];
-    const translationSentences = workingData.translation.sentences || [];
+    const trBucket = getCurrentTranslationData({ createIfMissing: false });
+    const translationSentences = (trBucket && Array.isArray(trBucket.sentences)) ? trBucket.sentences : [];
 
     // Объединить оригинал и перевод по ключам
     const allKeys = new Set();
@@ -11124,26 +11065,29 @@ async function createAutoTranslation(originalText, translationTextarea, key) {
         translationTextarea.value = translatedText;
 
         // Обновляем данные в workingData
-        if (workingData && workingData.translation) {
-            let translationSentence = workingData.translation.sentences.find(s => s.key === key);
-            if (!translationSentence) {
-                // Создаем новое предложение перевода, если его нет
-                translationSentence = {
-                    key: key,
-                    text: translatedText,
-                    audio: '',
-                    audio_avto: '',
-                    audio_user: '',
-                    audio_mic: '',
-                    start: 0,
-                    end: 0,
-                    chain: false
-                };
-                workingData.translation.sentences.push(translationSentence);
-            } else {
-                // Обновляем существующее предложение
-                translationSentence.text = translatedText;
+        try {
+            const trBucket = getCurrentTranslationData({ createIfMissing: true });
+            if (trBucket) {
+                trBucket.sentences = Array.isArray(trBucket.sentences) ? trBucket.sentences : [];
+                let translationSentence = trBucket.sentences.find(s => s && s.key === key);
+                if (!translationSentence) {
+                    translationSentence = {
+                        key: key,
+                        text: translatedText,
+                        audio: '',
+                        audio_avto: '',
+                        audio_user: '',
+                        audio_mic: '',
+                        start: 0,
+                        end: 0,
+                        chain: false
+                    };
+                    trBucket.sentences.push(translationSentence);
+                } else {
+                    translationSentence.text = translatedText;
+                }
             }
+        } catch (e) {
         }
 
         // Обновляем текст оригинала в workingData (если есть)
@@ -11212,9 +11156,13 @@ function updateTitlesInWorkingData() {
         workingData.original.title = titleInput.value || 'Диктант';
     }
 
-    // Обновляем title для языка перевода
-    if (workingData.translation && translationTitleInput) {
-        workingData.translation.title = translationTitleInput.value || 'Перевод';
+    // Обновляем title для текущего языка перевода
+    try {
+        const tr = getCurrentTranslationData({ createIfMissing: false });
+        if (tr && translationTitleInput) {
+            tr.title = translationTitleInput.value || 'Перевод';
+        }
+    } catch (e) {
     }
 }
 
@@ -11371,9 +11319,16 @@ function setupWaveformRegionCallback() {
                 workingData.original.audio_user_shared_start = region.start;
                 workingData.original.audio_user_shared_end = region.end;
             }
-            if (workingData && workingData.translation) {
-                workingData.translation.audio_user_shared_start = region.start;
-                workingData.translation.audio_user_shared_end = region.end;
+            try {
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const bucket = workingData.translations[k];
+                        if (!bucket) continue;
+                        bucket.audio_user_shared_start = region.start;
+                        bucket.audio_user_shared_end = region.end;
+                    }
+                }
+            } catch (e) {
             }
         } else if (currentMode === 'sentence') {
             // В режиме "sentence" обновляем поля в таблице и устанавливаем состояние 'creating'
