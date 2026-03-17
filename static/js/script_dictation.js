@@ -187,14 +187,11 @@ function normalizeDictationMediaUrl(rawUrl) {
         } catch (e) {
         }
 
-        const markers = ['/api/dictations/', '/api/temp/dictations/'];
+        const markers = ['/api/dictations/'];
         for (const m of markers) {
             const first = v.indexOf(m);
             if (first >= 0) {
-                const second = v.indexOf(m, first + m.length);
-                if (second >= 0) {
-                    v = v.slice(second);
-                }
+                return v.slice(first);
             }
         }
 
@@ -230,7 +227,7 @@ function resolveSentenceAudioUrl(sentence, fieldName) {
         const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
         if (!dictId) return '';
 
-        const basePath = dictId.startsWith('dict_temp_') ? '/api/temp/dictations' : '/api/dictations';
+        const basePath = '/api/dictations';
 
         const lang = (fieldName === 'audio_tr')
             ? String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '')
@@ -249,7 +246,7 @@ function maybeCacheBustDictationCover(url) {
     try {
         const u = String(url || '');
         if (!u) return u;
-        if (u.startsWith('/api/dictations_covers/') || u.startsWith('/api/temp/dictations_covers/')) {
+        if (u.startsWith('/api/dictations_covers/')) {
             const sep = u.includes('?') ? '&' : '?';
             return `${u}${sep}v=${Date.now()}`;
         }

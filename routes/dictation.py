@@ -144,64 +144,6 @@ def api_get_dictation_audio_v2(dictation_id, lang, filename):
     return _send_dictation_audio_from_b2(dictation_id, lang, filename)
 
 
-@dictation_bp.route('/api/temp/<int:user_id>/<dictation_id>/<lang>/<path:filename>', methods=['GET'])
-def api_get_temp_dictation_audio(user_id, dictation_id, lang, filename):
-    """Получение аудио для временного диктанта (Option A: только B2).
-
-    Ожидаемый путь в B2:
-      dictations_temp/<user_id>/<dictation_id>/<lang>/<filename>
-    где dictation_id в формате dict_temp_<timestamp>.
-    """
-    from helpers.b2_storage import b2_storage
-
-    if not b2_storage.enabled:
-        return jsonify({'error': 'B2 storage is disabled'}), 503
-
-    if not dictation_id or not dictation_id.startswith('dict_temp_'):
-        return jsonify({'error': f'Invalid dictation_id: {dictation_id}'}), 400
-
-    safe_lang = (lang or '').strip().lower()
-    if not safe_lang:
-        return jsonify({'error': 'Missing language'}), 400
-
-    safe_name = secure_filename(filename or '')
-    if not safe_name:
-        return jsonify({'error': 'Missing filename'}), 400
-
-    if not user_id or user_id <= 0:
-        return jsonify({'error': 'Invalid user_id'}), 400
-
-    remote_path = f"dictations_temp/{user_id}/{dictation_id}/{safe_lang}/{safe_name}"
-    try:
-        exists = b2_storage.file_exists(remote_path, raise_on_error=True)
-    except Exception:
-        return jsonify({'error': 'B2 storage unavailable'}), 503
-
-    if not exists:
-        return jsonify({'error': 'Audio file not found'}), 404
-
-    tmp = tempfile.NamedTemporaryFile(prefix='dict_temp_audio_', suffix=f"_{safe_name}", delete=False)
-    tmp_path = tmp.name
-    tmp.close()
-
-    ok = b2_storage.download_file(remote_path, tmp_path)
-    if not ok:
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        return jsonify({'error': 'Failed to download audio from B2'}), 502
-
-    @after_this_request
-    def _cleanup_tmp(response):
-        try:
-            os.remove(tmp_path)
-        except OSError:
-            pass
-        return response
-
-    return send_from_directory(os.path.dirname(tmp_path), os.path.basename(tmp_path))
-
 @dictation_bp.route('/dictation')
 def dictation():
     return render_template('dictation.html', language_data=load_language_data())

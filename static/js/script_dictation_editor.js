@@ -9,7 +9,7 @@ const endInput = document.getElementById('audioEndTime');
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0228';
+window.__DICTATION_EDITOR_BUILD = '2026-03-11_0229';
 console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
@@ -2512,6 +2512,7 @@ async function loadExistingDictation(initData) {
         level,
         original_data,
         translation_data,
+        translations_data,
         translation_flags,
         audio_file,
         audio_words,
@@ -2650,6 +2651,25 @@ async function loadExistingDictation(initData) {
             } catch (e) {
             }
         } else {
+        }
+
+        // Load all translations provided by server (not only the URL-selected one)
+        try {
+            if (translations_data && typeof translations_data === 'object') {
+                Object.keys(translations_data).forEach((lang) => {
+                    const norm = normalizeLangCode(lang);
+                    if (!norm) return;
+                    const bucket = translations_data[lang];
+                    if (bucket && typeof bucket === 'object') {
+                        workingData.translations[norm] = bucket;
+                        try {
+                            workingData.translations[norm].language = norm;
+                        } catch (e) {
+                        }
+                    }
+                });
+            }
+        } catch (e) {
         }
 
         // Ensure all translations declared by DB flags exist in SSOT.

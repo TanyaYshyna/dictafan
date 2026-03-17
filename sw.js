@@ -110,7 +110,6 @@ function isMediaUrl(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
-    if (path.startsWith('/api/temp/')) return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
     return false;
@@ -177,7 +176,6 @@ function shouldHandleRequest(requestUrl) {
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
     if (path.startsWith('/api/dictations/')) return true;
-    if (path.startsWith('/api/temp/')) return true;
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
 
@@ -339,7 +337,7 @@ self.addEventListener('fetch', (event) => {
 
   // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
   const hasRange = request.headers && request.headers.has('range');
-  if (hasRange && (request.url.includes('/api/dictations/') || request.url.includes('/api/temp/'))) {
+  if (hasRange && request.url.includes('/api/dictations/')) {
     // все аудио должны быть из кеша
     // Range requests for audio are also cache-only.
     event.respondWith((async () => {
@@ -397,26 +395,11 @@ self.addEventListener('fetch', (event) => {
         // If /api/dictations is missing in cache, allow network fallback and cache it for future offline usage.
         try {
           const u = new URL(request.url);
-          // /api/temp/dictations is cache-only (local draft storage)
-          if (u.pathname && u.pathname.startsWith('/api/temp/dictations/')) {
-            return new Response('Offline', {
-              status: 503,
-              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-            });
-          }
-
-          if (u.pathname && (u.pathname.startsWith('/api/dictations/') || u.pathname.startsWith('/api/temp/'))) {
+          if (u.pathname && u.pathname.startsWith('/api/dictations/')) {
             const netRes = await fetch(request);
             if (netRes && netRes.ok) {
               try {
-                const fullReq = new Request(request.url, {
-                  method: 'GET',
-                  headers: new Headers({})
-                });
-                const fullRes = await fetch(fullReq);
-                if (fullRes && fullRes.ok) {
-                  await cache.put(request.url, fullRes.clone());
-                }
+                await cache.put(request.url, netRes.clone());
               } catch (e) {
               }
               return netRes;
@@ -445,22 +428,14 @@ self.addEventListener('fetch', (event) => {
   // Dictation must be able to work fully offline.
   try {
     const url = new URL(request.url);
-    if (url.pathname && (url.pathname.startsWith('/api/dictations/') || url.pathname.startsWith('/api/temp/'))) {
+    if (url.pathname && url.pathname.startsWith('/api/dictations/')) {
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
           const cached = await cache.match(request.url);
           if (cached) return cached;
 
-          // /api/temp/dictations must exist only in cache
-          if (url.pathname && url.pathname.startsWith('/api/temp/dictations/')) {
-            return new Response('Offline', {
-              status: 503,
-              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
-            });
-          }
-
-          // /api/dictations + /api/temp: if not cached yet, fetch from network and store into cache.
+          // /api/dictations: if not cached yet, fetch from network and store into cache.
           const netRes = await fetch(request);
           if (netRes && netRes.ok) {
             try {
@@ -757,13 +732,13 @@ async function checkUrlsInCache(urls) {
   return { ok: missing.length === 0, missing, total: (urls || []).length };
 }
 
-async function purgeDictationFromBoundedCache(dictationId) {
-  // Purge dictation media from the persistent media cache.
+async function purgeDictationFromMediaCache(dictationId) {
+  // Purge /api/dictations/dict_123/... from the persistent media cache.
   const cache = await caches.open(MEDIA_CACHE_PERSIST);
   const keys = await cache.keys();
 
-  const dictId = String(dictationId || '').trim();
-  const dictKey = dictId.startsWith('dict_') ? dictId : `dict_${dictId}`;
+  const dictKey = String(dictationId || '').trim();
+  if (!dictKey) return { deleted: 0, dictationId: dictKey };
 
   let deleted = 0;
   for (const req of keys) {
@@ -779,43 +754,10 @@ async function purgeDictationFromBoundedCache(dictationId) {
       }
 
       // Cover: /api/dictations_covers/<id>.webp
-      if (path === `/api/dictations_covers/${dictKey.replace(/^dict_/, '')}.webp`) {
+      if (path === `/api/dictations_covers/${dictKey}.webp`) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  return { deleted, dictationId: dictKey };
-}
-
-async function purgeTempDraftFromMediaCache(dictationId) {
-  // Purge editor draft audio (/api/temp/dictations/<dictId>/...) from the persistent media cache.
-  const cache = await caches.open(MEDIA_CACHE_PERSIST);
-  const keys = await cache.keys();
-
-  const dictId = String(dictationId || '').trim();
-  const dictKey = (dictId.startsWith('dict_') || dictId.startsWith('dict_temp_')) ? dictId : `dict_${dictId}`;
-
-  let deleted = 0;
-  for (const req of keys) {
-    try {
-      const url = new URL(req.url);
-      const path = url.pathname;
-
-      if (path.startsWith(`/api/temp/dictations/${dictKey}/`)) {
-        const ok = await cache.delete(req);
-        if (ok) deleted += 1;
-        continue;
-      }
-
-      // Draft cover overlay: /api/temp/dictations_covers/<id>.webp
-      if (path === `/api/temp/dictations_covers/${dictKey}.webp`) {
-        const ok = await cache.delete(req);
-        if (ok) deleted += 1;
       }
     } catch (e) {
       // ignore
@@ -827,9 +769,8 @@ async function purgeTempDraftFromMediaCache(dictationId) {
 
 async function promoteDraftDictationCache(fromDictationId, toDictationId) {
   // Duplicate draft audio in cache without touching network:
-  // from: /api/temp/dictations/<fromId>/<lang>/<file>
-  // to:   /api/temp/dictations/<toId>/<lang>/<file>   (editor keeps working)
-  // and:  /api/dictations/<toId>/<lang>/<file>        (view page works offline)
+  // from: /api/dictations/<fromId>/<lang>/<file>
+  // to:   /api/dictations/<toId>/<lang>/<file>
   const cache = await caches.open(MEDIA_CACHE_PERSIST);
   const keys = await cache.keys();
 
@@ -837,41 +778,37 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
   const toIdRaw = String(toDictationId || '').trim();
   const toId = toIdRaw.startsWith('dict_') ? toIdRaw : `dict_${toIdRaw}`;
 
-  const fromPrefix = `/api/temp/dictations/${fromId}/`;
-  const toTempPrefix = `/api/temp/dictations/${toId}/`;
+  const fromPrefix = `/api/dictations/${fromId}/`;
   const toFinalPrefix = `/api/dictations/${toId}/`;
 
   const toNumeric = toId.replace(/^dict_/, '');
-  const fromCoverPath = `/api/temp/dictations_covers/${fromId}.webp`;
-  const toCoverTempPath = `/api/temp/dictations_covers/${toNumeric}.webp`;
-  const toCoverFinalPath = `/api/dictations_covers/${toNumeric}.webp`;
+  const fromCoverPath = `/api/dictations_covers/${fromId}.webp`;
+  const toCoverPath = `/api/dictations_covers/${toNumeric}.webp`;
 
-  let copiedTemp = 0;
   let copiedFinal = 0;
-  let missing = 0;
+  let copiedCover = 0;
 
   for (const req of keys) {
     try {
       const url = new URL(req.url);
       const path = url.pathname;
-      if (!path.startsWith(fromPrefix)) continue;
+      if (path.startsWith(fromPrefix)) {
+        const nextFinal = path.replace(fromPrefix, toFinalPrefix);
 
-      const cached = await cache.match(req);
-      if (!cached) {
-        missing += 1;
+        const fromUrl = new URL(path, self.location.origin).toString();
+        const finalUrl = new URL(nextFinal, self.location.origin).toString();
+
+        try {
+          const res = await cache.match(fromUrl);
+          if (res) {
+            await cache.put(finalUrl, res.clone());
+            copiedFinal += 1;
+          }
+        } catch (e) {
+          // ignore
+        }
         continue;
       }
-
-      const rest = path.slice(fromPrefix.length);
-      const toTempUrl = new URL(toTempPrefix + rest, self.location.origin).toString();
-      const toFinalUrl = new URL(toFinalPrefix + rest, self.location.origin).toString();
-
-      // Note: Response objects are one-time readable, so clone for each put.
-      await cache.put(toTempUrl, cached.clone());
-      copiedTemp += 1;
-
-      await cache.put(toFinalUrl, cached.clone());
-      copiedFinal += 1;
     } catch (e) {
       // ignore
     }
@@ -882,74 +819,15 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
     const fromCoverUrl = new URL(fromCoverPath, self.location.origin).toString();
     const cachedCover = await cache.match(fromCoverUrl);
     if (cachedCover) {
-      const toCoverTempUrl = new URL(toCoverTempPath, self.location.origin).toString();
-      const toCoverFinalUrl = new URL(toCoverFinalPath, self.location.origin).toString();
-      await cache.put(toCoverTempUrl, cachedCover.clone());
-      await cache.put(toCoverFinalUrl, cachedCover.clone());
+      const toCoverUrl = new URL(toCoverPath, self.location.origin).toString();
+      await cache.put(toCoverUrl, cachedCover.clone());
+      copiedCover += 1;
     }
   } catch (e) {
     // ignore
   }
 
-  // Optionally delete the old dict_temp_* entries to avoid wasting space.
-  // We keep this behavior because temp_id is not needed after promote.
-  let deletedOld = 0;
-  for (const req of keys) {
-    try {
-      const url = new URL(req.url);
-      const path = url.pathname;
-      if (path.startsWith(fromPrefix)) {
-        const ok = await cache.delete(req);
-        if (ok) deletedOld += 1;
-      }
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  // Delete old draft cover key if present.
-  try {
-    const fromCoverUrl = new URL(fromCoverPath, self.location.origin).toString();
-    const ok = await cache.delete(fromCoverUrl);
-    if (ok) deletedOld += 1;
-  } catch (e) {
-    // ignore
-  }
-
-  return {
-    ok: true,
-    fromId,
-    toId,
-    copiedTemp,
-    copiedFinal,
-    deletedOld,
-    missing,
-  };
-}
-
-async function commitTempCoverToBase(fromCoverKey, toNumericId) {
-  const cache = await caches.open(MEDIA_CACHE_PERSIST);
-
-  const fromKey = String(fromCoverKey || '').trim();
-  const toNum = parseInt(String(toNumericId || ''), 10);
-  if (!fromKey || !toNum || !isFinite(toNum) || toNum <= 0) {
-    return { ok: false, error: 'bad_args' };
-  }
-
-  const fromPath = `/api/temp/dictations_covers/${fromKey}.webp`;
-  const toPath = `/api/dictations_covers/${toNum}.webp`;
-
-  const fromUrl = new URL(fromPath, self.location.origin).toString();
-  const toUrl = new URL(toPath, self.location.origin).toString();
-
-  const cached = await cache.match(fromUrl);
-  if (!cached) {
-    return { ok: false, error: 'cache_miss', fromUrl, toUrl };
-  }
-
-  await cache.put(toUrl, cached.clone());
-  const deleted = await cache.delete(fromUrl);
-  return { ok: true, fromUrl, toUrl, deleted: !!deleted };
+  return { copiedFinal, copiedCover, fromId, toId };
 }
 
 self.addEventListener('message', (event) => {
@@ -980,20 +858,8 @@ self.addEventListener('message', (event) => {
         return;
       }
 
-      if (action === 'purgeTempDraft') {
-        const res = await purgeTempDraftFromMediaCache(data.dictationId);
-        respond({ success: true, result: res });
-        return;
-      }
-
       if (action === 'promoteDraftCache') {
         const res = await promoteDraftDictationCache(data.fromDictationId, data.toDictationId);
-        respond({ success: true, result: res });
-        return;
-      }
-
-      if (action === 'commitTempCover') {
-        const res = await commitTempCoverToBase(data.fromCoverKey, data.toNumericId);
         respond({ success: true, result: res });
         return;
       }

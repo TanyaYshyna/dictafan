@@ -63,13 +63,12 @@ class AudioManagerClass {
         }
 
         const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
-        const isDraftAudioUrl = typeof audioUrl === 'string' && audioUrl.includes('/api/temp/dictations/');
+        const isDraftAudioUrl = false;
         __dbg('play()', {
             audioUrl,
             buttonId: button && button.id,
-            buttonState: button && button.dataset && button.dataset.state,
-            buttonOriginalState: button && button.dataset && button.dataset.originalState,
-            playTokenNext: this._playToken + 1
+            isBlobUrl,
+            isDraftAudioUrl,
         });
 
         this._autoPlayEnabled = true;

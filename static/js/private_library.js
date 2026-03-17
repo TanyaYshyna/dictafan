@@ -1,7 +1,7 @@
 // Скрипт для новой страницы приватной библиотеки
 
 (function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0220';
+  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0229';
   console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
 
   let bookEditDirty = false;
@@ -258,7 +258,7 @@
     try {
       const u = String(url || '');
       if (!u) return u;
-      if (u.startsWith('/api/dictations_covers/') || u.startsWith('/api/temp/dictations_covers/')) {
+      if (u.startsWith('/api/dictations_covers/')) {
         return withCacheBust(u);
       }
       return u;
@@ -989,18 +989,6 @@
           v = `https://${v.slice('http://'.length)}`;
         }
       } catch (e) {
-      }
-
-      // Fix accidental duplication like .../api/dictations/.../api/dictations/...
-      const markers = ['/api/dictations/', '/api/temp/dictations/'];
-      for (const m of markers) {
-        const first = v.indexOf(m);
-        if (first >= 0) {
-          const second = v.indexOf(m, first + m.length);
-          if (second >= 0) {
-            v = v.slice(second);
-          }
-        }
       }
 
       // Ensure leading slash for same-origin relative requests.

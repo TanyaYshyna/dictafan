@@ -316,6 +316,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
     info = {}
     original_data = {"language": language_original, "title": "", "sentences": []}
     translation_data = {"language": language_translation, "title": "", "sentences": []}
+    translations_data = {}
     
     translation_flags = {}
     if dictation_id.startswith('dict_') and not dictation_id.startswith('dict_temp_'):
@@ -376,7 +377,23 @@ def dictation_editor(dictation_id, language_original, language_translation):
                         "title": info.get("title", ""),  # Используем title из БД (оригинальный заголовок)
                         "sentences": sentences_by_lang[language_original]
                     }
-                
+
+                # All translations (SSOT for frontend)
+                try:
+                    for lang, items in (sentences_by_lang or {}).items():
+                        if not lang:
+                            continue
+                        if lang == language_original:
+                            continue
+                        translations_data[lang] = {
+                            "language": lang,
+                            "title": title_translations.get(lang, ""),
+                            "sentences": items
+                        }
+                except Exception:
+                    translations_data = {}
+
+                # translation_data: backward-compatible single bucket for the requested translation language
                 if language_translation in sentences_by_lang:
                     # Используем перевод заголовка из title_translations для языка перевода
                     translation_title = title_translations.get(language_translation, "")
@@ -402,6 +419,16 @@ def dictation_editor(dictation_id, language_original, language_translation):
     # Получаем текущего пользователя
     from helpers.user_helpers import get_current_user
     current_user = get_current_user()
+
+    # Prefer opening with user's native language as active translation, if that translation exists.
+    try:
+        user_native = (current_user or {}).get('native_language')
+        user_native = str(user_native).strip().lower() if user_native else ''
+        if user_native and user_native in translations_data:
+            language_translation = user_native
+            translation_data = translations_data.get(user_native, translation_data)
+    except Exception:
+        pass
 
     # Получаем safe_email из JWT токена
     safe_email = get_safe_email_from_token()
@@ -429,6 +456,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
         speakers=info.get("speakers", {}),
         original_data=original_data,
         translation_data=translation_data,
+        translations_data=translations_data,
         audio_file=None,
         audio_words=audio_words,
         current_user=current_user,
@@ -941,24 +969,34 @@ def save_dictation_final():
             logger.error("❌ Отсутствует dictation_id")
             return jsonify({"success": False, "error": "Missing dictation_id"}), 400
 
-        def _rewrite_audio_url_for_final(value, lang_code, final_dictation_id):
+        def _normalize_audio_filename(value):
+            """DB invariant: store ONLY filename (basename) in audio fields.
+
+            Incoming value may be:
+            - filename: 001_en_avto.mp3
+            - API url: /api/dictations/dict_123/en/001_en_avto.mp3
+            - blob url: blob:...
+            - full external url
+            We always reduce to basename when possible; for blob: we return empty (it must not be persisted).
+            """
             try:
                 if not value or not isinstance(value, str):
-                    return value
+                    return ''
                 v = value.strip()
                 if not v:
-                    return value
-                if '/api/dictations/' in v:
-                    return v
+                    return ''
+                if v.startswith('blob:'):
+                    return ''
+                # Strip query params and take basename.
                 try:
-                    filename = v.split('?', 1)[0].rsplit('/', 1)[-1]
+                    v2 = v.split('?', 1)[0]
+                    base = v2.rsplit('/', 1)[-1]
                 except Exception:
-                    filename = None
-                if not filename:
-                    return v
-                return f"/api/dictations/{final_dictation_id}/{lang_code}/{filename}"
+                    base = v
+                base = (base or '').strip()
+                return base
             except Exception:
-                return value
+                return ''
         
         # category_key может быть пустым если диктант создается из приватной библиотеки (привязан к книге/разделу)
         # Используем дефолтное значение только если нет target_book_id
@@ -1094,14 +1132,20 @@ def save_dictation_final():
                             return False
                         return abs(float(a) - float(b)) < 0.01
                     
+                    # Normalize audio to filename-only before comparing / saving.
+                    audio_in = _normalize_audio_filename(sentence.get('audio'))
+                    audio_avto_in = _normalize_audio_filename(sentence.get('audio_avto'))
+                    audio_mic_in = _normalize_audio_filename(sentence.get('audio_mic'))
+                    audio_user_in = _normalize_audio_filename(sentence.get('audio_user'))
+
                     has_changes = (
                         old_sentence['text'] != sentence.get('text', '') or
                         old_sentence['explanation'] != sentence.get('explanation') or
                         old_sentence['speaker'] != sentence.get('speaker') or
-                        old_sentence['audio'] != sentence.get('audio') or
-                        old_sentence['audio_avto'] != sentence.get('audio_avto') or
-                        old_sentence['audio_mic'] != sentence.get('audio_mic') or
-                        old_sentence['audio_user'] != sentence.get('audio_user') or
+                        (old_sentence.get('audio') or '') != audio_in or
+                        (old_sentence.get('audio_avto') or '') != audio_avto_in or
+                        (old_sentence.get('audio_mic') or '') != audio_mic_in or
+                        (old_sentence.get('audio_user') or '') != audio_user_in or
                         not float_eq(old_sentence['start'], sentence.get('start')) or
                         not float_eq(old_sentence['end'], sentence.get('end')) or
                         old_sentence['chain'] != sentence.get('chain', False) or
@@ -1110,10 +1154,10 @@ def save_dictation_final():
                     )
                     
                     if has_changes:
-                        audio_final = _rewrite_audio_url_for_final(sentence.get('audio'), lang, dictation_id)
-                        audio_avto_final = _rewrite_audio_url_for_final(sentence.get('audio_avto'), lang, dictation_id)
-                        audio_mic_final = _rewrite_audio_url_for_final(sentence.get('audio_mic'), lang, dictation_id)
-                        audio_user_final = _rewrite_audio_url_for_final(sentence.get('audio_user'), lang, dictation_id)
+                        audio_final = audio_in
+                        audio_avto_final = audio_avto_in
+                        audio_mic_final = audio_mic_in
+                        audio_user_final = audio_user_in
                         # Обновляем только изменённые поля
                         update_sentence(
                             sentence_id=old_sentence['id'],
@@ -1132,10 +1176,10 @@ def save_dictation_final():
                         )
                         updated_count += 1
                 else:
-                    audio_final = _rewrite_audio_url_for_final(sentence.get('audio'), lang, dictation_id)
-                    audio_avto_final = _rewrite_audio_url_for_final(sentence.get('audio_avto'), lang, dictation_id)
-                    audio_mic_final = _rewrite_audio_url_for_final(sentence.get('audio_mic'), lang, dictation_id)
-                    audio_user_final = _rewrite_audio_url_for_final(sentence.get('audio_user'), lang, dictation_id)
+                    audio_final = _normalize_audio_filename(sentence.get('audio'))
+                    audio_avto_final = _normalize_audio_filename(sentence.get('audio_avto'))
+                    audio_mic_final = _normalize_audio_filename(sentence.get('audio_mic'))
+                    audio_user_final = _normalize_audio_filename(sentence.get('audio_user'))
                     # Новое предложение - добавляем
                     add_sentence(
                         dictation_id=db_id,
