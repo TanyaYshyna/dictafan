@@ -163,6 +163,13 @@ function applyAudioSettingsFromUserData(userData) {
 
 function normalizeDictationMediaUrl(rawUrl) {
     try {
+        try {
+            if (window.AudioManager && typeof window.AudioManager.normalizeMediaUrl === 'function') {
+                return window.AudioManager.normalizeMediaUrl(rawUrl);
+            }
+        } catch (e) {
+        }
+
         let v = String(rawUrl || '').trim();
         if (!v) return '';
         if (v.startsWith('blob:')) return v;
@@ -246,6 +253,12 @@ function resolveSentenceAudioUrl(sentence, fieldName) {
 
         const name = raw.split('?', 1)[0].split('/').pop();
         if (!name) return '';
+        try {
+            if (window.AudioManager && typeof window.AudioManager.buildDictationAudioUrl === 'function') {
+                return window.AudioManager.buildDictationAudioUrl(dictId, lang, name);
+            }
+        } catch (e) {
+        }
         return normalizeDictationMediaUrl(`${basePath}/${encodeURIComponent(dictId)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`);
     } catch (e) {
         return '';

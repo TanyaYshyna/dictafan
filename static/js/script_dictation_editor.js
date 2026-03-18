@@ -9958,6 +9958,12 @@ async function autoTranslate(text, fromLanguage, toLanguage) {
  */
 function getAudioPath(language) {
     if (currentDictation.id && currentDictation.id.startsWith('dict_')) {
+        try {
+            if (window.AudioManager && typeof window.AudioManager.normalizeMediaUrl === 'function') {
+                return window.AudioManager.normalizeMediaUrl(`/api/dictations/${currentDictation.id}/${language}`);
+            }
+        } catch (e) {
+        }
         return `/api/dictations/${currentDictation.id}/${language}`;
     }
 
@@ -9966,6 +9972,13 @@ function getAudioPath(language) {
 
 function buildDictationAudioUrl(dictationId, language, filename, opts = {}) {
     try {
+        try {
+            if (window.AudioManager && typeof window.AudioManager.buildDictationAudioUrl === 'function') {
+                return window.AudioManager.buildDictationAudioUrl(dictationId, language, filename);
+            }
+        } catch (e) {
+        }
+
         const id = String(dictationId || '').trim();
         const lang = String(language || '').trim();
         const raw = String(filename || '').trim();
@@ -9990,6 +10003,12 @@ async function resolveEditorPlaybackAudioUrl(dictationId, language, filename) {
         const raw = String(filename || '').trim();
         if (!id || !lang || !raw) return '';
         if (raw.startsWith('blob:') || raw.startsWith('/api/') || raw.startsWith('http://') || raw.startsWith('https://')) {
+            try {
+                if (window.AudioManager && typeof window.AudioManager.normalizeMediaUrl === 'function') {
+                    return window.AudioManager.normalizeMediaUrl(raw);
+                }
+            } catch (e) {
+            }
             return raw;
         }
 

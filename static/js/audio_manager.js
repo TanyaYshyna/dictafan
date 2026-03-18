@@ -9,6 +9,8 @@ class AudioManagerClass {
         this._playToken = 0;
         this._desiredStartTime = null;
         this._lastPlayRequest = null;
+        this._mediaCacheName = 'dictafan-media';
+        this._objectUrlByCanonicalUrl = {};
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -24,7 +26,7 @@ class AudioManagerClass {
         this.currentButton = button;
     }
 
-    play(button, audioUrl, onEndedCallback = null) {
+    async play(button, audioUrl, onEndedCallback = null) {
         const __dbgEnabled = !!window.__DICTATION_EDITOR_AUDIO_DEBUG;
         const __dbg = (...args) => {
             try {
@@ -62,10 +64,16 @@ class AudioManagerClass {
             }
         }
 
-        const isBlobUrl = typeof audioUrl === 'string' && audioUrl.startsWith('blob:');
+        let __inputUrl = audioUrl;
+        try {
+            __inputUrl = this.normalizeMediaUrl(__inputUrl);
+        } catch (e) {
+        }
+
+        const isBlobUrl = typeof __inputUrl === 'string' && __inputUrl.startsWith('blob:');
         const isDraftAudioUrl = false;
         __dbg('play()', {
-            audioUrl,
+            audioUrl: __inputUrl,
             buttonId: button && button.id,
             isBlobUrl,
             isDraftAudioUrl,
@@ -73,6 +81,24 @@ class AudioManagerClass {
 
         this._autoPlayEnabled = true;
         const playToken = ++this._playToken;
+
+        try {
+            if (!isBlobUrl && typeof __inputUrl === 'string' && __inputUrl.startsWith('/api/dictations/')) {
+                const resolved = await this.resolvePlayableUrl(__inputUrl, playToken);
+                if (!resolved) {
+                    return;
+                }
+                if (this._playToken !== playToken) {
+                    return;
+                }
+                audioUrl = resolved;
+            } else {
+                audioUrl = __inputUrl;
+            }
+        } catch (e) {
+            audioUrl = __inputUrl;
+        }
+
         const isSameAudio = this.audio && this.audio.src && this.audio.src.includes(audioUrl);
 
         // If we're resuming the exact same audio element (paused), do NOT recreate it.
@@ -680,6 +706,222 @@ class AudioManagerClass {
         if (this.playheadAnimation) {
             cancelAnimationFrame(this.playheadAnimation);
             this.playheadAnimation = null;
+        }
+    }
+
+    normalizeMediaUrl(rawUrl) {
+        try {
+            let v = String(rawUrl || '').trim();
+            if (!v) return '';
+            if (v.startsWith('blob:')) return v;
+
+            try {
+                if (v.startsWith('http://') || v.startsWith('https://')) {
+                    const u = new URL(v);
+                    const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol) ? location.protocol : u.protocol;
+                    if (desiredProtocol === 'https:' && u.protocol === 'http:') {
+                        u.protocol = 'https:';
+                    }
+
+                    try {
+                        if (typeof location !== 'undefined' && location && u.origin === location.origin) {
+                            v = `${u.pathname}${u.search || ''}`;
+                        } else {
+                            v = u.toString();
+                        }
+                    } catch (e) {
+                        v = `${u.pathname}${u.search || ''}`;
+                    }
+                }
+            } catch (e) {
+            }
+
+            try {
+                if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
+                    v = `https://${v.slice('http://'.length)}`;
+                }
+            } catch (e) {
+            }
+
+            const markers = ['/api/dictations/'];
+            for (const m of markers) {
+                const first = v.indexOf(m);
+                if (first >= 0) {
+                    return v.slice(first);
+                }
+            }
+
+            if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
+                v = `/${v}`;
+            }
+
+            return v;
+        } catch (e) {
+            return String(rawUrl || '').trim();
+        }
+    }
+
+    getBasename(filenameOrUrl) {
+        try {
+            const raw = String(filenameOrUrl || '').trim();
+            if (!raw) return '';
+            if (raw.startsWith('blob:')) return raw;
+            const name = raw.split('?', 1)[0].split('/').pop();
+            return String(name || '').trim();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    buildDictationAudioUrl(dictationId, language, filename) {
+        try {
+            const id = String(dictationId || '').trim();
+            const lang = String(language || '').trim();
+            const raw = String(filename || '').trim();
+            if (!id || !lang || !raw) return '';
+            if (raw.startsWith('blob:') || raw.startsWith('/api/') || raw.startsWith('http://') || raw.startsWith('https://')) {
+                return this.normalizeMediaUrl(raw);
+            }
+            const name = this.getBasename(raw);
+            if (!name) return '';
+            return this.normalizeMediaUrl(`/api/dictations/${encodeURIComponent(id)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`);
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async openMediaCache() {
+        try {
+            if (!('caches' in window)) return null;
+            return await caches.open(this._mediaCacheName);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async getCachedResponse(url) {
+        try {
+            const u = this.normalizeMediaUrl(url);
+            if (!u || u.startsWith('blob:')) return null;
+            const cache = await this.openMediaCache();
+            if (!cache) return null;
+            return await cache.match(u);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async putResponseToCache(url, response) {
+        try {
+            const u = this.normalizeMediaUrl(url);
+            if (!u || u.startsWith('blob:')) return false;
+            const cache = await this.openMediaCache();
+            if (!cache) return false;
+            await cache.put(u, response);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async deleteFromCache(url) {
+        try {
+            const u = this.normalizeMediaUrl(url);
+            if (!u || u.startsWith('blob:')) return false;
+            const cache = await this.openMediaCache();
+            if (!cache) return false;
+            return await cache.delete(u);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    _setObjectUrlForCanonical(canonicalUrl, nextObjectUrl) {
+        try {
+            const key = String(canonicalUrl || '').trim();
+            if (!key) return;
+            const next = String(nextObjectUrl || '').trim();
+            if (!next || !next.startsWith('blob:')) return;
+            const prev = this._objectUrlByCanonicalUrl[key];
+            if (prev && typeof prev === 'string' && prev.startsWith('blob:') && prev !== next) {
+                try { URL.revokeObjectURL(prev); } catch (e) {}
+            }
+            this._objectUrlByCanonicalUrl[key] = next;
+        } catch (e) {
+        }
+    }
+
+    _getObjectUrlForCanonical(canonicalUrl) {
+        try {
+            const key = String(canonicalUrl || '').trim();
+            if (!key) return '';
+            const v = this._objectUrlByCanonicalUrl[key];
+            return (v && typeof v === 'string') ? v : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async resolvePlayableUrl(canonicalUrl, playToken) {
+        try {
+            const u = this.normalizeMediaUrl(canonicalUrl);
+            if (!u) return '';
+            if (u.startsWith('blob:')) return u;
+
+            const existing = this._getObjectUrlForCanonical(u);
+            if (existing && existing.startsWith('blob:')) {
+                return existing;
+            }
+
+            const cache = await this.openMediaCache();
+            if (!cache) {
+                return u;
+            }
+
+            let res = null;
+            try {
+                res = await cache.match(u);
+            } catch (e) {
+                res = null;
+            }
+
+            if (!res) {
+                try {
+                    const fetchRes = await fetch(u, { cache: 'no-store' });
+                    if (fetchRes && fetchRes.ok) {
+                        try {
+                            await cache.put(u, fetchRes.clone());
+                        } catch (e) {
+                        }
+                        res = fetchRes;
+                    }
+                } catch (e) {
+                }
+            }
+
+            if (this._playToken !== playToken) {
+                return '';
+            }
+
+            if (!res) {
+                return u;
+            }
+
+            let blob = null;
+            try {
+                blob = await res.blob();
+            } catch (e) {
+                blob = null;
+            }
+            if (!blob || !blob.size) {
+                return u;
+            }
+
+            const objUrl = URL.createObjectURL(blob);
+            this._setObjectUrlForCanonical(u, objUrl);
+            return objUrl;
+        } catch (e) {
+            return '';
         }
     }
 }
