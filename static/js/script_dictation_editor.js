@@ -1,16 +1,26 @@
+// Offline-first схема сохранения аудио:
+// 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
+// 2) после Save: аудио читается из /api/dictations/... (cache/B2)
+
+var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
+
+if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+    window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation_editor');
+}
+
+try {
+    if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+        window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
+    }
+} catch (e) {
+}
+
 const userManager = window.UM;
 const waveformContainer = document.getElementById('audioWaveform');
 const currentAudioInfo = document.getElementById('currentAudioInfo');
 const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
-
-// Offline-first схема сохранения аудио:
-// 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
-// 2) после Save: аудио читается из /api/dictations/... (cache/B2)
-
-window.__DICTATION_EDITOR_BUILD = '2026-03-11_0229';
-console.warn('[DICTATION EDITOR BUILD]', window.__DICTATION_EDITOR_BUILD);
 
 function ensureSwStatusBar() {
     try {
@@ -1475,100 +1485,13 @@ function persistLastMediaCommit() {
 
 loadLastMediaCommit();
 
-function installBuildAutoReloader(buildValue, storageKey) {
-    try {
-        const v = String(buildValue || '');
-        if (!v) return;
-        const k = String(storageKey || 'dictafan:build');
-        const prev = String(localStorage.getItem(k) || '');
-        const onceKey = `${k}:reloaded:${v}`;
-        const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
-        if (prev && prev !== v && !alreadyReloaded) {
-            try {
-                sessionStorage.setItem(onceKey, 'true');
-            } catch (e) {
-            }
-            try {
-                localStorage.setItem(k, v);
-            } catch (e) {
-            }
-            location.reload();
-            return;
-        }
-        if (!prev) {
-            try {
-                localStorage.setItem(k, v);
-            } catch (e) {
-            }
-        }
-
-        try {
-            const modalTr = getStartModalTranslationLanguage();
-            if (modalTr) {
-                currentDictation.language_translation = modalTr;
-            }
-        } catch (e) {
-        }
-    } catch (e) {
+try {
+    const modalTr = getStartModalTranslationLanguage();
+    if (modalTr) {
+        currentDictation.language_translation = modalTr;
     }
+} catch (e) {
 }
-
-installBuildAutoReloader(window.__DICTATION_EDITOR_BUILD, 'dictafan:build:dictation_editor');
-
-function installDictationEditorBuildBadge() {
-    try {
-        if (window.__dictationEditorBuildBadgeInstalled) return;
-        window.__dictationEditorBuildBadgeInstalled = true;
-
-        try {
-            if (typeof window.setSwBarInfo === 'function') {
-                window.setSwBarInfo('build', String(window.__DICTATION_EDITOR_BUILD || '').trim() || 'unknown');
-            }
-        } catch (e) {
-        }
-
-        // Legacy fixed badge overlay is disabled; use the global status bar instead.
-        return;
-
-        const mount = () => {
-            try {
-                const id = 'dictation-editor-build-badge';
-                let el = document.getElementById(id);
-                if (!el) {
-                    el = document.createElement('div');
-                    el.id = id;
-                    el.setAttribute('aria-hidden', 'true');
-                    el.style.position = 'fixed';
-                    el.style.left = '6px';
-                    el.style.bottom = '6px';
-                    el.style.zIndex = '2147483647';
-                    el.style.fontSize = '10px';
-                    el.style.lineHeight = '1.2';
-                    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-                    el.style.color = 'rgba(255,255,255,0.75)';
-                    el.style.background = 'rgba(0,0,0,0.35)';
-                    el.style.padding = '2px 6px';
-                    el.style.borderRadius = '6px';
-                    el.style.pointerEvents = 'none';
-                    el.style.userSelect = 'none';
-                    document.body.appendChild(el);
-                }
-                const v = String(window.__DICTATION_EDITOR_BUILD || 'unknown');
-                el.textContent = `build: ${v}`;
-            } catch (e) {
-            }
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', mount, { once: true });
-        } else {
-            mount();
-        }
-    } catch (e) {
-    }
-}
-
-installDictationEditorBuildBadge();
 
 function installDictationEditorSaveStatusBadge() {
     try {

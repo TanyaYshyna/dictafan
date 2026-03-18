@@ -1,12 +1,22 @@
 // console.log("👀 renderSentenceCounter вызвана");
 
+var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
+
+if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+    window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation');
+}
+
+try {
+    if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+        window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
+    }
+} catch (e) {
+}
+
 // Global audio UI/controls (ensure defined before any usage)
 // Use window-scoped references to avoid ReferenceError on early calls
 window.originalAudioVisual = window.originalAudioVisual || null;
 window.translationPlayButton = window.translationPlayButton || null;
-
-window.__DICTATION_BUILD = '2026-03-08_0218';
-console.warn('[DICTATION BUILD]', window.__DICTATION_BUILD);
 
 function ensureSwStatusBar() {
     try {
@@ -279,35 +289,7 @@ function setSwStatus(message, opts = {}) {
     }
 }
 
-function installBuildAutoReloader(buildValue, storageKey) {
-    try {
-        const v = String(buildValue || '');
-        if (!v) return;
-        const k = String(storageKey || 'dictafan:build');
-        const prev = String(localStorage.getItem(k) || '');
-        const onceKey = `${k}:reloaded:${v}`;
-        const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
-        if (prev && prev !== v && !alreadyReloaded) {
-            try {
-                sessionStorage.setItem(onceKey, 'true');
-            } catch (e) {
-            }
-            try {
-                localStorage.setItem(k, v);
-            } catch (e) {
-            }
-            location.reload();
-            return;
-        }
-        if (!prev) {
-            try {
-                localStorage.setItem(k, v);
-            } catch (e) {
-            }
-        }
-    } catch (e) {
-    }
-}
+// build helpers moved to static/js/build_helpers.js
 
 function showDictationCacheFetchOverlay(text) {
     try {
@@ -469,63 +451,6 @@ async function fetchSentencesFromServerAndCache() {
 
     return true;
 }
-
-installBuildAutoReloader(window.__DICTATION_BUILD, 'dictafan:build:dictation');
-
-function installDictationBuildBadge() {
-    try {
-        if (window.__dictationBuildBadgeInstalled) return;
-        window.__dictationBuildBadgeInstalled = true;
-
-        try {
-            if (typeof window.setSwBarInfo === 'function') {
-                window.setSwBarInfo('build', String(window.__DICTATION_BUILD || '').trim() || 'unknown');
-            }
-        } catch (e) {
-        }
-
-        // Legacy fixed badge overlay is disabled; use the global status bar instead.
-        return;
-
-        const mount = () => {
-            try {
-                const id = 'dictation-build-badge';
-                let el = document.getElementById(id);
-                if (!el) {
-                    el = document.createElement('div');
-                    el.id = id;
-                    el.setAttribute('aria-hidden', 'true');
-                    el.style.position = 'fixed';
-                    el.style.left = '6px';
-                    el.style.bottom = '6px';
-                    el.style.zIndex = '2147483647';
-                    el.style.fontSize = '10px';
-                    el.style.lineHeight = '1.2';
-                    el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-                    el.style.color = 'rgba(255,255,255,0.75)';
-                    el.style.background = 'rgba(0,0,0,0.35)';
-                    el.style.padding = '2px 6px';
-                    el.style.borderRadius = '6px';
-                    el.style.pointerEvents = 'none';
-                    el.style.userSelect = 'none';
-                    document.body.appendChild(el);
-                }
-                const v = String(window.__DICTATION_BUILD || 'unknown');
-                el.textContent = `build: ${v}`;
-            } catch (e) {
-            }
-        };
-
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', mount, { once: true });
-        } else {
-            mount();
-        }
-    } catch (e) {
-    }
-}
-
-installDictationBuildBadge();
 
 const userManager = window.UM;
 let thisNewGame = true;

@@ -1,1809 +1,1731 @@
 // Скрипт для новой страницы приватной библиотеки
 
-(function () {
-  window.__PRIVATE_LIBRARY_BUILD = '2026-03-11_0229';
-  console.warn('[PRIVATE LIBRARY BUILD]', window.__PRIVATE_LIBRARY_BUILD);
+var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
 
-  let bookEditDirty = false;
+if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+  window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:private_library');
+}
 
-  function setBookEditDirty(nextDirty) {
-    bookEditDirty = !!nextDirty;
-    const star = document.getElementById('book-edit-unsaved-star');
-    if (star) {
-      star.style.display = bookEditDirty ? 'inline' : 'none';
-    }
+try {
+  if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+    window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
   }
+} catch (e) {
+}
 
-  function getDefaultOriginalLanguageForNewBook() {
-    try {
-      const fromFilter = (typeof currentBooksFilterLanguage !== 'undefined')
-        ? currentBooksFilterLanguage
-        : null;
-      const fromSelector = (booksLanguageSelectorInstance && typeof booksLanguageSelectorInstance.getValues === 'function')
-        ? (booksLanguageSelectorInstance.getValues() || {}).currentLearning
-        : null;
-      const fromUser = window.USER_LANGUAGE_DATA?.currentLearning || null;
-      const raw = fromFilter || fromSelector || fromUser || null;
-      if (!raw) return null;
-      const v = String(raw).trim().toLowerCase();
-      if (!v || v === 'all') return null;
-      return v;
-    } catch (e) {
-      return null;
-    }
+let bookEditDirty = false;
+
+function setBookEditDirty(nextDirty) {
+  bookEditDirty = !!nextDirty;
+  const star = document.getElementById('book-edit-unsaved-star');
+  if (star) {
+    star.style.display = bookEditDirty ? 'inline' : 'none';
   }
+}
 
-  // Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
-  // (Useful when something overlays the button or stops propagation.)
+function getDefaultOriginalLanguageForNewBook() {
   try {
-    if (!window.__deleteModalClickDebugInstalled) {
-      window.__deleteModalClickDebugInstalled = true;
-      document.addEventListener('click', (event) => {
-        try {
-          const t = event.target;
-          if (!t) return;
-          const confirmBtn = t.closest ? t.closest('#delete-dictation-confirm') : null;
-          const closeBtn = t.closest ? t.closest('#delete-dictation-close') : null;
-          const modal = t.closest ? t.closest('#delete-dictation-modal') : null;
-          if (confirmBtn || closeBtn || (modal && t.id === 'delete-dictation-modal')) {
-            console.log('🗑️ [capture] click', {
-              targetTag: t.tagName,
-              targetId: t.id || null,
-              targetClass: (typeof t.className === 'string') ? t.className : null,
-              isConfirm: !!confirmBtn,
-              isClose: !!closeBtn,
-              isModalBackdrop: !!(modal && t.id === 'delete-dictation-modal'),
-              pendingDeleteDictationId: (typeof pendingDeleteDictationId !== 'undefined') ? pendingDeleteDictationId : null
-            });
-          }
-        } catch (e) {
-          // ignore
-        }
-      }, true);
-    }
+    const fromFilter = (typeof currentBooksFilterLanguage !== 'undefined')
+      ? currentBooksFilterLanguage
+      : null;
+    const fromSelector = (booksLanguageSelectorInstance && typeof booksLanguageSelectorInstance.getValues === 'function')
+      ? (booksLanguageSelectorInstance.getValues() || {}).currentLearning
+      : null;
+    const fromUser = window.USER_LANGUAGE_DATA?.currentLearning || null;
+    const raw = fromFilter || fromSelector || fromUser || null;
+    if (!raw) return null;
+    const v = String(raw).trim().toLowerCase();
+    if (!v || v === 'all') return null;
+    return v;
   } catch (e) {
-    // ignore
-  }
-
-  function installBuildAutoReloader(buildValue, storageKey) {
-    try {
-      const v = String(buildValue || '');
-      if (!v) return;
-      const k = String(storageKey || 'dictafan:build');
-      const prev = String(localStorage.getItem(k) || '');
-      const onceKey = `${k}:reloaded:${v}`;
-      const alreadyReloaded = String(sessionStorage.getItem(onceKey) || '') === 'true';
-      if (prev && prev !== v && !alreadyReloaded) {
-        try {
-          sessionStorage.setItem(onceKey, 'true');
-        } catch (e) {
-        }
-        try {
-          localStorage.setItem(k, v);
-        } catch (e) {
-        }
-        location.reload();
-        return;
-      }
-      if (!prev) {
-        try {
-          localStorage.setItem(k, v);
-        } catch (e) {
-        }
-      }
-    } catch (e) {
-    }
-  }
-
-  installBuildAutoReloader(window.__PRIVATE_LIBRARY_BUILD, 'dictafan:build:private_library');
-
-  function installPrivateLibraryBuildBadge() {
-    try {
-      if (window.__privateLibraryBuildBadgeInstalled) return;
-      window.__privateLibraryBuildBadgeInstalled = true;
-
-      try {
-        if (typeof window.setSwBarInfo === 'function') {
-          window.setSwBarInfo('build', String(window.__PRIVATE_LIBRARY_BUILD || '').trim() || 'unknown');
-        }
-      } catch (e) {
-      }
-
-      // Legacy fixed badge overlay is disabled; use the global status bar instead.
-      return;
-
-      const mount = () => {
-        try {
-          const id = 'private-library-build-badge';
-          let el = document.getElementById(id);
-          if (!el) {
-            el = document.createElement('div');
-            el.id = id;
-            el.setAttribute('aria-hidden', 'true');
-            el.style.position = 'fixed';
-            el.style.left = '6px';
-            el.style.bottom = '6px';
-            el.style.zIndex = '2147483647';
-            el.style.fontSize = '10px';
-            el.style.lineHeight = '1.2';
-            el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-            el.style.color = 'rgba(255,255,255,0.75)';
-            el.style.background = 'rgba(0,0,0,0.35)';
-            el.style.padding = '2px 6px';
-            el.style.borderRadius = '6px';
-            el.style.pointerEvents = 'none';
-            el.style.userSelect = 'none';
-            document.body.appendChild(el);
-          }
-          const v = String(window.__PRIVATE_LIBRARY_BUILD || 'unknown');
-          el.textContent = `build: ${v}`;
-        } catch (e) {
-        }
-      };
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', mount, { once: true });
-      } else {
-        mount();
-      }
-    } catch (e) {
-    }
-  }
-
-  installPrivateLibraryBuildBadge();
-
-  let bookLanguageSelector = null;
-  let booksLanguageSelectorInstance = null;
-  let publicBooksLanguageSelectorInstance = null;
-  let activeBookId = null;
-  let activeBookIsWorkbook = false;
-  let bookViewActiveBookId = null;
-  let currentView = 'cards'; // 'cards' or 'list'
-  let cropper = null;
-  let croppedImageBlob = null;
-  let deskItems = []; // Список диктантов на столе
-  let deskLoadSeq = 0;
-  let deskLoadInFlight = null;
-  let pendingDeleteDictationId = null;
-
-  let lastOwnBooks = [];
-  let lastShelfBooks = [];
-  let currentBooksFilterLanguage = null;
-  let currentPublicBooksFilterLanguage = null;
-  let pendingDeleteSectionId = null;
-
-  function getToken() {
-    return localStorage.getItem("jwt_token");
-  }
-
-  async function idbPut(storeName, value) {
-    const db = await openDraftDb();
-    try {
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const req = store.put(value);
-        req.onsuccess = () => resolve(true);
-        req.onerror = () => reject(req.error);
-      });
-    } finally {
-      db.close();
-    }
-  }
-
-  async function idbDelete(storeName, key) {
-    const db = await openDraftDb();
-    try {
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readwrite');
-        const store = tx.objectStore(storeName);
-        const req = store.delete(key);
-        req.onsuccess = () => resolve(true);
-        req.onerror = () => reject(req.error);
-      });
-    } finally {
-      db.close();
-    }
-  }
-
-  async function idbDeleteDictationCache(dictationId) {
-    try {
-      const dictId = String(dictationId || '').trim();
-      if (!dictId) return;
-      const rows = await idbGetAll('dictations');
-      for (const row of rows || []) {
-        try {
-          if (row && String(row.dictationId || '') === dictId && row.key) {
-            await idbDelete('dictations', row.key);
-          }
-        } catch (e) {
-        }
-      }
-    } catch (e) {
-    }
-  }
-
-  async function idbGetAll(storeName) {
-    const db = await openDraftDb();
-    try {
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const req = store.getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => reject(req.error);
-      });
-    } finally {
-      db.close();
-    }
-  }
-
-  function withCacheBust(url) {
-    if (!url || typeof url !== 'string') return url;
-    const sep = url.includes('?') ? '&' : '?';
-    const v = (window && window.__PRIVATE_LIBRARY_BUILD) ? String(window.__PRIVATE_LIBRARY_BUILD) : '1';
-    return `${url}${sep}v=${encodeURIComponent(v)}`;
-  }
-
-  function withCacheBustVersion(url, version) {
-    if (!url || typeof url !== 'string') return url;
-    const v = (version !== undefined && version !== null && String(version).trim())
-      ? String(version).trim()
-      : ((window && window.__PRIVATE_LIBRARY_BUILD) ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}v=${encodeURIComponent(v)}`;
-  }
-
-  function maybeCacheBustDictationCover(url) {
-    try {
-      const u = String(url || '');
-      if (!u) return u;
-      if (u.startsWith('/api/dictations_covers/')) {
-        return withCacheBust(u);
-      }
-      return u;
-    } catch (e) {
-      return url;
-    }
-  }
-
-  async function apiRequest(url, options = {}) {
-    const token = getToken();
-    const headers = options.headers || {};
-
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    if (!(options.body instanceof FormData)) {
-      headers["Content-Type"] = headers["Content-Type"] || "application/json";
-    }
-
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      cache: 'no-store',
-    });
-
-    if (response.status === 401 || response.status === 422) {
-      if (window.UM) {
-        window.UM.requireAuth();
-      }
-      throw new Error("Требуется авторизация");
-    }
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
-      throw new Error(errorData.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
-  }
-
-  function showToast(message, opts = {}) {
-    const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1000;
-    const beepUrl = typeof opts.beepUrl === 'string' ? opts.beepUrl : null;
-
-    let el = document.getElementById('auto-toast');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'auto-toast';
-      el.style.position = 'fixed';
-      el.style.left = '50%';
-      el.style.top = '24px';
-      el.style.transform = 'translateX(-50%)';
-      el.style.zIndex = '100000';
-      el.style.background = 'rgba(0,0,0,0.78)';
-      el.style.color = '#fff';
-      el.style.padding = '10px 14px';
-      el.style.borderRadius = '12px';
-      el.style.fontSize = '14px';
-      el.style.maxWidth = 'min(92vw, 520px)';
-      el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
-      el.style.display = 'none';
-      document.body.appendChild(el);
-    }
-
-    el.textContent = message || '';
-    el.style.display = 'block';
-
-    if (beepUrl) {
-      try {
-        const a = new Audio(beepUrl);
-        a.volume = 0.7;
-        a.play().catch(() => {});
-      } catch (e) {
-      }
-    }
-
-    if (el._hideTimer) window.clearTimeout(el._hideTimer);
-    el._hideTimer = window.setTimeout(() => {
-      try {
-        const node = document.getElementById('auto-toast');
-        if (node) node.style.display = 'none';
-      } catch (e) {
-      }
-    }, Math.max(0, durationMs));
-  }
-
-  const deskToggleInFlight = new Set();
-
-  function ensureSwStatusBar() {
-    try {
-      const old = document.getElementById('swStatusBar');
-      if (old && old.parentNode) {
-        old.parentNode.removeChild(old);
-      }
-    } catch (e) {
-    }
     return null;
   }
+}
 
-  function setSwStatus(message, opts = {}) {
-    try {
-      // Route to the global status bar (sw_status_bar.js)
-      if (typeof window.setSwStatus === 'function') {
-        window.setSwStatus(message, opts);
-        return;
+// Debug helper: capture clicks globally to understand if modal buttons are actually receiving events.
+// (Useful when something overlays the button or stops propagation.)
+// Вспомогательная функция отладки: глобально перехватывает клики, чтобы понять, получают ли кнопки модального окна события.
+// (Полезно, когда что-то перекрывает кнопку или препятствует распространению событий.)
+try {
+  if (!window.__deleteModalClickDebugInstalled) {
+    window.__deleteModalClickDebugInstalled = true;
+    document.addEventListener('click', (event) => {
+      try {
+        const t = event.target;
+        if (!t) return;
+        const confirmBtn = t.closest ? t.closest('#delete-dictation-confirm') : null;
+        const closeBtn = t.closest ? t.closest('#delete-dictation-close') : null;
+        const modal = t.closest ? t.closest('#delete-dictation-modal') : null;
+        if (confirmBtn || closeBtn || (modal && t.id === 'delete-dictation-modal')) {
+          console.log('🗑️ [capture] click', {
+            targetTag: t.tagName,
+            targetId: t.id || null,
+            targetClass: (typeof t.className === 'string') ? t.className : null,
+            isConfirm: !!confirmBtn,
+            isClose: !!closeBtn,
+            isModalBackdrop: !!(modal && t.id === 'delete-dictation-modal'),
+            pendingDeleteDictationId: (typeof pendingDeleteDictationId !== 'undefined') ? pendingDeleteDictationId : null
+          });
+        }
+      } catch (e) {
+        // ignore
       }
-    } catch (e) {
-    }
-    // If global bar is not available, ensure we don't show legacy bar.
-    try { ensureSwStatusBar(); } catch (e2) {}
+    }, true);
   }
+} catch (e) {
+  // ignore
+}
 
-  const PAGE_NAME = 'private_library';
-  (async () => {
-    try {
-      const res = await fetch('/api/app-cache-revision', { cache: 'no-store' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const rev = data && (data.revision || data.app_cache_revision || data.value);
-      console.log('[Version]', `${PAGE_NAME}__${rev || 'unknown'}`);
-    } catch (e) {
-      console.log('[Version]', `${PAGE_NAME}__unknown`);
-    }
-  })();
+let bookLanguageSelector = null;
+let booksLanguageSelectorInstance = null;
+let publicBooksLanguageSelectorInstance = null;
+let activeBookId = null;
+let activeBookIsWorkbook = false;
+let bookViewActiveBookId = null;
+let currentView = 'cards'; // 'cards' or 'list'
+let cropper = null;
+let croppedImageBlob = null;
+let deskItems = []; // Список диктантов на столе
+let deskLoadSeq = 0;
+let deskLoadInFlight = null;
+let pendingDeleteDictationId = null;
 
-  function formatBytes(bytes) {
-    const n = Number(bytes) || 0;
-    if (n <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const k = 1024;
-    const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(k)));
-    const value = n / Math.pow(k, i);
-    const decimals = i === 0 ? 0 : (i === 1 ? 0 : 1);
-    return `${value.toFixed(decimals)} ${units[i]}`;
-  }
+let lastOwnBooks = [];
+let lastShelfBooks = [];
+let currentBooksFilterLanguage = null;
+let currentPublicBooksFilterLanguage = null;
+let pendingDeleteSectionId = null;
 
-  function formatMbValue(bytes) {
-    const b = Number(bytes);
-    if (!isFinite(b) || b <= 0) return 300;
-    return Math.max(10, Math.round(b / (1024 * 1024)));
-  }
+function getToken() {
+  return localStorage.getItem("jwt_token");
+}
 
-  async function swRequest(action, payload = {}) {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-      throw new Error('Service Worker не активен');
-    }
-
-    try {
-      setSwStatus(`SW: ${String(action)} …`, { durationMs: 0 });
-    } catch (e) {
-    }
-
-    const timeoutMs = typeof payload.timeoutMs === 'number' ? payload.timeoutMs : 15000;
-    const message = { action, ...payload };
-    delete message.timeoutMs;
-
+async function idbPut(storeName, value) {
+  const db = await openDraftDb();
+  try {
     return await new Promise((resolve, reject) => {
-      const channel = new MessageChannel();
-      const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
-
-      const timeout = setTimeout(() => {
-        reject(new Error('SW timeout'));
-      }, timeoutMs);
-
-      channel.port1.onmessage = (event) => {
-        const data = event.data || {};
-        if (data.requestId !== requestId) return;
-        clearTimeout(timeout);
-        if (data && data.success) {
-          try {
-            setSwStatus(`SW: ${String(action)} ok`);
-          } catch (e) {
-          }
-          resolve(data);
-        } else {
-          try {
-            const err = new Error(data && data.error ? data.error : 'sw_error');
-            err.swAction = action;
-            err.swError = data && data.error ? data.error : 'sw_error';
-            err.swResult = data && data.result ? data.result : null;
-            err.swPayload = payload || null;
-            try {
-              setSwStatus(`SW: ${String(action)} error`);
-            } catch (e2) {
-            }
-            reject(err);
-          } catch (e) {
-            try {
-              setSwStatus(`SW: ${String(action)} error`);
-            } catch (e2) {
-            }
-            reject(new Error(data && data.error ? data.error : 'sw_error'));
-          }
-        }
-      };
-
-      navigator.serviceWorker.controller.postMessage({ ...message, requestId }, [channel.port2]);
-    });
-  }
-
-  function chunkArray(arr, size) {
-    const n = Array.isArray(arr) ? arr : [];
-    const s = Math.max(1, Number(size) || 1);
-    const out = [];
-    for (let i = 0; i < n.length; i += s) {
-      out.push(n.slice(i, i + s));
-    }
-    return out;
-  }
-
-  async function openDraftDb() {
-    return await new Promise((resolve, reject) => {
-      const req = indexedDB.open('dictafan_drafts');
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains('drafts')) {
-          db.createObjectStore('drafts', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('outbox')) {
-          db.createObjectStore('outbox', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('activity_outbox')) {
-          db.createObjectStore('activity_outbox', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('success_outbox')) {
-          db.createObjectStore('success_outbox', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('dictations')) {
-          db.createObjectStore('dictations', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('desk_items')) {
-          db.createObjectStore('desk_items', { keyPath: 'key' });
-        }
-        if (!db.objectStoreNames.contains('media_manifest')) {
-          db.createObjectStore('media_manifest', { keyPath: 'key' });
-        }
-      };
-      req.onsuccess = () => resolve(req.result);
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const req = store.put(value);
+      req.onsuccess = () => resolve(true);
       req.onerror = () => reject(req.error);
     });
+  } finally {
+    db.close();
   }
+}
 
-  async function idbGet(storeName, key) {
-    const db = await openDraftDb();
-    try {
-      return await new Promise((resolve, reject) => {
-        const tx = db.transaction(storeName, 'readonly');
-        const store = tx.objectStore(storeName);
-        const req = store.get(key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => reject(req.error);
-      });
-    } finally {
-      db.close();
-    }
+async function idbDelete(storeName, key) {
+  const db = await openDraftDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readwrite');
+      const store = tx.objectStore(storeName);
+      const req = store.delete(key);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
   }
+}
 
-  async function syncOfflineActivityOutbox() {
-    try {
-      const token = window.UM?.token || localStorage.getItem('jwt_token');
-      if (!token) return false;
-      if (!navigator.onLine) return false;
-
-      const rows = await idbGetAll('activity_outbox');
-      if (!rows.length) return true;
-
-      for (const row of rows) {
-        if (!row || !row.dictation_id) {
-          // Старые/некорректные записи: не отправляем на сервер (иначе будет 400/500)
-          continue;
+async function idbDeleteDictationCache(dictationId) {
+  try {
+    const dictId = String(dictationId || '').trim();
+    if (!dictId) return;
+    const rows = await idbGetAll('dictations');
+    for (const row of rows || []) {
+      try {
+        if (row && String(row.dictationId || '') === dictId && row.key) {
+          await idbDelete('dictations', row.key);
         }
-        const toSend = [];
-        if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
-        if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
-        if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
-
-        let sentAll = true;
-        for (const item of toSend) {
-          const response = await fetch('/api/statistics/activity', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              dictation_id: row.dictation_id,
-              date: row.date,
-              type_activity: item.type_activity,
-              number: item.number
-            })
-          });
-          if (!response.ok) {
-            sentAll = false;
-            break;
-          }
-        }
-
-        if (sentAll) {
-          await idbDelete('activity_outbox', row.key);
-        } else {
-          return false;
-        }
+      } catch (e) {
       }
-
-      return true;
-    } catch (e) {
-      return false;
     }
+  } catch (e) {
   }
+}
 
-  async function syncOfflineSuccessOutbox() {
-    try {
-      const token = window.UM?.token || localStorage.getItem('jwt_token');
-      if (!token) return false;
-      if (!navigator.onLine) return false;
+async function idbGetAll(storeName) {
+  const db = await openDraftDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
+}
 
-      const rows = await idbGetAll('success_outbox');
-      if (!rows.length) return true;
+function withCacheBust(url) {
+  if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBust === 'function') {
+    return window.BuildHelpers.withCacheBust(url, __APP_BUILD_LOCAL);
+  }
+  return url;
+}
 
-      for (const row of rows) {
-        const response = await fetch('/api/statistics/success', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(row.payload)
-        });
-        if (!response.ok) {
-          return false;
-        }
-        await idbDelete('success_outbox', row.key);
-      }
+function withCacheBustVersion(url, version) {
+  if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBustVersion === 'function') {
+    return window.BuildHelpers.withCacheBustVersion(url, version, __APP_BUILD_LOCAL);
+  }
+  return url;
+}
 
-      return true;
-    } catch (e) {
-      return false;
+function maybeCacheBustDictationCover(url) {
+  try {
+    const u = String(url || '');
+    if (!u) return u;
+    if (u.startsWith('/api/dictations_covers/')) {
+      return withCacheBust(u);
     }
+    return u;
+  } catch (e) {
+    return url;
+  }
+}
+
+async function apiRequest(url, options = {}) {
+  const token = getToken();
+  const headers = options.headers || {};
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
   }
 
-  async function syncOfflineOutboxes() {
-    const [aOk, sOk] = await Promise.all([
-      syncOfflineActivityOutbox(),
-      syncOfflineSuccessOutbox()
-    ]);
-    refreshDeskOutboxIndicator().catch(() => {});
-    return !!aOk && !!sOk;
-  }
-
-  window.addEventListener('online', () => {
-    syncOfflineOutboxes().catch(() => {});
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    cache: 'no-store',
   });
 
-  function ensureDeskOutboxIndicator() {
-    if (document.getElementById('deskOutboxIndicator')) return;
-    const deskZone = document.querySelector('.desk-zone');
-    if (!deskZone) return;
-
-    const el = document.createElement('div');
-    el.id = 'deskOutboxIndicator';
-    el.style.position = 'absolute';
-    el.style.top = '8px';
-    el.style.right = '8px';
-    el.style.zIndex = '5';
-    el.style.background = 'rgba(0,0,0,0.55)';
-    el.style.color = '#fff';
-    el.style.fontSize = '12px';
-    el.style.lineHeight = '1.2';
-    el.style.padding = '6px 8px';
-    el.style.borderRadius = '10px';
-    el.style.cursor = 'pointer';
-    el.style.userSelect = 'none';
-    el.style.display = 'none';
-    el.textContent = '';
-
-    el.addEventListener('click', async () => {
-      try {
-        const [activities, successes] = await Promise.all([
-          idbGetAll('activity_outbox'),
-          idbGetAll('success_outbox')
-        ]);
-
-        const lines = [];
-        lines.push(`Очередь синка:`);
-        lines.push(`Успехи: ${successes.length}`);
-        for (const s of successes.slice(0, 20)) {
-          const d = s?.payload?.dictation_id;
-          const t = s?.createdAt ? new Date(s.createdAt).toLocaleString() : '';
-          lines.push(`- ${d || 'dictation'} ${t}`);
-        }
-        if (successes.length > 20) lines.push(`…и еще ${successes.length - 20}`);
-
-        lines.push(``);
-        lines.push(`Активность (дни): ${activities.length}`);
-        for (const a of activities.slice(0, 40)) {
-          const p = Number(a?.perfect_count) || 0;
-          const c = Number(a?.corrected_count) || 0;
-          const au = Number(a?.audio_count) || 0;
-          lines.push(`- ${a?.date || ''}: perfect=${p}, corrected=${c}, audio=${au}`);
-        }
-        if (activities.length > 40) lines.push(`…и еще ${activities.length - 40}`);
-
-        alert(lines.join('\n'));
-      } catch (e) {
-        alert('Не удалось прочитать очередь синка');
-      }
-    });
-
-    deskZone.style.position = 'relative';
-    deskZone.appendChild(el);
+  if (response.status === 401 || response.status === 422) {
+    if (window.UM) {
+      window.UM.requireAuth();
+    }
+    throw new Error("Требуется авторизация");
   }
 
-  async function refreshDeskOutboxIndicator() {
-    ensureDeskOutboxIndicator();
-    const el = document.getElementById('deskOutboxIndicator');
-    if (!el) return;
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+    throw new Error(errorData.error || `HTTP ${response.status}`);
+  }
 
+  return response.json();
+}
+
+function showToast(message, opts = {}) {
+  const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1000;
+  const beepUrl = typeof opts.beepUrl === 'string' ? opts.beepUrl : null;
+
+  let el = document.getElementById('auto-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'auto-toast';
+    el.style.position = 'fixed';
+    el.style.left = '50%';
+    el.style.top = '24px';
+    el.style.transform = 'translateX(-50%)';
+    el.style.zIndex = '100000';
+    el.style.background = 'rgba(0,0,0,0.78)';
+    el.style.color = '#fff';
+    el.style.padding = '10px 14px';
+    el.style.borderRadius = '12px';
+    el.style.fontSize = '14px';
+    el.style.maxWidth = 'min(92vw, 520px)';
+    el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+    el.style.display = 'none';
+    document.body.appendChild(el);
+  }
+
+  el.textContent = message || '';
+  el.style.display = 'block';
+
+  if (beepUrl) {
+    try {
+      const a = new Audio(beepUrl);
+      a.volume = 0.7;
+      a.play().catch(() => { });
+    } catch (e) {
+    }
+  }
+
+  if (el._hideTimer) window.clearTimeout(el._hideTimer);
+  el._hideTimer = window.setTimeout(() => {
+    try {
+      const node = document.getElementById('auto-toast');
+      if (node) node.style.display = 'none';
+    } catch (e) {
+    }
+  }, Math.max(0, durationMs));
+}
+
+const deskToggleInFlight = new Set();
+
+function ensureSwStatusBar() {
+  try {
+    const old = document.getElementById('swStatusBar');
+    if (old && old.parentNode) {
+      old.parentNode.removeChild(old);
+    }
+  } catch (e) {
+  }
+  return null;
+}
+
+function setSwStatus(message, opts = {}) {
+  try {
+    // Route to the global status bar (sw_status_bar.js)
+    if (typeof window.setSwStatus === 'function') {
+      window.setSwStatus(message, opts);
+      return;
+    }
+  } catch (e) {
+  }
+  // If global bar is not available, ensure we don't show legacy bar.
+  try { ensureSwStatusBar(); } catch (e2) { }
+}
+
+const PAGE_NAME = 'private_library';
+(async () => {
+  try {
+    const res = await fetch('/api/app-cache-revision', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const rev = data && (data.revision || data.app_cache_revision || data.value);
+    console.log('[Version]', `${PAGE_NAME}__${rev || 'unknown'}`);
+  } catch (e) {
+    console.log('[Version]', `${PAGE_NAME}__unknown`);
+  }
+})();
+
+function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const k = 1024;
+  const i = Math.min(units.length - 1, Math.floor(Math.log(n) / Math.log(k)));
+  const value = n / Math.pow(k, i);
+  const decimals = i === 0 ? 0 : (i === 1 ? 0 : 1);
+  return `${value.toFixed(decimals)} ${units[i]}`;
+}
+
+function formatMbValue(bytes) {
+  const b = Number(bytes);
+  if (!isFinite(b) || b <= 0) return 300;
+  return Math.max(10, Math.round(b / (1024 * 1024)));
+}
+
+async function swRequest(action, payload = {}) {
+  if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+    throw new Error('Service Worker не активен');
+  }
+
+  try {
+    setSwStatus(`SW: ${String(action)} …`, { durationMs: 0 });
+  } catch (e) {
+  }
+
+  const timeoutMs = typeof payload.timeoutMs === 'number' ? payload.timeoutMs : 15000;
+  const message = { action, ...payload };
+  delete message.timeoutMs;
+
+  return await new Promise((resolve, reject) => {
+    const channel = new MessageChannel();
+    const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+
+    const timeout = setTimeout(() => {
+      reject(new Error('SW timeout'));
+    }, timeoutMs);
+
+    channel.port1.onmessage = (event) => {
+      const data = event.data || {};
+      if (data.requestId !== requestId) return;
+      clearTimeout(timeout);
+      if (data && data.success) {
+        try {
+          setSwStatus(`SW: ${String(action)} ok`);
+        } catch (e) {
+        }
+        resolve(data);
+      } else {
+        try {
+          const err = new Error(data && data.error ? data.error : 'sw_error');
+          err.swAction = action;
+          err.swError = data && data.error ? data.error : 'sw_error';
+          err.swResult = data && data.result ? data.result : null;
+          err.swPayload = payload || null;
+          try {
+            setSwStatus(`SW: ${String(action)} error`);
+          } catch (e2) {
+          }
+          reject(err);
+        } catch (e) {
+          try {
+            setSwStatus(`SW: ${String(action)} error`);
+          } catch (e2) {
+          }
+          reject(new Error(data && data.error ? data.error : 'sw_error'));
+        }
+      }
+    };
+
+    navigator.serviceWorker.controller.postMessage({ ...message, requestId }, [channel.port2]);
+  });
+}
+
+function chunkArray(arr, size) {
+  const n = Array.isArray(arr) ? arr : [];
+  const s = Math.max(1, Number(size) || 1);
+  const out = [];
+  for (let i = 0; i < n.length; i += s) {
+    out.push(n.slice(i, i + s));
+  }
+  return out;
+}
+
+async function openDraftDb() {
+  return await new Promise((resolve, reject) => {
+    const req = indexedDB.open('dictafan_drafts');
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('drafts')) {
+        db.createObjectStore('drafts', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('outbox')) {
+        db.createObjectStore('outbox', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('activity_outbox')) {
+        db.createObjectStore('activity_outbox', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('success_outbox')) {
+        db.createObjectStore('success_outbox', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('dictations')) {
+        db.createObjectStore('dictations', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('desk_items')) {
+        db.createObjectStore('desk_items', { keyPath: 'key' });
+      }
+      if (!db.objectStoreNames.contains('media_manifest')) {
+        db.createObjectStore('media_manifest', { keyPath: 'key' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function idbGet(storeName, key) {
+  const db = await openDraftDb();
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(storeName, 'readonly');
+      const store = tx.objectStore(storeName);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function syncOfflineActivityOutbox() {
+  try {
+    const token = window.UM?.token || localStorage.getItem('jwt_token');
+    if (!token) return false;
+    if (!navigator.onLine) return false;
+
+    const rows = await idbGetAll('activity_outbox');
+    if (!rows.length) return true;
+
+    for (const row of rows) {
+      if (!row || !row.dictation_id) {
+        // Старые/некорректные записи: не отправляем на сервер (иначе будет 400/500)
+        continue;
+      }
+      const toSend = [];
+      if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
+      if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
+      if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
+
+      let sentAll = true;
+      for (const item of toSend) {
+        const response = await fetch('/api/statistics/activity', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            dictation_id: row.dictation_id,
+            date: row.date,
+            type_activity: item.type_activity,
+            number: item.number
+          })
+        });
+        if (!response.ok) {
+          sentAll = false;
+          break;
+        }
+      }
+
+      if (sentAll) {
+        await idbDelete('activity_outbox', row.key);
+      } else {
+        return false;
+      }
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function syncOfflineSuccessOutbox() {
+  try {
+    const token = window.UM?.token || localStorage.getItem('jwt_token');
+    if (!token) return false;
+    if (!navigator.onLine) return false;
+
+    const rows = await idbGetAll('success_outbox');
+    if (!rows.length) return true;
+
+    for (const row of rows) {
+      const response = await fetch('/api/statistics/success', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(row.payload)
+      });
+      if (!response.ok) {
+        return false;
+      }
+      await idbDelete('success_outbox', row.key);
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function syncOfflineOutboxes() {
+  const [aOk, sOk] = await Promise.all([
+    syncOfflineActivityOutbox(),
+    syncOfflineSuccessOutbox()
+  ]);
+  refreshDeskOutboxIndicator().catch(() => { });
+  return !!aOk && !!sOk;
+}
+
+window.addEventListener('online', () => {
+  syncOfflineOutboxes().catch(() => { });
+});
+
+function ensureDeskOutboxIndicator() {
+  if (document.getElementById('deskOutboxIndicator')) return;
+  const deskZone = document.querySelector('.desk-zone');
+  if (!deskZone) return;
+
+  const el = document.createElement('div');
+  el.id = 'deskOutboxIndicator';
+  el.style.position = 'absolute';
+  el.style.top = '8px';
+  el.style.right = '8px';
+  el.style.zIndex = '5';
+  el.style.background = 'rgba(0,0,0,0.55)';
+  el.style.color = '#fff';
+  el.style.fontSize = '12px';
+  el.style.lineHeight = '1.2';
+  el.style.padding = '6px 8px';
+  el.style.borderRadius = '10px';
+  el.style.cursor = 'pointer';
+  el.style.userSelect = 'none';
+  el.style.display = 'none';
+  el.textContent = '';
+
+  el.addEventListener('click', async () => {
     try {
       const [activities, successes] = await Promise.all([
         idbGetAll('activity_outbox'),
         idbGetAll('success_outbox')
       ]);
-      const aCount = Array.isArray(activities) ? activities.length : 0;
-      const sCount = Array.isArray(successes) ? successes.length : 0;
-      if (aCount === 0 && sCount === 0) {
-        el.style.display = 'none';
-        el.textContent = '';
-        el.title = '';
-        return;
+
+      const lines = [];
+      lines.push(`Очередь синка:`);
+      lines.push(`Успехи: ${successes.length}`);
+      for (const s of successes.slice(0, 20)) {
+        const d = s?.payload?.dictation_id;
+        const t = s?.createdAt ? new Date(s.createdAt).toLocaleString() : '';
+        lines.push(`- ${d || 'dictation'} ${t}`);
       }
+      if (successes.length > 20) lines.push(`…и еще ${successes.length - 20}`);
 
-      el.style.display = '';
-      el.textContent = `Очередь: успехи ${sCount}, активность ${aCount}`;
-      el.title = 'Неотправленные данные (клик — детали)';
+      lines.push(``);
+      lines.push(`Активность (дни): ${activities.length}`);
+      for (const a of activities.slice(0, 40)) {
+        const p = Number(a?.perfect_count) || 0;
+        const c = Number(a?.corrected_count) || 0;
+        const au = Number(a?.audio_count) || 0;
+        lines.push(`- ${a?.date || ''}: perfect=${p}, corrected=${c}, audio=${au}`);
+      }
+      if (activities.length > 40) lines.push(`…и еще ${activities.length - 40}`);
+
+      alert(lines.join('\n'));
     } catch (e) {
+      alert('Не удалось прочитать очередь синка');
+    }
+  });
+
+  deskZone.style.position = 'relative';
+  deskZone.appendChild(el);
+}
+
+async function refreshDeskOutboxIndicator() {
+  ensureDeskOutboxIndicator();
+  const el = document.getElementById('deskOutboxIndicator');
+  if (!el) return;
+
+  try {
+    const [activities, successes] = await Promise.all([
+      idbGetAll('activity_outbox'),
+      idbGetAll('success_outbox')
+    ]);
+    const aCount = Array.isArray(activities) ? activities.length : 0;
+    const sCount = Array.isArray(successes) ? successes.length : 0;
+    if (aCount === 0 && sCount === 0) {
       el.style.display = 'none';
+      el.textContent = '';
+      el.title = '';
+      return;
     }
-  }
 
-  function getDraftUserIdForKey() {
+    el.style.display = '';
+    el.textContent = `Очередь: успехи ${sCount}, активность ${aCount}`;
+    el.title = 'Неотправленные данные (клик — детали)';
+  } catch (e) {
+    el.style.display = 'none';
+  }
+}
+
+function getDraftUserIdForKey() {
+  try {
+    const um = window.UM;
+    const id = um?.userData?.id;
+    return id ? String(id) : 'anon';
+  } catch {
+    return 'anon';
+  }
+}
+
+function getDraftKey(dictationId) {
+  const id = dictationId ? String(dictationId) : '';
+  if (!id) return null;
+  return `${getDraftUserIdForKey()}:${id}`;
+}
+
+async function refreshOfflineCacheStatus() {
+  try {
+    if (typeof window.setSwBarProgress === 'function') {
+      window.setSwBarProgress('', null, 'cache');
+    }
+  } catch (e0) {
+  }
+  try {
+    const res = await swRequest('cacheStats');
+    const bytes = res.stats?.totalBytes || 0;
+    const entries = res.stats?.entries || 0;
+    const maxBytes = res.stats?.maxBytes || 0;
+
     try {
-      const um = window.UM;
-      const id = um?.userData?.id;
-      return id ? String(id) : 'anon';
-    } catch {
-      return 'anon';
+      if (typeof window.setSwBarProgress === 'function') {
+        const mb = 1024 * 1024;
+        const usedMb = Math.max(0, bytes) / mb;
+        const maxMb = Math.max(0, maxBytes) / mb;
+        const usedText = (usedMb >= 10) ? String(Math.round(usedMb)) : usedMb.toFixed(1);
+        const maxText = maxMb > 0 ? String(Math.round(maxMb)) : '0';
+        const label = `${usedText}/${maxText}`;
+        const pct = maxBytes > 0 ? Math.max(0, Math.min(100, (bytes / maxBytes) * 100)) : null;
+        window.setSwBarProgress(label, pct, 'cache');
+      }
+    } catch (e1) {
     }
-  }
-
-  function getDraftKey(dictationId) {
-    const id = dictationId ? String(dictationId) : '';
-    if (!id) return null;
-    return `${getDraftUserIdForKey()}:${id}`;
-  }
-
-  async function refreshOfflineCacheStatus() {
+  } catch (e) {
     try {
       if (typeof window.setSwBarProgress === 'function') {
         window.setSwBarProgress('', null, 'cache');
       }
-    } catch (e0) {
-    }
-    try {
-      const res = await swRequest('cacheStats');
-      const bytes = res.stats?.totalBytes || 0;
-      const entries = res.stats?.entries || 0;
-      const maxBytes = res.stats?.maxBytes || 0;
-
-      try {
-        if (typeof window.setSwBarProgress === 'function') {
-          const mb = 1024 * 1024;
-          const usedMb = Math.max(0, bytes) / mb;
-          const maxMb = Math.max(0, maxBytes) / mb;
-          const usedText = (usedMb >= 10) ? String(Math.round(usedMb)) : usedMb.toFixed(1);
-          const maxText = maxMb > 0 ? String(Math.round(maxMb)) : '0';
-          const label = `${usedText}/${maxText}`;
-          const pct = maxBytes > 0 ? Math.max(0, Math.min(100, (bytes / maxBytes) * 100)) : null;
-          window.setSwBarProgress(label, pct, 'cache');
-        }
-      } catch (e1) {
-      }
-    } catch (e) {
-      try {
-        if (typeof window.setSwBarProgress === 'function') {
-          window.setSwBarProgress('', null, 'cache');
-        }
-      } catch (e2) {
-      }
+    } catch (e2) {
     }
   }
+}
 
-  function openHomeLibraryModal() {
-    const modal = document.getElementById('home-library-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    if (window.lucide) lucide.createIcons();
+function openHomeLibraryModal() {
+  const modal = document.getElementById('home-library-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeHomeLibraryModal() {
+  const modal = document.getElementById('home-library-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+}
+
+function openBookViewModal() {
+  const modal = document.getElementById('book-view-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  if (window.lucide) lucide.createIcons();
+}
+
+function closeBookViewModal() {
+  const modal = document.getElementById('book-view-modal');
+  if (!modal) return;
+  modal.style.display = 'none';
+  bookViewActiveBookId = null;
+  activeBookId = null;
+  activeBookIsWorkbook = false;
+  const card = document.getElementById('bookViewCard');
+  const structure = document.getElementById('bookViewStructure');
+  if (card) card.innerHTML = '';
+  if (structure) structure.innerHTML = '';
+}
+
+async function openBookViewBook(bookId, isWorkbook = false) {
+  const idNum = parseInt(String(bookId || ''), 10);
+  if (!idNum || !isFinite(idNum)) return;
+
+  openBookViewModal();
+
+  bookViewActiveBookId = idNum;
+  activeBookId = idNum;
+  activeBookIsWorkbook = !!isWorkbook;
+
+  const card = document.getElementById('bookViewCard');
+  const structure = document.getElementById('bookViewStructure');
+  if (!card || !structure) return;
+
+  // Загружаем книгу
+  const bookData = await apiRequest(`/library/api/book/${idNum}`);
+  if (bookData && bookData.success && bookData.book) {
+    const titleEl = document.getElementById('book-view-title');
+    if (titleEl) titleEl.textContent = bookData.book.title || 'Книга';
+    renderActiveBookCard(bookData.book, card, { onClose: closeBookViewModal });
   }
 
-  function closeHomeLibraryModal() {
-    const modal = document.getElementById('home-library-modal');
-    if (!modal) return;
-    modal.style.display = 'none';
+  // Загружаем структуру
+  let sections = [];
+  let dictations = [];
+  if (isWorkbook) {
+    const orphanData = await apiRequest(`/library/api/orphan-dictations`);
+    dictations = orphanData.success ? orphanData.dictations : [];
+  } else {
+    const sectionsData = await apiRequest(`/library/api/book/${idNum}/sections`);
+    const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
+    sections = sectionsData.success ? sectionsData.sections : [];
+    dictations = dictationsData.success ? dictationsData.dictations : [];
+    window.currentBookSections = sections;
   }
 
-  function openBookViewModal() {
-    const modal = document.getElementById('book-view-modal');
-    if (!modal) return;
-    modal.style.display = 'flex';
-    if (window.lucide) lucide.createIcons();
-  }
+  renderBookContentTo(structure, sections, dictations, isWorkbook);
+}
 
-  function closeBookViewModal() {
-    const modal = document.getElementById('book-view-modal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    bookViewActiveBookId = null;
-    activeBookId = null;
-    activeBookIsWorkbook = false;
-    const card = document.getElementById('bookViewCard');
-    const structure = document.getElementById('bookViewStructure');
-    if (card) card.innerHTML = '';
-    if (structure) structure.innerHTML = '';
-  }
+async function toggleSectionInContainer(sectionId, rootContainer) {
+  if (!rootContainer) return;
+  const sectionItem = rootContainer.querySelector(`.structure-section[data-section-id="${String(sectionId)}"]`);
+  if (!sectionItem) return;
 
-  async function openBookViewBook(bookId, isWorkbook = false) {
-    const idNum = parseInt(String(bookId || ''), 10);
-    if (!idNum || !isFinite(idNum)) return;
+  const toggleBtn = sectionItem.querySelector('.structure-item-toggle');
+  const contentDiv = sectionItem.querySelector(`.structure-item-content[data-section-content-id="${String(sectionId)}"]`);
+  if (!toggleBtn || !contentDiv) return;
 
-    openBookViewModal();
+  const icon = toggleBtn.querySelector('i[data-lucide]');
+  const expanded = contentDiv.style.display !== 'none';
 
-    bookViewActiveBookId = idNum;
-    activeBookId = idNum;
-    activeBookIsWorkbook = !!isWorkbook;
-
-    const card = document.getElementById('bookViewCard');
-    const structure = document.getElementById('bookViewStructure');
-    if (!card || !structure) return;
-
-    // Загружаем книгу
-    const bookData = await apiRequest(`/library/api/book/${idNum}`);
-    if (bookData && bookData.success && bookData.book) {
-      const titleEl = document.getElementById('book-view-title');
-      if (titleEl) titleEl.textContent = bookData.book.title || 'Книга';
-      renderActiveBookCard(bookData.book, card, { onClose: closeBookViewModal });
-    }
-
-    // Загружаем структуру
-    let sections = [];
-    let dictations = [];
-    if (isWorkbook) {
-      const orphanData = await apiRequest(`/library/api/orphan-dictations`);
-      dictations = orphanData.success ? orphanData.dictations : [];
-    } else {
-      const sectionsData = await apiRequest(`/library/api/book/${idNum}/sections`);
-      const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
-      sections = sectionsData.success ? sectionsData.sections : [];
-      dictations = dictationsData.success ? dictationsData.dictations : [];
-      window.currentBookSections = sections;
-    }
-
-    renderBookContentTo(structure, sections, dictations, isWorkbook);
-  }
-
-  async function toggleSectionInContainer(sectionId, rootContainer) {
-    if (!rootContainer) return;
-    const sectionItem = rootContainer.querySelector(`.structure-section[data-section-id="${String(sectionId)}"]`);
-    if (!sectionItem) return;
-
-    const toggleBtn = sectionItem.querySelector('.structure-item-toggle');
-    const contentDiv = sectionItem.querySelector(`.structure-item-content[data-section-content-id="${String(sectionId)}"]`);
-    if (!toggleBtn || !contentDiv) return;
-
-    const icon = toggleBtn.querySelector('i[data-lucide]');
-    const expanded = contentDiv.style.display !== 'none';
-
-    if (expanded) {
-      contentDiv.style.display = 'none';
-      if (icon) icon.setAttribute('data-lucide', 'chevron-right');
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-      return;
-    }
-
-    contentDiv.style.display = 'block';
-    if (icon) icon.setAttribute('data-lucide', 'chevron-down');
+  if (expanded) {
+    contentDiv.style.display = 'none';
+    if (icon) icon.setAttribute('data-lucide', 'chevron-right');
     if (typeof lucide !== 'undefined') lucide.createIcons();
-
-    const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
-    if (existingContent) return;
-
-    try {
-      await loadSectionDictations(sectionId, contentDiv);
-    } catch (e) {
-      console.warn('[toggleSectionInContainer] loadSectionDictations failed', e);
-    }
-  }
-  
-  /**
-   * Сохраняем целевую книгу/раздел для нового диктанта в sessionStorage,
-   * чтобы редактор диктанта мог после сохранения привязать его к книге.
-   */
-  function setDictationTargetBook(bookId) {
-    try {
-      if (!bookId) return;
-      const payload = { book_id: Number(bookId) || null };
-      sessionStorage.setItem('dictationTargetBook', JSON.stringify(payload));
-      console.log('📚 dictationTargetBook сохранён в sessionStorage:', payload);
-    } catch (e) {
-      console.warn('⚠️ Не удалось сохранить dictationTargetBook в sessionStorage:', e);
-    }
+    return;
   }
 
-  // Функции для показа/скрытия индикатора загрузки
-  function showLoadingIndicator(message = 'Сохранение...') {
-    let overlay = document.getElementById('loading-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'loading-overlay';
-      overlay.innerHTML = `
+  contentDiv.style.display = 'block';
+  if (icon) icon.setAttribute('data-lucide', 'chevron-down');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  const existingContent = contentDiv.querySelector('.section-dictations-grid, .section-dictations-empty');
+  if (existingContent) return;
+
+  try {
+    await loadSectionDictations(sectionId, contentDiv);
+  } catch (e) {
+    console.warn('[toggleSectionInContainer] loadSectionDictations failed', e);
+  }
+}
+
+/**
+ * Сохраняем целевую книгу/раздел для нового диктанта в sessionStorage,
+ * чтобы редактор диктанта мог после сохранения привязать его к книге.
+ */
+function setDictationTargetBook(bookId) {
+  try {
+    if (!bookId) return;
+    const payload = { book_id: Number(bookId) || null };
+    sessionStorage.setItem('dictationTargetBook', JSON.stringify(payload));
+    console.log('📚 dictationTargetBook сохранён в sessionStorage:', payload);
+  } catch (e) {
+    console.warn('⚠️ Не удалось сохранить dictationTargetBook в sessionStorage:', e);
+  }
+}
+
+// Функции для показа/скрытия индикатора загрузки
+function showLoadingIndicator(message = 'Сохранение...') {
+  let overlay = document.getElementById('loading-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.innerHTML = `
         <div class="loading-content">
           <div class="loading-spinner"></div>
           <div class="loading-text">${message}</div>
         </div>
       `;
-      document.body.appendChild(overlay);
-      overlay.style.position = 'fixed';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.right = '0';
-      overlay.style.bottom = '0';
-      overlay.style.zIndex = '99999';
-      overlay.style.pointerEvents = 'auto';
-    } else {
-      overlay.querySelector('.loading-text').textContent = message;
-    }
-    overlay.style.display = 'flex';
+    document.body.appendChild(overlay);
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.zIndex = '99999';
+    overlay.style.pointerEvents = 'auto';
+  } else {
+    overlay.querySelector('.loading-text').textContent = message;
+  }
+  overlay.style.display = 'flex';
+  overlay.dataset.autoclosing = '';
+}
+
+function hideLoadingIndicator() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
     overlay.dataset.autoclosing = '';
   }
+}
 
-  function hideLoadingIndicator() {
-    const overlay = document.getElementById('loading-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-      overlay.dataset.autoclosing = '';
+function completeLoadingIndicator(message = 'Загрузка закончена', delayMs = 1000) {
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  const text = overlay.querySelector('.loading-text');
+  if (text) text.textContent = message;
+  overlay.dataset.autoclosing = '1';
+  window.setTimeout(() => {
+    try {
+      const ov = document.getElementById('loading-overlay');
+      if (!ov) return;
+      ov.style.display = 'none';
+      ov.dataset.autoclosing = '';
+    } catch (e) {
+    }
+  }, Math.max(0, Number(delayMs) || 0));
+}
+
+async function checkAppCacheRevision() {
+  try {
+    const res = await fetch('/api/app-cache-revision', { method: 'GET' });
+    if (!res.ok) return;
+    const data = await res.json().catch(() => null);
+    if (!data || !data.success || !data.revision) return;
+
+    const serverRev = String(data.revision);
+    const localRev = localStorage.getItem('app_cache_revision');
+
+    if (!localRev) {
+      localStorage.setItem('app_cache_revision', serverRev);
+      return;
+    }
+
+    if (localRev === serverRev) return;
+
+    try {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        await swRequest('cacheClearAppShell', { timeoutMs: 60000 });
+      }
+    } catch (e) {
+    }
+
+    localStorage.setItem('app_cache_revision', serverRev);
+    location.reload();
+  } catch (e) {
+    // ignore
+  }
+}
+
+// ==================== ЗОНА 1: Рабочий стол ====================
+function normalizeUrlForSwPrefetch(rawUrl) {
+  try {
+    let v = String(rawUrl || '').trim();
+    if (!v) return '';
+    if (v.startsWith('blob:')) return v;
+
+    // Normalize absolute URLs: enforce https on https pages and prefer same-origin relative path.
+    try {
+      if (v.startsWith('http://') || v.startsWith('https://')) {
+        const u = new URL(v);
+        const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol)
+          ? location.protocol
+          : u.protocol;
+        if (desiredProtocol === 'https:' && u.protocol === 'http:') {
+          u.protocol = 'https:';
+        }
+        try {
+          if (typeof location !== 'undefined' && location && u.origin === location.origin) {
+            v = `${u.pathname}${u.search || ''}`;
+          } else {
+            v = u.toString();
+          }
+        } catch (e) {
+          v = `${u.pathname}${u.search || ''}`;
+        }
+      }
+    } catch (e) {
+    }
+
+    // Safety: never keep plain http URL on an https page.
+    try {
+      if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
+        v = `https://${v.slice('http://'.length)}`;
+      }
+    } catch (e) {
+    }
+
+    // Ensure leading slash for same-origin relative requests.
+    if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
+      v = `/${v}`;
+    }
+
+    return v;
+  } catch (e) {
+    return String(rawUrl || '').trim();
+  }
+}
+
+function areDeskItemEffectivelyEqual(a, b) {
+  const x = a || {};
+  const y = b || {};
+  return (
+    String(x.id || '') === String(y.id || '')
+    && String(x.dictation_id || '') === String(y.dictation_id || '')
+    && String(x.cover_url || '') === String(y.cover_url || '')
+    && String(x.title || '') === String(y.title || '')
+    && String(x.language_code || '') === String(y.language_code || '')
+    && String(x.language_translation || '') === String(y.language_translation || '')
+    && String(x.level || '') === String(y.level || '')
+    && String(x.sentences_count || '') === String(y.sentences_count || '')
+  );
+}
+
+function applyDeskItemsIncremental(prevItems, nextItems) {
+  const container = document.getElementById('deskCardsContainer');
+  if (!container) return { applied: false };
+
+  const grid = container.querySelector('.shorts-grid');
+  if (!grid) return { applied: false };
+
+  const prev = Array.isArray(prevItems) ? prevItems : [];
+  const next = Array.isArray(nextItems) ? nextItems : [];
+
+  const prevById = new Map(prev.map(x => [String(x && x.id), x]));
+  const nextById = new Map(next.map(x => [String(x && x.id), x]));
+
+  const removed = [];
+  const added = [];
+  const updated = [];
+
+  for (const item of prev) {
+    const id = String(item && item.id);
+    if (!nextById.has(id)) removed.push(item);
+  }
+  for (const item of next) {
+    const id = String(item && item.id);
+    if (!prevById.has(id)) {
+      added.push(item);
+    } else {
+      const prevItem = prevById.get(id);
+      if (!areDeskItemEffectivelyEqual(prevItem, item)) {
+        updated.push(item);
+      }
     }
   }
 
-  function completeLoadingIndicator(message = 'Загрузка закончена', delayMs = 1000) {
-    const overlay = document.getElementById('loading-overlay');
-    if (!overlay) return;
-    const text = overlay.querySelector('.loading-text');
-    if (text) text.textContent = message;
-    overlay.dataset.autoclosing = '1';
-    window.setTimeout(() => {
-      try {
-        const ov = document.getElementById('loading-overlay');
-        if (!ov) return;
-        ov.style.display = 'none';
-        ov.dataset.autoclosing = '';
-      } catch (e) {
-      }
-    }, Math.max(0, Number(delayMs) || 0));
+  for (const item of removed) {
+    try {
+      const card = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+      if (card) card.remove();
+    } catch (e) {
+    }
+    try {
+      localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
+    } catch (e) {
+    }
   }
 
-  async function checkAppCacheRevision() {
+  for (const item of updated) {
     try {
-      const res = await fetch('/api/app-cache-revision', { method: 'GET' });
-      if (!res.ok) return;
-      const data = await res.json().catch(() => null);
-      if (!data || !data.success || !data.revision) return;
+      const existing = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+      if (!existing) continue;
+      const wrap = document.createElement('div');
+      wrap.innerHTML = createDictationCard(item, true);
+      const fresh = wrap.firstElementChild;
+      if (fresh) {
+        existing.replaceWith(fresh);
+      }
+    } catch (e) {
+    }
+  }
 
-      const serverRev = String(data.revision);
-      const localRev = localStorage.getItem('app_cache_revision');
+  for (const item of added) {
+    insertDeskCardElement(item, 'start');
+  }
 
-      if (!localRev) {
-        localStorage.setItem('app_cache_revision', serverRev);
+  try {
+    const remaining = grid.querySelectorAll('.desk-card').length;
+    if (!remaining) {
+      container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+    }
+  } catch (e) {
+  }
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  } catch (e) {
+  }
+
+  try {
+    if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
+      enableDeskFreeLayout(container);
+      installDeskDragAndDrop(container);
+    }
+  } catch (e) {
+  }
+
+  requestAnimationFrame(() => {
+    (async () => {
+      try {
+        await applyDeskCovers(container);
+        updateDictationCardsStats(container);
+        await updateCompletionBadges(container);
+      } catch (e) {
+      }
+    })().catch(() => { });
+  });
+
+  return { applied: true, added: added.length, removed: removed.length, updated: updated.length };
+}
+
+async function loadDeskItems() {
+  const seq = ++deskLoadSeq;
+  if (deskLoadInFlight) {
+    try {
+      await deskLoadInFlight;
+    } catch (e) {
+    }
+  }
+
+  let resolveInFlight;
+  let rejectInFlight;
+  deskLoadInFlight = new Promise((resolve, reject) => {
+    resolveInFlight = resolve;
+    rejectInFlight = reject;
+  });
+
+  const t0 = performance.now();
+  let renderedFromCache = false;
+  let cachedItemsSnapshot = [];
+
+  try {
+    const cached = await idbGet('desk_items', 'latest');
+    const items = cached && Array.isArray(cached.items) ? cached.items : [];
+    if (items.length) {
+      if (seq !== deskLoadSeq) {
+        resolveInFlight();
+        return;
+      }
+      deskItems = items;
+      cachedItemsSnapshot = items;
+      if (typeof renderDeskCards === 'function') {
+        renderDeskCards(deskItems);
+      }
+      updateInWorkIndicators();
+      refreshDeskOutboxIndicator().catch(() => { });
+      renderedFromCache = true;
+      const tCache = performance.now();
+      console.log('[desk-render] stage0 cached items:', items.length, 'time:', Math.round(tCache - t0), 'ms');
+    }
+  } catch (e) {
+  }
+
+  try {
+    const tNetStart = performance.now();
+    const data = await apiRequest("/desk/api/items");
+    const tNetEnd = performance.now();
+    console.log('[desk-render] stage0 network fetch:', Math.round(tNetEnd - tNetStart), 'ms');
+
+    if (data.success && data.items) {
+      if (seq !== deskLoadSeq) {
+        resolveInFlight();
         return;
       }
 
-      if (localRev === serverRev) return;
+      const prevSnapshot = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
+      const nextSnapshot = Array.isArray(data.items) ? data.items : [];
 
+      // If desk was rendered from cache, reconcile removed items and purge their cached dictation media.
+      // This is important for cross-tab/cross-device cleanup after a dictation is deleted on the server.
       try {
-        if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-          await swRequest('cacheClearAppShell', { timeoutMs: 60000 });
-        }
-      } catch (e) {
-      }
-
-      localStorage.setItem('app_cache_revision', serverRev);
-      location.reload();
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  // ==================== ЗОНА 1: Рабочий стол ====================
-  function normalizeUrlForSwPrefetch(rawUrl) {
-    try {
-      let v = String(rawUrl || '').trim();
-      if (!v) return '';
-      if (v.startsWith('blob:')) return v;
-
-      // Normalize absolute URLs: enforce https on https pages and prefer same-origin relative path.
-      try {
-        if (v.startsWith('http://') || v.startsWith('https://')) {
-          const u = new URL(v);
-          const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol)
-            ? location.protocol
-            : u.protocol;
-          if (desiredProtocol === 'https:' && u.protocol === 'http:') {
-            u.protocol = 'https:';
-          }
-          try {
-            if (typeof location !== 'undefined' && location && u.origin === location.origin) {
-              v = `${u.pathname}${u.search || ''}`;
-            } else {
-              v = u.toString();
-            }
-          } catch (e) {
-            v = `${u.pathname}${u.search || ''}`;
-          }
-        }
-      } catch (e) {
-      }
-
-      // Safety: never keep plain http URL on an https page.
-      try {
-        if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
-          v = `https://${v.slice('http://'.length)}`;
-        }
-      } catch (e) {
-      }
-
-      // Ensure leading slash for same-origin relative requests.
-      if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
-        v = `/${v}`;
-      }
-
-      return v;
-    } catch (e) {
-      return String(rawUrl || '').trim();
-    }
-  }
-
-  function areDeskItemEffectivelyEqual(a, b) {
-    const x = a || {};
-    const y = b || {};
-    return (
-      String(x.id || '') === String(y.id || '')
-      && String(x.dictation_id || '') === String(y.dictation_id || '')
-      && String(x.cover_url || '') === String(y.cover_url || '')
-      && String(x.title || '') === String(y.title || '')
-      && String(x.language_code || '') === String(y.language_code || '')
-      && String(x.language_translation || '') === String(y.language_translation || '')
-      && String(x.level || '') === String(y.level || '')
-      && String(x.sentences_count || '') === String(y.sentences_count || '')
-    );
-  }
-
-  function applyDeskItemsIncremental(prevItems, nextItems) {
-    const container = document.getElementById('deskCardsContainer');
-    if (!container) return { applied: false };
-
-    const grid = container.querySelector('.shorts-grid');
-    if (!grid) return { applied: false };
-
-    const prev = Array.isArray(prevItems) ? prevItems : [];
-    const next = Array.isArray(nextItems) ? nextItems : [];
-
-    const prevById = new Map(prev.map(x => [String(x && x.id), x]));
-    const nextById = new Map(next.map(x => [String(x && x.id), x]));
-
-    const removed = [];
-    const added = [];
-    const updated = [];
-
-    for (const item of prev) {
-      const id = String(item && item.id);
-      if (!nextById.has(id)) removed.push(item);
-    }
-    for (const item of next) {
-      const id = String(item && item.id);
-      if (!prevById.has(id)) {
-        added.push(item);
-      } else {
-        const prevItem = prevById.get(id);
-        if (!areDeskItemEffectivelyEqual(prevItem, item)) {
-          updated.push(item);
-        }
-      }
-    }
-
-    for (const item of removed) {
-      try {
-        const card = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
-        if (card) card.remove();
-      } catch (e) {
-      }
-      try {
-        localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
-      } catch (e) {
-      }
-    }
-
-    for (const item of updated) {
-      try {
-        const existing = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
-        if (!existing) continue;
-        const wrap = document.createElement('div');
-        wrap.innerHTML = createDictationCard(item, true);
-        const fresh = wrap.firstElementChild;
-        if (fresh) {
-          existing.replaceWith(fresh);
-        }
-      } catch (e) {
-      }
-    }
-
-    for (const item of added) {
-      insertDeskCardElement(item, 'start');
-    }
-
-    try {
-      const remaining = grid.querySelectorAll('.desk-card').length;
-      if (!remaining) {
-        container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
-      }
-    } catch (e) {
-    }
-
-    try {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-    } catch (e) {
-    }
-
-    try {
-      if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
-        enableDeskFreeLayout(container);
-        installDeskDragAndDrop(container);
-      }
-    } catch (e) {
-    }
-
-    requestAnimationFrame(() => {
-      (async () => {
-        try {
-          await applyDeskCovers(container);
-          updateDictationCardsStats(container);
-          await updateCompletionBadges(container);
-        } catch (e) {
-        }
-      })().catch(() => {});
-    });
-
-    return { applied: true, added: added.length, removed: removed.length, updated: updated.length };
-  }
-  
-  async function loadDeskItems() {
-    const seq = ++deskLoadSeq;
-    if (deskLoadInFlight) {
-      try {
-        await deskLoadInFlight;
-      } catch (e) {
-      }
-    }
-
-    let resolveInFlight;
-    let rejectInFlight;
-    deskLoadInFlight = new Promise((resolve, reject) => {
-      resolveInFlight = resolve;
-      rejectInFlight = reject;
-    });
-
-    const t0 = performance.now();
-    let renderedFromCache = false;
-    let cachedItemsSnapshot = [];
-
-    try {
-      const cached = await idbGet('desk_items', 'latest');
-      const items = cached && Array.isArray(cached.items) ? cached.items : [];
-      if (items.length) {
-        if (seq !== deskLoadSeq) {
-          resolveInFlight();
-          return;
-        }
-        deskItems = items;
-        cachedItemsSnapshot = items;
-        if (typeof renderDeskCards === 'function') {
-          renderDeskCards(deskItems);
-        }
-        updateInWorkIndicators();
-        refreshDeskOutboxIndicator().catch(() => {});
-        renderedFromCache = true;
-        const tCache = performance.now();
-        console.log('[desk-render] stage0 cached items:', items.length, 'time:', Math.round(tCache - t0), 'ms');
-      }
-    } catch (e) {
-    }
-
-    try {
-      const tNetStart = performance.now();
-      const data = await apiRequest("/desk/api/items");
-      const tNetEnd = performance.now();
-      console.log('[desk-render] stage0 network fetch:', Math.round(tNetEnd - tNetStart), 'ms');
-
-      if (data.success && data.items) {
-        if (seq !== deskLoadSeq) {
-          resolveInFlight();
-          return;
-        }
-
-        const prevSnapshot = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
-        const nextSnapshot = Array.isArray(data.items) ? data.items : [];
-
-        // If desk was rendered from cache, reconcile removed items and purge their cached dictation media.
-        // This is important for cross-tab/cross-device cleanup after a dictation is deleted on the server.
-        try {
-          const prev = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
-          const next = Array.isArray(data.items) ? data.items : [];
-          if (renderedFromCache && prev.length) {
-            const nextSet = new Set(next.map(x => String(x && x.dictation_id)));
-            const removed = prev.filter(x => x && !nextSet.has(String(x.dictation_id)));
-            for (const item of removed) {
+        const prev = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot : [];
+        const next = Array.isArray(data.items) ? data.items : [];
+        if (renderedFromCache && prev.length) {
+          const nextSet = new Set(next.map(x => String(x && x.dictation_id)));
+          const removed = prev.filter(x => x && !nextSet.has(String(x.dictation_id)));
+          for (const item of removed) {
+            try {
+              const did = item && item.dictation_id ? String(item.dictation_id) : '';
+              if (!did) continue;
               try {
-                const did = item && item.dictation_id ? String(item.dictation_id) : '';
-                if (!did) continue;
-                try {
-                  await swRequest('purgeDictation', { dictationId: did, timeoutMs: 60000 });
-                } catch (e) {
-                }
-                try {
-                  await idbDeleteDictationCache(`dict_${did}`);
-                } catch (e) {
-                }
+                await swRequest('purgeDictation', { dictationId: did, timeoutMs: 60000 });
               } catch (e) {
               }
-            }
-          }
-        } catch (e) {
-        }
-
-        // Merge with locally cached items to avoid wiping the desk if the server
-        // temporarily returns an incomplete list (e.g. dictations missing in JOIN,
-        // offline-only cached items, etc.).
-        const serverItems = Array.isArray(data.items) ? data.items : [];
-        const prevItems = Array.isArray(deskItems) ? deskItems : [];
-        const merged = (() => {
-          try {
-            const byDictationId = new Map();
-            // Prefer server items first (authoritative), then keep any local-only items.
-            for (const it of serverItems) {
-              if (!it) continue;
-              const k = String(it.dictation_id ?? it.id ?? '');
-              if (!k) continue;
-              byDictationId.set(k, it);
-            }
-            for (const it of prevItems) {
-              if (!it) continue;
-              const k = String(it.dictation_id ?? it.id ?? '');
-              if (!k) continue;
-              if (!byDictationId.has(k)) {
-                byDictationId.set(k, { ...it, __local_only: true });
+              try {
+                await idbDeleteDictationCache(`dict_${did}`);
+              } catch (e) {
               }
+            } catch (e) {
             }
-            return Array.from(byDictationId.values());
-          } catch (e) {
-            return serverItems.length ? serverItems : prevItems;
           }
-        })();
-
-        deskItems = merged;
-        try {
-          await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
-        } catch (e) {
         }
+      } catch (e) {
+      }
 
-        if (renderedFromCache && prevSnapshot.length) {
-          const res = applyDeskItemsIncremental(prevSnapshot, nextSnapshot);
-          if (!res || !res.applied) {
-            if (typeof renderDeskCards === 'function') {
-              renderDeskCards(deskItems);
+      // Merge with locally cached items to avoid wiping the desk if the server
+      // temporarily returns an incomplete list (e.g. dictations missing in JOIN,
+      // offline-only cached items, etc.).
+      const serverItems = Array.isArray(data.items) ? data.items : [];
+      const prevItems = Array.isArray(deskItems) ? deskItems : [];
+      const merged = (() => {
+        try {
+          const byDictationId = new Map();
+          // Prefer server items first (authoritative), then keep any local-only items.
+          for (const it of serverItems) {
+            if (!it) continue;
+            const k = String(it.dictation_id ?? it.id ?? '');
+            if (!k) continue;
+            byDictationId.set(k, it);
+          }
+          for (const it of prevItems) {
+            if (!it) continue;
+            const k = String(it.dictation_id ?? it.id ?? '');
+            if (!k) continue;
+            if (!byDictationId.has(k)) {
+              byDictationId.set(k, { ...it, __local_only: true });
             }
           }
-        } else {
+          return Array.from(byDictationId.values());
+        } catch (e) {
+          return serverItems.length ? serverItems : prevItems;
+        }
+      })();
+
+      deskItems = merged;
+      try {
+        await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+      } catch (e) {
+      }
+
+      if (renderedFromCache && prevSnapshot.length) {
+        const res = applyDeskItemsIncremental(prevSnapshot, nextSnapshot);
+        if (!res || !res.applied) {
           if (typeof renderDeskCards === 'function') {
             renderDeskCards(deskItems);
           }
         }
-        // Обновляем индикаторы "в работе" в карточках диктантов
-        updateInWorkIndicators();
-        refreshDeskOutboxIndicator().catch(() => {});
-        resolveInFlight();
-        return;
-      }
-      resolveInFlight();
-    } catch (error) {
-      rejectInFlight(error);
-      if (!renderedFromCache) {
-        console.error("Ошибка загрузки диктантов на столе:", error);
       } else {
-        console.warn("Ошибка обновления диктантов на столе (показан кеш):", error);
+        if (typeof renderDeskCards === 'function') {
+          renderDeskCards(deskItems);
+        }
       }
+      // Обновляем индикаторы "в работе" в карточках диктантов
+      updateInWorkIndicators();
+      refreshDeskOutboxIndicator().catch(() => { });
+      resolveInFlight();
+      return;
+    }
+    resolveInFlight();
+  } catch (error) {
+    rejectInFlight(error);
+    if (!renderedFromCache) {
+      console.error("Ошибка загрузки диктантов на столе:", error);
+    } else {
+      console.warn("Ошибка обновления диктантов на столе (показан кеш):", error);
     }
   }
-  
-  // Проверяет, находится ли диктант на столе
-  function isDictationOnDesk(dictationId) {
-    return deskItems.some(item => item.dictation_id === parseInt(dictationId));
-  }
-  
-  // Получает item_id диктанта на столе
-  function getDeskItemId(dictationId) {
-    const item = deskItems.find(item => item.dictation_id === parseInt(dictationId));
-    return item ? item.id : null;
-  }
-  
-  // Обновляет индикаторы "в работе" во всех карточках диктантов
-  function updateInWorkIndicators() {
-    // Не добавляем индикатор "в работе" для карточек на столе (desk-card)
-    document.querySelectorAll('.short-card[data-dictation-id]:not(.desk-card)').forEach(card => {
-      const dictationId = card.dataset.dictationId;
-      if (!dictationId) return;
-      
-      let indicator = card.querySelector('.short-in-work-indicator');
-      const isOnDesk = isDictationOnDesk(dictationId);
-      const thumb = card.querySelector('.short-thumb');
-      
-      if (isOnDesk && !indicator && thumb) {
-        // Добавляем индикатор
-        indicator = document.createElement('div');
-        indicator.className = 'short-in-work-indicator';
-        indicator.title = 'В работе';
-        indicator.innerHTML = '<i data-lucide="pen-tool"></i>';
-        thumb.appendChild(indicator);
-        if (window.lucide) lucide.createIcons();
-      } else if (!isOnDesk && indicator) {
-        // Удаляем индикатор
-        indicator.remove();
-      }
+}
+
+// Проверяет, находится ли диктант на столе
+function isDictationOnDesk(dictationId) {
+  return deskItems.some(item => item.dictation_id === parseInt(dictationId));
+}
+
+// Получает item_id диктанта на столе
+function getDeskItemId(dictationId) {
+  const item = deskItems.find(item => item.dictation_id === parseInt(dictationId));
+  return item ? item.id : null;
+}
+
+// Обновляет индикаторы "в работе" во всех карточках диктантов
+function updateInWorkIndicators() {
+  // Не добавляем индикатор "в работе" для карточек на столе (desk-card)
+  document.querySelectorAll('.short-card[data-dictation-id]:not(.desk-card)').forEach(card => {
+    const dictationId = card.dataset.dictationId;
+    if (!dictationId) return;
+
+    let indicator = card.querySelector('.short-in-work-indicator');
+    const isOnDesk = isDictationOnDesk(dictationId);
+    const thumb = card.querySelector('.short-thumb');
+
+    if (isOnDesk && !indicator && thumb) {
+      // Добавляем индикатор
+      indicator = document.createElement('div');
+      indicator.className = 'short-in-work-indicator';
+      indicator.title = 'В работе';
+      indicator.innerHTML = '<i data-lucide="pen-tool"></i>';
+      thumb.appendChild(indicator);
+      if (window.lucide) lucide.createIcons();
+    } else if (!isOnDesk && indicator) {
+      // Удаляем индикатор
+      indicator.remove();
+    }
+  });
+}
+
+// Удаляет диктант со стола (используется кнопкой "убрать со стола")
+async function removeFromDesk(itemId, dictationId) {
+  try {
+    // Удаляем со стола
+    const removeData = await apiRequest(`/desk/api/item/${itemId}`, {
+      method: 'DELETE'
     });
-  }
-  
-  // Удаляет диктант со стола (используется кнопкой "убрать со стола")
-  async function removeFromDesk(itemId, dictationId) {
-    try {
-      // Удаляем со стола
-      const removeData = await apiRequest(`/desk/api/item/${itemId}`, {
-        method: 'DELETE'
-      });
-      
-      if (removeData.success) {
-        try {
-          await swRequest('purgeDictation', { dictationId });
-        } catch (e) {
-          // ignore
-        }
 
-        try {
-          await idbDeleteDictationCache(`dict_${dictationId}`);
-        } catch (e) {
-        }
-
-        try {
-          const container = document.getElementById('deskCardsContainer');
-          const card = container ? container.querySelector(`.desk-card[data-desk-item-id="${String(itemId)}"]`) : null;
-          if (card) {
-            card.remove();
-          }
-        } catch (e) {
-        }
-
-        try {
-          const before = Array.isArray(deskItems) ? deskItems.length : 0;
-          deskItems = Array.isArray(deskItems)
-            ? deskItems.filter(x => String(x.id) !== String(itemId))
-            : [];
-          const after = Array.isArray(deskItems) ? deskItems.length : 0;
-          if (before !== after) {
-            try {
-              await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
-            } catch (e) {
-            }
-          }
-        } catch (e) {
-        }
-
-        try {
-          localStorage.removeItem(getDeskCardPosStorageKey(String(itemId)));
-        } catch (e) {
-        }
-
-        try {
-          const container = document.getElementById('deskCardsContainer');
-          if (container) {
-            const grid = container.querySelector('.shorts-grid');
-            const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
-            if (!remaining) {
-              container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
-            }
-          }
-        } catch (e) {
-        }
-
-        showToast('Диктант убран со стола', { durationMs: 1000, beepUrl: '/static/sounds/victory/beep2.mp3' });
-        refreshOfflineCacheStatus();
-      } else {
-        showToast('Ошибка при удалении диктанта со стола');
+    if (removeData.success) {
+      try {
+        await swRequest('purgeDictation', { dictationId });
+      } catch (e) {
+        // ignore
       }
-    } catch (error) {
-      console.error('❌ Ошибка удаления диктанта со стола:', error);
+
+      try {
+        await idbDeleteDictationCache(`dict_${dictationId}`);
+      } catch (e) {
+      }
+
+      try {
+        const container = document.getElementById('deskCardsContainer');
+        const card = container ? container.querySelector(`.desk-card[data-desk-item-id="${String(itemId)}"]`) : null;
+        if (card) {
+          card.remove();
+        }
+      } catch (e) {
+      }
+
+      try {
+        const before = Array.isArray(deskItems) ? deskItems.length : 0;
+        deskItems = Array.isArray(deskItems)
+          ? deskItems.filter(x => String(x.id) !== String(itemId))
+          : [];
+        const after = Array.isArray(deskItems) ? deskItems.length : 0;
+        if (before !== after) {
+          try {
+            await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+          } catch (e) {
+          }
+        }
+      } catch (e) {
+      }
+
+      try {
+        localStorage.removeItem(getDeskCardPosStorageKey(String(itemId)));
+      } catch (e) {
+      }
+
+      try {
+        const container = document.getElementById('deskCardsContainer');
+        if (container) {
+          const grid = container.querySelector('.shorts-grid');
+          const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
+          if (!remaining) {
+            container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+          }
+        }
+      } catch (e) {
+      }
+
+      showToast('Диктант убран со стола', { durationMs: 1000, beepUrl: '/static/sounds/victory/beep2.mp3' });
+      refreshOfflineCacheStatus();
+    } else {
       showToast('Ошибка при удалении диктанта со стола');
     }
+  } catch (error) {
+    console.error('❌ Ошибка удаления диктанта со стола:', error);
+    showToast('Ошибка при удалении диктанта со стола');
+  }
+}
+
+function ensureDeskGridContainer() {
+  const container = document.getElementById('deskCardsContainer');
+  if (!container) return null;
+  let grid = container.querySelector('.shorts-grid');
+  if (grid) return grid;
+
+  container.innerHTML = '';
+  grid = document.createElement('div');
+  grid.className = 'shorts-grid';
+  container.appendChild(grid);
+  return grid;
+}
+
+function insertDeskCardElement(item, position = 'start') {
+  const grid = ensureDeskGridContainer();
+  if (!grid) return null;
+  const html = createDictationCard(item, true);
+  if (position === 'end') {
+    grid.insertAdjacentHTML('beforeend', html);
+  } else {
+    grid.insertAdjacentHTML('afterbegin', html);
   }
 
-  function ensureDeskGridContainer() {
+  const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+  if (!el) return null;
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+
+  try {
     const container = document.getElementById('deskCardsContainer');
-    if (!container) return null;
-    let grid = container.querySelector('.shorts-grid');
-    if (grid) return grid;
-
-    container.innerHTML = '';
-    grid = document.createElement('div');
-    grid.className = 'shorts-grid';
-    container.appendChild(grid);
-    return grid;
+    if (container && (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container))) {
+      enableDeskFreeLayout(container);
+      installDeskDragAndDrop(container);
+    }
+  } catch (e) {
   }
 
-  function insertDeskCardElement(item, position = 'start') {
-    const grid = ensureDeskGridContainer();
-    if (!grid) return null;
-    const html = createDictationCard(item, true);
-    if (position === 'end') {
-      grid.insertAdjacentHTML('beforeend', html);
-    } else {
-      grid.insertAdjacentHTML('afterbegin', html);
-    }
-
-    const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
-    if (!el) return null;
-
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
-    }
-
-    try {
-      const container = document.getElementById('deskCardsContainer');
-      if (container && (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container))) {
-        enableDeskFreeLayout(container);
-        installDeskDragAndDrop(container);
-      }
-    } catch (e) {
-    }
-
-    try {
-      applyDeskCovers(document.getElementById('deskCardsContainer'));
-    } catch (e) {
-    }
-
-    try {
-      const tmpWrap = document.createElement('div');
-      tmpWrap.appendChild(el.cloneNode(true));
-      updateDictationCardsStats(tmpWrap);
-      updateCompletionBadges(tmpWrap);
-      const fresh = tmpWrap.firstElementChild;
-      if (fresh) {
-        el.replaceWith(fresh);
-        return fresh;
-      }
-    } catch (e) {
-    }
-
-    return el;
+  try {
+    applyDeskCovers(document.getElementById('deskCardsContainer'));
+  } catch (e) {
   }
 
-  async function syncDeskFromServerIncremental() {
-    const data = await apiRequest('/desk/api/items');
-    if (!data || !data.success || !Array.isArray(data.items)) {
-      return { success: false };
+  try {
+    const tmpWrap = document.createElement('div');
+    tmpWrap.appendChild(el.cloneNode(true));
+    updateDictationCardsStats(tmpWrap);
+    updateCompletionBadges(tmpWrap);
+    const fresh = tmpWrap.firstElementChild;
+    if (fresh) {
+      el.replaceWith(fresh);
+      return fresh;
     }
+  } catch (e) {
+  }
 
-    const next = data.items;
-    const prev = Array.isArray(deskItems) ? deskItems : [];
+  return el;
+}
 
-    // Same safety merge as in loadDeskItems(): keep local cached items that are missing
-    // from server response, so desk UI won't suddenly lose cards.
-    const nextMerged = (() => {
-      try {
-        const byDictationId = new Map();
-        for (const it of next) {
-          if (!it) continue;
-          const k = String(it.dictation_id ?? it.id ?? '');
-          if (!k) continue;
-          byDictationId.set(k, it);
-        }
-        for (const it of prev) {
-          if (!it) continue;
-          const k = String(it.dictation_id ?? it.id ?? '');
-          if (!k) continue;
-          if (!byDictationId.has(k)) {
-            byDictationId.set(k, { ...it, __local_only: true });
-          }
-        }
-        return Array.from(byDictationId.values());
-      } catch (e) {
-        return next;
-      }
-    })();
+async function syncDeskFromServerIncremental() {
+  const data = await apiRequest('/desk/api/items');
+  if (!data || !data.success || !Array.isArray(data.items)) {
+    return { success: false };
+  }
 
-    const prevById = new Map(prev.map(x => [String(x.id), x]));
-    const nextById = new Map(next.map(x => [String(x.id), x]));
+  const next = data.items;
+  const prev = Array.isArray(deskItems) ? deskItems : [];
 
-    const added = [];
-    const removed = [];
-
-    for (const item of next) {
-      if (!prevById.has(String(item.id))) {
-        added.push(item);
-      }
-    }
-    for (const item of prev) {
-      if (!nextById.has(String(item.id))) {
-        removed.push(item);
-      }
-    }
-
-    deskItems = nextMerged;
+  // Same safety merge as in loadDeskItems(): keep local cached items that are missing
+  // from server response, so desk UI won't suddenly lose cards.
+  const nextMerged = (() => {
     try {
-      await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+      const byDictationId = new Map();
+      for (const it of next) {
+        if (!it) continue;
+        const k = String(it.dictation_id ?? it.id ?? '');
+        if (!k) continue;
+        byDictationId.set(k, it);
+      }
+      for (const it of prev) {
+        if (!it) continue;
+        const k = String(it.dictation_id ?? it.id ?? '');
+        if (!k) continue;
+        if (!byDictationId.has(k)) {
+          byDictationId.set(k, { ...it, __local_only: true });
+        }
+      }
+      return Array.from(byDictationId.values());
     } catch (e) {
+      return next;
     }
+  })();
 
-    const container = document.getElementById('deskCardsContainer');
-    if (!container) {
-      return { success: true, added: added.length, removed: removed.length };
+  const prevById = new Map(prev.map(x => [String(x.id), x]));
+  const nextById = new Map(next.map(x => [String(x.id), x]));
+
+  const added = [];
+  const removed = [];
+
+  for (const item of next) {
+    if (!prevById.has(String(item.id))) {
+      added.push(item);
     }
-
-    // Remove cards first
-    for (const item of removed) {
-      try {
-        const card = container.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
-        if (card) card.remove();
-      } catch (e) {
-      }
-      try {
-        localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
-      } catch (e) {
-      }
+  }
+  for (const item of prev) {
+    if (!nextById.has(String(item.id))) {
+      removed.push(item);
     }
+  }
 
-    // Add new cards
-    for (const item of added) {
-      insertDeskCardElement(item, 'start');
-    }
+  deskItems = nextMerged;
+  try {
+    await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+  } catch (e) {
+  }
 
-    // If container is empty now, render empty state
-    try {
-      const grid = container.querySelector('.shorts-grid');
-      const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
-      if (!remaining) {
-        container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
-      }
-    } catch (e) {
-    }
-
-    updateInWorkIndicators();
-    refreshDeskOutboxIndicator().catch(() => {});
+  const container = document.getElementById('deskCardsContainer');
+  if (!container) {
     return { success: true, added: added.length, removed: removed.length };
   }
-  
-  // Добавляет или удаляет диктант со стола (используется кликом на карточку в библиотеке)
-  async function toggleDictationOnDesk(dictationId) {
-    if (!dictationId) return;
-    const key = String(dictationId);
-    if (deskToggleInFlight.has(key)) return;
-    deskToggleInFlight.add(key);
 
-    console.log('===DESK_TOGGLE=== start', { dictationId: String(dictationId) });
+  // Remove cards first
+  for (const item of removed) {
+    try {
+      const card = container.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+      if (card) card.remove();
+    } catch (e) {
+    }
+    try {
+      localStorage.removeItem(getDeskCardPosStorageKey(String(item.id)));
+    } catch (e) {
+    }
+  }
 
-    const isOnDesk = isDictationOnDesk(dictationId);
-    
-    if (isOnDesk) {
-      // Удаляем со стола
+  // Add new cards
+  for (const item of added) {
+    insertDeskCardElement(item, 'start');
+  }
+
+  // If container is empty now, render empty state
+  try {
+    const grid = container.querySelector('.shorts-grid');
+    const remaining = grid ? grid.querySelectorAll('.desk-card').length : 0;
+    if (!remaining) {
+      container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+    }
+  } catch (e) {
+  }
+
+  updateInWorkIndicators();
+  refreshDeskOutboxIndicator().catch(() => { });
+  return { success: true, added: added.length, removed: removed.length };
+}
+
+// Добавляет или удаляет диктант со стола (используется кликом на карточку в библиотеке)
+async function toggleDictationOnDesk(dictationId) {
+  if (!dictationId) return;
+  const key = String(dictationId);
+  if (deskToggleInFlight.has(key)) return;
+  deskToggleInFlight.add(key);
+
+  console.log('===DESK_TOGGLE=== start', { dictationId: String(dictationId) });
+
+  const isOnDesk = isDictationOnDesk(dictationId);
+
+  if (isOnDesk) {
+    // Удаляем со стола
+    try {
+      const ok = confirm('Вы точно хотите убрать диктант с рабочего стола?');
+      if (!ok) {
+        deskToggleInFlight.delete(key);
+        return;
+      }
+    } catch (e) {
+    }
+
+    const itemId = getDeskItemId(dictationId);
+    if (!itemId) {
+      console.error('❌ Не найден item_id для диктанта на столе:', dictationId);
+      deskToggleInFlight.delete(key);
+      return;
+    }
+
+    try {
+      await removeFromDesk(itemId, dictationId);
+    } finally {
+      deskToggleInFlight.delete(key);
+    }
+  } else {
+    // Добавляем на стол
+    try {
+      showLoadingIndicator('Скачиваю диктант для оффлайна…');
+
+      console.log('===DESK_TOGGLE=== add flow: prefetch start', { dictationId: String(dictationId) });
+
+      // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
+      // (HTML страница диктанта + JS/CSS + аудио + обложка). Если не влезает — не добавляем.
       try {
-        const ok = confirm('Вы точно хотите убрать диктант с рабочего стола?');
-        if (!ok) {
+        const requiredUrls = [];
+
+        const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
+        console.log('===DESK_TOGGLE=== meta loaded', {
+          dictationId: String(dictationId),
+          success: Boolean(metaRes && metaRes.success),
+          hasDictation: Boolean(metaRes && metaRes.dictation),
+        });
+        if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
+          requiredUrls.push(normalizeUrlForSwPrefetch(metaRes.dictation.cover_url));
+        }
+
+        // HTML страница диктанта (нужна для оффлайн-навигации)
+        // Языки берем так же, как формируется openUrl на desk карточке.
+        const dictIdForUrl = `dict_${dictationId}`;
+        const langOrigForUrl = (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.language_code)
+          ? metaRes.dictation.language_code
+          : 'en';
+        const langTrForUrl = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+          ? window.USER_LANGUAGE_DATA.nativeLanguage
+          : langOrigForUrl;
+        // Домашняя страница — это рабочий стол, тоже нужна оффлайн
+        requiredUrls.push('/');
+        requiredUrls.push(`/dictation/${dictIdForUrl}/${langOrigForUrl}/${langTrForUrl}`);
+
+        // Ключевые статические ассеты страницы диктанта.
+        // (Service Worker кеширует /static/*; здесь мы принудительно префетчим минимально нужное)
+        requiredUrls.push('/static/css/style_dictation.css');
+        requiredUrls.push('/static/js/utils.js');
+        requiredUrls.push('/static/js/language_manager.js');
+        requiredUrls.push('/static/js/model_manager.js');
+        requiredUrls.push('/static/js/user_manager.js');
+        requiredUrls.push('/static/js/auth_interceptor.js');
+        requiredUrls.push('/static/js/login_modal.js');
+        requiredUrls.push('/static/js/sw_register.js');
+        requiredUrls.push('/static/js/audio_manager.js');
+        requiredUrls.push('/static/js/audio_player_visual.js');
+        requiredUrls.push('/static/js/user_activity_history.js');
+        requiredUrls.push('/static/js/dictation_statistics.js');
+        requiredUrls.push('/static/js/progress_panel.js');
+        requiredUrls.push('/static/js/audio_settings_panel.js');
+        requiredUrls.push('/static/js/statistics_report.js');
+        requiredUrls.push('/static/js/whisper-model-manager.js');
+        requiredUrls.push('/static/js/speech_recognition_unified.js');
+        requiredUrls.push('/static/js/script_dictation.js');
+
+        // Звуки (нужны даже оффлайн: прогресс/победа)
+        requiredUrls.push('/static/sounds/success.mp3');
+        requiredUrls.push('/static/sounds/timer/timer_sounds.json');
+        requiredUrls.push('/static/sounds/victory/victory_sounds.json');
+        requiredUrls.push('/static/sounds/timer/beep1.mp3');
+        requiredUrls.push('/static/sounds/timer/beep3.mp3');
+        requiredUrls.push('/static/sounds/victory/beep2.mp3');
+        requiredUrls.push('/static/sounds/victory/beep4.mp3');
+
+        const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
+        console.log('===DESK_TOGGLE=== sentences list loaded', {
+          dictationId: String(dictationId),
+          success: Boolean(sentencesRes && sentencesRes.success),
+          count: (sentencesRes && Array.isArray(sentencesRes.sentences)) ? sentencesRes.sentences.length : null,
+        });
+        const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
+          ? sentencesRes.sentences
+          : [];
+        for (const s of sentences) {
+          if (s && s.audio) requiredUrls.push(normalizeUrlForSwPrefetch(s.audio));
+        }
+
+        const uniqueRequired = Array.from(new Set(requiredUrls.map(normalizeUrlForSwPrefetch))).filter(Boolean);
+        if (!uniqueRequired.length) {
+          showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
+          hideLoadingIndicator();
           deskToggleInFlight.delete(key);
           return;
         }
+
+        await swRequest('prefetchStrict', { urls: uniqueRequired, timeoutMs: 180000 });
+        console.log('===DESK_TOGGLE=== prefetchStrict done', { dictationId: String(dictationId), urls: uniqueRequired.length });
       } catch (e) {
-      }
-
-      const itemId = getDeskItemId(dictationId);
-      if (!itemId) {
-        console.error('❌ Не найден item_id для диктанта на столе:', dictationId);
-        deskToggleInFlight.delete(key);
-        return;
-      }
-      
-      try {
-        await removeFromDesk(itemId, dictationId);
-      } finally {
-        deskToggleInFlight.delete(key);
-      }
-    } else {
-      // Добавляем на стол
-      try {
-        showLoadingIndicator('Скачиваю диктант для оффлайна…');
-
-        console.log('===DESK_TOGGLE=== add flow: prefetch start', { dictationId: String(dictationId) });
-
-        // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
-        // (HTML страница диктанта + JS/CSS + аудио + обложка). Если не влезает — не добавляем.
+        const msg = e && e.message ? e.message : String(e);
         try {
-          const requiredUrls = [];
-
-          const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
-          console.log('===DESK_TOGGLE=== meta loaded', {
+          const res = e && e.swResult ? e.swResult : null;
+          console.log('===DESK_TOGGLE=== prefetchStrict failed', {
             dictationId: String(dictationId),
-            success: Boolean(metaRes && metaRes.success),
-            hasDictation: Boolean(metaRes && metaRes.dictation),
+            msg,
+            failed: res && typeof res.failed === 'number' ? res.failed : null,
+            overLimit: res && typeof res.overLimit === 'number' ? res.overLimit : null,
+            failedUrls: res && Array.isArray(res.failedUrls) ? res.failedUrls : null,
+            overLimitUrls: res && Array.isArray(res.overLimitUrls) ? res.overLimitUrls : null,
           });
-          if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
-            requiredUrls.push(normalizeUrlForSwPrefetch(metaRes.dictation.cover_url));
-          }
-
-          // HTML страница диктанта (нужна для оффлайн-навигации)
-          // Языки берем так же, как формируется openUrl на desk карточке.
-          const dictIdForUrl = `dict_${dictationId}`;
-          const langOrigForUrl = (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.language_code)
-            ? metaRes.dictation.language_code
-            : 'en';
-          const langTrForUrl = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-            ? window.USER_LANGUAGE_DATA.nativeLanguage
-            : langOrigForUrl;
-          // Домашняя страница — это рабочий стол, тоже нужна оффлайн
-          requiredUrls.push('/');
-          requiredUrls.push(`/dictation/${dictIdForUrl}/${langOrigForUrl}/${langTrForUrl}`);
-
-          // Ключевые статические ассеты страницы диктанта.
-          // (Service Worker кеширует /static/*; здесь мы принудительно префетчим минимально нужное)
-          requiredUrls.push('/static/css/style_dictation.css');
-          requiredUrls.push('/static/js/utils.js');
-          requiredUrls.push('/static/js/language_manager.js');
-          requiredUrls.push('/static/js/model_manager.js');
-          requiredUrls.push('/static/js/user_manager.js');
-          requiredUrls.push('/static/js/auth_interceptor.js');
-          requiredUrls.push('/static/js/login_modal.js');
-          requiredUrls.push('/static/js/sw_register.js');
-          requiredUrls.push('/static/js/audio_manager.js');
-          requiredUrls.push('/static/js/audio_player_visual.js');
-          requiredUrls.push('/static/js/user_activity_history.js');
-          requiredUrls.push('/static/js/dictation_statistics.js');
-          requiredUrls.push('/static/js/progress_panel.js');
-          requiredUrls.push('/static/js/audio_settings_panel.js');
-          requiredUrls.push('/static/js/statistics_report.js');
-          requiredUrls.push('/static/js/whisper-model-manager.js');
-          requiredUrls.push('/static/js/speech_recognition_unified.js');
-          requiredUrls.push('/static/js/script_dictation.js');
-
-          // Звуки (нужны даже оффлайн: прогресс/победа)
-          requiredUrls.push('/static/sounds/success.mp3');
-          requiredUrls.push('/static/sounds/timer/timer_sounds.json');
-          requiredUrls.push('/static/sounds/victory/victory_sounds.json');
-          requiredUrls.push('/static/sounds/timer/beep1.mp3');
-          requiredUrls.push('/static/sounds/timer/beep3.mp3');
-          requiredUrls.push('/static/sounds/victory/beep2.mp3');
-          requiredUrls.push('/static/sounds/victory/beep4.mp3');
-
-          const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
-          console.log('===DESK_TOGGLE=== sentences list loaded', {
-            dictationId: String(dictationId),
-            success: Boolean(sentencesRes && sentencesRes.success),
-            count: (sentencesRes && Array.isArray(sentencesRes.sentences)) ? sentencesRes.sentences.length : null,
-          });
-          const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
-            ? sentencesRes.sentences
-            : [];
-          for (const s of sentences) {
-            if (s && s.audio) requiredUrls.push(normalizeUrlForSwPrefetch(s.audio));
-          }
-
-          const uniqueRequired = Array.from(new Set(requiredUrls.map(normalizeUrlForSwPrefetch))).filter(Boolean);
-          if (!uniqueRequired.length) {
-            showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
-            hideLoadingIndicator();
-            deskToggleInFlight.delete(key);
-            return;
-          }
-
-          await swRequest('prefetchStrict', { urls: uniqueRequired, timeoutMs: 180000 });
-          console.log('===DESK_TOGGLE=== prefetchStrict done', { dictationId: String(dictationId), urls: uniqueRequired.length });
-        } catch (e) {
-          const msg = e && e.message ? e.message : String(e);
-          try {
-            const res = e && e.swResult ? e.swResult : null;
-            console.log('===DESK_TOGGLE=== prefetchStrict failed', {
-              dictationId: String(dictationId),
-              msg,
-              failed: res && typeof res.failed === 'number' ? res.failed : null,
-              overLimit: res && typeof res.overLimit === 'number' ? res.overLimit : null,
-              failedUrls: res && Array.isArray(res.failedUrls) ? res.failedUrls : null,
-              overLimitUrls: res && Array.isArray(res.overLimitUrls) ? res.overLimitUrls : null,
-            });
-          } catch (e2) {
-            console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
-          }
-          if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
-            showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
-            hideLoadingIndicator();
-            deskToggleInFlight.delete(key);
-            return;
-          } else {
-            // Soft-fail: allow adding dictation to desk even if offline prefetch fails
-            // (mixed content, transient network, etc.). We'll still try caching sentences later.
-            if (msg.includes('Service Worker не активен')) {
-              showToast('Оффлайн режим не активен. Диктант добавлю на стол, но оффлайн может не работать.');
-            } else {
-              showToast(`Не удалось скачать диктант в оффлайн: ${msg}. Добавляю на стол без оффлайна.`);
-            }
-          }
+        } catch (e2) {
+          console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
         }
-
-        const addData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
-          method: 'POST',
-          body: JSON.stringify({})
-        });
-
-        console.log('===DESK_TOGGLE=== add-to-desk response', {
-          dictationId: String(dictationId),
-          success: Boolean(addData && addData.success),
-          error: addData && (addData.error || addData.message) ? String(addData.error || addData.message) : '',
-        });
-        
-        // Treat "added: false" (already exists) as non-error, but don't claim it was added.
-        const wasAdded = !!(addData && addData.success && (addData.added === true || addData.added === 1));
-
-        if (addData && addData.success) {
-          try {
-            const syncRes = await syncDeskFromServerIncremental();
-            console.log('===DESK_TOGGLE=== desk sync incremental done', {
-              dictationId: String(dictationId),
-              success: Boolean(syncRes && syncRes.success),
-              added: syncRes && typeof syncRes.added === 'number' ? syncRes.added : null,
-              removed: syncRes && typeof syncRes.removed === 'number' ? syncRes.removed : null,
-            });
-          } catch (e) {
-            await loadDeskItems();
-            console.log('===DESK_TOGGLE=== loadDeskItems fallback done', { dictationId: String(dictationId) });
-          }
-
-          // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
-          try {
-            console.log('===DESK_TOGGLE=== idb save start', { dictationId: String(dictationId) });
-            const dictId = `dict_${dictationId}`;
-            const userId = getDraftUserIdForKey();
-            const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
-            const dictMeta = metaRes && metaRes.success ? metaRes.dictation : null;
-            const deskItem = Array.isArray(deskItems) ? deskItems.find(x => String(x.dictation_id) === String(dictationId)) : null;
-            const langOrig = (deskItem && (deskItem.language_code || deskItem.language_original)) || (dictMeta && dictMeta.language_code) || 'en';
-            const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-              ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-              : '';
-            const langTr = (deskItem && deskItem.language_translation) || nativeLang || langOrig;
-
-            const sentencesRes2 = await apiRequest(`/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`);
-            const sentences2 = sentencesRes2 && sentencesRes2.success && Array.isArray(sentencesRes2.sentences) ? sentencesRes2.sentences : [];
-
-            const basePayload = {
-              dictationId: dictId,
-              langOrig,
-              langTr,
-              updatedAt: Date.now(),
-              meta: dictMeta,
-              sentences: sentences2
-            };
-
-            // Store both under userId and under anon to survive offline token validation issues.
-            const idbKeyUser = `${userId}:${dictId}:${langOrig}:${langTr}`;
-            await idbPut('dictations', {
-              key: idbKeyUser,
-              userId,
-              ...basePayload
-            });
-            console.log('===DESK_TOGGLE=== idb save user ok', { dictationId: String(dictationId), key: idbKeyUser });
-
-            const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
-            await idbPut('dictations', {
-              key: idbKeyAnon,
-              userId: 'anon',
-              ...basePayload
-            });
-            console.log('===DESK_TOGGLE=== idb save anon ok', { dictationId: String(dictationId), key: idbKeyAnon });
-          } catch (e) {
-            console.log('===DESK_TOGGLE=== idb save failed', { dictationId: String(dictationId), err: (e && e.message) ? e.message : String(e) });
-          }
-
-          refreshOfflineCacheStatus();
-          completeLoadingIndicator(wasAdded ? 'Диктант добавлен на рабочий стол' : 'Диктант уже на рабочем столе', 1000);
-          console.log('===DESK_TOGGLE=== done ok', { dictationId: String(dictationId) });
-        } else {
-          const apiMsg = (addData && (addData.error || addData.message))
-            ? String(addData.error || addData.message)
-            : '';
-          console.warn('[toggleDictationOnDesk] add-to-desk failed', { dictationId, addData });
-          showToast(apiMsg ? `Не удалось добавить диктант на стол: ${apiMsg}` : 'Ошибка при добавлении диктанта на стол');
-        }
-      } catch (error) {
-        const msg = error && error.message ? error.message : String(error);
-        console.error('❌ Ошибка добавления диктанта на стол:', error);
-        showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
-        console.log('===DESK_TOGGLE=== failed', { dictationId: String(dictationId), msg });
-      } finally {
-        const overlay = document.getElementById('loading-overlay');
-        if (!overlay || overlay.dataset.autoclosing !== '1') {
+        if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
+          showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
           hideLoadingIndicator();
+          deskToggleInFlight.delete(key);
+          return;
+        } else {
+          // Soft-fail: allow adding dictation to desk even if offline prefetch fails
+          // (mixed content, transient network, etc.). We'll still try caching sentences later.
+          if (msg.includes('Service Worker не активен')) {
+            showToast('Оффлайн режим не активен. Диктант добавлю на стол, но оффлайн может не работать.');
+          } else {
+            showToast(`Не удалось скачать диктант в оффлайн: ${msg}. Добавляю на стол без оффлайна.`);
+          }
         }
-        console.log('===DESK_TOGGLE=== finally', { dictationId: String(dictationId) });
-        deskToggleInFlight.delete(key);
       }
+
+      const addData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+
+      console.log('===DESK_TOGGLE=== add-to-desk response', {
+        dictationId: String(dictationId),
+        success: Boolean(addData && addData.success),
+        error: addData && (addData.error || addData.message) ? String(addData.error || addData.message) : '',
+      });
+
+      // Treat "added: false" (already exists) as non-error, but don't claim it was added.
+      const wasAdded = !!(addData && addData.success && (addData.added === true || addData.added === 1));
+
+      if (addData && addData.success) {
+        try {
+          const syncRes = await syncDeskFromServerIncremental();
+          console.log('===DESK_TOGGLE=== desk sync incremental done', {
+            dictationId: String(dictationId),
+            success: Boolean(syncRes && syncRes.success),
+            added: syncRes && typeof syncRes.added === 'number' ? syncRes.added : null,
+            removed: syncRes && typeof syncRes.removed === 'number' ? syncRes.removed : null,
+          });
+        } catch (e) {
+          await loadDeskItems();
+          console.log('===DESK_TOGGLE=== loadDeskItems fallback done', { dictationId: String(dictationId) });
+        }
+
+        // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
+        try {
+          console.log('===DESK_TOGGLE=== idb save start', { dictationId: String(dictationId) });
+          const dictId = `dict_${dictationId}`;
+          const userId = getDraftUserIdForKey();
+          const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
+          const dictMeta = metaRes && metaRes.success ? metaRes.dictation : null;
+          const deskItem = Array.isArray(deskItems) ? deskItems.find(x => String(x.dictation_id) === String(dictationId)) : null;
+          const langOrig = (deskItem && (deskItem.language_code || deskItem.language_original)) || (dictMeta && dictMeta.language_code) || 'en';
+          const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+            ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+            : '';
+          const langTr = (deskItem && deskItem.language_translation) || nativeLang || langOrig;
+
+          const sentencesRes2 = await apiRequest(`/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`);
+          const sentences2 = sentencesRes2 && sentencesRes2.success && Array.isArray(sentencesRes2.sentences) ? sentencesRes2.sentences : [];
+
+          const basePayload = {
+            dictationId: dictId,
+            langOrig,
+            langTr,
+            updatedAt: Date.now(),
+            meta: dictMeta,
+            sentences: sentences2
+          };
+
+          // Store both under userId and under anon to survive offline token validation issues.
+          const idbKeyUser = `${userId}:${dictId}:${langOrig}:${langTr}`;
+          await idbPut('dictations', {
+            key: idbKeyUser,
+            userId,
+            ...basePayload
+          });
+          console.log('===DESK_TOGGLE=== idb save user ok', { dictationId: String(dictationId), key: idbKeyUser });
+
+          const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
+          await idbPut('dictations', {
+            key: idbKeyAnon,
+            userId: 'anon',
+            ...basePayload
+          });
+          console.log('===DESK_TOGGLE=== idb save anon ok', { dictationId: String(dictationId), key: idbKeyAnon });
+        } catch (e) {
+          console.log('===DESK_TOGGLE=== idb save failed', { dictationId: String(dictationId), err: (e && e.message) ? e.message : String(e) });
+        }
+
+        refreshOfflineCacheStatus();
+        completeLoadingIndicator(wasAdded ? 'Диктант добавлен на рабочий стол' : 'Диктант уже на рабочем столе', 1000);
+        console.log('===DESK_TOGGLE=== done ok', { dictationId: String(dictationId) });
+      } else {
+        const apiMsg = (addData && (addData.error || addData.message))
+          ? String(addData.error || addData.message)
+          : '';
+        console.warn('[toggleDictationOnDesk] add-to-desk failed', { dictationId, addData });
+        showToast(apiMsg ? `Не удалось добавить диктант на стол: ${apiMsg}` : 'Ошибка при добавлении диктанта на стол');
+      }
+    } catch (error) {
+      const msg = error && error.message ? error.message : String(error);
+      console.error('❌ Ошибка добавления диктанта на стол:', error);
+      showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
+      console.log('===DESK_TOGGLE=== failed', { dictationId: String(dictationId), msg });
+    } finally {
+      const overlay = document.getElementById('loading-overlay');
+      if (!overlay || overlay.dataset.autoclosing !== '1') {
+        hideLoadingIndicator();
+      }
+      console.log('===DESK_TOGGLE=== finally', { dictationId: String(dictationId) });
+      deskToggleInFlight.delete(key);
     }
   }
+}
 
-  // Создает карточку диктанта (для стола или для книги)
-  // item - объект с данными диктанта
-  // isDeskCard - true для карточки на столе, false для карточки в книге
-  function createDictationCard(item, isDeskCard = false) {
-    if (isDeskCard) {
-      // Карточка для рабочего стола
-      const dictationId = item.dictation_id;
-      const dictationIdFormatted = `dict_${dictationId}`;
-      const langOriginal = item.language_code || 'en';
-      const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-        ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-        : '';
-      const langTranslation = item.language_translation || nativeLang || item.language_code || 'en';
-      const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
-      const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
-      const coverUrl = maybeCacheBustDictationCover(item.cover_url);
+// Создает карточку диктанта (для стола или для книги)
+// item - объект с данными диктанта
+// isDeskCard - true для карточки на столе, false для карточки в книге
+function createDictationCard(item, isDeskCard = false) {
+  if (isDeskCard) {
+    // Карточка для рабочего стола
+    const dictationId = item.dictation_id;
+    const dictationIdFormatted = `dict_${dictationId}`;
+    const langOriginal = item.language_code || 'en';
+    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+      : '';
+    const langTranslation = item.language_translation || nativeLang || item.language_code || 'en';
+    const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+    const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+    const coverUrl = maybeCacheBustDictationCover(item.cover_url);
 
-      const sentencesCount = typeof item.sentences_count === 'number'
-        ? item.sentences_count
-        : (parseInt(item.sentences_count, 10) || 0);
+    const sentencesCount = typeof item.sentences_count === 'number'
+      ? item.sentences_count
+      : (parseInt(item.sentences_count, 10) || 0);
 
-      return `
+    return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
             <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="lazy">
@@ -1834,35 +1756,35 @@
           </div>
         </div>
       `;
-    } else {
-      // Карточка для книги
-      const d = item;
-      const coverUrl = d.cover_url || '/static/data/covers/cover_en.webp';
-      
-      // Определяем языки для URL
-      const langOriginal = d.language_original || d.language_code || 'en';
-      const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-        ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-        : '';
-      const langTranslation = d.language_translation || nativeLang || d.language_code || 'en';
-      
-      // ID в формате dict_X для URL
-      const dictationId = d.dictation_id || `dict_${d.id}`;
-      const dbId = d.db_id || d.id;
-      
-      // URL для редактирования (используем формат dict_X)
-      const editUrl = `/dictation_editor/${dictationId}/${langOriginal}/${langTranslation}`;
-      
-      // Проверяем, находится ли диктант на столе
-      const isOnDesk = isDictationOnDesk(dbId);
-      const inWorkIndicator = isOnDesk ? `
+  } else {
+    // Карточка для книги
+    const d = item;
+    const coverUrl = d.cover_url || '/static/data/covers/cover_en.webp';
+
+    // Определяем языки для URL
+    const langOriginal = d.language_original || d.language_code || 'en';
+    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+      : '';
+    const langTranslation = d.language_translation || nativeLang || d.language_code || 'en';
+
+    // ID в формате dict_X для URL
+    const dictationId = d.dictation_id || `dict_${d.id}`;
+    const dbId = d.db_id || d.id;
+
+    // URL для редактирования (используем формат dict_X)
+    const editUrl = `/dictation_editor/${dictationId}/${langOriginal}/${langTranslation}`;
+
+    // Проверяем, находится ли диктант на столе
+    const isOnDesk = isDictationOnDesk(dbId);
+    const inWorkIndicator = isOnDesk ? `
         <div class="short-in-work-indicator" title="В работе">
           <i data-lucide="pen-tool"></i>
         </div>
       ` : '';
-      
-      // Кнопки для карточки в книге (правый нижний угол)
-      const actionButtons = `
+
+    // Кнопки для карточки в книге (правый нижний угол)
+    const actionButtons = `
         <a href="${editUrl}" class="short-action-btn" title="Редактировать">
           <i data-lucide="pencil-ruler"></i>
         </a>
@@ -1873,11 +1795,11 @@
           <i data-lucide="trash-2"></i>
         </button>
       `;
-      
-      // Медалька будет добавлена асинхронно через updateCompletionBadges
-      // Статистика (звезды/полузвезды/микрофон) убрана - она только на столе
-      
-      return `
+
+    // Медалька будет добавлена асинхронно через updateCompletionBadges
+    // Статистика (звезды/полузвезды/микрофон) убрана - она только на столе
+
+    return `
         <div class="short-card" data-dictation-id="${dbId}" data-action="toggle-desk">
           <div class="short-thumb">
             <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
@@ -1902,577 +1824,577 @@
           </div>
         </div>
       `;
-    }
   }
+}
 
-  function normalizeCoverCacheUrl(rawUrl) {
+function normalizeCoverCacheUrl(rawUrl) {
+  try {
+    const u = new URL(String(rawUrl || ''), location.origin);
+    u.search = '';
+    return u.toString();
+  } catch (e) {
+    return String(rawUrl || '');
+  }
+}
+
+async function applyDeskCovers(container) {
+  try {
+    const imgs = container.querySelectorAll('.desk-card .short-cover[data-cover-url]');
+
+    let cacheHits = 0;
+    let cacheMisses = 0;
+
+    let cache = null;
     try {
-      const u = new URL(String(rawUrl || ''), location.origin);
-      u.search = '';
-      return u.toString();
+      if ('caches' in window) {
+        cache = await caches.open('dictafan-media');
+      }
     } catch (e) {
-      return String(rawUrl || '');
+      cache = null;
     }
-  }
 
-  async function applyDeskCovers(container) {
-    try {
-      const imgs = container.querySelectorAll('.desk-card .short-cover[data-cover-url]');
+    for (const img of imgs) {
+      if (img.dataset.coverApplied === '1') continue;
+      const url = img.dataset.coverUrl;
+      if (!url) continue;
 
-      let cacheHits = 0;
-      let cacheMisses = 0;
+      img.dataset.coverApplied = '1';
 
-      let cache = null;
-      try {
-        if ('caches' in window) {
-          cache = await caches.open('dictafan-media');
-        }
-      } catch (e) {
-        cache = null;
-      }
-
-      for (const img of imgs) {
-        if (img.dataset.coverApplied === '1') continue;
-        const url = img.dataset.coverUrl;
-        if (!url) continue;
-
-        img.dataset.coverApplied = '1';
-
-        const src = maybeCacheBustDictationCover(url);
-
-        if (cache) {
-          try {
-            const probeUrl = normalizeCoverCacheUrl(src);
-            const hit = await cache.match(probeUrl);
-            if (hit) cacheHits += 1;
-            else cacheMisses += 1;
-          } catch (e) {
-            cacheMisses += 1;
-          }
-        }
-
-        img.src = src;
-      }
+      const src = maybeCacheBustDictationCover(url);
 
       if (cache) {
-        console.log('[desk-render] stage2 covers source:', {
-          cacheHits,
-          networkOrB2: cacheMisses,
-          total: cacheHits + cacheMisses,
-        });
-      }
-    } catch (e) {
-      console.warn('[desk-render] applyDeskCovers failed', e);
-    }
-  }
-
-  function getDeskCardPosStorageKey(deskItemId) {
-    return `dictafan:desk:pos:${String(deskItemId || '')}`;
-  }
-
-  function readDeskCardPos(deskItemId) {
-    try {
-      const raw = localStorage.getItem(getDeskCardPosStorageKey(deskItemId));
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return null;
-      const x = Number(parsed.x);
-      const y = Number(parsed.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-      return { x, y };
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function writeDeskCardPos(deskItemId, x, y) {
-    try {
-      const payload = { x: Number(x) || 0, y: Number(y) || 0, updatedAt: Date.now() };
-      localStorage.setItem(getDeskCardPosStorageKey(deskItemId), JSON.stringify(payload));
-    } catch (e) {
-    }
-  }
-
-  function isDeskFreeLayoutEnabled() {
-    try {
-      return String(localStorage.getItem('dictafan:desk:layout') || '') === 'free';
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function setDeskFreeLayoutEnabled(enabled) {
-    try {
-      if (enabled) {
-        localStorage.setItem('dictafan:desk:layout', 'free');
-      } else {
-        localStorage.setItem('dictafan:desk:layout', 'grid');
-      }
-    } catch (e) {
-    }
-  }
-
-  function updateDeskLayoutToggleButtonState(btn) {
-    try {
-      if (!btn) return;
-      const enabled = isDeskFreeLayoutEnabled();
-      btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
-      btn.title = enabled
-        ? 'Свободный стол: можно таскать карточки'
-        : 'Обычный стол: карточки в ряд (таскать нельзя)';
-
-      const iconName = enabled ? 'move' : 'grip-vertical';
-      btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-
-      if (enabled) {
-        btn.classList.add('active');
-        btn.style.background = 'rgba(0,0,0,0.08)';
-        btn.style.border = '1px solid rgba(0,0,0,0.18)';
-      } else {
-        btn.classList.remove('active');
-        btn.style.background = '';
-        btn.style.border = '';
-      }
-    } catch (e) {
-    }
-  }
-
-  function ensureDeskLayoutToggleButton() {
-    try {
-      const palette = document.getElementById('toolPalette');
-      if (!palette) return;
-      if (document.getElementById('btnDeskFreeLayoutToggle')) return;
-
-      const btn = document.createElement('button');
-      btn.id = 'btnDeskFreeLayoutToggle';
-      btn.className = 'tool-palette-btn';
-      btn.addEventListener('click', () => {
-        const enabled = !isDeskFreeLayoutEnabled();
-        setDeskFreeLayoutEnabled(enabled);
-        updateDeskLayoutToggleButtonState(btn);
         try {
-          loadDeskItems();
+          const probeUrl = normalizeCoverCacheUrl(src);
+          const hit = await cache.match(probeUrl);
+          if (hit) cacheHits += 1;
+          else cacheMisses += 1;
         } catch (e) {
+          cacheMisses += 1;
         }
+      }
+
+      img.src = src;
+    }
+
+    if (cache) {
+      console.log('[desk-render] stage2 covers source:', {
+        cacheHits,
+        networkOrB2: cacheMisses,
+        total: cacheHits + cacheMisses,
       });
-
-      const sep = palette.querySelector('.tool-palette-separator');
-      if (sep && sep.parentNode === palette) {
-        palette.insertBefore(btn, sep);
-      } else {
-        palette.appendChild(btn);
-      }
-
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-
-      updateDeskLayoutToggleButtonState(btn);
-    } catch (e) {
     }
+  } catch (e) {
+    console.warn('[desk-render] applyDeskCovers failed', e);
   }
+}
 
-  function hasAnyDeskCardPositions(container) {
-    try {
-      const cards = container.querySelectorAll('.desk-card[data-desk-item-id]');
-      for (const card of cards) {
-        const deskItemId = card.getAttribute('data-desk-item-id');
-        if (!deskItemId) continue;
-        if (readDeskCardPos(deskItemId)) return true;
-      }
-    } catch (e) {
-    }
+function getDeskCardPosStorageKey(deskItemId) {
+  return `dictafan:desk:pos:${String(deskItemId || '')}`;
+}
+
+function readDeskCardPos(deskItemId) {
+  try {
+    const raw = localStorage.getItem(getDeskCardPosStorageKey(deskItemId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const x = Number(parsed.x);
+    const y = Number(parsed.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    return { x, y };
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeDeskCardPos(deskItemId, x, y) {
+  try {
+    const payload = { x: Number(x) || 0, y: Number(y) || 0, updatedAt: Date.now() };
+    localStorage.setItem(getDeskCardPosStorageKey(deskItemId), JSON.stringify(payload));
+  } catch (e) {
+  }
+}
+
+function isDeskFreeLayoutEnabled() {
+  try {
+    return String(localStorage.getItem('dictafan:desk:layout') || '') === 'free';
+  } catch (e) {
     return false;
   }
+}
 
-  function enableDeskFreeLayout(container) {
-    try {
-      const grid = container.querySelector('.shorts-grid');
-      if (!grid) return null;
-      grid.dataset.deskLayoutMode = 'free';
-      grid.style.position = 'relative';
-      grid.style.display = 'block';
-      grid.style.minHeight = grid.style.minHeight || '240px';
-
-      const cards = grid.querySelectorAll('.desk-card[data-desk-item-id]');
-      let maxBottom = 0;
-
-      cards.forEach((card, idx) => {
-        const deskItemId = card.getAttribute('data-desk-item-id');
-        const pos = deskItemId ? readDeskCardPos(deskItemId) : null;
-
-        const x = pos ? pos.x : (idx * 220);
-        const y = pos ? pos.y : 0;
-
-        card.style.position = 'absolute';
-        card.style.left = '0px';
-        card.style.top = '0px';
-        card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-        card.style.willChange = 'transform';
-        card.dataset.deskX = String(x);
-        card.dataset.deskY = String(y);
-        card.style.touchAction = 'none';
-
-        try {
-          const rect = card.getBoundingClientRect();
-          const h = rect && rect.height ? rect.height : 220;
-          maxBottom = Math.max(maxBottom, y + h);
-        } catch (e) {
-          maxBottom = Math.max(maxBottom, y + 220);
-        }
-      });
-
-      if (maxBottom > 0) {
-        grid.style.minHeight = `${Math.ceil(maxBottom + 40)}px`;
-      }
-
-      return grid;
-    } catch (e) {
-      console.warn('[desk-render] enableDeskFreeLayout failed', e);
-      return null;
+function setDeskFreeLayoutEnabled(enabled) {
+  try {
+    if (enabled) {
+      localStorage.setItem('dictafan:desk:layout', 'free');
+    } else {
+      localStorage.setItem('dictafan:desk:layout', 'grid');
     }
+  } catch (e) {
   }
+}
 
-  function installDeskDragAndDrop(container) {
-    try {
-      const grid = container.querySelector('.shorts-grid');
-      if (!grid) return;
-      if (grid.dataset.deskDndInstalled === '1') return;
-      if (grid.dataset.deskLayoutMode !== 'free') return;
-      grid.dataset.deskDndInstalled = '1';
+function updateDeskLayoutToggleButtonState(btn) {
+  try {
+    if (!btn) return;
+    const enabled = isDeskFreeLayoutEnabled();
+    btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    btn.title = enabled
+      ? 'Свободный стол: можно таскать карточки'
+      : 'Обычный стол: карточки в ряд (таскать нельзя)';
 
-      let dragging = null;
-
-      const onPointerDown = (e) => {
-        try {
-          if (!e || e.button !== undefined && e.button !== 0) return;
-          const thumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
-          if (!thumb) return;
-          const card = thumb.closest('.desk-card[data-desk-item-id]');
-          if (!card) return;
-          if (e.target.closest('button')) return;
-
-          const deskItemId = card.getAttribute('data-desk-item-id');
-          if (!deskItemId) return;
-
-          const gridRect = grid.getBoundingClientRect();
-          const cardRect = card.getBoundingClientRect();
-          const startX = Number(card.dataset.deskX) || 0;
-          const startY = Number(card.dataset.deskY) || 0;
-          const pointerX = (e.clientX - gridRect.left);
-          const pointerY = (e.clientY - gridRect.top);
-          const cardLeft = (cardRect.left - gridRect.left);
-          const cardTop = (cardRect.top - gridRect.top);
-          const offsetX = pointerX - cardLeft;
-          const offsetY = pointerY - cardTop;
-
-          dragging = {
-            deskItemId,
-            card,
-            gridRect,
-            offsetX,
-            offsetY,
-            startX,
-            startY,
-            moved: false,
-            active: false,
-            pointerId: e.pointerId
-          };
-
-          card.style.zIndex = '999';
-        } catch (err) {
-        }
-      };
-
-      const onPointerMove = (e) => {
-        try {
-          if (!dragging) return;
-          const gridRect = dragging.gridRect || grid.getBoundingClientRect();
-          const x = (e.clientX - gridRect.left) - dragging.offsetX;
-          const y = (e.clientY - gridRect.top) - dragging.offsetY;
-          const nx = Math.max(-2000, Math.min(20000, x));
-          const ny = Math.max(-2000, Math.min(20000, y));
-          if (Math.abs(nx - dragging.startX) > 3 || Math.abs(ny - dragging.startY) > 3) {
-            dragging.moved = true;
-          }
-          if (dragging.moved) {
-            if (!dragging.active) {
-              dragging.active = true;
-              if (dragging.card && dragging.card.setPointerCapture) {
-                try { dragging.card.setPointerCapture(dragging.pointerId); } catch (err) {}
-              }
-            }
-            dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
-            dragging.card.dataset.deskX = String(nx);
-            dragging.card.dataset.deskY = String(ny);
-            e.preventDefault();
-          }
-        } catch (err) {
-        }
-      };
-
-      const onPointerUp = (e) => {
-        try {
-          if (!dragging) return;
-          if (!dragging.active) {
-            dragging.card.style.zIndex = '';
-            dragging = null;
-            return;
-          }
-          const x = Number(dragging.card.dataset.deskX) || 0;
-          const y = Number(dragging.card.dataset.deskY) || 0;
-          writeDeskCardPos(dragging.deskItemId, x, y);
-          if (dragging.moved) {
-            dragging.card.dataset.deskJustDragged = '1';
-          }
-          dragging.card.style.zIndex = '';
-          dragging = null;
-          e.preventDefault();
-        } catch (err) {
-          dragging = null;
-        }
-      };
-
-      const onClickCapture = (e) => {
-        try {
-          const card = e.target && e.target.closest ? e.target.closest('.desk-card[data-desk-item-id]') : null;
-          if (!card) return;
-          const moved = card.dataset && card.dataset.deskJustDragged === '1';
-          if (moved) {
-            card.dataset.deskJustDragged = '';
-            e.preventDefault();
-            e.stopPropagation();
-          }
-        } catch (err) {
-        }
-      };
-
-      grid.addEventListener('pointerdown', onPointerDown, { passive: false });
-      window.addEventListener('pointermove', onPointerMove, { passive: false });
-      window.addEventListener('pointerup', onPointerUp, { passive: false });
-      grid.addEventListener('click', onClickCapture, true);
-    } catch (e) {
-      console.warn('[desk-render] installDeskDragAndDrop failed', e);
-    }
-  }
-
-  function renderDeskCards(items) {
-    const container = document.getElementById("deskCardsContainer");
-    if (!container) return;
-
-    if (!items || items.length === 0) {
-      container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
-      return;
-    }
-
-    const t0 = performance.now();
-
-    // Очищаем контейнер перед рендерингом, чтобы избежать дублирования
-    container.innerHTML = '';
-    
-    const grid = document.createElement('div');
-    grid.className = 'shorts-grid';
-    
-    items.forEach(item => {
-      const cardHtml = createDictationCard(item, true); // true = карточка для стола
-      grid.insertAdjacentHTML('beforeend', cardHtml);
-    });
-    
-    container.appendChild(grid);
-
-    const t1 = performance.now();
-    console.log('[desk-render] stage1 cards:', {
-      ms: Math.round(t1 - t0),
-      items: items.length,
-    });
-
-    // Обновляем иконки Lucide
+    const iconName = enabled ? 'move' : 'grip-vertical';
+    btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      lucide.createIcons();
+      window.lucide.createIcons();
     }
 
-    ensureDeskLayoutToggleButton();
-
-    if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
-      enableDeskFreeLayout(container);
-      installDeskDragAndDrop(container);
+    if (enabled) {
+      btn.classList.add('active');
+      btn.style.background = 'rgba(0,0,0,0.08)';
+      btn.style.border = '1px solid rgba(0,0,0,0.18)';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = '';
+      btn.style.border = '';
     }
+  } catch (e) {
+  }
+}
 
-    requestAnimationFrame(() => {
-      (async () => {
-        const t2Start = performance.now();
-        await applyDeskCovers(container);
-        const t2End = performance.now();
-        console.log('[desk-render] stage2 covers applied:', { ms: Math.round(t2End - t2Start) });
+function ensureDeskLayoutToggleButton() {
+  try {
+    const palette = document.getElementById('toolPalette');
+    if (!palette) return;
+    if (document.getElementById('btnDeskFreeLayoutToggle')) return;
 
-        setTimeout(async () => {
-          const t3Start = performance.now();
-          try {
-            updateDictationCardsStats(container);
-            await updateCompletionBadges(container);
-          } finally {
-            const t3End = performance.now();
-            console.log('[desk-render] stage3 stats/badges:', { ms: Math.round(t3End - t3Start) });
-          }
-        }, 0);
-      })().catch(() => {});
+    const btn = document.createElement('button');
+    btn.id = 'btnDeskFreeLayoutToggle';
+    btn.className = 'tool-palette-btn';
+    btn.addEventListener('click', () => {
+      const enabled = !isDeskFreeLayoutEnabled();
+      setDeskFreeLayoutEnabled(enabled);
+      updateDeskLayoutToggleButtonState(btn);
+      try {
+        loadDeskItems();
+      } catch (e) {
+      }
     });
-  }
 
-
-  // ==================== ЗОНА 2: Список книг ====================
-  
-  async function loadBooks() {
-    try {
-      const response = await fetch('/');
-      // Здесь нужно получить данные из серверного рендера или через API
-      // Пока используем существующий endpoint
-      await loadBooksFromAPI();
-    } catch (error) {
-      console.error("Ошибка загрузки книг:", error);
+    const sep = palette.querySelector('.tool-palette-separator');
+    if (sep && sep.parentNode === palette) {
+      palette.insertBefore(btn, sep);
+    } else {
+      palette.appendChild(btn);
     }
-  }
 
-  async function loadBooksFromAPI() {
-    // Временно: загружаем книги через существующую логику
-    // TODO: создать отдельный API endpoint для получения всех книг
-    try {
-      const token = getToken();
-      if (!token) {
-        console.warn("⚠️ Нет токена для загрузки книг");
-        return;
-      }
-      
-      const response = await fetch('/library/api/user-books', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📦 Данные книг получены от API:', data);
-        if (data.success) {
-          lastOwnBooks = Array.isArray(data.own_books) ? data.own_books : [];
-          lastShelfBooks = Array.isArray(data.shelf_books) ? data.shelf_books : [];
-          renderBooksList(data.own_books, data.shelf_books);
-        } else {
-          console.error("❌ Ошибка загрузки книг:", data.error);
-        }
-      } else {
-        const errorText = await response.text();
-        console.error("❌ Ошибка загрузки книг:", response.status, errorText);
-        if (response.status === 401 || response.status === 422) {
-          // Токен невалидный, нужно авторизоваться
-          if (window.UM) {
-            window.UM.requireAuth();
-          }
-        }
-      }
-    } catch (error) {
-      console.error("❌ Ошибка загрузки книг:", error);
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
     }
+
+    updateDeskLayoutToggleButtonState(btn);
+  } catch (e) {
   }
+}
 
-  function renderBooksList(ownBooks, shelfBooks) {
-    const container = document.getElementById("booksList");
-    if (!container) return;
+function hasAnyDeskCardPositions(container) {
+  try {
+    const cards = container.querySelectorAll('.desk-card[data-desk-item-id]');
+    for (const card of cards) {
+      const deskItemId = card.getAttribute('data-desk-item-id');
+      if (!deskItemId) continue;
+      if (readDeskCardPos(deskItemId)) return true;
+    }
+  } catch (e) {
+  }
+  return false;
+}
 
-    const rawFilterLang = currentBooksFilterLanguage
-      || window.USER_LANGUAGE_DATA?.currentLearning
-      || null;
-    const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
+function enableDeskFreeLayout(container) {
+  try {
+    const grid = container.querySelector('.shorts-grid');
+    if (!grid) return null;
+    grid.dataset.deskLayoutMode = 'free';
+    grid.style.position = 'relative';
+    grid.style.display = 'block';
+    grid.style.minHeight = grid.style.minHeight || '240px';
 
-    const normalizeBookLang = (b) => {
-      if (!b) return '';
-      return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
+    const cards = grid.querySelectorAll('.desk-card[data-desk-item-id]');
+    let maxBottom = 0;
+
+    cards.forEach((card, idx) => {
+      const deskItemId = card.getAttribute('data-desk-item-id');
+      const pos = deskItemId ? readDeskCardPos(deskItemId) : null;
+
+      const x = pos ? pos.x : (idx * 220);
+      const y = pos ? pos.y : 0;
+
+      card.style.position = 'absolute';
+      card.style.left = '0px';
+      card.style.top = '0px';
+      card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      card.style.willChange = 'transform';
+      card.dataset.deskX = String(x);
+      card.dataset.deskY = String(y);
+      card.style.touchAction = 'none';
+
+      try {
+        const rect = card.getBoundingClientRect();
+        const h = rect && rect.height ? rect.height : 220;
+        maxBottom = Math.max(maxBottom, y + h);
+      } catch (e) {
+        maxBottom = Math.max(maxBottom, y + 220);
+      }
+    });
+
+    if (maxBottom > 0) {
+      grid.style.minHeight = `${Math.ceil(maxBottom + 40)}px`;
+    }
+
+    return grid;
+  } catch (e) {
+    console.warn('[desk-render] enableDeskFreeLayout failed', e);
+    return null;
+  }
+}
+
+function installDeskDragAndDrop(container) {
+  try {
+    const grid = container.querySelector('.shorts-grid');
+    if (!grid) return;
+    if (grid.dataset.deskDndInstalled === '1') return;
+    if (grid.dataset.deskLayoutMode !== 'free') return;
+    grid.dataset.deskDndInstalled = '1';
+
+    let dragging = null;
+
+    const onPointerDown = (e) => {
+      try {
+        if (!e || e.button !== undefined && e.button !== 0) return;
+        const thumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+        if (!thumb) return;
+        const card = thumb.closest('.desk-card[data-desk-item-id]');
+        if (!card) return;
+        if (e.target.closest('button')) return;
+
+        const deskItemId = card.getAttribute('data-desk-item-id');
+        if (!deskItemId) return;
+
+        const gridRect = grid.getBoundingClientRect();
+        const cardRect = card.getBoundingClientRect();
+        const startX = Number(card.dataset.deskX) || 0;
+        const startY = Number(card.dataset.deskY) || 0;
+        const pointerX = (e.clientX - gridRect.left);
+        const pointerY = (e.clientY - gridRect.top);
+        const cardLeft = (cardRect.left - gridRect.left);
+        const cardTop = (cardRect.top - gridRect.top);
+        const offsetX = pointerX - cardLeft;
+        const offsetY = pointerY - cardTop;
+
+        dragging = {
+          deskItemId,
+          card,
+          gridRect,
+          offsetX,
+          offsetY,
+          startX,
+          startY,
+          moved: false,
+          active: false,
+          pointerId: e.pointerId
+        };
+
+        card.style.zIndex = '999';
+      } catch (err) {
+      }
     };
 
-    const allBooksRaw = [
-      ...(ownBooks || []).map(book => ({ ...book, isOwn: true })),
-      ...(shelfBooks || []).map(book => ({ ...book, isOwn: false }))
-    ];
+    const onPointerMove = (e) => {
+      try {
+        if (!dragging) return;
+        const gridRect = dragging.gridRect || grid.getBoundingClientRect();
+        const x = (e.clientX - gridRect.left) - dragging.offsetX;
+        const y = (e.clientY - gridRect.top) - dragging.offsetY;
+        const nx = Math.max(-2000, Math.min(20000, x));
+        const ny = Math.max(-2000, Math.min(20000, y));
+        if (Math.abs(nx - dragging.startX) > 3 || Math.abs(ny - dragging.startY) > 3) {
+          dragging.moved = true;
+        }
+        if (dragging.moved) {
+          if (!dragging.active) {
+            dragging.active = true;
+            if (dragging.card && dragging.card.setPointerCapture) {
+              try { dragging.card.setPointerCapture(dragging.pointerId); } catch (err) { }
+            }
+          }
+          dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
+          dragging.card.dataset.deskX = String(nx);
+          dragging.card.dataset.deskY = String(ny);
+          e.preventDefault();
+        }
+      } catch (err) {
+      }
+    };
 
-    const allBooks = filterLang
-      ? allBooksRaw.filter(b => {
-          const lang = normalizeBookLang(b);
-          return !lang || lang === String(filterLang).toLowerCase();
-        })
-      : allBooksRaw;
+    const onPointerUp = (e) => {
+      try {
+        if (!dragging) return;
+        if (!dragging.active) {
+          dragging.card.style.zIndex = '';
+          dragging = null;
+          return;
+        }
+        const x = Number(dragging.card.dataset.deskX) || 0;
+        const y = Number(dragging.card.dataset.deskY) || 0;
+        writeDeskCardPos(dragging.deskItemId, x, y);
+        if (dragging.moved) {
+          dragging.card.dataset.deskJustDragged = '1';
+        }
+        dragging.card.style.zIndex = '';
+        dragging = null;
+        e.preventDefault();
+      } catch (err) {
+        dragging = null;
+      }
+    };
 
-    if (allBooks.length === 0) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Нет книг</div>';
+    const onClickCapture = (e) => {
+      try {
+        const card = e.target && e.target.closest ? e.target.closest('.desk-card[data-desk-item-id]') : null;
+        if (!card) return;
+        const moved = card.dataset && card.dataset.deskJustDragged === '1';
+        if (moved) {
+          card.dataset.deskJustDragged = '';
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      } catch (err) {
+      }
+    };
+
+    grid.addEventListener('pointerdown', onPointerDown, { passive: false });
+    window.addEventListener('pointermove', onPointerMove, { passive: false });
+    window.addEventListener('pointerup', onPointerUp, { passive: false });
+    grid.addEventListener('click', onClickCapture, true);
+  } catch (e) {
+    console.warn('[desk-render] installDeskDragAndDrop failed', e);
+  }
+}
+
+function renderDeskCards(items) {
+  const container = document.getElementById("deskCardsContainer");
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
+    return;
+  }
+
+  const t0 = performance.now();
+
+  // Очищаем контейнер перед рендерингом, чтобы избежать дублирования
+  container.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'shorts-grid';
+
+  items.forEach(item => {
+    const cardHtml = createDictationCard(item, true); // true = карточка для стола
+    grid.insertAdjacentHTML('beforeend', cardHtml);
+  });
+
+  container.appendChild(grid);
+
+  const t1 = performance.now();
+  console.log('[desk-render] stage1 cards:', {
+    ms: Math.round(t1 - t0),
+    items: items.length,
+  });
+
+  // Обновляем иконки Lucide
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+
+  ensureDeskLayoutToggleButton();
+
+  if (isDeskFreeLayoutEnabled() || hasAnyDeskCardPositions(container)) {
+    enableDeskFreeLayout(container);
+    installDeskDragAndDrop(container);
+  }
+
+  requestAnimationFrame(() => {
+    (async () => {
+      const t2Start = performance.now();
+      await applyDeskCovers(container);
+      const t2End = performance.now();
+      console.log('[desk-render] stage2 covers applied:', { ms: Math.round(t2End - t2Start) });
+
+      setTimeout(async () => {
+        const t3Start = performance.now();
+        try {
+          updateDictationCardsStats(container);
+          await updateCompletionBadges(container);
+        } finally {
+          const t3End = performance.now();
+          console.log('[desk-render] stage3 stats/badges:', { ms: Math.round(t3End - t3Start) });
+        }
+      }, 0);
+    })().catch(() => { });
+  });
+}
+
+
+// ==================== ЗОНА 2: Список книг ====================
+
+async function loadBooks() {
+  try {
+    const response = await fetch('/');
+    // Здесь нужно получить данные из серверного рендера или через API
+    // Пока используем существующий endpoint
+    await loadBooksFromAPI();
+  } catch (error) {
+    console.error("Ошибка загрузки книг:", error);
+  }
+}
+
+async function loadBooksFromAPI() {
+  // Временно: загружаем книги через существующую логику
+  // TODO: создать отдельный API endpoint для получения всех книг
+  try {
+    const token = getToken();
+    if (!token) {
+      console.warn("⚠️ Нет токена для загрузки книг");
       return;
     }
 
-    container.innerHTML = allBooks.map(book => createMiniBookCard(book)).join('');
+    const response = await fetch('/library/api/user-books', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
-    hydrateMiniBookCardImages(container);
-
-    // Обработчики событий
-    container.querySelectorAll('.book-card-mini').forEach(card => {
-      const bookId = parseInt(card.getAttribute('data-book-id'));
-      const book = allBooks.find(b => b.id === bookId);
-
-      card.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setActiveBook(bookId, container);
-      });
-
-      card.addEventListener('dblclick', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-          setActiveBook(bookId, container);
-          await openBookViewBook(bookId, !!(book && book.is_workbook));
-        } catch (err) {
+    if (response.ok) {
+      const data = await response.json();
+      console.log('📦 Данные книг получены от API:', data);
+      if (data.success) {
+        lastOwnBooks = Array.isArray(data.own_books) ? data.own_books : [];
+        lastShelfBooks = Array.isArray(data.shelf_books) ? data.shelf_books : [];
+        renderBooksList(data.own_books, data.shelf_books);
+      } else {
+        console.error("❌ Ошибка загрузки книг:", data.error);
+      }
+    } else {
+      const errorText = await response.text();
+      console.error("❌ Ошибка загрузки книг:", response.status, errorText);
+      if (response.status === 401 || response.status === 422) {
+        // Токен невалидный, нужно авторизоваться
+        if (window.UM) {
+          window.UM.requireAuth();
         }
-      });
-    });
+      }
+    }
+  } catch (error) {
+    console.error("❌ Ошибка загрузки книг:", error);
+  }
+}
+
+function renderBooksList(ownBooks, shelfBooks) {
+  const container = document.getElementById("booksList");
+  if (!container) return;
+
+  const rawFilterLang = currentBooksFilterLanguage
+    || window.USER_LANGUAGE_DATA?.currentLearning
+    || null;
+  const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
+
+  const normalizeBookLang = (b) => {
+    if (!b) return '';
+    return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
+  };
+
+  const allBooksRaw = [
+    ...(ownBooks || []).map(book => ({ ...book, isOwn: true })),
+    ...(shelfBooks || []).map(book => ({ ...book, isOwn: false }))
+  ];
+
+  const allBooks = filterLang
+    ? allBooksRaw.filter(b => {
+      const lang = normalizeBookLang(b);
+      return !lang || lang === String(filterLang).toLowerCase();
+    })
+    : allBooksRaw;
+
+  if (allBooks.length === 0) {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Нет книг</div>';
+    return;
   }
 
-  function hydrateMiniBookCardImages(root) {
-    if (!root) return;
-    root.querySelectorAll('img[data-src]').forEach(img => {
-      const src = img.getAttribute('data-src');
-      if (!src) return;
-      img.setAttribute('src', src);
-      img.removeAttribute('data-src');
+  container.innerHTML = allBooks.map(book => createMiniBookCard(book)).join('');
+
+  hydrateMiniBookCardImages(container);
+
+  // Обработчики событий
+  container.querySelectorAll('.book-card-mini').forEach(card => {
+    const bookId = parseInt(card.getAttribute('data-book-id'));
+    const book = allBooks.find(b => b.id === bookId);
+
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveBook(bookId, container);
     });
+
+    card.addEventListener('dblclick', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        setActiveBook(bookId, container);
+        await openBookViewBook(bookId, !!(book && book.is_workbook));
+      } catch (err) {
+      }
+    });
+  });
+}
+
+function hydrateMiniBookCardImages(root) {
+  if (!root) return;
+  root.querySelectorAll('img[data-src]').forEach(img => {
+    const src = img.getAttribute('data-src');
+    if (!src) return;
+    img.setAttribute('src', src);
+    img.removeAttribute('data-src');
+  });
+}
+
+function createMiniBookCard(book) {
+  const foreignClass = book.isOwn ? '' : 'foreign';
+  const activeClass = activeBookId === book.id ? 'active' : '';
+  const blankImg = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+  // Формируем URL аватара создателя
+  let creatorAvatarHtml = '';
+  if (book.creator_user_id) {
+    const avatarUrl = withCacheBust(`/user/api/avatar?user_id=${book.creator_user_id}&size=small`);
+    creatorAvatarHtml = `<img src="${blankImg}" data-src="${avatarUrl}" alt="Creator" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`;
+  } else {
+    creatorAvatarHtml = '<i data-lucide="user"></i>';
   }
 
-  function createMiniBookCard(book) {
-    const foreignClass = book.isOwn ? '' : 'foreign';
-    const activeClass = activeBookId === book.id ? 'active' : '';
-    const blankImg = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-    
-    // Формируем URL аватара создателя
-    let creatorAvatarHtml = '';
-    if (book.creator_user_id) {
-      const avatarUrl = withCacheBust(`/user/api/avatar?user_id=${book.creator_user_id}&size=small`);
-      creatorAvatarHtml = `<img src="${blankImg}" data-src="${avatarUrl}" alt="Creator" onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`;
-    } else {
-      creatorAvatarHtml = '<i data-lucide="user"></i>';
-    }
-    
-    const creatorName = book.creator_username || 'Неизвестный';
-    
-    // Формируем HTML обложки
-    let coverHtml;
-    if (book.cover_url) {
-      const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
-        ? (book.updated_at || Date.now())
-        : (window && window.__PRIVATE_LIBRARY_BUILD ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
-      coverHtml = `<img class="book-card-mini-cover" src="${blankImg}" data-src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`;
-    } else {
-      coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
-    }
-    
-    return `
+  const creatorName = book.creator_username || 'Неизвестный';
+
+  // Формируем HTML обложки
+  let coverHtml;
+  if (book.cover_url) {
+    const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
+      ? (book.updated_at || Date.now())
+      : (__APP_BUILD_LOCAL || '1');
+    coverHtml = `<img class="book-card-mini-cover" src="${blankImg}" data-src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`;
+  } else {
+    coverHtml = `<div class="book-card-mini-cover-placeholder"><i data-lucide="book"></i></div>`;
+  }
+
+  return `
       <div class="book-card-mini ${foreignClass} ${activeClass}" data-book-id="${book.id}">
         <div class="book-card-mini-cover-wrapper">
           ${coverHtml}
@@ -2486,101 +2408,101 @@
         <div class="book-card-mini-title">${book.title}</div>
       </div>
     `;
-  }
+}
 
-  function setActiveBook(bookId, root = document) {
-    activeBookId = bookId;
-    
-    // Обновляем выделение в списке
-    root.querySelectorAll('.book-card-mini').forEach(card => {
-      if (parseInt(card.getAttribute('data-book-id')) === bookId) {
-        card.classList.add('active');
-      } else {
-        card.classList.remove('active');
-      }
-    });
-  }
+function setActiveBook(bookId, root = document) {
+  activeBookId = bookId;
 
-  // ==================== ЗОНА 3: Активная книга (устарело, заменено на book-view-modal) ====================
-  async function openActiveBookZone(book) {
-    const bookId = book && typeof book === 'object' ? (book.id || null) : book;
-    if (bookId) {
-      await openBookViewBook(bookId, !!(book && book.is_workbook));
+  // Обновляем выделение в списке
+  root.querySelectorAll('.book-card-mini').forEach(card => {
+    if (parseInt(card.getAttribute('data-book-id')) === bookId) {
+      card.classList.add('active');
+    } else {
+      card.classList.remove('active');
     }
+  });
+}
+
+// ==================== ЗОНА 3: Активная книга (устарело, заменено на book-view-modal) ====================
+async function openActiveBookZone(book) {
+  const bookId = book && typeof book === 'object' ? (book.id || null) : book;
+  if (bookId) {
+    await openBookViewBook(bookId, !!(book && book.is_workbook));
   }
+}
 
-  function closeActiveBookZone() {
-    closeBookViewModal();
-  }
+function closeActiveBookZone() {
+  closeBookViewModal();
+}
 
-  async function loadActiveBook(bookId, isWorkbook = false) {
-    try {
-      activeBookIsWorkbook = !!isWorkbook;
-      // Загружаем информацию о книге
-      const bookData = await apiRequest(`/library/api/book/${bookId}`);
-      
-      if (bookData.success && bookData.book) {
-        const viewCard = document.getElementById('bookViewCard');
-        const viewStructure = document.getElementById('bookViewStructure');
+async function loadActiveBook(bookId, isWorkbook = false) {
+  try {
+    activeBookIsWorkbook = !!isWorkbook;
+    // Загружаем информацию о книге
+    const bookData = await apiRequest(`/library/api/book/${bookId}`);
 
-        if (viewCard && viewStructure) {
-          openBookViewModal();
-          bookViewActiveBookId = bookId;
-          renderActiveBookCard(bookData.book, viewCard, { onClose: closeBookViewModal });
-        } else {
-          renderActiveBookCard(bookData.book);
-        }
-      }
-      
-      let sections = [];
-      let dictations = [];
-      
-      if (isWorkbook) {
-        // Для рабочей тетради загружаем бесхозные диктанты
-        const orphanData = await apiRequest(`/library/api/orphan-dictations`);
-        dictations = orphanData.success ? orphanData.dictations : [];
-      } else {
-        // Для обычных книг загружаем разделы и диктанты
-        const sectionsData = await apiRequest(`/library/api/book/${bookId}/sections`);
-        const dictationsData = await apiRequest(`/library/api/book/${bookId}/dictations`);
-        
-        sections = sectionsData.success ? sectionsData.sections : [];
-        dictations = dictationsData.success ? dictationsData.dictations : [];
-        
-        console.log('📚 Загружены разделы:', sections);
-        sections.forEach(s => {
-          console.log(`  - Раздел ${s.id}: "${s.title}", section_number: ${s.section_number}`);
-        });
-        
-        // Сохраняем разделы в глобальной переменной для доступа при редактировании
-        window.currentBookSections = sections;
-      }
-      
+    if (bookData.success && bookData.book) {
+      const viewCard = document.getElementById('bookViewCard');
       const viewStructure = document.getElementById('bookViewStructure');
-      if (viewStructure) {
-        renderBookContentTo(viewStructure, sections, dictations, isWorkbook);
+
+      if (viewCard && viewStructure) {
+        openBookViewModal();
+        bookViewActiveBookId = bookId;
+        renderActiveBookCard(bookData.book, viewCard, { onClose: closeBookViewModal });
+      } else {
+        renderActiveBookCard(bookData.book);
       }
-    } catch (error) {
-      console.error("Ошибка загрузки активной книги:", error);
     }
+
+    let sections = [];
+    let dictations = [];
+
+    if (isWorkbook) {
+      // Для рабочей тетради загружаем бесхозные диктанты
+      const orphanData = await apiRequest(`/library/api/orphan-dictations`);
+      dictations = orphanData.success ? orphanData.dictations : [];
+    } else {
+      // Для обычных книг загружаем разделы и диктанты
+      const sectionsData = await apiRequest(`/library/api/book/${bookId}/sections`);
+      const dictationsData = await apiRequest(`/library/api/book/${bookId}/dictations`);
+
+      sections = sectionsData.success ? sectionsData.sections : [];
+      dictations = dictationsData.success ? dictationsData.dictations : [];
+
+      console.log('📚 Загружены разделы:', sections);
+      sections.forEach(s => {
+        console.log(`  - Раздел ${s.id}: "${s.title}", section_number: ${s.section_number}`);
+      });
+
+      // Сохраняем разделы в глобальной переменной для доступа при редактировании
+      window.currentBookSections = sections;
+    }
+
+    const viewStructure = document.getElementById('bookViewStructure');
+    if (viewStructure) {
+      renderBookContentTo(viewStructure, sections, dictations, isWorkbook);
+    }
+  } catch (error) {
+    console.error("Ошибка загрузки активной книги:", error);
+  }
+}
+
+function renderBookContentTo(container, sections, dictations, isWorkbook = false) {
+  if (!container) return;
+
+  if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этой книге нет разделов и диктантов</div>';
+    return;
   }
 
-  function renderBookContentTo(container, sections, dictations, isWorkbook = false) {
-    if (!container) return;
+  let html = '';
 
-    if ((!sections || sections.length === 0) && (!dictations || dictations.length === 0)) {
-      container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этой книге нет разделов и диктантов</div>';
-      return;
-    }
+  if (!isWorkbook && sections && sections.length > 0) {
+    html += '<div class="book-structure-list">';
+    sections.forEach(section => {
+      const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
 
-    let html = '';
-
-    if (!isWorkbook && sections && sections.length > 0) {
-      html += '<div class="book-structure-list">';
-      sections.forEach(section => {
-        const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
-
-        html += `
+      html += `
           <div class="structure-item structure-section" data-section-id="${section.id}">
             <div class="structure-item-header">
               <button class="structure-item-toggle" data-section-id="${section.id}" title="Развернуть/свернуть">
@@ -2610,124 +2532,124 @@
             </div>
           </div>
         `;
-      });
-      html += '</div>';
-    }
-
-    if (dictations && dictations.length > 0) {
-      html += '<div class="shorts-grid">';
-      dictations.forEach(d => {
-        html += createDictationCard(d, false);
-      });
-      html += '</div>';
-    }
-
-    container.innerHTML = html;
-
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
-    }
-
-    setTimeout(() => {
-      updateCompletionBadges(container);
-    }, 100);
-  }
-
-  async function loadSectionForEdit(sectionId) {
-    try {
-      console.log('📚 Загружаю раздел для редактирования:', sectionId);
-      const sectionData = await apiRequest(`/library/api/book/${sectionId}`);
-      if (sectionData.success && sectionData.book) {
-        console.log('📚 Данные раздела загружены:', sectionData.book);
-        openSectionModal(sectionData.book, sectionData.book.parent_id);
-      } else {
-        // Если не получилось загрузить через API, ищем в текущих разделах
-        const sections = window.currentBookSections || [];
-        const section = sections.find(s => s.id === parseInt(sectionId));
-        if (section) {
-          console.log('📚 Раздел найден в текущих разделах:', section);
-          openSectionModal(section, section.parent_id);
-        } else {
-          console.error('📚 Раздел не найден');
-          showToast("Не удалось загрузить данные раздела", "error");
-        }
-      }
-    } catch (error) {
-      console.error("Ошибка загрузки раздела для редактирования:", error);
-      showToast("Ошибка загрузки раздела", "error");
-    }
-  }
-
-  function renderActiveBookCard(book, targetContainer = null, options = {}) {
-    const container = targetContainer
-      || document.getElementById("bookViewCard")
-      ;
-    if (!container) return;
-
-    console.log('📖 Рендерю большую карточку книги:', {
-      id: book.id,
-      title: book.title,
-      creator_user_id: book.creator_user_id,
-      creator_username: book.creator_username
     });
+    html += '</div>';
+  }
 
-    const avatarUrl = book.creator_user_id 
-      ? `/user/api/avatar?user_id=${book.creator_user_id}&size=small&t=${Date.now()}`
-      : '';
-    // Проверяем все возможные варианты имени создателя
-    const creatorName = book.creator_username || 
-                        (book.creator_user_id ? 'Загрузка...' : 'Неизвестный') || 
-                        'Неизвестный';
-    
-    console.log('👤 Имя создателя:', creatorName);
-    console.log('👤 book.creator_username:', book.creator_username);
-    console.log('👤 book.creator_user_id:', book.creator_user_id);
-    console.log('👤 Все поля book:', Object.keys(book));
-    
-    // Если creator_user_id отсутствует, пытаемся найти его в массиве publicBooks
-    let finalCreatorUserId = book.creator_user_id;
-    if (!finalCreatorUserId && book.id && typeof publicBooks !== 'undefined') {
-      const bookFromList = publicBooks.find(b => b.id === book.id);
-      if (bookFromList && bookFromList.creator_user_id) {
-        finalCreatorUserId = bookFromList.creator_user_id;
-        book.creator_user_id = finalCreatorUserId;
-        console.log('👤 Найден creator_user_id из списка:', finalCreatorUserId);
+  if (dictations && dictations.length > 0) {
+    html += '<div class="shorts-grid">';
+    dictations.forEach(d => {
+      html += createDictationCard(d, false);
+    });
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+
+  setTimeout(() => {
+    updateCompletionBadges(container);
+  }, 100);
+}
+
+async function loadSectionForEdit(sectionId) {
+  try {
+    console.log('📚 Загружаю раздел для редактирования:', sectionId);
+    const sectionData = await apiRequest(`/library/api/book/${sectionId}`);
+    if (sectionData.success && sectionData.book) {
+      console.log('📚 Данные раздела загружены:', sectionData.book);
+      openSectionModal(sectionData.book, sectionData.book.parent_id);
+    } else {
+      // Если не получилось загрузить через API, ищем в текущих разделах
+      const sections = window.currentBookSections || [];
+      const section = sections.find(s => s.id === parseInt(sectionId));
+      if (section) {
+        console.log('📚 Раздел найден в текущих разделах:', section);
+        openSectionModal(section, section.parent_id);
+      } else {
+        console.error('📚 Раздел не найден');
+        showToast("Не удалось загрузить данные раздела", "error");
       }
     }
-    
-    // Используем обновленный avatarUrl или исходный
-    const finalAvatarUrl = finalCreatorUserId 
-      ? `/user/api/avatar?user_id=${finalCreatorUserId}&size=small&t=${Date.now()}`
-      : '';
+  } catch (error) {
+    console.error("Ошибка загрузки раздела для редактирования:", error);
+    showToast("Ошибка загрузки раздела", "error");
+  }
+}
 
-    // Если есть ссылка на материалы автора, делаем картинку кликабельной
-    const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
-      ? (book.updated_at || Date.now())
-      : (window && window.__PRIVATE_LIBRARY_BUILD ? String(window.__PRIVATE_LIBRARY_BUILD) : '1');
-    const coverImage = book.cover_url 
-      ? `<img src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`
-      : `<div class="book-card-max-cover-placeholder"><i data-lucide="book-open"></i></div>`;
-    
-    const coverContent = book.author_materials_url
-      ? `<a href="${book.author_materials_url}" target="_blank" title="${book.author_materials_url}" style="display: block; width: 100%; height: 100%;">${coverImage}</a>`
-      : coverImage;
-    
-    // Индикатор видимости (перемещен в заголовок, перед названием)
-    const isPublic = book.visibility === 'public' || book.is_public === true;
-    const visibilityBadge = `
+function renderActiveBookCard(book, targetContainer = null, options = {}) {
+  const container = targetContainer
+    || document.getElementById("bookViewCard")
+    ;
+  if (!container) return;
+
+  console.log('📖 Рендерю большую карточку книги:', {
+    id: book.id,
+    title: book.title,
+    creator_user_id: book.creator_user_id,
+    creator_username: book.creator_username
+  });
+
+  const avatarUrl = book.creator_user_id
+    ? `/user/api/avatar?user_id=${book.creator_user_id}&size=small&t=${Date.now()}`
+    : '';
+  // Проверяем все возможные варианты имени создателя
+  const creatorName = book.creator_username ||
+    (book.creator_user_id ? 'Загрузка...' : 'Неизвестный') ||
+    'Неизвестный';
+
+  console.log('👤 Имя создателя:', creatorName);
+  console.log('👤 book.creator_username:', book.creator_username);
+  console.log('👤 book.creator_user_id:', book.creator_user_id);
+  console.log('👤 Все поля book:', Object.keys(book));
+
+  // Если creator_user_id отсутствует, пытаемся найти его в массиве publicBooks
+  let finalCreatorUserId = book.creator_user_id;
+  if (!finalCreatorUserId && book.id && typeof publicBooks !== 'undefined') {
+    const bookFromList = publicBooks.find(b => b.id === book.id);
+    if (bookFromList && bookFromList.creator_user_id) {
+      finalCreatorUserId = bookFromList.creator_user_id;
+      book.creator_user_id = finalCreatorUserId;
+      console.log('👤 Найден creator_user_id из списка:', finalCreatorUserId);
+    }
+  }
+
+  // Используем обновленный avatarUrl или исходный
+  const finalAvatarUrl = finalCreatorUserId
+    ? `/user/api/avatar?user_id=${finalCreatorUserId}&size=small&t=${Date.now()}`
+    : '';
+
+  // Если есть ссылка на материалы автора, делаем картинку кликабельной
+  const coverV = (book.cover_url && String(book.cover_url).includes('/library/api/book-cover'))
+    ? (book.updated_at || Date.now())
+    : (__APP_BUILD_LOCAL || '1');
+  const coverImage = book.cover_url
+    ? `<img src="${withCacheBustVersion(book.cover_url, coverV)}" alt="${book.title}">`
+    : `<div class="book-card-max-cover-placeholder"><i data-lucide="book-open"></i></div>`;
+
+  const coverContent = book.author_materials_url
+    ? `<a href="${book.author_materials_url}" target="_blank" title="${book.author_materials_url}" style="display: block; width: 100%; height: 100%;">${coverImage}</a>`
+    : coverImage;
+
+  // Индикатор видимости (перемещен в заголовок, перед названием)
+  const isPublic = book.visibility === 'public' || book.is_public === true;
+  const visibilityBadge = `
       <div class="book-card-max-visibility-badge" title="${isPublic ? 'Публичная книга (видна всем)' : 'Вижу только я'}">
         <i data-lucide="${isPublic ? 'globe' : 'home'}"></i>
       </div>
     `;
-    
-    // Кнопка закрытия книги
-    const closeButton = `
+
+  // Кнопка закрытия книги
+  const closeButton = `
       <button class="book-card-max-close-btn btn-close-active-book" title="Закрыть книгу">
         <i data-lucide="arrow-left-to-line"></i>
       </button>
     `;
-    
-    container.innerHTML = `
+
+  container.innerHTML = `
       <div class="book-card-max">
         ${closeButton}
         <div class="book-card-max-cover-wrapper">
@@ -2736,10 +2658,10 @@
           </div>
           <div class="book-card-max-creator">
             <div class="book-card-max-creator-avatar">
-              ${finalAvatarUrl 
-                ? `<img src="${finalAvatarUrl}" alt="${creatorName}" onerror="this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">` 
-                : '<i data-lucide="user"></i>'
-              }
+              ${finalAvatarUrl
+      ? `<img src="${finalAvatarUrl}" alt="${creatorName}" onerror="this.parentElement.innerHTML='<i data-lucide=\\'user\\'></i>'; if (window.lucide) lucide.createIcons();">`
+      : '<i data-lucide="user"></i>'
+    }
             </div>
             <div class="book-card-max-creator-name">${creatorName}</div>
           </div>
@@ -2784,46 +2706,46 @@
       </div>
     `;
 
-    // Обработчик кнопки закрытия книги
-    const closeBtn = container.querySelector(".btn-close-active-book");
-    if (closeBtn) {
-      closeBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof options.onClose === 'function') {
-          options.onClose();
-        } else {
-          closeActiveBookZone();
-        }
-      });
-    }
+  // Обработчик кнопки закрытия книги
+  const closeBtn = container.querySelector(".btn-close-active-book");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof options.onClose === 'function') {
+        options.onClose();
+      } else {
+        closeActiveBookZone();
+      }
+    });
+  }
 
-    // Обработчики выпадающего меню действий книги
-    const bookActionsBtn = container.querySelector(".btn-book-actions");
-    const bookActionsMenu = container.querySelector(".book-actions-menu");
-    
-    if (bookActionsBtn && bookActionsMenu) {
-      // Открытие/закрытие меню
-      bookActionsBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        // Закрываем все другие меню
-        document.querySelectorAll('.section-actions-menu').forEach(m => {
-          m.classList.remove('show');
-          m.style.display = 'none';
-        });
-        
-        const isVisible = bookActionsMenu.classList.contains('show');
-        if (isVisible) {
-          bookActionsMenu.classList.remove('show');
-          bookActionsMenu.style.display = 'none';
-        } else {
-          bookActionsMenu.classList.add('show');
-          bookActionsMenu.style.display = 'block';
-          
-          // Закрываем меню при клике вне его
-          setTimeout(() => {
-          const closeMenuHandler = function(e) {
+  // Обработчики выпадающего меню действий книги
+  const bookActionsBtn = container.querySelector(".btn-book-actions");
+  const bookActionsMenu = container.querySelector(".book-actions-menu");
+
+  if (bookActionsBtn && bookActionsMenu) {
+    // Открытие/закрытие меню
+    bookActionsBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Закрываем все другие меню
+      document.querySelectorAll('.section-actions-menu').forEach(m => {
+        m.classList.remove('show');
+        m.style.display = 'none';
+      });
+
+      const isVisible = bookActionsMenu.classList.contains('show');
+      if (isVisible) {
+        bookActionsMenu.classList.remove('show');
+        bookActionsMenu.style.display = 'none';
+      } else {
+        bookActionsMenu.classList.add('show');
+        bookActionsMenu.style.display = 'block';
+
+        // Закрываем меню при клике вне его
+        setTimeout(() => {
+          const closeMenuHandler = function (e) {
             if (!bookActionsMenu.contains(e.target) && !bookActionsBtn.contains(e.target)) {
               bookActionsMenu.classList.remove('show');
               bookActionsMenu.style.display = 'none';
@@ -2834,97 +2756,97 @@
         }, 0);
       }
     });
-      
-      // Обработчики пунктов меню
-      bookActionsMenu.addEventListener("click", (e) => {
-        const item = e.target.closest('.dropdown-menu-item');
-        if (!item) return;
-        
-        e.preventDefault();
-        e.stopPropagation();
-        
-        const action = item.getAttribute('data-action');
-        bookActionsMenu.classList.remove('show');
-        bookActionsMenu.style.display = 'none';
-        
-        switch(action) {
-          case 'add-section':
-            openSectionModal(null, activeBookId);
-            break;
-          case 'add-dictation':
-            if (activeBookId) {
-              setDictationTargetBook(activeBookId);
-            }
-            window.location.href = '/dictation_editor/new';
-            break;
-          case 'edit-book':
-            openBookModal(book);
-            break;
-          case 'delete-book':
-            if (confirm(`Вы уверены, что хотите удалить книгу "${book.title}"?`)) {
-              deleteBook(book.id);
-            }
-            break;
-        }
+
+    // Обработчики пунктов меню
+    bookActionsMenu.addEventListener("click", (e) => {
+      const item = e.target.closest('.dropdown-menu-item');
+      if (!item) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const action = item.getAttribute('data-action');
+      bookActionsMenu.classList.remove('show');
+      bookActionsMenu.style.display = 'none';
+
+      switch (action) {
+        case 'add-section':
+          openSectionModal(null, activeBookId);
+          break;
+        case 'add-dictation':
+          if (activeBookId) {
+            setDictationTargetBook(activeBookId);
+          }
+          window.location.href = '/dictation_editor/new';
+          break;
+        case 'edit-book':
+          openBookModal(book);
+          break;
+        case 'delete-book':
+          if (confirm(`Вы уверены, что хотите удалить книгу "${book.title}"?`)) {
+            deleteBook(book.id);
+          }
+          break;
+      }
+    });
+  }
+
+  // Обновляем иконки
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+async function loadSectionDictations(sectionId, container) {
+  try {
+    console.log('📚 Загружаю диктанты для раздела:', sectionId);
+    console.log('📚 URL запроса:', `/library/api/book/${sectionId}/dictations`);
+    const dictationsData = await apiRequest(`/library/api/book/${sectionId}/dictations`);
+    console.log('📚 Полный ответ API для раздела', sectionId, ':', JSON.stringify(dictationsData, null, 2));
+    const dictations = dictationsData.success ? dictationsData.dictations : [];
+    console.log('📚 Загружено диктантов:', dictations.length);
+    if (dictations.length > 0) {
+      console.log('📚 Список диктантов:', dictations.map(d => ({ id: d.id, title: d.title })));
+    }
+
+    // Удаляем индикатор загрузки
+    const loadingDiv = container.querySelector('.section-dictations-loading');
+    if (loadingDiv) {
+      loadingDiv.remove();
+    }
+
+    if (dictations.length === 0) {
+      console.log('📚 Раздел пуст, показываю сообщение');
+      container.innerHTML = '<div class="section-dictations-empty" style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этом разделе нет диктантов</div>';
+    } else {
+      console.log('📚 Рендерю', dictations.length, 'диктантов');
+      let html = '<div class="section-dictations-grid shorts-grid">';
+      dictations.forEach(d => {
+        html += createDictationCard(d, false); // false = карточка для книги
       });
-    }
+      html += '</div>';
+      container.innerHTML = html;
 
-    // Обновляем иконки
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
+      // Создаём иконки Lucide для новых карточек
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+
+      // Загружаем статистику и медальки для карточек диктантов
+      setTimeout(() => {
+        // Статистика (звезды/полузвезды/микрофон) только на столе, не в библиотеке
+        updateCompletionBadges(container); // Медальки остаются
+      }, 100);
     }
+  } catch (error) {
+    console.error("Ошибка загрузки диктантов раздела:", error);
+    container.innerHTML = '<div class="section-dictations-error" style="padding: 20px; text-align: center; color: var(--color-error);">Ошибка загрузки диктантов</div>';
   }
-
-  async function loadSectionDictations(sectionId, container) {
-    try {
-      console.log('📚 Загружаю диктанты для раздела:', sectionId);
-      console.log('📚 URL запроса:', `/library/api/book/${sectionId}/dictations`);
-      const dictationsData = await apiRequest(`/library/api/book/${sectionId}/dictations`);
-      console.log('📚 Полный ответ API для раздела', sectionId, ':', JSON.stringify(dictationsData, null, 2));
-      const dictations = dictationsData.success ? dictationsData.dictations : [];
-      console.log('📚 Загружено диктантов:', dictations.length);
-      if (dictations.length > 0) {
-        console.log('📚 Список диктантов:', dictations.map(d => ({ id: d.id, title: d.title })));
-      }
-      
-      // Удаляем индикатор загрузки
-      const loadingDiv = container.querySelector('.section-dictations-loading');
-      if (loadingDiv) {
-        loadingDiv.remove();
-      }
-      
-      if (dictations.length === 0) {
-        console.log('📚 Раздел пуст, показываю сообщение');
-        container.innerHTML = '<div class="section-dictations-empty" style="padding: 20px; text-align: center; color: var(--color-text-secondary);">В этом разделе нет диктантов</div>';
-      } else {
-        console.log('📚 Рендерю', dictations.length, 'диктантов');
-        let html = '<div class="section-dictations-grid shorts-grid">';
-        dictations.forEach(d => {
-          html += createDictationCard(d, false); // false = карточка для книги
-        });
-        html += '</div>';
-        container.innerHTML = html;
-        
-        // Создаём иконки Lucide для новых карточек
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons();
-        }
-        
-        // Загружаем статистику и медальки для карточек диктантов
-        setTimeout(() => {
-          // Статистика (звезды/полузвезды/микрофон) только на столе, не в библиотеке
-          updateCompletionBadges(container); // Медальки остаются
-        }, 100);
-      }
-    } catch (error) {
-      console.error("Ошибка загрузки диктантов раздела:", error);
-      container.innerHTML = '<div class="section-dictations-error" style="padding: 20px; text-align: center; color: var(--color-error);">Ошибка загрузки диктантов</div>';
-    }
-  }
+}
 
 
-  function renderDictationsAsCards(dictations, container) {
-    container.innerHTML = `
+function renderDictationsAsCards(dictations, container) {
+  container.innerHTML = `
       <div class="shorts-grid">
         ${dictations.map(d => `
           <div class="short-card" data-dictation-id="${d.id}">
@@ -2940,10 +2862,10 @@
         `).join('')}
       </div>
     `;
-  }
+}
 
-  function renderDictationsAsList(dictations, container) {
-    container.innerHTML = `
+function renderDictationsAsList(dictations, container) {
+  container.innerHTML = `
       <ul class="dictations-list">
         ${dictations.map(d => `
           <li class="dictation-list-item">
@@ -2954,1262 +2876,1262 @@
         `).join('')}
       </ul>
     `;
-  }
+}
 
-  // ==================== Модальное окно книги ====================
+// ==================== Модальное окно книги ====================
 
-  function openBookModal(book) {
-    // Очищаем предыдущий cropped blob
-    croppedImageBlob = null;
+function openBookModal(book) {
+  // Очищаем предыдущий cropped blob
+  croppedImageBlob = null;
 
-    setBookEditDirty(false);
-    
-    const modal = document.getElementById("book-edit-modal");
-    const titleEl = document.getElementById("book-edit-title");
-    const idInput = document.getElementById("book-id-input");
-    const titleInput = document.getElementById("book-title-input");
-    const authorInput = document.getElementById("book-author-text-input");
-    const themeInput = document.getElementById("book-theme-input");
-    const visibilityInput = document.getElementById("book-visibility-input");
-    const descInput = document.getElementById("book-description-input");
-    const authorMaterialsUrlInput = document.getElementById("book-author-materials-url-input");
-    const coverPreview = document.getElementById("book-cover-preview");
-    const coverPlaceholder = document.getElementById("book-cover-placeholder");
-    const coverUploadInput = document.getElementById("book-cover-upload");
+  setBookEditDirty(false);
 
-    if (!modal) return;
+  const modal = document.getElementById("book-edit-modal");
+  const titleEl = document.getElementById("book-edit-title");
+  const idInput = document.getElementById("book-id-input");
+  const titleInput = document.getElementById("book-title-input");
+  const authorInput = document.getElementById("book-author-text-input");
+  const themeInput = document.getElementById("book-theme-input");
+  const visibilityInput = document.getElementById("book-visibility-input");
+  const descInput = document.getElementById("book-description-input");
+  const authorMaterialsUrlInput = document.getElementById("book-author-materials-url-input");
+  const coverPreview = document.getElementById("book-cover-preview");
+  const coverPlaceholder = document.getElementById("book-cover-placeholder");
+  const coverUploadInput = document.getElementById("book-cover-upload");
 
-    if (book) {
-      titleEl.textContent = "Редактирование книги";
-      idInput.value = book.id;
-      titleInput.value = book.title || "";
-      authorInput.value = book.author_text || "";
-      themeInput.value = book.theme || "";
-      visibilityInput.value = book.visibility || "private";
-      descInput.value = book.short_description || "";
-      if (authorMaterialsUrlInput) {
-        authorMaterialsUrlInput.value = book.author_materials_url || "";
-      }
-      
-      if (book.cover_url) {
-        coverPreview.src = book.cover_url;
-        coverPreview.style.display = "block";
-        coverPlaceholder.style.display = "none";
-      } else {
-        coverPreview.style.display = "none";
-        coverPlaceholder.style.display = "flex";
-      }
+  if (!modal) return;
+
+  if (book) {
+    titleEl.textContent = "Редактирование книги";
+    idInput.value = book.id;
+    titleInput.value = book.title || "";
+    authorInput.value = book.author_text || "";
+    themeInput.value = book.theme || "";
+    visibilityInput.value = book.visibility || "private";
+    descInput.value = book.short_description || "";
+    if (authorMaterialsUrlInput) {
+      authorMaterialsUrlInput.value = book.author_materials_url || "";
+    }
+
+    if (book.cover_url) {
+      coverPreview.src = book.cover_url;
+      coverPreview.style.display = "block";
+      coverPlaceholder.style.display = "none";
     } else {
-      titleEl.textContent = "Новая книга";
-      idInput.value = "";
-      titleInput.value = "";
-      authorInput.value = "";
-      themeInput.value = "";
-      visibilityInput.value = "private";
-      descInput.value = "";
-      if (authorMaterialsUrlInput) {
-        authorMaterialsUrlInput.value = "";
-      }
       coverPreview.style.display = "none";
       coverPlaceholder.style.display = "flex";
-      coverPreview.src = "";
-      if (coverUploadInput) {
-        coverUploadInput.value = "";
-      }
     }
-
-    modal.style.display = "flex";
-    modal.classList.add("show");
-    
-    const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
-    initBookLanguageSelector(defaultLang);
-
-    // Track unsaved edits in inputs/selects.
-    try {
-      const trackIds = [
-        'book-title-input',
-        'book-author-text-input',
-        'book-author-materials-url-input',
-        'book-theme-input',
-        'book-visibility-input',
-        'book-description-input'
-      ];
-      trackIds.forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (el.dataset && el.dataset.bookDirtyBound === '1') return;
-        if (el.dataset) el.dataset.bookDirtyBound = '1';
-        el.addEventListener('input', () => setBookEditDirty(true));
-        el.addEventListener('change', () => setBookEditDirty(true));
-      });
-    } catch (e) {
+  } else {
+    titleEl.textContent = "Новая книга";
+    idInput.value = "";
+    titleInput.value = "";
+    authorInput.value = "";
+    themeInput.value = "";
+    visibilityInput.value = "private";
+    descInput.value = "";
+    if (authorMaterialsUrlInput) {
+      authorMaterialsUrlInput.value = "";
     }
-    
-    if (typeof lucide !== 'undefined') {
-      lucide.createIcons();
+    coverPreview.style.display = "none";
+    coverPlaceholder.style.display = "flex";
+    coverPreview.src = "";
+    if (coverUploadInput) {
+      coverUploadInput.value = "";
     }
   }
 
-  function closeBookModal() {
-    const modal = document.getElementById("book-edit-modal");
-    if (modal) {
-      modal.style.display = "none";
-      modal.classList.remove("show");
-    }
+  modal.style.display = "flex";
+  modal.classList.add("show");
 
-    setBookEditDirty(false);
+  const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
+  initBookLanguageSelector(defaultLang);
+
+  // Track unsaved edits in inputs/selects.
+  try {
+    const trackIds = [
+      'book-title-input',
+      'book-author-text-input',
+      'book-author-materials-url-input',
+      'book-theme-input',
+      'book-visibility-input',
+      'book-description-input'
+    ];
+    trackIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (el.dataset && el.dataset.bookDirtyBound === '1') return;
+      if (el.dataset) el.dataset.bookDirtyBound = '1';
+      el.addEventListener('input', () => setBookEditDirty(true));
+      el.addEventListener('change', () => setBookEditDirty(true));
+    });
+  } catch (e) {
   }
 
-  // ==================== Модальное окно раздела ====================
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
 
-  async function openSectionModal(section, parentId) {
-    const modal = document.getElementById("section-edit-modal");
-    const titleEl = document.getElementById("section-edit-title");
-    const idInput = document.getElementById("section-id-input");
-    const parentIdInput = document.getElementById("section-parent-id-input");
-    const numberInput = document.getElementById("section-number-input");
-    const titleInput = document.getElementById("section-title-input");
+function closeBookModal() {
+  const modal = document.getElementById("book-edit-modal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.remove("show");
+  }
 
-    if (!modal) return;
+  setBookEditDirty(false);
+}
 
-    if (section) {
-      // Редактирование существующего раздела
-      titleEl.textContent = "Редактирование раздела";
-      idInput.value = section.id;
-      parentIdInput.value = section.parent_id || '';
-      numberInput.value = section.section_number || '';
-      titleInput.value = section.title || "";
-    } else {
-      // Создание нового раздела
-      titleEl.textContent = "Новый раздел";
-      idInput.value = "";
-      parentIdInput.value = parentId || activeBookId;
-      titleInput.value = "";
-      
-      // Автоматически определяем номер для нового раздела
-      const bookId = parentId || activeBookId;
-      if (bookId) {
-        try {
-          const sectionsData = await apiRequest(`/library/api/book/${bookId}/sections`);
-          const sections = sectionsData.success ? sectionsData.sections : [];
-          
-          if (sections.length === 0) {
-            // Первый раздел - номер 1
-            numberInput.value = "1";
-          } else {
-            // Находим максимальный номер и прибавляем 1
-            const maxNumber = Math.max(
-              ...sections
-                .map(s => s.section_number)
-                .filter(n => n !== null && n !== undefined)
-                .concat([0]) // Если все номера null, начинаем с 0
-            );
-            numberInput.value = String(maxNumber + 1);
-          }
-        } catch (error) {
-          console.error("Ошибка загрузки разделов для определения номера:", error);
-          // В случае ошибки ставим 1
+// ==================== Модальное окно раздела ====================
+
+async function openSectionModal(section, parentId) {
+  const modal = document.getElementById("section-edit-modal");
+  const titleEl = document.getElementById("section-edit-title");
+  const idInput = document.getElementById("section-id-input");
+  const parentIdInput = document.getElementById("section-parent-id-input");
+  const numberInput = document.getElementById("section-number-input");
+  const titleInput = document.getElementById("section-title-input");
+
+  if (!modal) return;
+
+  if (section) {
+    // Редактирование существующего раздела
+    titleEl.textContent = "Редактирование раздела";
+    idInput.value = section.id;
+    parentIdInput.value = section.parent_id || '';
+    numberInput.value = section.section_number || '';
+    titleInput.value = section.title || "";
+  } else {
+    // Создание нового раздела
+    titleEl.textContent = "Новый раздел";
+    idInput.value = "";
+    parentIdInput.value = parentId || activeBookId;
+    titleInput.value = "";
+
+    // Автоматически определяем номер для нового раздела
+    const bookId = parentId || activeBookId;
+    if (bookId) {
+      try {
+        const sectionsData = await apiRequest(`/library/api/book/${bookId}/sections`);
+        const sections = sectionsData.success ? sectionsData.sections : [];
+
+        if (sections.length === 0) {
+          // Первый раздел - номер 1
           numberInput.value = "1";
+        } else {
+          // Находим максимальный номер и прибавляем 1
+          const maxNumber = Math.max(
+            ...sections
+              .map(s => s.section_number)
+              .filter(n => n !== null && n !== undefined)
+              .concat([0]) // Если все номера null, начинаем с 0
+          );
+          numberInput.value = String(maxNumber + 1);
         }
-      } else {
+      } catch (error) {
+        console.error("Ошибка загрузки разделов для определения номера:", error);
+        // В случае ошибки ставим 1
         numberInput.value = "1";
       }
-    }
-
-    modal.style.display = "flex";
-    modal.classList.add("show");
-    titleInput.focus();
-  }
-
-  function closeSectionModal() {
-    const modal = document.getElementById("section-edit-modal");
-    if (modal) {
-      modal.style.display = "none";
-      modal.classList.remove("show");
+    } else {
+      numberInput.value = "1";
     }
   }
 
-  async function handleSaveSection(event) {
-    event.preventDefault();
+  modal.style.display = "flex";
+  modal.classList.add("show");
+  titleInput.focus();
+}
 
-    const idInput = document.getElementById("section-id-input");
-    const parentIdInput = document.getElementById("section-parent-id-input");
-    const numberInput = document.getElementById("section-number-input");
-    const titleInput = document.getElementById("section-title-input");
+function closeSectionModal() {
+  const modal = document.getElementById("section-edit-modal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.remove("show");
+  }
+}
 
-    const sectionId = idInput.value ? parseInt(idInput.value, 10) : null;
-    const parentIdRaw = parentIdInput ? String(parentIdInput.value || '').trim() : '';
-    const parentId = parentIdRaw ? parseInt(parentIdRaw, 10) : null;
-    const sectionNumber = numberInput.value ? parseInt(numberInput.value, 10) : null;
+async function handleSaveSection(event) {
+  event.preventDefault();
 
-    if (!titleInput.value.trim()) {
-      showToast("Введите название раздела");
+  const idInput = document.getElementById("section-id-input");
+  const parentIdInput = document.getElementById("section-parent-id-input");
+  const numberInput = document.getElementById("section-number-input");
+  const titleInput = document.getElementById("section-title-input");
+
+  const sectionId = idInput.value ? parseInt(idInput.value, 10) : null;
+  const parentIdRaw = parentIdInput ? String(parentIdInput.value || '').trim() : '';
+  const parentId = parentIdRaw ? parseInt(parentIdRaw, 10) : null;
+  const sectionNumber = numberInput.value ? parseInt(numberInput.value, 10) : null;
+
+  if (!titleInput.value.trim()) {
+    showToast("Введите название раздела");
+    return;
+  }
+
+  // Safety: section must have a valid parent book/section.
+  // If parentId is invalid, JSON.stringify(NaN) becomes null and server will create a top-level book,
+  // which looks like "section didn't add".
+  if (!parentId || Number.isNaN(parentId)) {
+    showToast("Ошибка: не выбрана книга для раздела", { durationMs: 2500 });
+    return;
+  }
+
+  showLoadingIndicator("Сохранение раздела...");
+
+  try {
+    const payload = {
+      title: titleInput.value.trim(),
+      parent_id: parentId,
+      section_number: sectionNumber,
+      // Разделы не имеют обложек, авторов и описаний
+      author_text: null,
+      short_description: null,
+      original_language: null,
+      visibility: 'private',
+      theme: null,
+      order_index: 0
+    };
+
+    console.log('💾 Сохраняю раздел с payload:', payload);
+    console.log('💾 section_number в payload:', payload.section_number, 'тип:', typeof payload.section_number);
+
+    let data;
+    if (sectionId) {
+      // Обновление раздела
+      data = await apiRequest(`/library/api/book/${sectionId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    } else {
+      // Создание нового раздела
+      data = await apiRequest("/library/api/book", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!data.success) {
+      hideLoadingIndicator();
+      showToast(data.error || "Ошибка сохранения раздела");
       return;
     }
 
-    // Safety: section must have a valid parent book/section.
-    // If parentId is invalid, JSON.stringify(NaN) becomes null and server will create a top-level book,
-    // which looks like "section didn't add".
-    if (!parentId || Number.isNaN(parentId)) {
-      showToast("Ошибка: не выбрана книга для раздела", { durationMs: 2500 });
+    console.log('✅ Раздел сохранен, ответ сервера:', data);
+    if (data.book) {
+      console.log('📚 Сохраненный раздел:', data.book);
+      console.log('📚 section_number:', data.book.section_number);
+    }
+
+    closeSectionModal();
+
+    // Перезагружаем активную книгу чтобы показать новые разделы
+    if (activeBookId) {
+      console.log('🔄 Перезагружаю активную книгу:', activeBookId);
+      await loadActiveBook(activeBookId);
+    }
+
+    hideLoadingIndicator();
+  } catch (error) {
+    console.error("Ошибка сохранения раздела:", error);
+    hideLoadingIndicator();
+    showToast("Ошибка сохранения раздела");
+  }
+}
+
+// ==================== Crop Modal ====================
+
+function handleCoverSelect(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  // Проверяем, что это изображение
+  if (!file.type.startsWith('image/')) {
+    showToast('Пожалуйста, выберите изображение');
+    return;
+  }
+
+  // Открываем crop modal
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    openCropModal(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+function openCropModal(imageSrc) {
+  const modal = document.getElementById("crop-modal");
+  const image = document.getElementById("crop-image");
+
+  if (!modal || !image) return;
+
+  // Устанавливаем изображение
+  image.src = imageSrc;
+
+  // Показываем модальное окно
+  modal.style.display = "flex";
+  modal.classList.add("show");
+
+  // Уничтожаем предыдущий cropper если есть
+  if (cropper) {
+    cropper.destroy();
+  }
+
+  // Инициализируем cropper с квадратным crop box 200x200
+  cropper = new Cropper(image, {
+    aspectRatio: 1, // Квадрат
+    viewMode: 2,
+    dragMode: 'move',
+    autoCropArea: 1,
+    restore: false,
+    guides: true,
+    center: true,
+    highlight: false,
+    cropBoxMovable: true,
+    cropBoxResizable: true,
+    toggleDragModeOnDblclick: false,
+    minCropBoxWidth: 100,
+    minCropBoxHeight: 100,
+  });
+}
+
+function closeCropModal(clearBlob = true) {
+  const modal = document.getElementById("crop-modal");
+  if (modal) {
+    modal.style.display = "none";
+    modal.classList.remove("show");
+  }
+
+  if (cropper) {
+    cropper.destroy();
+    cropper = null;
+  }
+
+  // Очищаем blob только при отмене, НЕ при применении
+  if (clearBlob) {
+    croppedImageBlob = null;
+
+    // Очищаем input только при отмене
+    const coverUploadInput = document.getElementById("book-cover-upload");
+    if (coverUploadInput) {
+      coverUploadInput.value = '';
+    }
+  }
+}
+
+function handleCropConfirm() {
+  if (!cropper) return;
+
+  // Получаем canvas с обрезанным изображением (200x200)
+  const canvas = cropper.getCroppedCanvas({
+    width: 200,
+    height: 200,
+    imageSmoothingEnabled: true,
+    imageSmoothingQuality: 'high',
+  });
+
+  if (!canvas) {
+    showToast('Ошибка обрезки изображения');
+    return;
+  }
+
+  // Конвертируем canvas в blob (webp)
+  canvas.toBlob((blob) => {
+    if (!blob) {
+      showToast('Ошибка создания изображения');
       return;
     }
 
-    showLoadingIndicator("Сохранение раздела...");
-    
-    try {
+    croppedImageBlob = blob;
+
+    // Показываем preview в модальном окне книги
+    const preview = document.getElementById("book-cover-preview");
+    const placeholder = document.getElementById("book-cover-placeholder");
+
+    if (preview && placeholder) {
+      const url = URL.createObjectURL(blob);
+      preview.src = url;
+      preview.style.display = "block";
+      placeholder.style.display = "none";
+    }
+
+    // Закрываем crop modal БЕЗ очистки blob
+    closeCropModal(false);
+
+    showToast('Обложка готова к сохранению');
+
+    setBookEditDirty(true);
+  }, 'image/webp', 0.95);
+}
+
+function initBookLanguageSelector(selectedLanguage) {
+  const container = document.getElementById("book-language-selector");
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  const initSelector = () => {
+    if (!window.LanguageManager || !window.LanguageManager.isInitialized) {
+      setTimeout(initSelector, 100);
+      return;
+    }
+
+    const languageData = window.LanguageManager.getLanguageData();
+    if (!languageData) {
+      console.warn("Данные языков недоступны");
+      return;
+    }
+
+    const defaultLanguage = selectedLanguage || (window.USER_LANGUAGE_DATA?.nativeLanguage) || 'en';
+
+    if (typeof window.initLanguageSelector === 'function') {
+      bookLanguageSelector = window.initLanguageSelector('book-language-selector', {
+        mode: 'native-selector',
+        nativeLanguage: defaultLanguage,
+        languageData: languageData,
+        onLanguageChange: function (values) { }
+      });
+    }
+  };
+
+  initSelector();
+}
+
+function handleCoverUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    showToast("Выберите изображение");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    const coverPreview = document.getElementById("book-cover-preview");
+    const coverPlaceholder = document.getElementById("book-cover-placeholder");
+    if (coverPreview && coverPlaceholder) {
+      coverPreview.src = e.target.result;
+      coverPreview.style.display = "block";
+      coverPlaceholder.style.display = "none";
+    }
+  };
+  reader.readAsDataURL(file);
+
+  setBookEditDirty(true);
+}
+
+async function handleSaveBook(event) {
+  event.preventDefault();
+
+  const idInput = document.getElementById("book-id-input");
+  const titleInput = document.getElementById("book-title-input");
+  const authorInput = document.getElementById("book-author-text-input");
+  const themeInput = document.getElementById("book-theme-input");
+  const visibilityInput = document.getElementById("book-visibility-input");
+  const descInput = document.getElementById("book-description-input");
+  const authorMaterialsUrlInput = document.getElementById("book-author-materials-url-input");
+  const coverUploadInput = document.getElementById("book-cover-upload");
+
+  const bookId = idInput.value ? parseInt(idInput.value, 10) : null;
+
+  if (!titleInput.value.trim()) {
+    showToast("Введите название книги");
+    return;
+  }
+
+  let originalLanguage = '';
+  if (bookLanguageSelector && typeof bookLanguageSelector.getValues === 'function') {
+    const values = bookLanguageSelector.getValues();
+    originalLanguage = values.nativeLanguage || '';
+  }
+
+  showLoadingIndicator("Сохранение книги...");
+
+  try {
+    let data;
+    const token = getToken();
+
+    // Используем cropped blob если есть, иначе оригинальный файл
+    const hasCover = croppedImageBlob || coverUploadInput?.files[0];
+
+    if (hasCover) {
+      const formData = new FormData();
+      formData.append("title", titleInput.value.trim());
+      formData.append("author_text", authorInput.value.trim());
+      formData.append("original_language", originalLanguage);
+      formData.append("theme", themeInput.value.trim());
+      formData.append("visibility", visibilityInput.value);
+      formData.append("short_description", descInput.value.trim());
+      if (authorMaterialsUrlInput) {
+        formData.append("author_materials_url", authorMaterialsUrlInput.value.trim());
+      }
+
+      // Используем cropped blob или оригинальный файл
+      if (croppedImageBlob) {
+        formData.append("cover", croppedImageBlob, "cover.webp");
+      } else {
+        formData.append("cover", coverUploadInput.files[0]);
+      }
+
+      const headers = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      if (bookId) {
+        const response = await fetch(`/library/api/book/${bookId}`, {
+          method: "PATCH",
+          headers,
+          body: formData,
+        });
+        data = await response.json();
+      } else {
+        const response = await fetch("/library/api/book", {
+          method: "POST",
+          headers,
+          body: formData,
+        });
+        data = await response.json();
+      }
+    } else {
       const payload = {
         title: titleInput.value.trim(),
-        parent_id: parentId,
-        section_number: sectionNumber,
-        // Разделы не имеют обложек, авторов и описаний
-        author_text: null,
-        short_description: null,
-        original_language: null,
-        visibility: 'private',
-        theme: null,
-        order_index: 0
+        author_text: authorInput.value.trim(),
+        original_language: originalLanguage,
+        theme: themeInput.value.trim(),
+        visibility: visibilityInput.value,
+        short_description: descInput.value.trim(),
       };
 
-      console.log('💾 Сохраняю раздел с payload:', payload);
-      console.log('💾 section_number в payload:', payload.section_number, 'тип:', typeof payload.section_number);
+      if (authorMaterialsUrlInput) {
+        payload.author_materials_url = authorMaterialsUrlInput.value.trim() || null;
+      }
 
-      let data;
-      if (sectionId) {
-        // Обновление раздела
-        data = await apiRequest(`/library/api/book/${sectionId}`, {
+      if (bookId) {
+        data = await apiRequest(`/library/api/book/${bookId}`, {
           method: "PATCH",
           body: JSON.stringify(payload),
         });
       } else {
-        // Создание нового раздела
         data = await apiRequest("/library/api/book", {
           method: "POST",
           body: JSON.stringify(payload),
         });
       }
-
-      if (!data.success) {
-        hideLoadingIndicator();
-        showToast(data.error || "Ошибка сохранения раздела");
-        return;
-      }
-
-      console.log('✅ Раздел сохранен, ответ сервера:', data);
-      if (data.book) {
-        console.log('📚 Сохраненный раздел:', data.book);
-        console.log('📚 section_number:', data.book.section_number);
-      }
-
-      closeSectionModal();
-      
-      // Перезагружаем активную книгу чтобы показать новые разделы
-      if (activeBookId) {
-        console.log('🔄 Перезагружаю активную книгу:', activeBookId);
-        await loadActiveBook(activeBookId);
-      }
-      
-      hideLoadingIndicator();
-    } catch (error) {
-      console.error("Ошибка сохранения раздела:", error);
-      hideLoadingIndicator();
-      showToast("Ошибка сохранения раздела");
     }
-  }
 
-  // ==================== Crop Modal ====================
-  
-  function handleCoverSelect(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    // Проверяем, что это изображение
-    if (!file.type.startsWith('image/')) {
-      showToast('Пожалуйста, выберите изображение');
+    if (!data.success) {
+      hideLoadingIndicator();
+      showToast(data.error || "Ошибка сохранения книги");
       return;
     }
-    
-    // Открываем crop modal
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      openCropModal(e.target.result);
-    };
-    reader.readAsDataURL(file);
-  }
-  
-  function openCropModal(imageSrc) {
-    const modal = document.getElementById("crop-modal");
-    const image = document.getElementById("crop-image");
-    
-    if (!modal || !image) return;
-    
-    // Устанавливаем изображение
-    image.src = imageSrc;
-    
-    // Показываем модальное окно
-    modal.style.display = "flex";
-    modal.classList.add("show");
-    
-    // Уничтожаем предыдущий cropper если есть
-    if (cropper) {
-      cropper.destroy();
+
+    setBookEditDirty(false);
+
+    // Очищаем cropped blob
+    croppedImageBlob = null;
+
+    closeBookModal();
+    // Перезагружаем список книг
+    await loadBooksFromAPI();
+
+    // Если это активная книга, обновляем её
+    if (bookId && bookId === activeBookId) {
+      await loadActiveBook(bookId);
     }
-    
-    // Инициализируем cropper с квадратным crop box 200x200
-    cropper = new Cropper(image, {
-      aspectRatio: 1, // Квадрат
-      viewMode: 2,
-      dragMode: 'move',
-      autoCropArea: 1,
-      restore: false,
-      guides: true,
-      center: true,
-      highlight: false,
-      cropBoxMovable: true,
-      cropBoxResizable: true,
-      toggleDragModeOnDblclick: false,
-      minCropBoxWidth: 100,
-      minCropBoxHeight: 100,
+
+    hideLoadingIndicator();
+  } catch (error) {
+    console.error("Ошибка сохранения книги:", error);
+    hideLoadingIndicator();
+    showToast("Ошибка сохранения книги");
+  }
+}
+
+// ==================== Инициализация ====================
+
+function installEventHandlers() {
+  // Кнопка "Новая книга" в верхней панели
+  const newBookBtn = document.getElementById("btnNewBook");
+  if (newBookBtn) {
+    newBookBtn.addEventListener("click", () => openBookModal(null));
+  }
+
+  // Кнопка "Новая книга" в панели "Мои книги"
+  const newBookBtnInZone = document.getElementById("btnNewBookInZone");
+  if (newBookBtnInZone) {
+    newBookBtnInZone.addEventListener("click", () => openBookModal(null));
+  }
+
+  const homeLibraryBtn = document.getElementById('btnHomeLibrary');
+  if (homeLibraryBtn) {
+    homeLibraryBtn.addEventListener('click', () => openHomeLibraryModal());
+  }
+
+  const homeLibraryCloseBtn = document.getElementById('home-library-close');
+  if (homeLibraryCloseBtn) {
+    homeLibraryCloseBtn.addEventListener('click', closeHomeLibraryModal);
+  }
+
+  const homeLibraryModal = document.getElementById('home-library-modal');
+  if (homeLibraryModal) {
+    homeLibraryModal.addEventListener('click', (event) => {
+      if (event.target === homeLibraryModal) {
+        closeHomeLibraryModal();
+      }
     });
   }
-  
-  function closeCropModal(clearBlob = true) {
-    const modal = document.getElementById("crop-modal");
-    if (modal) {
-      modal.style.display = "none";
-      modal.classList.remove("show");
-    }
-    
-    if (cropper) {
-      cropper.destroy();
-      cropper = null;
-    }
-    
-    // Очищаем blob только при отмене, НЕ при применении
-    if (clearBlob) {
-      croppedImageBlob = null;
-      
-      // Очищаем input только при отмене
-      const coverUploadInput = document.getElementById("book-cover-upload");
-      if (coverUploadInput) {
-        coverUploadInput.value = '';
-      }
-    }
-  }
-  
-  function handleCropConfirm() {
-    if (!cropper) return;
-    
-    // Получаем canvas с обрезанным изображением (200x200)
-    const canvas = cropper.getCroppedCanvas({
-      width: 200,
-      height: 200,
-      imageSmoothingEnabled: true,
-      imageSmoothingQuality: 'high',
-    });
-    
-    if (!canvas) {
-      showToast('Ошибка обрезки изображения');
-      return;
-    }
-    
-    // Конвертируем canvas в blob (webp)
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        showToast('Ошибка создания изображения');
-        return;
-      }
-      
-      croppedImageBlob = blob;
-      
-      // Показываем preview в модальном окне книги
-      const preview = document.getElementById("book-cover-preview");
-      const placeholder = document.getElementById("book-cover-placeholder");
-      
-      if (preview && placeholder) {
-        const url = URL.createObjectURL(blob);
-        preview.src = url;
-        preview.style.display = "block";
-        placeholder.style.display = "none";
-      }
-      
-      // Закрываем crop modal БЕЗ очистки blob
-      closeCropModal(false);
-      
-      showToast('Обложка готова к сохранению');
 
-      setBookEditDirty(true);
-    }, 'image/webp', 0.95);
+  // Кнопка публичной библиотеки
+  const publicLibraryBtn = document.getElementById("btnPublicLibrary");
+  if (publicLibraryBtn) {
+    publicLibraryBtn.addEventListener("click", () => openPublicLibraryModal());
   }
 
-  function initBookLanguageSelector(selectedLanguage) {
-    const container = document.getElementById("book-language-selector");
-    if (!container) return;
+  // ==================== Desk zoom controls ====================
+  const deskZone = document.querySelector('.desk-zone');
+  const zoomInBtn = document.getElementById('btnDeskZoomIn');
+  const zoomOutBtn = document.getElementById('btnDeskZoomOut');
+  const zoomStorageKey = 'desk_zoom';
 
-    container.innerHTML = '';
+  const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-    const initSelector = () => {
-      if (!window.LanguageManager || !window.LanguageManager.isInitialized) {
-        setTimeout(initSelector, 100);
-        return;
-      }
-
-      const languageData = window.LanguageManager.getLanguageData();
-      if (!languageData) {
-        console.warn("Данные языков недоступны");
-        return;
-      }
-
-      const defaultLanguage = selectedLanguage || (window.USER_LANGUAGE_DATA?.nativeLanguage) || 'en';
-
-      if (typeof window.initLanguageSelector === 'function') {
-        bookLanguageSelector = window.initLanguageSelector('book-language-selector', {
-          mode: 'native-selector',
-          nativeLanguage: defaultLanguage,
-          languageData: languageData,
-          onLanguageChange: function(values) {}
-        });
-      }
-    };
-
-    initSelector();
-  }
-
-  function handleCoverUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      showToast("Выберите изображение");
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const coverPreview = document.getElementById("book-cover-preview");
-      const coverPlaceholder = document.getElementById("book-cover-placeholder");
-      if (coverPreview && coverPlaceholder) {
-        coverPreview.src = e.target.result;
-        coverPreview.style.display = "block";
-        coverPlaceholder.style.display = "none";
-      }
-    };
-    reader.readAsDataURL(file);
-
-    setBookEditDirty(true);
-  }
-
-  async function handleSaveBook(event) {
-    event.preventDefault();
-
-    const idInput = document.getElementById("book-id-input");
-    const titleInput = document.getElementById("book-title-input");
-    const authorInput = document.getElementById("book-author-text-input");
-    const themeInput = document.getElementById("book-theme-input");
-    const visibilityInput = document.getElementById("book-visibility-input");
-    const descInput = document.getElementById("book-description-input");
-    const authorMaterialsUrlInput = document.getElementById("book-author-materials-url-input");
-    const coverUploadInput = document.getElementById("book-cover-upload");
-
-    const bookId = idInput.value ? parseInt(idInput.value, 10) : null;
-
-    if (!titleInput.value.trim()) {
-      showToast("Введите название книги");
-      return;
-    }
-
-    let originalLanguage = '';
-    if (bookLanguageSelector && typeof bookLanguageSelector.getValues === 'function') {
-      const values = bookLanguageSelector.getValues();
-      originalLanguage = values.nativeLanguage || '';
-    }
-
-    showLoadingIndicator("Сохранение книги...");
-
+  const applyDeskZoom = (zoom) => {
+    if (!deskZone) return;
+    const z = clamp(Number(zoom) || 1, 0.6, 1.8);
+    deskZone.style.setProperty('--desk-zoom', String(z));
     try {
-      let data;
-      const token = getToken();
-      
-      // Используем cropped blob если есть, иначе оригинальный файл
-      const hasCover = croppedImageBlob || coverUploadInput?.files[0];
-      
-      if (hasCover) {
-          const formData = new FormData();
-          formData.append("title", titleInput.value.trim());
-          formData.append("author_text", authorInput.value.trim());
-          formData.append("original_language", originalLanguage);
-          formData.append("theme", themeInput.value.trim());
-          formData.append("visibility", visibilityInput.value);
-          formData.append("short_description", descInput.value.trim());
-          if (authorMaterialsUrlInput) {
-            formData.append("author_materials_url", authorMaterialsUrlInput.value.trim());
-          }
-        
-        // Используем cropped blob или оригинальный файл
-        if (croppedImageBlob) {
-          formData.append("cover", croppedImageBlob, "cover.webp");
-        } else {
-          formData.append("cover", coverUploadInput.files[0]);
-        }
-
-        const headers = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        if (bookId) {
-          const response = await fetch(`/library/api/book/${bookId}`, {
-            method: "PATCH",
-            headers,
-            body: formData,
-          });
-          data = await response.json();
-        } else {
-          const response = await fetch("/library/api/book", {
-            method: "POST",
-            headers,
-            body: formData,
-          });
-          data = await response.json();
-        }
-      } else {
-        const payload = {
-          title: titleInput.value.trim(),
-          author_text: authorInput.value.trim(),
-          original_language: originalLanguage,
-          theme: themeInput.value.trim(),
-          visibility: visibilityInput.value,
-          short_description: descInput.value.trim(),
-        };
-        
-        if (authorMaterialsUrlInput) {
-          payload.author_materials_url = authorMaterialsUrlInput.value.trim() || null;
-        }
-
-        if (bookId) {
-          data = await apiRequest(`/library/api/book/${bookId}`, {
-            method: "PATCH",
-            body: JSON.stringify(payload),
-          });
-        } else {
-          data = await apiRequest("/library/api/book", {
-            method: "POST",
-            body: JSON.stringify(payload),
-          });
-        }
-      }
-
-      if (!data.success) {
-        hideLoadingIndicator();
-        showToast(data.error || "Ошибка сохранения книги");
-        return;
-      }
-
-      setBookEditDirty(false);
-
-      // Очищаем cropped blob
-      croppedImageBlob = null;
-      
-      closeBookModal();
-      // Перезагружаем список книг
-      await loadBooksFromAPI();
-      
-      // Если это активная книга, обновляем её
-      if (bookId && bookId === activeBookId) {
-        await loadActiveBook(bookId);
-      }
-      
-      hideLoadingIndicator();
-    } catch (error) {
-      console.error("Ошибка сохранения книги:", error);
-      hideLoadingIndicator();
-      showToast("Ошибка сохранения книги");
-    }
-  }
-
-  // ==================== Инициализация ====================
-  
-  function installEventHandlers() {
-    // Кнопка "Новая книга" в верхней панели
-    const newBookBtn = document.getElementById("btnNewBook");
-    if (newBookBtn) {
-      newBookBtn.addEventListener("click", () => openBookModal(null));
-    }
-    
-    // Кнопка "Новая книга" в панели "Мои книги"
-    const newBookBtnInZone = document.getElementById("btnNewBookInZone");
-    if (newBookBtnInZone) {
-      newBookBtnInZone.addEventListener("click", () => openBookModal(null));
-    }
-
-    const homeLibraryBtn = document.getElementById('btnHomeLibrary');
-    if (homeLibraryBtn) {
-      homeLibraryBtn.addEventListener('click', () => openHomeLibraryModal());
-    }
-
-    const homeLibraryCloseBtn = document.getElementById('home-library-close');
-    if (homeLibraryCloseBtn) {
-      homeLibraryCloseBtn.addEventListener('click', closeHomeLibraryModal);
-    }
-
-    const homeLibraryModal = document.getElementById('home-library-modal');
-    if (homeLibraryModal) {
-      homeLibraryModal.addEventListener('click', (event) => {
-        if (event.target === homeLibraryModal) {
-          closeHomeLibraryModal();
-        }
-      });
-    }
-
-    // Кнопка публичной библиотеки
-    const publicLibraryBtn = document.getElementById("btnPublicLibrary");
-    if (publicLibraryBtn) {
-      publicLibraryBtn.addEventListener("click", () => openPublicLibraryModal());
-    }
-
-    // ==================== Desk zoom controls ====================
-    const deskZone = document.querySelector('.desk-zone');
-    const zoomInBtn = document.getElementById('btnDeskZoomIn');
-    const zoomOutBtn = document.getElementById('btnDeskZoomOut');
-    const zoomStorageKey = 'desk_zoom';
-
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-
-    const applyDeskZoom = (zoom) => {
-      if (!deskZone) return;
-      const z = clamp(Number(zoom) || 1, 0.6, 1.8);
-      deskZone.style.setProperty('--desk-zoom', String(z));
-      try {
-        localStorage.setItem(zoomStorageKey, String(z));
-      } catch (e) {
-      }
-    };
-
-    // Apply saved zoom on load
-    try {
-      const saved = localStorage.getItem(zoomStorageKey);
-      if (saved) {
-        applyDeskZoom(saved);
-      }
+      localStorage.setItem(zoomStorageKey, String(z));
     } catch (e) {
     }
+  };
 
-    const step = 0.1;
-    if (zoomInBtn) {
-      zoomInBtn.addEventListener('click', () => {
-        const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
-        applyDeskZoom(current + step);
-      });
+  // Apply saved zoom on load
+  try {
+    const saved = localStorage.getItem(zoomStorageKey);
+    if (saved) {
+      applyDeskZoom(saved);
     }
-    if (zoomOutBtn) {
-      zoomOutBtn.addEventListener('click', () => {
-        const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
-        applyDeskZoom(current - step);
-      });
-    }
-
-    // Закрытие модального окна публичной библиотеки
-    const publicLibraryCloseBtn = document.getElementById("public-library-close");
-    if (publicLibraryCloseBtn) {
-      publicLibraryCloseBtn.addEventListener("click", closePublicLibraryModal);
-    }
-
-    const bookViewCloseBtn = document.getElementById('book-view-close');
-    if (bookViewCloseBtn) {
-      bookViewCloseBtn.addEventListener('click', closeBookViewModal);
-    }
-
-    const bookViewModal = document.getElementById('book-view-modal');
-    if (bookViewModal) {
-      bookViewModal.addEventListener('click', (event) => {
-        if (event.target === bookViewModal) {
-          closeBookViewModal();
-        }
-      });
-    }
-
-    const publicLibraryModal = document.getElementById("public-library-modal");
-    if (publicLibraryModal) {
-      publicLibraryModal.addEventListener("click", (event) => {
-        if (event.target === publicLibraryModal) {
-          closePublicLibraryModal();
-        }
-      });
-    }
-
-    // Переключатель вида диктантов удален - всегда используем вид "cards"
-    currentView = 'cards';
-
-    // Закрыть модальное окно
-    const modalCloseBtn = document.getElementById("book-edit-close");
-    if (modalCloseBtn) {
-      modalCloseBtn.addEventListener("click", closeBookModal);
-    }
-
-    // Форма сохранения книги
-    const form = document.getElementById("book-edit-form");
-    if (form) {
-      form.addEventListener("submit", handleSaveBook);
-    }
-
-    // Загрузка обложки
-    const coverUploadBtn = document.getElementById("book-cover-upload-btn");
-    const coverUploadInput = document.getElementById("book-cover-upload");
-    const coverClickable = document.getElementById("book-cover-clickable");
-    
-    if (coverUploadBtn && coverUploadInput) {
-      coverUploadBtn.addEventListener("click", () => {
-        coverUploadInput.click();
-      });
-      coverUploadInput.addEventListener("change", handleCoverSelect);
-    }
-    
-    if (coverClickable && coverUploadInput) {
-      coverClickable.addEventListener("click", () => {
-        coverUploadInput.click();
-      });
-    }
-    
-    // Crop modal controls
-    const cropCloseBtn = document.getElementById("crop-close");
-    const cropCancelBtn = document.getElementById("crop-cancel");
-    const cropConfirmBtn = document.getElementById("crop-confirm");
-    
-    if (cropCloseBtn) {
-      cropCloseBtn.addEventListener("click", closeCropModal);
-    }
-    if (cropCancelBtn) {
-      cropCancelBtn.addEventListener("click", closeCropModal);
-    }
-    if (cropConfirmBtn) {
-      cropConfirmBtn.addEventListener("click", handleCropConfirm);
-    }
-
-    // Закрытие модального окна при клике вне его
-    const bookModal = document.getElementById("book-edit-modal");
-    if (bookModal) {
-      bookModal.addEventListener("click", (event) => {
-        if (event.target === bookModal) {
-          closeBookModal();
-        }
-      });
-    }
-
-    // Модальное окно раздела
-    const sectionCloseBtn = document.getElementById("section-edit-close");
-    if (sectionCloseBtn) {
-      sectionCloseBtn.addEventListener("click", closeSectionModal);
-    }
-
-    const sectionForm = document.getElementById("section-edit-form");
-    if (sectionForm) {
-      sectionForm.addEventListener("submit", handleSaveSection);
-    }
-
-    const sectionModal = document.getElementById("section-edit-modal");
-    if (sectionModal) {
-      sectionModal.addEventListener("click", (event) => {
-        if (event.target === sectionModal) {
-          closeSectionModal();
-        }
-      });
-    }
-
-    // Инициализируем прокрутку desk
-    // Обработчики для кнопок в карточках диктантов (делегирование событий)
-    document.addEventListener('dblclick', (e) => {
-      try {
-        const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
-        if (!deskThumb) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const href = deskThumb.getAttribute('data-href') || deskThumb.getAttribute('href');
-        if (href) {
-          window.location.href = href;
-        }
-      } catch (err) {
-      }
-    }, true);
-
-    document.addEventListener('click', async (e) => {
-      try {
-        const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
-        if (deskThumb) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-      } catch (err) {
-      }
-
-      // Кнопка раскрытия/сворачивания раздела
-      if (e.target.closest('.structure-item-toggle')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('.structure-item-toggle');
-        const sectionId = btn.getAttribute('data-section-id');
-        if (!sectionId) return;
-
-        // Book view overlay
-        if (btn.closest && btn.closest('#bookViewStructure')) {
-          await toggleSectionInContainer(sectionId, document.getElementById('bookViewStructure'));
-          return;
-        }
-
-        // Default: book view modal
-        if (container && container.id === 'bookViewStructure') {
-          await toggleSectionInContainer(String(sectionId), container);
-          return;
-        }
-      }
-
-      // Выпадающее меню действий раздела
-      if (e.target.closest('[data-action="section-actions"]')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="section-actions"]');
-        const sectionId = btn.getAttribute('data-section-id');
-        const menu = document.querySelector(`.section-actions-menu[data-section-id="${sectionId}"]`);
-        
-        if (menu) {
-          // Закрываем все другие меню
-          document.querySelectorAll('.section-actions-menu').forEach(m => {
-            if (m !== menu) {
-              m.classList.remove('show');
-              m.style.display = 'none';
-            }
-          });
-          document.querySelectorAll('.book-actions-menu').forEach(m => {
-            m.classList.remove('show');
-            m.style.display = 'none';
-          });
-          
-          const isVisible = menu.classList.contains('show');
-          if (isVisible) {
-            menu.classList.remove('show');
-            menu.style.display = 'none';
-          } else {
-            menu.classList.add('show');
-            menu.style.display = 'block';
-            
-            // Закрываем меню при клике вне его
-            setTimeout(() => {
-              const closeMenuHandler = function(e) {
-                if (!menu.contains(e.target) && !btn.contains(e.target)) {
-                  menu.classList.remove('show');
-                  menu.style.display = 'none';
-                  document.removeEventListener('click', closeMenuHandler);
-                }
-              };
-              document.addEventListener('click', closeMenuHandler);
-            }, 0);
-          }
-        }
-      }
-      
-      // Обработчики пунктов меню маленькой карточки книги
-      if (e.target.closest('.mini-book-actions-menu .dropdown-menu-item')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const item = e.target.closest('.dropdown-menu-item');
-        const action = item.getAttribute('data-action');
-        const bookId = item.getAttribute('data-book-id');
-        const menu = item.closest('.mini-book-actions-menu');
-        
-        if (menu) {
-          menu.classList.remove('show');
-          menu.style.display = 'none';
-        }
-        
-        switch(action) {
-          case 'edit-mini-book':
-            console.log('✏️ Редактирую книгу из маленькой карточки:', bookId);
-            if (bookId) {
-              const bookData = await apiRequest(`/library/api/book/${bookId}`);
-              if (bookData.success && bookData.book) {
-                openBookModal(bookData.book);
-              }
-            }
-            break;
-          case 'delete-mini-book':
-            console.log('🗑️ Удаляю книгу из маленькой карточки:', bookId);
-            if (bookId) {
-              const bookData = await apiRequest(`/library/api/book/${bookId}`);
-              if (bookData.success && bookData.book) {
-                const bookTitle = bookData.book.title || 'книгу';
-                if (confirm(`Вы уверены, что хотите удалить книгу "${bookTitle}"?`)) {
-                  await deleteBook(bookId);
-                }
-              }
-            }
-            break;
-        }
-      }
-      
-      // Обработчики пунктов меню раздела
-      if (e.target.closest('.section-actions-menu .dropdown-menu-item')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const item = e.target.closest('.dropdown-menu-item');
-        const action = item.getAttribute('data-action');
-        const sectionId = item.getAttribute('data-section-id');
-        const menu = item.closest('.section-actions-menu');
-        
-        if (menu) {
-          menu.classList.remove('show');
-          menu.style.display = 'none';
-        }
-        
-        switch(action) {
-          case 'add-subsection':
-            console.log('➕ Создаю подраздел для раздела:', sectionId);
-            if (sectionId) {
-              openSectionModal(null, sectionId);
-            }
-            break;
-          case 'add-dictation':
-            console.log('➕ Создаю диктант для раздела:', sectionId);
-            if (sectionId) {
-              setDictationTargetBook(sectionId);
-            }
-            window.location.href = '/dictation_editor/new';
-            break;
-          case 'edit-section':
-            console.log('✏️ Редактирую раздел:', sectionId);
-            if (activeBookId) {
-              loadSectionForEdit(sectionId);
-            }
-            break;
-          case 'delete-section':
-            const section = window.currentBookSections?.find(s => s.id === parseInt(sectionId));
-            const sectionTitle = section?.title || 'раздел';
-            if (confirm(`Вы уверены, что хотите удалить раздел "${sectionTitle}"?`)) {
-              deleteSection(sectionId);
-            }
-            break;
-        }
-      }
-
-      // Клик на карточку диктанта для добавления/удаления со стола (только в библиотеке, не на столе)
-      if (e.target.closest('.short-card[data-action="toggle-desk"]')) {
-        const card = e.target.closest('.short-card[data-action="toggle-desk"]');
-        // Игнорируем клики на кнопки действий и ссылки
-        if (e.target.closest('.short-actions') || e.target.closest('a') || e.target.closest('button')) {
-          // Do not handle as toggle-desk, but allow other handlers below (move/delete/etc)
-        } else {
-          // Игнорируем карточки на столе (они открываются для работы)
-          if (card.classList.contains('desk-card')) {
-            return;
-          }
-          e.preventDefault();
-          e.stopPropagation();
-          const dictationId = card.getAttribute('data-dictation-id');
-          if (dictationId) {
-            toggleDictationOnDesk(dictationId);
-          }
-          return;
-        }
-      }
-
-      // Кнопка "Переместить в книгу"
-      if (e.target.closest('[data-action="move-dictation"]')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="move-dictation"]');
-        const dictationId = btn.getAttribute('data-dictation-id');
-        console.log('🔄 Открываю модальное окно перемещения для диктанта:', dictationId);
-        openMoveDictationModal(dictationId);
-      }
-
-      // Удалить (на карточке диктанта)
-      if (e.target.closest('[data-action="delete-dictation"]')) {
-        const btn = e.target.closest('[data-action="delete-dictation"]');
-        const dictationId = btn.getAttribute('data-dictation-id');
-        console.log('🗑️ click delete-dictation', {
-          dictationId,
-          activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
-        });
-        deleteDictation(dictationId);
-      }
-
-      // Кнопка "Убрать со стола" (на карточке на столе)
-      if (e.target.closest('[data-action="remove-from-desk"]')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="remove-from-desk"]');
-        const itemId = btn.getAttribute('data-desk-item-id');
-        const dictationId = btn.getAttribute('data-dictation-id');
-        if (itemId && dictationId) {
-          removeFromDesk(itemId, dictationId);
-        }
-      }
-
-      if (e.target.closest('[data-action="show-in-book"]')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="show-in-book"]');
-        const dictationId = btn.getAttribute('data-dictation-id');
-        if (dictationId) {
-          await showDeskDictationInBook(dictationId);
-        }
-      }
-
-      // Кнопка "Добавить диктант" в разделе (старый обработчик, оставляем для совместимости)
-      if (e.target.closest('[data-action="add-dictation"]:not(.dropdown-menu-item)')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="add-dictation"]');
-        const sectionId = btn.getAttribute('data-section-id');
-        console.log('➕ Создаю новый диктант для раздела:', sectionId);
-        // Сохраняем целевой раздел (он же книга-узел) и открываем редактор
-        if (sectionId) {
-          setDictationTargetBook(sectionId);
-        } else if (activeBookId) {
-          setDictationTargetBook(activeBookId);
-        }
-        window.location.href = '/dictation_editor/new';
-      }
-
-      // Кнопка "Редактировать раздел" (старый обработчик, оставляем для совместимости)
-      if (e.target.closest('[data-action="edit-section"]:not(.dropdown-menu-item)')) {
-        e.preventDefault();
-        e.stopPropagation();
-        const btn = e.target.closest('[data-action="edit-section"]');
-        const sectionId = btn.getAttribute('data-section-id');
-        console.log('✏️ Редактирую раздел:', sectionId);
-        
-        // Находим данные раздела из списка разделов
-        if (activeBookId) {
-          loadSectionForEdit(sectionId);
-        }
-      }
-    });
-
-    // Модальное окно перемещения диктанта
-    const moveDictationCloseBtn = document.getElementById("move-dictation-close");
-    if (moveDictationCloseBtn) {
-      moveDictationCloseBtn.addEventListener("click", closeMoveDictationModal);
-    }
-
-    const moveDictationForm = document.getElementById("move-dictation-form");
-    if (moveDictationForm) {
-      moveDictationForm.addEventListener("submit", handleMoveDictation);
-    }
-
-    const moveDictationModal = document.getElementById("move-dictation-modal");
-    if (moveDictationModal) {
-      moveDictationModal.addEventListener("click", (event) => {
-        if (event.target === moveDictationModal) {
-          closeMoveDictationModal();
-        }
-      });
-    }
-
-    const deleteDictationModal = document.getElementById('delete-dictation-modal');
-    const deleteDictationCloseBtn = document.getElementById('delete-dictation-close');
-    const deleteDictationConfirmBtn = document.getElementById('delete-dictation-confirm');
-    console.log('🗑️ delete modal bind', {
-      hasModal: !!deleteDictationModal,
-      hasCloseBtn: !!deleteDictationCloseBtn,
-      hasConfirmBtn: !!deleteDictationConfirmBtn
-    });
-    if (deleteDictationCloseBtn) {
-      deleteDictationCloseBtn.addEventListener('click', closeDeleteDictationModal);
-    }
-    if (deleteDictationConfirmBtn) {
-      deleteDictationConfirmBtn.addEventListener('click', async () => {
-        const id = pendingDeleteDictationId;
-        console.log('🗑️ delete confirm click', {
-          pendingDeleteDictationId: id,
-          activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
-        });
-        if (!id) return;
-        await performDeleteDictation(id);
-      });
-    }
-    if (deleteDictationModal) {
-      deleteDictationModal.addEventListener('click', (event) => {
-        if (event.target === deleteDictationModal) {
-          closeDeleteDictationModal();
-        }
-      });
-    }
+  } catch (e) {
   }
 
-  // ==================== Перемещение диктанта ====================
+  const step = 0.1;
+  if (zoomInBtn) {
+    zoomInBtn.addEventListener('click', () => {
+      const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
+      applyDeskZoom(current + step);
+    });
+  }
+  if (zoomOutBtn) {
+    zoomOutBtn.addEventListener('click', () => {
+      const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
+      applyDeskZoom(current - step);
+    });
+  }
 
-  function openMoveDictationModal(dictationId) {
-    console.log('📖 openMoveDictationModal вызвана для диктанта:', dictationId);
-    const modal = document.getElementById("move-dictation-modal");
-    const dictIdInput = document.getElementById("move-dictation-id");
-    const bookSelect = document.getElementById("move-target-book");
-    const sectionsContainer = document.getElementById("move-dictation-sections-container");
-    const sectionsList = document.getElementById("move-dictation-sections-list");
-    const sectionInput = document.getElementById("move-target-section");
+  // Закрытие модального окна публичной библиотеки
+  const publicLibraryCloseBtn = document.getElementById("public-library-close");
+  if (publicLibraryCloseBtn) {
+    publicLibraryCloseBtn.addEventListener("click", closePublicLibraryModal);
+  }
 
-    console.log('Элементы модального окна:', { modal, dictIdInput, bookSelect });
+  const bookViewCloseBtn = document.getElementById('book-view-close');
+  if (bookViewCloseBtn) {
+    bookViewCloseBtn.addEventListener('click', closeBookViewModal);
+  }
 
-    if (!modal || !dictIdInput || !bookSelect) {
-      console.error('❌ Не найдены элементы модального окна!');
-      return;
+  const bookViewModal = document.getElementById('book-view-modal');
+  if (bookViewModal) {
+    bookViewModal.addEventListener('click', (event) => {
+      if (event.target === bookViewModal) {
+        closeBookViewModal();
+      }
+    });
+  }
+
+  const publicLibraryModal = document.getElementById("public-library-modal");
+  if (publicLibraryModal) {
+    publicLibraryModal.addEventListener("click", (event) => {
+      if (event.target === publicLibraryModal) {
+        closePublicLibraryModal();
+      }
+    });
+  }
+
+  // Переключатель вида диктантов удален - всегда используем вид "cards"
+  currentView = 'cards';
+
+  // Закрыть модальное окно
+  const modalCloseBtn = document.getElementById("book-edit-close");
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener("click", closeBookModal);
+  }
+
+  // Форма сохранения книги
+  const form = document.getElementById("book-edit-form");
+  if (form) {
+    form.addEventListener("submit", handleSaveBook);
+  }
+
+  // Загрузка обложки
+  const coverUploadBtn = document.getElementById("book-cover-upload-btn");
+  const coverUploadInput = document.getElementById("book-cover-upload");
+  const coverClickable = document.getElementById("book-cover-clickable");
+
+  if (coverUploadBtn && coverUploadInput) {
+    coverUploadBtn.addEventListener("click", () => {
+      coverUploadInput.click();
+    });
+    coverUploadInput.addEventListener("change", handleCoverSelect);
+  }
+
+  if (coverClickable && coverUploadInput) {
+    coverClickable.addEventListener("click", () => {
+      coverUploadInput.click();
+    });
+  }
+
+  // Crop modal controls
+  const cropCloseBtn = document.getElementById("crop-close");
+  const cropCancelBtn = document.getElementById("crop-cancel");
+  const cropConfirmBtn = document.getElementById("crop-confirm");
+
+  if (cropCloseBtn) {
+    cropCloseBtn.addEventListener("click", closeCropModal);
+  }
+  if (cropCancelBtn) {
+    cropCancelBtn.addEventListener("click", closeCropModal);
+  }
+  if (cropConfirmBtn) {
+    cropConfirmBtn.addEventListener("click", handleCropConfirm);
+  }
+
+  // Закрытие модального окна при клике вне его
+  const bookModal = document.getElementById("book-edit-modal");
+  if (bookModal) {
+    bookModal.addEventListener("click", (event) => {
+      if (event.target === bookModal) {
+        closeBookModal();
+      }
+    });
+  }
+
+  // Модальное окно раздела
+  const sectionCloseBtn = document.getElementById("section-edit-close");
+  if (sectionCloseBtn) {
+    sectionCloseBtn.addEventListener("click", closeSectionModal);
+  }
+
+  const sectionForm = document.getElementById("section-edit-form");
+  if (sectionForm) {
+    sectionForm.addEventListener("submit", handleSaveSection);
+  }
+
+  const sectionModal = document.getElementById("section-edit-modal");
+  if (sectionModal) {
+    sectionModal.addEventListener("click", (event) => {
+      if (event.target === sectionModal) {
+        closeSectionModal();
+      }
+    });
+  }
+
+  // Инициализируем прокрутку desk
+  // Обработчики для кнопок в карточках диктантов (делегирование событий)
+  document.addEventListener('dblclick', (e) => {
+    try {
+      const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+      if (!deskThumb) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const href = deskThumb.getAttribute('data-href') || deskThumb.getAttribute('href');
+      if (href) {
+        window.location.href = href;
+      }
+    } catch (err) {
+    }
+  }, true);
+
+  document.addEventListener('click', async (e) => {
+    try {
+      const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+      if (deskThumb) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    } catch (err) {
     }
 
-    // Сохраняем ID диктанта
-    dictIdInput.value = dictationId;
-    if (sectionInput) sectionInput.value = '';
+    // Кнопка раскрытия/сворачивания раздела
+    if (e.target.closest('.structure-item-toggle')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('.structure-item-toggle');
+      const sectionId = btn.getAttribute('data-section-id');
+      if (!sectionId) return;
 
-    // Скрываем контейнер разделов
-    if (sectionsContainer) sectionsContainer.style.display = 'none';
-    if (sectionsList) sectionsList.innerHTML = '';
-
-    // Загружаем список книг (кроме рабочей тетради)
-    const booksList = document.getElementById("booksList");
-    if (booksList) {
-      const bookCards = booksList.querySelectorAll('.book-card-mini');
-      bookSelect.innerHTML = '<option value="">-- Выберите книгу --</option>';
-      
-      bookCards.forEach(card => {
-        const bookId = card.getAttribute('data-book-id');
-        const bookTitle = card.querySelector('.book-card-mini-title')?.textContent || 'Без названия';
-        const isWorkbook = bookTitle === 'Рабочая тетрадь';
-        
-        if (!isWorkbook && bookId) {
-          const option = document.createElement('option');
-          option.value = bookId;
-          option.textContent = bookTitle;
-          bookSelect.appendChild(option);
-        }
-      });
-    }
-
-    // Обработчик изменения выбора книги
-    bookSelect.onchange = async function() {
-      const selectedBookId = this.value;
-      const selectedBookIdInt = parseInt(selectedBookId);
-      console.log('📖 Выбрана книга, ID:', selectedBookId, 'как число:', selectedBookIdInt);
-      
-      if (sectionInput) sectionInput.value = '';
-      
-      if (!selectedBookId) {
-        if (sectionsContainer) sectionsContainer.style.display = 'none';
-        if (sectionsList) sectionsList.innerHTML = '';
+      // Book view overlay
+      if (btn.closest && btn.closest('#bookViewStructure')) {
+        await toggleSectionInContainer(sectionId, document.getElementById('bookViewStructure'));
         return;
       }
 
-      // Загружаем разделы книги
-      try {
-        const token = getToken();
-        console.log('🔍 Запрашиваю разделы для книги:', selectedBookIdInt);
-        const response = await fetch(`/library/api/book/${selectedBookIdInt}/sections`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
+      // Default: book view modal
+      if (container && container.id === 'bookViewStructure') {
+        await toggleSectionInContainer(String(sectionId), container);
+        return;
+      }
+    }
+
+    // Выпадающее меню действий раздела
+    if (e.target.closest('[data-action="section-actions"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="section-actions"]');
+      const sectionId = btn.getAttribute('data-section-id');
+      const menu = document.querySelector(`.section-actions-menu[data-section-id="${sectionId}"]`);
+
+      if (menu) {
+        // Закрываем все другие меню
+        document.querySelectorAll('.section-actions-menu').forEach(m => {
+          if (m !== menu) {
+            m.classList.remove('show');
+            m.style.display = 'none';
           }
         });
-        
-        if (!response.ok) {
-          console.error('❌ Ошибка ответа сервера:', response.status, response.statusText);
-          const errorText = await response.text();
-          console.error('❌ Текст ошибки:', errorText);
-        }
-        
-        const data = await response.json();
-        
-        console.log('📚 Загружены разделы:', data);
-        console.log('📚 Количество разделов:', data.sections ? data.sections.length : 0);
-        console.log('📚 ID выбранной книги:', selectedBookId);
-        if (data.sections && data.sections.length > 0) {
-          console.log('📚 Все разделы:', data.sections);
-          data.sections.forEach((s, idx) => {
-            console.log(`  Раздел ${idx}: id=${s.id}, title=${s.title}, parent_id=${s.parent_id}, bookId=${selectedBookId}`);
-          });
-        }
-        
-        if (data.success && data.sections && data.sections.length > 0) {
-          // Показываем контейнер разделов и рендерим дерево
-          if (sectionsContainer) {
-            sectionsContainer.style.display = 'block';
-            console.log('✅ Показываю контейнер разделов');
-          }
-          if (sectionsList) {
-            sectionsList.innerHTML = '';
-            console.log('🌳 Рендерю дерево разделов, количество:', data.sections.length);
-            // Передаем bookId как parentId для первого уровня (используем число)
-            renderSectionsTree(data.sections, sectionsList, selectedBookIdInt, selectedBookIdInt, 0);
-            // Обновляем иконки Lucide после рендеринга
-            setTimeout(() => {
-              if (window.lucide) {
-                lucide.createIcons();
-              }
-              console.log('📋 Элементов в списке разделов:', sectionsList.children.length);
-            }, 100);
-          }
-        } else {
-          // Нет разделов - скрываем контейнер
-          console.log('ℹ️ Разделов нет, скрываю контейнер. data.success:', data.success, 'sections:', data.sections);
-          if (sectionsContainer) sectionsContainer.style.display = 'none';
-          if (sectionsList) sectionsList.innerHTML = '';
-        }
-      } catch (error) {
-        console.error('Ошибка загрузки разделов:', error);
-        if (sectionsContainer) sectionsContainer.style.display = 'none';
-      }
-    };
+        document.querySelectorAll('.book-actions-menu').forEach(m => {
+          m.classList.remove('show');
+          m.style.display = 'none';
+        });
 
-    // Показываем модальное окно
-    console.log('📋 Книг в списке:', bookSelect.options.length);
-    console.log('🎭 Показываю модальное окно...');
-    modal.classList.add('show');
-    modal.style.display = 'flex';
-    console.log('✅ Модальное окно должно быть видно. Стили:', {
-      display: modal.style.display,
-      classList: Array.from(modal.classList)
+        const isVisible = menu.classList.contains('show');
+        if (isVisible) {
+          menu.classList.remove('show');
+          menu.style.display = 'none';
+        } else {
+          menu.classList.add('show');
+          menu.style.display = 'block';
+
+          // Закрываем меню при клике вне его
+          setTimeout(() => {
+            const closeMenuHandler = function (e) {
+              if (!menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.remove('show');
+                menu.style.display = 'none';
+                document.removeEventListener('click', closeMenuHandler);
+              }
+            };
+            document.addEventListener('click', closeMenuHandler);
+          }, 0);
+        }
+      }
+    }
+
+    // Обработчики пунктов меню маленькой карточки книги
+    if (e.target.closest('.mini-book-actions-menu .dropdown-menu-item')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const item = e.target.closest('.dropdown-menu-item');
+      const action = item.getAttribute('data-action');
+      const bookId = item.getAttribute('data-book-id');
+      const menu = item.closest('.mini-book-actions-menu');
+
+      if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      }
+
+      switch (action) {
+        case 'edit-mini-book':
+          console.log('✏️ Редактирую книгу из маленькой карточки:', bookId);
+          if (bookId) {
+            const bookData = await apiRequest(`/library/api/book/${bookId}`);
+            if (bookData.success && bookData.book) {
+              openBookModal(bookData.book);
+            }
+          }
+          break;
+        case 'delete-mini-book':
+          console.log('🗑️ Удаляю книгу из маленькой карточки:', bookId);
+          if (bookId) {
+            const bookData = await apiRequest(`/library/api/book/${bookId}`);
+            if (bookData.success && bookData.book) {
+              const bookTitle = bookData.book.title || 'книгу';
+              if (confirm(`Вы уверены, что хотите удалить книгу "${bookTitle}"?`)) {
+                await deleteBook(bookId);
+              }
+            }
+          }
+          break;
+      }
+    }
+
+    // Обработчики пунктов меню раздела
+    if (e.target.closest('.section-actions-menu .dropdown-menu-item')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const item = e.target.closest('.dropdown-menu-item');
+      const action = item.getAttribute('data-action');
+      const sectionId = item.getAttribute('data-section-id');
+      const menu = item.closest('.section-actions-menu');
+
+      if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      }
+
+      switch (action) {
+        case 'add-subsection':
+          console.log('➕ Создаю подраздел для раздела:', sectionId);
+          if (sectionId) {
+            openSectionModal(null, sectionId);
+          }
+          break;
+        case 'add-dictation':
+          console.log('➕ Создаю диктант для раздела:', sectionId);
+          if (sectionId) {
+            setDictationTargetBook(sectionId);
+          }
+          window.location.href = '/dictation_editor/new';
+          break;
+        case 'edit-section':
+          console.log('✏️ Редактирую раздел:', sectionId);
+          if (activeBookId) {
+            loadSectionForEdit(sectionId);
+          }
+          break;
+        case 'delete-section':
+          const section = window.currentBookSections?.find(s => s.id === parseInt(sectionId));
+          const sectionTitle = section?.title || 'раздел';
+          if (confirm(`Вы уверены, что хотите удалить раздел "${sectionTitle}"?`)) {
+            deleteSection(sectionId);
+          }
+          break;
+      }
+    }
+
+    // Клик на карточку диктанта для добавления/удаления со стола (только в библиотеке, не на столе)
+    if (e.target.closest('.short-card[data-action="toggle-desk"]')) {
+      const card = e.target.closest('.short-card[data-action="toggle-desk"]');
+      // Игнорируем клики на кнопки действий и ссылки
+      if (e.target.closest('.short-actions') || e.target.closest('a') || e.target.closest('button')) {
+        // Do not handle as toggle-desk, but allow other handlers below (move/delete/etc)
+      } else {
+        // Игнорируем карточки на столе (они открываются для работы)
+        if (card.classList.contains('desk-card')) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        const dictationId = card.getAttribute('data-dictation-id');
+        if (dictationId) {
+          toggleDictationOnDesk(dictationId);
+        }
+        return;
+      }
+    }
+
+    // Кнопка "Переместить в книгу"
+    if (e.target.closest('[data-action="move-dictation"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="move-dictation"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      console.log('🔄 Открываю модальное окно перемещения для диктанта:', dictationId);
+      openMoveDictationModal(dictationId);
+    }
+
+    // Удалить (на карточке диктанта)
+    if (e.target.closest('[data-action="delete-dictation"]')) {
+      const btn = e.target.closest('[data-action="delete-dictation"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      console.log('🗑️ click delete-dictation', {
+        dictationId,
+        activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+      });
+      deleteDictation(dictationId);
+    }
+
+    // Кнопка "Убрать со стола" (на карточке на столе)
+    if (e.target.closest('[data-action="remove-from-desk"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="remove-from-desk"]');
+      const itemId = btn.getAttribute('data-desk-item-id');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      if (itemId && dictationId) {
+        removeFromDesk(itemId, dictationId);
+      }
+    }
+
+    if (e.target.closest('[data-action="show-in-book"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="show-in-book"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      if (dictationId) {
+        await showDeskDictationInBook(dictationId);
+      }
+    }
+
+    // Кнопка "Добавить диктант" в разделе (старый обработчик, оставляем для совместимости)
+    if (e.target.closest('[data-action="add-dictation"]:not(.dropdown-menu-item)')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="add-dictation"]');
+      const sectionId = btn.getAttribute('data-section-id');
+      console.log('➕ Создаю новый диктант для раздела:', sectionId);
+      // Сохраняем целевой раздел (он же книга-узел) и открываем редактор
+      if (sectionId) {
+        setDictationTargetBook(sectionId);
+      } else if (activeBookId) {
+        setDictationTargetBook(activeBookId);
+      }
+      window.location.href = '/dictation_editor/new';
+    }
+
+    // Кнопка "Редактировать раздел" (старый обработчик, оставляем для совместимости)
+    if (e.target.closest('[data-action="edit-section"]:not(.dropdown-menu-item)')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="edit-section"]');
+      const sectionId = btn.getAttribute('data-section-id');
+      console.log('✏️ Редактирую раздел:', sectionId);
+
+      // Находим данные раздела из списка разделов
+      if (activeBookId) {
+        loadSectionForEdit(sectionId);
+      }
+    }
+  });
+
+  // Модальное окно перемещения диктанта
+  const moveDictationCloseBtn = document.getElementById("move-dictation-close");
+  if (moveDictationCloseBtn) {
+    moveDictationCloseBtn.addEventListener("click", closeMoveDictationModal);
+  }
+
+  const moveDictationForm = document.getElementById("move-dictation-form");
+  if (moveDictationForm) {
+    moveDictationForm.addEventListener("submit", handleMoveDictation);
+  }
+
+  const moveDictationModal = document.getElementById("move-dictation-modal");
+  if (moveDictationModal) {
+    moveDictationModal.addEventListener("click", (event) => {
+      if (event.target === moveDictationModal) {
+        closeMoveDictationModal();
+      }
     });
   }
 
-  function renderSectionsTree(sections, container, bookId, parentId = null, level = 0) {
-    console.log(`🌳 renderSectionsTree вызвана: level=${level}, parentId=${parentId}, bookId=${bookId}, sections.length=${sections.length}`);
-    
-    // Фильтруем разделы по родителю
-    const filteredSections = sections.filter(s => {
-      // Для первого уровня (level 0) показываем разделы с parent_id === bookId
-      if (level === 0 && parentId === bookId) {
-        // Приводим к числам для сравнения
-        const sectionParentId = parseInt(s.parent_id);
-        const bookIdNum = parseInt(bookId);
-        const matches = sectionParentId === bookIdNum;
-        console.log(`  Проверка уровня 0: раздел "${s.title}" parent_id=${s.parent_id} (${sectionParentId}) === bookId=${bookId} (${bookIdNum})? ${matches}`);
-        return matches;
-      }
-      // Для остальных уровней фильтруем по parentId
-      if (parentId === null) {
-        return !s.parent_id || s.parent_id === null;
-      }
-      const sectionParentId = parseInt(s.parent_id);
-      const parentIdNum = parseInt(parentId);
-      const matches = sectionParentId === parentIdNum;
-      console.log(`  Проверка уровня ${level}: раздел "${s.title}" parent_id=${s.parent_id} (${sectionParentId}) === parentId=${parentId} (${parentIdNum})? ${matches}`);
-      return matches;
+  const deleteDictationModal = document.getElementById('delete-dictation-modal');
+  const deleteDictationCloseBtn = document.getElementById('delete-dictation-close');
+  const deleteDictationConfirmBtn = document.getElementById('delete-dictation-confirm');
+  console.log('🗑️ delete modal bind', {
+    hasModal: !!deleteDictationModal,
+    hasCloseBtn: !!deleteDictationCloseBtn,
+    hasConfirmBtn: !!deleteDictationConfirmBtn
+  });
+  if (deleteDictationCloseBtn) {
+    deleteDictationCloseBtn.addEventListener('click', closeDeleteDictationModal);
+  }
+  if (deleteDictationConfirmBtn) {
+    deleteDictationConfirmBtn.addEventListener('click', async () => {
+      const id = pendingDeleteDictationId;
+      console.log('🗑️ delete confirm click', {
+        pendingDeleteDictationId: id,
+        activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+      });
+      if (!id) return;
+      await performDeleteDictation(id);
     });
+  }
+  if (deleteDictationModal) {
+    deleteDictationModal.addEventListener('click', (event) => {
+      if (event.target === deleteDictationModal) {
+        closeDeleteDictationModal();
+      }
+    });
+  }
+}
 
-    console.log(`🌳 renderSectionsTree: level=${level}, parentId=${parentId}, filtered=${filteredSections.length}`);
-    if (filteredSections.length === 0) {
-      console.warn('⚠️ Нет разделов после фильтрации!');
+// ==================== Перемещение диктанта ====================
+
+function openMoveDictationModal(dictationId) {
+  console.log('📖 openMoveDictationModal вызвана для диктанта:', dictationId);
+  const modal = document.getElementById("move-dictation-modal");
+  const dictIdInput = document.getElementById("move-dictation-id");
+  const bookSelect = document.getElementById("move-target-book");
+  const sectionsContainer = document.getElementById("move-dictation-sections-container");
+  const sectionsList = document.getElementById("move-dictation-sections-list");
+  const sectionInput = document.getElementById("move-target-section");
+
+  console.log('Элементы модального окна:', { modal, dictIdInput, bookSelect });
+
+  if (!modal || !dictIdInput || !bookSelect) {
+    console.error('❌ Не найдены элементы модального окна!');
+    return;
+  }
+
+  // Сохраняем ID диктанта
+  dictIdInput.value = dictationId;
+  if (sectionInput) sectionInput.value = '';
+
+  // Скрываем контейнер разделов
+  if (sectionsContainer) sectionsContainer.style.display = 'none';
+  if (sectionsList) sectionsList.innerHTML = '';
+
+  // Загружаем список книг (кроме рабочей тетради)
+  const booksList = document.getElementById("booksList");
+  if (booksList) {
+    const bookCards = booksList.querySelectorAll('.book-card-mini');
+    bookSelect.innerHTML = '<option value="">-- Выберите книгу --</option>';
+
+    bookCards.forEach(card => {
+      const bookId = card.getAttribute('data-book-id');
+      const bookTitle = card.querySelector('.book-card-mini-title')?.textContent || 'Без названия';
+      const isWorkbook = bookTitle === 'Рабочая тетрадь';
+
+      if (!isWorkbook && bookId) {
+        const option = document.createElement('option');
+        option.value = bookId;
+        option.textContent = bookTitle;
+        bookSelect.appendChild(option);
+      }
+    });
+  }
+
+  // Обработчик изменения выбора книги
+  bookSelect.onchange = async function () {
+    const selectedBookId = this.value;
+    const selectedBookIdInt = parseInt(selectedBookId);
+    console.log('📖 Выбрана книга, ID:', selectedBookId, 'как число:', selectedBookIdInt);
+
+    if (sectionInput) sectionInput.value = '';
+
+    if (!selectedBookId) {
+      if (sectionsContainer) sectionsContainer.style.display = 'none';
+      if (sectionsList) sectionsList.innerHTML = '';
+      return;
     }
 
-    // Сортируем по order_index
-    filteredSections.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    // Загружаем разделы книги
+    try {
+      const token = getToken();
+      console.log('🔍 Запрашиваю разделы для книги:', selectedBookIdInt);
+      const response = await fetch(`/library/api/book/${selectedBookIdInt}/sections`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
 
-    filteredSections.forEach(section => {
-      console.log(`  📄 Рендерю раздел: ${section.title} (id=${section.id}, parent_id=${section.parent_id})`);
-      const hasChildren = sections.some(s => s.parent_id === section.id);
-      
-      const item = document.createElement('div');
-      item.className = 'move-dictation-section-item';
-      item.setAttribute('data-level', level);
-      item.setAttribute('data-section-id', section.id);
-      item.setAttribute('data-book-id', bookId);
-      
-      item.innerHTML = `
+      if (!response.ok) {
+        console.error('❌ Ошибка ответа сервера:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('❌ Текст ошибки:', errorText);
+      }
+
+      const data = await response.json();
+
+      console.log('📚 Загружены разделы:', data);
+      console.log('📚 Количество разделов:', data.sections ? data.sections.length : 0);
+      console.log('📚 ID выбранной книги:', selectedBookId);
+      if (data.sections && data.sections.length > 0) {
+        console.log('📚 Все разделы:', data.sections);
+        data.sections.forEach((s, idx) => {
+          console.log(`  Раздел ${idx}: id=${s.id}, title=${s.title}, parent_id=${s.parent_id}, bookId=${selectedBookId}`);
+        });
+      }
+
+      if (data.success && data.sections && data.sections.length > 0) {
+        // Показываем контейнер разделов и рендерим дерево
+        if (sectionsContainer) {
+          sectionsContainer.style.display = 'block';
+          console.log('✅ Показываю контейнер разделов');
+        }
+        if (sectionsList) {
+          sectionsList.innerHTML = '';
+          console.log('🌳 Рендерю дерево разделов, количество:', data.sections.length);
+          // Передаем bookId как parentId для первого уровня (используем число)
+          renderSectionsTree(data.sections, sectionsList, selectedBookIdInt, selectedBookIdInt, 0);
+          // Обновляем иконки Lucide после рендеринга
+          setTimeout(() => {
+            if (window.lucide) {
+              lucide.createIcons();
+            }
+            console.log('📋 Элементов в списке разделов:', sectionsList.children.length);
+          }, 100);
+        }
+      } else {
+        // Нет разделов - скрываем контейнер
+        console.log('ℹ️ Разделов нет, скрываю контейнер. data.success:', data.success, 'sections:', data.sections);
+        if (sectionsContainer) sectionsContainer.style.display = 'none';
+        if (sectionsList) sectionsList.innerHTML = '';
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки разделов:', error);
+      if (sectionsContainer) sectionsContainer.style.display = 'none';
+    }
+  };
+
+  // Показываем модальное окно
+  console.log('📋 Книг в списке:', bookSelect.options.length);
+  console.log('🎭 Показываю модальное окно...');
+  modal.classList.add('show');
+  modal.style.display = 'flex';
+  console.log('✅ Модальное окно должно быть видно. Стили:', {
+    display: modal.style.display,
+    classList: Array.from(modal.classList)
+  });
+}
+
+function renderSectionsTree(sections, container, bookId, parentId = null, level = 0) {
+  console.log(`🌳 renderSectionsTree вызвана: level=${level}, parentId=${parentId}, bookId=${bookId}, sections.length=${sections.length}`);
+
+  // Фильтруем разделы по родителю
+  const filteredSections = sections.filter(s => {
+    // Для первого уровня (level 0) показываем разделы с parent_id === bookId
+    if (level === 0 && parentId === bookId) {
+      // Приводим к числам для сравнения
+      const sectionParentId = parseInt(s.parent_id);
+      const bookIdNum = parseInt(bookId);
+      const matches = sectionParentId === bookIdNum;
+      console.log(`  Проверка уровня 0: раздел "${s.title}" parent_id=${s.parent_id} (${sectionParentId}) === bookId=${bookId} (${bookIdNum})? ${matches}`);
+      return matches;
+    }
+    // Для остальных уровней фильтруем по parentId
+    if (parentId === null) {
+      return !s.parent_id || s.parent_id === null;
+    }
+    const sectionParentId = parseInt(s.parent_id);
+    const parentIdNum = parseInt(parentId);
+    const matches = sectionParentId === parentIdNum;
+    console.log(`  Проверка уровня ${level}: раздел "${s.title}" parent_id=${s.parent_id} (${sectionParentId}) === parentId=${parentId} (${parentIdNum})? ${matches}`);
+    return matches;
+  });
+
+  console.log(`🌳 renderSectionsTree: level=${level}, parentId=${parentId}, filtered=${filteredSections.length}`);
+  if (filteredSections.length === 0) {
+    console.warn('⚠️ Нет разделов после фильтрации!');
+  }
+
+  // Сортируем по order_index
+  filteredSections.sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+
+  filteredSections.forEach(section => {
+    console.log(`  📄 Рендерю раздел: ${section.title} (id=${section.id}, parent_id=${section.parent_id})`);
+    const hasChildren = sections.some(s => s.parent_id === section.id);
+
+    const item = document.createElement('div');
+    item.className = 'move-dictation-section-item';
+    item.setAttribute('data-level', level);
+    item.setAttribute('data-section-id', section.id);
+    item.setAttribute('data-book-id', bookId);
+
+    item.innerHTML = `
         ${hasChildren ? `
           <div class="move-dictation-section-toggle" data-section-id="${section.id}">
             <i data-lucide="chevron-right"></i>
@@ -4217,1020 +4139,1018 @@
         ` : '<div style="width: 20px;"></div>'}
         <span class="move-dictation-section-title">${section.title || 'Без названия'}</span>
       `;
-      
-      // Обработчик клика на раздел
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.move-dictation-section-toggle')) {
-          e.stopPropagation();
-          toggleSectionChildren(section.id, item);
-          return;
-        }
-        
-        // Выбираем раздел
-        document.querySelectorAll('.move-dictation-section-item').forEach(el => {
-          el.classList.remove('selected');
-        });
-        item.classList.add('selected');
-        
-        const sectionInput = document.getElementById("move-target-section");
-        if (sectionInput) {
-          sectionInput.value = section.id;
-        }
-      });
-      
-      container.appendChild(item);
-      console.log(`  ✅ Раздел добавлен в DOM: ${section.title}`);
-      
-      // Если есть дети, создаем контейнер для них
-      if (hasChildren) {
-        const childrenContainer = document.createElement('div');
-        childrenContainer.className = 'move-dictation-section-children';
-        childrenContainer.setAttribute('data-parent-id', section.id);
-        container.appendChild(childrenContainer);
-        
-        // Рекурсивно рендерим детей
-        renderSectionsTree(sections, childrenContainer, bookId, section.id, level + 1);
+
+    // Обработчик клика на раздел
+    item.addEventListener('click', (e) => {
+      if (e.target.closest('.move-dictation-section-toggle')) {
+        e.stopPropagation();
+        toggleSectionChildren(section.id, item);
+        return;
       }
-    });
-    
-    // Инициализируем иконки Lucide после рендеринга всех элементов уровня
-    if (window.lucide && filteredSections.length > 0) {
-      setTimeout(() => {
-        lucide.createIcons();
-        console.log(`  🎨 Иконки Lucide обновлены для уровня ${level}`);
-      }, 0);
-    }
-  }
 
-  function toggleSectionChildren(sectionId, itemElement) {
-    const toggle = itemElement.querySelector('.move-dictation-section-toggle');
-    const childrenContainer = itemElement.nextElementSibling;
-    
-    if (!childrenContainer || !childrenContainer.classList.contains('move-dictation-section-children')) {
-      return;
-    }
-    
-    const isExpanded = childrenContainer.classList.contains('expanded');
-    
-    if (isExpanded) {
-      childrenContainer.classList.remove('expanded');
-      toggle.classList.remove('expanded');
-    } else {
-      childrenContainer.classList.add('expanded');
-      toggle.classList.add('expanded');
-    }
-    
-    // Обновляем иконки
-    if (window.lucide) {
-      lucide.createIcons();
-    }
-  }
-
-  function closeMoveDictationModal() {
-    const modal = document.getElementById("move-dictation-modal");
-    if (modal) {
-      modal.classList.remove('show');
-      modal.style.display = 'none';
-      // Очищаем форму
-      const form = document.getElementById("move-dictation-form");
-      if (form) form.reset();
-      
-      // Очищаем контейнер разделов
-      const sectionsContainer = document.getElementById("move-dictation-sections-container");
-      const sectionsList = document.getElementById("move-dictation-sections-list");
-      if (sectionsContainer) sectionsContainer.style.display = 'none';
-      if (sectionsList) sectionsList.innerHTML = '';
-      
-      // Снимаем выделение с разделов
+      // Выбираем раздел
       document.querySelectorAll('.move-dictation-section-item').forEach(el => {
         el.classList.remove('selected');
       });
-    }
-  }
+      item.classList.add('selected');
 
-  async function handleMoveDictation(e) {
-    e.preventDefault();
-
-    const dictationId = document.getElementById("move-dictation-id").value;
-    const bookId = document.getElementById("move-target-book").value;
-    const sectionId = document.getElementById("move-target-section")?.value || null;
-    const sectionsContainer = document.getElementById("move-dictation-sections-container");
-
-    if (!dictationId || !bookId) {
-      showToast("Выберите книгу", "error");
-      return;
-    }
-
-    // Если есть разделы и контейнер виден, но раздел не выбран - можно переместить в саму книгу
-    // Используем раздел, если выбран, иначе саму книгу
-    const targetId = sectionId || bookId;
-
-    try {
-      const token = getToken();
-      const response = await fetch(`/library/api/dictation/${dictationId}/move-to-book`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ book_id: parseInt(targetId) })
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        showToast("Диктант перемещён");
-        closeMoveDictationModal();
-        
-        // Определяем ID целевой книги (если выбран раздел, это родительская книга)
-        const targetBookIdNum = parseInt(bookId);
-        
-        // Перезагружаем активную книгу, если она открыта
-        if (activeBookId) {
-          const currentBookId = parseInt(activeBookId);
-          
-          // Определяем, является ли текущая открытая книга рабочей тетрадью
-          const bookCards = document.querySelectorAll('.book-card-mini');
-          let isCurrentWorkbook = false;
-          bookCards.forEach(card => {
-            if (parseInt(card.getAttribute('data-book-id')) === currentBookId) {
-              const title = card.querySelector('.book-card-mini-title')?.textContent;
-              if (title === 'Рабочая тетрадь') {
-                isCurrentWorkbook = true;
-              }
-            }
-          });
-          
-          // Если открыта рабочая тетрадь - обновляем её (диктант оттуда ушёл)
-          if (isCurrentWorkbook) {
-            await loadActiveBook(currentBookId, true);
-          }
-          // Если открыта целевая книга - обновляем её (диктант туда пришёл)
-          else if (currentBookId === targetBookIdNum) {
-            await loadActiveBook(currentBookId, false);
-            
-            // Если диктант перемещён в раздел, и этот раздел открыт - обновляем его
-            if (sectionId) {
-              const sectionContent = document.querySelector(`.structure-item-content[data-section-content-id="${sectionId}"]`);
-              if (sectionContent && sectionContent.style.display !== 'none') {
-                await loadSectionDictations(sectionId, sectionContent);
-              }
-            }
-          }
-        }
-      } else {
-        showToast(data.error || "Ошибка при перемещении", "error");
+      const sectionInput = document.getElementById("move-target-section");
+      if (sectionInput) {
+        sectionInput.value = section.id;
       }
-    } catch (error) {
-      console.error("Ошибка перемещения диктанта:", error);
-      showToast("Ошибка при перемещении", "error");
-    }
-  }
-
-  // ==================== Удаление диктанта ====================
-
-  async function deleteBook(bookId) {
-    try {
-      const data = await apiRequest(`/library/api/book/${bookId}`, {
-        method: "DELETE",
-      });
-
-      if (data.success) {
-        showToast("Книга удалена");
-        // Перезагружаем список книг
-        await loadBooksFromAPI();
-        if (String(bookViewActiveBookId || '') === String(bookId || '') || String(activeBookId || '') === String(bookId || '')) {
-          closeBookViewModal();
-        }
-      } else {
-        showToast(data.error || "Ошибка при удалении книги", "error");
-      }
-    } catch (error) {
-      console.error("Ошибка удаления книги:", error);
-      showToast("Ошибка при удалении книги", "error");
-    }
-  }
-
-  async function deleteSection(sectionId) {
-    try {
-      const data = await apiRequest(`/library/api/book/${sectionId}`, {
-        method: "DELETE",
-      });
-
-      if (data.success) {
-        showToast("Раздел удалён");
-        // Перезагружаем активную книгу
-        if (activeBookId) {
-          await loadActiveBook(activeBookId);
-        }
-      } else {
-        showToast(data.error || "Ошибка при удалении раздела", "error");
-      }
-    } catch (error) {
-      console.error("Ошибка удаления раздела:", error);
-      showToast("Ошибка при удалении раздела", "error");
-    }
-  }
-
-  async function deleteDictation(dictationId) {
-    console.log('🗑️ deleteDictation()', { dictationId });
-    openDeleteDictationModal(dictationId);
-  }
-
-  function openDeleteDictationModal(dictationId) {
-    const modal = document.getElementById('delete-dictation-modal');
-    if (!modal) {
-      console.warn('🗑️ openDeleteDictationModal: modal not found');
-      return;
-    }
-    pendingDeleteDictationId = String(dictationId || '');
-    pendingDeleteSectionId = null;
-
-    console.log('🗑️ openDeleteDictationModal', {
-      dictationId: pendingDeleteDictationId,
-      activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
     });
 
-    const nameEl = document.getElementById('delete-dictation-name');
-    const deskWarnEl = document.getElementById('delete-dictation-desk-warning');
-    try {
-      const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(dictationId))}"]`);
-      const title = card ? (card.querySelector('.short-title')?.textContent || '') : '';
-      if (nameEl) {
-        nameEl.textContent = title ? `«${title.trim()}»` : '';
-      }
+    container.appendChild(item);
+    console.log(`  ✅ Раздел добавлен в DOM: ${section.title}`);
 
-      // If delete was triggered from a section (paragraph) view, remember that sectionId.
-      // Otherwise we fall back to activeBookId.
-      try {
-        const sectionContent = card ? card.closest('.structure-item-content[data-section-content-id]') : null;
-        const sectionIdAttr = sectionContent ? sectionContent.getAttribute('data-section-content-id') : '';
-        const sectionIdNum = sectionIdAttr ? parseInt(String(sectionIdAttr), 10) : NaN;
-        if (sectionIdNum && isFinite(sectionIdNum) && sectionIdNum > 0) {
-          pendingDeleteSectionId = String(sectionIdNum);
+    // Если есть дети, создаем контейнер для них
+    if (hasChildren) {
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'move-dictation-section-children';
+      childrenContainer.setAttribute('data-parent-id', section.id);
+      container.appendChild(childrenContainer);
+
+      // Рекурсивно рендерим детей
+      renderSectionsTree(sections, childrenContainer, bookId, section.id, level + 1);
+    }
+  });
+
+  // Инициализируем иконки Lucide после рендеринга всех элементов уровня
+  if (window.lucide && filteredSections.length > 0) {
+    setTimeout(() => {
+      lucide.createIcons();
+      console.log(`  🎨 Иконки Lucide обновлены для уровня ${level}`);
+    }, 0);
+  }
+}
+
+function toggleSectionChildren(sectionId, itemElement) {
+  const toggle = itemElement.querySelector('.move-dictation-section-toggle');
+  const childrenContainer = itemElement.nextElementSibling;
+
+  if (!childrenContainer || !childrenContainer.classList.contains('move-dictation-section-children')) {
+    return;
+  }
+
+  const isExpanded = childrenContainer.classList.contains('expanded');
+
+  if (isExpanded) {
+    childrenContainer.classList.remove('expanded');
+    toggle.classList.remove('expanded');
+  } else {
+    childrenContainer.classList.add('expanded');
+    toggle.classList.add('expanded');
+  }
+
+  // Обновляем иконки
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+}
+
+function closeMoveDictationModal() {
+  const modal = document.getElementById("move-dictation-modal");
+  if (modal) {
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    // Очищаем форму
+    const form = document.getElementById("move-dictation-form");
+    if (form) form.reset();
+
+    // Очищаем контейнер разделов
+    const sectionsContainer = document.getElementById("move-dictation-sections-container");
+    const sectionsList = document.getElementById("move-dictation-sections-list");
+    if (sectionsContainer) sectionsContainer.style.display = 'none';
+    if (sectionsList) sectionsList.innerHTML = '';
+
+    // Снимаем выделение с разделов
+    document.querySelectorAll('.move-dictation-section-item').forEach(el => {
+      el.classList.remove('selected');
+    });
+  }
+}
+
+async function handleMoveDictation(e) {
+  e.preventDefault();
+
+  const dictationId = document.getElementById("move-dictation-id").value;
+  const bookId = document.getElementById("move-target-book").value;
+  const sectionId = document.getElementById("move-target-section")?.value || null;
+  const sectionsContainer = document.getElementById("move-dictation-sections-container");
+
+  if (!dictationId || !bookId) {
+    showToast("Выберите книгу", "error");
+    return;
+  }
+
+  // Если есть разделы и контейнер виден, но раздел не выбран - можно переместить в саму книгу
+  // Используем раздел, если выбран, иначе саму книгу
+  const targetId = sectionId || bookId;
+
+  try {
+    const token = getToken();
+    const response = await fetch(`/library/api/dictation/${dictationId}/move-to-book`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ book_id: parseInt(targetId) })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.success) {
+      showToast("Диктант перемещён");
+      closeMoveDictationModal();
+
+      // Определяем ID целевой книги (если выбран раздел, это родительская книга)
+      const targetBookIdNum = parseInt(bookId);
+
+      // Перезагружаем активную книгу, если она открыта
+      if (activeBookId) {
+        const currentBookId = parseInt(activeBookId);
+
+        // Определяем, является ли текущая открытая книга рабочей тетрадью
+        const bookCards = document.querySelectorAll('.book-card-mini');
+        let isCurrentWorkbook = false;
+        bookCards.forEach(card => {
+          if (parseInt(card.getAttribute('data-book-id')) === currentBookId) {
+            const title = card.querySelector('.book-card-mini-title')?.textContent;
+            if (title === 'Рабочая тетрадь') {
+              isCurrentWorkbook = true;
+            }
+          }
+        });
+
+        // Если открыта рабочая тетрадь - обновляем её (диктант оттуда ушёл)
+        if (isCurrentWorkbook) {
+          await loadActiveBook(currentBookId, true);
         }
-      } catch (e2) {
-        pendingDeleteSectionId = null;
+        // Если открыта целевая книга - обновляем её (диктант туда пришёл)
+        else if (currentBookId === targetBookIdNum) {
+          await loadActiveBook(currentBookId, false);
+
+          // Если диктант перемещён в раздел, и этот раздел открыт - обновляем его
+          if (sectionId) {
+            const sectionContent = document.querySelector(`.structure-item-content[data-section-content-id="${sectionId}"]`);
+            if (sectionContent && sectionContent.style.display !== 'none') {
+              await loadSectionDictations(sectionId, sectionContent);
+            }
+          }
+        }
       }
-    } catch (e) {
-      if (nameEl) nameEl.textContent = '';
+    } else {
+      showToast(data.error || "Ошибка при перемещении", "error");
+    }
+  } catch (error) {
+    console.error("Ошибка перемещения диктанта:", error);
+    showToast("Ошибка при перемещении", "error");
+  }
+}
+
+// ==================== Удаление диктанта ====================
+
+async function deleteBook(bookId) {
+  try {
+    const data = await apiRequest(`/library/api/book/${bookId}`, {
+      method: "DELETE",
+    });
+
+    if (data.success) {
+      showToast("Книга удалена");
+      // Перезагружаем список книг
+      await loadBooksFromAPI();
+      if (String(bookViewActiveBookId || '') === String(bookId || '') || String(activeBookId || '') === String(bookId || '')) {
+        closeBookViewModal();
+      }
+    } else {
+      showToast(data.error || "Ошибка при удалении книги", "error");
+    }
+  } catch (error) {
+    console.error("Ошибка удаления книги:", error);
+    showToast("Ошибка при удалении книги", "error");
+  }
+}
+
+async function deleteSection(sectionId) {
+  try {
+    const data = await apiRequest(`/library/api/book/${sectionId}`, {
+      method: "DELETE",
+    });
+
+    if (data.success) {
+      showToast("Раздел удалён");
+      // Перезагружаем активную книгу
+      if (activeBookId) {
+        await loadActiveBook(activeBookId);
+      }
+    } else {
+      showToast(data.error || "Ошибка при удалении раздела", "error");
+    }
+  } catch (error) {
+    console.error("Ошибка удаления раздела:", error);
+    showToast("Ошибка при удалении раздела", "error");
+  }
+}
+
+async function deleteDictation(dictationId) {
+  console.log('🗑️ deleteDictation()', { dictationId });
+  openDeleteDictationModal(dictationId);
+}
+
+function openDeleteDictationModal(dictationId) {
+  const modal = document.getElementById('delete-dictation-modal');
+  if (!modal) {
+    console.warn('🗑️ openDeleteDictationModal: modal not found');
+    return;
+  }
+  pendingDeleteDictationId = String(dictationId || '');
+  pendingDeleteSectionId = null;
+
+  console.log('🗑️ openDeleteDictationModal', {
+    dictationId: pendingDeleteDictationId,
+    activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+  });
+
+  const nameEl = document.getElementById('delete-dictation-name');
+  const deskWarnEl = document.getElementById('delete-dictation-desk-warning');
+  try {
+    const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(dictationId))}"]`);
+    const title = card ? (card.querySelector('.short-title')?.textContent || '') : '';
+    if (nameEl) {
+      nameEl.textContent = title ? `«${title.trim()}»` : '';
     }
 
+    // If delete was triggered from a section (paragraph) view, remember that sectionId.
+    // Otherwise we fall back to activeBookId.
     try {
-      const isOnDesk = typeof isDictationOnDesk === 'function' ? !!isDictationOnDesk(String(dictationId)) : false;
-      if (deskWarnEl) {
-        if (isOnDesk) {
-          deskWarnEl.style.display = 'block';
-          deskWarnEl.textContent = 'Внимание: диктант лежит на рабочем столе. При удалении он будет убран и со стола.';
-        } else {
-          deskWarnEl.style.display = 'none';
-          deskWarnEl.textContent = '';
-        }
+      const sectionContent = card ? card.closest('.structure-item-content[data-section-content-id]') : null;
+      const sectionIdAttr = sectionContent ? sectionContent.getAttribute('data-section-content-id') : '';
+      const sectionIdNum = sectionIdAttr ? parseInt(String(sectionIdAttr), 10) : NaN;
+      if (sectionIdNum && isFinite(sectionIdNum) && sectionIdNum > 0) {
+        pendingDeleteSectionId = String(sectionIdNum);
       }
-    } catch (e) {
-      if (deskWarnEl) {
+    } catch (e2) {
+      pendingDeleteSectionId = null;
+    }
+  } catch (e) {
+    if (nameEl) nameEl.textContent = '';
+  }
+
+  try {
+    const isOnDesk = typeof isDictationOnDesk === 'function' ? !!isDictationOnDesk(String(dictationId)) : false;
+    if (deskWarnEl) {
+      if (isOnDesk) {
+        deskWarnEl.style.display = 'block';
+        deskWarnEl.textContent = 'Внимание: диктант лежит на рабочем столе. При удалении он будет убран и со стола.';
+      } else {
         deskWarnEl.style.display = 'none';
         deskWarnEl.textContent = '';
       }
     }
-
-    console.log('🗑️ delete modal show', {
-      displayBefore: modal.style.display,
-      classBefore: modal.className,
-      hasNameEl: !!nameEl,
-      nameText: nameEl ? nameEl.textContent : null
-    });
-
-    modal.style.display = 'flex';
-    modal.classList.add('show');
-    if (window.lucide) {
-      lucide.createIcons();
+  } catch (e) {
+    if (deskWarnEl) {
+      deskWarnEl.style.display = 'none';
+      deskWarnEl.textContent = '';
     }
   }
 
-  function closeDeleteDictationModal() {
-    const modal = document.getElementById('delete-dictation-modal');
-    if (!modal) return;
-    modal.classList.remove('show');
-    modal.style.display = 'none';
-    pendingDeleteDictationId = null;
-    pendingDeleteSectionId = null;
+  console.log('🗑️ delete modal show', {
+    displayBefore: modal.style.display,
+    classBefore: modal.className,
+    hasNameEl: !!nameEl,
+    nameText: nameEl ? nameEl.textContent : null
+  });
+
+  modal.style.display = 'flex';
+  modal.classList.add('show');
+  if (window.lucide) {
+    lucide.createIcons();
   }
+}
 
-  async function performDeleteDictation(dictationId) {
+function closeDeleteDictationModal() {
+  const modal = document.getElementById('delete-dictation-modal');
+  if (!modal) return;
+  modal.classList.remove('show');
+  modal.style.display = 'none';
+  pendingDeleteDictationId = null;
+  pendingDeleteSectionId = null;
+}
+
+async function performDeleteDictation(dictationId) {
+  try {
+    const idStr = String(dictationId || '');
+    if (!idStr) return;
+
+    console.log('🗑️ performDeleteDictation start', {
+      dictationId: idStr,
+      activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
+    });
+
+    const dictIdStr = `dict_${idStr}`;
+    const deleteUrl = `/api/dictations/${encodeURIComponent(dictIdStr)}`;
+    console.log('🗑️ global delete request', { url: deleteUrl, dictationId: dictIdStr });
+    const token = getToken();
+    const response = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      cache: 'no-store'
+    });
+
+    let data = null;
     try {
-      const idStr = String(dictationId || '');
-      if (!idStr) return;
+      data = await response.json();
+    } catch (e) {
+      data = null;
+    }
 
-      console.log('🗑️ performDeleteDictation start', {
-        dictationId: idStr,
-        activeBookId: (typeof activeBookId !== 'undefined') ? activeBookId : null
-      });
+    console.log('🗑️ global delete response', {
+      status: response.status,
+      ok: response.ok,
+      data
+    });
 
-      const dictIdStr = `dict_${idStr}`;
-      const deleteUrl = `/api/dictations/${encodeURIComponent(dictIdStr)}`;
-      console.log('🗑️ global delete request', { url: deleteUrl, dictationId: dictIdStr });
-      const token = getToken();
-      const response = await fetch(deleteUrl, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        cache: 'no-store'
-      });
+    if (response.ok && data && data.success) {
+      closeDeleteDictationModal();
+      showToast('Диктант удалён');
 
-      let data = null;
       try {
-        data = await response.json();
+        await swRequest('purgeDictation', { dictationId: idStr, timeoutMs: 60000 });
       } catch (e) {
-        data = null;
       }
 
-      console.log('🗑️ global delete response', {
-        status: response.status,
-        ok: response.ok,
-        data
-      });
+      try {
+        await idbDeleteDictationCache(`dict_${idStr}`);
+      } catch (e) {
+      }
 
-      if (response.ok && data && data.success) {
-        closeDeleteDictationModal();
-        showToast('Диктант удалён');
+      try {
+        const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
+        if (card) {
+          card.remove();
+        }
+      } catch (e) {
+      }
 
+      // If dictation is on desk, remove it from desk list as well.
+      try {
+        const itemId = typeof getDeskItemId === 'function' ? getDeskItemId(idStr) : null;
+        if (itemId) {
+          await removeFromDesk(itemId, idStr);
+        }
+      } catch (e) {
+      }
+
+      if (activeBookId) {
         try {
-          await swRequest('purgeDictation', { dictationId: idStr, timeoutMs: 60000 });
+          await loadActiveBook(activeBookId, activeBookIsWorkbook);
         } catch (e) {
         }
+      }
+    } else {
+      showToast((data && data.error) ? data.error : 'Ошибка при удалении', 'error');
+    }
+  } catch (error) {
+    console.error('Ошибка удаления диктанта:', error);
+    showToast('Ошибка при удалении', 'error');
+  }
+}
 
-        try {
-          await idbDeleteDictationCache(`dict_${idStr}`);
-        } catch (e) {
-        }
+// ==================== Статистика и медальки диктантов ====================
 
-        try {
-          const card = document.querySelector(`.short-card[data-dictation-id="${CSS.escape(String(idStr))}"]`);
-          if (card) {
-            card.remove();
-          }
-        } catch (e) {
-        }
+// Загрузка статистики диктанта (звезды, полузвезды, микрофон)
+async function getDictationStats(dictationId) {
+  if (!dictationId) {
+    return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+  }
 
-        // If dictation is on desk, remove it from desk list as well.
-        try {
-          const itemId = typeof getDeskItemId === 'function' ? getDeskItemId(idStr) : null;
-          if (itemId) {
-            await removeFromDesk(itemId, idStr);
-          }
-        } catch (e) {
-        }
+  const loadDraftStatistics = async (dictationId) => {
+    try {
+      const userId = getDraftUserIdForKey();
+      const rawId = dictationId ? String(dictationId) : '';
+      if (!rawId) return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
 
-        if (activeBookId) {
-          try {
-            await loadActiveBook(activeBookId, activeBookIsWorkbook);
-          } catch (e) {
-          }
+      const numericId = parseInt(rawId.replace(/^dict_/, ''), 10);
+      const variants = [];
+      variants.push(rawId);
+      if (!rawId.startsWith('dict_')) variants.push(`dict_${rawId}`);
+      if (Number.isFinite(numericId)) {
+        variants.push(String(numericId));
+        variants.push(`dict_${numericId}`);
+      }
+
+      const tried = new Set();
+      for (const v of variants) {
+        if (!v) continue;
+        const k = `${userId}:${v}`;
+        if (tried.has(k)) continue;
+        tried.add(k);
+        const local = await idbGet('drafts', k);
+        const state = local && local.state ? local.state : null;
+        if (state) {
+          const draftStats = computeDraftStatistics(state);
+          draftStats.hasDraft = true;
+          return draftStats;
         }
-      } else {
-        showToast((data && data.error) ? data.error : 'Ошибка при удалении', 'error');
       }
     } catch (error) {
-      console.error('Ошибка удаления диктанта:', error);
-      showToast('Ошибка при удалении', 'error');
-    }
-  }
-
-  // ==================== Статистика и медальки диктантов ====================
-
-  // Загрузка статистики диктанта (звезды, полузвезды, микрофон)
-  async function getDictationStats(dictationId) {
-    if (!dictationId) {
-      return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+      console.warn('Ошибка загрузки статистики диктанта:', dictationId, error);
     }
 
-    const loadDraftStatistics = async (dictationId) => {
-      try {
-        const userId = getDraftUserIdForKey();
-        const rawId = dictationId ? String(dictationId) : '';
-        if (!rawId) return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+    return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
+  };
 
-        const numericId = parseInt(rawId.replace(/^dict_/, ''), 10);
-        const variants = [];
-        variants.push(rawId);
-        if (!rawId.startsWith('dict_')) variants.push(`dict_${rawId}`);
-        if (Number.isFinite(numericId)) {
-          variants.push(String(numericId));
-          variants.push(`dict_${numericId}`);
-        }
+  return loadDraftStatistics(dictationId);
+}
 
-        const tried = new Set();
-        for (const v of variants) {
-          if (!v) continue;
-          const k = `${userId}:${v}`;
-          if (tried.has(k)) continue;
-          tried.add(k);
-          const local = await idbGet('drafts', k);
-          const state = local && local.state ? local.state : null;
-          if (state) {
-            const draftStats = computeDraftStatistics(state);
-            draftStats.hasDraft = true;
-            return draftStats;
-          }
-        }
-      } catch (error) {
-        console.warn('Ошибка загрузки статистики диктанта:', dictationId, error);
-      }
+// Вычисление статистики из состояния диктанта
+function computeDraftStatistics(state) {
+  const perSentence = state.per_sentence || {};
+  let perfect = 0;
+  let corrected = 0;
+  let audio = 0;
 
-      return { perfect: 0, corrected: 0, audio: 0, hasDraft: false };
-    };
+  const toNumber = (value) => Number(value) || 0;
 
-    return loadDraftStatistics(dictationId);
-  }
-
-  // Вычисление статистики из состояния диктанта
-  function computeDraftStatistics(state) {
-    const perSentence = state.per_sentence || {};
-    let perfect = 0;
-    let corrected = 0;
-    let audio = 0;
-
-    const toNumber = (value) => Number(value) || 0;
-
-    const values = Object.values(perSentence);
-    if (values.length) {
-      values.forEach(sentence => {
-        perfect += toNumber(sentence.number_of_perfect);
-        corrected += toNumber(sentence.number_of_corrected);
-        audio += toNumber(sentence.number_of_audio);
-      });
-    } else {
-      // fallback (если черновик сохранён без per_sentence)
-      perfect = toNumber(state.number_of_perfect);
-      corrected = toNumber(state.number_of_corrected);
-      audio = toNumber(state.number_of_audio);
-    }
-
-    return {
-      perfect,
-      corrected,
-      audio,
-      hasDraft: false
-    };
-  }
-
-  // Обновление статистики для всех карточек диктантов
-  async function updateDictationCardsStats(container = null) {
-    const targetContainer = container || document;
-    const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
-    
-    cards.forEach(async (card) => {
-      const dictationId = card.dataset.dictationId;
-      if (!dictationId) return;
-
-      const statsContainer = card.querySelector('.short-stats[data-dictation-id]');
-      if (!statsContainer) return;
-
-      const stats = await getDictationStats(dictationId);
-      renderStatsIcons(statsContainer, stats);
+  const values = Object.values(perSentence);
+  if (values.length) {
+    values.forEach(sentence => {
+      perfect += toNumber(sentence.number_of_perfect);
+      corrected += toNumber(sentence.number_of_corrected);
+      audio += toNumber(sentence.number_of_audio);
     });
+  } else {
+    // fallback (если черновик сохранён без per_sentence)
+    perfect = toNumber(state.number_of_perfect);
+    corrected = toNumber(state.number_of_corrected);
+    audio = toNumber(state.number_of_audio);
   }
 
-  // Рендеринг иконок статистики
-  function renderStatsIcons(container, stats = {}) {
-    const metrics = [
-      {
-        className: 'stat-icon stat-icon-perfect',
-        icon: 'star',
-        value: Number(stats.perfect) || 0,
-        title: 'Звезд'
+  return {
+    perfect,
+    corrected,
+    audio,
+    hasDraft: false
+  };
+}
+
+// Обновление статистики для всех карточек диктантов
+async function updateDictationCardsStats(container = null) {
+  const targetContainer = container || document;
+  const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
+
+  cards.forEach(async (card) => {
+    const dictationId = card.dataset.dictationId;
+    if (!dictationId) return;
+
+    const statsContainer = card.querySelector('.short-stats[data-dictation-id]');
+    if (!statsContainer) return;
+
+    const stats = await getDictationStats(dictationId);
+    renderStatsIcons(statsContainer, stats);
+  });
+}
+
+// Рендеринг иконок статистики
+function renderStatsIcons(container, stats = {}) {
+  const metrics = [
+    {
+      className: 'stat-icon stat-icon-perfect',
+      icon: 'star',
+      value: Number(stats.perfect) || 0,
+      title: 'Звезд'
+    },
+    {
+      className: 'stat-icon stat-icon-corrected',
+      icon: 'star-half',
+      value: Number(stats.corrected) || 0,
+      title: 'Полузвезд'
+    },
+    {
+      className: 'stat-icon stat-icon-audio',
+      icon: 'mic',
+      value: Number(stats.audio) || 0,
+      title: 'Аудио'
+    }
+  ];
+
+  const hasProgress = metrics.some(metric => metric.value > 0);
+
+  if (!hasProgress) {
+    container.innerHTML = '<div class="stats-placeholder"></div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  const statsIcons = document.createElement('div');
+  statsIcons.className = 'stats-icons';
+
+  metrics.forEach(metric => {
+    const el = document.createElement('div');
+    el.className = metric.className;
+    el.title = `${metric.title}: ${metric.value}`;
+    el.innerHTML = `<i data-lucide="${metric.icon}"></i><span>${metric.value}</span>`;
+    statsIcons.appendChild(el);
+  });
+
+  container.appendChild(statsIcons);
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+// Кеш для количества выполнений
+let completionCountsCache = {};
+
+// Загрузка количества выполнений из БД
+async function loadCompletionCounts(container = null) {
+  const targetContainer = container || document;
+  const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
+  if (cards.length === 0) {
+    return;
+  }
+
+  // Собираем все ID диктантов
+  const dictationIds = Array.from(cards)
+    .map(card => card.dataset.dictationId)
+    .filter(id => id);
+
+  if (dictationIds.length === 0) {
+    return;
+  }
+
+  // Получаем токен
+  const token = window.UM?.token || localStorage.getItem('jwt_token');
+  if (!token) {
+    console.warn('[loadCompletionCounts] Нет токена, пропускаем загрузку');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/statistics/success/count', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       },
-      {
-        className: 'stat-icon stat-icon-corrected',
-        icon: 'star-half',
-        value: Number(stats.corrected) || 0,
-        title: 'Полузвезд'
-      },
-      {
-        className: 'stat-icon stat-icon-audio',
-        icon: 'mic',
-        value: Number(stats.audio) || 0,
-        title: 'Аудио'
+      body: JSON.stringify({ dictation_ids: dictationIds })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      // Обновляем кеш, добавляя новые данные (не заменяя полностью)
+      if (result.counts) {
+        Object.assign(completionCountsCache, result.counts);
       }
-    ];
+    } else {
+      console.error('[loadCompletionCounts] Ошибка загрузки:', await response.text());
+    }
+  } catch (error) {
+    console.error('[loadCompletionCounts] Ошибка при загрузке:', error);
+  }
+}
 
-    const hasProgress = metrics.some(metric => metric.value > 0);
+// Подсчет выполнений для конкретного диктанта
+function countDictationCompletions(dictationId) {
+  if (!dictationId) return 0;
 
-    if (!hasProgress) {
-      container.innerHTML = '<div class="stats-placeholder"></div>';
+  // Пробуем разные форматы ключа
+  const formats = [
+    dictationId,
+    `dict_${dictationId}`,
+    String(dictationId),
+    `dict_${String(dictationId)}`
+  ];
+
+  for (const key of formats) {
+    if (completionCountsCache[key] !== undefined) {
+      return completionCountsCache[key];
+    }
+  }
+
+  return 0;
+}
+
+// Обновление медалек на всех карточках
+async function updateCompletionBadges(container = null) {
+  const targetContainer = container || document;
+  const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
+
+  if (cards.length === 0) {
+    return;
+  }
+
+  // Всегда загружаем данные из БД для всех карточек в контейнере
+  // Это гарантирует, что медальки появятся даже для старых диктантов
+  await loadCompletionCounts(targetContainer);
+
+  cards.forEach(card => {
+    const dictationId = card.dataset.dictationId;
+    if (!dictationId) return;
+
+    const completionCount = countDictationCompletions(dictationId);
+    let badge = card.querySelector('.short-completion-badge');
+
+    if (completionCount > 0) {
+      if (!badge) {
+        // Создаем новую медальку
+        badge = document.createElement('div');
+        badge.className = 'short-completion-badge';
+        badge.dataset.dictationId = dictationId;
+        card.appendChild(badge);
+
+        // Добавляем обработчик клика
+        badge.style.cursor = 'pointer';
+        badge.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          const clickedDictationId = e.currentTarget.dataset.dictationId;
+          if (clickedDictationId && typeof DictationsReport !== 'undefined') {
+            await DictationsReport.open(clickedDictationId);
+          }
+        });
+      }
+      badge.title = `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`;
+      badge.setAttribute('aria-label', `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`);
+      badge.innerHTML = `<i data-lucide="award"></i><span class="completion-count">${completionCount}</span>`;
+    } else if (badge) {
+      // Удаляем медальку, если выполнений нет
+      badge.remove();
+    }
+  });
+
+  // Обновить иконки Lucide
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
+}
+
+// ==================== Модальное окно публичной библиотеки ====================
+
+async function openPublicLibraryModal() {
+  const modal = document.getElementById("public-library-modal");
+  if (!modal) return;
+
+  modal.style.display = "flex";
+
+  initializePublicBooksLanguageSelector();
+
+  // Загружаем публичные книги
+  if (Array.isArray(publicBooks) && publicBooks.length > 0 && (Date.now() - publicBooksLoadedAt) < 5 * 60 * 1000) {
+    renderPublicBooksList();
+  } else {
+    await loadPublicBooks();
+  }
+
+  // Обновляем иконки Lucide
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+}
+
+function closePublicLibraryModal() {
+  const modal = document.getElementById("public-library-modal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+let publicBooks = []; // Список публичных книг
+let publicBooksLoadedAt = 0;
+
+function initializePublicBooksLanguageSelector() {
+  try {
+    const container = document.getElementById('publicBooksLanguageSelector');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    const userSettings = window.USER_LANGUAGE_DATA;
+    if (!userSettings) return;
+
+    const baseLanguageData = window.LanguageManager.getLanguageData();
+    const languageData = {
+      all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
+      ...(baseLanguageData || {})
+    };
+
+    if (typeof window.initLanguageSelector === 'function') {
+      const options = {
+        mode: 'learning-selector-compact',
+        currentLearning: (currentPublicBooksFilterLanguage != null ? currentPublicBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
+        learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
+        languageData,
+        onLanguageChange: function (values) {
+          const v = values && values.currentLearning ? String(values.currentLearning) : '';
+          currentPublicBooksFilterLanguage = v || 'all';
+          renderPublicBooksList();
+        }
+      };
+
+      publicBooksLanguageSelectorInstance = window.initLanguageSelector('publicBooksLanguageSelector', options);
+      if (!currentPublicBooksFilterLanguage) {
+        const v = String(options.currentLearning || '');
+        currentPublicBooksFilterLanguage = v || 'all';
+      }
+    }
+  } catch (e) {
+  }
+}
+
+function renderPublicBooksList() {
+  const list = document.getElementById('publicBooksList');
+  if (!list) return;
+
+  const rawFilterLang = currentPublicBooksFilterLanguage
+    || window.USER_LANGUAGE_DATA?.currentLearning
+    || null;
+  const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
+
+  const normalizeBookLang = (b) => {
+    if (!b) return '';
+    return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
+  };
+
+  const items = filterLang
+    ? publicBooks.filter(b => {
+      const lang = normalizeBookLang(b);
+      return !lang || lang === String(filterLang).toLowerCase();
+    })
+    : publicBooks;
+
+  if (!items.length) {
+    list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Публичных книг пока нет</div>';
+    return;
+  }
+
+  list.innerHTML = items.map(book => createMiniBookCard(book)).join('');
+  hydrateMiniBookCardImages(list);
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    lucide.createIcons();
+  }
+
+  list.querySelectorAll('.book-card-mini').forEach(card => {
+    const bookId = parseInt(card.getAttribute('data-book-id'));
+    const book = items.find(b => b.id === bookId) || publicBooks.find(b => b.id === bookId);
+
+    card.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setActiveBook(bookId, list);
+    });
+
+    card.addEventListener('dblclick', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        setActiveBook(bookId, list);
+        await openBookViewBook(bookId, !!(book && book.is_workbook));
+      } catch (e2) {
+      }
+    });
+  });
+}
+
+async function loadPublicBooks() {
+  const list = document.getElementById("publicBooksList");
+  if (!list) return;
+
+  try {
+    list.innerHTML = '<div style="padding: 20px; text-align: center;">Загрузка...</div>';
+
+    const data = await apiRequest("/library/api/public-books?limit=200");
+    if (data.success && data.books) {
+      publicBooks = data.books;
+      publicBooksLoadedAt = Date.now();
+      console.log('📚 Загружены публичные книги:', data.books.length);
+      if (data.books.length > 0) {
+        console.log('📚 Первая книга:', {
+          id: data.books[0].id,
+          creator_user_id: data.books[0].creator_user_id,
+          creator_username: data.books[0].creator_username
+        });
+      }
+
+      if (!currentPublicBooksFilterLanguage) {
+        currentPublicBooksFilterLanguage = window.USER_LANGUAGE_DATA?.currentLearning || null;
+      }
+
+      renderPublicBooksList();
+    } else {
+      list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+    }
+  } catch (error) {
+    console.error("Ошибка загрузки публичных книг:", error);
+    list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
+  }
+}
+
+async function addPublicBookToShelf(bookId) {
+  try {
+    const data = await apiRequest(`/library/api/book/${bookId}/add-to-my`, {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+
+    if (data.success) {
+      // Закрываем модальное окно публичной библиотеки
+      closePublicLibraryModal();
+      // Обновляем список книг
+      await loadBooksFromAPI();
+      try {
+        setActiveBook(bookId);
+        await openBookViewBook(bookId);
+      } catch (e) {
+      }
+      showToast('Книга добавлена на вашу полку');
+    } else {
+      showToast('Ошибка при добавлении книги на полку', 'error');
+    }
+  } catch (error) {
+    console.error("Ошибка добавления книги на полку:", error);
+    showToast('Ошибка при добавлении книги на полку');
+  }
+}
+
+// Инициализация селектора языка для панели "Мои книги"
+function initializeBooksLanguageSelector() {
+  try {
+    const container = document.getElementById('booksLanguageSelector');
+    if (!container) {
+      console.warn('⚠️ Контейнер booksLanguageSelector не найден, повторная попытка через 100ms');
+      setTimeout(initializeBooksLanguageSelector, 100);
       return;
     }
 
     container.innerHTML = '';
-    const statsIcons = document.createElement('div');
-    statsIcons.className = 'stats-icons';
 
-    metrics.forEach(metric => {
-      const el = document.createElement('div');
-      el.className = metric.className;
-      el.title = `${metric.title}: ${metric.value}`;
-      el.innerHTML = `<i data-lucide="${metric.icon}"></i><span>${metric.value}</span>`;
-      statsIcons.appendChild(el);
-    });
+    const userSettings = window.USER_LANGUAGE_DATA;
 
-    container.appendChild(statsIcons);
-
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
-    }
-  }
-
-  // Кеш для количества выполнений
-  let completionCountsCache = {};
-
-  // Загрузка количества выполнений из БД
-  async function loadCompletionCounts(container = null) {
-    const targetContainer = container || document;
-    const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
-    if (cards.length === 0) {
+    if (!userSettings) {
+      console.warn('⚠️ USER_LANGUAGE_DATA не загружен');
       return;
     }
-    
-    // Собираем все ID диктантов
-    const dictationIds = Array.from(cards)
-      .map(card => card.dataset.dictationId)
-      .filter(id => id);
-    
-    if (dictationIds.length === 0) {
-      return;
-    }
-    
-    // Получаем токен
-    const token = window.UM?.token || localStorage.getItem('jwt_token');
-    if (!token) {
-      console.warn('[loadCompletionCounts] Нет токена, пропускаем загрузку');
-      return;
-    }
-    
-    try {
-      const response = await fetch('/api/statistics/success/count', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ dictation_ids: dictationIds })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        // Обновляем кеш, добавляя новые данные (не заменяя полностью)
-        if (result.counts) {
-          Object.assign(completionCountsCache, result.counts);
-        }
-      } else {
-        console.error('[loadCompletionCounts] Ошибка загрузки:', await response.text());
-      }
-    } catch (error) {
-      console.error('[loadCompletionCounts] Ошибка при загрузке:', error);
-    }
-  }
 
-  // Подсчет выполнений для конкретного диктанта
-  function countDictationCompletions(dictationId) {
-    if (!dictationId) return 0;
-    
-    // Пробуем разные форматы ключа
-    const formats = [
-      dictationId,
-      `dict_${dictationId}`,
-      String(dictationId),
-      `dict_${String(dictationId)}`
-    ];
-    
-    for (const key of formats) {
-      if (completionCountsCache[key] !== undefined) {
-        return completionCountsCache[key];
-      }
-    }
-    
-    return 0;
-  }
-
-  // Обновление медалек на всех карточках
-  async function updateCompletionBadges(container = null) {
-    const targetContainer = container || document;
-    const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
-    
-    if (cards.length === 0) {
-      return;
-    }
-    
-    // Всегда загружаем данные из БД для всех карточек в контейнере
-    // Это гарантирует, что медальки появятся даже для старых диктантов
-    await loadCompletionCounts(targetContainer);
-    
-    cards.forEach(card => {
-      const dictationId = card.dataset.dictationId;
-      if (!dictationId) return;
-      
-      const completionCount = countDictationCompletions(dictationId);
-      let badge = card.querySelector('.short-completion-badge');
-      
-      if (completionCount > 0) {
-        if (!badge) {
-          // Создаем новую медальку
-          badge = document.createElement('div');
-          badge.className = 'short-completion-badge';
-          badge.dataset.dictationId = dictationId;
-          card.appendChild(badge);
-          
-          // Добавляем обработчик клика
-          badge.style.cursor = 'pointer';
-          badge.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            const clickedDictationId = e.currentTarget.dataset.dictationId;
-            if (clickedDictationId && typeof DictationsReport !== 'undefined') {
-              await DictationsReport.open(clickedDictationId);
-            }
-          });
-        }
-        badge.title = `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`;
-        badge.setAttribute('aria-label', `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`);
-        badge.innerHTML = `<i data-lucide="award"></i><span class="completion-count">${completionCount}</span>`;
-      } else if (badge) {
-        // Удаляем медальку, если выполнений нет
-        badge.remove();
-      }
-    });
-    
-    // Обновить иконки Lucide
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons();
-    }
-  }
-
-  // ==================== Модальное окно публичной библиотеки ====================
-  
-  async function openPublicLibraryModal() {
-    const modal = document.getElementById("public-library-modal");
-    if (!modal) return;
-    
-    modal.style.display = "flex";
-
-    initializePublicBooksLanguageSelector();
-
-    // Загружаем публичные книги
-    if (Array.isArray(publicBooks) && publicBooks.length > 0 && (Date.now() - publicBooksLoadedAt) < 5 * 60 * 1000) {
-      renderPublicBooksList();
-    } else {
-      await loadPublicBooks();
-    }
-    
-    // Обновляем иконки Lucide
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      lucide.createIcons();
-    }
-  }
-
-  function closePublicLibraryModal() {
-    const modal = document.getElementById("public-library-modal");
-    if (modal) {
-      modal.style.display = "none";
-    }
-  }
-
-  let publicBooks = []; // Список публичных книг
-  let publicBooksLoadedAt = 0;
-
-  function initializePublicBooksLanguageSelector() {
-    try {
-      const container = document.getElementById('publicBooksLanguageSelector');
-      if (!container) return;
-
-      container.innerHTML = '';
-
-      const userSettings = window.USER_LANGUAGE_DATA;
-      if (!userSettings) return;
-
+    if (typeof window.initLanguageSelector === 'function') {
       const baseLanguageData = window.LanguageManager.getLanguageData();
       const languageData = {
         all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
         ...(baseLanguageData || {})
       };
-
-      if (typeof window.initLanguageSelector === 'function') {
-        const options = {
-          mode: 'learning-selector-compact',
-          currentLearning: (currentPublicBooksFilterLanguage != null ? currentPublicBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
-          learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
-          languageData,
-          onLanguageChange: function (values) {
-            const v = values && values.currentLearning ? String(values.currentLearning) : '';
-            currentPublicBooksFilterLanguage = v || 'all';
-            renderPublicBooksList();
-          }
-        };
-
-        publicBooksLanguageSelectorInstance = window.initLanguageSelector('publicBooksLanguageSelector', options);
-        if (!currentPublicBooksFilterLanguage) {
-          const v = String(options.currentLearning || '');
-          currentPublicBooksFilterLanguage = v || 'all';
-        }
-      }
-    } catch (e) {
-    }
-  }
-
-  function renderPublicBooksList() {
-    const list = document.getElementById('publicBooksList');
-    if (!list) return;
-
-    const rawFilterLang = currentPublicBooksFilterLanguage
-      || window.USER_LANGUAGE_DATA?.currentLearning
-      || null;
-    const filterLang = rawFilterLang && String(rawFilterLang) === 'all' ? null : rawFilterLang;
-
-    const normalizeBookLang = (b) => {
-      if (!b) return '';
-      return String(b.original_language || b.language_code || b.language || '').trim().toLowerCase();
-    };
-
-    const items = filterLang
-      ? publicBooks.filter(b => {
-          const lang = normalizeBookLang(b);
-          return !lang || lang === String(filterLang).toLowerCase();
-        })
-      : publicBooks;
-
-    if (!items.length) {
-      list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Публичных книг пока нет</div>';
-      return;
-    }
-
-    list.innerHTML = items.map(book => createMiniBookCard(book)).join('');
-    hydrateMiniBookCardImages(list);
-
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      lucide.createIcons();
-    }
-
-    list.querySelectorAll('.book-card-mini').forEach(card => {
-      const bookId = parseInt(card.getAttribute('data-book-id'));
-      const book = items.find(b => b.id === bookId) || publicBooks.find(b => b.id === bookId);
-
-      card.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setActiveBook(bookId, list);
-      });
-
-      card.addEventListener('dblclick', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        try {
-          setActiveBook(bookId, list);
-          await openBookViewBook(bookId, !!(book && book.is_workbook));
-        } catch (e2) {
-        }
-      });
-    });
-  }
-
-  async function loadPublicBooks() {
-    const list = document.getElementById("publicBooksList");
-    if (!list) return;
-    
-    try {
-      list.innerHTML = '<div style="padding: 20px; text-align: center;">Загрузка...</div>';
-      
-      const data = await apiRequest("/library/api/public-books?limit=200");
-      if (data.success && data.books) {
-        publicBooks = data.books;
-        publicBooksLoadedAt = Date.now();
-        console.log('📚 Загружены публичные книги:', data.books.length);
-        if (data.books.length > 0) {
-          console.log('📚 Первая книга:', {
-            id: data.books[0].id,
-            creator_user_id: data.books[0].creator_user_id,
-            creator_username: data.books[0].creator_username
-          });
-        }
-        
-        if (!currentPublicBooksFilterLanguage) {
-          currentPublicBooksFilterLanguage = window.USER_LANGUAGE_DATA?.currentLearning || null;
-        }
-
-        renderPublicBooksList();
-      } else {
-        list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
-      }
-    } catch (error) {
-      console.error("Ошибка загрузки публичных книг:", error);
-      list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки публичных книг</div>';
-    }
-  }
-
-  async function addPublicBookToShelf(bookId) {
-    try {
-      const data = await apiRequest(`/library/api/book/${bookId}/add-to-my`, {
-        method: "POST",
-        body: JSON.stringify({})
-      });
-      
-      if (data.success) {
-        // Закрываем модальное окно публичной библиотеки
-        closePublicLibraryModal();
-        // Обновляем список книг
-        await loadBooksFromAPI();
-        try {
-          setActiveBook(bookId);
-          await openBookViewBook(bookId);
-        } catch (e) {
-        }
-        showToast('Книга добавлена на вашу полку');
-      } else {
-        showToast('Ошибка при добавлении книги на полку', 'error');
-      }
-    } catch (error) {
-      console.error("Ошибка добавления книги на полку:", error);
-      showToast('Ошибка при добавлении книги на полку');
-    }
-  }
-
-  // Инициализация селектора языка для панели "Мои книги"
-  function initializeBooksLanguageSelector() {
-    try {
-      const container = document.getElementById('booksLanguageSelector');
-      if (!container) {
-        console.warn('⚠️ Контейнер booksLanguageSelector не найден, повторная попытка через 100ms');
-        setTimeout(initializeBooksLanguageSelector, 100);
-        return;
-      }
-
-      container.innerHTML = '';
-
-      const userSettings = window.USER_LANGUAGE_DATA;
-      
-      if (!userSettings) {
-        console.warn('⚠️ USER_LANGUAGE_DATA не загружен');
-        return;
-      }
-
-      if (typeof window.initLanguageSelector === 'function') {
-        const baseLanguageData = window.LanguageManager.getLanguageData();
-        const languageData = {
-          all: { language_ru: 'Все языки', language_en: 'All languages', country_cod: '' },
-          ...(baseLanguageData || {})
-        };
-        const options = {
-          mode: 'learning-selector-compact',
-          currentLearning: (currentBooksFilterLanguage != null ? currentBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
-          learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
-          languageData,
-          onLanguageChange: function (values) {
-            console.log('🔄 Изменение языка изучения в панели "Мои книги":', values);
-            const v = values && values.currentLearning ? String(values.currentLearning) : '';
-            currentBooksFilterLanguage = v || 'all';
-            renderBooksList(lastOwnBooks, lastShelfBooks);
-          }
-        };
-
-        console.log('🎯 Создаем LanguageSelector для панели "Мои книги"');
-        booksLanguageSelectorInstance = window.initLanguageSelector('booksLanguageSelector', options);
-
-        if (!currentBooksFilterLanguage) {
-          const v = String(options.currentLearning || '');
+      const options = {
+        mode: 'learning-selector-compact',
+        currentLearning: (currentBooksFilterLanguage != null ? currentBooksFilterLanguage : (userSettings.currentLearning || userSettings.learningLanguages?.[0] || 'en')),
+        learningLanguages: userSettings.learningLanguages || [userSettings.currentLearning || 'en'],
+        languageData,
+        onLanguageChange: function (values) {
+          console.log('🔄 Изменение языка изучения в панели "Мои книги":', values);
+          const v = values && values.currentLearning ? String(values.currentLearning) : '';
           currentBooksFilterLanguage = v || 'all';
+          renderBooksList(lastOwnBooks, lastShelfBooks);
         }
-        
-        if (booksLanguageSelectorInstance) {
-          console.log('✅ Селектор языка успешно инициализирован');
-        } else {
-          console.warn('❌ LanguageSelector не был создан');
-        }
-      } else {
-        console.warn('❌ Функция initLanguageSelector не найдена');
+      };
+
+      console.log('🎯 Создаем LanguageSelector для панели "Мои книги"');
+      booksLanguageSelectorInstance = window.initLanguageSelector('booksLanguageSelector', options);
+
+      if (!currentBooksFilterLanguage) {
+        const v = String(options.currentLearning || '');
+        currentBooksFilterLanguage = v || 'all';
       }
-    } catch (error) {
-      console.error('❌ Ошибка инициализации языкового селектора:', error);
+
+      if (booksLanguageSelectorInstance) {
+        console.log('✅ Селектор языка успешно инициализирован');
+      } else {
+        console.warn('❌ LanguageSelector не был создан');
+      }
+    } else {
+      console.warn('❌ Функция initLanguageSelector не найдена');
     }
+  } catch (error) {
+    console.error('❌ Ошибка инициализации языкового селектора:', error);
   }
+}
 
-  // Функция для загрузки данных после авторизации
-  let __initialDeskLoadTriggered = false;
-  let __initialBooksLoadTriggered = false;
+// Функция для загрузки данных после авторизации
+let __initialDeskLoadTriggered = false;
+let __initialBooksLoadTriggered = false;
 
-  function triggerDeskLoadOnce() {
-    if (__initialDeskLoadTriggered) return;
-    __initialDeskLoadTriggered = true;
-    loadDeskItems();
-  }
+function triggerDeskLoadOnce() {
+  if (__initialDeskLoadTriggered) return;
+  __initialDeskLoadTriggered = true;
+  loadDeskItems();
+}
 
-  function triggerBooksLoadOnce() {
-    if (__initialBooksLoadTriggered) return;
-    __initialBooksLoadTriggered = true;
-    loadBooksFromAPI();
-  }
+function triggerBooksLoadOnce() {
+  if (__initialBooksLoadTriggered) return;
+  __initialBooksLoadTriggered = true;
+  loadBooksFromAPI();
+}
 
-  function loadLibraryData() {
-    refreshOfflineCacheStatus();
-    triggerDeskLoadOnce();
-    triggerBooksLoadOnce();
-  }
+function loadLibraryData() {
+  refreshOfflineCacheStatus();
+  triggerDeskLoadOnce();
+  triggerBooksLoadOnce();
+}
 
-  // Инициализация при загрузке страницы
-  document.addEventListener("DOMContentLoaded", async () => {
-    installEventHandlers();
+// Инициализация при загрузке страницы
+document.addEventListener("DOMContentLoaded", async () => {
+  installEventHandlers();
 
-    checkAppCacheRevision().catch(() => {});
+  checkAppCacheRevision().catch(() => { });
 
-    refreshOfflineCacheStatus();
-    
-    // Ждем пока UserManager инициализируется и завершит валидацию токена
-    const waitForUserManager = setInterval(() => {
-      if (window.UM && typeof window.UM.isAuthenticated === 'function') {
-        // КРИТИЧНО: ждем завершения асинхронной инициализации
-        // UserManager инициализируется асинхронно через init(), нужно дождаться isInitialized
-        if (window.UM.isInitialized) {
-          clearInterval(waitForUserManager);
+  refreshOfflineCacheStatus();
 
-          // Если в оффлайне были накоплены activity/success, пробуем дослать их сразу при загрузке страницы
-          // (это позволяет закрыть страницу диктанта, а потом открыть стол и синкнуть данные на сервер)
-          syncOfflineOutboxes().catch(() => {});
-          
-          // Инициализируем USER_LANGUAGE_DATA (как на index странице)
-          const isAuthenticated = window.UM.isAuthenticated();
-          if (isAuthenticated) {
-            const user = window.UM.getCurrentUser();
-            if (user) {
-              window.USER_LANGUAGE_DATA = {
-                nativeLanguage: user.native_language || 'ru',
-                learningLanguages: user.learning_languages || ['en'],
-                currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
-                isAuthenticated: true
-              };
-            }
-          } else {
+  // Ждем пока UserManager инициализируется и завершит валидацию токена
+  const waitForUserManager = setInterval(() => {
+    if (window.UM && typeof window.UM.isAuthenticated === 'function') {
+      // КРИТИЧНО: ждем завершения асинхронной инициализации
+      // UserManager инициализируется асинхронно через init(), нужно дождаться isInitialized
+      if (window.UM.isInitialized) {
+        clearInterval(waitForUserManager);
+
+        // Если в оффлайне были накоплены activity/success, пробуем дослать их сразу при загрузке страницы
+        // (это позволяет закрыть страницу диктанта, а потом открыть стол и синкнуть данные на сервер)
+        syncOfflineOutboxes().catch(() => { });
+
+        // Инициализируем USER_LANGUAGE_DATA (как на index странице)
+        const isAuthenticated = window.UM.isAuthenticated();
+        if (isAuthenticated) {
+          const user = window.UM.getCurrentUser();
+          if (user) {
             window.USER_LANGUAGE_DATA = {
-              nativeLanguage: 'ru',
-              learningLanguages: ['en'],
-              currentLearning: 'en',
-              isAuthenticated: false
+              nativeLanguage: user.native_language || 'ru',
+              learningLanguages: user.learning_languages || ['en'],
+              currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
+              isAuthenticated: true
             };
           }
-          
-          // Инициализируем селектор языка после загрузки данных пользователя
-          // Используем setTimeout для гарантии готовности DOM
-          setTimeout(() => {
-            initializeBooksLanguageSelector();
-          }, 100);
-          
-          // Загружаем данные только если пользователь авторизован
-          if (isAuthenticated) {
-            console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
-            refreshOfflineCacheStatus();
-            triggerDeskLoadOnce();
-            triggerBooksLoadOnce();
-            syncOfflineOutboxes().catch(() => {}); // Trigger offline outbox sync on page load after UserManager initialization
-          } else {
-            console.log('⚠️ Пользователь не авторизован, данные не загружаются');
-            refreshOfflineCacheStatus();
-            triggerDeskLoadOnce();
-          }
-        }
-        // Если UserManager еще не инициализирован, продолжаем ждать
-      }
-    }, 100);
-    
-    // Слушаем событие успешного логина/регистрации
-    window.addEventListener('user-logged-in', () => {
-      console.log('✅ Пользователь авторизован, загружаем данные библиотеки');
-      // Обновляем USER_LANGUAGE_DATA
-      if (window.UM && window.UM.isAuthenticated()) {
-        const user = window.UM.getCurrentUser();
-        if (user) {
+        } else {
           window.USER_LANGUAGE_DATA = {
-            nativeLanguage: user.native_language || 'ru',
-            learningLanguages: user.learning_languages || ['en'],
-            currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
-            isAuthenticated: true
+            nativeLanguage: 'ru',
+            learningLanguages: ['en'],
+            currentLearning: 'en',
+            isAuthenticated: false
           };
-          // Перезагружаем селектор языка
-          setTimeout(() => {
-            initializeBooksLanguageSelector();
-          }, 100);
-          // Загружаем данные
-          loadLibraryData();
+        }
+
+        // Инициализируем селектор языка после загрузки данных пользователя
+        // Используем setTimeout для гарантии готовности DOM
+        setTimeout(() => {
+          initializeBooksLanguageSelector();
+        }, 100);
+
+        // Загружаем данные только если пользователь авторизован
+        if (isAuthenticated) {
+          console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
+          refreshOfflineCacheStatus();
+          triggerDeskLoadOnce();
+          triggerBooksLoadOnce();
+          syncOfflineOutboxes().catch(() => { }); // Trigger offline outbox sync on page load after UserManager initialization
+        } else {
+          console.log('⚠️ Пользователь не авторизован, данные не загружаются');
+          refreshOfflineCacheStatus();
+          triggerDeskLoadOnce();
         }
       }
-    });
-    
-    // ВРЕМЕННО ОТКЛЮЧЕНО (диагностика двойной инициализации стола/книг).
-    // Если после нескольких деплоев все стабильно (нет "очистилось и по новой" и нет зависаний),
-    // этот watchdog можно удалить при чистке кода.
-    // setTimeout(() => {
-    //   clearInterval(waitForUserManager);
-    //   ...
-    // }, 5000);
-  });
-})();
+      // Если UserManager еще не инициализирован, продолжаем ждать
+    }
+  }, 100);
 
+  // Слушаем событие успешного логина/регистрации
+  window.addEventListener('user-logged-in', () => {
+    console.log('✅ Пользователь авторизован, загружаем данные библиотеки');
+    // Обновляем USER_LANGUAGE_DATA
+    if (window.UM && window.UM.isAuthenticated()) {
+      const user = window.UM.getCurrentUser();
+      if (user) {
+        window.USER_LANGUAGE_DATA = {
+          nativeLanguage: user.native_language || 'ru',
+          learningLanguages: user.learning_languages || ['en'],
+          currentLearning: user.current_learning || user.learning_languages?.[0] || 'en',
+          isAuthenticated: true
+        };
+        // Перезагружаем селектор языка
+        setTimeout(() => {
+          initializeBooksLanguageSelector();
+        }, 100);
+        // Загружаем данные
+        loadLibraryData();
+      }
+    }
+  });
+
+  // ВРЕМЕННО ОТКЛЮЧЕНО (диагностика двойной инициализации стола/книг).
+  // Если после нескольких деплоев все стабильно (нет "очистилось и по новой" и нет зависаний),
+  // этот watchdog можно удалить при чистке кода.
+  // setTimeout(() => {
+  //   clearInterval(waitForUserManager);
+  //   ...
+  // }, 5000);
+});

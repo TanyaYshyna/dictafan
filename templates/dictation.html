@@ -468,8 +468,10 @@
     {{ language_data | tojson | safe }}
     </script>
     <script>
-        window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+        if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
     </script>
+    <script src="{{ url_for('static', filename='js/app_build.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>

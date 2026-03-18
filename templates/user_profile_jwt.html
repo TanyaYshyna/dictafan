@@ -185,6 +185,7 @@
     <script id="language-data" type="application/json">
     {{ language_data | tojson | safe }}
     </script>
+    <script src="{{ url_for('static', filename='js/app_build.js') }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>

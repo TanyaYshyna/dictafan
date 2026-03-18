@@ -27,6 +27,7 @@
     function getBuildValue() {
       try {
         var candidates = [
+          window.__APP_BUILD,
           window.__DICTATION_EDITOR_BUILD,
           window.__DICTATION_BUILD,
           window.__PRIVATE_LIBRARY_BUILD,
