@@ -799,13 +799,25 @@ class AudioManagerClass {
         }
     }
 
-    async getCachedResponse(url) {
+    _toCacheKey(url) {
         try {
             const u = this.normalizeMediaUrl(url);
-            if (!u || u.startsWith('blob:')) return null;
+            if (!u) return '';
+            if (u.startsWith('blob:')) return '';
+            // CacheStorage keys are absolute URLs in practice; keep one canonical form.
+            return new URL(u, window.location.origin).toString();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async getCachedResponse(url) {
+        try {
+            const key = this._toCacheKey(url);
+            if (!key) return null;
             const cache = await this.openMediaCache();
             if (!cache) return null;
-            return await cache.match(u);
+            return await cache.match(key);
         } catch (e) {
             return null;
         }
@@ -813,11 +825,11 @@ class AudioManagerClass {
 
     async putResponseToCache(url, response) {
         try {
-            const u = this.normalizeMediaUrl(url);
-            if (!u || u.startsWith('blob:')) return false;
+            const key = this._toCacheKey(url);
+            if (!key) return false;
             const cache = await this.openMediaCache();
             if (!cache) return false;
-            await cache.put(u, response);
+            await cache.put(key, response);
             return true;
         } catch (e) {
             return false;
@@ -826,11 +838,11 @@ class AudioManagerClass {
 
     async deleteFromCache(url) {
         try {
-            const u = this.normalizeMediaUrl(url);
-            if (!u || u.startsWith('blob:')) return false;
+            const key = this._toCacheKey(url);
+            if (!key) return false;
             const cache = await this.openMediaCache();
             if (!cache) return false;
-            return await cache.delete(u);
+            return await cache.delete(key);
         } catch (e) {
             return false;
         }
@@ -868,7 +880,12 @@ class AudioManagerClass {
             if (!u) return '';
             if (u.startsWith('blob:')) return u;
 
-            const existing = this._getObjectUrlForCanonical(u);
+            const cacheKey = this._toCacheKey(u);
+            if (!cacheKey) {
+                return u;
+            }
+
+            const existing = this._getObjectUrlForCanonical(cacheKey);
             if (existing && existing.startsWith('blob:')) {
                 return existing;
             }
@@ -880,7 +897,7 @@ class AudioManagerClass {
 
             let res = null;
             try {
-                res = await cache.match(u);
+                res = await cache.match(cacheKey);
             } catch (e) {
                 res = null;
             }
@@ -890,7 +907,7 @@ class AudioManagerClass {
                     const fetchRes = await fetch(u, { cache: 'no-store' });
                     if (fetchRes && fetchRes.ok) {
                         try {
-                            await cache.put(u, fetchRes.clone());
+                            await cache.put(cacheKey, fetchRes.clone());
                         } catch (e) {
                         }
                         res = fetchRes;
@@ -918,8 +935,39 @@ class AudioManagerClass {
             }
 
             const objUrl = URL.createObjectURL(blob);
-            this._setObjectUrlForCanonical(u, objUrl);
+            this._setObjectUrlForCanonical(cacheKey, objUrl);
             return objUrl;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    async saveDictationAudioBlob(dictationId, language, filename, blob, mime) {
+        try {
+            const url = this.buildDictationAudioUrl(dictationId, language, filename);
+            const key = this._toCacheKey(url);
+            if (!key) return '';
+            if (!blob || !blob.size) return '';
+
+            const headers = new Headers();
+            headers.set('Content-Type', (mime || blob.type || 'audio/mpeg'));
+            headers.set('Cache-Control', 'no-store');
+
+            const cache = await this.openMediaCache();
+            if (!cache) return '';
+            await cache.put(key, new Response(blob, { status: 200, headers }));
+
+            // Invalidate any previously-created objectURL for this key so the next play() gets fresh bytes.
+            try {
+                const prev = this._getObjectUrlForCanonical(key);
+                if (prev && prev.startsWith('blob:')) {
+                    try { URL.revokeObjectURL(prev); } catch (e) {}
+                    delete this._objectUrlByCanonicalUrl[key];
+                }
+            } catch (e) {
+            }
+
+            return key;
         } catch (e) {
             return '';
         }

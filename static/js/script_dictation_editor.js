@@ -2996,8 +2996,6 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
     try {
         const id = String(dictationId || '').trim();
         if (!id || !id.startsWith('dict_')) return;
-
-        const cache = await caches.open('dictafan-media');
         const toCommit = [];
 
         const pushCandidate = (lang, rawFilename) => {
@@ -3044,6 +3042,16 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
                 const res = await fetch(item.draftUrl);
                 const blob = await res.blob();
                 if (!blob || !blob.size) continue;
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.saveDictationAudioBlob === 'function') {
+                        await window.AudioManager.saveDictationAudioBlob(id, item.lang, item.filename, blob, blob.type || 'audio/mpeg');
+                        continue;
+                    }
+                } catch (e) {
+                }
+
+                // Fallback (legacy behavior)
+                const cache = await caches.open('dictafan-media');
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'audio/mpeg');
                 headers.set('Cache-Control', 'no-store');
