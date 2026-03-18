@@ -9686,11 +9686,13 @@ async function saveDictationOnly() {
             // Upload cached media to B2 via server-provided uploadUrl/token.
             // This is intentionally BLOCKING now: prevents leaving editor before media is actually uploaded.
             const toId = (result && result.dictation_id) ? result.dictation_id : currentDictation.id;
+            let audioUploadOk = false;
             if (toId && String(toId).startsWith('dict_')) {
                 if (shouldUploadAudio) {
                     try {
                         const resAudio = await uploadAudioThenCleanupB2({ dictationId: toId, token });
                         if (resAudio && resAudio.ok === true) {
+                            audioUploadOk = true;
                             setDirtyFlags({ audio: false });
                         }
                     } catch (e) {
@@ -9704,6 +9706,27 @@ async function saveDictationOnly() {
                         }
                     } catch (e) {
                     }
+                }
+
+                // Important: deleting a sentence row may make some audio files stale in B2,
+                // even when no new audio was generated/uploaded. Run cleanup after a successful DB save.
+                // Safety rules:
+                // - if we attempted audio upload, cleanup only when it succeeded
+                try {
+                    const canCleanup = (() => {
+                        try {
+                            if (!token) return false;
+                            if (!toId) return false;
+                            if (shouldUploadAudio === true && audioUploadOk !== true) return false;
+                            return true;
+                        } catch (e) {
+                            return false;
+                        }
+                    })();
+                    if (canCleanup) {
+                        await cleanupStaleB2DictationAudio({ dictationId: toId, token });
+                    }
+                } catch (e) {
                 }
             }
 
