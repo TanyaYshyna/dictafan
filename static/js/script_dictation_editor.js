@@ -1171,7 +1171,17 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
             return { ok: false, reason: 'get_upload_url_bad_payload' };
         }
 
-        const cache = await caches.open('dictafan-media');
+        let cache = null;
+        try {
+            if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+                cache = await window.AudioManager.openMediaCache();
+            }
+        } catch (e) {
+            cache = null;
+        }
+        if (!cache) {
+            cache = await caches.open('dictafan-media');
+        }
         let cacheHit = 0;
         let uploaded = 0;
         let skipped = 0;
@@ -1205,7 +1215,17 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
 
                 const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
 
-                const cached = await cache.match(u.toString());
+                let cached = null;
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.getCachedResponse === 'function') {
+                        cached = await window.AudioManager.getCachedResponse(u.toString());
+                    }
+                } catch (e) {
+                    cached = null;
+                }
+                if (!cached) {
+                    cached = await cache.match(u.toString());
+                }
                 if (!cached) {
                     console.warn('[B2 UPLOAD] cache miss', u.toString());
                     cacheMiss += 1;
@@ -1337,9 +1357,29 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
         if (!numericId) return { ok: false, reason: 'bad_numeric_id' };
         if (!token) return { ok: false, reason: 'missing_token' };
 
-        const cache = await caches.open('dictafan-media');
+        let cache = null;
+        try {
+            if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+                cache = await window.AudioManager.openMediaCache();
+            }
+        } catch (e) {
+            cache = null;
+        }
+        if (!cache) {
+            cache = await caches.open('dictafan-media');
+        }
         const coverUrl = new URL(`/api/dictations_covers/${numericId}.webp`, location.origin).toString();
-        let cached = await cache.match(coverUrl);
+        let cached = null;
+        try {
+            if (window.AudioManager && typeof window.AudioManager.getCachedResponse === 'function') {
+                cached = await window.AudioManager.getCachedResponse(coverUrl);
+            }
+        } catch (e) {
+            cached = null;
+        }
+        if (!cached) {
+            cached = await cache.match(coverUrl);
+        }
         let blob = null;
         if (cached) {
             blob = await cached.blob();
@@ -1363,8 +1403,26 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'image/webp');
                 headers.set('Cache-Control', 'no-store');
-                await cache.put(coverUrl, new Response(blob, { status: 200, headers }));
-                cached = await cache.match(coverUrl);
+                const response = new Response(blob, { status: 200, headers });
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
+                        await window.AudioManager.putResponseToCache(coverUrl, response.clone());
+                    } else {
+                        await cache.put(coverUrl, response.clone());
+                    }
+                } catch (e) {
+                    await cache.put(coverUrl, response.clone());
+                }
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.getCachedResponse === 'function') {
+                        cached = await window.AudioManager.getCachedResponse(coverUrl);
+                    }
+                } catch (e) {
+                    cached = null;
+                }
+                if (!cached) {
+                    cached = await cache.match(coverUrl);
+                }
             }
         } catch (e) {
         }
@@ -2874,38 +2932,6 @@ async function putDraftAudioToCache(dictationId, language, filename, blob, mime)
     } catch (e) {
         console.error('❌ putDraftAudioToCache failed', e);
         return null;
-    }
-}
-
-async function refreshFinalAudioCacheEntry(dictationId, language, filename) {
-    try {
-        const id = String(dictationId || '').trim();
-        const lang = String(language || '').trim();
-        const name = String(filename || '').trim();
-        if (!id || !lang || !name) return false;
-        if (!id.startsWith('dict_')) return false;
-
-        const rel = buildDictationAudioUrl(id, lang, name);
-        if (!rel) return false;
-        const baseUrl = new URL(rel, window.location.origin).toString();
-        const bustUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}v=${Date.now()}`;
-
-        const res = await fetch(bustUrl, { cache: 'no-store' });
-        if (!res || !res.ok) return false;
-
-        const blob = await res.blob();
-        if (!blob || !blob.size) return false;
-
-        const cache = await caches.open('dictafan-media');
-        try { await cache.delete(baseUrl); } catch (e) {}
-
-        const headers = new Headers();
-        headers.set('Content-Type', blob.type || res.headers.get('content-type') || 'audio/mpeg');
-        headers.set('Cache-Control', 'no-store');
-        await cache.put(baseUrl, new Response(blob, { status: 200, headers }));
-        return true;
-    } catch (e) {
-        return false;
     }
 }
 

@@ -1846,7 +1846,9 @@ async function applyDeskCovers(container) {
 
     let cache = null;
     try {
-      if ('caches' in window) {
+      if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+        cache = await window.AudioManager.openMediaCache();
+      } else if ('caches' in window) {
         cache = await caches.open('dictafan-media');
       }
     } catch (e) {

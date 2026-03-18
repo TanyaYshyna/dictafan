@@ -972,6 +972,39 @@ class AudioManagerClass {
             return '';
         }
     }
+
+    async deleteByUrl(url) {
+        try {
+            const key = this._toCacheKey(url);
+            if (!key) return false;
+
+            // Revoke any object URL for this cached entry.
+            try {
+                const prev = this._getObjectUrlForCanonical(key);
+                if (prev && prev.startsWith('blob:')) {
+                    try { URL.revokeObjectURL(prev); } catch (e) {}
+                }
+                delete this._objectUrlByCanonicalUrl[key];
+            } catch (e) {
+            }
+
+            const cache = await this.openMediaCache();
+            if (!cache) return false;
+            return await cache.delete(key);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async deleteDictationAudioBlob(dictationId, language, filename) {
+        try {
+            const url = this.buildDictationAudioUrl(dictationId, language, filename);
+            if (!url) return false;
+            return await this.deleteByUrl(url);
+        } catch (e) {
+            return false;
+        }
+    }
 }
 
 const audioManager = new AudioManagerClass();
