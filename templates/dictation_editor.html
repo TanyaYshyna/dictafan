@@ -751,7 +751,7 @@
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
 
     <!-- Добавляем скрипты LanguageManager и LanguageSelector -->
-    <script src="{{ url_for('static', filename='js/app_build.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
     <script>
         if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
     </script>
