@@ -244,7 +244,7 @@ function renderHeaderLangPairWithManager() {
                 try {
                     const next = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
                     if (!next) return;
-                    setHeaderTranslationLanguage(next);
+                    setHeaderTranslationLanguage(next, { preserveDirty: true });
                     renderTranslationsTabV2();
                 } catch (e) {
                 }
@@ -491,7 +491,7 @@ function selectTranslationLanguageAsCurrent(lang) {
         if (!workingData || !workingData.translations || !workingData.translations[code]) {
             return;
         }
-        setHeaderTranslationLanguage(code);
+        setHeaderTranslationLanguage(code, { preserveDirty: true });
 
         try {
             renderTableFromWorkingData();
@@ -1657,16 +1657,28 @@ function setHeaderNoTranslationMode() {
     }
 }
 
-function setHeaderTranslationLanguage(lang) {
+function setHeaderTranslationLanguage(lang, { preserveDirty = false } = {}) {
     const code = normalizeLangCode(lang);
     if (!code) {
         setHeaderNoTranslationMode();
         return;
     }
 
+    const prevDirty = preserveDirty ? (() => {
+        try { return { ...getDirtyFlags() }; } catch (e) { return null; }
+    })() : null;
+
     try {
         currentDictation.language_translation = code;
     } catch (e) {
+    }
+
+    // Persisted translation language is part of dictation metadata; UI-only switching must not touch it.
+    if (!preserveDirty) {
+        try {
+            currentDictation._persisted_language_translation = code;
+        } catch (e) {
+        }
     }
 
     try {
@@ -2669,6 +2681,7 @@ function initLanguageFlags(initData) {
             currentDictation.language_original = normalizeLangCode(language_original);
             currentDictation.language_translation = normalizeLangCode(language_translation);
             currentDictation.preferred_translation_language = normalizeLangCode(language_translation);
+            currentDictation._persisted_language_translation = normalizeLangCode(language_translation);
             currentDictation.translation_flags = (initData && initData.translation_flags) ? initData.translation_flags : (currentDictation.translation_flags || {});
         } catch (e) {
         }
@@ -9372,7 +9385,7 @@ async function saveDictationOnly() {
             db_id: currentDictation.db_id,
             user_id: user_id,  // ID пользователя для пути temp/<user_id>/
             language_original: currentDictation.language_original,
-            language_translation: currentDictation.language_translation,
+            language_translation: currentDictation._persisted_language_translation || currentDictation.language_translation,
             title: workingData.original.title || 'Без названия',
             title_translations: titleTranslations,  // Переводы заголовка
             level: currentDictation.level || 'A1',
@@ -9707,7 +9720,7 @@ async function saveDictationAndExit() {
         const saveData = {
             id: currentDictation.id,
             language_original: currentDictation.language_original,
-            language_translation: currentDictation.language_translation,
+            language_translation: currentDictation._persisted_language_translation || currentDictation.language_translation,
             title: document.getElementById('title') ? document.getElementById('title').value : 'Диктант',
             level: currentDictation.level || 'A1',
             is_dialog: currentDictation.is_dialog,
@@ -9759,7 +9772,7 @@ async function saveDictationAndExit() {
                 title: currentDictation.category_title,
                 path: currentDictation.category_path,
                 language_original: currentDictation.language_original,
-                language_translation: currentDictation.language_translation
+                language_translation: currentDictation._persisted_language_translation || currentDictation.language_translation
             };
             sessionStorage.setItem('selectedCategoryForDictation', JSON.stringify(currentCategoryData));
 
