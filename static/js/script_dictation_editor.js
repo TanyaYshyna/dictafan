@@ -169,11 +169,13 @@ function renderHeaderLangPairWithManager() {
         } catch (e) {
             userNative = '';
         }
-        const tr = (userNative && activeTranslations.includes(userNative))
-            ? userNative
-            : ((preferred && activeTranslations.includes(preferred))
-                ? preferred
-                : ((currentTr && activeTranslations.includes(currentTr)) ? currentTr : (activeTranslations[0] || '')));
+        const tr = (currentTr && activeTranslations.includes(currentTr))
+            ? currentTr
+            : ((userNative && activeTranslations.includes(userNative))
+                ? userNative
+                : ((preferred && activeTranslations.includes(preferred))
+                    ? preferred
+                    : (activeTranslations[0] || '')));
 
         // Keep currentDictation in sync.
         try { currentDictation.language_translation = tr; } catch (e) {}
@@ -263,6 +265,8 @@ function renderTranslationsTabV2() {
         if (!container) return;
         syncTranslationsFromDictationMeta();
 
+        const prevScrollTop = container.scrollTop;
+
         const activeLang = normalizeLangCode(currentDictation && currentDictation.language_translation);
         const available = getAvailableTranslationLanguages();
 
@@ -286,6 +290,11 @@ function renderTranslationsTabV2() {
         }
         html += '</div>';
         container.innerHTML = html;
+
+        try {
+            container.scrollTop = prevScrollTop;
+        } catch (e) {
+        }
 
         try {
             if (window.lucide && window.lucide.createIcons) {
@@ -507,12 +516,38 @@ function bindTranslationsTabV2Handlers() {
 
     // Single click vs double click
     let clickTimer = null;
+    let lastClickLang = '';
+    let lastClickAt = 0;
 
     container.addEventListener('click', (e) => {
         const row = e.target.closest('.translations-v2-item');
         if (!row) return;
         const lang = row.dataset.lang;
         if (!lang) return;
+
+        // Fallback for environments where dblclick is unreliable: treat 2 fast clicks
+        // on the same language as a "2 cycles" action.
+        const now = Date.now();
+        const sameAsPrev = lastClickLang && normalizeLangCode(lastClickLang) === normalizeLangCode(lang);
+        const isSecondFastClick = sameAsPrev && lastClickAt && (now - lastClickAt) <= 700;
+        lastClickLang = lang;
+        lastClickAt = now;
+
+        if (isSecondFastClick) {
+            if (clickTimer) {
+                clearTimeout(clickTimer);
+                clickTimer = null;
+            }
+
+            const code = normalizeLangCode(lang);
+            const isActive = !!(workingData && workingData.translations && code && workingData.translations[code]);
+            if (!isActive) {
+                openCreateTranslationLangModal(lang);
+            } else {
+                openRemoveTranslationLangModal(lang);
+            }
+            return;
+        }
 
         if (clickTimer) clearTimeout(clickTimer);
         clickTimer = setTimeout(() => {

@@ -928,6 +928,15 @@ select {
     background-position: center;
 }
 
+.user-native-flag-small {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: inline-block;
+    object-fit: cover;
+    margin-right: 6px;
+}
+
 .username {
     display: flex;
     align-items: center;

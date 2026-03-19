@@ -261,6 +261,50 @@ class UserManager {
     const avatarElement = userSection.querySelector('.user-avatar-small');
     const streakElement = userSection.querySelector('.streak-days');
 
+    try {
+      if (avatarElement && avatarElement.parentElement) {
+        const parent = avatarElement.parentElement;
+        let nativeLang = '';
+        try {
+          nativeLang = String(userData?.native_language || '').trim().toLowerCase();
+        } catch (e) {
+          nativeLang = '';
+        }
+        if (!nativeLang) {
+          try {
+            nativeLang = String(window?.USER_LANGUAGE_DATA?.nativeLanguage || window?.USER_LANGUAGE_DATA?.nativeLang || '').trim().toLowerCase();
+          } catch (e) {
+            nativeLang = '';
+          }
+        }
+
+        let cc = '';
+        try {
+          if (nativeLang && window.LanguageManager && typeof window.LanguageManager.getCountryCode === 'function') {
+            cc = String(window.LanguageManager.getCountryCode(nativeLang) || '').trim().toLowerCase();
+          }
+        } catch (e) {
+          cc = '';
+        }
+
+        const prev = parent.querySelector('.user-native-flag-small');
+        if (cc) {
+          let el = prev;
+          if (!el) {
+            el = document.createElement('img');
+            el.className = 'user-native-flag-small';
+            parent.insertBefore(el, avatarElement);
+          }
+          el.src = `/static/flags/${cc}.svg`;
+          el.alt = nativeLang;
+          el.onerror = function () { try { this.remove(); } catch (e) {} };
+        } else if (prev) {
+          try { prev.remove(); } catch (e) {}
+        }
+      }
+    } catch (e) {
+    }
+
     // console.log('📋 Найденные элементы:', {
     //   authButtons,
     //   userInfo,
