@@ -672,6 +672,26 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
             }
         };
 
+        const pushExpectedAutoAudio = (lang) => {
+            try {
+                const l = normalizeLangCode(lang);
+                if (!l) return;
+                const origSent = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+                    ? workingData.original.sentences
+                    : [];
+                for (const s of origSent) {
+                    if (!s) continue;
+                    const key = String(s.key || s.sentence_key || '').trim();
+                    if (!key) continue;
+                    const fname = generateAudioFileName(key, l);
+                    if (fname) {
+                        keep.add(`dictations/${id}/${l}/${fname}`);
+                    }
+                }
+            } catch (e) {
+            }
+        };
+
         const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
         const langs = (() => {
             try {
@@ -682,6 +702,17 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
                         const l = normalizeLangCode(k);
                         if (l && l !== origLang) out.push(l);
                     }
+                }
+                try {
+                    const flags = (currentDictation && currentDictation.translation_flags && typeof currentDictation.translation_flags === 'object')
+                        ? currentDictation.translation_flags
+                        : {};
+                    for (const k of Object.keys(flags)) {
+                        if (flags[k] !== true) continue;
+                        const l = normalizeLangCode(k);
+                        if (l && l !== origLang) out.push(l);
+                    }
+                } catch (e) {
                 }
                 return Array.from(new Set(out)).filter(Boolean);
             } catch (e) {
@@ -694,14 +725,21 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
                 ? (workingData && workingData.original ? workingData.original : null)
                 : getTranslationData(l);
             const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
-            for (const s of sentences) {
-                if (!s) continue;
-                push(l, s.audio);
-                push(l, s.audio_avto);
-                push(l, s.audio_mic);
-                push(l, s.audio_user);
+
+            if (!sentences.length) {
+                // Translation bucket may not be loaded into workingData; still keep expected filenames
+                // to avoid deleting already-uploaded translations.
+                pushExpectedAutoAudio(l);
+            } else {
+                for (const s of sentences) {
+                    if (!s) continue;
+                    push(l, s.audio);
+                    push(l, s.audio_avto);
+                    push(l, s.audio_mic);
+                    push(l, s.audio_user);
+                }
+                push(l, wd && wd.audio_user_shared);
             }
-            push(l, wd && wd.audio_user_shared);
         }
 
         const keep_remote_paths = Array.from(keep);

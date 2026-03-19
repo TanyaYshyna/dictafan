@@ -212,7 +212,7 @@ def api_b2_cleanup_dictation_audio():
 
         if not dictation_id or not dictation_id.startswith('dict_'):
             return jsonify({'success': False, 'error': 'dictation_id is required'}), 400
-        if not isinstance(keep_remote_paths, list):
+        if keep_remote_paths is not None and not isinstance(keep_remote_paths, list):
             return jsonify({'success': False, 'error': 'keep_remote_paths must be a list'}), 400
 
         # Ownership check: only owner may cleanup.
@@ -236,9 +236,43 @@ def api_b2_cleanup_dictation_audio():
 
         prefix = f"dictations/{dictation_id}/"
 
+        def _expected_keep_set_from_db(_db_id: int, _dictation_id: str):
+            out = set()
+            try:
+                from helpers.db_dictations import get_dictation_sentences
+                rows = get_dictation_sentences(int(_db_id))
+            except Exception:
+                rows = []
+
+            def _add(lang_code: str, filename: str):
+                try:
+                    l = str(lang_code or '').strip().lower()
+                    f = str(filename or '').strip()
+                    if not l or not f:
+                        return
+                    base = f.split('?', 1)[0].rsplit('/', 1)[-1].strip()
+                    if not base:
+                        return
+                    out.add(f"dictations/{_dictation_id}/{l}/{base}")
+                except Exception:
+                    return
+
+            for r in (rows or []):
+                try:
+                    lang = (r.get('language_code') if isinstance(r, dict) else None) or ''
+                    for fld in ('audio', 'audio_avto', 'audio_mic', 'audio_user'):
+                        val = r.get(fld) if isinstance(r, dict) else None
+                        if val:
+                            _add(lang, val)
+                except Exception:
+                    continue
+            return out
+
+        expected_keep_set = _expected_keep_set_from_db(db_id, dictation_id)
+
         # Sanitize keep list to prevent deleting outside of prefix.
-        keep_set = set()
-        for p in keep_remote_paths:
+        keep_set = set(expected_keep_set)
+        for p in (keep_remote_paths or []):
             try:
                 s = str(p or '').strip()
                 if not s:
@@ -293,6 +327,8 @@ def api_b2_cleanup_dictation_audio():
             'keep': len(keep_set),
             'deleted': deleted,
             'skipped': skipped,
+            'keep_from_db': len(expected_keep_set),
+            'keep_from_client': len(keep_remote_paths or []),
         })
     except Exception as e:
         logger.error('api_b2_cleanup_dictation_audio error: %s', e, exc_info=True)
