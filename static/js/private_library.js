@@ -1,17 +1,6 @@
 // Скрипт для новой страницы приватной библиотеки
 
-var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
-
-if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
-  window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:private_library');
-}
-
-try {
-  if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
-    window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
-  }
-} catch (e) {
-}
+var __APP_BUILD_LOCAL = (window && window.__APP_BUILD) ? String(window.__APP_BUILD || '').trim() : '';
 
 let bookEditDirty = false;
 
@@ -1488,121 +1477,13 @@ async function toggleDictationOnDesk(dictationId) {
   } else {
     // Добавляем на стол
     try {
-      showLoadingIndicator('Скачиваю диктант для оффлайна…');
+      showLoadingIndicator('Добавляю на рабочий стол…');
 
-      console.log('===DESK_TOGGLE=== add flow: prefetch start', { dictationId: String(dictationId) });
+      console.log('===DESK_TOGGLE=== add flow: fast path (no prefetch)', { dictationId: String(dictationId) });
 
       // Жёсткое правило: диктант можно добавить на стол только если ассеты влезают в оффлайн-лимит
       // (HTML страница диктанта + JS/CSS + аудио + обложка). Если не влезает — не добавляем.
-      try {
-        const requiredUrls = [];
-
-        const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
-        console.log('===DESK_TOGGLE=== meta loaded', {
-          dictationId: String(dictationId),
-          success: Boolean(metaRes && metaRes.success),
-          hasDictation: Boolean(metaRes && metaRes.dictation),
-        });
-        if (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.cover_url) {
-          requiredUrls.push(normalizeUrlForSwPrefetch(metaRes.dictation.cover_url));
-        }
-
-        // HTML страница диктанта (нужна для оффлайн-навигации)
-        // Языки берем так же, как формируется openUrl на desk карточке.
-        const dictIdForUrl = `dict_${dictationId}`;
-        const langOrigForUrl = (metaRes && metaRes.success && metaRes.dictation && metaRes.dictation.language_code)
-          ? metaRes.dictation.language_code
-          : 'en';
-        const langTrForUrl = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-          ? window.USER_LANGUAGE_DATA.nativeLanguage
-          : langOrigForUrl;
-        // Домашняя страница — это рабочий стол, тоже нужна оффлайн
-        requiredUrls.push('/');
-        requiredUrls.push(`/dictation/${dictIdForUrl}/${langOrigForUrl}/${langTrForUrl}`);
-
-        // Ключевые статические ассеты страницы диктанта.
-        // (Service Worker кеширует /static/*; здесь мы принудительно префетчим минимально нужное)
-        requiredUrls.push('/static/css/style_dictation.css');
-        requiredUrls.push('/static/js/utils.js');
-        requiredUrls.push('/static/js/language_manager.js');
-        requiredUrls.push('/static/js/model_manager.js');
-        requiredUrls.push('/static/js/user_manager.js');
-        requiredUrls.push('/static/js/auth_interceptor.js');
-        requiredUrls.push('/static/js/login_modal.js');
-        requiredUrls.push('/static/js/sw_register.js');
-        requiredUrls.push('/static/js/audio_manager.js');
-        requiredUrls.push('/static/js/audio_player_visual.js');
-        requiredUrls.push('/static/js/user_activity_history.js');
-        requiredUrls.push('/static/js/dictation_statistics.js');
-        requiredUrls.push('/static/js/progress_panel.js');
-        requiredUrls.push('/static/js/audio_settings_panel.js');
-        requiredUrls.push('/static/js/statistics_report.js');
-        requiredUrls.push('/static/js/whisper-model-manager.js');
-        requiredUrls.push('/static/js/speech_recognition_unified.js');
-        requiredUrls.push('/static/js/script_dictation.js');
-
-        // Звуки (нужны даже оффлайн: прогресс/победа)
-        requiredUrls.push('/static/sounds/success.mp3');
-        requiredUrls.push('/static/sounds/timer/timer_sounds.json');
-        requiredUrls.push('/static/sounds/victory/victory_sounds.json');
-        requiredUrls.push('/static/sounds/timer/beep1.mp3');
-        requiredUrls.push('/static/sounds/timer/beep3.mp3');
-        requiredUrls.push('/static/sounds/victory/beep2.mp3');
-        requiredUrls.push('/static/sounds/victory/beep4.mp3');
-
-        const sentencesRes = await apiRequest(`/api/dictation/${dictationId}/sentences`);
-        console.log('===DESK_TOGGLE=== sentences list loaded', {
-          dictationId: String(dictationId),
-          success: Boolean(sentencesRes && sentencesRes.success),
-          count: (sentencesRes && Array.isArray(sentencesRes.sentences)) ? sentencesRes.sentences.length : null,
-        });
-        const sentences = sentencesRes && sentencesRes.success && Array.isArray(sentencesRes.sentences)
-          ? sentencesRes.sentences
-          : [];
-        for (const s of sentences) {
-          if (s && s.audio) requiredUrls.push(normalizeUrlForSwPrefetch(s.audio));
-        }
-
-        const uniqueRequired = Array.from(new Set(requiredUrls.map(normalizeUrlForSwPrefetch))).filter(Boolean);
-        if (!uniqueRequired.length) {
-          showToast('Не удалось определить ассеты диктанта для оффлайн-режима');
-          hideLoadingIndicator();
-          deskToggleInFlight.delete(key);
-          return;
-        }
-
-        await swRequest('prefetchStrict', { urls: uniqueRequired, timeoutMs: 180000 });
-        console.log('===DESK_TOGGLE=== prefetchStrict done', { dictationId: String(dictationId), urls: uniqueRequired.length });
-      } catch (e) {
-        const msg = e && e.message ? e.message : String(e);
-        try {
-          const res = e && e.swResult ? e.swResult : null;
-          console.log('===DESK_TOGGLE=== prefetchStrict failed', {
-            dictationId: String(dictationId),
-            msg,
-            failed: res && typeof res.failed === 'number' ? res.failed : null,
-            overLimit: res && typeof res.overLimit === 'number' ? res.overLimit : null,
-            failedUrls: res && Array.isArray(res.failedUrls) ? res.failedUrls : null,
-            overLimitUrls: res && Array.isArray(res.overLimitUrls) ? res.overLimitUrls : null,
-          });
-        } catch (e2) {
-          console.log('===DESK_TOGGLE=== prefetchStrict failed', { dictationId: String(dictationId), msg });
-        }
-        if (msg === 'cache_limit_exceeded' || msg.includes('cache_limit_exceeded')) {
-          showToast('Не хватает места в оффлайн-кеше. Увеличь лимит или убери диктанты со стола.');
-          hideLoadingIndicator();
-          deskToggleInFlight.delete(key);
-          return;
-        } else {
-          // Soft-fail: allow adding dictation to desk even if offline prefetch fails
-          // (mixed content, transient network, etc.). We'll still try caching sentences later.
-          if (msg.includes('Service Worker не активен')) {
-            showToast('Оффлайн режим не активен. Диктант добавлю на стол, но оффлайн может не работать.');
-          } else {
-            showToast(`Не удалось скачать диктант в оффлайн: ${msg}. Добавляю на стол без оффлайна.`);
-          }
-        }
-      }
+      // NOTE: перенесено в отдельный flow "обновить кеш" (см. TODO). Здесь мы работаем только с базой данных.
 
       const addData = await apiRequest(`/library/api/dictation/${dictationId}/add-to-desk`, {
         method: 'POST',
@@ -1633,50 +1514,7 @@ async function toggleDictationOnDesk(dictationId) {
         }
 
         // Сохраняем контент диктанта (предложения) в IndexedDB, чтобы страница диктанта работала только из IDB
-        try {
-          console.log('===DESK_TOGGLE=== idb save start', { dictationId: String(dictationId) });
-          const dictId = `dict_${dictationId}`;
-          const userId = getDraftUserIdForKey();
-          const metaRes = await apiRequest(`/api/dictation/${dictationId}`);
-          const dictMeta = metaRes && metaRes.success ? metaRes.dictation : null;
-          const deskItem = Array.isArray(deskItems) ? deskItems.find(x => String(x.dictation_id) === String(dictationId)) : null;
-          const langOrig = (deskItem && (deskItem.language_code || deskItem.language_original)) || (dictMeta && dictMeta.language_code) || 'en';
-          const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
-            ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
-            : '';
-          const langTr = (deskItem && deskItem.language_translation) || nativeLang || langOrig;
-
-          const sentencesRes2 = await apiRequest(`/api/dictation/${dictId}/${langOrig}/${langTr}/sentences`);
-          const sentences2 = sentencesRes2 && sentencesRes2.success && Array.isArray(sentencesRes2.sentences) ? sentencesRes2.sentences : [];
-
-          const basePayload = {
-            dictationId: dictId,
-            langOrig,
-            langTr,
-            updatedAt: Date.now(),
-            meta: dictMeta,
-            sentences: sentences2
-          };
-
-          // Store both under userId and under anon to survive offline token validation issues.
-          const idbKeyUser = `${userId}:${dictId}:${langOrig}:${langTr}`;
-          await idbPut('dictations', {
-            key: idbKeyUser,
-            userId,
-            ...basePayload
-          });
-          console.log('===DESK_TOGGLE=== idb save user ok', { dictationId: String(dictationId), key: idbKeyUser });
-
-          const idbKeyAnon = `anon:${dictId}:${langOrig}:${langTr}`;
-          await idbPut('dictations', {
-            key: idbKeyAnon,
-            userId: 'anon',
-            ...basePayload
-          });
-          console.log('===DESK_TOGGLE=== idb save anon ok', { dictationId: String(dictationId), key: idbKeyAnon });
-        } catch (e) {
-          console.log('===DESK_TOGGLE=== idb save failed', { dictationId: String(dictationId), err: (e && e.message) ? e.message : String(e) });
-        }
+        // NOTE: отключено. Добавление на рабочий стол работает только с базой данных.
 
         refreshOfflineCacheStatus();
         completeLoadingIndicator(wasAdded ? 'Диктант добавлен на рабочий стол' : 'Диктант уже на рабочем столе', 1000);
@@ -1827,33 +1665,9 @@ function createDictationCard(item, isDeskCard = false) {
   }
 }
 
-function normalizeCoverCacheUrl(rawUrl) {
-  try {
-    const u = new URL(String(rawUrl || ''), location.origin);
-    u.search = '';
-    return u.toString();
-  } catch (e) {
-    return String(rawUrl || '');
-  }
-}
-
 async function applyDeskCovers(container) {
   try {
     const imgs = container.querySelectorAll('.desk-card .short-cover[data-cover-url]');
-
-    let cacheHits = 0;
-    let cacheMisses = 0;
-
-    let cache = null;
-    try {
-      if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
-        cache = await window.AudioManager.openMediaCache();
-      } else if ('caches' in window) {
-        cache = await caches.open('dictafan-media');
-      }
-    } catch (e) {
-      cache = null;
-    }
 
     for (const img of imgs) {
       if (img.dataset.coverApplied === '1') continue;
@@ -1864,26 +1678,7 @@ async function applyDeskCovers(container) {
 
       const src = maybeCacheBustDictationCover(url);
 
-      if (cache) {
-        try {
-          const probeUrl = normalizeCoverCacheUrl(src);
-          const hit = await cache.match(probeUrl);
-          if (hit) cacheHits += 1;
-          else cacheMisses += 1;
-        } catch (e) {
-          cacheMisses += 1;
-        }
-      }
-
       img.src = src;
-    }
-
-    if (cache) {
-      console.log('[desk-render] stage2 covers source:', {
-        cacheHits,
-        networkOrB2: cacheMisses,
-        total: cacheHits + cacheMisses,
-      });
     }
   } catch (e) {
     console.warn('[desk-render] applyDeskCovers failed', e);

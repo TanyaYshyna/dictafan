@@ -1,52 +1,7 @@
 // console.log("👀 renderSentenceCounter вызвана");
 
-var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
-
-if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
-    window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation');
-}
-
-try {
-    if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
-        window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
-    }
-} catch (e) {
-}
-
-// Global audio UI/controls (ensure defined before any usage)
-// Use window-scoped references to avoid ReferenceError on early calls
-window.originalAudioVisual = window.originalAudioVisual || null;
-window.translationPlayButton = window.translationPlayButton || null;
-
-function ensureSwStatusBar() {
-    try {
-        const id = 'swStatusBar';
-        let el = document.getElementById(id);
-        if (el) return el;
-        el = document.createElement('div');
-        el.id = id;
-        el.style.position = 'fixed';
-        el.style.left = '0';
-        el.style.right = '0';
-        el.style.bottom = '0';
-        el.style.zIndex = '2147483647';
-        el.style.padding = '6px 10px';
-        el.style.fontSize = '12px';
-        el.style.lineHeight = '1.2';
-        el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-        el.style.color = 'rgba(255,255,255,0.85)';
-        el.style.background = 'rgba(0,0,0,0.55)';
-        el.style.backdropFilter = 'blur(6px)';
-        el.style.webkitBackdropFilter = 'blur(6px)';
-        el.style.display = 'none';
-        el.style.pointerEvents = 'none';
-        el.textContent = '';
-        document.body.appendChild(el);
-        return el;
-    } catch (e) {
-        return null;
-    }
-}
+let originalAudioVisual = null;
+let translationPlayButton = null;
 
 function applyAudioSettingsFromUserData(userData) {
     try {
@@ -163,62 +118,13 @@ function applyAudioSettingsFromUserData(userData) {
 
 function normalizeDictationMediaUrl(rawUrl) {
     try {
-        try {
-            if (window.AudioManager && typeof window.AudioManager.normalizeMediaUrl === 'function') {
-                return window.AudioManager.normalizeMediaUrl(rawUrl);
-            }
-        } catch (e) {
+        const am = window.AudioManager;
+        if (am && typeof am.normalizeMediaUrl === 'function') {
+            return am.normalizeMediaUrl(rawUrl);
         }
-
-        let v = String(rawUrl || '').trim();
-        if (!v) return '';
-        if (v.startsWith('blob:')) return v;
-
-        try {
-            if (v.startsWith('http://') || v.startsWith('https://')) {
-                const u = new URL(v);
-                // If page is https, never keep an http absolute URL.
-                const desiredProtocol = (typeof location !== 'undefined' && location && location.protocol) ? location.protocol : u.protocol;
-                if (desiredProtocol === 'https:' && u.protocol === 'http:') {
-                    u.protocol = 'https:';
-                }
-
-                // Prefer returning a relative URL for same-origin requests.
-                try {
-                    if (typeof location !== 'undefined' && location && u.origin === location.origin) {
-                        v = `${u.pathname}${u.search || ''}`;
-                    } else {
-                        v = u.toString();
-                    }
-                } catch (e) {
-                    v = `${u.pathname}${u.search || ''}`;
-                }
-            }
-        } catch (e) {
-        }
-
-        try {
-            if (v.startsWith('http://') && typeof location !== 'undefined' && location && location.protocol === 'https:') {
-                v = `https://${v.slice('http://'.length)}`;
-            }
-        } catch (e) {
-        }
-
-        const markers = ['/api/dictations/'];
-        for (const m of markers) {
-            const first = v.indexOf(m);
-            if (first >= 0) {
-                return v.slice(first);
-            }
-        }
-
-        if (!v.startsWith('/') && (v.startsWith('api/') || v.startsWith('api\\'))) {
-            v = `/${v}`;
-        }
-
-        return v;
+        throw new Error('AudioManager_not_loaded');
     } catch (e) {
-        return String(rawUrl || '').trim();
+        throw e;
     }
 }
 
@@ -237,31 +143,27 @@ function resolveSentenceAudioUrl(sentence, fieldName) {
             ).trim();
         }
         if (!raw) return '';
+        const am = window.AudioManager;
+        if (!am) throw new Error('AudioManager_not_loaded');
+
         if (raw.startsWith('blob:')) return raw;
-        if (raw.startsWith('/api/')) return normalizeDictationMediaUrl(raw);
-        if (raw.startsWith('http://') || raw.startsWith('https://')) return normalizeDictationMediaUrl(raw);
+        if (raw.startsWith('/api/') || raw.startsWith('http://') || raw.startsWith('https://')) {
+            if (typeof am.normalizeMediaUrl !== 'function') throw new Error('AudioManager_not_loaded');
+            return am.normalizeMediaUrl(raw);
+        }
 
         const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
-        if (!dictId) return '';
-
-        const basePath = '/api/dictations';
-
         const lang = (fieldName === 'audio_tr')
             ? String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '')
             : String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '');
-        if (!lang) return '';
+        if (!dictId || !lang) return '';
 
         const name = raw.split('?', 1)[0].split('/').pop();
         if (!name) return '';
-        try {
-            if (window.AudioManager && typeof window.AudioManager.buildDictationAudioUrl === 'function') {
-                return window.AudioManager.buildDictationAudioUrl(dictId, lang, name);
-            }
-        } catch (e) {
-        }
-        return normalizeDictationMediaUrl(`${basePath}/${encodeURIComponent(dictId)}/${encodeURIComponent(lang)}/${encodeURIComponent(name)}`);
+        if (typeof am.buildDictationAudioUrl !== 'function') throw new Error('AudioManager_not_loaded');
+        return am.buildDictationAudioUrl(dictId, lang, name);
     } catch (e) {
-        return '';
+        throw e;
     }
 }
 
@@ -278,31 +180,6 @@ function maybeCacheBustDictationCover(url) {
         return url;
     }
 }
-
-function setSwStatus(message, opts = {}) {
-    try {
-        const el = ensureSwStatusBar();
-        if (!el) return;
-        el.textContent = String(message || '');
-        el.style.display = message ? 'block' : 'none';
-        if (el._hideTimer) {
-            clearTimeout(el._hideTimer);
-            el._hideTimer = null;
-        }
-        const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1500;
-        if (message && durationMs > 0) {
-            el._hideTimer = setTimeout(() => {
-                try {
-                    el.style.display = 'none';
-                } catch (e) {
-                }
-            }, durationMs);
-        }
-    } catch (e) {
-    }
-}
-
-// build helpers moved to static/js/build_helpers.js
 
 function showDictationCacheFetchOverlay(text) {
     try {
@@ -422,21 +299,30 @@ async function fetchSentencesFromServerAndCache() {
         setTimeout(() => {
             try {
                 const audioUrls = [];
-                const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+                const audioFields = ['audio', 'audio_tr'];
                 const resolveAudioToUrl = (rawValue, lang) => {
                     try {
+                        const am = window.AudioManager;
+                        if (!am) throw new Error('AudioManager_not_loaded');
                         const v = String(rawValue || '').trim();
                         if (!v) return null;
                         if (v.startsWith('blob:')) return v;
-                        if (v.startsWith('/api/')) return normalizeDictationMediaUrl(v);
-                        if (v.startsWith('http://') || v.startsWith('https://')) return normalizeDictationMediaUrl(v);
+                        if (v.startsWith('/api/')) {
+                            if (typeof am.normalizeMediaUrl !== 'function') throw new Error('AudioManager_not_loaded');
+                            return am.normalizeMediaUrl(v);
+                        }
+                        if (v.startsWith('http://') || v.startsWith('https://')) {
+                            if (typeof am.normalizeMediaUrl !== 'function') throw new Error('AudioManager_not_loaded');
+                            return am.normalizeMediaUrl(v);
+                        }
                         const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
                         if (!dictId || !lang) return null;
                         const name = v.split('?', 1)[0].split('/').pop();
                         if (!name) return null;
-                        return normalizeDictationMediaUrl(`/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`);
+                        if (typeof am.buildDictationAudioUrl !== 'function') throw new Error('AudioManager_not_loaded');
+                        return am.buildDictationAudioUrl(dictId, String(lang), name);
                     } catch (e) {
-                        return null;
+                        throw e;
                     }
                 };
                 for (const s of sentences) {
@@ -450,11 +336,12 @@ async function fetchSentencesFromServerAndCache() {
                 }
                 const unique = Array.from(new Set(audioUrls.filter(Boolean)));
                 if (unique.length) {
-                    swDictationRequest('prefetchStrict', {
-                        urls: unique,
-                        ignoreLimit: true,
-                        timeoutMs: 180000
-                    }).catch(() => {});
+                    try {
+                        if (window.AudioManager && typeof window.AudioManager.prefetchMediaUrls === 'function') {
+                            window.AudioManager.prefetchMediaUrls(unique, { concurrency: 4 }).catch(() => {});
+                        }
+                    } catch (e) {
+                    }
                 }
             } catch (e) {
             }
@@ -564,8 +451,8 @@ function installDictationFailedAudioFocusGuard() {
             if (!el) return false;
             if (el.id === 'originalAudioPlayer') return true;
             if (el.closest && el.closest('#originalAudioPlayer')) return true;
-            if (window.originalAudioVisual && window.originalAudioVisual.playButton) {
-                if (el === window.originalAudioVisual.playButton) return true;
+            if (originalAudioVisual && originalAudioVisual.playButton) {
+                if (el === originalAudioVisual.playButton) return true;
             }
         } catch (e) {
         }
@@ -2061,10 +1948,6 @@ let REQUIRED_PASSED_STAR_HALF = 3;   // сколько засчитанных п
 
 // Служебный счётчик пройденных попыток в текущем уроке
 let passedAudioCount = 0;
-
-let userAudioElement = null;        // один общий Audio()
-let userAudioObjectUrl = null;      // текущий объектный URL для прослушки
-let userPlayInited = false;         // чтобы не вешать обработчик многократно
 
 // --- обработка таблицы с диктантом в модальгом окне -----------------------------------------------
 // ====== Простые хелперы ======
@@ -3578,58 +3461,6 @@ function getSelectedSentences() {
     console.log('[getSelectedSentences] Выбрано предложений:', selectedSentences.length, selectedSentences);
 }
 
-// 
-async function swDictationRequest(action, payload = {}) {
-    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-        throw new Error('Service Worker не активен');
-    }
-
-    try {
-        setSwStatus(`SW: ${String(action)} …`, { durationMs: 0 });
-    } catch (e) {
-    }
-
-    const requestId = `dictation_${action}_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const timeoutMs = Number(payload.timeoutMs) || 15000;
-
-    return await new Promise((resolve, reject) => {
-        const channel = new MessageChannel();
-        const timer = setTimeout(() => reject(new Error('timeout')), timeoutMs);
-        channel.port1.onmessage = (event) => {
-            clearTimeout(timer);
-            const data = event.data || {};
-            if (data.requestId && data.requestId !== requestId) {
-                reject(new Error('bad_request_id'));
-                return;
-            }
-            if (data.success) {
-                try {
-                    setSwStatus(`SW: ${String(action)} ok`);
-                } catch (e) {
-                }
-                resolve(data.result);
-            } else {
-                try {
-                    setSwStatus(`SW: ${String(action)} error`);
-                } catch (e) {
-                }
-                reject(new Error(data.error || 'sw_request_failed'));
-            }
-        };
-
-        try {
-            navigator.serviceWorker.controller.postMessage({ action, requestId, ...payload }, [channel.port2]);
-        } catch (e) {
-            clearTimeout(timer);
-            try {
-                setSwStatus(`SW: ${String(action)} error`);
-            } catch (e2) {
-            }
-            reject(e);
-        }
-    });
-}
-
 async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     // все аудио должны быть из кеша
     const keys = Array.isArray(sentenceKeys) ? sentenceKeys : [];
@@ -3637,21 +3468,30 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     const urls = [];
     const resolveAudioToUrl = (rawValue, lang) => {
         try {
+            const am = window.AudioManager;
+            if (!am) throw new Error('AudioManager_not_loaded');
             const v = String(rawValue || '').trim();
             if (!v) return null;
             if (v.startsWith('blob:')) return v;
-            if (v.startsWith('/api/')) return normalizeDictationMediaUrl(v);
-            if (v.startsWith('http://') || v.startsWith('https://')) return normalizeDictationMediaUrl(v);
+            if (v.startsWith('/api/')) {
+                if (typeof am.normalizeMediaUrl !== 'function') throw new Error('AudioManager_not_loaded');
+                return am.normalizeMediaUrl(v);
+            }
+            if (v.startsWith('http://') || v.startsWith('https://')) {
+                if (typeof am.normalizeMediaUrl !== 'function') throw new Error('AudioManager_not_loaded');
+                return am.normalizeMediaUrl(v);
+            }
             const dictId = String(currentDictation && currentDictation.id ? currentDictation.id : '').trim();
             if (!dictId || !lang) return null;
             const name = v.split('?', 1)[0].split('/').pop();
             if (!name) return null;
-            return normalizeDictationMediaUrl(`/api/dictations/${encodeURIComponent(dictId)}/${encodeURIComponent(String(lang))}/${encodeURIComponent(name)}`);
+            if (typeof am.buildDictationAudioUrl !== 'function') throw new Error('AudioManager_not_loaded');
+            return am.buildDictationAudioUrl(dictId, String(lang), name);
         } catch (e) {
-            return null;
+            throw e;
         }
     };
-    const audioFields = ['audio', 'audio_a', 'audio_f', 'audio_m', 'audio_tr'];
+    const audioFields = ['audio', 'audio_tr'];
     for (const key of keys) {
         const s = byKey.get(key);
         if (!s) continue;
@@ -3665,27 +3505,43 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     const uniqueUrls = Array.from(new Set(urls.filter(Boolean)));
     if (!uniqueUrls.length) return;
 
-    const res = await swDictationRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
-    if (res && res.ok === true) return;
-
-    const missing = (res && Array.isArray(res.missing)) ? res.missing : [];
-    if (missing.length > 0) {
-        try {
-            await swDictationRequest('prefetchStrict', { urls: missing, timeoutMs: 180000 });
-        } catch (e) {
-        }
-
-        const res2 = await swDictationRequest('checkCached', { urls: uniqueUrls, timeoutMs: 20000 });
-        if (res2 && res2.ok === true) return;
-
-        const missingCount2 = res2 && Array.isArray(res2.missing) ? res2.missing.length : null;
-        const suffix2 = (missingCount2 !== null) ? ` (не найдено: ${missingCount2})` : '';
-        throw new Error(`audio_not_cached${suffix2}`);
+    const am = window.AudioManager;
+    if (!am || typeof am.getCachedResponse !== 'function') {
+        throw new Error('audio_manager_not_available');
     }
 
-    const missingCount = res && Array.isArray(res.missing) ? res.missing.length : null;
-    const suffix = (missingCount !== null) ? ` (не найдено: ${missingCount})` : '';
-    throw new Error(`audio_not_cached${suffix}`);
+    const missing = [];
+    for (const u of uniqueUrls) {
+        try {
+            const hit = await am.getCachedResponse(u);
+            if (!hit) missing.push(u);
+        } catch (e) {
+            missing.push(u);
+        }
+    }
+
+    if (!missing.length) return;
+
+    // Online: try to warm cache via AudioManager (best-effort).
+    try {
+        if (navigator.onLine && typeof am.prefetchMediaUrls === 'function') {
+            await am.prefetchMediaUrls(missing, { concurrency: 4 });
+        }
+    } catch (e) {
+    }
+
+    const missing2 = [];
+    for (const u of missing) {
+        try {
+            const hit = await am.getCachedResponse(u);
+            if (!hit) missing2.push(u);
+        } catch (e) {
+            missing2.push(u);
+        }
+    }
+    if (!missing2.length) return;
+
+    throw new Error(`audio_not_cached (не найдено: ${missing2.length})`);
 }
 
 function startGame(isResume = false) {
@@ -3898,84 +3754,6 @@ function loadSentencesFromJSON() {
     }
 }
 
-
-
-
-
-// --- Один пользовательский плеер для кнопки #userPlay -----------------------------------------------
-function ensureUserPlayButton() {
-    const btn = document.getElementById('userPlay');
-    if (!btn || userPlayInited) return;
-
-    // изначально заблокирована — пока нет записи
-    btn.disabled = true;
-
-    btn.addEventListener('click', () => {
-        if (!userAudioElement) return;
-        if (userAudioElement.paused) {
-            userAudioElement.play().catch(console.error);
-        } else {
-            userAudioElement.pause();
-        }
-    });
-
-    userPlayInited = true;
-}
-
-function setUserAudioBlob(blob) {
-    const btn = document.getElementById('userPlay');
-    if (!blob || !btn) return;
-
-    // 1. Сначала очищаем старый аудиоэлемент
-    if (userAudioElement) {
-        try {
-            userAudioElement.pause();
-            userAudioElement.src = ''; // очищаем источник
-        } catch { }
-    }
-
-    // 2. Отзываем старый URL (если он есть)
-    if (userAudioObjectUrl) {
-        URL.revokeObjectURL(userAudioObjectUrl);
-        userAudioObjectUrl = null;
-    }
-
-    // 3. Создаем новый URL из Blob
-    userAudioObjectUrl = URL.createObjectURL(blob);
-
-    // 4. Создаем новый аудиоэлемент если нужно
-    if (!userAudioElement) {
-        userAudioElement = new Audio();
-        userAudioElement.preload = 'metadata';
-    }
-
-    // 5. Устанавливаем новый источник
-    if (userAudioObjectUrl) {
-        userAudioElement.src = userAudioObjectUrl;
-    } else {
-        console.log("Blob URL не доступен");
-        userAudioElement.src = '';
-    }
-
-    btn.disabled = false;
-}
-
-function clearUserAudio() {
-    const btn = document.getElementById('userPlay');
-    if (userAudioElement) {
-        try {
-            userAudioElement.pause();
-            userAudioElement.src = '';
-        } catch { }
-    }
-
-    if (userAudioObjectUrl) {
-        URL.revokeObjectURL(userAudioObjectUrl);
-        userAudioObjectUrl = null;
-    }
-    if (btn) btn.disabled = true;
-}
-
 // Показ/скрытие UI по remainingAudio текущего предложения
 function refreshAudioUIForCurrentSentence() {
     const R = Number(REQUIRED_PASSED_COUNT ?? 0);
@@ -3983,13 +3761,11 @@ function refreshAudioUIForCurrentSentence() {
     const recordBtn = document.getElementById('recordButton');
     const percentWrap = document.getElementById('count_percent')?.parentElement; // stat-btn c процентом
     const visual = document.getElementById('audioVisualizer');
-    const playBtn = document.getElementById('userPlay');
 
     // Если аудиоконтроль вообще не нужен
     if (R === 0) {
         if (recordBtn) { recordBtn.disabled = true; recordBtn.classList.add('disabled'); }
         if (percentWrap) percentWrap.style.display = 'none';
-        if (playBtn) playBtn.style.display = 'none';
 
         if (visual) {
             try { if (typeof stopVisualization === 'function') stopVisualization(); } catch { }
@@ -4038,9 +3814,6 @@ function refreshAudioUIForCurrentSentence() {
                 recordingIndicator.style.opacity = isRecording ? '1' : '0';
             }
         }
-
-        // Кнопка воспроизведения: скрываем
-        if (playBtn) playBtn.style.display = hasAttempts ? '' : 'none';
 
         // Эквалайзер: скрываем
         if (visual) {
@@ -5296,9 +5069,6 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             if (!audioBlob) {
                 console.warn("⚠️ [saveRecording] Нет аудиоданных для сохранения, но продолжаем обработку текста");
                 // Не возвращаемся - продолжаем обработку текста даже без blob
-            } else {
-                // Сделать последнюю запись доступной на кнопке #userPlay
-                setUserAudioBlob(audioBlob);
             }
         
             // Получаем распознанный текст
@@ -5478,12 +5248,6 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     // Сформировать Blob из накопленных чанков и очистить буфер
     const audioBlob = new Blob(audioChunks, { type: blobType });
     audioChunks = [];
-
-    // Сделать последнюю запись доступной на кнопке #userPlay
-    setUserAudioBlob(audioBlob);
-
-    // Привяжем «официальный» плеер, как и раньше (если он тебе нужен)
-    const audioUrl = URL.createObjectURL(audioBlob);
 
     // ⬇️ добавлено: получаем оригинал и распознанный текст
     const originalText = currentSentence.text ?? '';
@@ -7288,7 +7052,6 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     updateSimpleSentenceCounter();
 
     // Сброс предыдущей записи пользователя (чтоб плеер не тащил старый blob) // NEW
-    clearUserAudio();                                                                 // NEW
     // Актуализируем видимость панели аудио (на случай R=0)
     updateAudioPanelVisibility();
     refreshAudioUIForCurrentSentence();
@@ -7310,14 +7073,11 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     }
 
     // Обновляем AudioPlayerVisual с путями к аудио текущего предложения
-    if (window.originalAudioVisual) {
-        window.originalAudioVisual.setAudioPaths({
-            audio: resolveSentenceAudioUrl(currentSentence, 'audio'),
-            audio_a: '',
-            audio_f: '',
-            audio_m: ''
+    if (originalAudioVisual) {
+        originalAudioVisual.setAudioPaths({
+            audio: resolveSentenceAudioUrl(currentSentence, 'audio')
         });
-        window.originalAudioVisual.reset();
+        originalAudioVisual.reset();
     }
 
     // Обновляем отображение счетчика записей
@@ -7565,8 +7325,6 @@ async function onloadInitializeDictation() {
 
         updateStats();               // первичная синхронизация
     })();
-
-    ensureUserPlayButton();
     updateAudioPanelVisibility();
     renderUserAudioTablo();
     setRecordStateIcon('square');  // ← инициализируем "квадрат" по умолчанию
@@ -7578,7 +7336,6 @@ async function onloadInitializeDictation() {
     if (originalAudioContainer && typeof AudioPlayerVisual !== 'undefined') {
         // Create and store both locally and globally for early/late access
         originalAudioVisual = new AudioPlayerVisual(originalAudioContainer);
-        window.originalAudioVisual = originalAudioVisual;
         originalAudioVisual.setLanguage(currentDictation.language_original);
 
         try {
@@ -7641,7 +7398,6 @@ async function onloadInitializeDictation() {
 
     // Инициализация кнопки перевода
     translationPlayButton = document.getElementById('translationPlayButton');
-    window.translationPlayButton = translationPlayButton;
     if (translationPlayButton) {
         translationPlayButton.addEventListener('click', () => {
             if (!currentSentence) return;
@@ -8572,17 +8328,13 @@ function restoreCursorPosition(containerEl, offset) {
  * Воспроизведение последовательности аудио по схеме
  * @param {string} sequence - Строка последовательности, например "omftaa"
  *   o - оригинал (audio)
- *   a - автоозвучка (audio_a) 
- *   f - порезанный файл (audio_f)
- *   m - микрофон (audio_m)
  *   t - перевод (audio_tr)
  */
 function playAudioSequence(sequence) {
     if (!sequence || !sequence.length) return;
     if (!currentSentence) return;
     if (!window.AudioManager) {
-        console.error('AudioManager не найден');
-        return;
+        throw new Error('AudioManager_not_loaded');
     }
 
     const seqSentence = currentSentence;
@@ -8624,26 +8376,17 @@ function playAudioSequence(sequence) {
         switch (step) {
             case 'o': // оригинал
                 audioPath = resolveSentenceAudioUrl(seqSentence, 'audio');
-                if (window.originalAudioVisual) {
-                    button = window.originalAudioVisual.playButton;
-                    window.originalAudioVisual.setAudioType('o');
-                }
-                break;
-            case 'a': // автоозвучка (устарело в диктанте)
-            case 'f': // порезанный файл (устарело в диктанте)
-            case 'm': // микрофон (устарело в диктанте)
-                audioPath = resolveSentenceAudioUrl(seqSentence, 'audio');
-                if (window.originalAudioVisual) {
-                    button = window.originalAudioVisual.playButton;
-                    window.originalAudioVisual.setAudioType('o');
+                if (originalAudioVisual) {
+                    button = originalAudioVisual.playButton;
+                    originalAudioVisual.setAudioType('o');
                 }
                 break;
             case 't': // перевод
                 audioPath = resolveSentenceAudioUrl(seqSentence, 'audio_tr');
-                button = window.translationPlayButton || null;
+                button = translationPlayButton || null;
                 break;
             default:
-                console.warn('Неизвестный тип аудио в последовательности:', step);
+                console.warn('Неизвестный/устаревший тип аудио в последовательности:', step);
                 index++;
                 setTimeout(playNext, 0);
                 return;
@@ -9124,16 +8867,16 @@ document.addEventListener('keydown', function (event) {
         switch (event.key) {
             case '1':
                 // Проигрываем оригинал - просто вызываем клик на кнопке
-                if (window.originalAudioVisual && window.originalAudioVisual.playButton) {
-                    window.originalAudioVisual.playButton.click();
+                if (originalAudioVisual && originalAudioVisual.playButton) {
+                    originalAudioVisual.playButton.click();
                 }
                 event.preventDefault();
                 break;
 
             case '2':
                 // Проигрываем перевод - просто вызываем клик на кнопке
-                if (window.translationPlayButton) {
-                    window.translationPlayButton.click();
+                if (translationPlayButton) {
+                    translationPlayButton.click();
                 }
                 event.preventDefault();
                 break;

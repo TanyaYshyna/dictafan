@@ -11,6 +11,8 @@ class AudioManagerClass {
         this._lastPlayRequest = null;
         this._mediaCacheName = 'dictafan-media';
         this._objectUrlByCanonicalUrl = {};
+        this._b2LedgerDbName = 'dictafan_drafts';
+        this._b2LedgerStoreName = 'b2_upload_ledger';
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -848,6 +850,62 @@ class AudioManagerClass {
         }
     }
 
+    async ensureCachedResponse(url) {
+        try {
+            const u = this.normalizeMediaUrl(url);
+            if (!u || u.startsWith('blob:')) return false;
+
+            const cacheKey = this._toCacheKey(u);
+            if (!cacheKey) return false;
+
+            const cache = await this.openMediaCache();
+            if (!cache) return false;
+
+            const existing = await cache.match(cacheKey);
+            if (existing) return true;
+
+            const fetchRes = await fetch(u, { cache: 'no-store' });
+            if (!fetchRes || !fetchRes.ok) return false;
+            await cache.put(cacheKey, fetchRes.clone());
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async prefetchMediaUrls(urls, opts = {}) {
+        try {
+            const list = Array.isArray(urls) ? urls.filter(Boolean) : [];
+            if (!list.length) return { success: true, total: 0, cached: 0, failed: 0 };
+
+            const concurrency = Math.max(1, Number(opts.concurrency) || 4);
+            let idx = 0;
+            let cached = 0;
+            let failed = 0;
+
+            const worker = async () => {
+                while (true) {
+                    const i = idx;
+                    idx += 1;
+                    if (i >= list.length) return;
+                    const u = list[i];
+                    const ok = await this.ensureCachedResponse(u);
+                    if (ok) cached += 1;
+                    else failed += 1;
+                }
+            };
+
+            const workers = [];
+            for (let i = 0; i < concurrency; i += 1) {
+                workers.push(worker());
+            }
+            await Promise.all(workers);
+            return { success: true, total: list.length, cached, failed };
+        } catch (e) {
+            return { success: false, total: 0, cached: 0, failed: 0 };
+        }
+    }
+
     _setObjectUrlForCanonical(canonicalUrl, nextObjectUrl) {
         try {
             const key = String(canonicalUrl || '').trim();
@@ -970,6 +1028,311 @@ class AudioManagerClass {
             return key;
         } catch (e) {
             return '';
+        }
+    }
+
+    async _openB2LedgerDb() {
+        return await new Promise((resolve, reject) => {
+            try {
+                const req = indexedDB.open(this._b2LedgerDbName);
+                req.onupgradeneeded = () => {
+                    try {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains(this._b2LedgerStoreName)) {
+                            db.createObjectStore(this._b2LedgerStoreName, { keyPath: 'key' });
+                        }
+                    } catch (e) {
+                    }
+                };
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    }
+
+    async _idbGet(storeName, key) {
+        const db = await this._openB2LedgerDb();
+        try {
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readonly');
+                const store = tx.objectStore(storeName);
+                const req = store.get(key);
+                req.onsuccess = () => resolve(req.result || null);
+                req.onerror = () => reject(req.error);
+            });
+        } finally {
+            try { db.close(); } catch (e) {}
+        }
+    }
+
+    async _idbPut(storeName, value) {
+        const db = await this._openB2LedgerDb();
+        try {
+            return await new Promise((resolve, reject) => {
+                const tx = db.transaction(storeName, 'readwrite');
+                const store = tx.objectStore(storeName);
+                const req = store.put(value);
+                req.onsuccess = () => resolve(true);
+                req.onerror = () => reject(req.error);
+            });
+        } finally {
+            try { db.close(); } catch (e) {}
+        }
+    }
+
+    async _sha256HexFromBlob(blob) {
+        try {
+            if (!blob || typeof blob.arrayBuffer !== 'function') return null;
+            const buf = await blob.arrayBuffer();
+            if (!buf) return null;
+            const c = (typeof window !== 'undefined' && window.crypto) ? window.crypto : (typeof crypto !== 'undefined' ? crypto : null);
+            if (!(c && c.subtle && typeof c.subtle.digest === 'function')) return null;
+            const hashBuf = await c.subtle.digest('SHA-256', buf);
+            const bytes = new Uint8Array(hashBuf);
+            let out = '';
+            for (let i = 0; i < bytes.length; i++) {
+                out += bytes[i].toString(16).padStart(2, '0');
+            }
+            return out;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _getB2LedgerKey(remotePath) {
+        return `b2_ledger:${String(remotePath || '').trim()}`;
+    }
+
+    async _getB2Ledger(remotePath) {
+        try {
+            const k = this._getB2LedgerKey(remotePath);
+            const row = await this._idbGet(this._b2LedgerStoreName, k);
+            return row && row.value ? row.value : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async _setB2Ledger(remotePath, value) {
+        try {
+            const k = this._getB2LedgerKey(remotePath);
+            await this._idbPut(this._b2LedgerStoreName, { key: k, value, updated_at: Date.now() });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async getB2UploadUrl(token) {
+        const t = String(token || '').trim();
+        if (!t) return { ok: false, reason: 'missing_token' };
+        const resp = await fetch('/api/b2/get_upload_url', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${t}`
+            },
+            body: JSON.stringify({})
+        });
+        if (!resp.ok) {
+            let text = '';
+            try { text = await resp.text(); } catch (e) {}
+            return { ok: false, reason: 'get_upload_url_failed', status: resp.status, text };
+        }
+        const json = await resp.json();
+        if (!json || !json.success || !json.uploadUrl || !json.uploadAuthToken) {
+            return { ok: false, reason: 'get_upload_url_bad_payload' };
+        }
+        return { ok: true, uploadUrl: json.uploadUrl, uploadAuthToken: json.uploadAuthToken };
+    }
+
+    async uploadDictationAudioFromCacheToB2({ dictationId, token, urls, shouldUpload = null, onUploaded = null, onProgress = null }) {
+        try {
+            if (!dictationId || !String(dictationId).startsWith('dict_')) {
+                return { ok: false, reason: 'bad_dictation_id' };
+            }
+            const t = String(token || '').trim();
+            if (!t) return { ok: false, reason: 'missing_token' };
+
+            const list = Array.from(new Set((Array.isArray(urls) ? urls : []).filter(Boolean)));
+            if (list.length === 0) {
+                return { ok: true, dictationId, urls: 0, cacheHit: 0, uploaded: 0, skipped: 0, failed: 0, cacheMiss: 0, hashed: 0 };
+            }
+
+            // Guard against multiple concurrent uploads for the same dictation.
+            try {
+                window.__B2_AUDIO_UPLOAD_INFLIGHT = window.__B2_AUDIO_UPLOAD_INFLIGHT || {};
+                const k = String(dictationId);
+                if (window.__B2_AUDIO_UPLOAD_INFLIGHT[k]) {
+                    return { ok: false, reason: 'inflight' };
+                }
+                window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = true;
+            } catch (e) {
+            }
+
+            const up = await this.getB2UploadUrl(t);
+            if (!up.ok) return { ok: false, reason: up.reason, status: up.status, text: up.text };
+
+            let cacheHit = 0;
+            let uploaded = 0;
+            let skipped = 0;
+            let failed = 0;
+            let cacheMiss = 0;
+            let hashed = 0;
+
+            let processed = 0;
+            for (const url of list) {
+                processed += 1;
+                try {
+                    if (typeof onProgress === 'function') {
+                        const pct = list.length ? Math.round((processed / list.length) * 100) : null;
+                        onProgress({ processed, total: list.length, pct, url });
+                    }
+                } catch (e) {
+                }
+
+                try {
+                    const u = new URL(this.normalizeMediaUrl(url), location.origin);
+                    const m = u.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
+                    if (!m) {
+                        continue;
+                    }
+                    const urlDictId = m[1];
+                    const lang = m[2];
+                    const filename = m[3];
+                    if (urlDictId !== dictationId) continue;
+
+                    const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
+
+                    let cached = null;
+                    try {
+                        cached = await this.getCachedResponse(u.toString());
+                    } catch (e) {
+                        cached = null;
+                    }
+                    if (!cached) {
+                        cacheMiss += 1;
+                        continue;
+                    }
+                    cacheHit += 1;
+                    const blob = await cached.blob();
+                    if (!blob || !blob.size) continue;
+
+                    let allow = true;
+                    try {
+                        if (typeof shouldUpload === 'function') {
+                            allow = shouldUpload({ dictationId, lang, filename, remotePath, url: u.toString(), blob });
+                        }
+                    } catch (e) {
+                        allow = false;
+                    }
+                    if (!allow) {
+                        skipped += 1;
+                        continue;
+                    }
+
+                    let sha256 = null;
+                    try {
+                        sha256 = await this._sha256HexFromBlob(blob);
+                        if (sha256) hashed += 1;
+                    } catch (e) {
+                        sha256 = null;
+                    }
+
+                    if (sha256) {
+                        try {
+                            const prev = await this._getB2Ledger(remotePath);
+                            if (prev && prev.sha256 && String(prev.sha256) === String(sha256) && Number(prev.size || 0) === Number(blob.size || 0)) {
+                                try {
+                                    if (typeof onUploaded === 'function') {
+                                        onUploaded({ dictationId, lang, filename, remotePath, url: u.toString(), uploaded: false, skipped: true, deduped: true });
+                                    }
+                                } catch (e) {
+                                }
+                                skipped += 1;
+                                continue;
+                            }
+                        } catch (e) {
+                        }
+                    }
+
+                    const b2Resp = await fetch(up.uploadUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': up.uploadAuthToken,
+                            'X-Bz-File-Name': encodeURIComponent(remotePath),
+                            'Content-Type': blob.type || 'b2/x-auto',
+                            'X-Bz-Content-Sha1': 'do_not_verify'
+                        },
+                        body: blob
+                    });
+                    if (!b2Resp.ok) {
+                        failed += 1;
+                        continue;
+                    }
+
+                    uploaded += 1;
+                    try {
+                        await this._setB2Ledger(remotePath, { sha256: sha256 || null, size: Number(blob.size || 0), uploadedAt: Date.now() });
+                    } catch (e) {
+                    }
+                    try {
+                        if (typeof onUploaded === 'function') {
+                            onUploaded({ dictationId, lang, filename, remotePath, url: u.toString(), uploaded: true, skipped: false, deduped: false });
+                        }
+                    } catch (e) {
+                    }
+                } catch (e) {
+                    failed += 1;
+                }
+            }
+
+            return {
+                ok: failed === 0 && cacheMiss === 0,
+                dictationId,
+                urls: list.length,
+                cacheHit,
+                uploaded,
+                skipped,
+                failed,
+                cacheMiss,
+                hashed
+            };
+        } catch (e) {
+            return { ok: false, reason: 'fatal', error: String(e && e.message ? e.message : e) };
+        } finally {
+            try {
+                const k = String(dictationId || '');
+                if (k && window.__B2_AUDIO_UPLOAD_INFLIGHT) {
+                    window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = false;
+                }
+            } catch (e) {
+            }
+        }
+    }
+
+    async cleanupStaleB2DictationAudio({ dictationId, token, keepRemotePaths }) {
+        try {
+            const id = String(dictationId || '').trim();
+            if (!id || !id.startsWith('dict_')) return { ok: false, reason: 'bad_dictation_id' };
+            const t = String(token || '').trim();
+            if (!t) return { ok: false, reason: 'missing_token' };
+            const keep_remote_paths = Array.isArray(keepRemotePaths) ? keepRemotePaths.filter(Boolean) : [];
+            if (!keep_remote_paths.length) return { ok: true, skipped: true, reason: 'empty_keep_list' };
+
+            const resp = await fetch('/api/b2/cleanup_dictation_audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${t}`
+                },
+                body: JSON.stringify({ dictation_id: id, keep_remote_paths })
+            });
+            return { ok: resp.ok, status: resp.status };
+        } catch (e) {
+            return { ok: false, reason: 'fatal', error: String(e && e.message ? e.message : e) };
         }
     }
 

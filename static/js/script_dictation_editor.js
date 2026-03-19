@@ -2,19 +2,6 @@
 // 1) до Save: несохранённое аудио хранится только в памяти вкладки (Blob/objectURL)
 // 2) после Save: аудио читается из /api/dictations/... (cache/B2)
 
-var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
-
-if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
-    window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation_editor');
-}
-
-try {
-    if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
-        window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
-    }
-} catch (e) {
-}
-
 const userManager = window.UM;
 const waveformContainer = document.getElementById('audioWaveform');
 const currentAudioInfo = document.getElementById('currentAudioInfo');
@@ -613,6 +600,11 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
         if (!id || !id.startsWith('dict_')) return;
         if (!token) return;
 
+        const am = window.AudioManager;
+        if (!am || typeof am.cleanupStaleB2DictationAudio !== 'function') {
+            throw new Error('AudioManager_not_loaded');
+        }
+
         const keep = new Set();
         const push = (lang, rawFilename) => {
             try {
@@ -663,16 +655,10 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
             return;
         }
 
-        await fetch('/api/b2/cleanup_dictation_audio', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                dictation_id: id,
-                keep_remote_paths
-            })
+        await am.cleanupStaleB2DictationAudio({
+            dictationId: id,
+            token,
+            keepRemotePaths: keep_remote_paths
         });
     } catch (e) {
     }
@@ -783,9 +769,6 @@ async function openDraftDb() {
             if (!db.objectStoreNames.contains('media_manifest')) {
                 db.createObjectStore('media_manifest', { keyPath: 'key' });
             }
-            if (!db.objectStoreNames.contains('b2_upload_ledger')) {
-                db.createObjectStore('b2_upload_ledger', { keyPath: 'key' });
-            }
         };
         req.onsuccess = () => resolve(req.result);
         req.onerror = () => reject(req.error);
@@ -844,49 +827,6 @@ async function idbDelete(storeName, key) {
         });
     } finally {
         db.close();
-    }
-}
-
-async function sha256HexFromBlob(blob) {
-    try {
-        if (!blob || typeof blob.arrayBuffer !== 'function') return null;
-        const buf = await blob.arrayBuffer();
-        if (!buf) return null;
-        const c = (typeof window !== 'undefined' && window.crypto) ? window.crypto : (typeof crypto !== 'undefined' ? crypto : null);
-        if (!(c && c.subtle && typeof c.subtle.digest === 'function')) return null;
-        const hashBuf = await c.subtle.digest('SHA-256', buf);
-        const bytes = new Uint8Array(hashBuf);
-        let out = '';
-        for (let i = 0; i < bytes.length; i++) {
-            out += bytes[i].toString(16).padStart(2, '0');
-        }
-        return out;
-    } catch (e) {
-        return null;
-    }
-}
-
-function getB2LedgerKey(remotePath) {
-    return `b2_ledger:${String(remotePath || '').trim()}`;
-}
-
-async function getB2Ledger(remotePath) {
-    try {
-        const k = getB2LedgerKey(remotePath);
-        const row = await idbGet('b2_upload_ledger', k);
-        return row && row.value ? row.value : null;
-    } catch (e) {
-        return null;
-    }
-}
-
-async function setB2Ledger(remotePath, value) {
-    try {
-        const k = getB2LedgerKey(remotePath);
-        await idbPut('b2_upload_ledger', { key: k, value, updated_at: Date.now() });
-        return true;
-    } catch (e) {
-        return false;
     }
 }
 
@@ -1122,6 +1062,11 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
             return { ok: false, reason: 'missing_token' };
         }
 
+        const am = window.AudioManager;
+        if (!am || typeof am.uploadDictationAudioFromCacheToB2 !== 'function') {
+            throw new Error('AudioManager_not_loaded');
+        }
+
         // Guard against multiple concurrent uploads for the same dictation.
         // This function can be triggered from multiple places after Save; without a guard
         // it causes multiple uploads of the same filenames -> B2 creates extra versions.
@@ -1150,184 +1095,44 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         } catch (e) {
         }
 
-        const uploadUrlResp = await fetch('/api/b2/get_upload_url', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
+
+        const res = await am.uploadDictationAudioFromCacheToB2({
+            dictationId,
+            token,
+            urls: uniqueUrls,
+            shouldUpload: ({ lang, filename }) => {
+                try {
+                    return hasDraftAudioUrl(lang, filename) === true;
+                } catch (e) {
+                    return false;
+                }
             },
-            body: JSON.stringify({})
-        });
-
-        if (!uploadUrlResp.ok) {
-            let t = '';
-            try { t = await uploadUrlResp.text(); } catch (e) {}
-            console.warn('[B2 UPLOAD] get_upload_url failed', { status: uploadUrlResp.status, text: t });
-            return { ok: false, reason: 'get_upload_url_failed', status: uploadUrlResp.status };
-        }
-        const uploadUrlJson = await uploadUrlResp.json();
-        if (!uploadUrlJson || !uploadUrlJson.success || !uploadUrlJson.uploadUrl || !uploadUrlJson.uploadAuthToken) {
-            console.warn('[B2 UPLOAD] get_upload_url bad payload', uploadUrlJson);
-            return { ok: false, reason: 'get_upload_url_bad_payload' };
-        }
-
-        let cache = null;
-        try {
-            if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
-                cache = await window.AudioManager.openMediaCache();
-            }
-        } catch (e) {
-            cache = null;
-        }
-        if (!cache) {
-            cache = await caches.open('dictafan-media');
-        }
-        let cacheHit = 0;
-        let uploaded = 0;
-        let skipped = 0;
-        let failed = 0;
-        let cacheMiss = 0;
-        let hashed = 0;
-        let processed = 0;
-        for (const url of uniqueUrls) {
-            try {
-                processed += 1;
+            onUploaded: ({ lang, filename, uploaded, skipped, deduped }) => {
+                try {
+                    if (uploaded || (skipped && deduped)) {
+                        try { clearDraftAudioUrl(lang, filename); } catch (e0) {}
+                    }
+                } catch (e) {
+                }
+            },
+            onProgress: ({ processed, total, pct }) => {
                 try {
                     if (typeof window.setSwBarProgress === 'function') {
-                        const pct = uniqueUrls.length ? Math.round((processed / uniqueUrls.length) * 100) : null;
-                        window.setSwBarProgress(`B2 audio: ${processed} из ${uniqueUrls.length}`, pct, 'audio');
-                    }
-                } catch (e0) {
-                }
-
-                const u = new URL(url, location.origin);
-                // Expected: /api/dictations/<dictationId>/<lang>/<filename>
-                const m = u.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
-                if (!m) {
-                    continue;
-                }
-                const urlDictId = m[1];
-                const lang = m[2];
-                const filename = m[3];
-                if (urlDictId !== dictationId) {
-                    continue;
-                }
-
-                const remotePath = `dictations/${dictationId}/${lang}/${filename}`;
-
-                let cached = null;
-                try {
-                    if (window.AudioManager && typeof window.AudioManager.getCachedResponse === 'function') {
-                        cached = await window.AudioManager.getCachedResponse(u.toString());
+                        window.setSwBarProgress(`B2 audio: ${processed} из ${total}`, pct, 'audio');
                     }
                 } catch (e) {
-                    cached = null;
                 }
-                if (!cached) {
-                    cached = await cache.match(u.toString());
-                }
-                if (!cached) {
-                    console.warn('[B2 UPLOAD] cache miss', u.toString());
-                    cacheMiss += 1;
-                    continue;
-                }
-                cacheHit += 1;
-                const blob = await cached.blob();
-                if (!blob || !blob.size) {
-                    continue;
-                }
-
-                // If this file does NOT exist as an in-memory draft blob URL, we assume it is unchanged.
-                // Only upload truly dirty (draft) blobs; this prevents B2 version increments for unchanged audio
-                // when you only edit text/structure.
-                let hasDraft = false;
-                try {
-                    hasDraft = hasDraftAudioUrl(lang, filename) === true;
-                } catch (e) {
-                    hasDraft = false;
-                }
-
-                if (!hasDraft) {
-                    // Always skip non-draft blobs.
-                    skipped += 1;
-                    continue;
-                }
-
-                // Dedupe: skip uploading if SHA-256 matches ledger.
-                let sha256 = null;
-                try {
-                    sha256 = await sha256HexFromBlob(blob);
-                    if (sha256) hashed += 1;
-                } catch (e) {
-                    sha256 = null;
-                }
-                if (sha256) {
-                    try {
-                        const prev = await getB2Ledger(remotePath);
-                        if (prev && prev.sha256 && String(prev.sha256) === String(sha256) && Number(prev.size || 0) === Number(blob.size || 0)) {
-                            try { clearDraftAudioUrl(lang, filename); } catch (e0) {}
-                            skipped += 1;
-                            continue;
-                        }
-                    } catch (e) {
-                    }
-                }
-
-                const b2Resp = await fetch(uploadUrlJson.uploadUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': uploadUrlJson.uploadAuthToken,
-                        'X-Bz-File-Name': encodeURIComponent(remotePath),
-                        'Content-Type': blob.type || 'b2/x-auto',
-                        'X-Bz-Content-Sha1': 'do_not_verify'
-                    },
-                    body: blob
-                });
-                if (!b2Resp.ok) {
-                    let txt = '';
-                    try { txt = await b2Resp.text(); } catch (e) {}
-                    console.warn('[B2 UPLOAD] upload failed', { status: b2Resp.status, remotePath, text: txt });
-                    failed += 1;
-                    continue;
-                }
-                uploaded += 1;
-
-                // Record ledger on success.
-                try {
-                    await setB2Ledger(remotePath, {
-                        sha256: sha256 || null,
-                        size: Number(blob.size || 0),
-                        uploadedAt: Date.now()
-                    });
-                } catch (e) {
-                }
-
-                // After a successful upload, draft audio is no longer needed.
-                try { clearDraftAudioUrl(lang, filename); } catch (e) {}
-            } catch (e) {
-                console.warn('[B2 UPLOAD] exception', e);
-                failed += 1;
             }
-        }
+        });
 
-        console.warn('[B2 UPLOAD] done', { dictationId, urls: uniqueUrls.length, cacheHit, uploaded, skipped, failed, cacheMiss, hashed });
         try {
             if (typeof window.setSwBarProgress === 'function') {
                 window.setSwBarProgress('', null, '');
             }
         } catch (e) {
         }
-        return {
-            ok: failed === 0 && cacheMiss === 0,
-            dictationId,
-            urls: uniqueUrls.length,
-            cacheHit,
-            uploaded,
-            skipped,
-            failed,
-            cacheMiss,
-            hashed
-        };
+
+        return res;
     } catch (e) {
         console.warn('[B2 UPLOAD] fatal', e);
         return { ok: false, reason: 'fatal', error: String(e && e.message ? e.message : e) };
@@ -1366,7 +1171,7 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
             cache = null;
         }
         if (!cache) {
-            cache = await caches.open('dictafan-media');
+            return { ok: false, reason: 'no_media_cache' };
         }
         const coverUrl = new URL(`/api/dictations_covers/${numericId}.webp`, location.origin).toString();
         let cached = null;
@@ -1376,9 +1181,6 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
             }
         } catch (e) {
             cached = null;
-        }
-        if (!cached) {
-            cached = await cache.match(coverUrl);
         }
         let blob = null;
         if (cached) {
@@ -1407,11 +1209,8 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                 try {
                     if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
                         await window.AudioManager.putResponseToCache(coverUrl, response.clone());
-                    } else {
-                        await cache.put(coverUrl, response.clone());
                     }
                 } catch (e) {
-                    await cache.put(coverUrl, response.clone());
                 }
                 try {
                     if (window.AudioManager && typeof window.AudioManager.getCachedResponse === 'function') {
@@ -1419,9 +1218,6 @@ async function uploadDictationCoverFromCacheToB2({ dictationId, token }) {
                     }
                 } catch (e) {
                     cached = null;
-                }
-                if (!cached) {
-                    cached = await cache.match(coverUrl);
                 }
             }
         } catch (e) {
@@ -2085,7 +1881,17 @@ async function handleCropConfirm() {
         try {
             const dictationId = String(currentDictation.id || '').trim();
             if (dictationId) {
-                const cache = await caches.open('dictafan-media');
+                let cache = null;
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+                        cache = await window.AudioManager.openMediaCache();
+                    }
+                } catch (e) {
+                    cache = null;
+                }
+                if (!cache) {
+                    throw new Error('Media cache is not available');
+                }
                 const numericId = dictationId.startsWith('dict_') ? parseInt(dictationId.replace(/^dict_/, ''), 10) : null;
                 const coverKey = (numericId && isFinite(numericId) && numericId > 0) ? String(numericId) : null;
                 if (!coverKey) {
@@ -2109,7 +1915,13 @@ async function handleCropConfirm() {
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'image/webp');
                 headers.set('Cache-Control', 'no-store');
-                await cache.put(baseUrl, new Response(blob, { status: 200, headers }));
+                const res = new Response(blob, { status: 200, headers });
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
+                        await window.AudioManager.putResponseToCache(baseUrl, res.clone());
+                    }
+                } catch (e) {
+                }
 
                 try {
                     const currentManifest = await getMediaManifest(dictationId);
@@ -3077,11 +2889,26 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
                 }
 
                 // Fallback (legacy behavior)
-                const cache = await caches.open('dictafan-media');
+                let cache = null;
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+                        cache = await window.AudioManager.openMediaCache();
+                    }
+                } catch (e) {
+                    cache = null;
+                }
+                if (!cache) {
+                    continue;
+                }
                 const headers = new Headers();
                 headers.set('Content-Type', blob.type || 'audio/mpeg');
                 headers.set('Cache-Control', 'no-store');
-                await cache.put(item.finalUrl, new Response(blob, { status: 200, headers }));
+                try {
+                    if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
+                        await window.AudioManager.putResponseToCache(item.finalUrl, new Response(blob, { status: 200, headers }));
+                    }
+                } catch (e) {
+                }
             } catch (e) {
             }
         }

@@ -43,6 +43,25 @@
 </head>
 
 <body>
+    <script>
+        if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+    </script>
+    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
+    <script>
+        var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
+
+        if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+            window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation');
+        }
+
+        try {
+            if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+                window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
+            }
+        } catch (e) {
+        }
+    </script>
     <div class="topbar">
         <img src="/static/icons/logo.svg" class="logo logo-full" onclick="window.location.href='/'">
         <img src="/static/icons/logo_min.svg" class="logo logo-min" onclick="window.location.href='/'">
@@ -467,11 +486,6 @@
     <script id="language-data" type="application/json">
     {{ language_data | tojson | safe }}
     </script>
-    <script>
-        if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
-    </script>
-    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>

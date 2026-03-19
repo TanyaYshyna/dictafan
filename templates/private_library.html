@@ -16,6 +16,22 @@
 </head>
 
 <body class="page-index">
+    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
+    <script>
+        var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
+
+        if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+            window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:private_library');
+        }
+
+        try {
+            if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+                window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
+            }
+        } catch (e) {
+        }
+    </script>
     <div class="topbar">
         <a href="/" class="logo-link">
             <img src="/static/icons/logo.svg" class="logo">
@@ -299,8 +315,6 @@
 
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
     <script> lucide.createIcons(); </script>
-    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
     <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
