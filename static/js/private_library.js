@@ -1019,26 +1019,29 @@ function getDeskItemId(dictationId) {
 
 // Обновляет индикаторы "в работе" во всех карточках диктантов
 function updateInWorkIndicators() {
-  // Не добавляем индикатор "в работе" для карточек на столе (desk-card)
+  // Синхронизируем состояние карточек в книге с тем, на столе диктант или нет:
+  // - фон карточки
+  // - кнопка add/remove desk (стрелка вверх/вниз) в левом нижнем углу
   document.querySelectorAll('.short-card[data-dictation-id]:not(.desk-card)').forEach(card => {
     const dictationId = card.dataset.dictationId;
     if (!dictationId) return;
 
-    let indicator = card.querySelector('.short-in-work-indicator');
     const isOnDesk = isDictationOnDesk(dictationId);
-    const thumb = card.querySelector('.short-thumb');
+    card.classList.toggle('short-card--on-desk', !!isOnDesk);
+    card.classList.toggle('short-card--off-desk', !isOnDesk);
 
-    if (isOnDesk && !indicator && thumb) {
-      // Добавляем индикатор
-      indicator = document.createElement('div');
-      indicator.className = 'short-in-work-indicator';
-      indicator.title = 'В работе';
-      indicator.innerHTML = '<i data-lucide="pen-tool"></i>';
-      thumb.appendChild(indicator);
-      if (window.lucide) lucide.createIcons();
-    } else if (!isOnDesk && indicator) {
-      // Удаляем индикатор
-      indicator.remove();
+    const btn = card.querySelector('[data-action="toggle-desk-explicit"]');
+    if (btn) {
+      btn.setAttribute('title', isOnDesk ? 'Убрать со стола' : 'Добавить на стол');
+      btn.setAttribute('aria-label', isOnDesk ? 'Убрать со стола' : 'Добавить на стол');
+      const icon = btn.querySelector('i[data-lucide]');
+      if (icon) {
+        icon.setAttribute('data-lucide', isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash');
+      }
+      try {
+        if (window.lucide) lucide.createIcons();
+      } catch (e) {
+      }
     }
   });
 }
@@ -1407,7 +1410,7 @@ function createDictationCard(item, isDeskCard = false) {
       ? item.sentences_count
       : (parseInt(item.sentences_count, 10) || 0);
 
-    const langPair = `${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}`;
+    const langPair = `${langOriginal}`;
 
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
@@ -1495,13 +1498,8 @@ function createDictationCard(item, isDeskCard = false) {
 
     // Проверяем, находится ли диктант на столе
     const isOnDesk = isDictationOnDesk(dbId);
-    const inWorkIndicator = isOnDesk ? `
-        <div class="short-in-work-indicator" title="В работе">
-          <i data-lucide="pen-tool"></i>
-        </div>
-      ` : '';
 
-    const langPair = `${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}`;
+    const langPair = `${langOriginal}`;
     const sentencesCount = typeof d.sentences_count === 'number'
       ? d.sentences_count
       : (parseInt(d.sentences_count, 10) || 0);
@@ -1510,10 +1508,9 @@ function createDictationCard(item, isDeskCard = false) {
     // Статистика (звезды/полузвезды/микрофон) убрана - она только на столе
 
     return `
-        <div class="short-card" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
+        <div class="short-card ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
           <div class="short-thumb">
             <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
-            ${inWorkIndicator}
           </div>
           <h3 class="short-title">${d.title || 'Без названия'}</h3>
 
@@ -1527,10 +1524,6 @@ function createDictationCard(item, isDeskCard = false) {
                 <i data-lucide="layers"></i><span>${sentencesCount}</span>
               </div>
             </div>
-          </div>
-
-          <div class="short-stats" data-dictation-id="${dbId}">
-            <div class="stats-placeholder"></div>
           </div>
 
           <div class="short-footer">
@@ -1548,17 +1541,6 @@ function createDictationCard(item, isDeskCard = false) {
                   <i data-lucide="folder-symlink"></i>
                   <span>Переместить</span>
                 </button>
-                ${isOnDesk ? `
-                  <button class="dropdown-menu-item" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="Убрать со стола">
-                    <i data-lucide="arrow-big-down-dash"></i>
-                    <span>Убрать со стола</span>
-                  </button>
-                ` : `
-                  <button class="dropdown-menu-item" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="Добавить на стол">
-                    <i data-lucide="arrow-big-up-dash"></i>
-                    <span>Добавить на стол</span>
-                  </button>
-                `}
                 <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="trash-2"></i>
                   <span>Удалить</span>
@@ -1566,6 +1548,10 @@ function createDictationCard(item, isDeskCard = false) {
               </div>
             </div>
           </div>
+
+          <button class="short-desk-toggle-corner" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}" aria-label="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}">
+            <i data-lucide="${isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash'}"></i>
+          </button>
         </div>
       `;
   }
@@ -3396,6 +3382,7 @@ function installEventHandlers() {
       e.stopPropagation();
       const btn = e.target.closest('[data-action="toggle-card-actions"]');
       const wrap = btn ? btn.closest('.short-actions-menu-wrapper') : null;
+      const card = btn ? btn.closest('.short-card') : null;
       const menu = wrap ? wrap.querySelector('.short-card-actions-menu') : null;
       if (!menu) return;
 
@@ -3407,13 +3394,19 @@ function installEventHandlers() {
         }
       });
 
+      document.querySelectorAll('.short-card.short-card--menu-open').forEach(c => {
+        if (c !== card) c.classList.remove('short-card--menu-open');
+      });
+
       const isVisible = menu.classList.contains('show');
       if (isVisible) {
         menu.classList.remove('show');
         menu.style.display = 'none';
+        if (card) card.classList.remove('short-card--menu-open');
       } else {
         menu.classList.add('show');
         menu.style.display = 'block';
+        if (card) card.classList.add('short-card--menu-open');
 
         setTimeout(() => {
           const closeMenuHandler = function (ev) {
@@ -3421,12 +3414,14 @@ function installEventHandlers() {
               if (!menu.contains(ev.target) && !btn.contains(ev.target)) {
                 menu.classList.remove('show');
                 menu.style.display = 'none';
+                if (card) card.classList.remove('short-card--menu-open');
                 document.removeEventListener('click', closeMenuHandler);
               }
             } catch (e2) {
               try {
                 menu.classList.remove('show');
                 menu.style.display = 'none';
+                if (card) card.classList.remove('short-card--menu-open');
               } catch {
               }
               document.removeEventListener('click', closeMenuHandler);
@@ -3456,6 +3451,8 @@ function installEventHandlers() {
       if (menu) {
         menu.classList.remove('show');
         menu.style.display = 'none';
+        const card = menu.closest ? menu.closest('.short-card') : null;
+        if (card) card.classList.remove('short-card--menu-open');
       }
       if (dictationId) {
         toggleDictationOnDesk(dictationId);

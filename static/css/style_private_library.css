@@ -561,13 +561,53 @@
   border: 2px solid var(--color-border, #e2e8f0);
   box-shadow: 0 4px 20px rgba(0, 0, 0, .06);
   transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
-  overflow: hidden;
+  overflow: visible;
   width: 200px;
   min-width: 200px;
   max-width: 200px;
   min-height: 210px;
   height: auto;
   box-sizing: border-box;
+}
+
+.short-card.short-card--menu-open {
+  z-index: 5000;
+}
+
+.short-card.short-card--on-desk:not(.desk-card) {
+  background: #ffffff;
+}
+
+.short-card.short-card--off-desk:not(.desk-card) {
+  background: var(--color-hover, #f8f9fa);
+}
+
+.short-desk-toggle-corner {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border, #dee2e6);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-text-secondary, #6b7280);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.short-desk-toggle-corner:hover {
+  background: #ffffff;
+  color: var(--color-text, #1f2933);
+}
+
+.short-desk-toggle-corner i {
+  width: 18px;
+  height: 18px;
 }
 
 .short-card:hover {
@@ -2329,7 +2369,7 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 200px;
-  z-index: 1000;
+  z-index: 6000;
   overflow: hidden;
   display: none;
 }
