@@ -673,21 +673,35 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
         };
 
         const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
-        const langs = [currentDictation && currentDictation.language_original, currentDictation && currentDictation.language_translation].filter(Boolean);
-        for (const lang of langs) {
-            const l = normalizeLangCode(lang);
+        const langs = (() => {
+            try {
+                const out = [];
+                if (origLang) out.push(origLang);
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const l = normalizeLangCode(k);
+                        if (l && l !== origLang) out.push(l);
+                    }
+                }
+                return Array.from(new Set(out)).filter(Boolean);
+            } catch (e) {
+                return [origLang].filter(Boolean);
+            }
+        })();
+
+        for (const l of langs) {
             const wd = (l && origLang && l === origLang)
                 ? (workingData && workingData.original ? workingData.original : null)
                 : getTranslationData(l);
             const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
             for (const s of sentences) {
                 if (!s) continue;
-                push(lang, s.audio);
-                push(lang, s.audio_avto);
-                push(lang, s.audio_mic);
-                push(lang, s.audio_user);
+                push(l, s.audio);
+                push(l, s.audio_avto);
+                push(l, s.audio_mic);
+                push(l, s.audio_user);
             }
-            push(lang, wd && wd.audio_user_shared);
+            push(l, wd && wd.audio_user_shared);
         }
 
         const keep_remote_paths = Array.from(keep);
