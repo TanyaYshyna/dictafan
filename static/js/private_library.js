@@ -12,6 +12,8 @@ function setBookEditDirty(nextDirty) {
   }
 }
 
+let __selectedBookDictationCard = null;
+
 function getDefaultOriginalLanguageForNewBook() {
   try {
     const fromFilter = (typeof currentBooksFilterLanguage !== 'undefined')
@@ -1405,6 +1407,8 @@ function createDictationCard(item, isDeskCard = false) {
       ? item.sentences_count
       : (parseInt(item.sentences_count, 10) || 0);
 
+    const langPair = `${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}`;
+
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
@@ -1412,27 +1416,52 @@ function createDictationCard(item, isDeskCard = false) {
             <div class="card-progress-stats"></div>
           </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>
-          <div class="short-id-container">
-            <div class="short-sentences-count" title="Количество предложений">
-              <i data-lucide="layers"></i><span>${sentencesCount}</span>
+
+          <div class="short-meta short-meta--row">
+            <div class="short-meta-left">
+              <span class="short-lang-flags">${langPair}</span>
+              <span class="short-level">${item.level || '—'}</span>
             </div>
-            <div class="short-dikt-number">${dictationIdFormatted}</div>
+            <div class="short-meta-right">
+              <div class="short-sentences-count" title="Количество предложений">
+                <i data-lucide="layers"></i><span>${sentencesCount}</span>
+              </div>
+            </div>
           </div>
+
           <div class="short-stats" data-dictation-id="${dictationId}">
             <div class="stats-placeholder"></div>
           </div>
-          <div class="short-meta">
-            <span class="short-lang-flags">${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}</span>
-            <span class="short-level">${item.level || '—'}</span>
-            <a class="short-action-btn" href="${editUrl}" title="Редактировать" onclick="event.stopPropagation();">
-              <i data-lucide="pencil-ruler"></i>
-            </a>
-            <button class="short-action-btn" data-action="show-in-book" data-dictation-id="${dictationId}" title="Покажи диктант в книге">
-              <i data-lucide="book-marked"></i>
-            </button>
-            <button class="short-action-btn" data-action="remove-from-desk" data-desk-item-id="${item.id}" data-dictation-id="${dictationId}" title="Убрать со стола">
-              <i data-lucide="arrow-big-down-dash"></i>
-            </button>
+
+          <div class="short-footer">
+            <div class="short-dikt-number">${dictationIdFormatted}</div>
+            <div class="dropdown-menu-wrapper short-actions-menu-wrapper">
+              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="Действия" aria-label="Действия">
+                <i data-lucide="more-vertical"></i>
+              </button>
+              <div class="dropdown-menu short-card-actions-menu" style="display: none;">
+                <a class="dropdown-menu-item" href="${editUrl}" onclick="event.stopPropagation();">
+                  <i data-lucide="pencil-ruler"></i>
+                  <span>Редактировать</span>
+                </a>
+                <button class="dropdown-menu-item" data-action="show-in-book" data-dictation-id="${dictationId}">
+                  <i data-lucide="book-marked"></i>
+                  <span>Показать в книге</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="remove-from-desk" data-desk-item-id="${item.id}" data-dictation-id="${dictationId}">
+                  <i data-lucide="arrow-big-down-dash"></i>
+                  <span>Убрать со стола</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dictationId}">
+                  <i data-lucide="folder-symlink"></i>
+                  <span>Переместить</span>
+                </button>
+                <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-dictation" data-dictation-id="${dictationId}">
+                  <i data-lucide="trash-2"></i>
+                  <span>Удалить</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -1472,44 +1501,70 @@ function createDictationCard(item, isDeskCard = false) {
         </div>
       ` : '';
 
-    // Кнопки для карточки в книге (правый нижний угол)
-    const actionButtons = `
-        <a href="${editUrl}" class="short-action-btn" title="Редактировать">
-          <i data-lucide="pencil-ruler"></i>
-        </a>
-        <button class="short-action-btn" data-action="move-dictation" data-dictation-id="${dbId}" title="Переместить в книгу">
-          <i data-lucide="folder-symlink"></i>
-        </button>
-        <button class="short-action-btn danger" data-action="delete-dictation" data-dictation-id="${dbId}" title="Удалить">
-          <i data-lucide="trash-2"></i>
-        </button>
-      `;
+    const langPair = `${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}`;
+    const sentencesCount = typeof d.sentences_count === 'number'
+      ? d.sentences_count
+      : (parseInt(d.sentences_count, 10) || 0);
 
     // Медалька будет добавлена асинхронно через updateCompletionBadges
     // Статистика (звезды/полузвезды/микрофон) убрана - она только на столе
 
     return `
-        <div class="short-card" data-dictation-id="${dbId}" data-action="toggle-desk">
+        <div class="short-card" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
           <div class="short-thumb">
             <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
             ${inWorkIndicator}
           </div>
           <h3 class="short-title">${d.title || 'Без названия'}</h3>
-          <div class="short-id-container">
-            <div class="short-sentences-count" title="Количество предложений">
-              <i data-lucide="layers"></i><span>${d.sentences_count || 0}</span>
+
+          <div class="short-meta short-meta--row">
+            <div class="short-meta-left">
+              <span class="short-lang-flags">${langPair}</span>
+              <span class="short-level">${d.level || '—'}</span>
             </div>
+            <div class="short-meta-right">
+              <div class="short-sentences-count" title="Количество предложений">
+                <i data-lucide="layers"></i><span>${sentencesCount}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="short-stats" data-dictation-id="${dbId}">
+            <div class="stats-placeholder"></div>
+          </div>
+
+          <div class="short-footer">
             <div class="short-dikt-number">${dictationId}</div>
-          </div>
-          <div class="short-meta">
-            <span class="short-lang-flags">${langOriginal}${langTranslation !== langOriginal ? ' → ' + langTranslation : ''}</span>
-            <span class="short-level">${d.level || '—'}</span>
-            ${d.author_materials_url ? `<button class="short-action-btn" title="Открыть материалы автора" onclick="event.stopPropagation(); window.open('${d.author_materials_url}', '_blank');">
-              <i data-lucide="external-link"></i>
-            </button>` : ''}
-          </div>
-          <div class="short-actions">
-            ${actionButtons}
+            <div class="dropdown-menu-wrapper short-actions-menu-wrapper">
+              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="Действия" aria-label="Действия">
+                <i data-lucide="more-vertical"></i>
+              </button>
+              <div class="dropdown-menu short-card-actions-menu" style="display: none;">
+                <a class="dropdown-menu-item" href="${editUrl}" onclick="event.stopPropagation();">
+                  <i data-lucide="pencil-ruler"></i>
+                  <span>Редактировать</span>
+                </a>
+                <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dbId}">
+                  <i data-lucide="folder-symlink"></i>
+                  <span>Переместить</span>
+                </button>
+                ${isOnDesk ? `
+                  <button class="dropdown-menu-item" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="Убрать со стола">
+                    <i data-lucide="arrow-big-down-dash"></i>
+                    <span>Убрать со стола</span>
+                  </button>
+                ` : `
+                  <button class="dropdown-menu-item" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="Добавить на стол">
+                    <i data-lucide="arrow-big-up-dash"></i>
+                    <span>Добавить на стол</span>
+                  </button>
+                `}
+                <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-dictation" data-dictation-id="${dbId}">
+                  <i data-lucide="trash-2"></i>
+                  <span>Удалить</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -3301,6 +3356,29 @@ function installEventHandlers() {
     }
   }, true);
 
+  // dblclick по диктанту в книге: открываем редактор, НЕ toggle-desk
+  document.addEventListener('dblclick', (e) => {
+    try {
+      const card = e.target && e.target.closest ? e.target.closest('.short-card[data-action="toggle-desk"]') : null;
+      if (!card) return;
+      if (card.classList.contains('desk-card')) return;
+
+      // Игнорируем dblclick по кнопкам/ссылкам, чтобы не мешать действиям
+      if (e.target.closest('a') || e.target.closest('button') || e.target.closest('.dropdown-menu')) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const editUrl = card.getAttribute('data-edit-url') || '';
+      if (editUrl) {
+        window.location.href = editUrl;
+      }
+    } catch (err) {
+    }
+  }, true);
+
   document.addEventListener('click', async (e) => {
     try {
       const deskThumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
@@ -3310,6 +3388,79 @@ function installEventHandlers() {
         return;
       }
     } catch (err) {
+    }
+
+    // Выпадающее меню действий карточки диктанта (desk/book)
+    if (e.target.closest('[data-action="toggle-card-actions"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="toggle-card-actions"]');
+      const wrap = btn ? btn.closest('.short-actions-menu-wrapper') : null;
+      const menu = wrap ? wrap.querySelector('.short-card-actions-menu') : null;
+      if (!menu) return;
+
+      // Закрываем все другие меню карточек
+      document.querySelectorAll('.short-card-actions-menu').forEach(m => {
+        if (m !== menu) {
+          m.classList.remove('show');
+          m.style.display = 'none';
+        }
+      });
+
+      const isVisible = menu.classList.contains('show');
+      if (isVisible) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      } else {
+        menu.classList.add('show');
+        menu.style.display = 'block';
+
+        setTimeout(() => {
+          const closeMenuHandler = function (ev) {
+            try {
+              if (!menu.contains(ev.target) && !btn.contains(ev.target)) {
+                menu.classList.remove('show');
+                menu.style.display = 'none';
+                document.removeEventListener('click', closeMenuHandler);
+              }
+            } catch (e2) {
+              try {
+                menu.classList.remove('show');
+                menu.style.display = 'none';
+              } catch {
+              }
+              document.removeEventListener('click', closeMenuHandler);
+            }
+          };
+          document.addEventListener('click', closeMenuHandler);
+        }, 0);
+      }
+
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (e3) {
+      }
+
+      return;
+    }
+
+    // Явное добавление/убирание со стола из меню карточки
+    if (e.target.closest('[data-action="toggle-desk-explicit"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="toggle-desk-explicit"]');
+      const dictationId = btn ? btn.getAttribute('data-dictation-id') : null;
+      const menu = btn ? btn.closest('.short-card-actions-menu') : null;
+      if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      }
+      if (dictationId) {
+        toggleDictationOnDesk(dictationId);
+      }
+      return;
     }
 
     // Кнопка раскрытия/сворачивания раздела
@@ -3471,11 +3622,17 @@ function installEventHandlers() {
         if (card.classList.contains('desk-card')) {
           return;
         }
+        // Одиночный клик по диктанту в книге: только визуально выделяем карточку.
         e.preventDefault();
         e.stopPropagation();
-        const dictationId = card.getAttribute('data-dictation-id');
-        if (dictationId) {
-          toggleDictationOnDesk(dictationId);
+
+        try {
+          if (__selectedBookDictationCard && __selectedBookDictationCard !== card) {
+            __selectedBookDictationCard.classList.remove('short-card--selected');
+          }
+          card.classList.add('short-card--selected');
+          __selectedBookDictationCard = card;
+        } catch (e2) {
         }
         return;
       }

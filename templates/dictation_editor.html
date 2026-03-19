@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="/static/css/style_color.css">
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/style_dictation_editor.css">
-    <link rel="icon" href="data:,"> <!-- Пустая иконка -->
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
 
     <!-- Cropper.js для обрезки изображений -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
