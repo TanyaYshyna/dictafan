@@ -159,6 +159,22 @@
   font-size: 28px;
 }
 
+.dictation-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dictation-langpair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dictation-langpair .flag-pair-combo {
+  cursor: default;
+}
+
 
 
 /* проверка + правильный ответ + кнопрока проверки */

@@ -427,188 +427,6 @@ async function idbGet(storeName, key) {
   }
 }
 
-async function syncOfflineActivityOutbox() {
-  try {
-    const token = window.UM?.token || localStorage.getItem('jwt_token');
-    if (!token) return false;
-    if (!navigator.onLine) return false;
-
-    const rows = await idbGetAll('activity_outbox');
-    if (!rows.length) return true;
-
-    for (const row of rows) {
-      if (!row || !row.dictation_id) {
-        // Старые/некорректные записи: не отправляем на сервер (иначе будет 400/500)
-        continue;
-      }
-      const toSend = [];
-      if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
-      if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
-      if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
-
-      let sentAll = true;
-      for (const item of toSend) {
-        const response = await fetch('/api/statistics/activity', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            dictation_id: row.dictation_id,
-            date: row.date,
-            type_activity: item.type_activity,
-            number: item.number
-          })
-        });
-        if (!response.ok) {
-          sentAll = false;
-          break;
-        }
-      }
-
-      if (sentAll) {
-        await idbDelete('activity_outbox', row.key);
-      } else {
-        return false;
-      }
-    }
-
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-async function syncOfflineSuccessOutbox() {
-  try {
-    const token = window.UM?.token || localStorage.getItem('jwt_token');
-    if (!token) return false;
-    if (!navigator.onLine) return false;
-
-    const rows = await idbGetAll('success_outbox');
-    if (!rows.length) return true;
-
-    for (const row of rows) {
-      const response = await fetch('/api/statistics/success', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(row.payload)
-      });
-      if (!response.ok) {
-        return false;
-      }
-      await idbDelete('success_outbox', row.key);
-    }
-
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
-
-async function syncOfflineOutboxes() {
-  const [aOk, sOk] = await Promise.all([
-    syncOfflineActivityOutbox(),
-    syncOfflineSuccessOutbox()
-  ]);
-  refreshDeskOutboxIndicator().catch(() => { });
-  return !!aOk && !!sOk;
-}
-
-window.addEventListener('online', () => {
-  syncOfflineOutboxes().catch(() => { });
-});
-
-function ensureDeskOutboxIndicator() {
-  if (document.getElementById('deskOutboxIndicator')) return;
-  const deskZone = document.querySelector('.desk-zone');
-  if (!deskZone) return;
-
-  const el = document.createElement('div');
-  el.id = 'deskOutboxIndicator';
-  el.style.position = 'absolute';
-  el.style.top = '8px';
-  el.style.right = '8px';
-  el.style.zIndex = '5';
-  el.style.background = 'rgba(0,0,0,0.55)';
-  el.style.color = '#fff';
-  el.style.fontSize = '12px';
-  el.style.lineHeight = '1.2';
-  el.style.padding = '6px 8px';
-  el.style.borderRadius = '10px';
-  el.style.cursor = 'pointer';
-  el.style.userSelect = 'none';
-  el.style.display = 'none';
-  el.textContent = '';
-
-  el.addEventListener('click', async () => {
-    try {
-      const [activities, successes] = await Promise.all([
-        idbGetAll('activity_outbox'),
-        idbGetAll('success_outbox')
-      ]);
-
-      const lines = [];
-      lines.push(`Очередь синка:`);
-      lines.push(`Успехи: ${successes.length}`);
-      for (const s of successes.slice(0, 20)) {
-        const d = s?.payload?.dictation_id;
-        const t = s?.createdAt ? new Date(s.createdAt).toLocaleString() : '';
-        lines.push(`- ${d || 'dictation'} ${t}`);
-      }
-      if (successes.length > 20) lines.push(`…и еще ${successes.length - 20}`);
-
-      lines.push(``);
-      lines.push(`Активность (дни): ${activities.length}`);
-      for (const a of activities.slice(0, 40)) {
-        const p = Number(a?.perfect_count) || 0;
-        const c = Number(a?.corrected_count) || 0;
-        const au = Number(a?.audio_count) || 0;
-        lines.push(`- ${a?.date || ''}: perfect=${p}, corrected=${c}, audio=${au}`);
-      }
-      if (activities.length > 40) lines.push(`…и еще ${activities.length - 40}`);
-
-      alert(lines.join('\n'));
-    } catch (e) {
-      alert('Не удалось прочитать очередь синка');
-    }
-  });
-
-  deskZone.style.position = 'relative';
-  deskZone.appendChild(el);
-}
-
-async function refreshDeskOutboxIndicator() {
-  ensureDeskOutboxIndicator();
-  const el = document.getElementById('deskOutboxIndicator');
-  if (!el) return;
-
-  try {
-    const [activities, successes] = await Promise.all([
-      idbGetAll('activity_outbox'),
-      idbGetAll('success_outbox')
-    ]);
-    const aCount = Array.isArray(activities) ? activities.length : 0;
-    const sCount = Array.isArray(successes) ? successes.length : 0;
-    if (aCount === 0 && sCount === 0) {
-      el.style.display = 'none';
-      el.textContent = '';
-      el.title = '';
-      return;
-    }
-
-    el.style.display = '';
-    el.textContent = `Очередь: успехи ${sCount}, активность ${aCount}`;
-    el.title = 'Неотправленные данные (клик — детали)';
-  } catch (e) {
-    el.style.display = 'none';
-  }
-}
-
 function getDraftUserIdForKey() {
   try {
     const um = window.UM;
@@ -1554,7 +1372,16 @@ function createDictationCard(item, isDeskCard = false) {
     const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
       ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
       : '';
-    const langTranslation = item.language_translation || nativeLang || item.language_code || 'en';
+
+    const availableTranslations = Array.isArray(item.translation_languages)
+      ? item.translation_languages.map(x => String(x || '').trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const preferredNative = (nativeLang && availableTranslations.includes(nativeLang))
+      ? nativeLang
+      : '';
+
+    const langTranslation = preferredNative || item.language_translation || nativeLang || item.language_code || 'en';
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const coverUrl = maybeCacheBustDictationCover(item.cover_url);
@@ -1604,7 +1431,16 @@ function createDictationCard(item, isDeskCard = false) {
     const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
       ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
       : '';
-    const langTranslation = d.language_translation || nativeLang || d.language_code || 'en';
+
+    const availableTranslations = Array.isArray(d.translation_languages)
+      ? d.translation_languages.map(x => String(x || '').trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const preferredNative = (nativeLang && availableTranslations.includes(nativeLang))
+      ? nativeLang
+      : '';
+
+    const langTranslation = preferredNative || d.language_translation || nativeLang || d.language_code || 'en';
 
     // ID в формате dict_X для URL
     const dictationId = d.dictation_id || `dict_${d.id}`;

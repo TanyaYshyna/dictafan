@@ -210,9 +210,45 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
         
         # Получаем предложения для языка оригинала из БД
         original_sentences = get_dictation_sentences(db_id, lang_orig)
-        
+
+        # Получаем текущего пользователя (нужно для выбора языка перевода по умолчанию)
+        current_user = get_current_user()
+
+        # Выбираем язык перевода:
+        # - если родной язык пользователя есть среди переводов диктанта -> используем его
+        # - иначе, если запрошенный lang_tr существует -> используем его
+        # - иначе -> первый доступный перевод
+        # - иначе -> совпадает с оригиналом (перевода нет)
+        effective_lang_tr = (lang_tr or '').strip().lower()
+        try:
+            from helpers.db_dictations import get_dictation_translation_flags
+            flags = get_dictation_translation_flags(db_id) or {}
+            orig_norm = (lang_orig or '').strip().lower()
+            available_translations = sorted([
+                str(k).strip().lower()
+                for k, v in (flags or {}).items()
+                if v and k and str(k).strip().lower() and (not orig_norm or str(k).strip().lower() != orig_norm)
+            ])
+        except Exception:
+            available_translations = []
+
+        try:
+            user_native = (current_user or {}).get('native_language')
+            user_native = str(user_native).strip().lower() if user_native else ''
+        except Exception:
+            user_native = ''
+
+        if user_native and user_native in available_translations:
+            effective_lang_tr = user_native
+        elif effective_lang_tr and effective_lang_tr in available_translations:
+            pass
+        elif available_translations:
+            effective_lang_tr = available_translations[0]
+        else:
+            effective_lang_tr = (lang_orig or '').strip().lower()
+
         # Получаем предложения для языка перевода из БД
-        translation_sentences = get_dictation_sentences(db_id, lang_tr)
+        translation_sentences = get_dictation_sentences(db_id, effective_lang_tr)
         
         # Создаем словарь переводов по ключу предложения
         translation_dict = {s['sentence_key']: s for s in translation_sentences}
@@ -258,8 +294,8 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             
             sentences.append(sentence)
         
-        # Получаем текущего пользователя
-        current_user = get_current_user()
+        # Обновляем язык перевода, который показываем в шаблоне
+        lang_tr = effective_lang_tr
         
         # Получаем URL обложки
         cover_url = get_cover_url_for_id(dictation_id, lang_orig)

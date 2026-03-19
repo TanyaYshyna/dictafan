@@ -6751,6 +6751,24 @@ function loadDictationData() {
             console.warn('⚠️ language_translation пустой! Проверьте data-language-translation в HTML');
         }
 
+        // Рендерим пару языков (оригинал → перевод) рядом с названием (только отображение)
+        try {
+            const pairContainer = document.getElementById('dictationLangPair');
+            if (pairContainer && window.LanguageManager && typeof window.initLanguageSelector === 'function') {
+                const languageData = window.LanguageManager.getLanguageData();
+                if (languageData) {
+                    pairContainer.innerHTML = '';
+                    window.initLanguageSelector('dictationLangPair', {
+                        mode: 'flag-pair-fixed',
+                        currentLearning: String(currentDictation.language_original || '').trim().toLowerCase(),
+                        nativeLanguage: String(currentDictation.language_translation || '').trim().toLowerCase(),
+                        languageData
+                    });
+                }
+            }
+        } catch (e) {
+        }
+
         applyInputDirection(currentDictation.language_original);
         // Используем LanguageManager для получения country_cod_url
         if (window.LanguageManager && typeof window.LanguageManager.getCountryCodeUrl === 'function') {

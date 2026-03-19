@@ -144,7 +144,10 @@
                         </td>
                         <!-- <td>2222</td> -->
                         <td>
-                            <h2 id="title-diktation">{{ title_orig }}</h2>
+                            <div class="dictation-title-row">
+                                <div id="dictationLangPair" class="dictation-langpair"></div>
+                                <h2 id="title-diktation">{{ title_orig }}</h2>
+                            </div>
                         </td>
                         <!-- <td>3333</td> -->
                         <td>
@@ -488,6 +491,7 @@
     </script>
     <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/language_selector.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/user_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}?v={{ app_cache_revision }}"></script>

@@ -47,6 +47,13 @@ def enrich_dictation_data(dictation):
     
     language_original = dictation.get('language_code', languages_list[0] if languages_list else 'en')
     language_translation = languages_list[1] if len(languages_list) > 1 else (languages_list[0] if languages_list else '')
+
+    translation_languages = []
+    try:
+        orig = str(language_original or '').strip().lower()
+        translation_languages = sorted([str(l).strip().lower() for l in languages_list if l and str(l).strip().lower() and str(l).strip().lower() != orig])
+    except Exception:
+        translation_languages = []
     
     # Считаем количество предложений
     sentences_count = len([s for s in sentences if s['language_code'] == language_original])
@@ -59,6 +66,7 @@ def enrich_dictation_data(dictation):
     dictation['db_id'] = db_id  # Числовой ID из БД
     dictation['language_original'] = language_original
     dictation['language_translation'] = language_translation
+    dictation['translation_languages'] = translation_languages
     dictation['cover_url'] = cover_url
     dictation['sentences_count'] = sentences_count
     
