@@ -4710,7 +4710,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Если в оффлайне были накоплены activity/success, пробуем дослать их сразу при загрузке страницы
         // (это позволяет закрыть страницу диктанта, а потом открыть стол и синкнуть данные на сервер)
-        syncOfflineOutboxes().catch(() => { });
+        try {
+          if (typeof syncOfflineOutboxes === 'function') {
+            syncOfflineOutboxes().catch(() => { });
+          }
+        } catch (e) {
+        }
 
         // Инициализируем USER_LANGUAGE_DATA (как на index странице)
         const isAuthenticated = window.UM.isAuthenticated();
@@ -4745,7 +4750,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           refreshOfflineCacheStatus();
           triggerDeskLoadOnce();
           triggerBooksLoadOnce();
-          syncOfflineOutboxes().catch(() => { }); // Trigger offline outbox sync on page load after UserManager initialization
+          try {
+            if (typeof syncOfflineOutboxes === 'function') {
+              syncOfflineOutboxes().catch(() => { }); // Trigger offline outbox sync on page load after UserManager initialization
+            }
+          } catch (e) {
+          }
         } else {
           console.log('⚠️ Пользователь не авторизован, данные не загружаются');
           refreshOfflineCacheStatus();
