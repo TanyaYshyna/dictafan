@@ -706,11 +706,46 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
 }
 
 async function uploadAudioThenCleanupB2({ dictationId, token }) {
+    const waitInflightDone = async ({ id, timeoutMs = 30000 } = {}) => {
+        const started = Date.now();
+        while (Date.now() - started < timeoutMs) {
+            try {
+                const k = String(id || '');
+                if (!k) return;
+                const m = window.__B2_AUDIO_UPLOAD_INFLIGHT;
+                if (!m || m[k] !== true) return;
+            } catch (e) {
+                return;
+            }
+            await new Promise(r => setTimeout(r, 200));
+        }
+    };
+
     let res = null;
     try {
         res = await uploadDictationAudioFromCacheToB2({ dictationId, token });
     } catch (e) {
         res = null;
+    }
+
+    if (res && res.ok === false && res.reason === 'inflight') {
+        try {
+            await waitInflightDone({ id: dictationId, timeoutMs: 30000 });
+        } catch (e) {
+        }
+        try {
+            res = await uploadDictationAudioFromCacheToB2({ dictationId, token });
+        } catch (e) {
+        }
+
+        try {
+            if (res && res.ok === false && res.reason === 'inflight') {
+                if (hasAnyDraftAudioBlob() === false) {
+                    res = { ok: true, reason: 'inflight_already_done' };
+                }
+            }
+        } catch (e) {
+        }
     }
 
     try {
@@ -1109,19 +1144,6 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
             throw new Error('AudioManager_not_loaded');
         }
 
-        // Guard against multiple concurrent uploads for the same dictation.
-        // This function can be triggered from multiple places after Save; without a guard
-        // it causes multiple uploads of the same filenames -> B2 creates extra versions.
-        try {
-            window.__B2_AUDIO_UPLOAD_INFLIGHT = window.__B2_AUDIO_UPLOAD_INFLIGHT || {};
-            const k = String(dictationId);
-            if (window.__B2_AUDIO_UPLOAD_INFLIGHT[k]) {
-                return { ok: false, reason: 'inflight' };
-            }
-            window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = true;
-        } catch (e) {
-        }
-
         const urls = collectFinalAudioUrlsForPrefetch(dictationId);
         const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean))).filter((url) => {
             try {
@@ -1200,9 +1222,8 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         } catch (e) {
         }
         try {
-            const k = String(dictationId || '');
-            if (k && window.__B2_AUDIO_UPLOAD_INFLIGHT) {
-                window.__B2_AUDIO_UPLOAD_INFLIGHT[k] = false;
+            if (typeof window.setSwBarProgress === 'function') {
+                window.setSwBarProgress('', null, '');
             }
         } catch (e) {
         }
@@ -2894,6 +2915,45 @@ function hasDraftAudioUrl(language, filename) {
     try {
         const u = getDraftAudioUrl(language, filename);
         return !!(u && typeof u === 'string' && u.startsWith('blob:'));
+    } catch (e) {
+        return false;
+    }
+}
+
+function hasAnyDraftAudioBlob() {
+    try {
+        const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
+        const langs = (() => {
+            try {
+                const out = [];
+                if (origLang) out.push(origLang);
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const l = normalizeLangCode(k);
+                        if (l && l !== origLang) out.push(l);
+                    }
+                }
+                return Array.from(new Set(out)).filter(Boolean);
+            } catch (e) {
+                return [origLang].filter(Boolean);
+            }
+        })();
+
+        for (const l of langs) {
+            const wd = (l && origLang && l === origLang)
+                ? (workingData && workingData.original ? workingData.original : null)
+                : getTranslationData(l);
+            const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
+            for (const s of sentences) {
+                if (!s) continue;
+                if (hasDraftAudioUrl(l, s.audio)) return true;
+                if (hasDraftAudioUrl(l, s.audio_avto)) return true;
+                if (hasDraftAudioUrl(l, s.audio_mic)) return true;
+                if (hasDraftAudioUrl(l, s.audio_user)) return true;
+            }
+            if (hasDraftAudioUrl(l, wd && wd.audio_user_shared)) return true;
+        }
+        return false;
     } catch (e) {
         return false;
     }
