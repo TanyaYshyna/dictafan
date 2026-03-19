@@ -528,6 +528,25 @@ function bindTranslationsTabV2Handlers() {
         const lang = row.dataset.lang;
         if (!lang) return;
 
+        // If user clicked on the checkbox/icon area, treat it as an explicit
+        // toggle action (create/remove) and show the modal immediately.
+        const clickedCheckbox = !!e.target.closest('.translations-v2-checkbox');
+        if (clickedCheckbox) {
+            if (clickTimer) {
+                clearTimeout(clickTimer);
+                clickTimer = null;
+            }
+
+            const code = normalizeLangCode(lang);
+            const isActive = !!(workingData && workingData.translations && code && workingData.translations[code]);
+            if (!isActive) {
+                openCreateTranslationLangModal(lang);
+            } else {
+                openRemoveTranslationLangModal(lang);
+            }
+            return;
+        }
+
         // Fallback for environments where dblclick is unreliable: treat 2 fast clicks
         // on the same language as a "2 cycles" action.
         const now = Date.now();

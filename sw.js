@@ -2,13 +2,13 @@ const CACHE_VERSION = 'v5';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
-// Persistent cache for dictation media. Must survive SW updates so offline dictations
-// (IndexedDB tables + audio/covers) are not lost when updating HTML/JS/CSS.
+// Постоянный кеш для медиа диктанта. Должен переживать обновления Service Worker, чтобы офлайн-диктанты
+// (таблицы IndexedDB + аудио/обложки) не терялись при обновлении HTML/JS/CSS.
 const MEDIA_CACHE_PERSIST = 'dictafan-media';
 
-// NOTE(B2 direct upload): browser uploads to Backblaze B2 require a custom CORS rule on the
-// bucket (allowedOperations: ["b2_upload_file"]). The rule must allow this app origin
-// (e.g. https://dictafan-staging001.up.railway.app) and headers used by B2 uploads:
+// ПРИМЕЧАНИЕ (прямая загрузка в B2): загрузки из браузера в Backblaze B2 требуют кастомного CORS-правила
+// на бакете (allowedOperations: ["b2_upload_file"]). Правило должно разрешать origin этого приложения
+// (например https://dictafan-staging001.up.railway.app) и заголовки, используемые при загрузке в B2:
 // authorization, x-bz-file-name, x-bz-content-sha1, content-type.
 
 const DEFAULT_MAX_BYTES = 300 * 1024 * 1024;
@@ -55,24 +55,24 @@ function normalizeCacheKey(requestOrUrl) {
     const url = new URL(raw);
     const path = url.pathname;
 
-    // Cache external ASR assets (Transformers.js + Whisper model files) ignoring query params.
+    // Кешируем внешние ASR-ассеты (Transformers.js + файлы модели Whisper), игнорируя query-параметры.
     if (url.hostname === 'huggingface.co' || url.hostname === 'cdn.jsdelivr.net') {
       return `${url.origin}${path}`;
     }
 
-    // For JS/CSS assets we MUST respect cache-busting query params (?v=...) so deploys can
-    // reliably ship new code even with SW runtime caching.
+    // Для JS/CSS ассетов мы ОБЯЗАНЫ учитывать cache-busting query-параметры (?v=...), чтобы деплои
+    // гарантированно доставляли новый код даже при runtime-кешировании в SW.
     if (path.startsWith('/static/')) {
       const isJs = path.endsWith('.js');
       const isCss = path.endsWith('.css');
       if (isJs || isCss) {
         return `${url.origin}${path}${url.search}`;
       }
-      // Other static assets can ignore query params.
+      // Остальные static-ассеты могут игнорировать query-параметры.
       return `${url.origin}${path}`;
     }
 
-    // App shell: ignore query params.
+    // App shell: игнорируем query-параметры.
     if (path === '/' || path.startsWith('/dictation/')) {
       return `${url.origin}${path}`;
     }
@@ -142,7 +142,7 @@ async function setMaxBytes(value) {
       req.onerror = () => reject(req.error);
     });
   } catch (e) {
-    // ignore
+    // игнорируем
   }
   return { maxBytes };
 }
@@ -155,7 +155,7 @@ async function getResponseSizeBytes(response) {
       if (!isNaN(parsed) && parsed >= 0) return parsed;
     }
   } catch (e) {
-    // ignore
+    // игнорируем
   }
 
   try {
@@ -171,7 +171,7 @@ function shouldHandleRequest(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
 
-    // Allow offline ASR assets from external origins.
+    // Разрешаем офлайн-доступ к ASR-ассетам с внешних доменов.
     if (url.hostname === 'huggingface.co') return true;
     if (url.hostname === 'cdn.jsdelivr.net') return true;
 
@@ -179,12 +179,12 @@ function shouldHandleRequest(requestUrl) {
     if (path === '/library/api/book-cover') return true;
     if (path === '/user/api/avatar') return true;
 
-    // Offline-first dictation pages + required static assets.
-    // Dictation page loads sentences from IndexedDB; this caches only HTML/JS/CSS/media.
+    // Страницы диктанта в режиме offline-first + необходимые static-ассеты.
+    // Страница диктанта берет предложения из IndexedDB; здесь кешируются только HTML/JS/CSS/медиа.
     if (path.startsWith('/dictation/')) return true;
     if (path.startsWith('/static/')) return true;
 
-    // Home page is the main desk; allow opening it offline.
+    // Главная страница — основной «стол», разрешаем открывать офлайн.
     if (path === '/') return true;
 
     return false;
@@ -225,7 +225,7 @@ async function cacheFirstBounded(request) {
       }
       if (cached) return cached;
     } catch (e2) {
-      // ignore
+      // игнорируем
     }
 
     return new Response('Offline', {
@@ -261,7 +261,7 @@ async function cacheFirstUnbounded(request) {
       }
       if (cached) return cached;
     } catch (e2) {
-      // ignore
+      // игнорируем
     }
 
     return new Response('Offline', {
@@ -286,7 +286,7 @@ async function cacheAudioFullFileInBackground(url) {
       }
     }
   } catch (e) {
-    // ignore
+    // игнорируем
   }
 }
 
@@ -297,7 +297,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    // Delete only outdated versioned runtime caches. Keep MEDIA_CACHE_PERSIST.
+    // Удаляем только устаревшие версионированные runtime-кеши. MEDIA_CACHE_PERSIST сохраняем.
     await Promise.all(keys.map((key) => {
       if (key.startsWith('dictafan-runtime-') && key !== RUNTIME_CACHE_BOUNDED && key !== RUNTIME_CACHE_UNBOUNDED) {
         return caches.delete(key);
@@ -335,11 +335,11 @@ self.addEventListener('fetch', (event) => {
 
   if (!shouldHandleRequest(request.url)) return;
 
-  // For Range requests (common for <audio>), serve a 206 Partial Content response from cache.
+  // Для Range-запросов (часто для <audio>) отдаём 206 Partial Content из кеша.
   const hasRange = request.headers && request.headers.has('range');
   if (hasRange && request.url.includes('/api/dictations/')) {
     // все аудио должны быть из кеша
-    // Range requests for audio are also cache-only.
+    // Range-запросы для аудио тоже должны быть только из кеша.
     event.respondWith((async () => {
       try {
         const cache = await caches.open(MEDIA_CACHE_PERSIST);
@@ -359,7 +359,7 @@ self.addEventListener('fetch', (event) => {
             let end = m[2] ? parseInt(m[2], 10) : NaN;
 
             if (isNaN(start)) {
-              // bytes=-N (suffix)
+              // bytes=-N (суффикс)
               const suffix = isNaN(end) ? 0 : end;
               start = Math.max(0, size - suffix);
               end = size > 0 ? size - 1 : 0;
@@ -387,12 +387,12 @@ self.addEventListener('fetch', (event) => {
 
             return new Response(chunk, { status: 206, headers });
           } catch (e) {
-            // Fallback to full cached response
+            // Если не получилось собрать range-ответ, отдаём полный кешированный ответ
             return cached;
           }
         }
 
-        // If /api/dictations is missing in cache, allow network fallback and cache it for future offline usage.
+        // Если /api/dictations отсутствует в кеше, разрешаем сетевой fallback и кладём в кеш для будущей офлайн-работы.
         try {
           const u = new URL(request.url);
           if (u.pathname && u.pathname.startsWith('/api/dictations/')) {
@@ -405,8 +405,8 @@ self.addEventListener('fetch', (event) => {
               return netRes;
             }
 
-            // IMPORTANT: if network responded (even with an error), return it.
-            // Do not mask real backend status codes with synthetic Offline 503.
+            // ВАЖНО: если сеть ответила (даже ошибкой), возвращаем этот ответ.
+            // Не маскируем реальные backend-коды синтетическим Offline 503.
             if (netRes) {
               return netRes;
             }
@@ -414,7 +414,7 @@ self.addEventListener('fetch', (event) => {
         } catch (e) {
         }
       } catch (e) {
-        // ignore
+        // игнорируем
       }
       return new Response('Offline', {
         status: 503,
@@ -425,7 +425,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // все аудио должны быть из кеша
-  // Dictation must be able to work fully offline.
+  // Диктант должен уметь работать полностью офлайн.
   try {
     const url = new URL(request.url);
     if (url.pathname && url.pathname.startsWith('/api/dictations/')) {
@@ -435,7 +435,7 @@ self.addEventListener('fetch', (event) => {
           const cached = await cache.match(request.url);
           if (cached) return cached;
 
-          // /api/dictations: if not cached yet, fetch from network and store into cache.
+          // /api/dictations: если ещё не закешировано, берём из сети и кладём в кеш.
           const netRes = await fetch(request);
           if (netRes && netRes.ok) {
             try {
@@ -445,8 +445,8 @@ self.addEventListener('fetch', (event) => {
             return netRes;
           }
 
-          // IMPORTANT: if network responded (even with an error), return it.
-          // Do not mask real backend status codes with synthetic Offline 503.
+          // ВАЖНО: если сеть ответила (даже ошибкой), возвращаем этот ответ.
+          // Не маскируем реальные backend-коды синтетическим Offline 503.
           if (netRes) {
             return netRes;
           }
@@ -491,7 +491,7 @@ async function computeCacheStats() {
       const blob = await res.clone().blob();
       totalBytes += blob.size || 0;
     } catch (e) {
-      // ignore
+      // игнорируем
     }
   }
 
@@ -733,7 +733,7 @@ async function checkUrlsInCache(urls) {
 }
 
 async function purgeDictationFromMediaCache(dictationId) {
-  // Purge /api/dictations/dict_123/... from the persistent media cache.
+  // Удаляем /api/dictations/dict_123/... из постоянного медиа-кеша.
   const cache = await caches.open(MEDIA_CACHE_PERSIST);
   const keys = await cache.keys();
 
@@ -746,21 +746,21 @@ async function purgeDictationFromMediaCache(dictationId) {
       const url = new URL(req.url);
       const path = url.pathname;
 
-      // Audio: /api/dictations/dict_123/...
+      // Аудио: /api/dictations/dict_123/...
       if (path.startsWith(`/api/dictations/${dictKey}/`)) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;
       }
 
-      // Cover: /api/dictations_covers/<id>.webp
+      // Обложка: /api/dictations_covers/<id>.webp
       if (path === `/api/dictations_covers/${dictKey}.webp`) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;
       }
     } catch (e) {
-      // ignore
+      // игнорируем
     }
   }
 
@@ -768,9 +768,9 @@ async function purgeDictationFromMediaCache(dictationId) {
 }
 
 async function promoteDraftDictationCache(fromDictationId, toDictationId) {
-  // Duplicate draft audio in cache without touching network:
-  // from: /api/dictations/<fromId>/<lang>/<file>
-  // to:   /api/dictations/<toId>/<lang>/<file>
+  // Дублируем черновое аудио в кеше, не обращаясь к сети:
+  // источник: /api/dictations/<fromId>/<lang>/<file>
+  // назначение: /api/dictations/<toId>/<lang>/<file>
   const cache = await caches.open(MEDIA_CACHE_PERSIST);
   const keys = await cache.keys();
 
@@ -805,16 +805,16 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
             copiedFinal += 1;
           }
         } catch (e) {
-          // ignore
+          // игнорируем
         }
         continue;
       }
     } catch (e) {
-      // ignore
+      // игнорируем
     }
   }
 
-  // Promote draft cover from overlay key to numeric dictation key.
+  // Превращаем обложку черновика: из overlay-ключа в numeric-ключ диктанта.
   try {
     const fromCoverUrl = new URL(fromCoverPath, self.location.origin).toString();
     const cachedCover = await cache.match(fromCoverUrl);
@@ -824,7 +824,7 @@ async function promoteDraftDictationCache(fromDictationId, toDictationId) {
       copiedCover += 1;
     }
   } catch (e) {
-    // ignore
+    // игнорируем
   }
 
   return { copiedFinal, copiedCover, fromId, toId };
@@ -840,7 +840,7 @@ self.addEventListener('message', (event) => {
         event.ports[0].postMessage({ requestId, ...payload });
       }
     } catch (e) {
-      // ignore
+      // игнорируем
     }
   };
 
