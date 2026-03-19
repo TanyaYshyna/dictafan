@@ -466,7 +466,26 @@ function markTranslationInactive(lang, nextActiveLang) {
         } catch (e) {
         }
 
-        const next = normalizeLangCode(nextActiveLang);
+        const next = (() => {
+            try {
+                const remaining = listExistingTranslationLangs().filter(l => l && l !== code);
+                const preferred = (() => {
+                    try {
+                        return normalizeLangCode(window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang));
+                    } catch (e) {
+                        return '';
+                    }
+                })();
+                const requested = normalizeLangCode(nextActiveLang);
+
+                if (requested && remaining.includes(requested)) return requested;
+                if (preferred && remaining.includes(preferred)) return preferred;
+                return remaining[0] || '';
+            } catch (e) {
+                return '';
+            }
+        })();
+
         if (next && workingData && workingData.translations && workingData.translations[next]) {
             setHeaderTranslationLanguage(next);
         } else {
@@ -1732,10 +1751,20 @@ function getActiveTranslationLanguagesList() {
     }
 }
 
-function setHeaderNoTranslationMode() {
+function setHeaderNoTranslationMode({ preserveDirty = false } = {}) {
     try {
         currentDictation.language_translation = '';
     } catch (e) {
+    }
+
+    // Persisted translation language is part of dictation metadata.
+    // When we intentionally switch into "no translation" mode (e.g. removing the last language),
+    // we want it to be saved. UI-only switching must not touch it.
+    if (!preserveDirty) {
+        try {
+            currentDictation._persisted_language_translation = '';
+        } catch (e) {
+        }
     }
     try {
         const label = document.getElementById('translationLanguageLabel');
@@ -1754,7 +1783,7 @@ function setHeaderNoTranslationMode() {
 function setHeaderTranslationLanguage(lang, { preserveDirty = false } = {}) {
     const code = normalizeLangCode(lang);
     if (!code) {
-        setHeaderNoTranslationMode();
+        setHeaderNoTranslationMode({ preserveDirty });
         return;
     }
 
@@ -2850,7 +2879,22 @@ function collectFinalAudioUrlsForPrefetch(dictationId) {
     const urls = [];
     try {
         const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
-        const langs = [currentDictation.language_original, currentDictation.language_translation].filter(Boolean);
+        const langs = (() => {
+            try {
+                const out = [];
+                if (origLang) out.push(origLang);
+                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                    for (const k of Object.keys(workingData.translations)) {
+                        const l = normalizeLangCode(k);
+                        if (l && l !== origLang) out.push(l);
+                    }
+                }
+                return Array.from(new Set(out)).filter(Boolean);
+            } catch (e) {
+                return [origLang].filter(Boolean);
+            }
+        })();
+
         for (const lang of langs) {
             const l = normalizeLangCode(lang);
             const wd = (l && origLang && l === origLang)
