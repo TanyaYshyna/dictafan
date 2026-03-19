@@ -370,80 +370,86 @@ function openRemoveTranslationLangModal(lang) {
 }
 
 async function createTranslationLanguage(lang) {
-    const code = normalizeLangCode(lang);
-    if (!code) return;
-
+    showLoadingIndicator('Создание перевода...');
     try {
-        showLoadingIndicator(`Создание переводов (${code})...`);
+        const code = normalizeLangCode(lang);
+        if (!code) return;
+
+        try {
+            showLoadingIndicator(`Создание переводов (${code})...`);
+        } catch (e) {
+        }
+
+        try {
+            const entry = ensureTranslation(code);
+            if (entry) {
+                entry.language = code;
+                entry.speakers = (workingData && workingData.original) ? (workingData.original.speakers || {}) : {};
+            }
+
+            const origSent = (workingData && workingData.original && Array.isArray(workingData.original.sentences)) ? workingData.original.sentences : [];
+            const out = [];
+            for (let i = 0; i < origSent.length; i++) {
+                const s = origSent[i];
+                if (!s) continue;
+                const key = String(s.key || s.sentence_key || '').trim();
+                if (!key) continue;
+
+                let trText = '';
+                try {
+                    trText = normalizeDictationInvisibleChars(await autoTranslate(String(s.text || ''), currentDictation.language_original, code));
+                } catch (e) {
+                    trText = '';
+                }
+
+                const audioFile = generateAudioFileName(key, code);
+                const trSentence = {
+                    key,
+                    speaker: s.speaker || '1',
+                    text: trText,
+                    audio: audioFile,
+                    audio_avto: audioFile,
+                    audio_user: '',
+                    audio_mic: '',
+                    start: 0,
+                    end: 0,
+                    chain: false,
+                    explanation: ''
+                };
+
+                try {
+                    showLoadingIndicator(`Создание перевода ${i + 1} из ${origSent.length}...`);
+                } catch (e) {
+                }
+
+                await generateAudioForSentence(trSentence, code);
+                out.push(trSentence);
+            }
+            if (entry) {
+                entry.sentences = out;
+            }
+
+            setHeaderTranslationLanguage(code);
+
+            try {
+                renderTableFromWorkingData();
+                applyTableViewForTab(currentTabName);
+            } catch (e) {
+            }
+
+            renderTranslationsTabV2();
+
+            try {
+                // Creating/removing translation language is a DB/meta change; audio becomes dirty
+                // only when actual audio is generated/recorded.
+                setDirtyFlags({ db: true });
+                updateUnsavedStar();
+            } catch (e) {
+            }
+        } finally {
+            hideLoadingIndicator();
+        }
     } catch (e) {
-    }
-
-    try {
-        const entry = ensureTranslation(code);
-        if (entry) {
-            entry.language = code;
-            entry.speakers = (workingData && workingData.original) ? (workingData.original.speakers || {}) : {};
-        }
-
-        const origSent = (workingData && workingData.original && Array.isArray(workingData.original.sentences)) ? workingData.original.sentences : [];
-        const out = [];
-        for (let i = 0; i < origSent.length; i++) {
-            const s = origSent[i];
-            if (!s) continue;
-            const key = String(s.key || s.sentence_key || '').trim();
-            if (!key) continue;
-
-            let trText = '';
-            try {
-                trText = normalizeDictationInvisibleChars(await autoTranslate(String(s.text || ''), currentDictation.language_original, code));
-            } catch (e) {
-                trText = '';
-            }
-
-            const audioFile = generateAudioFileName(key, code);
-            const trSentence = {
-                key,
-                speaker: s.speaker || '1',
-                text: trText,
-                audio: audioFile,
-                audio_avto: audioFile,
-                audio_user: '',
-                audio_mic: '',
-                start: 0,
-                end: 0,
-                chain: false,
-                explanation: ''
-            };
-
-            try {
-                showLoadingIndicator(`Создание перевода ${i + 1} из ${origSent.length}...`);
-            } catch (e) {
-            }
-
-            await generateAudioForSentence(trSentence, code);
-            out.push(trSentence);
-        }
-        if (entry) {
-            entry.sentences = out;
-        }
-
-        setHeaderTranslationLanguage(code);
-
-        try {
-            renderTableFromWorkingData();
-            applyTableViewForTab(currentTabName);
-        } catch (e) {
-        }
-
-        renderTranslationsTabV2();
-
-        try {
-            setDirtyFlags({ db: true, audio: true });
-            updateUnsavedStar();
-        } catch (e) {
-        }
-    } finally {
-        try { hideLoadingIndicator(); } catch (e) {}
     }
 }
 
@@ -1116,7 +1122,21 @@ async function uploadDictationAudioFromCacheToB2({ dictationId, token }) {
         }
 
         const urls = collectFinalAudioUrlsForPrefetch(dictationId);
-        const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean)));
+        const uniqueUrls = Array.from(new Set((urls || []).filter(Boolean))).filter((url) => {
+            try {
+                const u = new URL(String(url), location.origin);
+                const m = u.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
+                if (!m) return false;
+                const lang = normalizeLangCode(m[2]);
+                const filename = String(m[3] || '').trim();
+                if (!lang || !filename) return false;
+                // Only upload draft-marked media. This prevents AudioManager from counting
+                // cache misses for non-draft URLs and leaving the audio dirty flag stuck.
+                return hasDraftAudioUrl(lang, filename) === true;
+            } catch (e) {
+                return false;
+            }
+        });
         if (uniqueUrls.length === 0) {
             return { ok: true, dictationId, urls: 0, cacheHit: 0, uploaded: 0, skipped: 0, failed: 0, cacheMiss: 0 };
         }
