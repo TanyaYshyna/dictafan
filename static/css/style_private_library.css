@@ -582,33 +582,7 @@
   background: var(--color-hover, #f8f9fa);
 }
 
-.short-desk-toggle-corner {
-  position: absolute;
-  left: 10px;
-  bottom: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border, #dee2e6);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--color-text-secondary, #6b7280);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 20;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-}
 
-.short-desk-toggle-corner:hover {
-  background: #ffffff;
-  color: var(--color-text, #1f2933);
-}
-
-.short-desk-toggle-corner i {
-  width: 18px;
-  height: 18px;
-}
 
 .short-card:hover {
   transform: translateY(-4px);
@@ -798,9 +772,9 @@
   gap: 4px;
   padding: 3px 6px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.9);
-  color: #f59e0b;
-  border: 1px solid rgba(245, 158, 11, 0.65);
+  background: rgba(255, 255, 255, 0.536);
+  color: var(--color-button-text-yellow);
+  /* border: 1px solid var(--color-button-text-yellow); */
   font-size: 12px;
   font-weight: 700;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -811,7 +785,7 @@
   width: 16px;
   height: 16px;
   stroke-width: 2.5;
-  color: #f59e0b;
+  color: var(--color-button-text-yellow);
 }
 
 .short-completion-badge .completion-count {
@@ -845,8 +819,23 @@
 }
 
 .short-footer .short-dikt-number {
-  flex: 1;
   text-align: left;
+}
+
+.short-footer .short-dikt-number {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.short-desk-toggle-btn {
+  flex-shrink: 0;
+}
+
+.short-footer .short-actions-menu-wrapper {
+  margin-left: auto;
 }
 
 .short-action-btn--kebab {
@@ -1094,7 +1083,11 @@
   border: 1px solid var(--color-border, #dee2e6);
   cursor: pointer;
   transition: all 0.2s ease;
-  overflow: hidden; /* Убираем переполнение картинки за края */
+  overflow: visible;
+}
+
+.desk-card .short-thumb {
+  overflow: hidden;
 }
 
 /* Специальные стили для картинок в desk-card */

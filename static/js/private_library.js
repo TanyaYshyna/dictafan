@@ -1527,6 +1527,9 @@ function createDictationCard(item, isDeskCard = false) {
           </div>
 
           <div class="short-footer">
+            <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}" aria-label="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}">
+              <i data-lucide="${isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash'}"></i>
+            </button>
             <div class="short-dikt-number">${dictationId}</div>
             <div class="dropdown-menu-wrapper short-actions-menu-wrapper">
               <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="Действия" aria-label="Действия">
@@ -1548,10 +1551,6 @@ function createDictationCard(item, isDeskCard = false) {
               </div>
             </div>
           </div>
-
-          <button class="short-desk-toggle-corner" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}" aria-label="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}">
-            <i data-lucide="${isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash'}"></i>
-          </button>
         </div>
       `;
   }
