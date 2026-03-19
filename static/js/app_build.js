@@ -1,6 +1,6 @@
 (function () {
   try {
-    var v = '2026-03-11_0244';
+    var v = '2026-03-11_0245';
     window.__APP_BUILD = v;
     window.__APP_CACHE_REVISION = v;
   } catch (e) {

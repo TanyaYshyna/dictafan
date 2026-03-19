@@ -1774,6 +1774,18 @@ class LanguageSelector {
                     const sideEl = e.target.closest('[data-side]');
                     const side = sideEl ? sideEl.dataset.side : '';
                     if (!side) {
+                        // UX: clicking on the arrow / empty area should still open the dropdown.
+                        // For single-side dropdowns, open that side by default.
+                        if (this.options.mode === 'flag-pair-dropdown-right') {
+                            e.stopPropagation();
+                            openSide('right');
+                            return;
+                        }
+                        if (this.options.mode === 'flag-pair-dropdown-left') {
+                            e.stopPropagation();
+                            openSide('left');
+                            return;
+                        }
                         closeAll();
                         return;
                     }

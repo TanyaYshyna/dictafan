@@ -343,28 +343,6 @@ function openRemoveTranslationLangModal(lang) {
         if (t) t.textContent = `Переводы на ${getLanguageNameSafe(code)} будут очищены при сохранении!`;
         m.style.display = 'flex';
         m.dataset.lang = code;
-
-        const select = document.getElementById('removeTranslationNextActiveSelect');
-        if (select) {
-            const current = normalizeLangCode(currentDictation && currentDictation.language_translation);
-            const list = listExistingTranslationLangs().filter(l => l && l !== code);
-            if (current && current !== code && list.includes(current) === false) {
-                list.unshift(current);
-            }
-            select.innerHTML = '';
-            for (const l of list) {
-                const opt = document.createElement('option');
-                opt.value = l;
-                opt.textContent = getLanguageNameSafe(l);
-                if (l === current) opt.selected = true;
-                select.appendChild(opt);
-            }
-            if (current && current !== code) {
-                select.value = current;
-            } else {
-                select.value = list[0] || '';
-            }
-        }
     } catch (e) {
     }
 }
@@ -442,7 +420,7 @@ async function createTranslationLanguage(lang) {
             try {
                 // Creating/removing translation language is a DB/meta change; audio becomes dirty
                 // only when actual audio is generated/recorded.
-                setDirtyFlags({ db: true });
+                setDirtyFlags({ db: true, audio: true });
                 updateUnsavedStar();
             } catch (e) {
             }
@@ -500,7 +478,7 @@ function markTranslationInactive(lang, nextActiveLang) {
 
         renderTranslationsTabV2();
         try {
-            setDirtyFlags({ db: true });
+            setDirtyFlags({ db: true, audio: true });
             updateUnsavedStar();
         } catch (e) {
         }
@@ -626,11 +604,9 @@ function bindTranslationsTabV2Handlers() {
             clearBtn.addEventListener('click', () => {
                 const m = document.getElementById('removeTranslationLangModal');
                 const lang = m ? normalizeLangCode(m.dataset.lang) : '';
-                const sel = document.getElementById('removeTranslationNextActiveSelect');
-                const next = sel ? normalizeLangCode(sel.value) : '';
                 closeRemoveTranslationLangModal();
                 if (!lang) return;
-                markTranslationInactive(lang, next);
+                markTranslationInactive(lang, '');
             });
         }
     } catch (e) {
@@ -9415,21 +9391,21 @@ function updateUnsavedStar() {
     const dbStar = document.getElementById('unsavedStarDb');
     if (dbStar) {
         dbStar.style.display = (flags.db || isNewNotSaved) ? 'inline-flex' : 'none';
-        dbStar.style.color = '#2b77ff';
+        dbStar.style.color = 'var(--color-button-text-lightgreen)';
         dbStar.title = 'Изменения в тексте/БД';
     }
 
     const audioStar = document.getElementById('unsavedStarAudio');
     if (audioStar) {
         audioStar.style.display = flags.audio ? 'inline-flex' : 'none';
-        audioStar.style.color = '#ff8a00';
+        audioStar.style.color = 'var(--color-button-purple)';
         audioStar.title = 'Изменения в аудио';
     }
 
     const coverStar = document.getElementById('unsavedStarCover');
     if (coverStar) {
         coverStar.style.display = flags.cover ? 'inline-flex' : 'none';
-        coverStar.style.color = '#19a64a';
+        coverStar.style.color = 'var(--color-button-text-yellow)';
         coverStar.title = 'Изменения в обложке';
     }
 }
