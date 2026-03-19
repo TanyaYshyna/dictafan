@@ -144,10 +144,7 @@
                         </td>
                         <!-- <td>2222</td> -->
                         <td>
-                            <div class="dictation-title-row">
-                                <div id="dictationLangPair" class="dictation-langpair"></div>
-                                <h2 id="title-diktation">{{ title_orig }}</h2>
-                            </div>
+                            <h2 id="title-diktation">{{ title_orig }}</h2>
                         </td>
                         <!-- <td>3333</td> -->
                         <td>
@@ -320,7 +317,10 @@
             <!-- Строка с заголовком и ID диктанта -->
             <div class="title-row">
                 <div class="dictation-title-group">
-                    <h2 class="dictation-title">{{ title_orig }}</h2>
+                    <div class="dictation-title-row">
+                        <div id="dictationLangPair" class="dictation-langpair"></div>
+                        <h2 class="dictation-title">{{ title_orig }}</h2>
+                    </div>
                 </div>
                 <div class="title-meta">
                     <span id="dictationIdDisplay" class="dictation-id">{{ dictation_id }}</span>

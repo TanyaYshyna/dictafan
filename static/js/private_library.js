@@ -876,11 +876,16 @@ async function loadDeskItems() {
       }
       deskItems = items;
       cachedItemsSnapshot = items;
-      if (typeof renderDeskCards === 'function') {
+      if (typeof renderDeskCards === 'function' && deskItems.length > 0) {
         renderDeskCards(deskItems);
       }
       updateInWorkIndicators();
-      refreshDeskOutboxIndicator().catch(() => { });
+      try {
+        if (typeof refreshDeskOutboxIndicator === 'function') {
+          refreshDeskOutboxIndicator().catch(() => { });
+        }
+      } catch (e) {
+      }
       renderedFromCache = true;
       const tCache = performance.now();
       console.log('[desk-render] stage0 cached items:', items.length, 'time:', Math.round(tCache - t0), 'ms');
@@ -979,7 +984,12 @@ async function loadDeskItems() {
       }
       // Обновляем индикаторы "в работе" в карточках диктантов
       updateInWorkIndicators();
-      refreshDeskOutboxIndicator().catch(() => { });
+      try {
+        if (typeof refreshDeskOutboxIndicator === 'function') {
+          refreshDeskOutboxIndicator().catch(() => { });
+        }
+      } catch (e) {
+      }
       resolveInFlight();
       return;
     }
@@ -1254,7 +1264,12 @@ async function syncDeskFromServerIncremental() {
   }
 
   updateInWorkIndicators();
-  refreshDeskOutboxIndicator().catch(() => { });
+  try {
+    if (typeof refreshDeskOutboxIndicator === 'function') {
+      refreshDeskOutboxIndicator().catch(() => { });
+    }
+  } catch (e) {
+  }
   return { success: true, added: added.length, removed: removed.length };
 }
 
