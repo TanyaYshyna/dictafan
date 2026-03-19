@@ -163,6 +163,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .dictation-langpair {
@@ -172,7 +174,20 @@
 }
 
 .dictation-langpair .flag-pair-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   cursor: default;
+}
+
+.dictation-langpair .flag-pair-side {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dictation-langpair .flag-pair-combo i[data-lucide] {
+  width: 18px;
+  height: 18px;
 }
 
 
@@ -1124,14 +1139,14 @@ body.playing-audio::after {
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   width: 100%;
 }
 
 .dictation-title-group {
   flex: 1;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
