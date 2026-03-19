@@ -713,11 +713,12 @@ async function uploadAudioThenCleanupB2({ dictationId, token }) {
         res = null;
     }
 
-    // Safety: cleanup only when upload succeeded without failures/misses.
     try {
-        if (res && res.ok === true) {
-            await cleanupStaleB2DictationAudio({ dictationId, token });
-        }
+        console.warn('[B2 UPLOAD] done', res);
+    } catch (e) {
+    }
+    try {
+        await cleanupStaleB2DictationAudio({ dictationId, token });
     } catch (e) {
     }
 
@@ -2922,21 +2923,35 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
 
         try {
             const origLang = normalizeLangCode(currentDictation && currentDictation.language_original);
-            const langs = [currentDictation && currentDictation.language_original, currentDictation && currentDictation.language_translation].filter(Boolean);
-            for (const lang of langs) {
-                const l = normalizeLangCode(lang);
+            const langs = (() => {
+                try {
+                    const out = [];
+                    if (origLang) out.push(origLang);
+                    if (workingData && workingData.translations && typeof workingData.translations === 'object') {
+                        for (const k of Object.keys(workingData.translations)) {
+                            const l = normalizeLangCode(k);
+                            if (l && l !== origLang) out.push(l);
+                        }
+                    }
+                    return Array.from(new Set(out)).filter(Boolean);
+                } catch (e) {
+                    return [origLang].filter(Boolean);
+                }
+            })();
+
+            for (const l of langs) {
                 const wd = (l && origLang && l === origLang)
                     ? (workingData && workingData.original ? workingData.original : null)
                     : getTranslationData(l);
                 const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
                 for (const s of sentences) {
                     if (!s) continue;
-                    pushCandidate(lang, s.audio);
-                    pushCandidate(lang, s.audio_avto);
-                    pushCandidate(lang, s.audio_mic);
-                    pushCandidate(lang, s.audio_user);
+                    pushCandidate(l, s.audio);
+                    pushCandidate(l, s.audio_avto);
+                    pushCandidate(l, s.audio_mic);
+                    pushCandidate(l, s.audio_user);
                 }
-                pushCandidate(lang, wd && wd.audio_user_shared);
+                pushCandidate(l, wd && wd.audio_user_shared);
             }
         } catch (e) {
         }
