@@ -11,6 +11,8 @@ class UserManager {
     this._lastTokenValidationError = null;
     this._userCacheKey = 'dictafan_user_cache_v1';
     this._requireAuthDeferred = false;
+    this._requireAuthInFlight = false;
+    this._requireAuthLastAt = 0;
 
     // ✅ АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ
     this.init().then(() => {
@@ -87,6 +89,20 @@ class UserManager {
       return;
     }
 
+    // Не спамим повторными вызовами (часто requireAuth триггерится несколькими запросами подряд)
+    try {
+      const now = Date.now();
+      if (this._requireAuthInFlight) {
+        return;
+      }
+      if (this._requireAuthLastAt && (now - this._requireAuthLastAt) < 500) {
+        return;
+      }
+      this._requireAuthInFlight = true;
+      this._requireAuthLastAt = now;
+    } catch (e) {
+    }
+
     console.log('🔐 Требуем авторизацию - показываем модальное окно');
 
     // Во время парсинга HTML теги <script> ниже текущего (включая login_modal.js)
@@ -97,9 +113,11 @@ class UserManager {
         this._requireAuthDeferred = true;
         document.addEventListener('DOMContentLoaded', () => {
           this._requireAuthDeferred = false;
+          try { this._requireAuthInFlight = false; } catch (e) {}
           this.requireAuth();
         }, { once: true });
       }
+      try { this._requireAuthInFlight = false; } catch (e) {}
       return;
     }
 
@@ -115,6 +133,7 @@ class UserManager {
       } else if (typeof LoginModal !== 'undefined') {
         LoginModal.show();
       }
+      try { this._requireAuthInFlight = false; } catch (e) {}
       return;
     }
     
@@ -134,9 +153,11 @@ class UserManager {
           } else if (typeof LoginModal !== 'undefined') {
             LoginModal.show();
           }
+          try { this._requireAuthInFlight = false; } catch (e) {}
         } else if (attempts >= maxAttempts) {
           clearInterval(checkInterval);
           console.error('❌ LoginModal не загрузился за 3 секунды');
+          try { this._requireAuthInFlight = false; } catch (e) {}
         }
       }, 50);
       return;
@@ -157,10 +178,12 @@ class UserManager {
         } else {
           console.error('❌ Модальное окно не найдено после загрузки скрипта');
         }
+        try { this._requireAuthInFlight = false; } catch (e) {}
       }, 100);
     };
     script.onerror = () => {
       console.error('❌ Ошибка загрузки скрипта login_modal.js');
+      try { this._requireAuthInFlight = false; } catch (e) {}
     };
     document.head.appendChild(script);
   }

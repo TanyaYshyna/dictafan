@@ -4922,14 +4922,14 @@ document.addEventListener("DOMContentLoaded", async () => {
           };
         }
 
-        // Инициализируем селектор языка после загрузки данных пользователя
-        // Используем setTimeout для гарантии готовности DOM
-        setTimeout(() => {
-          initializeBooksLanguageSelector();
-        }, 100);
-
         // Загружаем данные только если пользователь авторизован
         if (isAuthenticated) {
+          // Инициализируем селектор языка после загрузки данных пользователя
+          // Используем setTimeout для гарантии готовности DOM
+          setTimeout(() => {
+            initializeBooksLanguageSelector();
+          }, 100);
+
           console.log('📚 Пользователь авторизован, загружаем данные библиотеки');
           refreshOfflineCacheStatus();
           triggerDeskLoadOnce();
