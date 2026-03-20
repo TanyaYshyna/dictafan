@@ -324,11 +324,6 @@ function bindProfileTestRecording() {
     };
 }
 
-// Глобальные переменные для обрезки изображений
-let cropper = null;
-let croppedImageBlob = null;
-
-
 // Инициализация при загрузке страницы - ТОЛЬКО ОДИН ОБРАБОТЧИК
 document.addEventListener('DOMContentLoaded', async function () {
     UM = new UserManager();
@@ -604,112 +599,53 @@ function setupFormListeners() {
 function initializeTopbarControls() {
     const avatarButton = document.getElementById('avatarUploadButton');
     const avatarInput = document.getElementById('avatarUpload');
-    if (avatarButton && avatarInput) {
-        avatarButton.addEventListener('click', () => avatarInput.click());
-        avatarInput.addEventListener('change', handleAvatarFileSelection);
-    }
-    
-    // Обработчики для модального окна обрезки
-    const cropClose = document.getElementById('crop-close');
-    const cropConfirm = document.getElementById('crop-confirm');
-
-    if (cropClose) {
-        cropClose.addEventListener('click', () => closeCropModal(true));
-    }
-    if (cropConfirm) {
-        cropConfirm.addEventListener('click', handleCropConfirm);
-    }
-
-    const saveButton = document.getElementById('saveButton');
-    if (saveButton) {
-        saveButton.addEventListener('click', async () => {
-            await handleSave();
-        });
-    }
-
-    const exitToIndexBtn = document.getElementById('exitToIndexBtn');
-    if (exitToIndexBtn) {
-        exitToIndexBtn.addEventListener('click', () => {
-            showExitModal();
-        });
-    }
-
-    // Обработчики модального окна выхода
-    const exitModal = document.getElementById('exitModal');
-    const exitStayBtn = document.getElementById('exitStayBtn');
-    const exitWithoutSavingBtn = document.getElementById('exitWithoutSavingBtn');
-    const exitWithSavingBtn = document.getElementById('exitWithSavingBtn');
-
-    if (exitStayBtn) {
-        exitStayBtn.addEventListener('click', () => {
-            if (exitModal) exitModal.style.display = 'none';
-        });
-    }
-
-    if (exitWithoutSavingBtn) {
-        exitWithoutSavingBtn.addEventListener('click', () => {
-            if (exitModal) exitModal.style.display = 'none';
-            proceedToExit();
-        });
-    }
-
-    if (exitWithSavingBtn) {
-        exitWithSavingBtn.addEventListener('click', async () => {
-            if (exitModal) exitModal.style.display = 'none';
-            await handleSaveAndExit();
-        });
-    }
-
-    // Закрытие модального окна по клику вне его
-    if (exitModal) {
-        exitModal.addEventListener('click', (e) => {
-            if (e.target === exitModal) {
-                exitModal.style.display = 'none';
+    try {
+        if (window.CoverManager && typeof window.CoverManager.bind === 'function') {
+            window.CoverManager.bind({
+                fileInputId: 'avatarUpload',
+                uploadBtnId: 'avatarUploadButton',
+                previewImgId: ['avatarLarge', 'avatarSmall'],
+                aspectRatio: 1,
+                outputWidth: 120,
+                outputHeight: 120,
+                outputType: 'image/webp',
+                outputQuality: 0.95,
+                maxFileSizeBytes: 5 * 1024 * 1024,
+                onConfirm: async (blob) => {
+                    try {
+                        showInfo('Загружаем аватар...');
+                    } catch (e) {
+                    }
+                    await UM.uploadAvatar(blob);
+                    originalData.avatar = UM.userData.avatar || {};
+                    updateAvatarDisplay(originalData.avatar);
+                    setUnsavedState(true);
+                    try {
+                        const input = document.getElementById('avatarUpload');
+                        if (input) input.value = '';
+                    } catch (e) {
+                    }
+                }
+            });
+        } else {
+            try {
+                if (avatarButton) avatarButton.disabled = true;
+                if (avatarInput) avatarInput.disabled = true;
+            } catch (e) {
             }
-        });
-    }
-
-    // Обработка клавиши Escape
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && exitModal && exitModal.style.display === 'flex') {
-            exitModal.style.display = 'none';
         }
-    });
+    } catch (e) {
+        try {
+            if (avatarButton) avatarButton.disabled = true;
+            if (avatarInput) avatarInput.disabled = true;
+        } catch (e2) {
+        }
+    }
 }
-
-function handleAvatarFileSelection(event) {
-    const input = event.target;
-    if (!input.files || input.files.length === 0) {
-        return;
-    }
-    
-    const file = input.files[0];
-    
-    // Проверяем что это изображение
-    if (!file.type.startsWith('image/')) {
-        showError('Выберите изображение');
-        input.value = '';
-        return;
-    }
-
-    // Проверяем размер файла (максимум 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-        showError('Размер файла не должен превышать 5MB');
-        input.value = '';
-        return;
-    }
-
-    // Открываем модальное окно обрезки
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        openCropModal(e.target.result);
-    };
-    reader.readAsDataURL(file);
-}
-
 
 // Проверка изменений данных
 function checkForChanges() {
+    // ...
     const currentValues = getCurrentFormValues();
 
     // Аватар: сравниваем только базовые URL (без timestamp), чтобы после сохранения звёздочка гасла
@@ -812,180 +748,12 @@ function getCurrentFormValues() {
     };
 }
 
-// Функции для обрезки изображения
-function openCropModal(imageSrc) {
-    const modal = document.getElementById("crop-modal");
-    const image = document.getElementById("crop-image");
-    
-    if (!modal || !image) return;
-    
-    // Устанавливаем изображение
-    image.src = imageSrc;
-    
-    // Показываем модальное окно
-    modal.style.display = "flex";
-    modal.classList.add("show");
-
-    // Фокус по умолчанию на "Сохранить" (кнопка crop-confirm)
-    try {
-        const btn = document.getElementById('crop-confirm');
-        if (btn) {
-            setTimeout(() => btn.focus(), 0);
-        }
-    } catch (e) {
-    }
-    
-    // Уничтожаем предыдущий cropper если есть
-    if (cropper) {
-        cropper.destroy();
-    }
-    
-    // Инициализируем cropper с квадратным crop box 200x200
-    cropper = new Cropper(image, {
-        aspectRatio: 1, // Квадрат
-        viewMode: 2,
-        dragMode: 'move',
-        autoCropArea: 1,
-        restore: false,
-        guides: true,
-        center: true,
-        highlight: false,
-        cropBoxMovable: true,
-        cropBoxResizable: true,
-        toggleDragModeOnDblclick: false,
-        minCropBoxWidth: 100,
-        minCropBoxHeight: 100,
-    });
-}
-
-function closeCropModal(clearBlob = true) {
-    const modal = document.getElementById("crop-modal");
-    if (modal) {
-        modal.style.display = "none";
-        modal.classList.remove("show");
-    }
-    
-    if (cropper) {
-        cropper.destroy();
-        cropper = null;
-    }
-    
-    // Очищаем blob только при отмене, НЕ при применении
-    if (clearBlob) {
-        croppedImageBlob = null;
-        
-        // Очищаем input только при отмене
-        const avatarInput = document.getElementById("avatarUpload");
-        if (avatarInput) {
-            avatarInput.value = '';
-        }
-    }
-}
-
-async function handleCropConfirm() {
-    if (!cropper) return;
-    
-    // Получаем canvas с обрезанным изображением для большого аватара (120x120)
-    const canvas = cropper.getCroppedCanvas({
-        width: 120,
-        height: 120,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
-    });
-    
-    if (!canvas) {
-        showError('Ошибка обрезки изображения');
-        return;
-    }
-    
-    // Конвертируем canvas в blob (webp)
-    canvas.toBlob(async (blob) => {
-        if (!blob) {
-            showError('Ошибка создания изображения');
-            return;
-        }
-        
-        croppedImageBlob = blob;
-        
-        // Показываем preview в элементах аватара
-        const avatarLarge = document.getElementById("avatarLarge");
-        const avatarSmall = document.getElementById("avatarSmall");
-        if (avatarLarge || avatarSmall) {
-            const url = URL.createObjectURL(blob);
-            if (avatarLarge) avatarLarge.src = url;
-            if (avatarSmall) avatarSmall.src = url;
-        }
-        
-        // Отправляем обрезанное изображение на сервер
-        try {
-            showInfo('Загружаем аватар...');
-            const response = await UM.uploadAvatar(blob);
-            
-            // Обновляем данные из текущего пользователя (где теперь должен быть аватар)
-            originalData.avatar = UM.userData.avatar || {};
-            updateAvatarDisplay(originalData.avatar);
-            
-            // НЕ обновляем topbar здесь - пользователь может передумать сохранять
-            // Topbar обновится только после сохранения профиля через кнопку "Сохранить"
-            
-            showSuccess('Аватар успешно загружен! Для применения изменений нажмите "Сохранить"');
-            
-            // Отмечаем, что есть несохраненные изменения (аватар уже загружен, но нужно сохранить)
-            setUnsavedState(true);
-            
-            // Закрываем crop modal БЕЗ очистки blob
-            closeCropModal(false);
-            
-            // Очищаем input
-            const avatarInput = document.getElementById("avatarUpload");
-            if (avatarInput) {
-                avatarInput.value = '';
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки аватара:', error);
-            showError('Ошибка загрузки аватара: ' + error.message);
-        }
-    }, 'image/webp', 0.9);
-}
-
 function normalizeAvatarForCompare(avatar) {
     if (!avatar || typeof avatar !== 'object') return { large: '', small: '' };
     return {
         large: String(avatar.large || avatar.medium || avatar.original || ''),
         small: String(avatar.small || avatar.medium || avatar.original || '')
     };
-}
-
-// Загрузка аватара - РЕАЛЬНАЯ отправка на сервер (старая функция, теперь не используется напрямую)
-async function uploadAvatar() {
-    // Эта функция больше не используется напрямую - обрезка происходит через handleCropConfirm
-    // Оставлена для совместимости, если где-то вызывается напрямую
-    const fileInput = document.getElementById('avatarUpload');
-    const file = fileInput.files[0];
-
-    if (!file) {
-        showError('Выберите файл для загрузки');
-        return;
-    }
-
-    if (!file.type.startsWith('image/')) {
-        showError('Выберите изображение');
-        fileInput.value = '';
-        return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB
-        showError('Размер файла не должен превышать 5MB');
-        fileInput.value = '';
-        return;
-    }
-
-    // Открываем модальное окно обрезки
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        openCropModal(e.target.result);
-    };
-    reader.readAsDataURL(file);
 }
 
 // Обновление отображения аватара

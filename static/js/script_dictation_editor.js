@@ -1837,10 +1837,6 @@ let levelSelectOutsideHandler = null;
 let currentTabName = 'general';
 let explanationVisible = false;
 
-// Глобальные переменные для обрезки изображений
-let cropper = null;
-let croppedImageBlob = null;
-
 
 
 
@@ -1877,243 +1873,136 @@ function normalizeDictationInvisibleChars(text) {
 
 
 // ==================== сover обложка ========================================
-// Функция для настройки обработчиков cover
+// Реализация crop/preview вынесена в CoverManager
 function setupCoverHandlers() {
-    const coverUploadBtn = document.getElementById('coverUploadBtn');
-    const coverFile = document.getElementById('coverFile');
-    const coverImage = document.getElementById('coverImage');
+    try {
+        if (!window.CoverManager || typeof window.CoverManager.bind !== 'function') {
+            return;
+        }
 
-    if (coverUploadBtn && coverFile) {
-        // При клике на кнопку "Загрузить" открываем файловый диалог
-        coverUploadBtn.addEventListener('click', () => {
-            coverFile.click();
-        });
+        window.CoverManager.bind({
+            fileInputId: 'coverFile',
+            uploadBtnId: 'coverUploadBtn',
+            previewImgId: 'coverImage',
+            aspectRatio: 200 / 120,
+            outputWidth: 200,
+            outputHeight: 120,
+            outputType: 'image/webp',
+            outputQuality: 0.9,
+            maxFileSizeBytes: 5 * 1024 * 1024,
+            onDirty: () => {
+                try { setDirtyFlags({ cover: true }); } catch (e) {}
+            },
+            onConfirm: async (blob) => {
+                try {
+                    window.__DICTATION_EDITOR_COVER_PENDING = true;
+                } catch (e) {
+                }
 
-        // При выборе файла открываем модальное окно обрезки
-        coverFile.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
+                try {
+                    currentDictation.coverFile = blob;
+                } catch (e) {
+                }
+                try {
+                    window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
+                    window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = null;
+                } catch (e) {
+                }
+                try {
+                    setDirtyFlags({ cover: true });
+                } catch (e) {
+                }
 
-            // Проверяем что это изображение
-            if (!file.type.startsWith('image/')) {
-                alert('Выберите изображение');
-                return;
+                // Offline-first: сохраняем cover.webp в Cache Storage (dictafan-media).
+                try {
+                    const dictationId = String(currentDictation.id || '').trim();
+                    if (dictationId) {
+                        let cache = null;
+                        try {
+                            if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
+                                cache = await window.AudioManager.openMediaCache();
+                            }
+                        } catch (e) {
+                            cache = null;
+                        }
+                        if (!cache) {
+                            throw new Error('Media cache is not available');
+                        }
+                        const numericId = dictationId.startsWith('dict_') ? parseInt(dictationId.replace(/^dict_/, ''), 10) : null;
+                        const coverKey = (numericId && isFinite(numericId) && numericId > 0) ? String(numericId) : null;
+                        if (!coverKey) {
+                            throw new Error('Invalid dictation numeric id for cover');
+                        }
+
+                        const basePath = `/api/dictations_covers/${coverKey}.webp`;
+                        const baseUrl = new URL(basePath, window.location.origin).toString();
+                        try {
+                            console.log('[COVER][CACHE PUT] crop-confirm', {
+                                dictationId,
+                                numericId: (numericId && isFinite(numericId) && numericId > 0) ? numericId : null,
+                                coverKey,
+                                basePath,
+                                baseUrl,
+                                blobType: blob.type || null,
+                                blobSize: blob.size || 0
+                            });
+                        } catch (e) {
+                        }
+                        const headers = new Headers();
+                        headers.set('Content-Type', blob.type || 'image/webp');
+                        headers.set('Cache-Control', 'no-store');
+                        const res = new Response(blob, { status: 200, headers });
+                        try {
+                            if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
+                                await window.AudioManager.putResponseToCache(baseUrl, res.clone());
+                            }
+                        } catch (e) {
+                        }
+
+                        try {
+                            const currentManifest = await getMediaManifest(dictationId);
+                            currentManifest.cover = {
+                                changed: true,
+                                coverKey,
+                                size: Number(blob.size || 0),
+                                updatedAt: Date.now()
+                            };
+                            await setMediaManifest(dictationId, currentManifest);
+                        } catch (e) {
+                        }
+
+                        try { scheduleSaveStatusRefresh(); } catch (e) {}
+                    }
+                } catch (error) {
+                    console.error('Ошибка при сохранении cover в cache:', error);
+                } finally {
+                    try {
+                        window.__DICTATION_EDITOR_COVER_PENDING = false;
+                    } catch (e) {
+                    }
+                }
             }
-
-            // Проверяем размер файла (максимум 5MB)
-            if (file.size > 5 * 1024 * 1024) {
-                alert('Размер файла не должен превышать 5MB');
-                return;
-            }
-
-            // Открываем crop modal
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                openCropModal(e.target.result);
-                };
-                reader.readAsDataURL(file);
         });
-    }
-
-    // Обработчики для модального окна обрезки
-    const cropClose = document.getElementById('crop-close');
-    const cropCancel = document.getElementById('crop-cancel');
-    const cropConfirm = document.getElementById('crop-confirm');
-
-    if (cropClose) {
-        cropClose.addEventListener('click', () => closeCropModal(true));
-    }
-    if (cropCancel) {
-        cropCancel.addEventListener('click', () => closeCropModal(true));
-    }
-    if (cropConfirm) {
-        cropConfirm.addEventListener('click', handleCropConfirm);
+    } catch (e) {
     }
 }
 
 function openCropModal(imageSrc) {
-    const modal = document.getElementById("crop-modal");
-    const image = document.getElementById("crop-image");
-    
-    if (!modal || !image) return;
-    
-    // Устанавливаем изображение
-    image.src = imageSrc;
-    
-    // Показываем модальное окно
-    modal.style.display = "flex";
-    modal.classList.add("show");
-    
-    // Уничтожаем предыдущий cropper если есть
-    if (cropper) {
-        cropper.destroy();
+    if (window.CoverManager && typeof window.CoverManager.openCropModal === 'function') {
+        return window.CoverManager.openCropModal(imageSrc);
     }
-    
-    // Инициализируем cropper с прямоугольным crop box 200x120 (ШxВ)
-    cropper = new Cropper(image, {
-        aspectRatio: 200 / 120, // Прямоугольник 200x120
-        viewMode: 2,
-        dragMode: 'move',
-        autoCropArea: 1,
-        restore: false,
-        guides: true,
-        center: true,
-        highlight: false,
-        cropBoxMovable: true,
-        cropBoxResizable: true,
-        toggleDragModeOnDblclick: false,
-        minCropBoxWidth: 100,
-        minCropBoxHeight: 100,
-    });
 }
 
 function closeCropModal(clearBlob = true) {
-    const modal = document.getElementById("crop-modal");
-    if (modal) {
-        modal.style.display = "none";
-        modal.classList.remove("show");
-    }
-    
-    if (cropper) {
-        cropper.destroy();
-        cropper = null;
-    }
-    
-    // Очищаем blob только при отмене, НЕ при применении
-    if (clearBlob) {
-        croppedImageBlob = null;
-        
-        // Очищаем input только при отмене
-        const coverFile = document.getElementById("coverFile");
-        if (coverFile) {
-            coverFile.value = '';
-        }
+    if (window.CoverManager && typeof window.CoverManager.closeCropModal === 'function') {
+        return window.CoverManager.closeCropModal(clearBlob);
     }
 }
 
 async function handleCropConfirm() {
-    if (!cropper) return;
-    
-    // Получаем canvas с обрезанным изображением для ковера диктанта (200x120, ШxВ)
-    const canvas = cropper.getCroppedCanvas({
-        width: 200,
-        height: 120,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high',
-    });
-    
-    if (!canvas) {
-        alert('Ошибка обрезки изображения');
-        return;
+    if (window.CoverManager && typeof window.CoverManager.handleCropConfirm === 'function') {
+        return window.CoverManager.handleCropConfirm();
     }
-    
-    // Конвертируем canvas в blob (webp)
-    canvas.toBlob(async (blob) => {
-        if (!blob) {
-            alert('Ошибка создания изображения');
-            return;
-        }
-
-        try {
-            window.__DICTATION_EDITOR_COVER_PENDING = true;
-        } catch (e) {
-        }
-        
-        croppedImageBlob = blob;
-        
-        // Показываем preview в элементе coverImage
-        const coverImage = document.getElementById("coverImage");
-        if (coverImage) {
-            const url = URL.createObjectURL(blob);
-            coverImage.src = url;
-        }
-
-        try {
-            currentDictation.coverFile = blob;
-        } catch (e) {
-        }
-        try {
-            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT = window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT || {};
-            window.__DICTATION_EDITOR_LAST_MEDIA_COMMIT.cover = null;
-        } catch (e) {
-        }
-        try {
-            setDirtyFlags({ cover: true });
-        } catch (e) {
-        }
-        
-        // Offline-first: сохраняем cover.webp в Cache Storage (dictafan-media).
-        try {
-            const dictationId = String(currentDictation.id || '').trim();
-            if (dictationId) {
-                let cache = null;
-                try {
-                    if (window.AudioManager && typeof window.AudioManager.openMediaCache === 'function') {
-                        cache = await window.AudioManager.openMediaCache();
-                    }
-                } catch (e) {
-                    cache = null;
-                }
-                if (!cache) {
-                    throw new Error('Media cache is not available');
-                }
-                const numericId = dictationId.startsWith('dict_') ? parseInt(dictationId.replace(/^dict_/, ''), 10) : null;
-                const coverKey = (numericId && isFinite(numericId) && numericId > 0) ? String(numericId) : null;
-                if (!coverKey) {
-                    throw new Error('Invalid dictation numeric id for cover');
-                }
-
-                const basePath = `/api/dictations_covers/${coverKey}.webp`;
-                const baseUrl = new URL(basePath, window.location.origin).toString();
-                try {
-                    console.log('[COVER][CACHE PUT] crop-confirm', {
-                        dictationId,
-                        numericId: (numericId && isFinite(numericId) && numericId > 0) ? numericId : null,
-                        coverKey,
-                        basePath,
-                        baseUrl,
-                        blobType: blob.type || null,
-                        blobSize: blob.size || 0
-                    });
-                } catch (e) {
-                }
-                const headers = new Headers();
-                headers.set('Content-Type', blob.type || 'image/webp');
-                headers.set('Cache-Control', 'no-store');
-                const res = new Response(blob, { status: 200, headers });
-                try {
-                    if (window.AudioManager && typeof window.AudioManager.putResponseToCache === 'function') {
-                        await window.AudioManager.putResponseToCache(baseUrl, res.clone());
-                    }
-                } catch (e) {
-                }
-
-                try {
-                    const currentManifest = await getMediaManifest(dictationId);
-                    currentManifest.cover = {
-                        changed: true,
-                        coverKey,
-                        size: Number(blob.size || 0),
-                        updatedAt: Date.now()
-                    };
-                    await setMediaManifest(dictationId, currentManifest);
-                } catch (e) {
-                }
-
-                try { scheduleSaveStatusRefresh(); } catch (e) {}
-
-            }
-            closeCropModal(false);
-        } catch (error) {
-            console.error('Ошибка при сохранении cover в cache:', error);
-            closeCropModal(false);
-        } finally {
-            try {
-                window.__DICTATION_EDITOR_COVER_PENDING = false;
-            } catch (e) {
-            }
-        }
-    }, 'image/webp', 0.9);
 }
 
 // Функция для загрузки cover существующего диктанта

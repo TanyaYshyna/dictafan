@@ -159,6 +159,28 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - (опционально) фоновая доставка результатов на сервер (если сеть недоступна — отправить позже)
 - кэширование обложек/аватаров через `/api/dictations_covers/...` (и аналогичные URL для аватаров), если это включено в стратегию SW
 
+### `static/js/cover_manager.js`
+
+Роль:
+
+- единая точка правды для UI-операций с обложками (выбор файла, crop modal, формирование `Blob` для upload, preview).
+
+Важно:
+
+- Page-код (private library / dictation / editor / profile) не должен дублировать логику crop/preview.
+- Экспортируемый глобальный объект: `window.CoverManager`.
+
+### `static/js/idb_manager.js`
+
+Роль:
+
+- единая точка правды для работы с `IndexedDB` (открытие базы, схема stores, `idbGet/idbPut/idbDelete/...`).
+
+Важно:
+
+- Page-код (private library / dictation / editor) не должен копировать boilerplate IndexedDB.
+- Экспортируемый глобальный объект: `window.IdbManager`.
+
 Важно:
 
 - Аудио (чтение/кэширование/удаление) — зона ответственности `AudioManager`, а не SW.
@@ -404,6 +426,8 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 - Frontend:
   - `static/js/script_dictation_editor.js`
   - `static/js/audio_manager.js`
+  - `static/js/cover_manager.js`
+  - `static/js/idb_manager.js`
   - `static/js/script_dictation.js`
   - `static/js/private_library.js`
 - Service Worker:

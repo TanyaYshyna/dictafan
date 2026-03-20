@@ -813,6 +813,7 @@
 
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
+     <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/script_dictation_editor.js') }}?v={{ app_cache_revision }}"></script>
 
     <script>

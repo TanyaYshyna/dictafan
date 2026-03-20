@@ -74,8 +74,6 @@ let activeBookId = null;
 let activeBookIsWorkbook = false;
 let bookViewActiveBookId = null;
 let currentView = 'cards'; // 'cards' or 'list'
-let cropper = null;
-let croppedImageBlob = null;
 let deskItems = []; // Список диктантов на столе
 let deskLoadSeq = 0;
 let deskLoadInFlight = null;
@@ -91,7 +89,62 @@ function getToken() {
   return localStorage.getItem("jwt_token");
 }
 
+function getBookCroppedCoverBlob() {
+  try {
+    const m = window.CoverManager;
+    if (m && typeof m.getCroppedBlob === 'function') {
+      return m.getCroppedBlob();
+    }
+  } catch (e) {
+  }
+  return null;
+}
+
+function clearBookCroppedCoverBlob() {
+  try {
+    const m = window.CoverManager;
+    if (m && typeof m.clearCroppedBlob === 'function') {
+      m.clearCroppedBlob();
+      return;
+    }
+  } catch (e) {
+  }
+}
+
+function bindCoverHandlers() {
+  try {
+    const m = window.CoverManager;
+    if (!m || typeof m.bind !== 'function') return;
+
+    m.bind({
+      fileInputId: 'book-cover-upload',
+      uploadBtnId: 'book-cover-upload-btn',
+      clickableId: 'book-cover-clickable',
+      previewImgId: 'book-cover-preview',
+      placeholderId: 'book-cover-placeholder',
+      aspectRatio: 1,
+      outputWidth: 200,
+      outputHeight: 200,
+      outputType: 'image/webp',
+      outputQuality: 0.95,
+      maxFileSizeBytes: 5 * 1024 * 1024,
+      successToast: 'Обложка готова к сохранению',
+      onDirty: () => {
+        try { setBookEditDirty(true); } catch (e) {}
+      },
+      onConfirm: () => {
+        try { setBookEditDirty(true); } catch (e) {}
+      },
+    });
+  } catch (e) {
+  }
+}
+
 async function idbPut(storeName, value) {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.idbPut === 'function') {
+    return idb.idbPut(storeName, value);
+  }
   const db = await openDraftDb();
   try {
     return await new Promise((resolve, reject) => {
@@ -107,6 +160,10 @@ async function idbPut(storeName, value) {
 }
 
 async function idbDelete(storeName, key) {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.idbDelete === 'function') {
+    return idb.idbDelete(storeName, key);
+  }
   const db = await openDraftDb();
   try {
     return await new Promise((resolve, reject) => {
@@ -122,6 +179,10 @@ async function idbDelete(storeName, key) {
 }
 
 async function idbDeleteDictationCache(dictationId) {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.idbDeleteDictationCache === 'function') {
+    return idb.idbDeleteDictationCache(dictationId);
+  }
   try {
     const dictId = String(dictationId || '').trim();
     if (!dictId) return;
@@ -139,6 +200,10 @@ async function idbDeleteDictationCache(dictationId) {
 }
 
 async function idbGetAll(storeName) {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.idbGetAll === 'function') {
+    return idb.idbGetAll(storeName);
+  }
   const db = await openDraftDb();
   try {
     return await new Promise((resolve, reject) => {
@@ -383,6 +448,10 @@ function chunkArray(arr, size) {
 }
 
 async function openDraftDb() {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.openDraftDb === 'function') {
+    return idb.openDraftDb();
+  }
   return await new Promise((resolve, reject) => {
     const req = indexedDB.open('dictafan_drafts');
     req.onupgradeneeded = () => {
@@ -415,6 +484,10 @@ async function openDraftDb() {
 }
 
 async function idbGet(storeName, key) {
+  const idb = window.IdbManager;
+  if (idb && typeof idb.idbGet === 'function') {
+    return idb.idbGet(storeName, key);
+  }
   const db = await openDraftDb();
   try {
     return await new Promise((resolve, reject) => {
@@ -2561,9 +2634,6 @@ function renderDictationsAsList(dictations, container) {
 // ==================== Модальное окно книги ====================
 
 function openBookModal(book) {
-  // Очищаем предыдущий cropped blob
-  croppedImageBlob = null;
-
   setBookEditDirty(false);
 
   const modal = document.getElementById("book-edit-modal");
@@ -2819,131 +2889,6 @@ async function handleSaveSection(event) {
   }
 }
 
-// ==================== Crop Modal ====================
-
-function handleCoverSelect(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  // Проверяем, что это изображение
-  if (!file.type.startsWith('image/')) {
-    showToast('Пожалуйста, выберите изображение');
-    return;
-  }
-
-  // Открываем crop modal
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    openCropModal(e.target.result);
-  };
-  reader.readAsDataURL(file);
-}
-
-function openCropModal(imageSrc) {
-  const modal = document.getElementById("crop-modal");
-  const image = document.getElementById("crop-image");
-
-  if (!modal || !image) return;
-
-  // Устанавливаем изображение
-  image.src = imageSrc;
-
-  // Показываем модальное окно
-  modal.style.display = "flex";
-  modal.classList.add("show");
-
-  // Уничтожаем предыдущий cropper если есть
-  if (cropper) {
-    cropper.destroy();
-  }
-
-  // Инициализируем cropper с квадратным crop box 200x200
-  cropper = new Cropper(image, {
-    aspectRatio: 1, // Квадрат
-    viewMode: 2,
-    dragMode: 'move',
-    autoCropArea: 1,
-    restore: false,
-    guides: true,
-    center: true,
-    highlight: false,
-    cropBoxMovable: true,
-    cropBoxResizable: true,
-    toggleDragModeOnDblclick: false,
-    minCropBoxWidth: 100,
-    minCropBoxHeight: 100,
-  });
-}
-
-function closeCropModal(clearBlob = true) {
-  const modal = document.getElementById("crop-modal");
-  if (modal) {
-    modal.style.display = "none";
-    modal.classList.remove("show");
-  }
-
-  if (cropper) {
-    cropper.destroy();
-    cropper = null;
-  }
-
-  // Очищаем blob только при отмене, НЕ при применении
-  if (clearBlob) {
-    croppedImageBlob = null;
-
-    // Очищаем input только при отмене
-    const coverUploadInput = document.getElementById("book-cover-upload");
-    if (coverUploadInput) {
-      coverUploadInput.value = '';
-    }
-  }
-}
-
-function handleCropConfirm() {
-  if (!cropper) return;
-
-  // Получаем canvas с обрезанным изображением (200x200)
-  const canvas = cropper.getCroppedCanvas({
-    width: 200,
-    height: 200,
-    imageSmoothingEnabled: true,
-    imageSmoothingQuality: 'high',
-  });
-
-  if (!canvas) {
-    showToast('Ошибка обрезки изображения');
-    return;
-  }
-
-  // Конвертируем canvas в blob (webp)
-  canvas.toBlob((blob) => {
-    if (!blob) {
-      showToast('Ошибка создания изображения');
-      return;
-    }
-
-    croppedImageBlob = blob;
-
-    // Показываем preview в модальном окне книги
-    const preview = document.getElementById("book-cover-preview");
-    const placeholder = document.getElementById("book-cover-placeholder");
-
-    if (preview && placeholder) {
-      const url = URL.createObjectURL(blob);
-      preview.src = url;
-      preview.style.display = "block";
-      placeholder.style.display = "none";
-    }
-
-    // Закрываем crop modal БЕЗ очистки blob
-    closeCropModal(false);
-
-    showToast('Обложка готова к сохранению');
-
-    setBookEditDirty(true);
-  }, 'image/webp', 0.95);
-}
-
 function initBookLanguageSelector(selectedLanguage) {
   const container = document.getElementById("book-language-selector");
   if (!container) return;
@@ -2975,30 +2920,6 @@ function initBookLanguageSelector(selectedLanguage) {
   };
 
   initSelector();
-}
-
-function handleCoverUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  if (!file.type.startsWith("image/")) {
-    showToast("Выберите изображение");
-    return;
-  }
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const coverPreview = document.getElementById("book-cover-preview");
-    const coverPlaceholder = document.getElementById("book-cover-placeholder");
-    if (coverPreview && coverPlaceholder) {
-      coverPreview.src = e.target.result;
-      coverPreview.style.display = "block";
-      coverPlaceholder.style.display = "none";
-    }
-  };
-  reader.readAsDataURL(file);
-
-  setBookEditDirty(true);
 }
 
 async function handleSaveBook(event) {
@@ -3033,7 +2954,8 @@ async function handleSaveBook(event) {
     const token = getToken();
 
     // Используем cropped blob если есть, иначе оригинальный файл
-    const hasCover = croppedImageBlob || coverUploadInput?.files[0];
+    const croppedBlob = getBookCroppedCoverBlob();
+    const hasCover = croppedBlob || coverUploadInput?.files[0];
 
     if (hasCover) {
       const formData = new FormData();
@@ -3048,8 +2970,8 @@ async function handleSaveBook(event) {
       }
 
       // Используем cropped blob или оригинальный файл
-      if (croppedImageBlob) {
-        formData.append("cover", croppedImageBlob, "cover.webp");
+      if (croppedBlob) {
+        formData.append("cover", croppedBlob, "cover.webp");
       } else {
         formData.append("cover", coverUploadInput.files[0]);
       }
@@ -3110,7 +3032,7 @@ async function handleSaveBook(event) {
     setBookEditDirty(false);
 
     // Очищаем cropped blob
-    croppedImageBlob = null;
+    clearBookCroppedCoverBlob();
 
     closeBookModal();
     // Перезагружаем список книг
@@ -3259,32 +3181,17 @@ function installEventHandlers() {
   const coverUploadInput = document.getElementById("book-cover-upload");
   const coverClickable = document.getElementById("book-cover-clickable");
 
-  if (coverUploadBtn && coverUploadInput) {
-    coverUploadBtn.addEventListener("click", () => {
-      coverUploadInput.click();
-    });
-    coverUploadInput.addEventListener("change", handleCoverSelect);
-  }
-
-  if (coverClickable && coverUploadInput) {
-    coverClickable.addEventListener("click", () => {
-      coverUploadInput.click();
-    });
-  }
-
-  // Crop modal controls
-  const cropCloseBtn = document.getElementById("crop-close");
-  const cropCancelBtn = document.getElementById("crop-cancel");
-  const cropConfirmBtn = document.getElementById("crop-confirm");
-
-  if (cropCloseBtn) {
-    cropCloseBtn.addEventListener("click", closeCropModal);
-  }
-  if (cropCancelBtn) {
-    cropCancelBtn.addEventListener("click", closeCropModal);
-  }
-  if (cropConfirmBtn) {
-    cropConfirmBtn.addEventListener("click", handleCropConfirm);
+  if (window.CoverManager) {
+    bindCoverHandlers();
+  } else {
+    try {
+      if (coverUploadBtn) coverUploadBtn.disabled = true;
+    } catch (e) {
+    }
+    try {
+      if (coverClickable) coverClickable.style.pointerEvents = 'none';
+    } catch (e) {
+    }
   }
 
   // Закрытие модального окна при клике вне его
