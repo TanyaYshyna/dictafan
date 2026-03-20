@@ -466,6 +466,25 @@
       } catch (e) {
       }
       installInterceptor();
+
+      try {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.addEventListener('message', function (event) {
+            try {
+              var data = event && event.data ? event.data : {};
+              if (!data || data.type !== 'sw_cache_cleanup') return;
+              var p = data.payload || {};
+              if (!p || p.kind !== 'static_version') return;
+              var path = String(p.path || '').trim();
+              var deleted = Number(p.deleted);
+              if (!path || !(deleted > 0)) return;
+              touch('SW: cleaned ' + String(Math.round(deleted)) + ' old cache entr' + (deleted === 1 ? 'y' : 'ies') + ' for ' + path);
+            } catch (e2) {
+            }
+          });
+        }
+      } catch (e3) {
+      }
     }
 
     boot();

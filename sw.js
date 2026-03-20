@@ -2,6 +2,89 @@ const CACHE_VERSION = 'v5';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
+const SW_DEBUG = false;
+let __swReqSeq = 0;
+
+function swTimeStart(label) {
+  if (!SW_DEBUG) return;
+  try {
+    console.time(label);
+  } catch (e) {
+  }
+}
+
+function isStaticJsOrCssUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    const path = url.pathname || '';
+    if (!path.startsWith('/static/')) return false;
+    if (path.endsWith('.js')) return true;
+    if (path.endsWith('.css')) return true;
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function broadcastSwEvent(type, payload) {
+  try {
+    const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const c of clientsList || []) {
+      try {
+        c.postMessage({ type, payload });
+      } catch (e) {
+      }
+    }
+  } catch (e) {
+  }
+}
+
+async function cleanupOldStaticAssetVersions(cache, currentUrl) {
+  try {
+    const url = new URL(currentUrl);
+    const path = url.pathname || '';
+    if (!path.startsWith('/static/')) return;
+    if (!(path.endsWith('.js') || path.endsWith('.css'))) return;
+
+    let keys = [];
+    try {
+      const baseReq = new Request(`${url.origin}${path}`, { method: 'GET' });
+      keys = await cache.keys(baseReq, { ignoreSearch: true });
+    } catch (e) {
+      keys = await cache.keys();
+    }
+
+    let deleted = 0;
+    for (const req of keys) {
+      try {
+        const u = new URL(req.url);
+        if (u.pathname !== path) continue;
+        if (req.url === currentUrl) continue;
+        if (req.url === `${url.origin}${path}${url.search}`) continue;
+        const ok = await cache.delete(req);
+        if (ok) deleted += 1;
+      } catch (e) {
+      }
+    }
+
+    if (deleted > 0) {
+      try {
+        await broadcastSwEvent('sw_cache_cleanup', { kind: 'static_version', path, deleted });
+      } catch (e) {
+      }
+    }
+  } catch (e) {
+  }
+}
+
+function swTimeEnd(label) {
+  if (!SW_DEBUG) return;
+  try {
+    console.timeEnd(label);
+  } catch (e) {
+  }
+}
+
 // Постоянный кеш для медиа диктанта. Должен переживать обновления Service Worker, чтобы офлайн-диктанты
 // (таблицы IndexedDB + аудио/обложки) не терялись при обновлении HTML/JS/CSS.
 const MEDIA_CACHE_PERSIST = 'dictafan-media';
@@ -10,44 +93,6 @@ const MEDIA_CACHE_PERSIST = 'dictafan-media';
 // на бакете (allowedOperations: ["b2_upload_file"]). Правило должно разрешать origin этого приложения
 // (например https://dictafan-staging001.up.railway.app) и заголовки, используемые при загрузке в B2:
 // authorization, x-bz-file-name, x-bz-content-sha1, content-type.
-
-const DEFAULT_MAX_BYTES = 300 * 1024 * 1024;
-
-function openMetaDb() {
-  return new Promise((resolve, reject) => {
-    try {
-      const request = indexedDB.open('dictafan-sw-meta', 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains('settings')) {
-          db.createObjectStore('settings');
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
-async function getMaxBytes() {
-  try {
-    const db = await openMetaDb();
-    return await new Promise((resolve) => {
-      const tx = db.transaction('settings', 'readonly');
-      const store = tx.objectStore('settings');
-      const req = store.get('maxBytes');
-      req.onsuccess = () => {
-        const v = req.result;
-        resolve(typeof v === 'number' && isFinite(v) && v > 0 ? v : DEFAULT_MAX_BYTES);
-      };
-      req.onerror = () => resolve(DEFAULT_MAX_BYTES);
-    });
-  } catch (e) {
-    return DEFAULT_MAX_BYTES;
-  }
-}
 
 function normalizeCacheKey(requestOrUrl) {
   try {
@@ -83,6 +128,56 @@ function normalizeCacheKey(requestOrUrl) {
   }
 }
 
+async function staleWhileRevalidateImage(request, event) {
+  const cacheKey = normalizeCacheKey(request);
+  const cache = await caches.open(RUNTIME_CACHE_UNBOUNDED);
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    if (event && event.waitUntil) {
+      event.waitUntil((async () => {
+        try {
+          const netRes = await fetch(request);
+          if (netRes && netRes.ok) {
+            try {
+              await cache.put(cacheKey, netRes.clone());
+            } catch (e) {
+            }
+          }
+        } catch (e) {
+        }
+      })());
+    }
+    return cached;
+  }
+
+  try {
+    const legacyCache = await caches.open(MEDIA_CACHE_PERSIST);
+    const legacy = await legacyCache.match(request);
+    if (legacy) {
+      if (event && event.waitUntil) {
+        event.waitUntil((async () => {
+          try {
+            await cache.put(cacheKey, legacy.clone());
+          } catch (e) {
+          }
+        })());
+      }
+      return legacy;
+    }
+  } catch (e) {
+  }
+
+  const response = await fetch(request);
+  if (response && response.ok) {
+    try {
+      await cache.put(cacheKey, response.clone());
+    } catch (e) {
+    }
+  }
+  return response;
+}
+
 function shouldIgnoreSearchFallbackForRequest(request) {
   try {
     const url = new URL(request.url);
@@ -110,9 +205,17 @@ function isMediaUrl(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
-    if (path === '/library/api/book-cover') return true;
-    if (path === '/user/api/avatar') return true;
     return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+function isImageUrl(requestUrl) {
+  try {
+    const url = new URL(requestUrl);
+    const path = url.pathname;
+    return path === '/library/api/book-cover' || path === '/user/api/avatar';
   } catch (e) {
     return false;
   }
@@ -126,43 +229,6 @@ function pickCacheNameForRequest(requestOrUrl) {
     return RUNTIME_CACHE_BOUNDED;
   } catch (e) {
     return RUNTIME_CACHE_BOUNDED;
-  }
-}
-
-async function setMaxBytes(value) {
-  const parsed = Number(value);
-  const maxBytes = isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_MAX_BYTES;
-  try {
-    const db = await openMetaDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction('settings', 'readwrite');
-      const store = tx.objectStore('settings');
-      const req = store.put(maxBytes, 'maxBytes');
-      req.onsuccess = () => resolve();
-      req.onerror = () => reject(req.error);
-    });
-  } catch (e) {
-    // игнорируем
-  }
-  return { maxBytes };
-}
-
-async function getResponseSizeBytes(response) {
-  try {
-    const len = response && response.headers ? response.headers.get('content-length') : null;
-    if (len) {
-      const parsed = parseInt(len, 10);
-      if (!isNaN(parsed) && parsed >= 0) return parsed;
-    }
-  } catch (e) {
-    // игнорируем
-  }
-
-  try {
-    const blob = await response.clone().blob();
-    return blob.size || 0;
-  } catch (e) {
-    return 0;
   }
 }
 
@@ -193,7 +259,7 @@ function shouldHandleRequest(requestUrl) {
   }
 }
 
-async function cacheFirstBounded(request) {
+async function cacheFirstBounded(request, event) {
   try {
     const cache = await caches.open(pickCacheNameForRequest(request));
 
@@ -208,10 +274,18 @@ async function cacheFirstBounded(request) {
 
     const response = await fetch(request);
     if (response && response.ok && !hasRange) {
-      const [stats, maxBytes] = await Promise.all([computeCacheStats(), getMaxBytes()]);
-      const size = await getResponseSizeBytes(response);
-      if ((stats.totalBytes + size) <= maxBytes) {
+      try {
         await cache.put(cacheKey, response.clone());
+      } catch (e) {
+      }
+
+      try {
+        const rawUrl = request && request.url ? request.url : '';
+        if (event && event.waitUntil && isStaticJsOrCssUrl(rawUrl)) {
+          const currentKey = (typeof cacheKey === 'string') ? cacheKey : rawUrl;
+          event.waitUntil(cleanupOldStaticAssetVersions(cache, currentKey));
+        }
+      } catch (e) {
       }
     }
     return response;
@@ -235,7 +309,7 @@ async function cacheFirstBounded(request) {
   }
 }
 
-async function cacheFirstUnbounded(request) {
+async function cacheFirstUnbounded(request, event) {
   try {
     const cache = await caches.open(pickCacheNameForRequest(request));
 
@@ -248,7 +322,19 @@ async function cacheFirstUnbounded(request) {
 
     const response = await fetch(request);
     if (response && response.ok) {
-      await cache.put(cacheKey, response.clone());
+      try {
+        await cache.put(cacheKey, response.clone());
+      } catch (e) {
+      }
+
+      try {
+        const rawUrl = request && request.url ? request.url : '';
+        if (event && event.waitUntil && isStaticJsOrCssUrl(rawUrl)) {
+          const currentKey = (typeof cacheKey === 'string') ? cacheKey : rawUrl;
+          event.waitUntil(cleanupOldStaticAssetVersions(cache, currentKey));
+        }
+      } catch (e) {
+      }
     }
     return response;
   } catch (e) {
@@ -279,10 +365,9 @@ async function cacheAudioFullFileInBackground(url) {
 
     const response = await fetch(new Request(url, { method: 'GET' }));
     if (response && response.ok) {
-      const [stats, maxBytes] = await Promise.all([computeCacheStats(), getMaxBytes()]);
-      const size = await getResponseSizeBytes(response);
-      if ((stats.totalBytes + size) <= maxBytes) {
+      try {
         await cache.put(url, response.clone());
+      } catch (e) {
       }
     }
   } catch (e) {
@@ -312,6 +397,14 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
+  const reqId = (__swReqSeq += 1);
+  let reqPath = '';
+  try {
+    reqPath = new URL(request.url).pathname || '';
+  } catch (e) {
+    reqPath = '';
+  }
+
   try {
     const url = new URL(request.url);
     if (url.pathname && url.pathname.endsWith('.map')) {
@@ -335,11 +428,26 @@ self.addEventListener('fetch', (event) => {
 
   if (!shouldHandleRequest(request.url)) return;
 
+  if (isImageUrl(request.url)) {
+    const label = `sw#${reqId} image ${reqPath}`;
+    swTimeStart(label);
+    event.respondWith((async () => {
+      try {
+        return await staleWhileRevalidateImage(request, event);
+      } finally {
+        swTimeEnd(label);
+      }
+    })());
+    return;
+  }
+
   // Для Range-запросов (часто для <audio>) отдаём 206 Partial Content из кеша.
   const hasRange = request.headers && request.headers.has('range');
   if (hasRange && request.url.includes('/api/dictations/')) {
     // все аудио должны быть из кеша
     // Range-запросы для аудио тоже должны быть только из кеша.
+    const label = `sw#${reqId} dictations-range ${reqPath}`;
+    swTimeStart(label);
     event.respondWith((async () => {
       try {
         const cache = await caches.open(MEDIA_CACHE_PERSIST);
@@ -420,7 +528,9 @@ self.addEventListener('fetch', (event) => {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' }
       });
-    })());
+    })().finally(() => {
+      swTimeEnd(label);
+    }));
     return;
   }
 
@@ -429,6 +539,8 @@ self.addEventListener('fetch', (event) => {
   try {
     const url = new URL(request.url);
     if (url.pathname && url.pathname.startsWith('/api/dictations/')) {
+      const label = `sw#${reqId} dictations ${reqPath}`;
+      swTimeStart(label);
       event.respondWith((async () => {
         try {
           const cache = await caches.open(MEDIA_CACHE_PERSIST);
@@ -456,64 +568,36 @@ self.addEventListener('fetch', (event) => {
           status: 503,
           headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
-      })());
+      })().finally(() => {
+        swTimeEnd(label);
+      }));
       return;
     }
   } catch (e) {
   }
 
   if (isUnboundedUrl(request.url)) {
-    event.respondWith(cacheFirstUnbounded(request));
+    const label = `sw#${reqId} unbounded ${reqPath}`;
+    swTimeStart(label);
+    event.respondWith((async () => {
+      try {
+        return await cacheFirstUnbounded(request, event);
+      } finally {
+        swTimeEnd(label);
+      }
+    })());
   } else {
-    event.respondWith(cacheFirstBounded(request));
+    const label = `sw#${reqId} bounded ${reqPath}`;
+    swTimeStart(label);
+    event.respondWith((async () => {
+      try {
+        return await cacheFirstBounded(request, event);
+      } finally {
+        swTimeEnd(label);
+      }
+    })());
   }
 });
-
-async function computeCacheStats() {
-  const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
-  const keys = await cache.keys();
-
-  let totalBytes = 0;
-  for (const req of keys) {
-    try {
-      const res = await cache.match(req);
-      if (!res) continue;
-
-      const len = res.headers.get('content-length');
-      if (len) {
-        const parsed = parseInt(len, 10);
-        if (!isNaN(parsed)) {
-          totalBytes += parsed;
-          continue;
-        }
-      }
-
-      const blob = await res.clone().blob();
-      totalBytes += blob.size || 0;
-    } catch (e) {
-      // игнорируем
-    }
-  }
-
-  const maxBytes = await getMaxBytes();
-  return { entries: keys.length, totalBytes, maxBytes };
-}
-
-async function computeCacheStatsForCache(cacheName) {
-  const resolved = cacheName || RUNTIME_CACHE_BOUNDED;
-  const cache = await caches.open(resolved);
-  const keys = await cache.keys();
-
-  let totalBytes = 0;
-  for (const req of keys) {
-    try {
-      const response = await cache.match(req);
-      totalBytes += await getResponseSizeBytes(response);
-    } catch (e) {
-    }
-  }
-  return { totalBytes, count: keys.length, cacheName: resolved };
-}
 
 async function clearRuntimeCache() {
   await Promise.all([
@@ -566,9 +650,6 @@ async function prefetchUrls(urls) {
   let skipped = 0;
   let failed = 0;
 
-  const maxBytes = await getMaxBytes();
-  const cacheTotals = new Map();
-
   for (const url of urls || []) {
     try {
       if (!url || typeof url !== 'string') {
@@ -581,13 +662,6 @@ async function prefetchUrls(urls) {
       const cacheName = pickCacheNameForRequest(absolute);
       const cache = await caches.open(cacheName);
 
-      if (!cacheTotals.has(cacheName)) {
-        const stats = await computeCacheStatsForCache(cacheName);
-        cacheTotals.set(cacheName, stats.totalBytes || 0);
-      }
-
-      let totalBytes = cacheTotals.get(cacheName) || 0;
-
       const cached = await cache.match(normalizedKey);
       if (cached) {
         skipped += 1;
@@ -596,15 +670,11 @@ async function prefetchUrls(urls) {
 
       const res = await fetch(new Request(url, { method: 'GET' }));
       if (res && res.ok) {
-        const size = await getResponseSizeBytes(res);
-        if ((totalBytes + size) <= maxBytes) {
+        try {
           await cache.put(normalizedKey, res.clone());
-          fetched += 1;
-          totalBytes += size;
-          cacheTotals.set(cacheName, totalBytes);
-        } else {
-          skipped += 1;
+        } catch (e) {
         }
+        fetched += 1;
       } else {
         failed += 1;
       }
@@ -620,14 +690,9 @@ async function prefetchUrlsStrict(urls, options = {}) {
   let fetched = 0;
   let skipped = 0;
   let failed = 0;
-  let overLimit = 0;
 
   const failedUrls = [];
-  const overLimitUrls = [];
-
-  const ignoreLimit = !!(options && options.ignoreLimit);
-  const maxBytes = ignoreLimit ? Number.MAX_SAFE_INTEGER : await getMaxBytes();
-  const cacheTotals = new Map();
+  void (options);
 
   for (const url of urls || []) {
     try {
@@ -641,13 +706,6 @@ async function prefetchUrlsStrict(urls, options = {}) {
       const cacheName = pickCacheNameForRequest(absolute);
       const cache = await caches.open(cacheName);
 
-      if (!cacheTotals.has(cacheName)) {
-        const stats = await computeCacheStatsForCache(cacheName);
-        cacheTotals.set(cacheName, stats.totalBytes || 0);
-      }
-
-      let totalBytes = cacheTotals.get(cacheName) || 0;
-
       const cached = await cache.match(normalizedKey);
       if (cached) {
         skipped += 1;
@@ -656,16 +714,11 @@ async function prefetchUrlsStrict(urls, options = {}) {
 
       const res = await fetch(new Request(url, { method: 'GET' }));
       if (res && res.ok) {
-        const size = await getResponseSizeBytes(res);
-        if (options.ignoreLimit || (totalBytes + size) <= maxBytes) {
+        try {
           await cache.put(normalizedKey, res.clone());
-          fetched += 1;
-          totalBytes += size;
-          cacheTotals.set(cacheName, totalBytes);
-        } else {
-          overLimit += 1;
-          if (overLimitUrls.length < 10) overLimitUrls.push(absolute);
+        } catch (e) {
         }
+        fetched += 1;
       } else {
         failed += 1;
         if (failedUrls.length < 10) {
@@ -687,27 +740,14 @@ async function prefetchUrlsStrict(urls, options = {}) {
     }
   }
 
-  let totalBytesAll = 0;
-  try {
-    for (const v of cacheTotals.values()) {
-      const n = Number(v);
-      if (isFinite(n) && n > 0) totalBytesAll += n;
-    }
-  } catch (e) {
-  }
-
-  const ok = failed === 0 && overLimit === 0;
+  const ok = failed === 0;
   return {
     ok,
     fetched,
     skipped,
     failed,
-    overLimit,
     total: (urls || []).length,
-    totalBytes: totalBytesAll,
-    maxBytes,
     failedUrls,
-    overLimitUrls,
   };
 }
 
@@ -846,14 +886,8 @@ self.addEventListener('message', (event) => {
 
   (async () => {
     try {
-      if (action === 'cacheStats') {
-        const stats = await computeCacheStats();
-        respond({ success: true, stats });
-        return;
-      }
-
       if (action === 'purgeDictation') {
-        const res = await purgeDictationFromBoundedCache(data.dictationId);
+        const res = await purgeDictationFromMediaCache(data.dictationId);
         respond({ success: true, result: res });
         return;
       }
@@ -861,18 +895,6 @@ self.addEventListener('message', (event) => {
       if (action === 'promoteDraftCache') {
         const res = await promoteDraftDictationCache(data.fromDictationId, data.toDictationId);
         respond({ success: true, result: res });
-        return;
-      }
-
-      if (action === 'getSettings') {
-        const maxBytes = await getMaxBytes();
-        respond({ success: true, settings: { maxBytes } });
-        return;
-      }
-
-      if (action === 'setMaxBytes') {
-        const res = await setMaxBytes(data.maxBytes);
-        respond({ success: true, settings: res });
         return;
       }
 
@@ -901,11 +923,7 @@ self.addEventListener('message', (event) => {
         if (res.ok) {
           respond({ success: true, result: res });
         } else {
-          if (res.overLimit > 0) {
-            respond({ success: false, error: 'cache_limit_exceeded', result: res });
-          } else {
-            respond({ success: false, error: 'prefetch_failed', result: res });
-          }
+          respond({ success: false, error: 'prefetch_failed', result: res });
         }
         return;
       }

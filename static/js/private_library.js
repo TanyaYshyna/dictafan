@@ -1455,14 +1455,6 @@ function createDictationCard(item, isDeskCard = false) {
                   <i data-lucide="arrow-big-down-dash"></i>
                   <span>Убрать со стола</span>
                 </button>
-                <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dictationId}">
-                  <i data-lucide="folder-symlink"></i>
-                  <span>Переместить</span>
-                </button>
-                <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-dictation" data-dictation-id="${dictationId}">
-                  <i data-lucide="trash-2"></i>
-                  <span>Удалить</span>
-                </button>
               </div>
             </div>
           </div>
