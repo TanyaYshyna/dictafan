@@ -4836,8 +4836,22 @@ let __initialBooksLoadTriggered = false;
 
 function triggerDeskLoadOnce() {
   if (__initialDeskLoadTriggered) return;
+  try {
+    const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('jwt_token') : null;
+    if (!token) {
+      return;
+    }
+  } catch (e) {
+    return;
+  }
   __initialDeskLoadTriggered = true;
-  loadDeskItems();
+  try {
+    const p = loadDeskItems();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => { });
+    }
+  } catch (e) {
+  }
 }
 
 function triggerBooksLoadOnce() {
@@ -4857,6 +4871,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   installEventHandlers();
 
   checkAppCacheRevision().catch(() => { });
+
+  // Ранний auth-gate: если токена нет, не дергаем защищенные API (например, /desk/api/items)
+  // до момента успешного логина.
+  try {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) {
+      console.log('⚠️ Нет токена на старте страницы, ждём логин');
+    }
+  } catch (e) {
+  }
 
   refreshOfflineCacheStatus();
 
@@ -4919,7 +4943,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         } else {
           console.log('⚠️ Пользователь не авторизован, данные не загружаются');
           refreshOfflineCacheStatus();
-          triggerDeskLoadOnce();
+          // Важно: не вызываем loadDeskItems без токена (иначе 401 и __initialDeskLoadTriggered=true,
+          // а после логина повторная загрузка уже не произойдет)
         }
       }
       // Если UserManager еще не инициализирован, продолжаем ждать
