@@ -3,6 +3,7 @@ let language_selector;
 let originalData = {};
 let hasUnsavedChanges = false;
 let isSavingProfile = false;
+let pendingAvatarBlob = null;
 
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
@@ -612,14 +613,9 @@ function initializeTopbarControls() {
                 outputQuality: 0.95,
                 maxFileSizeBytes: 5 * 1024 * 1024,
                 onConfirm: async (blob) => {
-                    try {
-                        showInfo('Загружаем аватар...');
-                    } catch (e) {
-                    }
-                    await UM.uploadAvatar(blob);
-                    originalData.avatar = UM.userData.avatar || {};
-                    updateAvatarDisplay(originalData.avatar);
+                    pendingAvatarBlob = blob;
                     setUnsavedState(true);
+                    try { checkForChanges(); } catch (e) {}
                     try {
                         const input = document.getElementById('avatarUpload');
                         if (input) input.value = '';
@@ -641,6 +637,89 @@ function initializeTopbarControls() {
         } catch (e2) {
         }
     }
+
+    try {
+        const saveButton = document.getElementById('saveButton');
+        if (saveButton && saveButton.dataset && !saveButton.dataset.boundClick) {
+            saveButton.dataset.boundClick = '1';
+            saveButton.addEventListener('click', async () => {
+                await handleSave();
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitToIndexBtn = document.getElementById('exitToIndexBtn');
+        if (exitToIndexBtn && exitToIndexBtn.dataset && !exitToIndexBtn.dataset.boundClick) {
+            exitToIndexBtn.dataset.boundClick = '1';
+            exitToIndexBtn.addEventListener('click', () => {
+                showExitModal();
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitStayBtn = document.getElementById('exitStayBtn');
+        if (exitStayBtn && exitStayBtn.dataset && !exitStayBtn.dataset.boundClick) {
+            exitStayBtn.dataset.boundClick = '1';
+            exitStayBtn.addEventListener('click', () => {
+                toggleExitModal(false);
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitWithoutSavingBtn = document.getElementById('exitWithoutSavingBtn');
+        if (exitWithoutSavingBtn && exitWithoutSavingBtn.dataset && !exitWithoutSavingBtn.dataset.boundClick) {
+            exitWithoutSavingBtn.dataset.boundClick = '1';
+            exitWithoutSavingBtn.addEventListener('click', () => {
+                toggleExitModal(false);
+                proceedToExit();
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitWithSavingBtn = document.getElementById('exitWithSavingBtn');
+        if (exitWithSavingBtn && exitWithSavingBtn.dataset && !exitWithSavingBtn.dataset.boundClick) {
+            exitWithSavingBtn.dataset.boundClick = '1';
+            exitWithSavingBtn.addEventListener('click', async () => {
+                toggleExitModal(false);
+                await handleSaveAndExit();
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitModal = document.getElementById('exitModal');
+        if (exitModal && exitModal.dataset && !exitModal.dataset.boundClick) {
+            exitModal.dataset.boundClick = '1';
+            exitModal.addEventListener('click', (e) => {
+                if (e.target === exitModal) {
+                    toggleExitModal(false);
+                }
+            });
+        }
+    } catch (e) {
+    }
+
+    try {
+        if (!document.body.dataset.profileExitEscBound) {
+            document.body.dataset.profileExitEscBound = '1';
+            document.addEventListener('keydown', (e) => {
+                const exitModal = document.getElementById('exitModal');
+                if (e.key === 'Escape' && exitModal && exitModal.style.display === 'flex') {
+                    toggleExitModal(false);
+                }
+            });
+        }
+    } catch (e) {
+    }
 }
 
 // Проверка изменений данных
@@ -653,9 +732,9 @@ function checkForChanges() {
         try {
             const a = normalizeAvatarForCompare(UM && UM.userData ? UM.userData.avatar : null);
             const b = normalizeAvatarForCompare(originalData ? originalData.avatar : null);
-            return a.large !== b.large || a.small !== b.small;
+            return a.large !== b.large || a.small !== b.small || !!pendingAvatarBlob;
         } catch (e) {
-            return false;
+            return !!pendingAvatarBlob;
         }
     })();
 
@@ -684,7 +763,7 @@ function setUnsavedState(state) {
         if (isSavingProfile) {
             saveButton.disabled = true;
         } else {
-            saveButton.disabled = !state;
+            saveButton.disabled = false;
         }
     }
 
@@ -824,6 +903,16 @@ async function saveProfile(options = {}) {
     setUnsavedState(hasUnsavedChanges || hasAudioChanges);
 
     try {
+        let avatarUploadedThisSave = false;
+        try {
+            if (pendingAvatarBlob) {
+                await UM.uploadAvatar(pendingAvatarBlob);
+                avatarUploadedThisSave = true;
+            }
+        } catch (e) {
+            throw e;
+        }
+
         const updateData = {
             username: formValues.username,
             native_language: formValues.native_language,
@@ -973,9 +1062,26 @@ async function saveProfile(options = {}) {
             UM.userData.native_language = updatedUser.native_language;
             UM.userData.learning_languages = updatedUser.learning_languages;
             UM.userData.current_learning = updatedUser.current_learning;
+
+            try {
+                window.USER_LANGUAGE_DATA = {
+                    nativeLanguage: UM.userData.native_language || 'ru',
+                    learningLanguages: UM.userData.learning_languages || ['en'],
+                    currentLearning: UM.userData.current_learning || (UM.userData.learning_languages && UM.userData.learning_languages[0]) || 'en',
+                    isAuthenticated: true
+                };
+            } catch (e) {
+            }
             
             // ВАЖНО: Обновляем аватар из originalData, так как он уже был загружен через uploadAvatar
             // и сохранен в originalData.avatar при загрузке
+            try {
+                if (avatarUploadedThisSave) {
+                    originalData.avatar = UM.userData.avatar || originalData.avatar || {};
+                }
+            } catch (e) {
+            }
+
             if (originalData.avatar) {
                 UM.userData.avatar = originalData.avatar;
             } else if (updatedUser.avatar) {
@@ -1049,6 +1155,7 @@ async function saveProfile(options = {}) {
         checkForChanges();
         // Убеждаемся, что обработчик beforeunload удален
         setUnsavedState(false);
+        pendingAvatarBlob = null;
         showSuccess('Профиль успешно сохранен!');
 
         if (typeof afterSave === 'function') {
