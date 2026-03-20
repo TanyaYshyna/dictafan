@@ -113,7 +113,10 @@ class UserManager {
         this._requireAuthDeferred = true;
         document.addEventListener('DOMContentLoaded', () => {
           this._requireAuthDeferred = false;
-          try { this._requireAuthInFlight = false; } catch (e) {}
+          try {
+            this._requireAuthInFlight = false;
+            this._requireAuthLastAt = 0;
+          } catch (e) {}
           this.requireAuth();
         }, { once: true });
       }
