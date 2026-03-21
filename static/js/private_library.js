@@ -940,17 +940,35 @@ async function loadDeskItems() {
   const t0 = performance.now();
   let renderedFromCache = false;
   let cachedItemsSnapshot = [];
+  let cachedDeskVersion = '';
 
   try {
     const cached = await idbGet('desk_items', 'latest');
+    const cachedVer = await idbGet('desk_items', 'desk_version');
+    try {
+      cachedDeskVersion = cachedVer && typeof cachedVer.version === 'string' ? cachedVer.version : '';
+    } catch (e) {
+      cachedDeskVersion = '';
+    }
     const items = cached && Array.isArray(cached.items) ? cached.items : [];
     if (items.length) {
       if (seq !== deskLoadSeq) {
         resolveInFlight();
         return;
       }
-      deskItems = items;
-      cachedItemsSnapshot = items;
+      // Mark items as coming from IDB cache so we can load covers immediately
+      // (fast repeat loads) while keeping staged cover loading for network renders.
+      const itemsMarked = items.map(it => {
+        try {
+          if (!it || typeof it !== 'object') return it;
+          if (it.__desk_cached_render === true) return it;
+          return { ...it, __desk_cached_render: true };
+        } catch (e) {
+          return it;
+        }
+      });
+      deskItems = itemsMarked;
+      cachedItemsSnapshot = itemsMarked;
       if (typeof renderDeskCards === 'function' && deskItems.length > 0) {
         renderDeskCards(deskItems);
       }
@@ -969,6 +987,26 @@ async function loadDeskItems() {
   }
 
   try {
+    if (cachedDeskVersion) {
+      try {
+        const tVerStart = performance.now();
+        const verData = await apiRequest("/desk/api/items/version");
+        const tVerEnd = performance.now();
+        console.log('[desk-render] stage0 desk version check:', Math.round(tVerEnd - tVerStart), 'ms');
+
+        if (verData && verData.success && typeof verData.version === 'string') {
+          if (String(verData.version) === String(cachedDeskVersion)) {
+            if (renderedFromCache) {
+              resolveInFlight();
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        // If version check fails, fall back to full fetch.
+      }
+    }
+
     const tNetStart = performance.now();
     const data = await apiRequest("/desk/api/items");
     const tNetEnd = performance.now();
@@ -1023,7 +1061,13 @@ async function loadDeskItems() {
             if (!it) continue;
             const k = String(it.dictation_id ?? it.id ?? '');
             if (!k) continue;
-            byDictationId.set(k, it);
+            // Network snapshot: keep staged cover loading (no __desk_cached_render)
+            if (it && typeof it === 'object' && it.__desk_cached_render) {
+              const { __desk_cached_render, ...rest } = it;
+              byDictationId.set(k, rest);
+            } else {
+              byDictationId.set(k, it);
+            }
           }
           for (const it of prevItems) {
             if (!it) continue;
@@ -1042,6 +1086,14 @@ async function loadDeskItems() {
       deskItems = merged;
       try {
         await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
+      } catch (e) {
+      }
+
+      try {
+        const verData = await apiRequest("/desk/api/items/version");
+        if (verData && verData.success && typeof verData.version === 'string') {
+          await idbPut('desk_items', { key: 'desk_version', updatedAt: Date.now(), version: String(verData.version) });
+        }
       } catch (e) {
       }
 
@@ -1485,10 +1537,17 @@ function createDictationCard(item, isDeskCard = false) {
 
     const langPair = `${langOriginal}`;
 
+    const isCachedRender = !!(item && item.__desk_cached_render);
+
+    const coverSrc = isCachedRender
+      ? (coverUrl || 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
+      : 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+    const coverLoading = isCachedRender ? 'eager' : 'lazy';
+
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
-            <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="lazy">
+            <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async">
             <div class="card-progress-stats"></div>
           </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>

@@ -19,6 +19,53 @@ desk_bp = Blueprint("desk", __name__, url_prefix="/desk")
 #     return render_template("desk.html")
 
 
+@desk_bp.route("/api/items/version", methods=["GET"])
+@jwt_required()
+def api_desk_items_version():
+    """Lightweight desk version check for multi-device sync.
+
+    Returns a stable version string derived from:
+    - number of desk items
+    - most recent created_at timestamp
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                COUNT(*)::int AS items_count,
+                MAX(created_at) AS last_created_at
+            FROM desk_items
+            WHERE user_id = %s
+            """,
+            (user["id"],),
+        )
+        row = cur.fetchone() or {}
+        items_count = int(row.get("items_count") or 0)
+        last_created_at = row.get("last_created_at")
+        last_iso = last_created_at.isoformat() if last_created_at else ""
+        version = f"{items_count}:{last_iso}"
+        return jsonify(
+            {
+                "success": True,
+                "version": version,
+                "items_count": items_count,
+                "last_created_at": last_iso,
+            }
+        )
+    except Exception as exc:
+        logger.error("Ошибка получения версии стола пользователя: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
 @desk_bp.route("/api/items", methods=["GET"])
 @jwt_required()
 def api_desk_items():
