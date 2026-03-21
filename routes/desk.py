@@ -44,7 +44,19 @@ def api_desk_items():
                 d.language_code,
                 d.owner_id,
                 d.level,
-                (SELECT COUNT(*) FROM dictation_sentences WHERE dictation_id = d.id AND language_code = d.language_code) as sentences_count,
+                COALESCE(d.tr_en, FALSE) as tr_en,
+                COALESCE(d.tr_uk, FALSE) as tr_uk,
+                COALESCE(d.tr_sv, FALSE) as tr_sv,
+                COALESCE(d.tr_be, FALSE) as tr_be,
+                COALESCE(d.tr_ru, FALSE) as tr_ru,
+                COALESCE(d.tr_de, FALSE) as tr_de,
+                COALESCE(d.tr_fr, FALSE) as tr_fr,
+                COALESCE(d.tr_es, FALSE) as tr_es,
+                COALESCE(d.tr_it, FALSE) as tr_it,
+                COALESCE(d.tr_tr, FALSE) as tr_tr,
+                COALESCE(d.tr_ar, FALSE) as tr_ar,
+                COALESCE(d.tr_pl, FALSE) as tr_pl,
+                COALESCE(d.sentences_count, 0) as sentences_count,
                 (SELECT DISTINCT language_code 
                  FROM dictation_sentences 
                  WHERE dictation_id = d.id AND language_code != d.language_code 
@@ -81,10 +93,42 @@ def api_desk_items():
                     "title": row["title"],
                     "language_code": row["language_code"],
                     "language_translation": row["language_translation"] or row["language_code"],
+                    "translation_languages": sorted(
+                        [
+                            lang
+                            for lang in [
+                                "en",
+                                "uk",
+                                "sv",
+                                "be",
+                                "ru",
+                                "de",
+                                "fr",
+                                "es",
+                                "it",
+                                "tr",
+                                "ar",
+                                "pl",
+                            ]
+                            if row.get(f"tr_{lang}")
+                        ]
+                    ),
                     "owner_id": row.get("owner_id"),
                     "level": row["level"],
                     "sentences_count": row["sentences_count"] or 0,
                     "cover_url": cover_url,
+                    "tr_en": bool(row.get("tr_en")),
+                    "tr_uk": bool(row.get("tr_uk")),
+                    "tr_sv": bool(row.get("tr_sv")),
+                    "tr_be": bool(row.get("tr_be")),
+                    "tr_ru": bool(row.get("tr_ru")),
+                    "tr_de": bool(row.get("tr_de")),
+                    "tr_fr": bool(row.get("tr_fr")),
+                    "tr_es": bool(row.get("tr_es")),
+                    "tr_it": bool(row.get("tr_it")),
+                    "tr_tr": bool(row.get("tr_tr")),
+                    "tr_ar": bool(row.get("tr_ar")),
+                    "tr_pl": bool(row.get("tr_pl")),
                 }
             )
 

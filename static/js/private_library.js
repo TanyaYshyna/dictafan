@@ -4367,6 +4367,8 @@ function renderStatsIcons(container, stats = {}) {
 // Кеш для количества выполнений
 let completionCountsCache = {};
 
+let completionCountsLoadedFromIdb = false;
+
 // Загрузка количества выполнений из БД
 async function loadCompletionCounts(container = null) {
   const targetContainer = container || document;
@@ -4384,6 +4386,38 @@ async function loadCompletionCounts(container = null) {
     return;
   }
 
+  if (!completionCountsLoadedFromIdb) {
+    completionCountsLoadedFromIdb = true;
+    try {
+      const cached = await idbGet('desk_items', 'completion_counts');
+      if (cached && cached.counts && typeof cached.counts === 'object') {
+        Object.assign(completionCountsCache, cached.counts);
+      }
+    } catch (e) {
+    }
+  }
+
+  const hasCachedCount = (dictationId) => {
+    if (!dictationId) return false;
+    const formats = [
+      dictationId,
+      `dict_${dictationId}`,
+      String(dictationId),
+      `dict_${String(dictationId)}`,
+    ];
+    for (const key of formats) {
+      if (completionCountsCache[key] !== undefined) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const missingIds = dictationIds.filter(id => !hasCachedCount(id));
+  if (missingIds.length === 0) {
+    return;
+  }
+
   // Получаем токен
   const token = window.UM?.token || localStorage.getItem('jwt_token');
   if (!token) {
@@ -4398,7 +4432,7 @@ async function loadCompletionCounts(container = null) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ dictation_ids: dictationIds })
+      body: JSON.stringify({ dictation_ids: missingIds })
     });
 
     if (response.ok) {
@@ -4406,6 +4440,10 @@ async function loadCompletionCounts(container = null) {
       // Обновляем кеш, добавляя новые данные (не заменяя полностью)
       if (result.counts) {
         Object.assign(completionCountsCache, result.counts);
+        try {
+          await idbPut('desk_items', { key: 'completion_counts', updatedAt: Date.now(), counts: completionCountsCache });
+        } catch (e) {
+        }
       }
     } else {
       console.error('[loadCompletionCounts] Ошибка загрузки:', await response.text());

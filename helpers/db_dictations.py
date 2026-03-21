@@ -259,7 +259,7 @@ def set_dictation_translation_flags(dictation_id: int, flags: dict) -> None:
 
 
 def update_dictation(dictation_id, title=None, language_code=None, level=None, 
-                    is_public=None, speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None):
+                    is_public=None, speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None, sentences_count=None):
     """
     Обновляет диктант в БД
     
@@ -271,6 +271,7 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
         is_public: Новый статус публичности (если None - не обновляется)
         speakers: Новый словарь спикеров (если None - не обновляется)
         audio_user_shared: Новый URL общего аудио (если None - не обновляется)
+        sentences_count: Денормализованное количество предложений на языке оригинала (если None - не обновляется)
         title_translations: Новый словарь переводов заголовка (если None - не обновляется)
         author_materials_url: URL на материалы автора (если None - не обновляется)
     
@@ -307,6 +308,10 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
             if is_public is not None:
                 updates.append("is_public = %s")
                 values.append(is_public)
+
+            if sentences_count is not None:
+                updates.append("sentences_count = %s")
+                values.append(int(sentences_count) if sentences_count is not None else 0)
             
             if speakers is not None:
                 updates.append("speakers_json = %s")

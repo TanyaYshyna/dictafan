@@ -1118,6 +1118,23 @@ def save_dictation_final():
         
         sentences_data = data.get('sentences', {})
         logger.info(f"📝 Сохранение предложений для диктанта {dictation_id} (db_id={db_id}), языков: {list(sentences_data.keys())}")
+
+        try:
+            orig_lang = str(data.get('language_original') or data.get('language_code') or '').strip().lower()
+        except Exception:
+            orig_lang = ''
+        if not orig_lang:
+            try:
+                orig_lang = str(data.get('language_original') or 'en').strip().lower()
+            except Exception:
+                orig_lang = 'en'
+
+        try:
+            orig_payload = sentences_data.get(orig_lang) if isinstance(sentences_data, dict) else None
+            orig_sentences = orig_payload.get('sentences') if isinstance(orig_payload, dict) else None
+            computed_sentences_count = len(orig_sentences) if isinstance(orig_sentences, list) else 0
+        except Exception:
+            computed_sentences_count = 0
         added_count = 0
         updated_count = 0
         deleted_count = 0
@@ -1254,6 +1271,11 @@ def save_dictation_final():
             deleted_count,
             skipped_lang_count,
         )
+
+        try:
+            update_dictation(dictation_id=int(db_id), sentences_count=int(computed_sentences_count))
+        except Exception:
+            pass
 
         # Refresh cached translation flags (tr_*) for fast filtering.
         # Safe: if columns are not present yet, helper is a no-op.
