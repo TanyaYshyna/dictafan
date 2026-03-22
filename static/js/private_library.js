@@ -1052,38 +1052,21 @@ async function loadDeskItems() {
       // temporarily returns an incomplete list (e.g. dictations missing in JOIN,
       // offline-only cached items, etc.).
       const serverItems = Array.isArray(data.items) ? data.items : [];
-      const prevItems = Array.isArray(deskItems) ? deskItems : [];
-      const merged = (() => {
+      const cleanedServerItems = serverItems.map(it => {
         try {
-          const byDictationId = new Map();
-          // Prefer server items first (authoritative), then keep any local-only items.
-          for (const it of serverItems) {
-            if (!it) continue;
-            const k = String(it.dictation_id ?? it.id ?? '');
-            if (!k) continue;
-            // Network snapshot: keep staged cover loading (no __desk_cached_render)
-            if (it && typeof it === 'object' && it.__desk_cached_render) {
-              const { __desk_cached_render, ...rest } = it;
-              byDictationId.set(k, rest);
-            } else {
-              byDictationId.set(k, it);
-            }
-          }
-          for (const it of prevItems) {
-            if (!it) continue;
-            const k = String(it.dictation_id ?? it.id ?? '');
-            if (!k) continue;
-            if (!byDictationId.has(k)) {
-              byDictationId.set(k, { ...it, __local_only: true });
-            }
-          }
-          return Array.from(byDictationId.values());
+          if (!it || typeof it !== 'object') return it;
+          if (!it.__desk_cached_render) return it;
+          const { __desk_cached_render, ...rest } = it;
+          return rest;
         } catch (e) {
-          return serverItems.length ? serverItems : prevItems;
+          return it;
         }
-      })();
+      });
 
-      deskItems = merged;
+      // IMPORTANT: server is authoritative for the desk.
+      // Persist only server items to avoid accumulating stale/deleted cards in IDB
+      // (e.g. long-lived Safari tabs).
+      deskItems = cleanedServerItems;
       try {
         await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: deskItems });
       } catch (e) {
@@ -1104,9 +1087,32 @@ async function loadDeskItems() {
             renderDeskCards(deskItems);
           }
         }
+        try {
+          if (window.PersistentLog && typeof window.PersistentLog.log === 'function') {
+            window.PersistentLog.log('desk_reconcile', {
+              renderedFromCache: true,
+              prevCount: prevSnapshot.length,
+              nextCount: nextSnapshot.length,
+              applied: !!(res && res.applied),
+              added: res && typeof res.added === 'number' ? res.added : null,
+              removed: res && typeof res.removed === 'number' ? res.removed : null,
+              updated: res && typeof res.updated === 'number' ? res.updated : null,
+            });
+          }
+        } catch (e) {
+        }
       } else {
         if (typeof renderDeskCards === 'function') {
           renderDeskCards(deskItems);
+        }
+        try {
+          if (window.PersistentLog && typeof window.PersistentLog.log === 'function') {
+            window.PersistentLog.log('desk_render', {
+              renderedFromCache: false,
+              count: Array.isArray(deskItems) ? deskItems.length : 0
+            });
+          }
+        } catch (e) {
         }
       }
       // Обновляем индикаторы "в работе" в карточках диктантов
