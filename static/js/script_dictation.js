@@ -2577,6 +2577,13 @@ function pauseGame(isInactivityPause = false) {
     // Если уже на паузе - ничего не делаем
     if (pauseModal.style.display === 'flex') return;
 
+    // Останавливаем основной таймер (и таймер обратного отсчета, если включен)
+    // чтобы в паузе цифры не продолжали тикать.
+    try {
+        stopTimer();
+    } catch (e) {
+    }
+
     // Если пауза из-за бездействия, вычитаем время бездействия из накопленного времени
     if (isInactivityPause) {
         const panel = getProgressPanelInstance();
@@ -4139,6 +4146,19 @@ function updateStats(circle = null) {
 // --------------- timer ---------------------------------
 
 function startTimer() {
+    // Таймер должен начинать тикать только после реального старта диктанта,
+    // а не при простом открытии страницы.
+    try {
+        if (!gameHasAlreadyBegun) {
+            return;
+        }
+        // Если модалка старта ещё открыта — не запускаем.
+        if (typeof startModal !== 'undefined' && startModal && startModal.style && startModal.style.display === 'flex') {
+            return;
+        }
+    } catch (e) {
+    }
+
     const panel = getProgressPanelInstance();
     if (panel) {
         panel.startSession();

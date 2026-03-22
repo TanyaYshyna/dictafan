@@ -770,6 +770,10 @@ class ProgressPanel {
         if (!button || button.dataset.timerSetup === '1') return;
         button.addEventListener('click', (event) => {
             event.preventDefault();
+            // Prevent double-click from instantly toggling pause/resume.
+            if (event && typeof event.detail === 'number' && event.detail > 1) {
+                return;
+            }
             // Кнопка "время" (маленькая) переключает паузу (как раньше),
             // а широкая кнопка "таймер" открывает настройки таймера.
             const pauseModal = document.getElementById('pauseModal');
