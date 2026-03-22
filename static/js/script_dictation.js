@@ -9110,10 +9110,36 @@ async function registerCompletedDictation() {
                 })
             });
 
+            const bumpCompletionCountsCache = async (id) => {
+                try {
+                    if (!id) return;
+                    const store = 'desk_items';
+                    const key = 'completion_counts';
+                    const existing = await (typeof idbGet === 'function' ? idbGet(store, key) : null);
+                    const payload = (existing && typeof existing === 'object') ? existing : { key, updatedAt: 0, counts: {} };
+                    const counts = (payload.counts && typeof payload.counts === 'object') ? payload.counts : {};
+
+                    const numeric = String(id);
+                    const dictKey = `dict_${numeric}`;
+                    const current = Number(counts[numeric] ?? counts[dictKey] ?? 0) || 0;
+                    const next = current + 1;
+                    counts[numeric] = next;
+                    counts[dictKey] = next;
+
+                    payload.counts = counts;
+                    payload.updatedAt = Date.now();
+                    if (typeof idbPut === 'function') {
+                        await idbPut(store, payload);
+                    }
+                } catch (e) {
+                }
+            };
+
             if (successResponse.ok) {
                 const result = await successResponse.json();
                 console.log('[Register] ✅ Успех сохранен в history_successes:', result.success_data);
                 dictationCompletionSaved = true;
+                await bumpCompletionCountsCache(dictationIdForDb);
                 stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
             } else {
@@ -9137,6 +9163,7 @@ async function registerCompletedDictation() {
 
                 // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
                 dictationCompletionSaved = true;
+                await bumpCompletionCountsCache(dictationIdForDb);
                 stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
             }
@@ -9156,6 +9183,32 @@ async function registerCompletedDictation() {
 
             // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
             dictationCompletionSaved = true;
+            try {
+                const dictationIdForDb2 = (() => {
+                    const raw = String(currentDictation.id ?? '').trim();
+                    const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
+                    return Number.isFinite(parsed) ? parsed : null;
+                })();
+                const store = 'desk_items';
+                const key = 'completion_counts';
+                const existing = await (typeof idbGet === 'function' ? idbGet(store, key) : null);
+                const payload = (existing && typeof existing === 'object') ? existing : { key, updatedAt: 0, counts: {} };
+                const counts = (payload.counts && typeof payload.counts === 'object') ? payload.counts : {};
+                if (dictationIdForDb2) {
+                    const numeric = String(dictationIdForDb2);
+                    const dictKey = `dict_${numeric}`;
+                    const current = Number(counts[numeric] ?? counts[dictKey] ?? 0) || 0;
+                    const next = current + 1;
+                    counts[numeric] = next;
+                    counts[dictKey] = next;
+                    payload.counts = counts;
+                    payload.updatedAt = Date.now();
+                    if (typeof idbPut === 'function') {
+                        await idbPut(store, payload);
+                    }
+                }
+            } catch (e2) {
+            }
             stopDraftAutosaveTimers();
             await clearDraftFromIndexedDb();
         }

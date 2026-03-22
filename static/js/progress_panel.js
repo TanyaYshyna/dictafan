@@ -81,18 +81,18 @@ class ProgressPanel {
         return `
             <table class="table-progress">
                 <tr>
-                    <td colspan="4">
-                        <div class="timer-control">
-                            <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Время работы над диктантом">
-                                <i data-lucide="clock"></i>
-                                <span id="${timerId}" class="timer-value">00:00:00</span>
-                            </button>
-                            <button id="${timerBtnId}" class="stat-btn row-timer timer" disabled title="Таймер">
-                                <i data-lucide="timer"></i>
-                                <span class="timer-label">Таймер</span>
-                                <span class="timer-value" hidden>00:00:00</span>
-                            </button>
-                        </div>
+                    <td colspan="2">
+                        <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Время работы над диктантом">
+                            <i data-lucide="clock"></i>
+                            <span id="${timerId}" class="timer-value">00:00:00</span>
+                        </button>
+                    </td>
+                    <td colspan="2">
+                        <button id="${timerBtnId}" class="stat-btn row-timer timer" disabled title="Таймер">
+                            <span class="timer-label">Таймер</span>
+                            <span class="timer-value" hidden>00:00:00</span>
+                            <i data-lucide="timer"></i>
+                        </button>
                     </td>
                 </tr>
                 <tr>
@@ -998,7 +998,10 @@ class ProgressPanel {
         this.updateTimerButtons();
         this._updateTimerButtonColor();
         this.startSession({ resetCountdown: true });
-        this._saveTimerPreference();
+        try {
+            this._saveTimerPreference();
+        } catch (e) {
+        }
         return true;
     }
 
@@ -1053,6 +1056,18 @@ class ProgressPanel {
         this.stats.timer = 0;
         this.updateTimer();
         this.updateTimerIcon();
+    }
+
+    _saveTimerPreference() {
+        try {
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            const duration = Number(this.countdownDuration || 0);
+            if (!(duration > 0)) return;
+            localStorage.setItem(this.timerPreferenceKey, JSON.stringify({ duration }));
+            console.log('[Timer] _saveTimerPreference -> duration=%s', duration);
+        } catch (error) {
+            console.warn('Ошибка сохранения настроек таймера:', error);
+        }
     }
 
     _playCountdownSoundFallback() {

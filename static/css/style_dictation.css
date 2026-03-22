@@ -459,6 +459,7 @@ body.playing-audio::after {
   border-collapse: collapse;
   border-spacing: 0;
   width: 100%;
+  table-layout: fixed;
   border: 0px;
   margin: 0 !important;
 }
@@ -472,7 +473,7 @@ body.playing-audio::after {
    Чтобы на странице диктанта было такое же расстояние, применяем тот же padding
    ко всем ячейкам таблицы внутри .progress-panel-modal-r */
 .progress-panel-modal-r .table-progress td {
-  padding: 2px !important;
+  padding: 0 !important;
 }
 /* .table-progress tr:first-child td {
   padding: 10px;
@@ -3378,56 +3379,38 @@ body.playing-audio::after {
     background: var(--color-button-purple);
 }
 
-.timer-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+/* Верхний ряд прогресс-панели: 2 кнопки по 2 колонки (таблица 2x4) */
+.table-progress .stat-btn.timer-settings,
+.table-progress .stat-btn.row-timer.timer {
   width: 100%;
-}
-
-/* Обе кнопки вместе должны занимать ту же ширину, что и раньше */
-.timer-control .stat-btn.timer-settings {
-  flex: 0 0 160px;
-  width: 160px;
-  min-width: 160px;
-  max-width: 160px;
-  padding: 0 10px;
-  gap: 8px;
   justify-content: center;
+  padding: 0 10px;
+  gap: 6px;
 }
 
-.timer-control .stat-btn.timer-settings .timer-value {
+.table-progress .stat-btn.timer-settings .timer-value {
   flex: 1;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-.timer-control .stat-btn.row-timer.timer {
-  flex: 0 0 170px;
-  width: 170px;
-  min-width: 170px;
-  max-width: 170px;
-  justify-content: center;
-  gap: 8px;
-}
-
-.timer-control .stat-btn.row-timer.timer .timer-label,
-.timer-control .stat-btn.row-timer.timer .timer-value {
+.table-progress .stat-btn.row-timer.timer .timer-label,
+.table-progress .stat-btn.row-timer.timer .timer-value {
   font-variant-numeric: tabular-nums;
 }
 
-.timer-control .stat-btn.row-timer.timer .timer-value {
+.table-progress .stat-btn.row-timer.timer .timer-value {
   margin-left: 0;
   flex: 1;
   text-align: center;
 }
 
-.timer-control .stat-btn.row-timer.timer .timer-label {
+.table-progress .stat-btn.row-timer.timer .timer-label {
   flex: 1;
   text-align: center;
 }
 
-.timer-control .stat-btn.row-timer.timer i[data-lucide] {
+.table-progress .stat-btn.row-timer.timer i[data-lucide] {
   margin-left: auto;
 }
 
