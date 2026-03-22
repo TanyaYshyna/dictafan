@@ -917,14 +917,19 @@ class ProgressPanel {
             <div class="timer-dialog" role="dialog" aria-modal="true">
                 <button type="button" class="timer-dialog-close" data-action="close" aria-label="Закрыть">
                     <i data-lucide="x"></i>
+                    <span class="timer-dialog-close-fallback" aria-hidden="true">×</span>
                 </button>
+                <div class="timer-dialog-header">
+                    <div class="timer-dialog-title">Таймер:</div>
+                </div>
                 <div class="timer-dialog-timer-fields">
                     <div class="timer-field-group">
-                        <label>
+                        <label class="timer-field-label">
                             Минуты
                             <input type="number" min="0" max="720" step="1" name="timerMinutes" value="5">
                         </label>
-                        <label>
+                        <div class="timer-field-sep" aria-hidden="true">:</div>
+                        <label class="timer-field-label">
                             Секунды
                             <input type="number" min="0" max="59" step="1" name="timerSeconds" value="0">
                         </label>
