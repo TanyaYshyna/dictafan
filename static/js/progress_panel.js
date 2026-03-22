@@ -14,7 +14,6 @@ class ProgressPanel {
         this.elements = {
             timer: document.getElementById('timer'),
             timerSettings: document.getElementById('btn-timer-settings'),
-            timerModeIcon: document.getElementById('timer-mode-icon'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
@@ -22,7 +21,6 @@ class ProgressPanel {
             // Модальные элементы
             modalTimer: document.getElementById('modal_timer'),
             modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
-            modalTimerModeIcon: document.getElementById('modal-timer-mode-icon'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -53,6 +51,7 @@ class ProgressPanel {
 
         // Настройки режима времени
         this.timerMode = 'clock'; // clock | countdown
+        this.countdownEnabled = false;
         this.countdownDuration = 0; // seconds (значение по умолчанию)
         this.countdownRemaining = 0; // seconds (отображение оставшегося времени)
         this.countdownExpired = false;
@@ -78,18 +77,20 @@ class ProgressPanel {
         const timerId = variant === 'modal' ? 'modal_timer' : 'timer';
         const timerBtnId = variant === 'modal' ? 'btn-modal-timer' : 'btn-timer';
         const timerSettingsId = variant === 'modal' ? 'btn-modal-timer-settings' : 'btn-timer-settings';
-        const timerModeIconId = variant === 'modal' ? 'modal-timer-mode-icon' : 'timer-mode-icon';
         
         return `
             <table class="table-progress">
                 <tr>
                     <td colspan="4">
                         <div class="timer-control">
-                            <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Режим времени">
-                                <span id="${timerModeIconId}" class="timer-mode-icon" aria-hidden="true"></span>
+                            <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Время работы над диктантом">
+                                <i data-lucide="clock"></i>
+                                <span id="${timerId}" class="timer-value">00:00:00</span>
                             </button>
-                            <button id="${timerBtnId}" class="stat-btn row-timer timer" disabled title="Время работы над диктантом">
-                                <span id="${timerId}">00:00:00</span>
+                            <button id="${timerBtnId}" class="stat-btn row-timer timer" disabled title="Таймер">
+                                <i data-lucide="timer"></i>
+                                <span class="timer-label">Таймер</span>
+                                <span class="timer-value" hidden>00:00:00</span>
                             </button>
                         </div>
                     </td>
@@ -143,14 +144,12 @@ class ProgressPanel {
         this.elements = {
             timer: document.getElementById('timer'),
             timerSettings: document.getElementById('btn-timer-settings'),
-            timerModeIcon: document.getElementById('timer-mode-icon'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             modalTimer: document.getElementById('modal_timer'),
             modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
-            modalTimerModeIcon: document.getElementById('modal-timer-mode-icon'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -163,8 +162,8 @@ class ProgressPanel {
         // Убеждаемся, что таймер показывает 00:00:00 при первом рендере
         this.stats.timer = 0;
         this.updateTimer();
-        this._initTimerControls();
         this._loadTimerPreference();
+        this._initTimerControls();
         // Загружаем список звуков таймера
         this._loadTimerSounds();
         // Загружаем список звуков победы
@@ -181,57 +180,6 @@ class ProgressPanel {
             if (modalTimerEl) {
                 window.modalTimerElement = modalTimerEl;
             }
-            
-            // Добавляем обработчики клика на кнопки таймера для остановки времени
-            const btnTimer = document.getElementById('btn-timer');
-            const btnModalTimer = document.getElementById('btn-modal-timer');
-            
-            if (btnTimer) {
-                // Убираем disabled чтобы кнопка была кликабельной
-                btnTimer.removeAttribute('disabled');
-                // Удаляем старый обработчик если есть
-                btnTimer.replaceWith(btnTimer.cloneNode(true));
-                const newBtnTimer = document.getElementById('btn-timer');
-                newBtnTimer.addEventListener('click', function() {
-                    // Проверяем, открыто ли модальное окно паузы
-                    const pauseModal = document.getElementById('pauseModal');
-                    if (pauseModal && pauseModal.style.display === 'flex') {
-                        // Если на паузе - возобновляем
-                        if (typeof window.resumeGame === 'function') {
-                            window.resumeGame();
-                        }
-                    } else {
-                        // Если не на паузе - ставим на паузу
-                        if (typeof window.pauseGame === 'function') {
-                            window.pauseGame();
-                        }
-                    }
-                });
-            }
-            
-            if (btnModalTimer) {
-                // Убираем disabled чтобы кнопка была кликабельной
-                btnModalTimer.removeAttribute('disabled');
-                // Удаляем старый обработчик если есть
-                btnModalTimer.replaceWith(btnModalTimer.cloneNode(true));
-                const newBtnModalTimer = document.getElementById('btn-modal-timer');
-                newBtnModalTimer.addEventListener('click', function() {
-                    // Проверяем, открыто ли модальное окно паузы
-                    const pauseModal = document.getElementById('pauseModal');
-                    if (pauseModal && pauseModal.style.display === 'flex') {
-                        // Если на паузе - возобновляем
-                        if (typeof window.resumeGame === 'function') {
-                            window.resumeGame();
-                        }
-                    } else {
-                        // Если не на паузе - ставим на паузу
-                        if (typeof window.pauseGame === 'function') {
-                            window.pauseGame();
-                        }
-                    }
-                });
-            }
-            
         }
 
         this.markClean({ lastSaveOk: true });
@@ -281,7 +229,7 @@ class ProgressPanel {
             this.timerState.dictationAccumulatedMs = 0;
         }
 
-        if (this.timerMode === 'countdown') {
+        if (this.countdownEnabled) {
             if (options.resetCountdown || this.timerState.countdownRemainingMs <= 0) {
                 const baseSeconds = this.countdownDuration > 0
                     ? this.countdownDuration
@@ -374,38 +322,47 @@ class ProgressPanel {
      * Обновляет отображение таймера на основе текущего состояния.
      */
     updateTimer() {
-        const timerValue = this._computeTimerSeconds();
-        this.stats.timer = timerValue;
+        const now = Date.now();
 
-        const hours = Math.floor(timerValue / 3600);
-        const minutes = Math.floor((timerValue % 3600) / 60);
-        const seconds = timerValue % 60;
+        const elapsedSeconds = Math.floor(this._computeClockMs(now) / 1000);
+        const timerValue = elapsedSeconds;
+        const elapsedHours = Math.floor(elapsedSeconds / 3600);
+        const elapsedMinutes = Math.floor((elapsedSeconds % 3600) / 60);
+        const elapsedSecs = elapsedSeconds % 60;
+        const formattedElapsed = `${String(elapsedHours).padStart(2, '0')}:${String(elapsedMinutes).padStart(2, '0')}:${String(elapsedSecs).padStart(2, '0')}`;
 
-        const formatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-
-        if (this.timerMode === 'countdown') {
-            this.countdownRemaining = timerValue;
+        let formattedCountdown = formattedElapsed;
+        if (this.countdownEnabled) {
+            const remainingSeconds = Math.floor(this._computeCountdownMs(now) / 1000);
+            this.countdownRemaining = remainingSeconds;
+            const remHours = Math.floor(remainingSeconds / 3600);
+            const remMinutes = Math.floor((remainingSeconds % 3600) / 60);
+            const remSecs = remainingSeconds % 60;
+            formattedCountdown = `${String(remHours).padStart(2, '0')}:${String(remMinutes).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}`;
         }
+
+        // timer stat keeps elapsed seconds (for history/compat)
+        this.stats.timer = elapsedSeconds;
 
         // Обновляем элементы, если они есть в this.elements
         if (this.elements.timer) {
-            this.elements.timer.textContent = formatted;
+            this.elements.timer.textContent = formattedElapsed;
         }
         if (this.elements.modalTimer) {
-            this.elements.modalTimer.textContent = formatted;
+            this.elements.modalTimer.textContent = formattedElapsed;
         }
         
         // Также обновляем элементы напрямую из DOM (на случай, если они не были найдены при рендере)
         const timerEl = document.getElementById('timer');
         const modalTimerEl = document.getElementById('modal_timer');
         if (timerEl) {
-            timerEl.textContent = formatted;
+            timerEl.textContent = formattedElapsed;
             if (!this.elements.timer) {
                 this.elements.timer = timerEl;
             }
         }
         if (modalTimerEl) {
-            modalTimerEl.textContent = formatted;
+            modalTimerEl.textContent = formattedElapsed;
             if (!this.elements.modalTimer) {
                 this.elements.modalTimer = modalTimerEl;
             }
@@ -423,7 +380,24 @@ class ProgressPanel {
             }
         }
 
-        this.updateTimerIcon();
+        // Обновляем широкую кнопку таймера: либо слово "Таймер", либо оставшееся время
+        try {
+            const applyBtnValue = (btnId) => {
+                const btn = document.getElementById(btnId);
+                if (!btn) return;
+                const valueNode = btn.querySelector('.timer-value');
+                if (valueNode) valueNode.textContent = formattedCountdown;
+            };
+            applyBtnValue('btn-timer');
+            applyBtnValue('btn-modal-timer');
+        } catch (e) {
+        }
+        this.updateTimerButtons();
+    }
+
+    updateTimerIcon() {
+        // Backward-compat: icon switching was removed from UI, but some older code still calls this.
+        this.updateTimerButtons();
     }
 
     /**
@@ -464,7 +438,7 @@ class ProgressPanel {
         const now = Date.now();
         this._captureElapsed(now);
 
-        if (this.timerMode === 'countdown' && this.timerState.countdownRemainingMs <= 0) {
+        if (this.countdownEnabled && this.timerState.countdownRemainingMs <= 0) {
             if (!this.countdownExpired) {
                 this.countdownExpired = true;
                 this.timerState.countdownRemainingMs = 0;
@@ -505,7 +479,7 @@ class ProgressPanel {
 
         this.timerState.dictationAccumulatedMs += delta;
 
-        if (this.timerMode === 'countdown') {
+        if (this.countdownEnabled) {
             this.timerState.countdownRemainingMs = Math.max(0, this.timerState.countdownRemainingMs - delta);
         }
 
@@ -513,7 +487,7 @@ class ProgressPanel {
     }
 
     _computeTimerSeconds(now = Date.now()) {
-        if (this.timerMode === 'countdown') {
+        if (this.countdownEnabled) {
             return Math.floor(this._computeCountdownMs(now) / 1000);
         }
         return Math.floor(this._computeClockMs(now) / 1000);
@@ -777,15 +751,33 @@ class ProgressPanel {
         this._ensureTimerButtonsEnabled();
         this._setupTimerSettingsButton(this.elements.timerSettings);
         this._setupTimerSettingsButton(this.elements.modalTimerSettings);
-        this.updateTimerIcon();
+        this._setupTimerButton(document.getElementById('btn-timer'));
+        this._setupTimerButton(document.getElementById('btn-modal-timer'));
+        this.updateTimerButtons();
         this._updateTimerButtonColor();
+    }
+
+    _setupTimerButton(button) {
+        if (!button || button.dataset.timerSetup === '1') return;
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            this.openTimerDialog();
+        });
+        button.dataset.timerSetup = '1';
     }
 
     _setupTimerSettingsButton(button) {
         if (!button || button.dataset.timerSetup === '1') return;
         button.addEventListener('click', (event) => {
             event.preventDefault();
-            this.openTimerDialog();
+            // Кнопка "время" (маленькая) переключает паузу (как раньше),
+            // а широкая кнопка "таймер" открывает настройки таймера.
+            const pauseModal = document.getElementById('pauseModal');
+            if (pauseModal && pauseModal.style.display === 'flex') {
+                if (typeof window.resumeGame === 'function') window.resumeGame();
+            } else {
+                if (typeof window.pauseGame === 'function') window.pauseGame();
+            }
         });
         button.dataset.timerSetup = '1';
     }
@@ -795,17 +787,30 @@ class ProgressPanel {
         const modal = document.getElementById('btn-modal-timer');
         if (inline) inline.removeAttribute('disabled');
         if (modal) modal.removeAttribute('disabled');
+
+        const inlineClock = document.getElementById('btn-timer-settings');
+        const modalClock = document.getElementById('btn-modal-timer-settings');
+        if (inlineClock) inlineClock.removeAttribute('disabled');
+        if (modalClock) modalClock.removeAttribute('disabled');
     }
 
-    updateTimerIcon() {
-        const iconName = this.timerMode === 'countdown' ? 'timer' : 'alarm-clock';
-        this._setLucideIcon(this.elements.timerModeIcon, iconName);
-        this._setLucideIcon(this.elements.modalTimerModeIcon, iconName);
+    updateTimerButtons() {
+        const updateVariant = (btnId) => {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const label = btn.querySelector('.timer-label');
+            const value = btn.querySelector('.timer-value');
+            const shouldShowValue = !!(this.countdownEnabled && this.timerState.countdownRemainingMs > 0);
+            if (label) label.hidden = shouldShowValue;
+            if (value) value.hidden = !shouldShowValue;
+        };
+        updateVariant('btn-timer');
+        updateVariant('btn-modal-timer');
         this._updateTimerButtonColor();
     }
 
     _updateTimerButtonColor() {
-        const isCountdown = this.timerMode === 'countdown';
+        const isCountdown = !!this.countdownEnabled;
         const btnTimer = document.getElementById('btn-timer');
         const btnModalTimer = document.getElementById('btn-modal-timer');
         const btnSettings = document.getElementById('btn-timer-settings');
@@ -856,25 +861,15 @@ class ProgressPanel {
         this._ensureTimerDialog();
         const {
             overlay,
-            clockRadio,
-            timerRadio,
             minutesInput,
             secondsInput,
-            timerFields,
-            updateFields
+            closeBtn
         } = this.timerDialogElements;
 
-        clockRadio.checked = this.timerMode !== 'countdown';
-        timerRadio.checked = this.timerMode === 'countdown';
-
-        const baseSeconds = this.timerMode === 'countdown'
-            ? (this.countdownRemaining || this.countdownDuration || 300)
-            : (this.countdownDuration || 300);
-        console.log('[Timer] openTimerDialog() mode=%s baseSeconds=%s countdownRemaining=%s countdownDuration=%s', this.timerMode, baseSeconds, this.countdownRemaining, this.countdownDuration);
+        const baseSeconds = (this.timerState.countdownDefaultSeconds || this.countdownDuration || 300);
+        console.log('[Timer] openTimerDialog() baseSeconds=%s countdownRemaining=%s countdownDuration=%s', baseSeconds, this.countdownRemaining, this.countdownDuration);
         minutesInput.value = Math.floor(baseSeconds / 60);
         secondsInput.value = baseSeconds % 60;
-
-        updateFields();
 
         if (this.timerDialogElements.escHandler) {
             document.removeEventListener('keydown', this.timerDialogElements.escHandler);
@@ -891,12 +886,13 @@ class ProgressPanel {
         overlay.hidden = false;
         overlay.classList.add('visible');
         setTimeout(() => {
-            if (timerRadio.checked) {
-                minutesInput.focus();
-            } else {
-                clockRadio.focus();
-            }
+            minutesInput.focus();
         }, 0);
+
+        try {
+            if (closeBtn) closeBtn.focus();
+        } catch (e) {
+        }
     }
 
     closeTimerDialog() {
@@ -919,18 +915,10 @@ class ProgressPanel {
 
         overlay.innerHTML = `
             <div class="timer-dialog" role="dialog" aria-modal="true">
-                <h3 class="timer-dialog-title">Режим времени</h3>
-                <div class="timer-dialog-options">
-                    <label class="timer-option">
-                        <input type="radio" name="timerMode" value="clock" checked>
-                        <span>Часы (считаем время работы)</span>
-                    </label>
-                    <label class="timer-option">
-                        <input type="radio" name="timerMode" value="countdown">
-                        <span>Таймер (ограничение по времени)</span>
-                    </label>
-                </div>
-                <div class="timer-dialog-timer-fields collapsed">
+                <button type="button" class="timer-dialog-close" data-action="close" aria-label="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+                <div class="timer-dialog-timer-fields">
                     <div class="timer-field-group">
                         <label>
                             Минуты
@@ -941,10 +929,8 @@ class ProgressPanel {
                             <input type="number" min="0" max="59" step="1" name="timerSeconds" value="0">
                         </label>
                     </div>
-                    <p class="timer-hint">Таймер включится при старте диктанта и поставит занятие на паузу, когда время закончится.</p>
                 </div>
                 <div class="timer-dialog-actions">
-                    <button type="button" class="button-secondary" data-action="cancel">Отмена</button>
                     <button type="button" class="button-primary" data-action="start">Старт</button>
                 </div>
             </div>
@@ -953,32 +939,18 @@ class ProgressPanel {
         document.body.appendChild(overlay);
 
         const dialog = overlay.querySelector('.timer-dialog');
-        const clockRadio = overlay.querySelector('input[value="clock"]');
-        const timerRadio = overlay.querySelector('input[value="countdown"]');
         const minutesInput = overlay.querySelector('input[name="timerMinutes"]');
         const secondsInput = overlay.querySelector('input[name="timerSeconds"]');
-        const timerFields = overlay.querySelector('.timer-dialog-timer-fields');
-        const cancelBtn = overlay.querySelector('[data-action="cancel"]');
+        const closeBtn = overlay.querySelector('[data-action="close"]');
         const startBtn = overlay.querySelector('[data-action="start"]');
 
-        const updateFields = () => {
-            const showTimer = timerRadio.checked;
-            if (showTimer) {
-                timerFields.classList.remove('collapsed');
-            } else {
-                timerFields.classList.add('collapsed');
-            }
-        };
-
-        clockRadio.addEventListener('change', updateFields);
-        timerRadio.addEventListener('change', updateFields);
-
-        cancelBtn.addEventListener('click', () => this.closeTimerDialog());
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeTimerDialog());
+        }
         startBtn.addEventListener('click', () => {
-            const mode = timerRadio.checked ? 'countdown' : 'clock';
             const minutes = parseInt(minutesInput.value, 10) || 0;
             const seconds = parseInt(secondsInput.value, 10) || 0;
-            if (this._applyTimerSettings(mode, minutes, seconds)) {
+            if (this._applyTimerSettings('countdown', minutes, seconds)) {
                 this.closeTimerDialog();
             }
         });
@@ -992,34 +964,21 @@ class ProgressPanel {
         this.timerDialogElements = {
             overlay,
             dialog,
-            clockRadio,
-            timerRadio,
             minutesInput,
             secondsInput,
-            timerFields,
-            updateFields,
+            closeBtn,
             escHandler: null
         };
+
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ elements: [dialog] });
+            }
+        } catch (e) {
+        }
     }
 
     _applyTimerSettings(mode, minutes, seconds) {
-        if (mode === 'clock') {
-            console.log('[Timer] _applyTimerSettings -> режим часы');
-            if (this.timerMode !== 'clock') {
-                this.pauseSession();
-                this.timerMode = 'clock';
-                this.countdownExpired = false;
-                this.updateTimer();
-                this.updateTimerIcon();
-                this._updateTimerButtonColor();
-            } else {
-                this.updateTimer();
-            }
-            this.startSession();
-            this._saveTimerPreference();
-            return true;
-        }
-
         const safeMinutes = Math.max(0, minutes);
         let safeSeconds = Math.max(0, seconds);
         if (safeSeconds > 59) {
@@ -1036,14 +995,14 @@ class ProgressPanel {
             return false;
         }
 
-        this.timerMode = 'countdown';
+        this.countdownEnabled = true;
         this.pauseSession();
         this._setCountdownSeconds(totalSeconds);
         // Сразу обновляем отображение установленного времени
         this.stats.timer = totalSeconds;
         console.log('[Timer] _applyTimerSettings -> сохранено totalSeconds=%s', totalSeconds);
         this.updateTimer();
-        this.updateTimerIcon();
+        this.updateTimerButtons();
         this._updateTimerButtonColor();
         this.startSession({ resetCountdown: true });
         this._saveTimerPreference();
@@ -1101,39 +1060,6 @@ class ProgressPanel {
         this.stats.timer = 0;
         this.updateTimer();
         this.updateTimerIcon();
-    }
-
-    _saveTimerPreference() {
-        try {
-            if (typeof window === 'undefined' || !window.localStorage) return;
-            const data = {
-                mode: this.timerMode,
-                duration: (this.timerMode === 'countdown' || this.timerState.countdownDefaultSeconds > 0)
-                    ? (this.timerState.countdownDefaultSeconds || this.countdownDuration || 0)
-                    : null
-            };
-            localStorage.setItem(this.timerPreferenceKey, JSON.stringify(data));
-            console.log('[Timer] _saveTimerPreference ->', data);
-        } catch (error) {
-            console.warn('Ошибка сохранения настроек таймера:', error);
-        }
-    }
-
-    _playCountdownSound() {
-        // Пробуем проиграть случайный звук из списка
-        if (this.timerSounds && this.timerSounds.length > 0) {
-            const randomSound = this.timerSounds[Math.floor(Math.random() * this.timerSounds.length)];
-            const audio = new Audio(randomSound);
-            audio.volume = 0.7; // Умеренная громкость
-            audio.play().catch((error) => {
-                console.warn('Не удалось проиграть звук таймера, используем fallback:', error);
-                this._playCountdownSoundFallback();
-            });
-            return;
-        }
-        
-        // Fallback на Web Audio бип, если звуки не загружены
-        this._playCountdownSoundFallback();
     }
 
     _playCountdownSoundFallback() {

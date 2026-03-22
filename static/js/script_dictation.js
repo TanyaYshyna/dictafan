@@ -4526,9 +4526,9 @@ function checkIfAllCompleted() {
     if (btnTotal) btnTotal.style.display = 'flex';
     if (btnCircle) btnCircle.style.display = 'flex';
 
-    // Останавливаем таймер при открытии модального окна списка предложений
-    stopTimer();
-    // Останавливаем таймер бездействия
+    // Не останавливаем учет времени при открытии модального окна выбора предложений.
+    // Остановка должна происходить только при завершении диктанта (победе).
+    // Останавливаем только таймер бездействия, чтобы пауза не сработала поверх модалки.
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;
@@ -7002,9 +7002,8 @@ async function initializeDictation() {
     // Если есть интернет и есть pending в outbox — синхронизируем в фоне.
     syncDraftIfOnline(false).catch(() => {});
 
-    // Останавливаем таймер при открытии модального окна списка предложений
-    stopTimer();
-    // Останавливаем таймер бездействия
+    // Не останавливаем учет времени при открытии модального окна выбора предложений.
+    // Останавливаем только таймер бездействия, чтобы пауза не сработала поверх модалки.
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;

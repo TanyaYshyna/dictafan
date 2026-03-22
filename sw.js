@@ -13,6 +13,39 @@ function swTimeStart(label) {
   }
 }
 
+async function networkFirstAppShell(request, event) {
+  try {
+    const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+    const cacheKey = normalizeCacheKey(request);
+    try {
+      const netRes = await fetch(request);
+      if (netRes && netRes.ok) {
+        try {
+          await cache.put(cacheKey, netRes.clone());
+        } catch (e) {
+        }
+        return netRes;
+      }
+      if (netRes) {
+        return netRes;
+      }
+    } catch (e) {
+    }
+
+    let cached = await cache.match(cacheKey);
+    if (!cached && shouldIgnoreSearchFallbackForRequest(request)) {
+      cached = await cache.match(request, { ignoreSearch: true });
+    }
+    if (cached) return cached;
+  } catch (e) {
+  }
+
+  return new Response('Offline', {
+    status: 503,
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+  });
+}
+
 function isStaticJsOrCssUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
@@ -427,6 +460,28 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (!shouldHandleRequest(request.url)) return;
+
+  // Для app shell навигации (HTML) используем network-first,
+  // чтобы после деплоя не показывать целиком старую версию из кеша.
+  try {
+    const url = new URL(request.url);
+    const isAppShellNav = (request.mode === 'navigate')
+      && (url.origin === self.location.origin)
+      && (url.pathname === '/' || url.pathname.startsWith('/dictation/'));
+    if (isAppShellNav) {
+      const label = `sw#${reqId} nav ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          return await networkFirstAppShell(request, event);
+        } finally {
+          swTimeEnd(label);
+        }
+      })());
+      return;
+    }
+  } catch (e) {
+  }
 
   if (isImageUrl(request.url)) {
     const label = `sw#${reqId} image ${reqPath}`;

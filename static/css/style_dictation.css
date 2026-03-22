@@ -3385,18 +3385,42 @@ body.playing-audio::after {
   width: 100%;
 }
 
-.timer-control .stat-btn.timer {
-  justify-content: center;
+/* Обе кнопки вместе должны занимать ту же ширину, что и раньше */
+.timer-control .stat-btn.timer-settings {
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+  padding: 0 10px;
+  gap: 8px;
+  justify-content: flex-start;
 }
 
+.timer-control .stat-btn.timer-settings .timer-value {
+  flex: 1;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-control .stat-btn.row-timer.timer {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.timer-control .stat-btn.row-timer.timer .timer-label,
+.timer-control .stat-btn.row-timer.timer .timer-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-control .stat-btn.row-timer.timer .timer-value {
+  margin-left: auto;
+}
+
+/* базовые стили сохранены, размеры переопределены выше */
 .stat-btn.timer-settings {
-  width: 44px;
-  min-width: 44px;
-  max-width: 44px;
-  padding: 0;
   display: flex;
   align-items: center;
-  justify-content: center;
   background: var(--color-button-yellow) !important;
   color: var(--color-button-text-yellow) !important;
   cursor: pointer !important;
@@ -3408,18 +3432,7 @@ body.playing-audio::after {
   color: var(--color-button-text-orange) !important;
 }
 
-.timer-mode-icon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.timer-mode-icon svg {
-  width: 100%;
-  height: 100%;
-}
+/* timer-mode-icon больше не используется */
 
 .timer-control .unsaved-star {
   margin-left: 6px;
@@ -3449,6 +3462,28 @@ body.playing-audio::after {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  position: relative;
+}
+
+.timer-dialog-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: var(--color-text, #343434);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timer-dialog-close i[data-lucide] {
+  width: 18px;
+  height: 18px;
 }
 
 .timer-dialog-title {
@@ -3483,15 +3518,10 @@ body.playing-audio::after {
   min-height: 110px;
 }
 
-.timer-dialog-timer-fields.collapsed {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
 .timer-field-group {
   display: flex;
   gap: 12px;
+  justify-content: center;
 }
 
 .timer-field-group label {
@@ -3504,7 +3534,7 @@ body.playing-audio::after {
 }
 
 .timer-field-group input {
-  width: 40px;
+  width: 54px;
   padding: 6px 8px;
   border-radius: 8px;
   border: 1px solid var(--color-border-light, #dcdcdc);
