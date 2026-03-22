@@ -827,34 +827,19 @@ class ProgressPanel {
             }
         };
 
+        const clearClasses = (el) => {
+            if (!el) return;
+            el.classList.remove('timer-clock');
+            el.classList.remove('timer-countdown');
+        };
+
+        // Timer button changes color based on countdown mode.
         applyClasses(btnTimer);
         applyClasses(btnModalTimer);
-        applyClasses(btnSettings);
-        applyClasses(btnModalSettings);
-    }
 
-    _setLucideIcon(element, iconName) {
-        if (!element) return;
-        element.setAttribute('data-lucide', iconName);
-        element.innerHTML = '';
-        const lucideLib = window.lucide;
-        if (lucideLib && typeof lucideLib.createIcons === 'function') {
-            try {
-                lucideLib.createIcons({ elements: [element] });
-                return;
-            } catch (error) {
-                console.warn('Lucide createIcons error:', error);
-            }
-        }
-
-        // Lucide ещё не готов — повторим попытку чуть позже
-        if (!this._lucideRetryScheduled) {
-            this._lucideRetryScheduled = true;
-            setTimeout(() => {
-                this._lucideRetryScheduled = false;
-                this.updateTimerIcon();
-            }, 200);
-        }
+        // Clock button should not change color when countdown is enabled.
+        clearClasses(btnSettings);
+        clearClasses(btnModalSettings);
     }
 
     openTimerDialog() {
@@ -917,7 +902,6 @@ class ProgressPanel {
             <div class="timer-dialog" role="dialog" aria-modal="true">
                 <button type="button" class="timer-dialog-close" data-action="close" aria-label="Закрыть">
                     <i data-lucide="x"></i>
-                    <span class="timer-dialog-close-fallback" aria-hidden="true">×</span>
                 </button>
                 <div class="timer-dialog-header">
                     <div class="timer-dialog-title">Таймер:</div>

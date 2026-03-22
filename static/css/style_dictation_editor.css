@@ -3394,18 +3394,18 @@ td.col-speaker {
 }
 
 .crop-actions .btn-primary {
-  background: var(--color-button-text-yellow, #f9c609);
-  color: var(--color-text, #1f2933);
+  background: var(--color-button-yellow, rgb(252, 235, 163));
+  color: var(--color-button-text-yellow, rgb(255, 198, 9));
   border: none;
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-weight: 600;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
 .crop-actions .btn-primary:hover {
-  background: var(--color-button-text-yellow-hover, #e6b508);
+  background: var(--color-button-yellow-hover, rgb(245, 224, 143));
 }
 
 .crop-actions .btn-secondary {

@@ -855,14 +855,15 @@
         <div class="modal-content crop-modal-content">
             <div class="modal-header">
                 <h3>Обрезка обложки</h3>
-                <button class="modal-close" id="crop-close">&times;</button>
+                <button class="modal-close" id="crop-close" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
             <div class="modal-body crop-modal-body">
                 <div class="crop-container">
                     <img id="crop-image" src="" alt="Crop">
                 </div>
                 <div class="crop-actions">
-                    <button type="button" class="btn-secondary" id="crop-cancel">Отмена</button>
                     <button type="button" class="btn-primary" id="crop-confirm">Применить</button>
                 </div>
             </div>

@@ -1890,6 +1890,7 @@ function setupCoverHandlers() {
             outputType: 'image/webp',
             outputQuality: 0.9,
             maxFileSizeBytes: 5 * 1024 * 1024,
+            focusConfirm: true,
             onDirty: () => {
                 try { setDirtyFlags({ cover: true }); } catch (e) {}
             },
@@ -1989,7 +1990,15 @@ function setupCoverHandlers() {
 
 function openCropModal(imageSrc) {
     if (window.CoverManager && typeof window.CoverManager.openCropModal === 'function') {
-        return window.CoverManager.openCropModal(imageSrc);
+        const res = window.CoverManager.openCropModal(imageSrc);
+        try {
+            const modal = document.getElementById('crop-modal');
+            if (modal && window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ elements: [modal] });
+            }
+        } catch (e) {
+        }
+        return res;
     }
 }
 
@@ -3108,7 +3117,14 @@ async function handleAudioPlayback(event) {
         } else {
             fieldName = button.dataset.fieldName; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
             nameAudioFile = sentence && sentence[fieldName];
-            audioUrl = await resolveEditorPlaybackAudioUrl(currentDictation.id, language, nameAudioFile);
+
+            const needsRegenEarly = String(button.dataset.create || '') === 'true';
+            // If user requested regeneration, do not resolve/play existing audio for this row.
+            if (!needsRegenEarly) {
+                audioUrl = await resolveEditorPlaybackAudioUrl(currentDictation.id, language, nameAudioFile);
+            } else {
+                audioUrl = null;
+            }
         }
     }
 
@@ -3182,7 +3198,16 @@ async function handleAudioPlayback(event) {
                 }
             }
             // в состоянии "создание"
-            await createAndPlayAudio(button, language, fieldName, languageUrl);
+            try {
+                await createAndPlayAudio(button, language, fieldName, languageUrl);
+            } catch (e) {
+                try { audioManager.stop(); } catch (e2) {}
+                try {
+                    button.dataset.state = 'creating';
+                    setButtonState(button);
+                } catch (e3) {}
+                return;
+            }
             break;
         case 'creating_user':
             // Если blob уже есть — играем, не генерим
@@ -3194,7 +3219,16 @@ async function handleAudioPlayback(event) {
                 }
             }
             // в состоянии "создание"
-            await createAndPlayAudio(button, language, fieldName, languageUrl);
+            try {
+                await createAndPlayAudio(button, language, fieldName, languageUrl);
+            } catch (e) {
+                try { audioManager.stop(); } catch (e2) {}
+                try {
+                    button.dataset.state = 'creating_user';
+                    setButtonState(button);
+                } catch (e3) {}
+                return;
+            }
             break;
 
         case 'creating_mic':
@@ -3217,10 +3251,31 @@ async function createAndPlayAudio(button, language, fieldName, languageUrl) {
     setButtonState(button, 'creating');
 
     try {
+        // Ensure no other audio continues playing while we generate/attach a new one.
+        try {
+            if (window.audioManager && typeof window.audioManager.stop === 'function') {
+                window.audioManager.stop();
+            }
+        } catch (e) {
+        }
+
         // Получаем данные предложения
         const sentence = getSentenceForButton(button);
         if (!sentence) {
             throw new Error('Не найдено предложение для кнопки');
+        }
+
+        // If user explicitly forced regeneration, drop any existing in-memory draft blob URL
+        // for this file to avoid playing stale audio.
+        try {
+            const forced = String(button && button.dataset ? (button.dataset.create || '') : '') === 'true';
+            if (forced) {
+                const existingName = sentence && sentence[fieldName] ? String(sentence[fieldName] || '').trim() : '';
+                if (existingName) {
+                    clearDraftAudioUrl(language, existingName);
+                }
+            }
+        } catch (e) {
         }
 
         // Проверяем режим и наличие start/end для вырезания из общего файла
