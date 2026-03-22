@@ -997,8 +997,30 @@ async function loadDeskItems() {
         if (verData && verData.success && typeof verData.version === 'string') {
           if (String(verData.version) === String(cachedDeskVersion)) {
             if (renderedFromCache) {
-              resolveInFlight();
-              return;
+              const cachedCount = Array.isArray(cachedItemsSnapshot) ? cachedItemsSnapshot.length : 0;
+              const serverCount = (verData && typeof verData.items_count === 'number') ? verData.items_count : null;
+              const hasLocalOnly = Array.isArray(cachedItemsSnapshot)
+                ? cachedItemsSnapshot.some(it => it && typeof it === 'object' && it.__local_only)
+                : false;
+
+              const shouldSelfHeal = hasLocalOnly || (serverCount !== null && serverCount !== cachedCount);
+              try {
+                if (window.PersistentLog && typeof window.PersistentLog.log === 'function') {
+                  window.PersistentLog.log('desk_version_match', {
+                    matched: true,
+                    cachedCount: cachedCount,
+                    serverCount: serverCount,
+                    hasLocalOnly: !!hasLocalOnly,
+                    selfHeal: !!shouldSelfHeal,
+                  });
+                }
+              } catch (e) {
+              }
+
+              if (!shouldSelfHeal) {
+                resolveInFlight();
+                return;
+              }
             }
           }
         }
