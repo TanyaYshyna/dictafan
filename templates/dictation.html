@@ -120,95 +120,59 @@
     <div id="start-modal" class="modal">
         <div class="modal-content">
             <!-- Верхняя часть - без прокрутки -->
-            <!-- +------+------+---+
-                 | 1111 | 2222 | 3 |
-                 |      +----------+
-                 |      |    4444  |
-                 +------+----------+
-                 |      6666       |
-                 +------+--------- +
-                 | 7777 | 5555     |
-                 +------+----------+-->
-            <table>
-                <colgroup>
-                    <col width="1"> <!-- Первый столбец по размеру содержимого -->
-                    <col> <!-- Второй столбец займет оставшееся пространство -->
-                    <col width="1"> <!-- последний столбец по размеру содержимого -->
-                </colgroup>
-                <tbody>
-                    <tr>
-                        <!-- <td rowspan="2">1111</td> -->
-                        <td rowspan="2">
-                            <!-- Поля для настройки последовательности воспроизведения -->
-                            <div id="audioSettingsContainer" style="display: none;"></div>
-
-                        </td>
-                        <!-- <td>2222</td> -->
-                        <td>
-                            <h2 id="title-diktation">{{ title_orig }}</h2>
-                        </td>
-                        <!-- <td>3333</td> -->
-                        <td>
-                            <div class="start-modal-header-actions">
-                                <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
-                                    <i data-lucide="settings"></i>
-                                </button>
-                                <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
-                                    <i data-lucide="log-out"></i>
-                                </button>
-                                <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
-                                    <i data-lucide="x"></i>
-                                </button>
-                            </div>
-
-                        </td>
-                    </tr>
-                    <!-- <td>4444</td> -->
-                    <tr>
-                        <td colspan="2">
-                            <!-- Контейнер для рендера прогресс-панели (модал) -->
-                            <div id="progressPanelModalContainer" class="progress-panel-modal-r"></div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <!-- <td>5555</td> -->
-                        <td colspan="3">
-                            <button id="confirmStartBtn" tabindex="0" onclick=startGame()>
-                                S T A R T
+            <div class="start-modal-header">
+                <div class="start-modal-header-left">
+                    <!-- Поля для настройки последовательности воспроизведения -->
+                    <div id="audioSettingsContainer" style="display: none;"></div>
+                </div>
+                <div class="start-modal-header-main">
+                    <div class="start-modal-title-row">
+                        <h2 id="title-diktation">{{ title_orig }}</h2>
+                        <div class="start-modal-header-actions">
+                            <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
+                                <i data-lucide="settings"></i>
                             </button>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>
-                            <!-- Виділити все в таблиці all-control-->
-                            <div class="all-checkbox-container">
-                                <button id="allCheckbox" class="all-checkbox-btn">
-                                    <i data-lucide="circle-check-big"></i>
-                                    <span>отметить все</span>
-                                </button>
-                            </div>
-                        </td>
-                        <!-- <td>6666</td> -->
-                        <td colspan="2">
-                            <!-- Контрол перемешивания -->
-                            <div class="start-controls-row">
-                                <div class="all-checkbox-container">
-                                    <button id="mixControl" class="all-checkbox-btn">
-                                        <i data-lucide="move-right"></i>
-                                        <span>прямой порядок</span>
-                                    </button>
-                                    <button id="resetProgressBtn" class="all-checkbox-btn">
-                                        <i data-lucide="rotate-ccw"></i>
-                                        <span>Давай по новой</span>
-                                    </button>
-                                </div>
-                                <span class="dikt-number-badge">{{ dikt_numer }}</span>
-                            </div>
-                        </td>
-                        <!-- <td>8888</td> -->
-                    </tr>
-                </tbody>
-            </table>
+                            <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
+                                <i data-lucide="log-out"></i>
+                            </button>
+                            <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Контейнер для рендера прогресс-панели (модал) -->
+                    <div id="progressPanelModalContainer" class="progress-panel-modal-r"></div>
+                </div>
+            </div>
+
+            <button id="confirmStartBtn" tabindex="0" onclick=startGame()>
+                S T A R T
+            </button>
+
+            <div class="start-modal-controls">
+                <!-- Виділити все в таблиці all-control-->
+                <div class="all-checkbox-container">
+                    <button id="allCheckbox" class="all-checkbox-btn">
+                        <i data-lucide="circle-check-big"></i>
+                        <span>отметить все</span>
+                    </button>
+                </div>
+
+                <!-- Контрол перемешивания -->
+                <div class="start-controls-row">
+                    <div class="all-checkbox-container">
+                        <button id="mixControl" class="all-checkbox-btn">
+                            <i data-lucide="move-right"></i>
+                            <span>прямой порядок</span>
+                        </button>
+                        <button id="resetProgressBtn" class="all-checkbox-btn">
+                            <i data-lucide="rotate-ccw"></i>
+                            <span>Давай по новой</span>
+                        </button>
+                    </div>
+                    <span class="dikt-number-badge">{{ dikt_numer }}</span>
+                </div>
+            </div>
 
 
             <!-- Нижняя часть - только таблица с прокруткой -->

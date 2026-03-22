@@ -80,6 +80,12 @@ class ProgressPanel {
         
         return `
             <table class="table-progress">
+                <colgroup>
+                    <col class="progress-col">
+                    <col class="progress-col">
+                    <col class="progress-col">
+                    <col class="progress-col">
+                </colgroup>
                 <tr>
                     <td colspan="2">
                         <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Время работы над диктантом">

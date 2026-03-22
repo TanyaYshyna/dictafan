@@ -439,9 +439,7 @@ body.playing-audio::after {
 }
 
 /* Первая ячейка в таблице модального окна - без padding и с шириной по содержимому */
-#start-modal table td:first-child {
-  padding: 0 !important;
-}
+/* removed: start-modal header is no longer table-based */
 
 /* Убираем обводку у всех ячеек таблицы в модальном окне */
 /* .modal-content table,
@@ -456,12 +454,21 @@ body.playing-audio::after {
 
 
 .table-progress {
-  border-collapse: collapse;
-  border-spacing: 0;
+  border-collapse: separate;
+  border-spacing: 6px;
   width: 100%;
   table-layout: fixed;
   border: 0px;
   margin: 0 !important;
+}
+
+.table-progress col.progress-col {
+  width: 25%;
+}
+
+.modal-content .table-progress td,
+.modal-content .table-progress th {
+  padding: 0 !important;
 }
 .table-progress td {
   padding: 0;
@@ -2240,18 +2247,39 @@ body.playing-audio::after {
   position: relative;
 }
 
-/* Стили для таблицы в модальном окне - убираем ограничение ширины первой колонки */
-#start-modal table colgroup col:first-child {
-  width: 1px;
-  min-width: 0;
+.start-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
 }
 
-#start-modal table td:first-child {
-  width: 1px !important;
-  min-width: 0 !important;
-  max-width: none !important;
-  padding: 0 !important;
-  white-space: nowrap;
+.start-modal-header-left {
+  display: flex;
+  align-items: flex-start;
+}
+
+.start-modal-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.start-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.start-modal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
 }
 
 /* Контейнер настроек аудио в модальном окне - подстраивается под содержимое */

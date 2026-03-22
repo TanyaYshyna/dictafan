@@ -1139,6 +1139,16 @@ async function loadDeskItems() {
       }
       // Обновляем индикаторы "в работе" в карточках диктантов
       updateInWorkIndicators();
+
+      // После успешной сетевой загрузки стола принудительно обновляем completion counts
+      // (кеш в IDB может быть устаревшим после деплоя)
+      try {
+        const deskContainer = document.getElementById('deskCardsContainer');
+        setTimeout(() => {
+          refreshCompletionBadgesFromServer(deskContainer).catch(() => { });
+        }, 0);
+      } catch (e) {
+      }
       try {
         if (typeof refreshDeskOutboxIndicator === 'function') {
           refreshDeskOutboxIndicator().catch(() => { });
@@ -4451,18 +4461,32 @@ function renderStatsIcons(container, stats = {}) {
   }
 }
 
+async function refreshCompletionBadgesFromServer(container = null) {
+  const targetContainer = container || document;
+  try {
+    await loadCompletionCounts(targetContainer, { forceNetwork: true });
+  } catch (e) {
+  }
+  try {
+    await updateCompletionBadges(targetContainer);
+  } catch (e) {
+  }
+}
+
 // Кеш для количества выполнений
 let completionCountsCache = {};
 
 let completionCountsLoadedFromIdb = false;
 
 // Загрузка количества выполнений из БД
-async function loadCompletionCounts(container = null) {
+async function loadCompletionCounts(container = null, options = {}) {
   const targetContainer = container || document;
   const cards = targetContainer.querySelectorAll('.short-card[data-dictation-id]');
   if (cards.length === 0) {
     return;
   }
+
+  const forceNetwork = !!(options && options.forceNetwork);
 
   // Собираем все ID диктантов
   const dictationIds = Array.from(cards)
@@ -4501,7 +4525,8 @@ async function loadCompletionCounts(container = null) {
   };
 
   const missingIds = dictationIds.filter(id => !hasCachedCount(id));
-  if (missingIds.length === 0) {
+  const requestIds = forceNetwork ? dictationIds : missingIds;
+  if (!forceNetwork && missingIds.length === 0) {
     return;
   }
 
@@ -4519,7 +4544,7 @@ async function loadCompletionCounts(container = null) {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ dictation_ids: missingIds })
+      body: JSON.stringify({ dictation_ids: requestIds })
     });
 
     if (response.ok) {
