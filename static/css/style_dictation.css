@@ -3387,10 +3387,10 @@ body.playing-audio::after {
 
 /* Обе кнопки вместе должны занимать ту же ширину, что и раньше */
 .timer-control .stat-btn.timer-settings {
-  flex: 0 0 112px;
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
+  flex: 0 0 200px;
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
   padding: 0 10px;
   gap: 8px;
   justify-content: flex-start;
