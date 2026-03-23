@@ -420,6 +420,11 @@ class ProgressPanel {
         this.updateTimerButtons();
     }
 
+    _updateTimerButtonColor() {
+        // Backward-compat: timer color switching based on mode was removed to simplify UI.
+        // Kept as a no-op because other methods still call it.
+    }
+
     /**
      * Возвращает снимок состояния таймера для внешнего кода.
      */
