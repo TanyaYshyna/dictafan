@@ -121,10 +121,10 @@
             <h3 class="profile-section-header">
                 Настройки автономных языковых моделей
                 <button type="button" class="profile-section-toggle button-color-yellow" data-target="#languageSelectorModelsContainer" aria-label="Свернуть/развернуть">
-                    <i data-lucide="chevrons-up"></i>
+                    <i data-lucide="chevrons-down"></i>
                 </button>
             </h3>
-            <div id="languageSelectorModelsContainer"></div>
+            <div id="languageSelectorModelsContainer" style="display: none;"></div>
         </div>
 
         <!-- Настройки для диктантов -->
@@ -132,15 +132,20 @@
             <h3 class="profile-section-header">
                 Настройки для диктантов
                 <button type="button" class="profile-section-toggle button-color-yellow" data-target="#userAudioSettingsContainer" aria-label="Свернуть/развернуть">
-                    <i data-lucide="chevrons-up"></i>
+                    <i data-lucide="chevrons-down"></i>
                 </button>
             </h3>
-            <div id="userAudioSettingsContainer"></div>
+            <div id="userAudioSettingsContainer" style="display: none;"></div>
         </div>
 
         <div class="form-section">
-            <h3>Группы</h3>
-            <div id="groupsSection" class="profile-panel">
+            <h3 class="profile-section-header">
+                Группы
+                <button type="button" class="profile-section-toggle button-color-yellow" data-target="#groupsSection" aria-label="Свернуть/развернуть">
+                    <i data-lucide="chevrons-down"></i>
+                </button>
+            </h3>
+            <div id="groupsSection" class="profile-panel" style="display: none;">
                 <div class="panel-content">
                     <div class="groups-layout">
                         <div class="groups-left">
@@ -175,7 +180,7 @@
                                     <div class="groups-details-value" id="groupsDetailsDescription">—</div>
                                 </div>
 
-                                <div class="groups-details-row">
+                                <div class="groups-details-row invite-row">
                                     <div class="groups-details-label">Инвайт ссылка</div>
                                     <div class="groups-invite">
                                         <input type="text" id="groupsInviteLink" class="groups-invite-input" readonly value="">
@@ -187,7 +192,7 @@
 
                                 <div class="groups-students">
                                     <div class="groups-toolbar groups-students-toolbar">
-                                        <div class="groups-toolbar-title">Ученики</div>
+                                        <div class="groups-toolbar-title groups-students-title">Ученики</div>
                                         <div class="groups-toolbar-actions">
                                             <button type="button" id="groupsStudentsRefreshBtn" class="button-color-yellow" title="обновить данные о группе">
                                                 <i data-lucide="refresh-cw"></i>
@@ -251,12 +256,6 @@
                     <button type="button" id="groupRestoreModalYes" class="button-color-yellow">ДА</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Список отслеживаемых пользователей (заглушка для будущего) -->
-        <div class="form-section">
-            <h3>Организация групп обучения</h3>
-            <p>Функционал для родителей и учителей будет доступен в следующем обновлении.</p>
         </div>
 
         <!-- Модальное окно подтверждения выхода -->

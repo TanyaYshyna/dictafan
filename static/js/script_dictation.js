@@ -3269,12 +3269,71 @@ function resetDictationProgress() {
         panel.setStat('perfect', 0);
         panel.setStat('corrected', 0);
         panel.setStat('audio', 0);
+        try {
+            if (typeof panel.stopSession === 'function') {
+                panel.stopSession({ resetAccumulated: true, resetCountdown: true });
+            }
+            if (panel.stats) {
+                panel.stats.timer = 0;
+            }
+            if (typeof panel.updateTimer === 'function') {
+                panel.updateTimer();
+            }
+            if (typeof panel.updateUI === 'function') {
+                panel.updateUI();
+            }
+        } catch (e) {
+        }
     }
 
     if (dictationStatistics && dictationStatistics.currentSession) {
         dictationStatistics.currentSession.perfect = 0;
         dictationStatistics.currentSession.corrected = 0;
         dictationStatistics.currentSession.audio = 0;
+        try {
+            dictationStatistics.currentSession.timer_seconds = 0;
+        } catch (e) {
+        }
+    }
+
+    try {
+        // Сбросить сохраненную дневную статистику (звезды/микрофон/время) для текущего диктанта
+        const ah = window.activityHistory;
+        const pp = window.progressPanel;
+        if (ah && typeof ah.loadCurrentMonth === 'function' && typeof ah.findTodaySession === 'function') {
+            // Обновляем in-memory session, чтобы следующий save не восстановил старые значения
+            if (ah.currentSession) {
+                ah.currentSession.perfect = 0;
+                ah.currentSession.corrected = 0;
+                ah.currentSession.audio = 0;
+                ah.currentSession.timer_seconds = 0;
+                ah.currentSession.timer = 0;
+            }
+
+            // Правим текущий месяц в памяти, если он уже загружен
+            if (ah.monthData && Array.isArray(ah.monthData.statistics)) {
+                const today = ah.findTodaySession(currentDictation && currentDictation.id ? currentDictation.id : null);
+                if (today) {
+                    today.perfect = 0;
+                    today.corrected = 0;
+                    today.audio = 0;
+                    today.timer_seconds = 0;
+                    today.timer = 0;
+                }
+            }
+
+            // Пишем на сервер (fire-and-forget)
+            Promise.resolve(ah.saveSession(true)).catch(() => {});
+        }
+
+        if (pp && pp.history && pp.history.currentSession) {
+            pp.history.currentSession.perfect = 0;
+            pp.history.currentSession.corrected = 0;
+            pp.history.currentSession.audio = 0;
+            pp.history.currentSession.timer_seconds = 0;
+            pp.history.currentSession.timer = 0;
+        }
+    } catch (e) {
     }
 
     renderSelectionTable();

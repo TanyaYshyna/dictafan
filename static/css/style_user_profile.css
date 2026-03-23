@@ -601,6 +601,23 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     word-break: break-word;
  }
 
+ #groupsDetailsTitle {
+    font-weight: 700;
+ }
+
+ .groups-details-row.invite-row {
+    align-items: center;
+ }
+
+ .groups-details-row.invite-row .groups-details-label {
+    font-weight: 400;
+ }
+
+ .groups-students-title {
+    font-weight: 400;
+    margin-top: 6px;
+ }
+
  .groups-invite {
     display: flex;
     gap: 10px;

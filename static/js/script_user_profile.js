@@ -134,6 +134,7 @@ function setSelectedGroup(groupId) {
         if (inviteEl) inviteEl.value = '';
     } catch (e) {
     }
+    updateInviteCopyButtonIcon();
     renderGroupsTable();
     renderGroupsDetails();
     refreshStudents();
@@ -238,6 +239,22 @@ function renderGroupsDetails() {
             const map = groupsUiState._inviteLinksByGroupId || {};
             inviteEl.value = map[String(g.id)] || '';
         }
+    }
+    updateInviteCopyButtonIcon();
+}
+
+function updateInviteCopyButtonIcon() {
+    try {
+        const btn = document.getElementById('groupsInviteCopyBtn');
+        const inviteEl = document.getElementById('groupsInviteLink');
+        if (!btn || !inviteEl) return;
+        const hasLink = Boolean(String(inviteEl.value || '').trim());
+        btn.title = hasLink ? 'Скопировать' : 'Создать инвайт';
+        btn.innerHTML = `<i data-lucide="${hasLink ? 'copy' : 'plus'}"></i>`;
+        if (window.lucide) {
+            window.lucide.createIcons({ root: btn });
+        }
+    } catch (e) {
     }
 }
 
@@ -494,6 +511,7 @@ async function createInviteForSelectedGroup() {
         if (inviteEl) inviteEl.value = fullUrl;
         if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
         groupsUiState._inviteLinksByGroupId[String(g.id)] = fullUrl;
+        updateInviteCopyButtonIcon();
         return fullUrl;
     } catch (e) {
         showError(e && e.message ? e.message : 'Ошибка');
