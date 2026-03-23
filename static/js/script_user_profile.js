@@ -101,255 +101,508 @@ async function groupsApiRequest(path, options = {}) {
     return data;
 }
 
-function renderGroupsList(groups) {
-    const listEl = document.getElementById('groupsList');
-    if (!listEl) return;
-    listEl.innerHTML = '';
+let groupsUiState = {
+    groups: [],
+    selectedGroupId: null,
+    selectedStudentId: null,
+    filterMode: 'active',
+};
 
-    if (!Array.isArray(groups) || groups.length === 0) {
+function getGroupsFilterMode() {
+    const m = String(groupsUiState.filterMode || '').toLowerCase();
+    return m === 'all' ? 'all' : 'active';
+}
+
+function getVisibleGroups() {
+    const groups = Array.isArray(groupsUiState.groups) ? groupsUiState.groups : [];
+    const mode = getGroupsFilterMode();
+    if (mode === 'all') return groups;
+    return groups.filter((g) => !g || !g.archived_at);
+}
+
+function getSelectedGroup() {
+    const id = groupsUiState.selectedGroupId;
+    if (!id) return null;
+    return (groupsUiState.groups || []).find((g) => String(g.id) === String(id)) || null;
+}
+
+function setSelectedGroup(groupId) {
+    groupsUiState.selectedGroupId = groupId != null ? String(groupId) : null;
+    groupsUiState.selectedStudentId = null;
+    renderGroupsTable();
+    renderGroupsDetails();
+    refreshStudents();
+}
+
+function setSelectedStudent(studentId) {
+    groupsUiState.selectedStudentId = studentId != null ? String(studentId) : null;
+    renderStudentsTable(groupsUiState._studentsCache || []);
+}
+
+function renderGroupsTable() {
+    const table = document.getElementById('groupsTable');
+    if (!table) return;
+    table.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'groups-table-header';
+    const h1 = document.createElement('div');
+    h1.textContent = 'ID';
+    const h2 = document.createElement('div');
+    h2.textContent = 'Название';
+    const h3 = document.createElement('div');
+    h3.textContent = '';
+    header.appendChild(h1);
+    header.appendChild(h2);
+    header.appendChild(h3);
+    table.appendChild(header);
+
+    const groups = getVisibleGroups();
+    if (groups.length === 0) {
         const empty = document.createElement('div');
+        empty.style.padding = '12px';
         empty.style.color = '#666';
         empty.textContent = 'Пока нет групп';
-        listEl.appendChild(empty);
+        table.appendChild(empty);
         return;
     }
 
     groups.forEach((g) => {
         const row = document.createElement('div');
-        row.style.display = 'flex';
-        row.style.flexDirection = 'column';
-        row.style.gap = '8px';
-        row.style.padding = '12px';
-        row.style.border = '1px solid var(--color-border-light, #e9ecef)';
-        row.style.borderRadius = '10px';
-        row.style.marginTop = '12px';
-        row.dataset.groupId = String(g.id);
-
-        const title = document.createElement('div');
-        title.style.fontWeight = '700';
-        title.textContent = `${g.title} (id: ${g.id})`;
-
-        const meta = document.createElement('div');
-        meta.style.color = '#666';
-        meta.textContent = `Учеников: ${Number(g.students_count || 0)}`;
-
-        const actions = document.createElement('div');
-        actions.style.display = 'flex';
-        actions.style.gap = '10px';
-        actions.style.flexWrap = 'wrap';
-        actions.style.justifyContent = 'flex-end';
-
-        const inviteBtn = document.createElement('button');
-        inviteBtn.type = 'button';
-        inviteBtn.className = 'button-color-yellow';
-        inviteBtn.textContent = 'Инвайт-ссылка';
-
-        const studentsBtn = document.createElement('button');
-        studentsBtn.type = 'button';
-        studentsBtn.className = 'button-color-yellow';
-        studentsBtn.textContent = 'Ученики';
-
-        const detailsEl = document.createElement('div');
-        detailsEl.style.display = 'none';
-        detailsEl.style.paddingTop = '8px';
-        detailsEl.style.borderTop = '1px dashed var(--color-border-light, #e9ecef)';
-
-        inviteBtn.onclick = async () => {
-            try {
-                inviteBtn.disabled = true;
-                const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, {
-                    method: 'POST',
-                    body: JSON.stringify({ max_uses: null }),
-                });
-                const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
-                const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
-                const path = joinPath || (token ? `/join-group/${token}` : null);
-                if (!path) {
-                    showError('Не удалось получить ссылку');
-                    return;
-                }
-                const fullUrl = `${location.origin}${path}`;
-
-                detailsEl.style.display = 'block';
-                detailsEl.innerHTML = '';
-                const lbl = document.createElement('div');
-                lbl.style.fontWeight = '600';
-                lbl.textContent = 'Ссылка для вступления:';
-                const link = document.createElement('input');
-                link.type = 'text';
-                link.value = fullUrl;
-                link.readOnly = true;
-                link.style.width = '100%';
-                link.style.marginTop = '6px';
-                link.style.padding = '10px 12px';
-                link.style.border = '1px solid #ced4da';
-                link.style.borderRadius = '8px';
-                link.style.fontSize = '16px';
-                detailsEl.appendChild(lbl);
-                detailsEl.appendChild(link);
-
-                try {
-                    await navigator.clipboard.writeText(fullUrl);
-                    showSuccess('Ссылка скопирована');
-                } catch (e) {
-                    showInfo('Скопируй ссылку вручную');
-                }
-            } catch (e) {
-                showError(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                inviteBtn.disabled = false;
-            }
-        };
-
-        studentsBtn.onclick = async () => {
-            try {
-                studentsBtn.disabled = true;
-                const data = await groupsApiRequest(`/groups/api/group/${g.id}/students`, { method: 'GET' });
-                const students = data && Array.isArray(data.students) ? data.students : [];
-
-                detailsEl.style.display = 'block';
-                detailsEl.innerHTML = '';
-                const hdr = document.createElement('div');
-                hdr.style.fontWeight = '600';
-                hdr.textContent = 'Ученики:';
-                detailsEl.appendChild(hdr);
-
-                if (students.length === 0) {
-                    const empty = document.createElement('div');
-                    empty.style.color = '#666';
-                    empty.style.marginTop = '6px';
-                    empty.textContent = 'Пока никто не вступил';
-                    detailsEl.appendChild(empty);
-                    return;
-                }
-
-                const table = document.createElement('div');
-                table.style.display = 'flex';
-                table.style.flexDirection = 'column';
-                table.style.gap = '8px';
-                table.style.marginTop = '8px';
-
-                students.forEach((s) => {
-                    const sRow = document.createElement('div');
-                    sRow.style.display = 'flex';
-                    sRow.style.alignItems = 'center';
-                    sRow.style.justifyContent = 'space-between';
-                    sRow.style.gap = '10px';
-                    sRow.style.padding = '8px 10px';
-                    sRow.style.border = '1px solid var(--color-border-light, #e9ecef)';
-                    sRow.style.borderRadius = '10px';
-
-                    const left = document.createElement('div');
-                    left.style.display = 'flex';
-                    left.style.flexDirection = 'column';
-
-                    const name = document.createElement('div');
-                    name.style.fontWeight = '600';
-                    name.textContent = `${s.username || 'user'} (id: ${s.id})`;
-
-                    const email = document.createElement('div');
-                    email.style.color = '#666';
-                    email.style.fontSize = '14px';
-                    email.textContent = s.email || '';
-
-                    left.appendChild(name);
-                    left.appendChild(email);
-
-                    const removeBtn = document.createElement('button');
-                    removeBtn.type = 'button';
-                    removeBtn.className = 'button-color-yellow';
-                    removeBtn.textContent = 'Удалить';
-                    removeBtn.onclick = async () => {
-                        try {
-                            removeBtn.disabled = true;
-                            await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/remove`, { method: 'POST' });
-                            showSuccess('Ученик удалён');
-                            studentsBtn.onclick();
-                            await refreshGroups();
-                        } catch (e) {
-                            showError(e && e.message ? e.message : 'Ошибка');
-                        } finally {
-                            removeBtn.disabled = false;
-                        }
-                    };
-
-                    sRow.appendChild(left);
-                    sRow.appendChild(removeBtn);
-                    table.appendChild(sRow);
-                });
-
-                detailsEl.appendChild(table);
-            } catch (e) {
-                showError(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                studentsBtn.disabled = false;
-            }
-        };
-
-        actions.appendChild(inviteBtn);
-        actions.appendChild(studentsBtn);
-
-        row.appendChild(title);
-        if (g.description) {
-            const desc = document.createElement('div');
-            desc.style.color = '#444';
-            desc.textContent = String(g.description);
-            row.appendChild(desc);
+        row.className = 'groups-table-row';
+        const isArchived = Boolean(g && g.archived_at);
+        if (isArchived) {
+            row.classList.add('archived');
         }
-        row.appendChild(meta);
-        row.appendChild(actions);
-        row.appendChild(detailsEl);
+        if (String(g.id) === String(groupsUiState.selectedGroupId)) {
+            row.classList.add('selected');
+        }
+        row.dataset.groupId = String(g.id);
+        const c1 = document.createElement('div');
+        c1.textContent = String(g.id);
+        const c2 = document.createElement('div');
+        c2.textContent = String(g.title || '');
+        const c3 = document.createElement('div');
+        c3.className = 'groups-table-actions-cell';
+        if (isArchived) {
+            const restoreBtn = document.createElement('button');
+            restoreBtn.type = 'button';
+            restoreBtn.className = 'groups-row-restore-btn button-color-yellow';
+            restoreBtn.title = 'Снять удаление группы';
+            restoreBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+            restoreBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openGroupRestoreModal(g);
+            });
+            c3.appendChild(restoreBtn);
+        }
+        row.appendChild(c1);
+        row.appendChild(c2);
+        row.appendChild(c3);
 
-        listEl.appendChild(row);
+        row.addEventListener('click', () => {
+            setSelectedGroup(g.id);
+        });
+        row.addEventListener('dblclick', () => {
+            openGroupModal('edit', g);
+        });
+
+        table.appendChild(row);
+    });
+
+    try {
+        if (window.lucide) {
+            window.lucide.createIcons({ root: table });
+        }
+    } catch (e) {
+    }
+}
+
+function renderGroupsDetails() {
+    const g = getSelectedGroup();
+    const titleEl = document.getElementById('groupsDetailsTitle');
+    const descEl = document.getElementById('groupsDetailsDescription');
+    const inviteEl = document.getElementById('groupsInviteLink');
+    if (titleEl) titleEl.textContent = g ? (g.title || '—') : '—';
+    if (descEl) descEl.textContent = g ? (g.description || '—') : '—';
+    if (inviteEl && !g) inviteEl.value = '';
+}
+
+function avatarUrlForUser(userId) {
+    if (!userId) return '';
+    return `/user/api/avatar?user_id=${encodeURIComponent(String(userId))}&size=small`;
+}
+
+function renderStudentsTable(students) {
+    const table = document.getElementById('groupsStudentsTable');
+    if (!table) return;
+    table.innerHTML = '';
+
+    if (!groupsUiState.selectedGroupId) {
+        const empty = document.createElement('div');
+        empty.style.padding = '12px';
+        empty.style.color = '#666';
+        empty.textContent = 'Выбери группу слева';
+        table.appendChild(empty);
+        return;
+    }
+
+    if (!Array.isArray(students) || students.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '12px';
+        empty.style.color = '#666';
+        empty.textContent = 'Пока нет учеников';
+        table.appendChild(empty);
+        return;
+    }
+
+    students.forEach((s) => {
+        const row = document.createElement('div');
+        row.className = 'groups-students-table-row';
+        row.dataset.studentId = String(s.id);
+        if (String(s.id) === String(groupsUiState.selectedStudentId)) {
+            row.classList.add('selected');
+        }
+
+        const avatar = document.createElement('img');
+        avatar.className = 'groups-student-avatar';
+        avatar.alt = 'avatar';
+        avatar.src = avatarUrlForUser(s.id);
+
+        const name = document.createElement('div');
+        name.className = 'groups-student-name';
+        name.textContent = String(s.username || '');
+
+        const status = document.createElement('div');
+        status.className = 'groups-student-status';
+        const st = String(s.status || '').toLowerCase();
+        status.textContent = st === 'active' ? 'подтвердил' : 'не подтвердил';
+
+        row.appendChild(avatar);
+        row.appendChild(name);
+        row.appendChild(status);
+
+        row.addEventListener('click', () => {
+            setSelectedStudent(s.id);
+        });
+
+        table.appendChild(row);
     });
 }
 
 async function refreshGroups() {
-    const listEl = document.getElementById('groupsList');
-    if (!listEl) return;
     try {
         const data = await groupsApiRequest('/groups/api/my', { method: 'GET' });
         const groups = data && Array.isArray(data.groups) ? data.groups : [];
-        renderGroupsList(groups);
+        groupsUiState.groups = groups;
+        renderGroupsTable();
+
+        const visible = getVisibleGroups();
+        if (!groupsUiState.selectedGroupId && visible.length > 0) {
+            setSelectedGroup(visible[0].id);
+        } else {
+            renderGroupsDetails();
+            refreshStudents();
+        }
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    }
+}
+
+async function refreshSelectedGroupDetailsFromServer() {
+    const id = groupsUiState.selectedGroupId;
+    if (!id) return;
+    try {
+        const data = await groupsApiRequest(`/groups/api/group/${id}`, { method: 'GET' });
+        const updated = data && data.group ? data.group : null;
+        if (!updated) return;
+        const groups = Array.isArray(groupsUiState.groups) ? groupsUiState.groups : [];
+        const idx = groups.findIndex((g) => String(g.id) === String(id));
+        if (idx >= 0) {
+            groups[idx] = Object.assign({}, groups[idx], updated);
+        }
+        groupsUiState.groups = groups;
+        renderGroupsTable();
+        renderGroupsDetails();
+    } catch (e) {
+    }
+}
+
+async function refreshStudents() {
+    groupsUiState._studentsCache = [];
+    if (!groupsUiState.selectedGroupId) {
+        renderStudentsTable([]);
+        return;
+    }
+    try {
+        const data = await groupsApiRequest(`/groups/api/group/${groupsUiState.selectedGroupId}/students`, { method: 'GET' });
+        const students = data && Array.isArray(data.students) ? data.students : [];
+        groupsUiState._studentsCache = students;
+        renderStudentsTable(students);
+    } catch (e) {
+        renderStudentsTable([]);
+    }
+}
+
+function toggleGroupModal(isOpen) {
+    const modal = document.getElementById('groupModal');
+    if (!modal) return;
+    modal.style.display = isOpen ? 'flex' : 'none';
+}
+
+function toggleGroupRestoreModal(isOpen) {
+    const modal = document.getElementById('groupRestoreModal');
+    if (!modal) return;
+    modal.style.display = isOpen ? 'flex' : 'none';
+}
+
+function openGroupRestoreModal(group) {
+    const textEl = document.getElementById('groupRestoreModalText');
+    groupsUiState._restoreGroupId = group && group.id != null ? String(group.id) : null;
+    if (textEl) {
+        const title = group && group.title ? String(group.title) : '';
+        textEl.textContent = title ? `Снять удаление группы «${title}»?` : 'Снять удаление группы?';
+    }
+    toggleGroupRestoreModal(true);
+    try {
+        if (window.lucide) window.lucide.createIcons({ root: document.getElementById('groupRestoreModal') });
+    } catch (e) {
+    }
+}
+
+async function restoreGroupFromModal() {
+    const yesBtn = document.getElementById('groupRestoreModalYes');
+    const groupId = groupsUiState._restoreGroupId;
+    if (!groupId) return;
+    try {
+        if (yesBtn) yesBtn.disabled = true;
+        await groupsApiRequest(`/groups/api/group/${groupId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ archived_at: null }),
+        });
+        showSuccess('Группа восстановлена');
+        toggleGroupRestoreModal(false);
+        groupsUiState._restoreGroupId = null;
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    } finally {
+        if (yesBtn) yesBtn.disabled = false;
+    }
+}
+
+function openGroupModal(mode, group) {
+    const title = document.getElementById('groupModalTitle');
+    const titleInput = document.getElementById('groupModalTitleInput');
+    const descInput = document.getElementById('groupModalDescriptionInput');
+    if (!title || !titleInput || !descInput) return;
+
+    if (mode === 'edit' && group) {
+        title.textContent = 'Группа';
+        titleInput.value = String(group.title || '');
+        descInput.value = String(group.description || '');
+        groupsUiState._modalGroupId = String(group.id);
+    } else {
+        title.textContent = 'Группа';
+        titleInput.value = '';
+        descInput.value = '';
+        groupsUiState._modalGroupId = null;
+    }
+
+    toggleGroupModal(true);
+    try {
+        if (window.lucide) window.lucide.createIcons();
+    } catch (e) {
+    }
+    titleInput.focus();
+}
+
+async function saveGroupFromModal() {
+    const titleInput = document.getElementById('groupModalTitleInput');
+    const descInput = document.getElementById('groupModalDescriptionInput');
+    const saveBtn = document.getElementById('groupModalSave');
+    if (!titleInput || !descInput || !saveBtn) return;
+
+    const title = String(titleInput.value || '').trim();
+    const description = String(descInput.value || '').trim();
+    if (!title) {
+        showError('Название обязательно');
+        return;
+    }
+
+    try {
+        saveBtn.disabled = true;
+        const editingId = groupsUiState._modalGroupId;
+        if (editingId) {
+            await groupsApiRequest(`/groups/api/group/${editingId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ title, description: description || null }),
+            });
+            showSuccess('Сохранено');
+        } else {
+            await groupsApiRequest('/groups/api/group', {
+                method: 'POST',
+                body: JSON.stringify({ title, description: description || null }),
+            });
+            showSuccess('Группа создана');
+        }
+        toggleGroupModal(false);
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+async function createInviteForSelectedGroup() {
+    const g = getSelectedGroup();
+    if (!g) {
+        showInfo('Выбери группу');
+        return;
+    }
+    const inviteEl = document.getElementById('groupsInviteLink');
+    try {
+        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, {
+            method: 'POST',
+            body: JSON.stringify({ max_uses: null }),
+        });
+        const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
+        const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
+        const path = joinPath || (token ? `/join-group/${token}` : null);
+        if (!path) throw new Error('Не удалось получить ссылку');
+        const fullUrl = `${location.origin}${path}`;
+        if (inviteEl) inviteEl.value = fullUrl;
+        return fullUrl;
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+        return null;
+    }
+}
+
+async function copyInviteLink() {
+    const inviteEl = document.getElementById('groupsInviteLink');
+    const val = inviteEl ? String(inviteEl.value || '').trim() : '';
+    if (!val) {
+        const created = await createInviteForSelectedGroup();
+        if (!created) return;
+    }
+    const link = inviteEl ? String(inviteEl.value || '').trim() : '';
+    if (!link) return;
+    try {
+        await navigator.clipboard.writeText(link);
+        showSuccess('Ссылка скопирована');
+    } catch (e) {
+        showInfo('Скопируй ссылку вручную');
+    }
+}
+
+async function archiveSelectedGroup() {
+    const g = getSelectedGroup();
+    if (!g) {
+        showInfo('Выбери группу');
+        return;
+    }
+    try {
+        await groupsApiRequest(`/groups/api/group/${g.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ archived_at: new Date().toISOString() }),
+        });
+        showSuccess('Группа архивирована');
+        groupsUiState.selectedGroupId = null;
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    }
+}
+
+async function removeSelectedStudent() {
+    const g = getSelectedGroup();
+    const studentId = groupsUiState.selectedStudentId;
+    if (!g) {
+        showInfo('Выбери группу');
+        return;
+    }
+    if (!studentId) {
+        showInfo('Выбери ученика');
+        return;
+    }
+    try {
+        await groupsApiRequest(`/groups/api/group/${g.id}/students/${studentId}/remove`, { method: 'POST' });
+        showSuccess('Ученик удалён');
+        groupsUiState.selectedStudentId = null;
+        await refreshGroups();
+        await refreshStudents();
     } catch (e) {
         showError(e && e.message ? e.message : 'Ошибка');
     }
 }
 
 function initializeGroupsSection() {
-    const btn = document.getElementById('createGroupBtn');
-    const titleEl = document.getElementById('groupTitle');
-    const descEl = document.getElementById('groupDescription');
-    const listEl = document.getElementById('groupsList');
-    if (!btn || !titleEl || !descEl || !listEl) return;
+    const groupsTable = document.getElementById('groupsTable');
+    const createBtn = document.getElementById('groupsCreateBtn');
+    const delBtn = document.getElementById('groupsDeleteBtn');
+    const filterSelect = document.getElementById('groupsFilterSelect');
+    const inviteCopyBtn = document.getElementById('groupsInviteCopyBtn');
+    const studentsRefreshBtn = document.getElementById('groupsStudentsRefreshBtn');
+    const studentsCreateBtn = document.getElementById('groupsStudentsCreateBtn');
+    const studentsDeleteBtn = document.getElementById('groupsStudentsDeleteBtn');
+    const modal = document.getElementById('groupModal');
+    const modalClose = document.getElementById('groupModalClose');
+    const modalSave = document.getElementById('groupModalSave');
 
-    btn.onclick = async () => {
-        const title = String(titleEl.value || '').trim();
-        const description = String(descEl.value || '').trim();
-        if (!title) {
-            showError('Название обязательно');
-            return;
-        }
+    const restoreModal = document.getElementById('groupRestoreModal');
+    const restoreModalClose = document.getElementById('groupRestoreModalClose');
+    const restoreModalYes = document.getElementById('groupRestoreModalYes');
+
+    if (!groupsTable || !createBtn || !delBtn || !modal || !modalClose || !modalSave) return;
+
+    if (filterSelect) {
         try {
-            btn.disabled = true;
-            const data = await groupsApiRequest('/groups/api/group', {
-                method: 'POST',
-                body: JSON.stringify({ title, description: description || null }),
-            });
-            if (data && data.success) {
-                showSuccess('Группа создана');
-                titleEl.value = '';
-                descEl.value = '';
-                await refreshGroups();
-            } else {
-                showError('Не удалось создать группу');
-            }
+            const saved = localStorage.getItem('groups_filter_mode');
+            if (saved) groupsUiState.filterMode = saved;
         } catch (e) {
-            showError(e && e.message ? e.message : 'Ошибка');
-        } finally {
-            btn.disabled = false;
         }
-    };
+        filterSelect.value = getGroupsFilterMode();
+        filterSelect.addEventListener('change', () => {
+            groupsUiState.filterMode = String(filterSelect.value || 'active');
+            try {
+                localStorage.setItem('groups_filter_mode', getGroupsFilterMode());
+            } catch (e) {
+            }
+            groupsUiState.selectedGroupId = null;
+            renderGroupsTable();
+            renderGroupsDetails();
+            refreshStudents();
+            const visible = getVisibleGroups();
+            if (visible.length > 0) setSelectedGroup(visible[0].id);
+        });
+    }
+
+    createBtn.addEventListener('click', () => openGroupModal('create'));
+    delBtn.addEventListener('click', () => archiveSelectedGroup());
+    inviteCopyBtn && inviteCopyBtn.addEventListener('click', () => copyInviteLink());
+    studentsRefreshBtn && studentsRefreshBtn.addEventListener('click', async () => {
+        await refreshSelectedGroupDetailsFromServer();
+        await refreshStudents();
+    });
+    studentsCreateBtn && studentsCreateBtn.addEventListener('click', () => copyInviteLink());
+    studentsDeleteBtn && studentsDeleteBtn.addEventListener('click', () => removeSelectedStudent());
+
+    modalClose.addEventListener('click', () => toggleGroupModal(false));
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) toggleGroupModal(false);
+    });
+    modalSave.addEventListener('click', () => saveGroupFromModal());
+
+    if (restoreModal && restoreModalClose && restoreModalYes) {
+        restoreModalClose.addEventListener('click', () => toggleGroupRestoreModal(false));
+        restoreModal.addEventListener('click', (e) => {
+            if (e.target === restoreModal) toggleGroupRestoreModal(false);
+        });
+        restoreModalYes.addEventListener('click', () => restoreGroupFromModal());
+    }
 
     refreshGroups();
 }

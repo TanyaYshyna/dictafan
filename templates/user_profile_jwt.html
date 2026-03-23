@@ -142,21 +142,112 @@
             <h3>Группы</h3>
             <div id="groupsSection" class="profile-panel">
                 <div class="panel-content">
-                    <div class="form-row">
-                        <label for="groupTitle">Название</label>
-                        <input type="text" id="groupTitle" name="groupTitle" placeholder="Напр. 7А" maxlength="255">
+                    <div class="groups-layout">
+                        <div class="groups-left">
+                            <div class="groups-toolbar">
+                                <div class="groups-toolbar-actions">
+                                    <button type="button" id="groupsCreateBtn" class="button-color-yellow" title="Новая группа">
+                                        <i data-lucide="plus"></i>
+                                    </button>
+                                    <button type="button" id="groupsDeleteBtn" class="button-color-yellow" title="Удалить/архивировать группу">
+                                        <i data-lucide="trash-2"></i>
+                                    </button>
+                                    <select id="groupsFilterSelect" class="groups-filter-select" title="Фильтр">
+                                        <option value="active">показать только активные</option>
+                                        <option value="all">показать все</option>
+                                    </select>
+                                </div>
+                                <div class="groups-toolbar-title">Группы</div>
+                            </div>
+
+                            <div class="groups-table" id="groupsTable"></div>
+                        </div>
+
+                        <div class="groups-right">
+                            <div class="groups-details">
+                                <div class="groups-details-row">
+                                    <div class="groups-details-label">Название</div>
+                                    <div class="groups-details-value" id="groupsDetailsTitle">—</div>
+                                </div>
+                                <div class="groups-details-row">
+                                    <div class="groups-details-label">Описание</div>
+                                    <div class="groups-details-value" id="groupsDetailsDescription">—</div>
+                                </div>
+
+                                <div class="groups-details-row">
+                                    <div class="groups-details-label">Инвайт ссылка</div>
+                                    <div class="groups-invite">
+                                        <input type="text" id="groupsInviteLink" class="groups-invite-input" readonly value="">
+                                        <button type="button" id="groupsInviteCopyBtn" class="button-color-yellow" title="Скопировать">
+                                            <i data-lucide="copy"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="groups-students">
+                                    <div class="groups-toolbar groups-students-toolbar">
+                                        <div class="groups-toolbar-title">Ученики</div>
+                                        <div class="groups-toolbar-actions">
+                                            <button type="button" id="groupsStudentsRefreshBtn" class="button-color-yellow" title="обновить данные о группе">
+                                                <i data-lucide="refresh-cw"></i>
+                                            </button>
+                                            <button type="button" id="groupsStudentsCreateBtn" class="button-color-yellow" title="Новый (инвайт)">
+                                                <i data-lucide="plus"></i>
+                                            </button>
+                                            <button type="button" id="groupsStudentsDeleteBtn" class="button-color-yellow" title="Удалить ученика">
+                                                <i data-lucide="trash-2"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="groups-students-table" id="groupsStudentsTable"></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-row">
-                        <label for="groupDescription">Описание</label>
-                        <input type="text" id="groupDescription" name="groupDescription" placeholder="(необязательно)">
+                </div>
+            </div>
+        </div>
+
+        <div id="groupModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 640px;">
+                <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+                    <h3 id="groupModalTitle" style="margin: 0;">Группа</h3>
+                    <button type="button" id="groupModalClose" class="modal-close" title="Закрыть">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 0 16px 16px 16px;">
+                    <div class="form-row" style="margin-top: 6px;">
+                        <label for="groupModalTitleInput">Название</label>
+                        <input type="text" id="groupModalTitleInput" maxlength="255">
                     </div>
-                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 12px;">
-                        <button type="button" id="createGroupBtn" class="button-color-yellow">
-                            <i data-lucide="plus"></i>
-                            Создать группу
-                        </button>
+                    <div class="form-row" style="margin-top: 12px;">
+                        <label for="groupModalDescriptionInput">Описание</label>
+                        <input type="text" id="groupModalDescriptionInput">
                     </div>
-                    <div id="groupsList" style="margin-top: 16px;"></div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+                    <button type="button" id="groupModalSave" class="button-color-yellow">
+                        <i data-lucide="save"></i>
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="groupRestoreModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 520px;">
+                <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+                    <h3 style="margin: 0;">Группа</h3>
+                    <button type="button" id="groupRestoreModalClose" class="modal-close" title="Закрыть">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 0 16px 16px 16px;">
+                    <div id="groupRestoreModalText" style="margin-top: 6px;">Снять удаление группы?</div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+                    <button type="button" id="groupRestoreModalYes" class="button-color-yellow">ДА</button>
                 </div>
             </div>
         </div>

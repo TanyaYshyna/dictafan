@@ -302,7 +302,6 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
             JOIN users u ON u.id = gs.student_user_id
             WHERE gs.group_id = %s
               AND gs.removed_at IS NULL
-              AND gs.status = 'active'
             ORDER BY u.username ASC, u.id ASC
             """,
             (group_id,),
