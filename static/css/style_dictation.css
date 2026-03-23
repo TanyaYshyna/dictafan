@@ -447,7 +447,7 @@ body.playing-audio::after {
   margin: 0 !important;
   display: inline-table;
   border-collapse: separate;
-  border-spacing: 6px;
+  border-spacing: 4px;
 }
 
 .table-progress col.progress-col {
