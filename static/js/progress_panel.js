@@ -401,6 +401,20 @@ class ProgressPanel {
         this.updateTimerButtons();
     }
 
+    updateTimerButtons() {
+        const shouldShowValue = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
+        const apply = (btnId) => {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            const label = btn.querySelector('.timer-label');
+            const value = btn.querySelector('.timer-value');
+            if (label) label.hidden = shouldShowValue;
+            if (value) value.hidden = !shouldShowValue;
+        };
+        apply('btn-timer');
+        apply('btn-modal-timer');
+    }
+
     updateTimerIcon() {
         // Backward-compat: icon switching was removed from UI, but some older code still calls this.
         this.updateTimerButtons();
