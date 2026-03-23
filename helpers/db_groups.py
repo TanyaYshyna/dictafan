@@ -66,7 +66,7 @@ def list_my_groups(user_id: int) -> list[dict]:
             FROM groups g
             JOIN group_teachers gt ON gt.group_id = g.id
             WHERE gt.teacher_user_id = %s
-            ORDER BY g.archived_at NULLS FIRST, g.created_at DESC
+            ORDER BY g.archived_at NULLS FIRST, g.id DESC
             """,
             (user_id,),
         )
@@ -302,7 +302,7 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
             JOIN users u ON u.id = gs.student_user_id
             WHERE gs.group_id = %s
               AND gs.removed_at IS NULL
-            ORDER BY u.username ASC, u.id ASC
+            ORDER BY u.id ASC
             """,
             (group_id,),
         )

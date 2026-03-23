@@ -480,6 +480,18 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     gap: 12px;
  }
 
+ .groups-toolbar-left {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+ }
+
+ .groups-toolbar-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+ }
+
  .groups-toolbar-title {
     font-weight: 700;
  }
@@ -571,9 +583,17 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     align-items: start;
  }
 
+ .groups-details-row.no-label {
+    grid-template-columns: minmax(0, 1fr);
+ }
+
  .groups-details-label {
     font-weight: 700;
     color: #495057;
+ }
+
+ .groups-details-row .groups-details-label {
+    white-space: nowrap;
  }
 
  .groups-details-value {

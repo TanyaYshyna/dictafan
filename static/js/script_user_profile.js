@@ -129,6 +129,11 @@ function getSelectedGroup() {
 function setSelectedGroup(groupId) {
     groupsUiState.selectedGroupId = groupId != null ? String(groupId) : null;
     groupsUiState.selectedStudentId = null;
+    try {
+        const inviteEl = document.getElementById('groupsInviteLink');
+        if (inviteEl) inviteEl.value = '';
+    } catch (e) {
+    }
     renderGroupsTable();
     renderGroupsDetails();
     refreshStudents();
@@ -226,7 +231,14 @@ function renderGroupsDetails() {
     const inviteEl = document.getElementById('groupsInviteLink');
     if (titleEl) titleEl.textContent = g ? (g.title || '—') : '—';
     if (descEl) descEl.textContent = g ? (g.description || '—') : '—';
-    if (inviteEl && !g) inviteEl.value = '';
+    if (inviteEl) {
+        if (!g) {
+            inviteEl.value = '';
+        } else {
+            const map = groupsUiState._inviteLinksByGroupId || {};
+            inviteEl.value = map[String(g.id)] || '';
+        }
+    }
 }
 
 function avatarUrlForUser(userId) {
@@ -448,11 +460,17 @@ async function saveGroupFromModal() {
             showSuccess('Группа создана');
         }
         toggleGroupModal(false);
+        groupsUiState._modalGroupId = null;
         await refreshGroups();
     } catch (e) {
         showError(e && e.message ? e.message : 'Ошибка');
     } finally {
         saveBtn.disabled = false;
+        try {
+            const modal = document.getElementById('groupModal');
+            if (modal) modal.style.display = 'none';
+        } catch (e) {
+        }
     }
 }
 
@@ -474,6 +492,8 @@ async function createInviteForSelectedGroup() {
         if (!path) throw new Error('Не удалось получить ссылку');
         const fullUrl = `${location.origin}${path}`;
         if (inviteEl) inviteEl.value = fullUrl;
+        if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
+        groupsUiState._inviteLinksByGroupId[String(g.id)] = fullUrl;
         return fullUrl;
     } catch (e) {
         showError(e && e.message ? e.message : 'Ошибка');

@@ -145,19 +145,22 @@
                     <div class="groups-layout">
                         <div class="groups-left">
                             <div class="groups-toolbar">
-                                <div class="groups-toolbar-actions">
-                                    <button type="button" id="groupsCreateBtn" class="button-color-yellow" title="Новая группа">
-                                        <i data-lucide="plus"></i>
-                                    </button>
-                                    <button type="button" id="groupsDeleteBtn" class="button-color-yellow" title="Удалить/архивировать группу">
-                                        <i data-lucide="trash-2"></i>
-                                    </button>
+                                <div class="groups-toolbar-left">
                                     <select id="groupsFilterSelect" class="groups-filter-select" title="Фильтр">
                                         <option value="active">показать только активные</option>
                                         <option value="all">показать все</option>
                                     </select>
                                 </div>
-                                <div class="groups-toolbar-title">Группы</div>
+                                <div class="groups-toolbar-right">
+                                    <div class="groups-toolbar-actions">
+                                        <button type="button" id="groupsCreateBtn" class="button-color-yellow" title="Новая группа">
+                                            <i data-lucide="plus"></i>
+                                        </button>
+                                        <button type="button" id="groupsDeleteBtn" class="button-color-yellow" title="Удалить/архивировать группу">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="groups-table" id="groupsTable"></div>
@@ -165,12 +168,10 @@
 
                         <div class="groups-right">
                             <div class="groups-details">
-                                <div class="groups-details-row">
-                                    <div class="groups-details-label">Название</div>
+                                <div class="groups-details-row no-label">
                                     <div class="groups-details-value" id="groupsDetailsTitle">—</div>
                                 </div>
-                                <div class="groups-details-row">
-                                    <div class="groups-details-label">Описание</div>
+                                <div class="groups-details-row no-label">
                                     <div class="groups-details-value" id="groupsDetailsDescription">—</div>
                                 </div>
 
