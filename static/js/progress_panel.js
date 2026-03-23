@@ -804,7 +804,10 @@ class ProgressPanel {
         if (modalClock) modalClock.removeAttribute('disabled');
     }
 
-    updateTimerButtons() {
+    openTimerDialog() {
+        this._ensureTimerDialog();
+        if (!this.timerDialogElements) return;
+
         const updateVariant = (btnId) => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
@@ -814,13 +817,12 @@ class ProgressPanel {
             if (label) label.hidden = shouldShowValue;
             if (value) value.hidden = !shouldShowValue;
         };
+
         updateVariant('btn-timer');
-        const {
-            overlay,
-            minutesInput,
-            secondsInput,
-            closeBtn
-        } = this.timerDialogElements;
+        updateVariant('btn-modal-timer');
+
+        const { overlay, minutesInput, secondsInput, closeBtn } = this.timerDialogElements;
+        if (!overlay || !minutesInput || !secondsInput) return;
 
         const baseSeconds = (this.timerState.countdownDefaultSeconds || this.countdownDuration || 300);
         console.log('[Timer] openTimerDialog() baseSeconds=%s countdownRemaining=%s countdownDuration=%s', baseSeconds, this.countdownRemaining, this.countdownDuration);
@@ -854,6 +856,7 @@ class ProgressPanel {
     closeTimerDialog() {
         if (!this.timerDialogElements) return;
         const { overlay, escHandler } = this.timerDialogElements;
+        if (!overlay) return;
         if (escHandler) {
             document.removeEventListener('keydown', escHandler);
             this.timerDialogElements.escHandler = null;
