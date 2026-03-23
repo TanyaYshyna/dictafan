@@ -7661,8 +7661,8 @@ async function onloadInitializeDictation() {
 
     initPlaySequenceInputs();
 
-    // Обработчик клика на часы для паузы
-    const timerButton = document.querySelector('.stat-btn.timer');
+    // Обработчик клика на таймер для паузы (привязка по id, без зависимости от классов)
+    const timerButton = document.getElementById('btn-timer') || document.getElementById('btn-modal-timer');
     if (timerButton) {
         timerButton.addEventListener('click', function () {
             if (pauseModal.style.display === 'flex') {
@@ -9962,8 +9962,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 // обработчики событий для отслеживания активности:-----------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Обработчик клика на часы для паузы
-    const timerButton = document.querySelector('.stat-btn.timer');
+    // Обработчик клика на таймер для паузы (привязка по id, без зависимости от классов)
+    const timerButton = document.getElementById('btn-timer') || document.getElementById('btn-modal-timer');
     if (timerButton) {
         timerButton.addEventListener('click', function () {
             if (pauseModal.style.display === 'flex') {

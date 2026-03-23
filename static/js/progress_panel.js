@@ -88,13 +88,13 @@ class ProgressPanel {
                 </colgroup>
                 <tr>
                     <td colspan="2">
-                        <button id="${timerSettingsId}" class="stat-btn timer-settings" title="Время работы над диктантом">
+                        <button id="${timerSettingsId}" class="pp-timer-settings" title="Время работы над диктантом">
                             <i data-lucide="clock"></i>
                             <span id="${timerId}" class="timer-value">00:00:00</span>
                         </button>
                     </td>
                     <td colspan="2">
-                        <button id="${timerBtnId}" class="stat-btn row-timer timer" disabled title="Таймер">
+                        <button id="${timerBtnId}" class="pp-timer" disabled title="Таймер">
                             <span class="timer-label">Таймер</span>
                             <span class="timer-value" hidden>00:00:00</span>
                             <i data-lucide="timer"></i>
@@ -103,25 +103,25 @@ class ProgressPanel {
                 </tr>
                 <tr>
                     <td>
-                        <button id="btn-${prefix}count-perfect" class="stat-btn perfect" disabled title="Количество предложений набранных без ошибок с 1-й попытки">
+                        <button id="btn-${prefix}count-perfect" class="pp-perfect" disabled title="Количество предложений набранных без ошибок с 1-й попытки">
                             <i data-lucide="star"></i>
                             <span id="${prefix}count-perfect">0</span>
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-corrected" class="stat-btn corrected" disabled title="Количество набранных предложений">
+                        <button id="btn-${prefix}count-corrected" class="pp-corrected" disabled title="Количество набранных предложений">
                             <i data-lucide="star-half"></i>
                             <span id="${prefix}count-corrected">0</span>
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-audio" class="stat-btn corrected-audio" disabled title="Сколько предложений прошло аудио контроль">
+                        <button id="btn-${prefix}count-audio" class="pp-audio" disabled title="Сколько предложений прошло аудио контроль">
                             <i data-lucide="mic-off"></i>
                             <span id="${prefix}count-audio">0</span>
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-total" class="stat-btn total" disabled title="Общее количество предложений">
+                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Общее количество предложений">
                             <i data-lucide="layers"></i>
                             <span id="${prefix}count-total">0</span>
                         </button>
@@ -815,45 +815,6 @@ class ProgressPanel {
             if (value) value.hidden = !shouldShowValue;
         };
         updateVariant('btn-timer');
-        updateVariant('btn-modal-timer');
-        this._updateTimerButtonColor();
-    }
-
-    _updateTimerButtonColor() {
-        const isCountdown = !!this.countdownEnabled;
-        const btnTimer = document.getElementById('btn-timer');
-        const btnModalTimer = document.getElementById('btn-modal-timer');
-        const btnSettings = document.getElementById('btn-timer-settings');
-        const btnModalSettings = document.getElementById('btn-modal-timer-settings');
-        
-        const applyClasses = (el) => {
-            if (!el) return;
-            if (isCountdown) {
-                el.classList.add('timer-countdown');
-                el.classList.remove('timer-clock');
-            } else {
-                el.classList.add('timer-clock');
-                el.classList.remove('timer-countdown');
-            }
-        };
-
-        const clearClasses = (el) => {
-            if (!el) return;
-            el.classList.remove('timer-clock');
-            el.classList.remove('timer-countdown');
-        };
-
-        // Timer button changes color based on countdown mode.
-        applyClasses(btnTimer);
-        applyClasses(btnModalTimer);
-
-        // Clock button should not change color when countdown is enabled.
-        clearClasses(btnSettings);
-        clearClasses(btnModalSettings);
-    }
-
-    openTimerDialog() {
-        this._ensureTimerDialog();
         const {
             overlay,
             minutesInput,

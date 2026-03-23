@@ -425,19 +425,6 @@ body.playing-audio::after {
   outline-offset: 2px;
 }
  
-
-.modal-content table {
-  border-collapse: collapse;
-  border-spacing: 0;
-  border: none !important;
-}
-
-.modal-content td, 
-.modal-content th {
-  padding: 2px !important;
-  border: none !important;
-}
-
 /* Первая ячейка в таблице модального окна - без padding и с шириной по содержимому */
 /* removed: start-modal header is no longer table-based */
 
@@ -454,17 +441,17 @@ body.playing-audio::after {
 
 
 .table-progress {
-  border-collapse: separate;
-  border-spacing: 6px;
   width: auto;
   table-layout: fixed;
   border: 0px;
   margin: 0 !important;
   display: inline-table;
+  border-collapse: separate;
+  border-spacing: 10px;
 }
 
 .table-progress col.progress-col {
-  width: 25%;
+  width: 80px;
 }
 
 .modal-content .table-progress td,
@@ -475,6 +462,74 @@ body.playing-audio::after {
   padding: 0;
   text-align: center;
   border: 0px ;
+  height: 42px;
+}
+
+/* Progress panel buttons: keep HTML minimal (one class per button) and fully scope styling here */
+.table-progress button {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+  white-space: nowrap;
+  cursor: default;
+  width: 100%;
+  height: 100%;
+}
+
+.table-progress button:disabled {
+  opacity: 1;
+  pointer-events: none;
+}
+
+.table-progress .pp-perfect {
+  background: var(--color-button-mint);
+  color: var(--color-button-text-mint);
+}
+
+.table-progress .pp-corrected {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
+}
+
+.table-progress .pp-audio {
+  background: var(--color-button-purple);
+  color: var(--color-button-text-purple);
+}
+
+.table-progress .pp-total {
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+}
+
+.table-progress .pp-timer-settings,
+.table-progress .pp-timer {
+  width: 100%;
+  background: var(--color-button-yellow) !important;
+  color: var(--color-button-text-yellow) !important;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.table-progress .pp-timer:hover,
+.table-progress .pp-timer-settings:hover {
+  background: var(--color-button-yellow) !important;
+  color: var(--color-button-text-orange) !important;
+}
+
+.table-progress button [data-lucide] {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  flex-shrink: 0 !important;
 }
 /* В модальном окне применяется .modal-content td с padding: 2px !important,
    что добавляет отступы к ячейкам таблицы прогресс-панели.
@@ -975,22 +1030,6 @@ body.playing-audio::after {
 
 /* Модальное окно окончания диктанта КОНЕЦ */
 
-/* табло с часами и текущими результатами круга ------------------*/
-.progress-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* Такой же отступ, как между кнопками */
-}
-
-.progress-top,
-.progress-bottom {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  /* Расстояние между элементами */
-}
-
 .stat-btn {
   display: inline-flex;
   gap: 1px;
@@ -1061,18 +1100,11 @@ body.playing-audio::after {
   max-width: 100%;
 }
 
-/* Цвет кнопки таймера в зависимости от режима */
-.stat-btn.timer.timer-clock,
-.stat-btn.timer-settings.timer-clock {
+.stat-btn.timer,
+.stat-btn.timer-settings {
   background: var(--color-button-yellow) !important;
   color: var(--color-button-text-yellow) !important;
 }
-
-.stat-btn.timer.timer-countdown,
-.stat-btn.timer-settings.timer-countdown {
-  background: var(--color-button-mint) !important;
-  color: var(--color-button-text-mint) !important;
-} 
 
 
 /* Цветовые схемы */
@@ -3442,57 +3474,7 @@ body.playing-audio::after {
     background: var(--color-button-purple);
 }
 
-/* Верхний ряд прогресс-панели: 2 кнопки по 2 колонки (таблица 2x4) */
-.table-progress .stat-btn.timer-settings,
-.table-progress .stat-btn.row-timer.timer {
-  width: 100%;
-  justify-content: center;
-  padding: 0 10px;
-  gap: 6px;
-}
-
-.table-progress .stat-btn.timer-settings .timer-value {
-  flex: 1;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.table-progress .stat-btn.row-timer.timer .timer-label,
-.table-progress .stat-btn.row-timer.timer .timer-value {
-  font-variant-numeric: tabular-nums;
-}
-
-.table-progress .stat-btn.row-timer.timer .timer-value {
-  margin-left: 0;
-  flex: 1;
-  text-align: center;
-}
-
-.table-progress .stat-btn.row-timer.timer .timer-label {
-  flex: 1;
-  text-align: center;
-}
-
-.table-progress .stat-btn.row-timer.timer i[data-lucide] {
-  margin-left: auto;
-}
-
-/* базовые стили сохранены, размеры переопределены выше */
-.stat-btn.timer-settings {
-  display: flex;
-  align-items: center;
-  background: var(--color-button-yellow) !important;
-  color: var(--color-button-text-yellow) !important;
-  cursor: pointer !important;
-  pointer-events: auto !important;
-}
-
-.stat-btn.timer-settings:hover {
-  background: var(--color-button-yellow) !important;
-  color: var(--color-button-text-orange) !important;
-}
-
-/* timer-mode-icon больше не используется */
+/* progress panel button layout: handled by .table-progress button + pp-* classes */
 
 .timer-control .unsaved-star {
   margin-left: 6px;
