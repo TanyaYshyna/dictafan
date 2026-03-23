@@ -460,6 +460,29 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     font-size: 1.3em;
 }
 
+ .form-section h3.profile-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+ }
+
+ .form-section h3.profile-section-header .profile-section-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    flex: 0 0 auto;
+ }
+
+ .form-section h3.profile-section-header .profile-section-toggle i[data-lucide] {
+    width: 20px;
+    height: 20px;
+ }
+
 .profile-header {
     text-align: center;
     margin-bottom: 30px;

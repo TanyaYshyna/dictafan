@@ -118,25 +118,52 @@
 
         <!-- Языковые модели-->
         <div class="form-section">
-            <h3>Настройки автономных языковых моделей </h3>
+            <h3 class="profile-section-header">
+                Настройки автономных языковых моделей
+                <button type="button" class="profile-section-toggle button-color-yellow" data-target="#languageSelectorModelsContainer" aria-label="Свернуть/развернуть">
+                    <i data-lucide="chevrons-up"></i>
+                </button>
+            </h3>
             <div id="languageSelectorModelsContainer"></div>
         </div>
 
         <!-- Настройки для диктантов -->
         <div class="form-section">
-            <h3>Настройки для диктантов</h3>
+            <h3 class="profile-section-header">
+                Настройки для диктантов
+                <button type="button" class="profile-section-toggle button-color-yellow" data-target="#userAudioSettingsContainer" aria-label="Свернуть/развернуть">
+                    <i data-lucide="chevrons-up"></i>
+                </button>
+            </h3>
             <div id="userAudioSettingsContainer"></div>
         </div>
 
-        <!-- Отчеты по обучению (заглушка для будущего) -->
         <div class="form-section">
-            <h3>Отчеты по обучению</h3>
-            <p>Статистика и прогресс обучения будут доступны в следующем обновлении.</p>
+            <h3>Группы</h3>
+            <div id="groupsSection" class="profile-panel">
+                <div class="panel-content">
+                    <div class="form-row">
+                        <label for="groupTitle">Название</label>
+                        <input type="text" id="groupTitle" name="groupTitle" placeholder="Напр. 7А" maxlength="255">
+                    </div>
+                    <div class="form-row">
+                        <label for="groupDescription">Описание</label>
+                        <input type="text" id="groupDescription" name="groupDescription" placeholder="(необязательно)">
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 12px;">
+                        <button type="button" id="createGroupBtn" class="button-color-yellow">
+                            <i data-lucide="plus"></i>
+                            Создать группу
+                        </button>
+                    </div>
+                    <div id="groupsList" style="margin-top: 16px;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Список отслеживаемых пользователей (заглушка для будущего) -->
         <div class="form-section">
-            <h3>Отслеживаемые пользователи</h3>
+            <h3>Организация групп обучения</h3>
             <p>Функционал для родителей и учителей будет доступен в следующем обновлении.</p>
         </div>
 

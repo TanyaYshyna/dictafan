@@ -47,6 +47,313 @@ async function swRequest(action, payload = {}) {
     });
 }
 
+function initializeProfileSectionToggles() {
+    try {
+        if (document.body.dataset.profileSectionTogglesBound === '1') return;
+        document.body.dataset.profileSectionTogglesBound = '1';
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest ? e.target.closest('.profile-section-toggle') : null;
+            if (!btn) return;
+
+            const targetSelector = btn.dataset ? btn.dataset.target : null;
+            if (!targetSelector) return;
+
+            const target = document.querySelector(targetSelector);
+            if (!target) return;
+
+            const isCollapsed = target.style.display === 'none';
+            target.style.display = isCollapsed ? '' : 'none';
+
+            const icon = btn.querySelector('i[data-lucide]');
+            if (icon) {
+                icon.setAttribute('data-lucide', isCollapsed ? 'chevrons-up' : 'chevrons-down');
+            } else {
+                btn.innerHTML = `<i data-lucide="${isCollapsed ? 'chevrons-up' : 'chevrons-down'}"></i>`;
+            }
+
+            if (window.lucide) {
+                window.lucide.createIcons({ root: btn });
+            }
+        });
+    } catch (e) {
+    }
+}
+
+async function groupsApiRequest(path, options = {}) {
+    const headers = Object.assign({}, options.headers || {});
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    if (UM && UM.token) {
+        headers['Authorization'] = `Bearer ${UM.token}`;
+    }
+
+    const res = await fetch(path, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body,
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const msg = data && (data.error || data.message) ? (data.error || data.message) : `HTTP ${res.status}`;
+        throw new Error(msg);
+    }
+    return data;
+}
+
+function renderGroupsList(groups) {
+    const listEl = document.getElementById('groupsList');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    if (!Array.isArray(groups) || groups.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.color = '#666';
+        empty.textContent = 'Пока нет групп';
+        listEl.appendChild(empty);
+        return;
+    }
+
+    groups.forEach((g) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.flexDirection = 'column';
+        row.style.gap = '8px';
+        row.style.padding = '12px';
+        row.style.border = '1px solid var(--color-border-light, #e9ecef)';
+        row.style.borderRadius = '10px';
+        row.style.marginTop = '12px';
+        row.dataset.groupId = String(g.id);
+
+        const title = document.createElement('div');
+        title.style.fontWeight = '700';
+        title.textContent = `${g.title} (id: ${g.id})`;
+
+        const meta = document.createElement('div');
+        meta.style.color = '#666';
+        meta.textContent = `Учеников: ${Number(g.students_count || 0)}`;
+
+        const actions = document.createElement('div');
+        actions.style.display = 'flex';
+        actions.style.gap = '10px';
+        actions.style.flexWrap = 'wrap';
+        actions.style.justifyContent = 'flex-end';
+
+        const inviteBtn = document.createElement('button');
+        inviteBtn.type = 'button';
+        inviteBtn.className = 'button-color-yellow';
+        inviteBtn.textContent = 'Инвайт-ссылка';
+
+        const studentsBtn = document.createElement('button');
+        studentsBtn.type = 'button';
+        studentsBtn.className = 'button-color-yellow';
+        studentsBtn.textContent = 'Ученики';
+
+        const detailsEl = document.createElement('div');
+        detailsEl.style.display = 'none';
+        detailsEl.style.paddingTop = '8px';
+        detailsEl.style.borderTop = '1px dashed var(--color-border-light, #e9ecef)';
+
+        inviteBtn.onclick = async () => {
+            try {
+                inviteBtn.disabled = true;
+                const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, {
+                    method: 'POST',
+                    body: JSON.stringify({ max_uses: null }),
+                });
+                const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
+                const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
+                const path = joinPath || (token ? `/join-group/${token}` : null);
+                if (!path) {
+                    showError('Не удалось получить ссылку');
+                    return;
+                }
+                const fullUrl = `${location.origin}${path}`;
+
+                detailsEl.style.display = 'block';
+                detailsEl.innerHTML = '';
+                const lbl = document.createElement('div');
+                lbl.style.fontWeight = '600';
+                lbl.textContent = 'Ссылка для вступления:';
+                const link = document.createElement('input');
+                link.type = 'text';
+                link.value = fullUrl;
+                link.readOnly = true;
+                link.style.width = '100%';
+                link.style.marginTop = '6px';
+                link.style.padding = '10px 12px';
+                link.style.border = '1px solid #ced4da';
+                link.style.borderRadius = '8px';
+                link.style.fontSize = '16px';
+                detailsEl.appendChild(lbl);
+                detailsEl.appendChild(link);
+
+                try {
+                    await navigator.clipboard.writeText(fullUrl);
+                    showSuccess('Ссылка скопирована');
+                } catch (e) {
+                    showInfo('Скопируй ссылку вручную');
+                }
+            } catch (e) {
+                showError(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                inviteBtn.disabled = false;
+            }
+        };
+
+        studentsBtn.onclick = async () => {
+            try {
+                studentsBtn.disabled = true;
+                const data = await groupsApiRequest(`/groups/api/group/${g.id}/students`, { method: 'GET' });
+                const students = data && Array.isArray(data.students) ? data.students : [];
+
+                detailsEl.style.display = 'block';
+                detailsEl.innerHTML = '';
+                const hdr = document.createElement('div');
+                hdr.style.fontWeight = '600';
+                hdr.textContent = 'Ученики:';
+                detailsEl.appendChild(hdr);
+
+                if (students.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.style.color = '#666';
+                    empty.style.marginTop = '6px';
+                    empty.textContent = 'Пока никто не вступил';
+                    detailsEl.appendChild(empty);
+                    return;
+                }
+
+                const table = document.createElement('div');
+                table.style.display = 'flex';
+                table.style.flexDirection = 'column';
+                table.style.gap = '8px';
+                table.style.marginTop = '8px';
+
+                students.forEach((s) => {
+                    const sRow = document.createElement('div');
+                    sRow.style.display = 'flex';
+                    sRow.style.alignItems = 'center';
+                    sRow.style.justifyContent = 'space-between';
+                    sRow.style.gap = '10px';
+                    sRow.style.padding = '8px 10px';
+                    sRow.style.border = '1px solid var(--color-border-light, #e9ecef)';
+                    sRow.style.borderRadius = '10px';
+
+                    const left = document.createElement('div');
+                    left.style.display = 'flex';
+                    left.style.flexDirection = 'column';
+
+                    const name = document.createElement('div');
+                    name.style.fontWeight = '600';
+                    name.textContent = `${s.username || 'user'} (id: ${s.id})`;
+
+                    const email = document.createElement('div');
+                    email.style.color = '#666';
+                    email.style.fontSize = '14px';
+                    email.textContent = s.email || '';
+
+                    left.appendChild(name);
+                    left.appendChild(email);
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'button-color-yellow';
+                    removeBtn.textContent = 'Удалить';
+                    removeBtn.onclick = async () => {
+                        try {
+                            removeBtn.disabled = true;
+                            await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/remove`, { method: 'POST' });
+                            showSuccess('Ученик удалён');
+                            studentsBtn.onclick();
+                            await refreshGroups();
+                        } catch (e) {
+                            showError(e && e.message ? e.message : 'Ошибка');
+                        } finally {
+                            removeBtn.disabled = false;
+                        }
+                    };
+
+                    sRow.appendChild(left);
+                    sRow.appendChild(removeBtn);
+                    table.appendChild(sRow);
+                });
+
+                detailsEl.appendChild(table);
+            } catch (e) {
+                showError(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                studentsBtn.disabled = false;
+            }
+        };
+
+        actions.appendChild(inviteBtn);
+        actions.appendChild(studentsBtn);
+
+        row.appendChild(title);
+        if (g.description) {
+            const desc = document.createElement('div');
+            desc.style.color = '#444';
+            desc.textContent = String(g.description);
+            row.appendChild(desc);
+        }
+        row.appendChild(meta);
+        row.appendChild(actions);
+        row.appendChild(detailsEl);
+
+        listEl.appendChild(row);
+    });
+}
+
+async function refreshGroups() {
+    const listEl = document.getElementById('groupsList');
+    if (!listEl) return;
+    try {
+        const data = await groupsApiRequest('/groups/api/my', { method: 'GET' });
+        const groups = data && Array.isArray(data.groups) ? data.groups : [];
+        renderGroupsList(groups);
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    }
+}
+
+function initializeGroupsSection() {
+    const btn = document.getElementById('createGroupBtn');
+    const titleEl = document.getElementById('groupTitle');
+    const descEl = document.getElementById('groupDescription');
+    const listEl = document.getElementById('groupsList');
+    if (!btn || !titleEl || !descEl || !listEl) return;
+
+    btn.onclick = async () => {
+        const title = String(titleEl.value || '').trim();
+        const description = String(descEl.value || '').trim();
+        if (!title) {
+            showError('Название обязательно');
+            return;
+        }
+        try {
+            btn.disabled = true;
+            const data = await groupsApiRequest('/groups/api/group', {
+                method: 'POST',
+                body: JSON.stringify({ title, description: description || null }),
+            });
+            if (data && data.success) {
+                showSuccess('Группа создана');
+                titleEl.value = '';
+                descEl.value = '';
+                await refreshGroups();
+            } else {
+                showError('Не удалось создать группу');
+            }
+        } catch (e) {
+            showError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            btn.disabled = false;
+        }
+    };
+
+    refreshGroups();
+}
+
 async function checkAppCacheRevision() {
     try {
         const res = await fetch('/api/app-cache-revision', { method: 'GET' });
@@ -361,6 +668,8 @@ document.addEventListener('DOMContentLoaded', async function () {
         initializeLanguageSelector();
         initializeLanguageModelsSelector();
         initializeAudioSettings();
+        initializeGroupsSection();
+        initializeProfileSectionToggles();
         setupFormListeners();
         initializeTopbarControls();
         setupPasswordToggles();
