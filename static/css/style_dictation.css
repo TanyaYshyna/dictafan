@@ -456,10 +456,11 @@ body.playing-audio::after {
 .table-progress {
   border-collapse: separate;
   border-spacing: 6px;
-  width: 100%;
+  width: auto;
   table-layout: fixed;
   border: 0px;
   margin: 0 !important;
+  display: inline-table;
 }
 
 .table-progress col.progress-col {
@@ -1996,6 +1997,14 @@ body.playing-audio::after {
   text-align: right;
 }
 
+.progress-panel-modal-r .table-progress {
+  margin-left: auto !important;
+}
+
+.progress-panel-modal-r .table-progress td {
+  vertical-align: middle;
+}
+
 #btnBackToList {
 /* justify-content: flex-end; */
   margin-left: auto;
@@ -2274,12 +2283,38 @@ body.playing-audio::after {
   gap: 12px;
 }
 
+.start-modal-title-row h2#title-diktation {
+  flex: 1;
+  text-align: center;
+  margin: 0;
+}
+
+.start-modal-header-actions {
+  flex: 0 0 auto;
+}
+
 .start-modal-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+}
+
+.start-modal-controls .all-checkbox-container {
+  justify-content: flex-start;
+}
+
+.start-modal-controls .start-controls-row {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.start-modal-controls .dikt-number-badge {
+  margin-left: auto;
 }
 
 /* Контейнер настроек аудио в модальном окне - подстраивается под содержимое */

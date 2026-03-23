@@ -1018,6 +1018,15 @@ async function loadDeskItems() {
               }
 
               if (!shouldSelfHeal) {
+                // Even if desk items did not change, completion counts can change (new successes).
+                // Refresh medals from server to avoid stale IDB cache after deploy.
+                try {
+                  const deskContainer = document.getElementById('deskCardsContainer');
+                  setTimeout(() => {
+                    refreshCompletionBadgesFromServer(deskContainer).catch(() => { });
+                  }, 0);
+                } catch (e) {
+                }
                 resolveInFlight();
                 return;
               }
