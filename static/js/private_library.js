@@ -67,6 +67,201 @@ try {
   // ignore
 }
 
+function getJoinGroupTokenFromUrl() {
+  try {
+    const u = new URL(window.location.href);
+    const t = u.searchParams.get('join_group');
+    const v = String(t || '').trim();
+    return v || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearJoinGroupTokenInUrl() {
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.delete('join_group');
+    window.history.replaceState({}, '', u.toString());
+  } catch (e) {
+  }
+}
+
+function ensureJoinGroupConfirmModal() {
+  let modal = document.getElementById('join-group-confirm-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'join-group-confirm-modal';
+  modal.className = 'modal';
+  modal.style.display = 'none';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
+        <h3 style="margin:0;">Вступить в группу</h3>
+        <button type="button" class="modal-close" id="join-group-confirm-close" title="Закрыть">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:0 16px 16px 16px;">
+        <div id="join-group-confirm-text" style="margin-top:6px;">Вступить в группу учителя?</div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:0 16px 16px 16px;">
+        <button type="button" class="button-secondary" id="join-group-confirm-cancel">Отмена</button>
+        <button type="button" class="button-color-yellow" id="join-group-confirm-yes">Вступить</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  try {
+    if (window.lucide) window.lucide.createIcons({ root: modal });
+  } catch (e) {
+  }
+  return modal;
+}
+
+async function showJoinGroupConfirmModal() {
+  return new Promise((resolve) => {
+    const modal = ensureJoinGroupConfirmModal();
+    const closeBtn = document.getElementById('join-group-confirm-close');
+    const cancelBtn = document.getElementById('join-group-confirm-cancel');
+    const yesBtn = document.getElementById('join-group-confirm-yes');
+
+    const cleanup = () => {
+      try {
+        modal.style.display = 'none';
+      } catch (e) {
+      }
+      try {
+        modal.removeEventListener('click', onBackdrop);
+      } catch (e) {
+      }
+      try {
+        closeBtn && closeBtn.removeEventListener('click', onCancel);
+      } catch (e) {
+      }
+      try {
+        cancelBtn && cancelBtn.removeEventListener('click', onCancel);
+      } catch (e) {
+      }
+      try {
+        yesBtn && yesBtn.removeEventListener('click', onYes);
+      } catch (e) {
+      }
+    };
+
+    const onBackdrop = (e) => {
+      if (e.target === modal) {
+        cleanup();
+        resolve(false);
+      }
+    };
+    const onCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+    const onYes = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    modal.addEventListener('click', onBackdrop);
+    closeBtn && closeBtn.addEventListener('click', onCancel);
+    cancelBtn && cancelBtn.addEventListener('click', onCancel);
+    yesBtn && yesBtn.addEventListener('click', onYes);
+    modal.style.display = 'flex';
+    try {
+      if (window.lucide) window.lucide.createIcons({ root: modal });
+    } catch (e) {
+    }
+  });
+}
+
+async function joinGroupByToken(token) {
+  const t = String(token || '').trim();
+  if (!t) throw new Error('token is required');
+
+  const data = await apiRequest(`/groups/api/join/${encodeURIComponent(t)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return data;
+}
+
+async function handleJoinGroupInviteFromUrl() {
+  const token = getJoinGroupTokenFromUrl();
+  if (!token) return;
+
+  // avoid repeated prompts on reload
+  try {
+    const key = `join_group_handled_${token}`;
+    if (sessionStorage.getItem(key) === '1') {
+      clearJoinGroupTokenInUrl();
+      return;
+    }
+    sessionStorage.setItem(key, '1');
+  } catch (e) {
+  }
+
+  // If not authed -> force login via modal
+  try {
+    if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
+      if (window.LoginModal && typeof window.LoginModal.showAndWaitForLogin === 'function') {
+        await window.LoginModal.showAndWaitForLogin();
+      } else if (typeof window.showLoginModal === 'function') {
+        window.showLoginModal();
+        // wait until authenticated
+        await new Promise((resolve) => {
+          const started = Date.now();
+          const timer = setInterval(() => {
+            const ok = window.UM && typeof window.UM.isAuthenticated === 'function' && window.UM.isAuthenticated();
+            if (ok) {
+              clearInterval(timer);
+              resolve();
+              return;
+            }
+            if (Date.now() - started > 5 * 60 * 1000) {
+              clearInterval(timer);
+              resolve();
+            }
+          }, 300);
+        });
+      }
+    }
+  } catch (e) {
+  }
+
+  if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
+    showToast('Нужно войти, чтобы вступить в группу');
+    return;
+  }
+
+  const ok = await showJoinGroupConfirmModal();
+  if (!ok) {
+    clearJoinGroupTokenInUrl();
+    return;
+  }
+
+  try {
+    const res = await joinGroupByToken(token);
+    if (res && res.success) {
+      showToast('Ты вступил в группу');
+      clearJoinGroupTokenInUrl();
+      try {
+        // refresh library data if available
+        if (typeof loadLibraryData === 'function') loadLibraryData();
+      } catch (e) {
+      }
+    } else {
+      const msg = res && (res.error || res.message) ? String(res.error || res.message) : 'Ошибка';
+      showToast(`Не удалось вступить в группу: ${msg}`);
+    }
+  } catch (e) {
+    const msg = e && e.message ? e.message : String(e);
+    showToast(`Не удалось вступить в группу: ${msg}`);
+  }
+}
+
 let bookLanguageSelector = null;
 let booksLanguageSelectorInstance = null;
 let publicBooksLanguageSelectorInstance = null;
@@ -4935,6 +5130,12 @@ function loadLibraryData() {
 // Инициализация при загрузке страницы
 document.addEventListener("DOMContentLoaded", async () => {
   installEventHandlers();
+
+  // join-group flow: handle invite token passed as URL param
+  try {
+    handleJoinGroupInviteFromUrl().catch(() => { });
+  } catch (e) {
+  }
 
   checkAppCacheRevision().catch(() => { });
 

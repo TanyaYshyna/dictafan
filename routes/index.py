@@ -6,7 +6,7 @@ import shutil
 import hashlib
 import tempfile
 import zipfile
-from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory
+from flask import Blueprint, jsonify, render_template, request, current_app, send_file, send_from_directory, redirect
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
 
@@ -756,6 +756,17 @@ def index():
         own_books=[],
         shelf_books=[],
     )
+
+
+@index_bp.route('/join-group/<string:token>')
+def join_group_link(token: str):
+    try:
+        t = str(token or '').strip()
+    except Exception:
+        t = ''
+    if not t:
+        return redirect('/')
+    return redirect('/?join_group=' + t)
 
 
 @index_bp.route('/api/app-cache-revision')
