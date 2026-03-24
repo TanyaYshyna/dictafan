@@ -53,6 +53,36 @@
     gap: 12px;
 }
 
+ .topbar-icon-btn {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    z-index: 22;
+    pointer-events: auto;
+    color: var(--color-text-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+ }
+
+ .topbar-icon-btn:hover {
+    background: var(--color-hover);
+ }
+
+ .topbar-icon-btn:disabled {
+    cursor: default;
+ }
+
+ .topbar-icon-btn i {
+    width: 16px;
+    height: 16px;
+ }
+
 .topbar-save-group button {
     min-width: 48px;
     justify-content: center;
