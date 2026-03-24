@@ -138,6 +138,31 @@ function setSelectedGroup(groupId) {
     renderGroupsTable();
     renderGroupsDetails();
     refreshStudents();
+
+    // подтянуть последнюю активную инвайт-ссылку (если есть)
+    refreshInviteForSelectedGroup();
+}
+
+async function refreshInviteForSelectedGroup() {
+    const g = getSelectedGroup();
+    if (!g) return;
+
+    try {
+        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite/latest`, { method: 'GET' });
+        const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
+        const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
+        const path = joinPath || (token ? `/join-group/${token}` : null);
+        const fullUrl = path ? `${location.origin}${path}` : '';
+
+        const inviteEl = document.getElementById('groupsInviteLink');
+        if (inviteEl) inviteEl.value = fullUrl;
+        if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
+        groupsUiState._inviteLinksByGroupId[String(g.id)] = fullUrl;
+
+        updateInviteCopyButtonIcon();
+    } catch (e) {
+        // не блокируем UI если не получилось подтянуть
+    }
 }
 
 function setSelectedStudent(studentId) {
@@ -523,8 +548,13 @@ async function copyInviteLink() {
     const inviteEl = document.getElementById('groupsInviteLink');
     const val = inviteEl ? String(inviteEl.value || '').trim() : '';
     if (!val) {
-        const created = await createInviteForSelectedGroup();
-        if (!created) return;
+        // сначала пытаемся получить существующую ссылку с сервера
+        await refreshInviteForSelectedGroup();
+        const afterRefresh = inviteEl ? String(inviteEl.value || '').trim() : '';
+        if (!afterRefresh) {
+            const created = await createInviteForSelectedGroup();
+            if (!created) return;
+        }
     }
     const link = inviteEl ? String(inviteEl.value || '').trim() : '';
     if (!link) return;

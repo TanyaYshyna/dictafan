@@ -215,6 +215,62 @@ def create_group_invite(group_id: int, teacher_user_id: int, *, max_uses: int | 
         conn.close()
 
 
+def get_latest_active_group_invite(group_id: int, teacher_user_id: int) -> Optional[dict]:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM group_teachers
+            WHERE group_id = %s AND teacher_user_id = %s
+            """,
+            (group_id, teacher_user_id),
+        )
+        if not cur.fetchone():
+            raise PermissionError("Not a group teacher")
+
+        cur.execute(
+            """
+            SELECT
+                gi.id,
+                gi.group_id,
+                gi.token,
+                gi.mode,
+                gi.expires_at,
+                gi.max_uses,
+                gi.uses_count,
+                gi.created_at,
+                gi.revoked_at
+            FROM group_invites gi
+            WHERE gi.group_id = %s
+              AND gi.revoked_at IS NULL
+              AND (gi.expires_at IS NULL OR gi.expires_at > NOW())
+              AND (gi.max_uses IS NULL OR gi.uses_count < gi.max_uses)
+            ORDER BY gi.created_at DESC, gi.id DESC
+            LIMIT 1
+            """,
+            (group_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return None
+
+        return {
+            "id": row.get("id"),
+            "group_id": row.get("group_id"),
+            "token": row.get("token"),
+            "mode": row.get("mode"),
+            "expires_at": row.get("expires_at").isoformat() if row.get("expires_at") else None,
+            "max_uses": row.get("max_uses"),
+            "uses_count": int(row.get("uses_count") or 0),
+            "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
+            "revoked_at": row.get("revoked_at").isoformat() if row.get("revoked_at") else None,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def accept_group_invite_by_token(token: str, student_user_id: int) -> dict:
     conn, cur = get_db_cursor()
     try:

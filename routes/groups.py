@@ -8,6 +8,7 @@ from helpers.db_groups import (
     accept_group_invite_by_token,
     create_group,
     create_group_invite,
+    get_latest_active_group_invite,
     get_group_for_teacher,
     list_group_students_for_teacher,
     list_my_groups,
@@ -121,6 +122,27 @@ def api_create_group_invite(group_id: int):
         return jsonify({"success": False, "error": "Forbidden"}), 403
     except Exception as exc:
         logger.error("Ошибка создания инвайта для группы %s: %s", group_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/group/<int:group_id>/invite/latest", methods=["GET"])
+@jwt_required()
+def api_get_latest_group_invite(group_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        invite = get_latest_active_group_invite(group_id, user["id"])
+        join_path = None
+        if invite and invite.get("token"):
+            join_path = f"/join-group/{invite['token']}"
+        return jsonify({"success": True, "invite": invite, "join_path": join_path})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except Exception as exc:
+        logger.error("Ошибка получения последнего инвайта для группы %s: %s", group_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
