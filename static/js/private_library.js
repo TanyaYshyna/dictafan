@@ -116,6 +116,15 @@ function ensureJoinGroupConfirmModal() {
   modal.id = 'join-group-confirm-modal';
   modal.className = 'modal';
   modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.zIndex = '10090';
   modal.innerHTML = `
     <div class="modal-content" style="max-width: 520px;">
       <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
@@ -134,6 +143,16 @@ function ensureJoinGroupConfirmModal() {
     </div>
   `;
   document.body.appendChild(modal);
+
+  try {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.position = 'relative';
+      content.style.zIndex = '10091';
+    }
+  } catch (e) {
+  }
+
   try {
     if (window.lucide) window.lucide.createIcons({ root: modal });
   } catch (e) {
