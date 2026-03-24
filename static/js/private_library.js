@@ -78,6 +78,27 @@ function getJoinGroupTokenFromUrl() {
   }
 }
 
+function waitForUserManagerReady(timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const timer = setInterval(() => {
+      try {
+        const ready = !!(window.UM && typeof window.UM.isAuthenticated === 'function' && window.UM.isInitialized);
+        if (ready) {
+          clearInterval(timer);
+          resolve(true);
+          return;
+        }
+      } catch (e) {
+      }
+      if (Date.now() - started > timeoutMs) {
+        clearInterval(timer);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
 function clearJoinGroupTokenInUrl() {
   try {
     const u = new URL(window.location.href);
@@ -188,20 +209,14 @@ async function joinGroupByToken(token) {
   return data;
 }
 
+let __joinGroupInviteInFlight = false;
+
 async function handleJoinGroupInviteFromUrl() {
+  if (__joinGroupInviteInFlight) return;
   const token = getJoinGroupTokenFromUrl();
   if (!token) return;
 
-  // avoid repeated prompts on reload
-  try {
-    const key = `join_group_handled_${token}`;
-    if (sessionStorage.getItem(key) === '1') {
-      clearJoinGroupTokenInUrl();
-      return;
-    }
-    sessionStorage.setItem(key, '1');
-  } catch (e) {
-  }
+  __joinGroupInviteInFlight = true;
 
   // If not authed -> force login via modal
   try {
@@ -233,12 +248,14 @@ async function handleJoinGroupInviteFromUrl() {
 
   if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
     showToast('Нужно войти, чтобы вступить в группу');
+    __joinGroupInviteInFlight = false;
     return;
   }
 
   const ok = await showJoinGroupConfirmModal();
   if (!ok) {
     clearJoinGroupTokenInUrl();
+    __joinGroupInviteInFlight = false;
     return;
   }
 
@@ -252,13 +269,16 @@ async function handleJoinGroupInviteFromUrl() {
         if (typeof loadLibraryData === 'function') loadLibraryData();
       } catch (e) {
       }
+      __joinGroupInviteInFlight = false;
     } else {
       const msg = res && (res.error || res.message) ? String(res.error || res.message) : 'Ошибка';
       showToast(`Не удалось вступить в группу: ${msg}`);
+      __joinGroupInviteInFlight = false;
     }
   } catch (e) {
     const msg = e && e.message ? e.message : String(e);
     showToast(`Не удалось вступить в группу: ${msg}`);
+    __joinGroupInviteInFlight = false;
   }
 }
 
@@ -5131,12 +5151,6 @@ function loadLibraryData() {
 document.addEventListener("DOMContentLoaded", async () => {
   installEventHandlers();
 
-  // join-group flow: handle invite token passed as URL param
-  try {
-    handleJoinGroupInviteFromUrl().catch(() => { });
-  } catch (e) {
-  }
-
   checkAppCacheRevision().catch(() => { });
 
   // Ранний auth-gate: если токена нет, не дергаем защищенные API (например, /desk/api/items)
@@ -5158,6 +5172,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       // UserManager инициализируется асинхронно через init(), нужно дождаться isInitialized
       if (window.UM.isInitialized) {
         clearInterval(waitForUserManager);
+
+        // join-group flow: handle invite token passed as URL param
+        try {
+          handleJoinGroupInviteFromUrl().catch(() => { });
+        } catch (e) {
+        }
 
         // Если в оффлайне были накоплены activity/success, пробуем дослать их сразу при загрузке страницы
         // (это позволяет закрыть страницу диктанта, а потом открыть стол и синкнуть данные на сервер)
