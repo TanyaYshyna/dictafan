@@ -123,15 +123,14 @@ function ensureJoinGroupConfirmModal() {
   modal.style.height = '100%';
   modal.style.justifyContent = 'center';
   modal.style.alignItems = 'center';
-  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+  modal.style.backdropFilter = 'blur(2px)';
+  modal.style.webkitBackdropFilter = 'blur(2px)';
   modal.style.zIndex = '10090';
   modal.innerHTML = `
     <div class="modal-content" style="max-width: 520px;">
       <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
         <h3 style="margin:0;">Вступить в группу</h3>
-        <button type="button" class="modal-close" id="join-group-confirm-close" title="Закрыть">
-          <i data-lucide="x"></i>
-        </button>
       </div>
       <div class="modal-body" style="padding:0 16px 16px 16px;">
         <div id="join-group-confirm-text" style="margin-top:6px;">Вступить в группу учителя?</div>
@@ -160,24 +159,25 @@ function ensureJoinGroupConfirmModal() {
   return modal;
 }
 
+async function getJoinGroupInvitePreview(token) {
+  const t = String(token || '').trim();
+  if (!t) throw new Error('token is required');
+  const data = await apiRequest(`/groups/api/join/${encodeURIComponent(t)}/preview`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return data;
+}
+
 async function showJoinGroupConfirmModal() {
   return new Promise((resolve) => {
     const modal = ensureJoinGroupConfirmModal();
-    const closeBtn = document.getElementById('join-group-confirm-close');
     const cancelBtn = document.getElementById('join-group-confirm-cancel');
     const yesBtn = document.getElementById('join-group-confirm-yes');
 
     const cleanup = () => {
       try {
         modal.style.display = 'none';
-      } catch (e) {
-      }
-      try {
-        modal.removeEventListener('click', onBackdrop);
-      } catch (e) {
-      }
-      try {
-        closeBtn && closeBtn.removeEventListener('click', onCancel);
       } catch (e) {
       }
       try {
@@ -190,12 +190,6 @@ async function showJoinGroupConfirmModal() {
       }
     };
 
-    const onBackdrop = (e) => {
-      if (e.target === modal) {
-        cleanup();
-        resolve(false);
-      }
-    };
     const onCancel = () => {
       cleanup();
       resolve(false);
@@ -205,8 +199,6 @@ async function showJoinGroupConfirmModal() {
       resolve(true);
     };
 
-    modal.addEventListener('click', onBackdrop);
-    closeBtn && closeBtn.addEventListener('click', onCancel);
     cancelBtn && cancelBtn.addEventListener('click', onCancel);
     yesBtn && yesBtn.addEventListener('click', onYes);
     modal.style.display = 'flex';
@@ -273,6 +265,26 @@ async function handleJoinGroupInviteFromUrl() {
     if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
       showToast('Нужно войти, чтобы вступить в группу');
       return;
+    }
+
+    // Try to show teacher/group info before confirmation
+    try {
+      const previewRes = await getJoinGroupInvitePreview(token);
+      const preview = previewRes && previewRes.preview ? previewRes.preview : null;
+      const groupTitle = preview && preview.group_title ? String(preview.group_title) : '';
+      const teacherUsername = preview && preview.teacher_username ? String(preview.teacher_username) : '';
+      const textEl = document.getElementById('join-group-confirm-text');
+      if (textEl) {
+        if (groupTitle && teacherUsername) {
+          textEl.textContent = `Вступить в группу «${groupTitle}» учителя ${teacherUsername}?`;
+        } else if (groupTitle) {
+          textEl.textContent = `Вступить в группу «${groupTitle}»?`;
+        } else if (teacherUsername) {
+          textEl.textContent = `Вступить в группу учителя ${teacherUsername}?`;
+        }
+      }
+    } catch (e) {
+      // ignore preview failures
     }
 
     console.log('[join-group] showing confirm modal');

@@ -331,6 +331,60 @@ def accept_group_invite_by_token(token: str, student_user_id: int) -> dict:
         conn.close()
 
 
+def get_group_invite_preview_by_token(token: str) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT
+                gi.id,
+                gi.group_id,
+                gi.expires_at,
+                gi.max_uses,
+                gi.uses_count,
+                gi.revoked_at,
+                g.title AS group_title,
+                u.username AS teacher_username
+            FROM group_invites gi
+            JOIN groups g ON g.id = gi.group_id
+            JOIN users u ON u.id = gi.created_by_teacher_user_id
+            WHERE gi.token = %s
+            """,
+            (token,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            raise ValueError("Invite not found")
+
+        if row.get("revoked_at"):
+            raise ValueError("Invite revoked")
+
+        expires_at = row.get("expires_at")
+        if expires_at is not None:
+            cur.execute("SELECT NOW() > %s AS expired", (expires_at,))
+            expired = (cur.fetchone() or {}).get("expired")
+            if expired:
+                raise ValueError("Invite expired")
+
+        max_uses = row.get("max_uses")
+        uses_count = int(row.get("uses_count") or 0)
+        if max_uses is not None and uses_count >= int(max_uses):
+            raise ValueError("Invite limit reached")
+
+        group_id = row.get("group_id")
+        if not group_id:
+            raise ValueError("Invite group missing")
+
+        return {
+            "group_id": int(group_id),
+            "group_title": row.get("group_title"),
+            "teacher_username": row.get("teacher_username"),
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list[dict]:
     conn, cur = get_db_cursor()
     try:

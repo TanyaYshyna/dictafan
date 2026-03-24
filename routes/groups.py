@@ -8,6 +8,7 @@ from helpers.db_groups import (
     accept_group_invite_by_token,
     create_group,
     create_group_invite,
+    get_group_invite_preview_by_token,
     get_latest_active_group_invite,
     get_group_for_teacher,
     list_group_students_for_teacher,
@@ -161,6 +162,24 @@ def api_join_group(token: str):
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.error("Ошибка вступления по инвайту: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/join/<string:token>/preview", methods=["GET"])
+@jwt_required()
+def api_join_group_preview(token: str):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        preview = get_group_invite_preview_by_token(token)
+        return jsonify({"success": True, "preview": preview})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка preview инвайта: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
