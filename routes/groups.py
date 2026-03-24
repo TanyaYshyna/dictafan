@@ -14,6 +14,7 @@ from helpers.db_groups import (
     get_group_invite_preview_by_token,
     get_latest_active_group_invite,
     get_group_for_teacher,
+    list_pending_email_invites_for_teacher,
     list_pending_email_invites_for_student,
     list_group_students_for_teacher,
     list_my_groups,
@@ -274,7 +275,12 @@ def api_group_students(group_id: int):
 
     try:
         students = list_group_students_for_teacher(group_id, user["id"])
-        return jsonify({"success": True, "students": students})
+        try:
+            pending = list_pending_email_invites_for_teacher(group_id, user["id"])
+        except Exception:
+            pending = []
+        combined = (students or []) + (pending or [])
+        return jsonify({"success": True, "students": combined})
     except PermissionError:
         return jsonify({"success": False, "error": "Forbidden"}), 403
     except Exception as exc:

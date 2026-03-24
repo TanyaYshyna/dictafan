@@ -43,6 +43,59 @@ def create_group(owner_user_id: int, title: str, description: str | None = None)
         conn.close()
 
 
+def list_pending_email_invites_for_teacher(group_id: int, teacher_user_id: int) -> list[dict]:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM group_teachers
+            WHERE group_id = %s AND teacher_user_id = %s
+            """,
+            (group_id, teacher_user_id),
+        )
+        if not cur.fetchone():
+            raise PermissionError("Not a group teacher")
+
+        cur.execute(
+            """
+            SELECT
+                gi.id,
+                gi.target_email,
+                gi.created_at
+            FROM group_invites gi
+            WHERE gi.group_id = %s
+              AND gi.mode = 'email'
+              AND gi.revoked_at IS NULL
+              AND gi.accepted_at IS NULL
+              AND gi.declined_at IS NULL
+              AND (gi.expires_at IS NULL OR gi.expires_at > NOW())
+              AND (gi.max_uses IS NULL OR gi.uses_count < gi.max_uses)
+              AND gi.target_email IS NOT NULL
+            ORDER BY gi.created_at DESC, gi.id DESC
+            """,
+            (group_id,),
+        )
+        rows = cur.fetchall() or []
+        result: list[dict] = []
+        for r in rows:
+            result.append(
+                {
+                    "id": f"email_invite:{r.get('id')}",
+                    "invite_id": r.get("id"),
+                    "username": r.get("target_email"),
+                    "email": r.get("target_email"),
+                    "status": "pending",
+                    "kind": "email_invite",
+                    "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
+                }
+            )
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
 def create_group_email_invite(group_id: int, teacher_user_id: int, *, target_email: str) -> dict:
     conn, cur = get_db_cursor()
     try:

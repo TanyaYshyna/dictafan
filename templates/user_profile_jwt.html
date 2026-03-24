@@ -261,6 +261,27 @@
             </div>
         </div>
 
+        <div id="groupEmailInviteModal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 560px;">
+                <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+                    <h3 style="margin: 0;">Новый ученик (email)</h3>
+                    <button type="button" id="groupEmailInviteModalClose" class="modal-close" title="Закрыть">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="modal-body" style="padding: 0 16px 16px 16px;">
+                    <div class="form-row" style="margin-top: 6px;">
+                        <label for="groupEmailInviteInput">Email ученика</label>
+                        <input type="email" id="groupEmailInviteInput" maxlength="255" autocomplete="email">
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+                    <button type="button" id="groupEmailInviteModalCancel" class="button-secondary">Отмена</button>
+                    <button type="button" id="groupEmailInviteModalSend" class="button-color-yellow">Пригласить</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Модальное окно подтверждения выхода -->
         <div id="exitModal" class="modal" style="display: none;">
             <div class="modal-content exit-modal-content">

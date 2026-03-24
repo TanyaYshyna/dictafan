@@ -75,6 +75,39 @@ async function createEmailInviteForSelectedGroup(targetEmail) {
     }
 }
 
+function toggleGroupEmailInviteModal(isOpen) {
+    const modal = document.getElementById('groupEmailInviteModal');
+    if (!modal) return;
+    modal.style.display = isOpen ? 'flex' : 'none';
+    if (isOpen) {
+        const input = document.getElementById('groupEmailInviteInput');
+        try {
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        } catch (e) {
+        }
+    }
+}
+
+async function submitGroupEmailInviteFromModal() {
+    const input = document.getElementById('groupEmailInviteInput');
+    const email = input ? String(input.value || '').trim() : '';
+    if (!email) {
+        showInfo('Введи email ученика');
+        return;
+    }
+    const res = await createEmailInviteForSelectedGroup(email);
+    if (res) {
+        toggleGroupEmailInviteModal(false);
+        try {
+            await refreshStudents();
+        } catch (e) {
+        }
+    }
+}
+
 function initializeProfileSectionToggles() {
     try {
         if (document.body.dataset.profileSectionTogglesBound === '1') return;
@@ -343,18 +376,24 @@ function renderStudentsTable(students) {
         const row = document.createElement('div');
         row.className = 'groups-students-table-row';
         row.dataset.studentId = String(s.id);
-        if (String(s.id) === String(groupsUiState.selectedStudentId)) {
+        const isEmailInviteRow = String(s.kind || '') === 'email_invite' || String(s.id || '').startsWith('email_invite:');
+        if (!isEmailInviteRow && String(s.id) === String(groupsUiState.selectedStudentId)) {
             row.classList.add('selected');
         }
 
         const avatar = document.createElement('img');
         avatar.className = 'groups-student-avatar';
         avatar.alt = 'avatar';
-        avatar.src = avatarUrlForUser(s.id);
+        if (!isEmailInviteRow) {
+            avatar.src = avatarUrlForUser(s.id);
+        } else {
+            avatar.src = '';
+            avatar.style.opacity = '0.2';
+        }
 
         const name = document.createElement('div');
         name.className = 'groups-student-name';
-        name.textContent = String(s.username || '');
+        name.textContent = String((isEmailInviteRow ? (s.email || s.username) : s.username) || '');
 
         const status = document.createElement('div');
         status.className = 'groups-student-status';
@@ -366,6 +405,11 @@ function renderStudentsTable(students) {
         row.appendChild(status);
 
         row.addEventListener('click', () => {
+            if (isEmailInviteRow) {
+                groupsUiState.selectedStudentId = null;
+                renderStudentsTable(groupsUiState._studentsCache || []);
+                return;
+            }
             setSelectedStudent(s.id);
         });
 
@@ -624,6 +668,10 @@ async function removeSelectedStudent() {
         showInfo('Выбери ученика');
         return;
     }
+    if (String(studentId).startsWith('email_invite:')) {
+        showInfo('Нельзя удалить: ученик ещё не подтвердил приглашение');
+        return;
+    }
     try {
         await groupsApiRequest(`/groups/api/group/${g.id}/students/${studentId}/remove`, { method: 'POST' });
         showSuccess('Ученик удалён');
@@ -645,6 +693,12 @@ function initializeGroupsSection() {
     const studentsInviteEmailBtn = document.getElementById('groupsStudentsInviteEmailBtn');
     const studentsInviteLinkBtn = document.getElementById('groupsStudentsInviteLinkBtn');
     const studentsDeleteBtn = document.getElementById('groupsStudentsDeleteBtn');
+
+    const emailInviteModal = document.getElementById('groupEmailInviteModal');
+    const emailInviteModalClose = document.getElementById('groupEmailInviteModalClose');
+    const emailInviteModalCancel = document.getElementById('groupEmailInviteModalCancel');
+    const emailInviteModalSend = document.getElementById('groupEmailInviteModalSend');
+    const emailInviteInput = document.getElementById('groupEmailInviteInput');
     const modal = document.getElementById('groupModal');
     const modalClose = document.getElementById('groupModalClose');
     const modalSave = document.getElementById('groupModalSave');
@@ -690,12 +744,27 @@ function initializeGroupsSection() {
             showInfo('Выбери группу');
             return;
         }
-        const email = prompt('Email ученика для приглашения в группу:');
-        if (!email) return;
-        await createEmailInviteForSelectedGroup(email);
+        toggleGroupEmailInviteModal(true);
     });
     studentsInviteLinkBtn && studentsInviteLinkBtn.addEventListener('click', () => copyInviteLink());
     studentsDeleteBtn && studentsDeleteBtn.addEventListener('click', () => removeSelectedStudent());
+
+    if (emailInviteModal && emailInviteModalClose && emailInviteModalCancel && emailInviteModalSend) {
+        emailInviteModalClose.addEventListener('click', () => toggleGroupEmailInviteModal(false));
+        emailInviteModalCancel.addEventListener('click', () => toggleGroupEmailInviteModal(false));
+        emailInviteModal.addEventListener('click', (e) => {
+            if (e.target === emailInviteModal) toggleGroupEmailInviteModal(false);
+        });
+        emailInviteModalSend.addEventListener('click', async () => submitGroupEmailInviteFromModal());
+        if (emailInviteInput) {
+            emailInviteInput.addEventListener('keydown', async (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    await submitGroupEmailInviteFromModal();
+                }
+            });
+        }
+    }
 
     modalClose.addEventListener('click', () => toggleGroupModal(false));
     modal.addEventListener('click', (e) => {

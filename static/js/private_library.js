@@ -5352,6 +5352,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         } catch (e) {
         }
 
+        // email-invite flow: if user already authenticated on page load
+        try {
+          handlePendingEmailInvitesAfterLogin().catch(() => { });
+        } catch (e) {
+        }
+
         // Если в оффлайне были накоплены activity/success, пробуем дослать их сразу при загрузке страницы
         // (это позволяет закрыть страницу диктанта, а потом открыть стол и синкнуть данные на сервер)
         try {
