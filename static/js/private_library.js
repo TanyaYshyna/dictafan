@@ -218,49 +218,55 @@ async function handleJoinGroupInviteFromUrl() {
 
   __joinGroupInviteInFlight = true;
 
-  // If not authed -> force login via modal
   try {
-    if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
-      if (window.LoginModal && typeof window.LoginModal.showAndWaitForLogin === 'function') {
-        await window.LoginModal.showAndWaitForLogin();
-      } else if (typeof window.showLoginModal === 'function') {
-        window.showLoginModal();
-        // wait until authenticated
-        await new Promise((resolve) => {
-          const started = Date.now();
-          const timer = setInterval(() => {
-            const ok = window.UM && typeof window.UM.isAuthenticated === 'function' && window.UM.isAuthenticated();
-            if (ok) {
-              clearInterval(timer);
-              resolve();
-              return;
-            }
-            if (Date.now() - started > 5 * 60 * 1000) {
-              clearInterval(timer);
-              resolve();
-            }
-          }, 300);
-        });
+    console.log('[join-group] token detected', token);
+
+    // If not authed -> force login via modal
+    try {
+      if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
+        console.log('[join-group] user not authenticated, showing login modal');
+        if (window.LoginModal && typeof window.LoginModal.showAndWaitForLogin === 'function') {
+          await window.LoginModal.showAndWaitForLogin();
+        } else if (typeof window.showLoginModal === 'function') {
+          window.showLoginModal();
+          // wait until authenticated
+          await new Promise((resolve) => {
+            const started = Date.now();
+            const timer = setInterval(() => {
+              const ok = window.UM && typeof window.UM.isAuthenticated === 'function' && window.UM.isAuthenticated();
+              if (ok) {
+                clearInterval(timer);
+                resolve();
+                return;
+              }
+              if (Date.now() - started > 5 * 60 * 1000) {
+                clearInterval(timer);
+                resolve();
+              }
+            }, 300);
+          });
+        }
       }
+    } catch (e) {
+      console.warn('[join-group] login modal flow failed', e);
     }
-  } catch (e) {
-  }
 
-  if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
-    showToast('Нужно войти, чтобы вступить в группу');
-    __joinGroupInviteInFlight = false;
-    return;
-  }
+    if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) {
+      showToast('Нужно войти, чтобы вступить в группу');
+      return;
+    }
 
-  const ok = await showJoinGroupConfirmModal();
-  if (!ok) {
-    clearJoinGroupTokenInUrl();
-    __joinGroupInviteInFlight = false;
-    return;
-  }
+    console.log('[join-group] showing confirm modal');
+    const ok = await showJoinGroupConfirmModal();
+    console.log('[join-group] confirm result', ok);
+    if (!ok) {
+      clearJoinGroupTokenInUrl();
+      return;
+    }
 
-  try {
+    console.log('[join-group] calling join API');
     const res = await joinGroupByToken(token);
+    console.log('[join-group] join API result', res);
     if (res && res.success) {
       showToast('Ты вступил в группу');
       clearJoinGroupTokenInUrl();
@@ -269,15 +275,15 @@ async function handleJoinGroupInviteFromUrl() {
         if (typeof loadLibraryData === 'function') loadLibraryData();
       } catch (e) {
       }
-      __joinGroupInviteInFlight = false;
     } else {
       const msg = res && (res.error || res.message) ? String(res.error || res.message) : 'Ошибка';
       showToast(`Не удалось вступить в группу: ${msg}`);
-      __joinGroupInviteInFlight = false;
     }
   } catch (e) {
+    console.warn('[join-group] failed', e);
     const msg = e && e.message ? e.message : String(e);
     showToast(`Не удалось вступить в группу: ${msg}`);
+  } finally {
     __joinGroupInviteInFlight = false;
   }
 }
@@ -5257,6 +5263,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 100);
         // Загружаем данные
         loadLibraryData();
+
+        // join-group flow: если пользователь только что залогинился/зарегистрировался
+        // и в URL есть join_group, показываем подтверждение вступления.
+        try {
+          handleJoinGroupInviteFromUrl().catch(() => { });
+        } catch (e) {
+        }
       }
     }
   });
