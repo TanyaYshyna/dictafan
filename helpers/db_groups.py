@@ -43,6 +43,236 @@ def create_group(owner_user_id: int, title: str, description: str | None = None)
         conn.close()
 
 
+def create_group_email_invite(group_id: int, teacher_user_id: int, *, target_email: str) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM group_teachers
+            WHERE group_id = %s AND teacher_user_id = %s
+            """,
+            (group_id, teacher_user_id),
+        )
+        if not cur.fetchone():
+            raise PermissionError("Not a group teacher")
+
+        email = (target_email or "").strip().lower()
+        if not email:
+            raise ValueError("target_email is required")
+
+        token = secrets.token_urlsafe(24)
+
+        cur.execute(
+            """
+            INSERT INTO group_invites (
+                group_id,
+                created_by_teacher_user_id,
+                token,
+                mode,
+                expires_at,
+                max_uses,
+                target_email
+            )
+            VALUES (%s, %s, %s, 'email', NULL, 1, %s)
+            RETURNING id, group_id, token, mode, expires_at, max_uses, uses_count, target_email, created_at, revoked_at
+            """,
+            (group_id, teacher_user_id, token, email),
+        )
+        row = cur.fetchone() or {}
+        conn.commit()
+
+        return {
+            "id": row.get("id"),
+            "group_id": row.get("group_id"),
+            "token": row.get("token"),
+            "mode": row.get("mode"),
+            "expires_at": row.get("expires_at").isoformat() if row.get("expires_at") else None,
+            "max_uses": row.get("max_uses"),
+            "uses_count": int(row.get("uses_count") or 0),
+            "target_email": row.get("target_email"),
+            "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
+            "revoked_at": row.get("revoked_at").isoformat() if row.get("revoked_at") else None,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+def list_pending_email_invites_for_student(student_email: str) -> list[dict]:
+    conn, cur = get_db_cursor()
+    try:
+        email = (student_email or "").strip().lower()
+        if not email:
+            return []
+
+        cur.execute(
+            """
+            SELECT
+                gi.id,
+                gi.group_id,
+                gi.target_email,
+                gi.created_at,
+                g.title AS group_title,
+                u.username AS teacher_username
+            FROM group_invites gi
+            JOIN groups g ON g.id = gi.group_id
+            JOIN users u ON u.id = gi.created_by_teacher_user_id
+            WHERE gi.mode = 'email'
+              AND gi.revoked_at IS NULL
+              AND gi.accepted_at IS NULL
+              AND gi.declined_at IS NULL
+              AND (gi.expires_at IS NULL OR gi.expires_at > NOW())
+              AND (gi.max_uses IS NULL OR gi.uses_count < gi.max_uses)
+              AND LOWER(gi.target_email) = %s
+            ORDER BY gi.created_at DESC, gi.id DESC
+            """,
+            (email,),
+        )
+        rows = cur.fetchall() or []
+        result: list[dict] = []
+        for r in rows:
+            result.append(
+                {
+                    "id": r.get("id"),
+                    "group_id": int(r.get("group_id")) if r.get("group_id") is not None else None,
+                    "target_email": r.get("target_email"),
+                    "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
+                    "group_title": r.get("group_title"),
+                    "teacher_username": r.get("teacher_username"),
+                }
+            )
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def accept_email_invite(invite_id: int, student_user_id: int, student_email: str) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        email = (student_email or "").strip().lower()
+        cur.execute(
+            """
+            SELECT
+                gi.id,
+                gi.group_id,
+                gi.target_email,
+                gi.expires_at,
+                gi.max_uses,
+                gi.uses_count,
+                gi.revoked_at,
+                gi.accepted_at,
+                gi.declined_at
+            FROM group_invites gi
+            WHERE gi.id = %s AND gi.mode = 'email'
+            """,
+            (invite_id,),
+        )
+        inv = cur.fetchone() or None
+        if not inv:
+            raise ValueError("Invite not found")
+
+        if inv.get("revoked_at"):
+            raise ValueError("Invite revoked")
+        if inv.get("accepted_at"):
+            raise ValueError("Invite already accepted")
+        if inv.get("declined_at"):
+            raise ValueError("Invite already declined")
+
+        target_email = (inv.get("target_email") or "").strip().lower()
+        if not target_email or not email or target_email != email:
+            raise ValueError("Invite is not for this email")
+
+        expires_at = inv.get("expires_at")
+        if expires_at is not None:
+            cur.execute("SELECT NOW() > %s AS expired", (expires_at,))
+            expired = (cur.fetchone() or {}).get("expired")
+            if expired:
+                raise ValueError("Invite expired")
+
+        max_uses = inv.get("max_uses")
+        uses_count = int(inv.get("uses_count") or 0)
+        if max_uses is not None and uses_count >= int(max_uses):
+            raise ValueError("Invite limit reached")
+
+        group_id = inv.get("group_id")
+        if not group_id:
+            raise ValueError("Invite group missing")
+
+        cur.execute(
+            """
+            INSERT INTO group_students (group_id, student_user_id, status)
+            VALUES (%s, %s, 'active')
+            ON CONFLICT (group_id, student_user_id)
+            DO UPDATE SET status = 'active', removed_at = NULL, joined_at = CURRENT_TIMESTAMP
+            """,
+            (group_id, student_user_id),
+        )
+
+        cur.execute(
+            """
+            UPDATE group_invites
+            SET
+                uses_count = uses_count + 1,
+                accepted_at = CURRENT_TIMESTAMP,
+                declined_at = NULL,
+                accepted_by_student_user_id = %s
+            WHERE id = %s
+            """,
+            (student_user_id, inv.get("id")),
+        )
+
+        conn.commit()
+        return {"group_id": int(group_id)}
+    finally:
+        cur.close()
+        conn.close()
+
+
+def decline_email_invite(invite_id: int, student_user_id: int, student_email: str) -> None:
+    conn, cur = get_db_cursor()
+    try:
+        email = (student_email or "").strip().lower()
+        cur.execute(
+            """
+            SELECT id, target_email, revoked_at, accepted_at, declined_at
+            FROM group_invites
+            WHERE id = %s AND mode = 'email'
+            """,
+            (invite_id,),
+        )
+        inv = cur.fetchone() or None
+        if not inv:
+            raise ValueError("Invite not found")
+
+        if inv.get("revoked_at"):
+            raise ValueError("Invite revoked")
+        if inv.get("accepted_at"):
+            raise ValueError("Invite already accepted")
+        if inv.get("declined_at"):
+            raise ValueError("Invite already declined")
+
+        target_email = (inv.get("target_email") or "").strip().lower()
+        if not target_email or not email or target_email != email:
+            raise ValueError("Invite is not for this email")
+
+        cur.execute(
+            """
+            UPDATE group_invites
+            SET
+                declined_at = CURRENT_TIMESTAMP,
+                accepted_by_student_user_id = %s
+            WHERE id = %s
+            """,
+            (student_user_id, inv.get("id")),
+        )
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 def list_my_groups(user_id: int) -> list[dict]:
     conn, cur = get_db_cursor()
     try:

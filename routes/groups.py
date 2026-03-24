@@ -7,10 +7,14 @@ from helpers.db_users import get_user_by_email
 from helpers.db_groups import (
     accept_group_invite_by_token,
     create_group,
+    create_group_email_invite,
     create_group_invite,
+    accept_email_invite,
+    decline_email_invite,
     get_group_invite_preview_by_token,
     get_latest_active_group_invite,
     get_group_for_teacher,
+    list_pending_email_invites_for_student,
     list_group_students_for_teacher,
     list_my_groups,
     soft_remove_group_student,
@@ -126,6 +130,31 @@ def api_create_group_invite(group_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@groups_bp.route("/api/group/<int:group_id>/invite/email", methods=["POST"])
+@jwt_required()
+def api_create_group_email_invite(group_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    target_email = (data.get("email") or data.get("target_email") or "").strip().lower()
+    if not target_email:
+        return jsonify({"success": False, "error": "email is required"}), 400
+
+    try:
+        invite = create_group_email_invite(group_id, user["id"], target_email=target_email)
+        return jsonify({"success": True, "invite": invite})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка создания email-инвайта для группы %s: %s", group_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @groups_bp.route("/api/group/<int:group_id>/invite/latest", methods=["GET"])
 @jwt_required()
 def api_get_latest_group_invite(group_id: int):
@@ -180,6 +209,58 @@ def api_join_group_preview(token: str):
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.error("Ошибка preview инвайта: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/my-invites", methods=["GET"])
+@jwt_required()
+def api_my_invites():
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        invites = list_pending_email_invites_for_student(user.get("email") or current_email)
+        return jsonify({"success": True, "invites": invites})
+    except Exception as exc:
+        logger.error("Ошибка получения инвайтов ученика: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/invite/<int:invite_id>/accept", methods=["POST"])
+@jwt_required()
+def api_accept_invite(invite_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        res = accept_email_invite(invite_id, user["id"], user.get("email") or current_email)
+        return jsonify({"success": True, "group_id": res.get("group_id")})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка принятия инвайта %s: %s", invite_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/invite/<int:invite_id>/decline", methods=["POST"])
+@jwt_required()
+def api_decline_invite(invite_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        decline_email_invite(invite_id, user["id"], user.get("email") or current_email)
+        return jsonify({"success": True})
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка отклонения инвайта %s: %s", invite_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

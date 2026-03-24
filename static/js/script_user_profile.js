@@ -47,6 +47,34 @@ async function swRequest(action, payload = {}) {
     });
 }
 
+async function createEmailInviteForSelectedGroup(targetEmail) {
+    const g = getSelectedGroup();
+    if (!g) {
+        showInfo('Выбери группу');
+        return null;
+    }
+    const email = String(targetEmail || '').trim().toLowerCase();
+    if (!email) {
+        showInfo('Введи email ученика');
+        return null;
+    }
+    try {
+        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite/email`, {
+            method: 'POST',
+            body: JSON.stringify({ email }),
+        });
+        if (!data || !data.success) {
+            const msg = data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка';
+            throw new Error(msg);
+        }
+        showSuccess('Инвайт создан');
+        return data.invite || null;
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+        return null;
+    }
+}
+
 function initializeProfileSectionToggles() {
     try {
         if (document.body.dataset.profileSectionTogglesBound === '1') return;
@@ -614,7 +642,8 @@ function initializeGroupsSection() {
     const filterSelect = document.getElementById('groupsFilterSelect');
     const inviteCopyBtn = document.getElementById('groupsInviteCopyBtn');
     const studentsRefreshBtn = document.getElementById('groupsStudentsRefreshBtn');
-    const studentsCreateBtn = document.getElementById('groupsStudentsCreateBtn');
+    const studentsInviteEmailBtn = document.getElementById('groupsStudentsInviteEmailBtn');
+    const studentsInviteLinkBtn = document.getElementById('groupsStudentsInviteLinkBtn');
     const studentsDeleteBtn = document.getElementById('groupsStudentsDeleteBtn');
     const modal = document.getElementById('groupModal');
     const modalClose = document.getElementById('groupModalClose');
@@ -655,7 +684,17 @@ function initializeGroupsSection() {
         await refreshSelectedGroupDetailsFromServer();
         await refreshStudents();
     });
-    studentsCreateBtn && studentsCreateBtn.addEventListener('click', () => copyInviteLink());
+    studentsInviteEmailBtn && studentsInviteEmailBtn.addEventListener('click', async () => {
+        const g = getSelectedGroup();
+        if (!g) {
+            showInfo('Выбери группу');
+            return;
+        }
+        const email = prompt('Email ученика для приглашения в группу:');
+        if (!email) return;
+        await createEmailInviteForSelectedGroup(email);
+    });
+    studentsInviteLinkBtn && studentsInviteLinkBtn.addEventListener('click', () => copyInviteLink());
     studentsDeleteBtn && studentsDeleteBtn.addEventListener('click', () => removeSelectedStudent());
 
     modalClose.addEventListener('click', () => toggleGroupModal(false));

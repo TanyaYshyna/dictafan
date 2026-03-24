@@ -169,6 +169,142 @@ async function getJoinGroupInvitePreview(token) {
   return data;
 }
 
+function ensureEmailInviteModal() {
+  let modal = document.getElementById('email-invite-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'email-invite-modal';
+  modal.className = 'modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+  modal.style.backdropFilter = 'blur(2px)';
+  modal.style.webkitBackdropFilter = 'blur(2px)';
+  modal.style.zIndex = '10092';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 560px;">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
+        <h3 style="margin:0;">Приглашение в группу</h3>
+      </div>
+      <div class="modal-body" style="padding:0 16px 16px 16px;">
+        <div id="email-invite-text" style="margin-top:6px;"></div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:0 16px 16px 16px;">
+        <button type="button" class="button-secondary" id="email-invite-decline">Отклонить</button>
+        <button type="button" class="button-color-yellow" id="email-invite-accept">Принять</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  try {
+    const content = modal.querySelector('.modal-content');
+    if (content) {
+      content.style.position = 'relative';
+      content.style.zIndex = '10093';
+    }
+  } catch (e) {
+  }
+  return modal;
+}
+
+async function showEmailInviteModal(text) {
+  return new Promise((resolve) => {
+    const modal = ensureEmailInviteModal();
+    const textEl = document.getElementById('email-invite-text');
+    const acceptBtn = document.getElementById('email-invite-accept');
+    const declineBtn = document.getElementById('email-invite-decline');
+    if (textEl) textEl.textContent = String(text || '').trim();
+
+    const cleanup = () => {
+      try { modal.style.display = 'none'; } catch (e) {}
+      try { acceptBtn && acceptBtn.removeEventListener('click', onAccept); } catch (e) {}
+      try { declineBtn && declineBtn.removeEventListener('click', onDecline); } catch (e) {}
+    };
+    const onAccept = () => { cleanup(); resolve(true); };
+    const onDecline = () => { cleanup(); resolve(false); };
+
+    acceptBtn && acceptBtn.addEventListener('click', onAccept);
+    declineBtn && declineBtn.addEventListener('click', onDecline);
+    modal.style.display = 'flex';
+  });
+}
+
+async function fetchMyPendingEmailInvites() {
+  const data = await apiRequest('/groups/api/my-invites', { method: 'GET' });
+  return data;
+}
+
+async function acceptEmailInvite(inviteId) {
+  const data = await apiRequest(`/groups/api/invite/${encodeURIComponent(inviteId)}/accept`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return data;
+}
+
+async function declineEmailInvite(inviteId) {
+  const data = await apiRequest(`/groups/api/invite/${encodeURIComponent(inviteId)}/decline`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return data;
+}
+
+let __emailInvitesCheckedOnce = false;
+
+async function handlePendingEmailInvitesAfterLogin() {
+  if (__emailInvitesCheckedOnce) return;
+  __emailInvitesCheckedOnce = true;
+  try {
+    if (!window.UM || typeof window.UM.isAuthenticated !== 'function' || !window.UM.isAuthenticated()) return;
+  } catch (e) {
+    return;
+  }
+
+  try {
+    const res = await fetchMyPendingEmailInvites();
+    if (!res || !res.success) return;
+    const invites = Array.isArray(res.invites) ? res.invites : [];
+    if (invites.length === 0) return;
+    const inv = invites[0];
+    const groupTitle = inv && inv.group_title ? String(inv.group_title) : '';
+    const teacherUsername = inv && inv.teacher_username ? String(inv.teacher_username) : '';
+    const txt = groupTitle && teacherUsername
+      ? `Учитель ${teacherUsername} приглашает тебя в группу «${groupTitle}». Принять приглашение?`
+      : 'Тебя пригласили в группу. Принять приглашение?';
+
+    const ok = await showEmailInviteModal(txt);
+    if (ok) {
+      const r = await acceptEmailInvite(inv.id);
+      if (r && r.success) {
+        showToast('Приглашение принято');
+        try { if (typeof loadLibraryData === 'function') loadLibraryData(); } catch (e) {}
+      } else {
+        const msg = r && (r.error || r.message) ? String(r.error || r.message) : 'Ошибка';
+        showToast(`Не удалось принять приглашение: ${msg}`);
+      }
+    } else {
+      const r = await declineEmailInvite(inv.id);
+      if (r && r.success) {
+        showToast('Приглашение отклонено');
+      } else {
+        const msg = r && (r.error || r.message) ? String(r.error || r.message) : 'Ошибка';
+        showToast(`Не удалось отклонить приглашение: ${msg}`);
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
 async function showJoinGroupConfirmModal() {
   return new Promise((resolve) => {
     const modal = ensureJoinGroupConfirmModal();
@@ -5299,6 +5435,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         // и в URL есть join_group, показываем подтверждение вступления.
         try {
           handleJoinGroupInviteFromUrl().catch(() => { });
+        } catch (e) {
+        }
+
+        // email-invite flow: если есть приглашения по email, показываем их после логина
+        try {
+          handlePendingEmailInvitesAfterLogin().catch(() => { });
         } catch (e) {
         }
       }
