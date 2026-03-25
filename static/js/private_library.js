@@ -111,6 +111,16 @@ function getTodayIsoDate() {
   return `${y}-${m}-${day}`;
 }
 
+function escapeHtml(value) {
+  const s = String(value == null ? '' : value);
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function addDaysIsoDate(iso, days) {
   try {
     const parts = String(iso || '').split('-');
@@ -154,6 +164,230 @@ function setCreateAssignmentDaysState(modal, days) {
     modal.dataset.daysState = JSON.stringify(Array.isArray(days) ? days : []);
   } catch (e) {
   }
+}
+
+function ensureStudentPlanPanel() {
+  let panel = document.getElementById('student-plan-panel');
+  if (panel) return panel;
+
+  panel = document.createElement('div');
+  panel.id = 'student-plan-panel';
+  panel.style.display = 'none';
+  panel.style.position = 'fixed';
+  panel.style.left = '0';
+  panel.style.top = '0';
+  panel.style.width = '100%';
+  panel.style.height = '100%';
+  panel.style.zIndex = '100000';
+  panel.style.background = 'rgba(0,0,0,0.35)';
+  panel.style.backdropFilter = 'blur(4px)';
+
+  panel.innerHTML = `
+    <div id="student-plan-panel-drawer" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="calendar-check"></i>
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:16px; line-height:1.1;">План</div>
+            <div id="student-plan-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
+          </div>
+        </div>
+        <button type="button" id="student-plan-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="Предыдущий день" style="width:40px; height:40px;">
+            <i data-lucide="chevron-left"></i>
+          </button>
+          <input type="date" id="student-plan-date" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);">
+          <button type="button" id="student-plan-next" class="topbar-icon-btn" title="Следующий день" style="width:40px; height:40px;">
+            <i data-lucide="chevron-right"></i>
+          </button>
+        </div>
+        <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">Сегодня</button>
+      </div>
+
+      <div id="student-plan-list" style="padding:14px; overflow:auto; flex:1;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+  return panel;
+}
+
+function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
+  try {
+    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+      : '';
+    const langOriginal = String(dictationLanguageCode || 'en').trim().toLowerCase() || 'en';
+    const langTranslation = (nativeLang || langOriginal || 'en');
+    const openUrl = `/dictation/dict_${Number(dictationId)}/${langOriginal}/${langTranslation}`;
+    window.location.href = openUrl;
+  } catch (e) {
+    try {
+      window.location.href = `/dictation/dict_${Number(dictationId)}/en/en`;
+    } catch (e2) {
+    }
+  }
+}
+
+function _studentPlanRender(panel, dateIso, items) {
+  const list = document.getElementById('student-plan-list');
+  const subtitle = document.getElementById('student-plan-subtitle');
+  if (subtitle) subtitle.textContent = dateIso ? String(dateIso) : '';
+  if (!list) return;
+
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">На эту дату заданий нет</div>';
+    return;
+  }
+
+  const byGroup = new Map();
+  for (const a of rows) {
+    const g = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : 'Группа');
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g).push(a);
+  }
+
+  const blocks = [];
+  for (const [groupTitle, groupItems] of byGroup.entries()) {
+    const cards = groupItems.map(a => {
+      const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
+      const level = a && a.dictation_level ? String(a.dictation_level) : '—';
+      const req = Number(a && a.required_completions ? a.required_completions : 1);
+      const done = Number(a && typeof a.done !== 'undefined' ? a.done : 0);
+      const overdue = !!(a && a.overdue);
+      const badgeBg = overdue ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.06)';
+      const badgeColor = overdue ? '#b91c1c' : '#111827';
+      const start = a && a.start_date ? String(a.start_date) : '';
+      const end = a && a.end_date ? String(a.end_date) : '';
+      const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || dateIso);
+      const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
+      const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
+
+      return `
+        <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px;">
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+            </div>
+            <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
+              <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
+              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    blocks.push(`
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800; font-size:13px; color: rgba(0,0,0,0.75);">${escapeHtml(String(groupTitle))}</div>
+        ${cards}
+      </div>
+    `);
+  }
+
+  list.innerHTML = blocks.join('');
+
+  list.querySelectorAll('[data-action="student-plan-open"]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dictationId = btn.getAttribute('data-dictation-id');
+      const lang = btn.getAttribute('data-dictation-lang');
+      if (dictationId) {
+        _studentPlanOpenDictation(dictationId, lang);
+      }
+    });
+  });
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: list });
+    }
+  } catch (e) {
+  }
+}
+
+async function openStudentPlanPanel(dateIso = null) {
+  const panel = ensureStudentPlanPanel();
+  const dateInput = document.getElementById('student-plan-date');
+  const closeBtn = document.getElementById('student-plan-close');
+  const prevBtn = document.getElementById('student-plan-prev');
+  const nextBtn = document.getElementById('student-plan-next');
+  const todayBtn = document.getElementById('student-plan-today');
+
+  const today = getTodayIsoDate();
+  const initial = String(dateIso || (dateInput && dateInput.value) || today);
+  if (dateInput) dateInput.value = initial;
+
+  const close = () => {
+    try { panel.style.display = 'none'; } catch (e) { }
+  };
+
+  panel.onclick = (e) => {
+    const drawer = document.getElementById('student-plan-panel-drawer');
+    if (e.target === panel) close();
+    if (drawer && e.target === drawer) {
+    }
+  };
+
+  if (closeBtn) closeBtn.onclick = () => close();
+
+  const load = async () => {
+    const d = dateInput ? String(dateInput.value || '').trim() : '';
+    if (!d) return;
+    const list = document.getElementById('student-plan-list');
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+    try {
+      const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
+      if (!res || !res.success) {
+        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
+        return;
+      }
+      _studentPlanRender(panel, d, res.assignments || []);
+    } catch (e) {
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
+    }
+  };
+
+  if (dateInput) dateInput.onchange = () => load();
+  if (todayBtn) todayBtn.onclick = () => {
+    if (dateInput) dateInput.value = today;
+    load();
+  };
+  if (prevBtn) prevBtn.onclick = () => {
+    if (!dateInput) return;
+    const cur = String(dateInput.value || today);
+    dateInput.value = addDaysIsoDate(cur, -1);
+    load();
+  };
+  if (nextBtn) nextBtn.onclick = () => {
+    if (!dateInput) return;
+    const cur = String(dateInput.value || today);
+    dateInput.value = addDaysIsoDate(cur, 1);
+    load();
+  };
+
+  panel.style.display = 'block';
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: panel });
+    }
+  } catch (e) {
+  }
+
+  await load();
 }
 
 function renderCreateAssignmentDaysTable(modal) {
@@ -388,7 +622,7 @@ async function openCreateAssignmentModal(dictationId) {
             return;
           }
 
-          showToast('Задание сохранено');
+          showToast('Задание сохранено', { durationMs: 2500 });
           close();
           return;
         }
@@ -422,18 +656,18 @@ async function openCreateAssignmentModal(dictationId) {
           });
 
           if (!res || !res.success) {
-            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения');
+            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения', { durationMs: 2500 });
             return;
           }
 
-          showToast('Задание сохранено');
+          showToast('Задание сохранено', { durationMs: 2500 });
           close();
           return;
         }
 
         showToast('Неверный тип задания');
       } catch (e) {
-        showToast('Ошибка сохранения');
+        showToast('Ошибка сохранения', { durationMs: 2500 });
       }
     };
   }
@@ -4007,6 +4241,13 @@ function installEventHandlers() {
   const homeLibraryBtn = document.getElementById('btnHomeLibrary');
   if (homeLibraryBtn) {
     homeLibraryBtn.addEventListener('click', () => openHomeLibraryModal());
+  }
+
+  const studentPlanBtn = document.getElementById('btnStudentPlan');
+  if (studentPlanBtn) {
+    studentPlanBtn.addEventListener('click', () => {
+      openStudentPlanPanel().catch(() => { });
+    });
   }
 
   const homeLibraryCloseBtn = document.getElementById('home-library-close');

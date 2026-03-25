@@ -243,21 +243,27 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             """
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
                    a.start_date, a.end_date, a.required_completions,
-                   a.created_at, a.updated_at, a.archived_at
+                   a.created_at, a.updated_at, a.archived_at,
+                   g.title AS group_title,
+                   d.title AS dictation_title,
+                   d.language_code AS dictation_language_code,
+                   d.level AS dictation_level
             FROM assignments a
+            JOIN groups g ON g.id = a.group_id
+            JOIN dictations d ON d.id = a.dictation_id
             WHERE a.archived_at IS NULL
               AND a.start_date <= %s
               AND a.end_date >= %s
               AND EXISTS (
                 SELECT 1
                 FROM group_students gs
-                JOIN groups g ON g.id = gs.group_id
                 WHERE gs.group_id = a.group_id
                   AND gs.student_user_id = %s
                   AND gs.status = 'active'
                   AND gs.removed_at IS NULL
                   AND g.archived_at IS NULL
               )
+              AND g.archived_at IS NULL
             ORDER BY a.start_date ASC, a.id ASC
             """,
             (target_date, target_date, student_user_id),
@@ -267,6 +273,11 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
         result: list[dict] = []
         for r in rows:
             a = _row_to_assignment(r)
+
+            a["group_title"] = r.get("group_title")
+            a["dictation_title"] = r.get("dictation_title")
+            a["dictation_language_code"] = r.get("dictation_language_code")
+            a["dictation_level"] = r.get("dictation_level")
 
             is_day = a.get("start_date") == a.get("end_date")
             if is_day:
