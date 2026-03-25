@@ -10,6 +10,442 @@ function setBookEditDirty(nextDirty) {
   if (star) {
     star.style.display = bookEditDirty ? 'inline' : 'none';
   }
+
+}
+
+function ensureCreateAssignmentModal() {
+  let modal = document.getElementById('create-assignment-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'create-assignment-modal';
+  modal.className = 'modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+  modal.style.backdropFilter = 'blur(2px)';
+  modal.style.webkitBackdropFilter = 'blur(2px)';
+  modal.style.zIndex = '10094';
+
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 720px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
+        <h3 style="margin:0;">Задание</h3>
+        <button type="button" id="create-assignment-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:0 16px 16px 16px;">
+        <input type="hidden" id="create-assignment-dictation-id" value="">
+
+        <div class="form-row" style="margin-top: 6px;">
+          <label for="create-assignment-group">Группа</label>
+          <select id="create-assignment-group"></select>
+        </div>
+
+        <div class="form-row" style="margin-top: 12px;">
+          <label for="create-assignment-type">Тип задания</label>
+          <select id="create-assignment-type">
+            <option value="period">на период</option>
+            <option value="days">по дням</option>
+          </select>
+        </div>
+
+        <div id="create-assignment-type-period" style="margin-top: 12px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-row" style="margin-top: 0;">
+              <label for="create-assignment-from">с</label>
+              <input type="date" id="create-assignment-from">
+            </div>
+            <div class="form-row" style="margin-top: 0;">
+              <label for="create-assignment-to">по</label>
+              <input type="date" id="create-assignment-to">
+            </div>
+          </div>
+          <div class="form-row" style="margin-top: 12px;">
+            <label for="create-assignment-attempts">Сколько раз пройти на медальку</label>
+            <input type="number" id="create-assignment-attempts" min="1" step="1" value="1">
+          </div>
+        </div>
+
+        <div id="create-assignment-type-days" style="margin-top: 12px; display:none;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+            <div style="font-weight:600;">План по дням</div>
+            <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день">
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+          <div id="create-assignment-days-table" style="margin-top: 10px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:0 16px 16px 16px;">
+        <button type="button" id="create-assignment-cancel" class="button-secondary">Отмена</button>
+        <button type="button" id="create-assignment-save" class="button-color-yellow">Сохранить</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
+
+  return modal;
+}
+
+function getTodayIsoDate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function addDaysIsoDate(iso, days) {
+  try {
+    const parts = String(iso || '').split('-');
+    if (parts.length !== 3) return iso;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    d.setDate(d.getDate() + Number(days || 0));
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  } catch (e) {
+    return iso;
+  }
+}
+
+function isWeekendIsoDate(iso) {
+  try {
+    const parts = String(iso || '').split('-');
+    if (parts.length !== 3) return false;
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const w = d.getDay();
+    return w === 0 || w === 6;
+  } catch (e) {
+    return false;
+  }
+}
+
+function getCreateAssignmentDaysState(modal) {
+  try {
+    const raw = modal.dataset.daysState;
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function setCreateAssignmentDaysState(modal, days) {
+  try {
+    modal.dataset.daysState = JSON.stringify(Array.isArray(days) ? days : []);
+  } catch (e) {
+  }
+}
+
+function renderCreateAssignmentDaysTable(modal) {
+  const table = document.getElementById('create-assignment-days-table');
+  if (!table) return;
+  table.innerHTML = '';
+
+  const days = getCreateAssignmentDaysState(modal);
+  if (days.length === 0) {
+    const empty = document.createElement('div');
+    empty.style.padding = '10px 0';
+    empty.style.color = '#666';
+    empty.textContent = 'Добавь дни кнопкой +';
+    table.appendChild(empty);
+    return;
+  }
+
+  const header = document.createElement('div');
+  header.style.display = 'grid';
+  header.style.gridTemplateColumns = '1fr 200px 36px';
+  header.style.gap = '10px';
+  header.style.fontSize = '12px';
+  header.style.color = '#666';
+  header.style.padding = '0 0 6px 0';
+  header.innerHTML = '<div>Дата</div><div>Диктантов в день</div><div></div>';
+  table.appendChild(header);
+
+  days.forEach((row, idx) => {
+    const wrap = document.createElement('div');
+    wrap.style.display = 'grid';
+    wrap.style.gridTemplateColumns = '1fr 200px 36px';
+    wrap.style.gap = '10px';
+    wrap.style.alignItems = 'center';
+    wrap.style.padding = '6px 0';
+
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = row && row.date ? String(row.date) : '';
+
+    const countInput = document.createElement('input');
+    countInput.type = 'number';
+    countInput.min = '1';
+    countInput.step = '1';
+    countInput.value = row && row.count ? String(row.count) : '1';
+
+    if (isWeekendIsoDate(dateInput.value)) {
+      dateInput.style.borderColor = '#d33';
+      countInput.style.borderColor = '#d33';
+    }
+
+    dateInput.addEventListener('change', () => {
+      const next = getCreateAssignmentDaysState(modal);
+      next[idx] = Object.assign({}, next[idx], { date: String(dateInput.value || '') });
+      setCreateAssignmentDaysState(modal, next);
+      renderCreateAssignmentDaysTable(modal);
+    });
+    countInput.addEventListener('change', () => {
+      const next = getCreateAssignmentDaysState(modal);
+      const v = parseInt(String(countInput.value || '1'), 10);
+      next[idx] = Object.assign({}, next[idx], { count: Number.isFinite(v) && v > 0 ? v : 1 });
+      setCreateAssignmentDaysState(modal, next);
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'topbar-icon-btn';
+    delBtn.title = 'Удалить день';
+    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+    delBtn.addEventListener('click', () => {
+      const next = getCreateAssignmentDaysState(modal);
+      next.splice(idx, 1);
+      setCreateAssignmentDaysState(modal, next);
+      renderCreateAssignmentDaysTable(modal);
+    });
+
+    wrap.appendChild(dateInput);
+    wrap.appendChild(countInput);
+    wrap.appendChild(delBtn);
+    table.appendChild(wrap);
+  });
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: table });
+    }
+  } catch (e) {
+  }
+}
+
+async function loadMyGroupsForAssignmentModal() {
+  const res = await apiRequest('/groups/api/my', { method: 'GET' });
+  if (!res || !res.success) return [];
+  const groups = Array.isArray(res.groups) ? res.groups : [];
+  return groups.filter(g => !g.archived_at);
+}
+
+async function openCreateAssignmentModal(dictationId) {
+  const modal = ensureCreateAssignmentModal();
+  const idInput = document.getElementById('create-assignment-dictation-id');
+  if (idInput) idInput.value = String(dictationId || '');
+
+  const groupSelect = document.getElementById('create-assignment-group');
+  if (groupSelect) {
+    groupSelect.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— выбери группу —';
+    groupSelect.appendChild(opt);
+  }
+
+  try {
+    const groups = await loadMyGroupsForAssignmentModal();
+    if (groupSelect) {
+      groups.forEach(g => {
+        const o = document.createElement('option');
+        o.value = String(g.id);
+        o.textContent = String(g.title || `Группа ${g.id}`);
+        groupSelect.appendChild(o);
+      });
+    }
+  } catch (e) {
+  }
+
+  const typeSelect = document.getElementById('create-assignment-type');
+  const periodBlock = document.getElementById('create-assignment-type-period');
+  const daysBlock = document.getElementById('create-assignment-type-days');
+  const fromEl = document.getElementById('create-assignment-from');
+  const toEl = document.getElementById('create-assignment-to');
+  const attemptsEl = document.getElementById('create-assignment-attempts');
+
+  const today = getTodayIsoDate();
+  if (fromEl) fromEl.value = today;
+  if (toEl) toEl.value = addDaysIsoDate(today, 1);
+  if (attemptsEl) attemptsEl.value = '1';
+
+  setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
+  renderCreateAssignmentDaysTable(modal);
+
+  const updateTypeUi = () => {
+    const v = typeSelect ? String(typeSelect.value || 'period') : 'period';
+    if (periodBlock) periodBlock.style.display = v === 'period' ? 'block' : 'none';
+    if (daysBlock) daysBlock.style.display = v === 'days' ? 'block' : 'none';
+  };
+
+  if (typeSelect) {
+    typeSelect.onchange = () => updateTypeUi();
+    typeSelect.value = 'period';
+  }
+  updateTypeUi();
+
+  const addDayBtn = document.getElementById('create-assignment-days-add');
+  if (addDayBtn) {
+    addDayBtn.onclick = () => {
+      const cur = getCreateAssignmentDaysState(modal);
+      const last = cur.length > 0 ? cur[cur.length - 1] : null;
+      const lastDate = last && last.date ? String(last.date) : today;
+      cur.push({ date: addDaysIsoDate(lastDate, 1), count: 1 });
+      setCreateAssignmentDaysState(modal, cur);
+      renderCreateAssignmentDaysTable(modal);
+    };
+  }
+
+  const closeBtn = document.getElementById('create-assignment-close');
+  const cancelBtn = document.getElementById('create-assignment-cancel');
+  const saveBtn = document.getElementById('create-assignment-save');
+
+  const close = () => {
+    try { modal.style.display = 'none'; } catch (e) { }
+  };
+
+  if (closeBtn) closeBtn.onclick = () => close();
+  if (cancelBtn) cancelBtn.onclick = () => close();
+  modal.onclick = (e) => {
+    if (e.target === modal) close();
+  };
+
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      try {
+        const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
+        const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+        const mode = typeSelect ? String(typeSelect.value || 'period').trim() : 'period';
+
+        if (!groupId) {
+          showToast('Выбери группу');
+          return;
+        }
+        if (!dictationIdRaw) {
+          showToast('Не найден dictation_id');
+          return;
+        }
+
+        const group_id = Number(groupId);
+        const dictation_id = Number(dictationIdRaw);
+        if (!Number.isFinite(group_id) || group_id <= 0) {
+          showToast('Неверный group_id');
+          return;
+        }
+        if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
+          showToast('Неверный dictation_id');
+          return;
+        }
+
+        if (mode === 'period') {
+          const start_date = fromEl ? String(fromEl.value || '').trim() : '';
+          const end_date = toEl ? String(toEl.value || '').trim() : '';
+          const required_completions = attemptsEl ? Number(attemptsEl.value || 1) : 1;
+
+          if (!start_date || !end_date) {
+            showToast('Выбери даты');
+            return;
+          }
+          if (!Number.isFinite(required_completions) || required_completions <= 0) {
+            showToast('Неверное число попыток');
+            return;
+          }
+
+          const res = await apiRequest('/api/assignments/teacher/create', {
+            method: 'POST',
+            body: JSON.stringify({
+              group_id,
+              dictation_id,
+              mode: 'period',
+              start_date,
+              end_date,
+              required_completions
+            })
+          });
+
+          if (!res || !res.success) {
+            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения');
+            return;
+          }
+
+          showToast('Задание сохранено');
+          close();
+          return;
+        }
+
+        if (mode === 'days') {
+          const state = getCreateAssignmentDaysState(modal);
+          const days = (Array.isArray(state) ? state : []).map(x => ({
+            date: String(x?.date || '').trim(),
+            required_completions: Number(x?.count || 1)
+          })).filter(x => x.date);
+
+          if (!days.length) {
+            showToast('Добавь хотя бы один день');
+            return;
+          }
+          for (const d of days) {
+            if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
+              showToast('Неверное число попыток в плане');
+              return;
+            }
+          }
+
+          const res = await apiRequest('/api/assignments/teacher/create', {
+            method: 'POST',
+            body: JSON.stringify({
+              group_id,
+              dictation_id,
+              mode: 'days',
+              days
+            })
+          });
+
+          if (!res || !res.success) {
+            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения');
+            return;
+          }
+
+          showToast('Задание сохранено');
+          close();
+          return;
+        }
+
+        showToast('Неверный тип задания');
+      } catch (e) {
+        showToast('Ошибка сохранения');
+      }
+    };
+  }
+
+  modal.style.display = 'flex';
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
 }
 
 let __selectedBookDictationCard = null;
@@ -189,7 +625,7 @@ function ensureEmailInviteModal() {
   modal.style.webkitBackdropFilter = 'blur(2px)';
   modal.style.zIndex = '10092';
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 560px;">
+    <div class="modal-content" style="max-width: 560px; background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
       <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
         <h3 style="margin:0;">Приглашение в группу</h3>
       </div>
@@ -2014,6 +2450,10 @@ function createDictationCard(item, isDeskCard = false) {
                   <i data-lucide="pencil-ruler"></i>
                   <span>Редактировать</span>
                 </a>
+                <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
+                  <i data-lucide="clipboard-list"></i>
+                  <span>Задание</span>
+                </button>
                 <button class="dropdown-menu-item" data-action="show-in-book" data-dictation-id="${dictationId}">
                   <i data-lucide="book-marked"></i>
                   <span>Показать в книге</span>
@@ -2099,6 +2539,10 @@ function createDictationCard(item, isDeskCard = false) {
                   <i data-lucide="pencil-ruler"></i>
                   <span>Редактировать</span>
                 </a>
+                <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dbId}">
+                  <i data-lucide="clipboard-list"></i>
+                  <span>Задание</span>
+                </button>
                 <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="folder-symlink"></i>
                   <span>Переместить</span>
@@ -4035,6 +4479,16 @@ function installEventHandlers() {
       const dictationId = btn.getAttribute('data-dictation-id');
       console.log('🔄 Открываю модальное окно перемещения для диктанта:', dictationId);
       openMoveDictationModal(dictationId);
+    }
+
+    if (e.target.closest('[data-action="create-assignment"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="create-assignment"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      if (dictationId) {
+        openCreateAssignmentModal(dictationId);
+      }
     }
 
     // Удалить (на карточке диктанта)

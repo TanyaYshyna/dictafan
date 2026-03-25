@@ -181,6 +181,7 @@ from routes.statistics import statistics_bp
 from routes.library import library_bp
 from routes.desk import desk_bp
 from routes.groups import groups_bp
+from routes.assignments import assignments_bp
 
 app.register_blueprint(index_bp)
 app.register_blueprint(editor_bp)
@@ -190,6 +191,7 @@ app.register_blueprint(statistics_bp)
 app.register_blueprint(library_bp)
 app.register_blueprint(desk_bp)
 app.register_blueprint(groups_bp)
+app.register_blueprint(assignments_bp)
 
 
 @app.route('/favicon.ico')
