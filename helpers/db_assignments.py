@@ -279,7 +279,9 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             a["dictation_language_code"] = r.get("dictation_language_code")
             a["dictation_level"] = r.get("dictation_level")
 
-            is_day = a.get("start_date") == a.get("end_date")
+            start_d = _parse_date(a.get("start_date"))
+            end_d = _parse_date(a.get("end_date"))
+            is_day = (start_d == end_d) if (start_d and end_d) else False
             if is_day:
                 # выполнений за конкретную дату
                 cur.execute(
@@ -303,13 +305,13 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                       AND hs.created_at::date >= %s
                       AND hs.created_at::date <= %s
                     """,
-                    (student_user_id, a.get("dictation_id"), a.get("start_date"), a.get("end_date")),
+                    (student_user_id, a.get("dictation_id"), start_d, end_d),
                 )
 
             cnt = (cur.fetchone() or {}).get("cnt") or 0
             a["done"] = int(cnt)
             a["mode"] = "days" if is_day else "period"
-            a["overdue"] = (target_date > a.get("end_date")) if a.get("end_date") else False
+            a["overdue"] = bool(end_d and (target_date > end_d))
             result.append(a)
 
         return result
