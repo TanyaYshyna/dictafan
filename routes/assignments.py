@@ -8,6 +8,7 @@ from helpers.db_assignments import (
     archive_assignments,
     create_assignment_days,
     create_assignment_period,
+    get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
 )
@@ -113,6 +114,24 @@ def api_teacher_archive_assignments():
         return jsonify({"success": True, "archived": updated})
     except Exception as exc:
         logger.error("Ошибка архивирования заданий: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@assignments_bp.route("/teacher/assignment/<int:assignment_id>/students", methods=["GET"])
+@jwt_required()
+def api_teacher_assignment_students_progress(assignment_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        data = get_assignment_students_progress_for_teacher(assignment_id, user["id"])
+        return jsonify({"success": True, **data})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except Exception as exc:
+        logger.error("Ошибка получения прогресса по заданию %s: %s", assignment_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

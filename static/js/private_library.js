@@ -220,6 +220,125 @@ function ensureStudentPlanPanel() {
   return panel;
 }
 
+function ensureTeacherAssignmentStudentsModal() {
+  let modal = document.getElementById('teacher-assignment-students-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'teacher-assignment-students-modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.zIndex = '100001';
+  modal.style.background = 'rgba(0,0,0,0.35)';
+  modal.style.backdropFilter = 'blur(4px)';
+
+  modal.innerHTML = `
+    <div style="position:absolute; right:0; top:0; height:100%; width:min(62vw, 760px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
+        <div>
+          <div id="teacher-assignment-students-title" style="font-weight:700; font-size:16px; line-height:1.1;">Ученики</div>
+          <div id="teacher-assignment-students-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
+        </div>
+        <button type="button" id="teacher-assignment-students-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div id="teacher-assignment-students-list" style="padding:14px; overflow:auto; flex:1;"></div>
+    </div>
+  `;
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      try { modal.style.display = 'none'; } catch (e2) { }
+    }
+  });
+
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function _teacherStudentsRender(data) {
+  const modal = ensureTeacherAssignmentStudentsModal();
+  const titleEl = document.getElementById('teacher-assignment-students-title');
+  const subtitleEl = document.getElementById('teacher-assignment-students-subtitle');
+  const list = document.getElementById('teacher-assignment-students-list');
+
+  const assignment = data && data.assignment ? data.assignment : {};
+  const summary = data && data.summary ? data.summary : {};
+  const students = Array.isArray(data && data.students ? data.students : null) ? data.students : [];
+
+  if (titleEl) titleEl.textContent = assignment && assignment.dictation_title ? String(assignment.dictation_title) : 'Ученики';
+  if (subtitleEl) {
+    const pct = typeof summary.percent_completed === 'number' ? summary.percent_completed : 0;
+    const done = typeof summary.students_completed === 'number' ? summary.students_completed : 0;
+    const total = typeof summary.students_total === 'number' ? summary.students_total : students.length;
+    subtitleEl.textContent = `${pct}% выполнено · ${done}/${total}`;
+  }
+  if (!list) return;
+
+  if (!students.length) {
+    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Пока нет учеников</div>';
+    return;
+  }
+
+  const blocks = students.map(s => {
+    const username = String(s && s.username ? s.username : '');
+    const done = Number(s && typeof s.done !== 'undefined' ? s.done : 0);
+    const req = Number(s && typeof s.required !== 'undefined' ? s.required : 1);
+    const isDone = Boolean(s && s.is_done);
+    const avatarUrl = String(s && s.avatar_small_url ? s.avatar_small_url : '');
+    const badgeBg = isDone ? 'rgba(34,197,94,0.14)' : 'rgba(0,0,0,0.06)';
+    const badgeColor = isDone ? '#166534' : 'rgba(0,0,0,0.65)';
+    const leftBg = avatarUrl ? `url(${escapeHtml(avatarUrl)})` : 'none';
+
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid rgba(0,0,0,0.06);">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <div style="width:32px; height:32px; border-radius:50%; background:#eee; background-image:${leftBg}; background-size:cover; background-position:center;"></div>
+          <div style="min-width:0;">
+            <div style="font-weight:650; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(username)}</div>
+          </div>
+        </div>
+        <div style="flex-shrink:0; padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${done}/${req}</div>
+      </div>
+    `;
+  }).join('');
+
+  list.innerHTML = blocks;
+}
+
+async function openTeacherAssignmentStudentsModal(assignmentId) {
+  const modal = ensureTeacherAssignmentStudentsModal();
+  const closeBtn = document.getElementById('teacher-assignment-students-close');
+  const list = document.getElementById('teacher-assignment-students-list');
+
+  if (closeBtn) closeBtn.onclick = () => { try { modal.style.display = 'none'; } catch (e) { } };
+  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+
+  modal.style.display = 'block';
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
+
+  try {
+    const res = await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(assignmentId))}/students`, { method: 'GET' });
+    if (!res || !res.success) {
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+      return;
+    }
+    _teacherStudentsRender(res);
+  } catch (e) {
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+  }
+}
+
 function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
   try {
     const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
@@ -428,7 +547,9 @@ function ensureTeacherAssignmentsPanel() {
           <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
           <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
         </div>
-        <button type="button" id="teacher-assignments-refresh" class="button-secondary" style="height:40px;">Обновить</button>
+        <button type="button" id="teacher-assignments-refresh" class="topbar-icon-btn" title="Обновить" style="width:40px; height:40px;">
+          <i data-lucide="refresh-cw"></i>
+        </button>
       </div>
 
       <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
@@ -457,8 +578,13 @@ function _teacherAssignmentsRender(items) {
     const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
     const req = Number(a && a.required_completions ? a.required_completions : 1);
     const isArchived = Boolean(a && a.archived_at);
+    const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
     const badgeBg = isArchived ? 'rgba(0,0,0,0.06)' : 'rgba(245,158,11,0.16)';
     const badgeColor = isArchived ? 'rgba(0,0,0,0.6)' : '#92400e';
+
+    const leftBadge = (pct == null)
+      ? ''
+      : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
 
     return `
       <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
@@ -468,8 +594,12 @@ function _teacherAssignmentsRender(items) {
             <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
-            <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${req}x</div>
-            ${isArchived ? '' : `<button type="button" class="button-secondary" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" style="height:34px; padding:0 12px;">Архивировать</button>`}
+            <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
+              <i data-lucide="badge-check"></i>
+            </button>
+            ${leftBadge}
+            <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
+            ${isArchived ? '' : `<button type="button" class="topbar-icon-btn" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Архивировать" style="width:34px; height:34px;"><i data-lucide="file-archive"></i></button>`}
           </div>
         </div>
       </div>
@@ -523,7 +653,19 @@ async function _teacherAssignmentsReload() {
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
       return;
     }
-    _teacherAssignmentsRender(res.assignments || []);
+    const items = Array.isArray(res.assignments) ? res.assignments : [];
+    for (const a of items) {
+      try {
+        const sid = a && a.id ? String(a.id) : '';
+        if (!sid) continue;
+        const prog = await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(sid)}/students`, { method: 'GET' });
+        if (prog && prog.success && prog.summary && typeof prog.summary.percent_completed === 'number') {
+          a.class_percent_completed = prog.summary.percent_completed;
+        }
+      } catch (e) {
+      }
+    }
+    _teacherAssignmentsRender(items);
   } catch (e) {
     if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
   }

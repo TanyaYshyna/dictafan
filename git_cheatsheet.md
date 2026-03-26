@@ -167,7 +167,7 @@ git push origin production
 #  сначала в девелоп а потом в продакшен (что бы были одинаковые)
 git checkout develop_DB
 git add .
-git commit -m "0300"
+git commit -m "0301"
 git push origin develop_DB
 
 git checkout production

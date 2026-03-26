@@ -113,6 +113,125 @@ def create_assignment_period(
         conn.close()
 
 
+def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date, a.required_completions,
+                   g.title AS group_title,
+                   d.title AS dictation_title,
+                   d.language_code AS dictation_language_code,
+                   d.level AS dictation_level
+            FROM assignments a
+            JOIN groups g ON g.id = a.group_id
+            JOIN dictations d ON d.id = a.dictation_id
+            WHERE a.id = %s
+              AND EXISTS (
+                SELECT 1
+                FROM group_teachers gt
+                WHERE gt.group_id = a.group_id
+                  AND gt.teacher_user_id = %s
+              )
+            """,
+            (assignment_id, teacher_user_id),
+        )
+        arow = cur.fetchone()
+        if not arow:
+            raise PermissionError("Forbidden")
+
+        start_d = _parse_date(arow.get("start_date"))
+        end_d = _parse_date(arow.get("end_date"))
+        req = int(arow.get("required_completions") or 1)
+        dictation_id = int(arow.get("dictation_id"))
+        group_id = int(arow.get("group_id"))
+
+        cur.execute(
+            """
+            SELECT u.id AS student_user_id, u.username
+            FROM group_students gs
+            JOIN users u ON u.id = gs.student_user_id
+            WHERE gs.group_id = %s
+              AND gs.status = 'active'
+              AND gs.removed_at IS NULL
+            ORDER BY LOWER(u.username) ASC, u.id ASC
+            """,
+            (group_id,),
+        )
+        students = cur.fetchall() or []
+
+        result_students: list[dict] = []
+        completed = 0
+        for s in students:
+            sid = int(s.get("student_user_id"))
+            if start_d and end_d and start_d == end_d:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int AS cnt
+                    FROM history_successes hs
+                    WHERE hs.user_id = %s
+                      AND hs.dictation_id = %s
+                      AND hs.created_at::date = %s
+                    """,
+                    (sid, dictation_id, start_d),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int AS cnt
+                    FROM history_successes hs
+                    WHERE hs.user_id = %s
+                      AND hs.dictation_id = %s
+                      AND hs.created_at::date >= %s
+                      AND hs.created_at::date <= %s
+                    """,
+                    (sid, dictation_id, start_d, end_d),
+                )
+
+            done = int((cur.fetchone() or {}).get("cnt") or 0)
+            is_done = done >= req
+            if is_done:
+                completed += 1
+
+            result_students.append(
+                {
+                    "id": sid,
+                    "username": s.get("username") or "",
+                    "avatar_small_url": f"/user/api/avatar?user_id={sid}&size=small",
+                    "done": done,
+                    "required": req,
+                    "is_done": is_done,
+                }
+            )
+
+        total = len(result_students)
+        percent = int(round((completed / total) * 100)) if total else 0
+
+        return {
+            "assignment": {
+                "id": int(arow.get("id")),
+                "group_id": group_id,
+                "dictation_id": dictation_id,
+                "start_date": start_d.isoformat() if start_d else None,
+                "end_date": end_d.isoformat() if end_d else None,
+                "required_completions": req,
+                "group_title": arow.get("group_title"),
+                "dictation_title": arow.get("dictation_title"),
+                "dictation_language_code": arow.get("dictation_language_code"),
+                "dictation_level": arow.get("dictation_level"),
+            },
+            "summary": {
+                "students_total": total,
+                "students_completed": completed,
+                "percent_completed": percent,
+            },
+            "students": result_students,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def create_assignment_days(
     group_id: int,
     dictation_id: int,
