@@ -329,7 +329,7 @@ h2 {
     max-width: none;
     margin: 0;
     border-radius: 0;
-    padding: 20px;
+    padding: 20px 20px 35px 20px;
     background-color: var(--color-panel-bg);
     font-family: sans-serif;
     padding-left: 5vw;

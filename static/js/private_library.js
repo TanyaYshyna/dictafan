@@ -390,6 +390,209 @@ async function openStudentPlanPanel(dateIso = null) {
   await load();
 }
 
+function ensureTeacherAssignmentsPanel() {
+  let panel = document.getElementById('teacher-assignments-panel');
+  if (panel) return panel;
+
+  panel = document.createElement('div');
+  panel.id = 'teacher-assignments-panel';
+  panel.style.display = 'none';
+  panel.style.position = 'fixed';
+  panel.style.left = '0';
+  panel.style.top = '0';
+  panel.style.width = '100%';
+  panel.style.height = '100%';
+  panel.style.zIndex = '100000';
+  panel.style.background = 'rgba(0,0,0,0.35)';
+  panel.style.backdropFilter = 'blur(4px)';
+
+  panel.innerHTML = `
+    <div id="teacher-assignments-panel-drawer" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
+            <i data-lucide="hat-glasses"></i>
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:16px; line-height:1.1;">Задания</div>
+            <div style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;">Список заданий для выбранной группы</div>
+          </div>
+        </div>
+        <button type="button" id="teacher-assignments-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+          <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
+          <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
+        </div>
+        <button type="button" id="teacher-assignments-refresh" class="button-secondary" style="height:40px;">Обновить</button>
+      </div>
+
+      <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
+    </div>
+  `;
+
+  document.body.appendChild(panel);
+  return panel;
+}
+
+function _teacherAssignmentsRender(items) {
+  const list = document.getElementById('teacher-assignments-list');
+  if (!list) return;
+
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Заданий нет</div>';
+    return;
+  }
+
+  const blocks = rows.map(a => {
+    const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
+    const level = a && a.dictation_level ? String(a.dictation_level) : '—';
+    const start = a && a.start_date ? String(a.start_date) : '';
+    const end = a && a.end_date ? String(a.end_date) : '';
+    const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
+    const req = Number(a && a.required_completions ? a.required_completions : 1);
+    const isArchived = Boolean(a && a.archived_at);
+    const badgeBg = isArchived ? 'rgba(0,0,0,0.06)' : 'rgba(245,158,11,0.16)';
+    const badgeColor = isArchived ? 'rgba(0,0,0,0.6)' : '#92400e';
+
+    return `
+      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+          <div style="min-width:0;">
+            <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+            <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+          </div>
+          <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
+            <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${req}x</div>
+            ${isArchived ? '' : `<button type="button" class="button-secondary" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" style="height:34px; padding:0 12px;">Архивировать</button>`}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  list.innerHTML = blocks;
+
+  list.querySelectorAll('[data-action="teacher-archive-assignment"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-assignment-id');
+      if (!id) return;
+      btn.disabled = true;
+      try {
+        await apiRequest('/api/assignments/teacher/archive', {
+          method: 'POST',
+          body: JSON.stringify({ ids: [Number(id)] }),
+        });
+        try { showToast('Задание архивировано', { durationMs: 2000 }); } catch (e2) { }
+        await _teacherAssignmentsReload();
+      } catch (err) {
+        try { showToast('Не удалось архивировать', { durationMs: 2500 }); } catch (e2) { }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: list });
+    }
+  } catch (e) {
+  }
+}
+
+async function _teacherAssignmentsReload() {
+  const groupSelect = document.getElementById('teacher-assignments-group');
+  const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
+  const list = document.getElementById('teacher-assignments-list');
+  if (!groupId) {
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
+    return;
+  }
+  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+  try {
+    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}`, { method: 'GET' });
+    if (!res || !res.success) {
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+      return;
+    }
+    _teacherAssignmentsRender(res.assignments || []);
+  } catch (e) {
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+  }
+}
+
+async function openTeacherAssignmentsPanel() {
+  const panel = ensureTeacherAssignmentsPanel();
+  const closeBtn = document.getElementById('teacher-assignments-close');
+  const refreshBtn = document.getElementById('teacher-assignments-refresh');
+  const groupSelect = document.getElementById('teacher-assignments-group');
+  const list = document.getElementById('teacher-assignments-list');
+
+  const close = () => {
+    try { panel.style.display = 'none'; } catch (e) { }
+  };
+
+  panel.onclick = (e) => {
+    if (e.target === panel) close();
+  };
+  if (closeBtn) closeBtn.onclick = () => close();
+
+  if (groupSelect) {
+    groupSelect.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '— выбери группу —';
+    groupSelect.appendChild(opt);
+  }
+  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+
+  try {
+    const groups = await loadMyGroupsForAssignmentModal();
+    if (groupSelect) {
+      groups.forEach(g => {
+        const o = document.createElement('option');
+        o.value = String(g.id);
+        o.textContent = String(g.title || `Группа ${g.id}`);
+        groupSelect.appendChild(o);
+      });
+      if (groups.length === 1) {
+        groupSelect.value = String(groups[0].id);
+      }
+    }
+  } catch (e) {
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить группы</div>';
+  }
+
+  if (groupSelect) {
+    groupSelect.onchange = () => {
+      _teacherAssignmentsReload().catch(() => { });
+    };
+  }
+  if (refreshBtn) {
+    refreshBtn.onclick = () => {
+      _teacherAssignmentsReload().catch(() => { });
+    };
+  }
+
+  panel.style.display = 'block';
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: panel });
+    }
+  } catch (e) {
+  }
+
+  await _teacherAssignmentsReload();
+}
+
 function renderCreateAssignmentDaysTable(modal) {
   const table = document.getElementById('create-assignment-days-table');
   if (!table) return;
@@ -4247,6 +4450,13 @@ function installEventHandlers() {
   if (studentPlanBtn) {
     studentPlanBtn.addEventListener('click', () => {
       openStudentPlanPanel().catch(() => { });
+    });
+  }
+
+  const teacherAssignmentsBtn = document.getElementById('btnTeacherAssignments');
+  if (teacherAssignmentsBtn) {
+    teacherAssignmentsBtn.addEventListener('click', () => {
+      openTeacherAssignmentsPanel().catch(() => { });
     });
   }
 

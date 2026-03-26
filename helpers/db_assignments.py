@@ -184,8 +184,14 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             f"""
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
                    a.start_date, a.end_date, a.required_completions,
-                   a.created_at, a.updated_at, a.archived_at
+                   a.created_at, a.updated_at, a.archived_at,
+                   g.title AS group_title,
+                   d.title AS dictation_title,
+                   d.language_code AS dictation_language_code,
+                   d.level AS dictation_level
             FROM assignments a
+            JOIN groups g ON g.id = a.group_id
+            JOIN dictations d ON d.id = a.dictation_id
             WHERE a.group_id = %s
               {archived_filter}
             ORDER BY a.start_date DESC, a.id DESC
@@ -193,7 +199,16 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             (group_id,),
         )
         rows = cur.fetchall() or []
-        return [_row_to_assignment(r) for r in rows]
+
+        result: list[dict] = []
+        for r in rows:
+            a = _row_to_assignment(r)
+            a["group_title"] = r.get("group_title")
+            a["dictation_title"] = r.get("dictation_title")
+            a["dictation_language_code"] = r.get("dictation_language_code")
+            a["dictation_level"] = r.get("dictation_level")
+            result.append(a)
+        return result
     finally:
         cur.close()
         conn.close()

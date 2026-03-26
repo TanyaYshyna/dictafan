@@ -143,8 +143,8 @@
   min-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
-  padding-left: clamp(16px, 3vw, 32px);
-  padding-right: clamp(16px, 3vw, 32px);
+  padding-left: clamp(16px, 3vw, 20px);
+  padding-right: clamp(16px, 3vw, 20px);
 }
 
 .page-index .desk-zone {
