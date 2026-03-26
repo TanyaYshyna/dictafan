@@ -29,6 +29,7 @@ from helpers.db_users import (
     verify_user_password,
     update_user,
 )
+from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
 from helpers.b2_storage import b2_storage
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
@@ -434,6 +435,13 @@ def api_update_profile():
             'streak_days': updated_user['streak_days'],
             'role': updated_user['role'],
         }
+
+        if 'telegram_chat_id' in updated_user:
+            user_response['telegram_chat_id'] = updated_user.get('telegram_chat_id')
+        if 'telegram_enabled' in updated_user:
+            user_response['telegram_enabled'] = bool(updated_user.get('telegram_enabled'))
+        if 'telegram_link_code' in updated_user:
+            user_response['telegram_link_code'] = updated_user.get('telegram_link_code')
         
         # Добавляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
         if 'settings_json' in updated_user:
@@ -451,6 +459,40 @@ def api_update_profile():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/link_code', methods=['POST'])
+@jwt_required()
+def api_telegram_link_code():
+    """Сгенерировать код привязки Telegram (для команды /start <code>)."""
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    try:
+        code = generate_and_store_telegram_link_code(int(user_db['id']))
+        return jsonify({'success': True, 'code': code})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/enabled', methods=['POST'])
+@jwt_required()
+def api_telegram_set_enabled():
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled'))
+
+    try:
+        set_user_telegram_enabled(int(user_db['id']), enabled)
+        return jsonify({'success': True, 'enabled': enabled})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @user_bp.route('/api/avatar', methods=['POST'])

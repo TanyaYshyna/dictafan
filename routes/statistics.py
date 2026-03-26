@@ -12,6 +12,8 @@ from helpers.db_users import get_user_by_email, update_user
 from helpers.db_history import (
     add_activity, add_success, get_success_count, get_success_counts_for_dictations,
 )
+from helpers.db_telegram import list_teacher_chat_ids_for_student_success, get_student_and_dictation_info
+from helpers.telegram import is_telegram_enabled, send_telegram_message
 
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
@@ -312,6 +314,40 @@ def save_success():
         
         # Сохраняем успех в БД (каждое завершение - отдельная запись)
         success = add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total, error_count)
+
+        # Telegram уведомление учителю (MVP): только если есть активное задание и включены уведомления
+        try:
+            if is_telegram_enabled():
+                dictation_int = None
+                if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
+                    dictation_int = int(dictation_id.replace('dict_', ''))
+                else:
+                    dictation_int = int(dictation_id)
+
+                success_date_iso = datetime.now().date().isoformat()
+                teacher_chat_ids = list_teacher_chat_ids_for_student_success(
+                    student_user_id=user_id,
+                    dictation_id=dictation_int,
+                    success_date_iso=success_date_iso,
+                )
+
+                if teacher_chat_ids:
+                    info = get_student_and_dictation_info(user_id, dictation_int)
+                    student_username = info.get('student_username') or 'Ученик'
+                    dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
+                    dictation_level = info.get('dictation_level') or '—'
+                    text = (
+                        f"✅ <b>{student_username}</b> выполнил(а) задание\n"
+                        f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
+                        f"Дата: {success_date_iso}"
+                    )
+                    for cid in teacher_chat_ids:
+                        try:
+                            send_telegram_message(cid, text)
+                        except Exception:
+                            pass
+        except Exception:
+            pass
         
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
         

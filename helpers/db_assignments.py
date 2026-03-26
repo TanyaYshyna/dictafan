@@ -113,6 +113,38 @@ def create_assignment_period(
         conn.close()
 
 
+def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
+    if not ids:
+        return 0
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            UPDATE assignments a
+            SET archived_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE a.id = ANY(%s)
+              AND a.archived_at IS NOT NULL
+              AND EXISTS (
+                SELECT 1
+                FROM group_teachers gt
+                JOIN groups g ON g.id = gt.group_id
+                WHERE gt.group_id = a.group_id
+                  AND gt.teacher_user_id = %s
+                  AND g.archived_at IS NULL
+              )
+            """,
+            (ids, teacher_user_id),
+        )
+        updated = cur.rowcount
+        conn.commit()
+        return int(updated or 0)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
     conn, cur = get_db_cursor()
     try:
@@ -307,7 +339,8 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
-                   d.level AS dictation_level
+                   d.level AS dictation_level,
+                   d.sentences_count AS dictation_sentences_count
             FROM assignments a
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
@@ -326,6 +359,15 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             a["dictation_title"] = r.get("dictation_title")
             a["dictation_language_code"] = r.get("dictation_language_code")
             a["dictation_level"] = r.get("dictation_level")
+            a["dictation_sentences_count"] = int(r.get("dictation_sentences_count") or 0)
+
+            try:
+                from routes.index import get_cover_url_for_id
+
+                lang = a.get("dictation_language_code")
+                a["dictation_cover_url"] = get_cover_url_for_id(f"dict_{a.get('dictation_id')}", lang)
+            except Exception:
+                a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
             result.append(a)
         return result
     finally:

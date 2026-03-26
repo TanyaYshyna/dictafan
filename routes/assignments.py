@@ -11,6 +11,7 @@ from helpers.db_assignments import (
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
+    unarchive_assignments,
 )
 
 
@@ -114,6 +115,32 @@ def api_teacher_archive_assignments():
         return jsonify({"success": True, "archived": updated})
     except Exception as exc:
         logger.error("Ошибка архивирования заданий: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@assignments_bp.route("/teacher/unarchive", methods=["POST"])
+@jwt_required()
+def api_teacher_unarchive_assignments():
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    ids = data.get("ids") or data.get("assignment_ids") or []
+    if not isinstance(ids, list):
+        return jsonify({"success": False, "error": "ids must be list"}), 400
+
+    try:
+        ids_int = [int(x) for x in ids]
+    except Exception:
+        return jsonify({"success": False, "error": "ids must be int list"}), 400
+
+    try:
+        updated = unarchive_assignments(ids_int, user["id"])
+        return jsonify({"success": True, "unarchived": updated})
+    except Exception as exc:
+        logger.error("Ошибка разархивирования заданий: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

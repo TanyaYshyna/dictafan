@@ -182,6 +182,7 @@ from routes.library import library_bp
 from routes.desk import desk_bp
 from routes.groups import groups_bp
 from routes.assignments import assignments_bp
+from routes.telegram import telegram_bp
 
 app.register_blueprint(index_bp)
 app.register_blueprint(editor_bp)
@@ -192,6 +193,7 @@ app.register_blueprint(library_bp)
 app.register_blueprint(desk_bp)
 app.register_blueprint(groups_bp)
 app.register_blueprint(assignments_bp)
+app.register_blueprint(telegram_bp)
 
 
 @app.route('/favicon.ico')

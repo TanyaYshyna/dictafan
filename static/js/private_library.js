@@ -542,14 +542,20 @@ function ensureTeacherAssignmentsPanel() {
         </button>
       </div>
 
-      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-          <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
-          <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
+      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+            <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
+            <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
+          </div>
+          <button type="button" id="teacher-assignments-refresh" class="topbar-icon-btn" title="Обновить" style="width:40px; height:40px;">
+            <i data-lucide="refresh-cw"></i>
+          </button>
         </div>
-        <button type="button" id="teacher-assignments-refresh" class="topbar-icon-btn" title="Обновить" style="width:40px; height:40px;">
-          <i data-lucide="refresh-cw"></i>
-        </button>
+        <label style="display:flex; align-items:center; gap:10px; font-size:12px; color: rgba(0,0,0,0.65); user-select:none;">
+          <input id="teacher-assignments-include-archived" type="checkbox" />
+          <span>Показать архив</span>
+        </label>
       </div>
 
       <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
@@ -573,6 +579,8 @@ function _teacherAssignmentsRender(items) {
   const blocks = rows.map(a => {
     const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
     const level = a && a.dictation_level ? String(a.dictation_level) : '—';
+    const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
+    const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
     const start = a && a.start_date ? String(a.start_date) : '';
     const end = a && a.end_date ? String(a.end_date) : '';
     const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
@@ -582,6 +590,10 @@ function _teacherAssignmentsRender(items) {
     const badgeBg = isArchived ? 'rgba(0,0,0,0.06)' : 'rgba(245,158,11,0.16)';
     const badgeColor = isArchived ? 'rgba(0,0,0,0.6)' : '#92400e';
 
+    const coverStyle = coverUrl
+      ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
+      : '';
+
     const leftBadge = (pct == null)
       ? ''
       : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
@@ -589,9 +601,12 @@ function _teacherAssignmentsRender(items) {
     return `
       <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-          <div style="min-width:0;">
-            <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-            <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+          <div style="min-width:0; display:flex; gap:10px;">
+            <div style="width:44px; height:44px; border-radius:10px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+            <div style="min-width:0;">
+              <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentencesCount || 0))} предлож.</div>
+            </div>
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
@@ -599,7 +614,9 @@ function _teacherAssignmentsRender(items) {
             </button>
             ${leftBadge}
             <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
-            ${isArchived ? '' : `<button type="button" class="topbar-icon-btn" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Архивировать" style="width:34px; height:34px;"><i data-lucide="file-archive"></i></button>`}
+            ${isArchived
+              ? `<button type="button" class="topbar-icon-btn" data-action="teacher-unarchive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Вернуть из архива" style="width:34px; height:34px;"><i data-lucide="rotate-ccw"></i></button>`
+              : `<button type="button" class="topbar-icon-btn" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Архивировать" style="width:34px; height:34px;"><i data-lucide="file-archive"></i></button>`}
           </div>
         </div>
       </div>
@@ -630,6 +647,28 @@ function _teacherAssignmentsRender(items) {
     });
   });
 
+  list.querySelectorAll('[data-action="teacher-unarchive-assignment"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-assignment-id');
+      if (!id) return;
+      btn.disabled = true;
+      try {
+        await apiRequest('/api/assignments/teacher/unarchive', {
+          method: 'POST',
+          body: JSON.stringify({ ids: [Number(id)] }),
+        });
+        try { showToast('Задание возвращено', { durationMs: 2000 }); } catch (e2) { }
+        await _teacherAssignmentsReload();
+      } catch (err) {
+        try { showToast('Не удалось вернуть', { durationMs: 2500 }); } catch (e2) { }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
   try {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons({ root: list });
@@ -641,6 +680,8 @@ function _teacherAssignmentsRender(items) {
 async function _teacherAssignmentsReload() {
   const groupSelect = document.getElementById('teacher-assignments-group');
   const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
+  const includeArchivedEl = document.getElementById('teacher-assignments-include-archived');
+  const includeArchived = includeArchivedEl ? !!includeArchivedEl.checked : false;
   const list = document.getElementById('teacher-assignments-list');
   if (!groupId) {
     if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
@@ -648,7 +689,7 @@ async function _teacherAssignmentsReload() {
   }
   if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
   try {
-    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}`, { method: 'GET' });
+    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}?include_archived=${includeArchived ? '1' : '0'}`, { method: 'GET' });
     if (!res || !res.success) {
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
       return;
@@ -676,6 +717,7 @@ async function openTeacherAssignmentsPanel() {
   const closeBtn = document.getElementById('teacher-assignments-close');
   const refreshBtn = document.getElementById('teacher-assignments-refresh');
   const groupSelect = document.getElementById('teacher-assignments-group');
+  const includeArchivedEl = document.getElementById('teacher-assignments-include-archived');
   const list = document.getElementById('teacher-assignments-list');
 
   const close = () => {
@@ -720,6 +762,12 @@ async function openTeacherAssignmentsPanel() {
   }
   if (refreshBtn) {
     refreshBtn.onclick = () => {
+      _teacherAssignmentsReload().catch(() => { });
+    };
+  }
+
+  if (includeArchivedEl) {
+    includeArchivedEl.onchange = () => {
       _teacherAssignmentsReload().catch(() => { });
     };
   }

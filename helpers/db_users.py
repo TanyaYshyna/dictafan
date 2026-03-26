@@ -155,13 +155,22 @@ def get_user_by_email(email: str) -> Optional[dict]:
         cur.execute("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name='users' AND column_name IN ('settings_json', 'audio_settings_json')
+            WHERE table_name='users' AND column_name IN (
+                'settings_json',
+                'audio_settings_json',
+                'telegram_chat_id',
+                'telegram_enabled',
+                'telegram_link_code'
+            )
         """)
         # RealDictCursor возвращает словари, поэтому используем 'column_name' как ключ
         rows = cur.fetchall()
         columns = {row['column_name'] if isinstance(row, dict) else row[0] for row in rows}
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
+        has_telegram_chat_id = 'telegram_chat_id' in columns
+        has_telegram_enabled = 'telegram_enabled' in columns
+        has_telegram_link_code = 'telegram_link_code' in columns
         
         # Формируем список полей для SELECT
         select_fields = [
@@ -173,6 +182,12 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.settings_json")
         if has_audio_settings_json:
             select_fields.append("u.audio_settings_json")
+        if has_telegram_chat_id:
+            select_fields.append("u.telegram_chat_id")
+        if has_telegram_enabled:
+            select_fields.append("u.telegram_enabled")
+        if has_telegram_link_code:
+            select_fields.append("u.telegram_link_code")
         
         cur.execute(
             f"""
@@ -217,6 +232,13 @@ def get_user_by_email(email: str) -> Optional[dict]:
             result["settings_json"] = row.get("settings_json")
         elif has_audio_settings_json and "audio_settings_json" in row:
             result["audio_settings_json"] = row.get("audio_settings_json")
+
+        if has_telegram_chat_id and "telegram_chat_id" in row:
+            result["telegram_chat_id"] = row.get("telegram_chat_id")
+        if has_telegram_enabled and "telegram_enabled" in row:
+            result["telegram_enabled"] = bool(row.get("telegram_enabled"))
+        if has_telegram_link_code and "telegram_link_code" in row:
+            result["telegram_link_code"] = row.get("telegram_link_code")
         
         return result
     finally:

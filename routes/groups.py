@@ -18,6 +18,7 @@ from helpers.db_groups import (
     list_pending_email_invites_for_student,
     list_group_students_for_teacher,
     list_my_groups,
+    set_group_student_notify_teacher_on_success,
     soft_remove_group_student,
     update_group,
 )
@@ -303,4 +304,30 @@ def api_remove_group_student(group_id: int, student_user_id: int):
         return jsonify({"success": False, "error": "Forbidden"}), 403
     except Exception as exc:
         logger.error("Ошибка удаления ученика %s из группы %s: %s", student_user_id, group_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/group/<int:group_id>/students/<int:student_user_id>/notify_teacher_on_success", methods=["POST"])
+@jwt_required()
+def api_set_student_notify_teacher_on_success(group_id: int, student_user_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get("enabled"))
+
+    try:
+        set_group_student_notify_teacher_on_success(group_id, user["id"], student_user_id, enabled)
+        return jsonify({"success": True, "enabled": enabled})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except Exception as exc:
+        logger.error(
+            "Ошибка обновления notify_teacher_on_success для ученика %s в группе %s: %s",
+            student_user_id,
+            group_id,
+            exc,
+        )
         return jsonify({"success": False, "error": str(exc)}), 500

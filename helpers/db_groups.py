@@ -684,6 +684,18 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
 
         cur.execute(
             """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='group_students'
+              AND column_name IN ('notify_teacher_on_success')
+            """
+        )
+        cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in (cur.fetchall() or [])}
+        has_notify = 'notify_teacher_on_success' in cols
+
+        extra_select = ", gs.notify_teacher_on_success" if has_notify else ""
+        cur.execute(
+            f"""
             SELECT
                 u.id AS user_id,
                 u.username,
@@ -691,6 +703,7 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
                 gs.status,
                 gs.joined_at,
                 gs.removed_at
+                {extra_select}
             FROM group_students gs
             JOIN users u ON u.id = gs.student_user_id
             WHERE gs.group_id = %s
@@ -710,9 +723,55 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
                     "status": r.get("status"),
                     "joined_at": r.get("joined_at").isoformat() if r.get("joined_at") else None,
                     "removed_at": r.get("removed_at").isoformat() if r.get("removed_at") else None,
+                    "notify_teacher_on_success": bool(r.get("notify_teacher_on_success")) if has_notify else True,
                 }
             )
         return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def set_group_student_notify_teacher_on_success(
+    group_id: int,
+    teacher_user_id: int,
+    student_user_id: int,
+    enabled: bool,
+) -> None:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM group_teachers
+            WHERE group_id = %s AND teacher_user_id = %s
+            """,
+            (group_id, teacher_user_id),
+        )
+        if not cur.fetchone():
+            raise PermissionError("Not a group teacher")
+
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='group_students'
+              AND column_name='notify_teacher_on_success'
+            """,
+        )
+        if not cur.fetchone():
+            raise RuntimeError("DB schema mismatch: group_students.notify_teacher_on_success is missing")
+
+        cur.execute(
+            """
+            UPDATE group_students
+            SET notify_teacher_on_success = %s
+            WHERE group_id = %s AND student_user_id = %s
+              AND removed_at IS NULL
+            """,
+            (bool(enabled), group_id, student_user_id),
+        )
+        conn.commit()
     finally:
         cur.close()
         conn.close()
