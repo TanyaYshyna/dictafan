@@ -140,6 +140,38 @@
 
         <div class="form-section">
             <h3 class="profile-section-header">
+                Telegram
+                <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#telegramSection" aria-label="Свернуть/развернуть">
+                    <i data-lucide="chevrons-down"></i>
+                </button>
+            </h3>
+            <div id="telegramSection" class="profile-panel" style="display: none;">
+                <div class="panel-content">
+                    <div class="form-row">
+                        <label>Статус</label>
+                        <div id="telegramStatusText" style="padding: 10px 0;">—</div>
+                    </div>
+                    <div class="form-row" style="display: flex; align-items: center; gap: 12px;">
+                        <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
+                            <i data-lucide="key"></i>
+                            Получить код
+                        </button>
+                        <input type="text" id="telegramLinkCodeInput" readonly placeholder="код" style="flex: 1;">
+                        <button type="button" id="telegramCopyStartCmdBtn" class="topbar-icon-btn" title="Скопировать /start <code>">
+                            <i data-lucide="copy"></i>
+                        </button>
+                    </div>
+                    <div class="form-row">
+                        <label for="telegramEnabledToggle">Включить уведомления</label>
+                        <input type="checkbox" id="telegramEnabledToggle">
+                    </div>
+                    <div id="telegramHelpText" style="color: #666; font-size: 12px; line-height: 1.4; margin-top: 6px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3 class="profile-section-header">
                 Группы
                 <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#groupsSection" aria-label="Свернуть/развернуть">
                     <i data-lucide="chevrons-down"></i>

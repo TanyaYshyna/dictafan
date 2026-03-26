@@ -349,6 +349,126 @@ function avatarUrlForUser(userId) {
     return `/user/api/avatar?user_id=${encodeURIComponent(String(userId))}&size=small`;
 }
 
+async function telegramApiRequest(path, options = {}) {
+    const headers = Object.assign({}, options.headers || {});
+    headers['Content-Type'] = headers['Content-Type'] || 'application/json';
+    if (UM && UM.token) {
+        headers['Authorization'] = `Bearer ${UM.token}`;
+    }
+
+    const res = await fetch(path, {
+        method: options.method || 'GET',
+        headers,
+        body: options.body,
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        const msg = data && (data.error || data.message) ? (data.error || data.message) : `HTTP ${res.status}`;
+        throw new Error(msg);
+    }
+    return data;
+}
+
+function renderTelegramSection() {
+    const statusEl = document.getElementById('telegramStatusText');
+    const helpEl = document.getElementById('telegramHelpText');
+    const codeInput = document.getElementById('telegramLinkCodeInput');
+    const enabledToggle = document.getElementById('telegramEnabledToggle');
+    const getCodeBtn = document.getElementById('telegramGetCodeBtn');
+    const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
+
+    if (!statusEl || !helpEl || !codeInput || !enabledToggle || !getCodeBtn || !copyBtn) return;
+
+    const user = (UM && UM.userData) ? UM.userData : {};
+    const chatId = user.telegram_chat_id;
+    const enabled = Boolean(user.telegram_enabled);
+    const linked = Boolean(chatId);
+
+    statusEl.textContent = linked ? `Привязан (chat_id: ${chatId})` : 'Не привязан';
+    enabledToggle.checked = enabled;
+
+    const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
+    codeInput.value = codeVal;
+
+    if (linked) {
+        helpEl.textContent = 'Telegram уже привязан. Если нужно привязать другой аккаунт — нажми «Получить код» и отправь /start <код> боту.';
+    } else {
+        helpEl.textContent = 'Нажми «Получить код», затем отправь команду /start <код> в чат с ботом Telegram.';
+    }
+
+    try {
+        getCodeBtn.disabled = false;
+        copyBtn.disabled = !codeInput.value;
+    } catch (e) {
+    }
+
+    getCodeBtn.onclick = async () => {
+        try {
+            getCodeBtn.disabled = true;
+            const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
+            if (!data || !data.success || !data.code) {
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+            }
+            codeInput.value = String(data.code);
+            if (UM && UM.userData) {
+                UM.userData.telegram_link_code = String(data.code);
+            }
+            copyBtn.disabled = false;
+            showSuccess('Код получен');
+        } catch (e) {
+            showError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            getCodeBtn.disabled = false;
+        }
+    };
+
+    copyBtn.onclick = async () => {
+        const code = String(codeInput.value || '').trim();
+        if (!code) {
+            showInfo('Сначала получи код');
+            return;
+        }
+        const cmd = `/start ${code}`;
+        try {
+            await navigator.clipboard.writeText(cmd);
+            showSuccess('Скопировано');
+        } catch (e) {
+            showInfo(cmd);
+        }
+    };
+
+    enabledToggle.onchange = async () => {
+        const next = Boolean(enabledToggle.checked);
+        try {
+            enabledToggle.disabled = true;
+            const data = await telegramApiRequest('/user/api/telegram/enabled', {
+                method: 'POST',
+                body: JSON.stringify({ enabled: next }),
+            });
+            if (!data || !data.success) {
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+            }
+            if (UM && UM.userData) {
+                UM.userData.telegram_enabled = Boolean(data.enabled);
+            }
+            showSuccess('Сохранено');
+        } catch (e) {
+            enabledToggle.checked = !next;
+            showError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            enabledToggle.disabled = false;
+        }
+    };
+
+    try {
+        if (window.lucide) {
+            window.lucide.createIcons({ root: document.getElementById('telegramSection') });
+        }
+    } catch (e) {
+    }
+}
+
 function renderStudentsTable(students) {
     const table = document.getElementById('groupsStudentsTable');
     if (!table) return;
@@ -400,9 +520,59 @@ function renderStudentsTable(students) {
         const st = String(s.status || '').toLowerCase();
         status.textContent = st === 'active' ? 'подтвердил' : 'не подтвердил';
 
+        const notifyWrap = document.createElement('div');
+        notifyWrap.className = 'groups-student-status';
+        notifyWrap.style.display = 'flex';
+        notifyWrap.style.alignItems = 'center';
+        notifyWrap.style.justifyContent = 'flex-end';
+        notifyWrap.style.gap = '8px';
+
+        const notifyLabel = document.createElement('span');
+        notifyLabel.textContent = 'TG';
+        notifyLabel.style.fontSize = '12px';
+        notifyLabel.style.color = '#666';
+
+        const notifyToggle = document.createElement('input');
+        notifyToggle.type = 'checkbox';
+        notifyToggle.title = 'Уведомлять учителя о выполнении этим учеником';
+        notifyToggle.checked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
+        notifyToggle.disabled = isEmailInviteRow;
+        notifyToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        notifyToggle.addEventListener('change', async () => {
+            if (isEmailInviteRow) return;
+            const g = getSelectedGroup();
+            if (!g) return;
+            const next = Boolean(notifyToggle.checked);
+            try {
+                notifyToggle.disabled = true;
+                await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
+                    method: 'POST',
+                    body: JSON.stringify({ enabled: next }),
+                });
+                const cache = Array.isArray(groupsUiState._studentsCache) ? groupsUiState._studentsCache : [];
+                const idx = cache.findIndex((x) => String(x.id) === String(s.id));
+                if (idx >= 0) {
+                    cache[idx] = Object.assign({}, cache[idx], { notify_teacher_on_success: next });
+                }
+                groupsUiState._studentsCache = cache;
+                showSuccess('Сохранено');
+            } catch (e) {
+                notifyToggle.checked = !next;
+                showError(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                notifyToggle.disabled = false;
+            }
+        });
+
+        notifyWrap.appendChild(notifyLabel);
+        notifyWrap.appendChild(notifyToggle);
+
         row.appendChild(avatar);
         row.appendChild(name);
         row.appendChild(status);
+        row.appendChild(notifyWrap);
 
         row.addEventListener('click', () => {
             if (isEmailInviteRow) {
@@ -1155,6 +1325,7 @@ function loadUserData() {
     document.getElementById('username').value = originalData.username;
     document.getElementById('email').value = originalData.email;
     updateAvatarDisplay(originalData.avatar);
+    renderTelegramSection();
     setUnsavedState(false);
 }
 
