@@ -4,11 +4,35 @@ from typing import Optional
 from helpers.db import get_db_cursor
 
 
+def _ensure_users_telegram_columns(cur, required: list[str]) -> None:
+    if not required:
+        return
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='users'
+          AND column_name = ANY(%s)
+        """,
+        (required,),
+    )
+    rows = cur.fetchall() or []
+    cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+    missing = [c for c in required if c not in cols]
+    if missing:
+        raise RuntimeError(
+            "DB schema mismatch: missing users columns: "
+            + ", ".join(missing)
+            + ". Apply migrations/add_telegram_notifications.sql"
+        )
+
+
 def generate_and_store_telegram_link_code(user_id: int) -> str:
     code = secrets.token_urlsafe(16)
 
     conn, cur = get_db_cursor()
     try:
+        _ensure_users_telegram_columns(cur, ['telegram_link_code'])
         cur.execute(
             """
             UPDATE users
@@ -33,6 +57,7 @@ def link_telegram_chat_by_code(code: str, chat_id: int) -> Optional[int]:
 
     conn, cur = get_db_cursor()
     try:
+        _ensure_users_telegram_columns(cur, ['telegram_link_code', 'telegram_chat_id', 'telegram_enabled'])
         cur.execute(
             """
             SELECT id
@@ -68,6 +93,7 @@ def link_telegram_chat_by_code(code: str, chat_id: int) -> Optional[int]:
 def set_user_telegram_enabled(user_id: int, enabled: bool) -> None:
     conn, cur = get_db_cursor()
     try:
+        _ensure_users_telegram_columns(cur, ['telegram_enabled'])
         cur.execute(
             """
             UPDATE users
