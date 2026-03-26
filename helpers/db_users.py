@@ -160,7 +160,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
                 'audio_settings_json',
                 'telegram_chat_id',
                 'telegram_enabled',
-                'telegram_link_code'
+                'telegram_link_code',
+                'telegram_self_reports_enabled'
             )
         """)
         # RealDictCursor возвращает словари, поэтому используем 'column_name' как ключ
@@ -171,6 +172,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         has_telegram_chat_id = 'telegram_chat_id' in columns
         has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
+        has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
         
         # Формируем список полей для SELECT
         select_fields = [
@@ -188,6 +190,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.telegram_enabled")
         if has_telegram_link_code:
             select_fields.append("u.telegram_link_code")
+        if has_telegram_self_reports_enabled:
+            select_fields.append("u.telegram_self_reports_enabled")
         
         cur.execute(
             f"""
@@ -239,6 +243,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
             result["telegram_enabled"] = bool(row.get("telegram_enabled"))
         if has_telegram_link_code and "telegram_link_code" in row:
             result["telegram_link_code"] = row.get("telegram_link_code")
+        if has_telegram_self_reports_enabled and "telegram_self_reports_enabled" in row:
+            result["telegram_self_reports_enabled"] = bool(row.get("telegram_self_reports_enabled"))
         
         return result
     finally:
@@ -325,17 +331,22 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
             update_fields.append("streak_days = %s")
             update_values.append(updates['streak_days'])
         
-        # Проверяем наличие колонок settings_json и audio_settings_json
+        # Проверяем наличие колонок settings_json, audio_settings_json и telegram_self_reports_enabled
         cur.execute("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name='users' AND column_name IN ('settings_json', 'audio_settings_json')
+            WHERE table_name='users' AND column_name IN (
+                'settings_json',
+                'audio_settings_json',
+                'telegram_self_reports_enabled'
+            )
         """)
         # RealDictCursor возвращает словари, поэтому используем 'column_name' как ключ
         rows = cur.fetchall()
         columns = {row['column_name'] if isinstance(row, dict) else row[0] for row in rows}
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
+        has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
         
         # Обновляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
         if 'settings_json' in updates:
@@ -355,6 +366,16 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
                 "DB schema mismatch: column users.audio_settings_json is missing. "
                 "Apply migrations/add_audio_settings_json_to_users.sql (or add the column) to persist profile settings."
             )
+
+        if 'telegram_self_reports_enabled' in updates:
+            if has_telegram_self_reports_enabled:
+                update_fields.append("telegram_self_reports_enabled = %s")
+                update_values.append(bool(updates['telegram_self_reports_enabled']))
+            else:
+                raise RuntimeError(
+                    "DB schema mismatch: column users.telegram_self_reports_enabled is missing. "
+                    "Apply migrations/add_personal_groups_and_self_telegram_reports.sql"
+                )
         
         # Обновляем updated_at
         update_fields.append("updated_at = CURRENT_TIMESTAMP")

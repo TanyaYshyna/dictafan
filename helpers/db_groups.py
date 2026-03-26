@@ -6,6 +6,153 @@ from typing import Any, Optional
 from .db import get_db_cursor
 
 
+def _users_columns(cur, names: list[str]) -> set[str]:
+    if not names:
+        return set()
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='users'
+          AND column_name = ANY(%s)
+        """,
+        (names,),
+    )
+    rows = cur.fetchall() or []
+    return {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+
+
+def _groups_columns(cur, names: list[str]) -> set[str]:
+    if not names:
+        return set()
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='groups'
+          AND column_name = ANY(%s)
+        """,
+        (names,),
+    )
+    rows = cur.fetchall() or []
+    return {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+
+
+def _is_personal_group_row(row: dict) -> bool:
+    try:
+        return bool(row.get('is_personal'))
+    except Exception:
+        return False
+
+
+def ensure_personal_group_for_user(user_id: int, username: str) -> Optional[dict]:
+    """Create a personal group for user if schema supports it and it doesn't exist.
+
+    Returns created/exists group dict (same shape as list_my_groups items) or None if schema doesn't support.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+        if 'is_personal' not in gcols or 'personal_owner_user_id' not in gcols:
+            return None
+
+        cur.execute(
+            """
+            SELECT id, title, description, created_at, updated_at, archived_at, is_personal, personal_owner_user_id
+            FROM groups
+            WHERE is_personal = TRUE AND personal_owner_user_id = %s
+            LIMIT 1
+            """,
+            (int(user_id),),
+        )
+        row = cur.fetchone()
+        if not row:
+            cur.execute(
+                """
+                INSERT INTO groups (title, description, is_personal, personal_owner_user_id)
+                VALUES (%s, %s, TRUE, %s)
+                RETURNING id, title, description, created_at, updated_at, archived_at, is_personal, personal_owner_user_id
+                """,
+                (str(username or '').strip() or 'Мой план', 'Личный план', int(user_id)),
+            )
+            row = cur.fetchone() or {}
+
+        group_id = int(row.get('id'))
+        cur.execute(
+            """
+            INSERT INTO group_teachers (group_id, teacher_user_id, role)
+            VALUES (%s, %s, 'owner')
+            ON CONFLICT DO NOTHING
+            """,
+            (group_id, int(user_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO group_students (group_id, student_user_id, status)
+            VALUES (%s, %s, 'active')
+            ON CONFLICT (group_id, student_user_id)
+            DO UPDATE SET status='active', removed_at=NULL, joined_at=CURRENT_TIMESTAMP
+            """,
+            (group_id, int(user_id)),
+        )
+        # Force notify_teacher_on_success=false if column exists
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='group_students' AND column_name='notify_teacher_on_success'
+            """
+        )
+        if cur.fetchone():
+            cur.execute(
+                """
+                UPDATE group_students
+                SET notify_teacher_on_success = FALSE
+                WHERE group_id = %s AND student_user_id = %s
+                """,
+                (group_id, int(user_id)),
+            )
+
+        conn.commit()
+
+        return {
+            "id": row.get("id"),
+            "title": row.get("title"),
+            "description": row.get("description"),
+            "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
+            "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
+            "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
+            "teacher_role": "owner",
+            "students_count": 1,
+            "is_personal": True,
+            "personal_owner_user_id": int(user_id),
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _ensure_not_personal_group(cur, group_id: int, teacher_user_id: int) -> None:
+    gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+    if 'is_personal' not in gcols or 'personal_owner_user_id' not in gcols:
+        return
+    cur.execute(
+        """
+        SELECT is_personal, personal_owner_user_id
+        FROM groups
+        WHERE id = %s
+          AND EXISTS (
+            SELECT 1 FROM group_teachers gt
+            WHERE gt.group_id = groups.id AND gt.teacher_user_id = %s
+          )
+        """,
+        (int(group_id), int(teacher_user_id)),
+    )
+    row = cur.fetchone() or {}
+    if row and _is_personal_group_row(row):
+        raise PermissionError('Personal group is read-only')
+
+
 def create_group(owner_user_id: int, title: str, description: str | None = None) -> dict:
     conn, cur = get_db_cursor()
     try:
@@ -99,6 +246,7 @@ def list_pending_email_invites_for_teacher(group_id: int, teacher_user_id: int) 
 def create_group_email_invite(group_id: int, teacher_user_id: int, *, target_email: str) -> dict:
     conn, cur = get_db_cursor()
     try:
+        _ensure_not_personal_group(cur, group_id, teacher_user_id)
         cur.execute(
             """
             SELECT 1
@@ -329,6 +477,13 @@ def decline_email_invite(invite_id: int, student_user_id: int, student_email: st
 def list_my_groups(user_id: int) -> list[dict]:
     conn, cur = get_db_cursor()
     try:
+        gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+        extra_select = ""
+        if 'is_personal' in gcols:
+            extra_select += ", g.is_personal"
+        if 'personal_owner_user_id' in gcols:
+            extra_select += ", g.personal_owner_user_id"
+
         cur.execute(
             """
             SELECT
@@ -346,11 +501,12 @@ def list_my_groups(user_id: int) -> list[dict]:
                       AND gs.status = 'active'
                       AND gs.removed_at IS NULL
                 ) AS students_count
+                {extra_select}
             FROM groups g
             JOIN group_teachers gt ON gt.group_id = g.id
             WHERE gt.teacher_user_id = %s
             ORDER BY g.archived_at NULLS FIRST, g.id DESC
-            """,
+            """.format(extra_select=extra_select),
             (user_id,),
         )
         rows = cur.fetchall() or []
@@ -366,6 +522,8 @@ def list_my_groups(user_id: int) -> list[dict]:
                     "archived_at": r.get("archived_at").isoformat() if r.get("archived_at") else None,
                     "teacher_role": r.get("teacher_role"),
                     "students_count": int(r.get("students_count") or 0),
+                    "is_personal": bool(r.get("is_personal")) if 'is_personal' in gcols else False,
+                    "personal_owner_user_id": int(r.get("personal_owner_user_id")) if ('personal_owner_user_id' in gcols and r.get('personal_owner_user_id') is not None) else None,
                 }
             )
         return result
@@ -377,13 +535,21 @@ def list_my_groups(user_id: int) -> list[dict]:
 def get_group_for_teacher(group_id: int, teacher_user_id: int) -> Optional[dict]:
     conn, cur = get_db_cursor()
     try:
+        gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+        extra_select = ""
+        if 'is_personal' in gcols:
+            extra_select += ", g.is_personal"
+        if 'personal_owner_user_id' in gcols:
+            extra_select += ", g.personal_owner_user_id"
+
         cur.execute(
             """
             SELECT g.id, g.title, g.description, g.created_at, g.updated_at, g.archived_at, gt.role AS teacher_role
+                   {extra_select}
             FROM groups g
             JOIN group_teachers gt ON gt.group_id = g.id
             WHERE g.id = %s AND gt.teacher_user_id = %s
-            """,
+            """.format(extra_select=extra_select),
             (group_id, teacher_user_id),
         )
         row = cur.fetchone()
@@ -397,6 +563,8 @@ def get_group_for_teacher(group_id: int, teacher_user_id: int) -> Optional[dict]
             "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
             "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
             "teacher_role": row.get("teacher_role"),
+            "is_personal": bool(row.get('is_personal')) if 'is_personal' in gcols else False,
+            "personal_owner_user_id": int(row.get('personal_owner_user_id')) if ('personal_owner_user_id' in gcols and row.get('personal_owner_user_id') is not None) else None,
         }
     finally:
         cur.close()
@@ -451,6 +619,7 @@ def update_group(group_id: int, teacher_user_id: int, updates: dict[str, Any]) -
 def create_group_invite(group_id: int, teacher_user_id: int, *, max_uses: int | None = None, expires_at: Any | None = None) -> dict:
     conn, cur = get_db_cursor()
     try:
+        _ensure_not_personal_group(cur, group_id, teacher_user_id)
         cur.execute(
             """
             SELECT 1
@@ -501,6 +670,7 @@ def create_group_invite(group_id: int, teacher_user_id: int, *, max_uses: int | 
 def get_latest_active_group_invite(group_id: int, teacher_user_id: int) -> Optional[dict]:
     conn, cur = get_db_cursor()
     try:
+        _ensure_not_personal_group(cur, group_id, teacher_user_id)
         cur.execute(
             """
             SELECT 1
@@ -740,6 +910,7 @@ def set_group_student_notify_teacher_on_success(
 ) -> None:
     conn, cur = get_db_cursor()
     try:
+        _ensure_not_personal_group(cur, group_id, teacher_user_id)
         cur.execute(
             """
             SELECT 1
@@ -780,6 +951,7 @@ def set_group_student_notify_teacher_on_success(
 def soft_remove_group_student(group_id: int, teacher_user_id: int, student_user_id: int) -> None:
     conn, cur = get_db_cursor()
     try:
+        _ensure_not_personal_group(cur, group_id, teacher_user_id)
         cur.execute(
             """
             SELECT 1

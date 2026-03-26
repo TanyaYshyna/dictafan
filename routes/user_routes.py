@@ -30,6 +30,7 @@ from helpers.db_users import (
     update_user,
 )
 from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
+from helpers.db_groups import ensure_personal_group_for_user
 from helpers.b2_storage import b2_storage
 
 user_bp = Blueprint('user', __name__, url_prefix='/user')
@@ -124,6 +125,11 @@ def api_register():
         return jsonify({'error': 'User already exists'}), 400
     except Exception as exc:
         return jsonify({'error': f'Failed to create user: {exc}'}), 500
+
+    try:
+        ensure_personal_group_for_user(int(user_response.get('id')), str(user_response.get('username') or ''))
+    except Exception:
+        pass
 
     # Создаем токен (identity = email, как и раньше)
     access_token = create_access_token(identity=email)
@@ -442,6 +448,8 @@ def api_update_profile():
             user_response['telegram_enabled'] = bool(updated_user.get('telegram_enabled'))
         if 'telegram_link_code' in updated_user:
             user_response['telegram_link_code'] = updated_user.get('telegram_link_code')
+        if 'telegram_self_reports_enabled' in updated_user:
+            user_response['telegram_self_reports_enabled'] = bool(updated_user.get('telegram_self_reports_enabled'))
         
         # Добавляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
         if 'settings_json' in updated_user:
@@ -459,6 +467,42 @@ def api_update_profile():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@user_bp.route('/api/profile', methods=['GET'])
+@jwt_required()
+def api_get_profile():
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'error': 'User not found'}), 404
+
+    user_response = {
+        'id': user_db['id'],
+        'username': user_db['username'],
+        'email': user_db['email'],
+        'native_language': user_db['native_language'],
+        'current_learning': user_db['current_learning'],
+        'learning_languages': user_db.get('learning_languages', []),
+        'streak_days': user_db['streak_days'],
+        'role': user_db['role'],
+    }
+
+    if 'telegram_chat_id' in user_db:
+        user_response['telegram_chat_id'] = user_db.get('telegram_chat_id')
+    if 'telegram_enabled' in user_db:
+        user_response['telegram_enabled'] = bool(user_db.get('telegram_enabled'))
+    if 'telegram_link_code' in user_db:
+        user_response['telegram_link_code'] = user_db.get('telegram_link_code')
+    if 'telegram_self_reports_enabled' in user_db:
+        user_response['telegram_self_reports_enabled'] = bool(user_db.get('telegram_self_reports_enabled'))
+
+    if 'settings_json' in user_db:
+        user_response['settings_json'] = user_db['settings_json']
+    elif 'audio_settings_json' in user_db:
+        user_response['audio_settings_json'] = user_db['audio_settings_json']
+
+    return jsonify({'user': user_response})
 
 
 @user_bp.route('/api/telegram/link_code', methods=['POST'])
@@ -491,6 +535,26 @@ def api_telegram_set_enabled():
     try:
         set_user_telegram_enabled(int(user_db['id']), enabled)
         return jsonify({'success': True, 'enabled': enabled})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/self_reports_enabled', methods=['POST'])
+@jwt_required()
+def api_telegram_set_self_reports_enabled():
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    enabled = bool(data.get('enabled'))
+
+    try:
+        updated = update_user(current_email, {'telegram_self_reports_enabled': enabled})
+        if not updated:
+            return jsonify({'success': False, 'error': 'Failed to update user'}), 500
+        return jsonify({'success': True, 'enabled': bool(updated.get('telegram_self_reports_enabled'))})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

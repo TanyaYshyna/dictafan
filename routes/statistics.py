@@ -348,6 +348,30 @@ def save_success():
                             pass
         except Exception:
             pass
+
+        # Telegram self-report студенту (если включено): при любом success
+        try:
+            if is_telegram_enabled():
+                if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')) and bool(user.get('telegram_self_reports_enabled')):
+                    dictation_int = None
+                    if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
+                        dictation_int = int(dictation_id.replace('dict_', ''))
+                    else:
+                        dictation_int = int(dictation_id)
+
+                    success_date_iso = datetime.now().date().isoformat()
+                    info = get_student_and_dictation_info(user_id, dictation_int)
+                    student_username = info.get('student_username') or 'Вы'
+                    dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
+                    dictation_level = info.get('dictation_level') or '—'
+                    text = (
+                        f"✅ <b>{student_username}</b>, вы успешно выполнили диктант\n"
+                        f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
+                        f"Дата: {success_date_iso}"
+                    )
+                    send_telegram_message(int(user.get('telegram_chat_id')), text)
+        except Exception:
+            pass
         
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
         

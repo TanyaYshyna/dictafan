@@ -375,26 +375,30 @@ function renderTelegramSection() {
     const helpEl = document.getElementById('telegramHelpText');
     const codeInput = document.getElementById('telegramLinkCodeInput');
     const enabledToggle = document.getElementById('telegramEnabledToggle');
+    const selfReportsToggle = document.getElementById('telegramSelfReportsEnabledToggle');
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
+    const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
 
-    if (!statusEl || !helpEl || !codeInput || !enabledToggle || !getCodeBtn || !copyBtn) return;
+    if (!statusEl || !helpEl || !codeInput || !enabledToggle || !selfReportsToggle || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
     const user = (UM && UM.userData) ? UM.userData : {};
     const chatId = user.telegram_chat_id;
     const enabled = Boolean(user.telegram_enabled);
+    const selfReportsEnabled = Boolean(user.telegram_self_reports_enabled);
     const linked = Boolean(chatId);
 
     statusEl.textContent = linked ? `Привязан (chat_id: ${chatId})` : 'Не привязан';
     enabledToggle.checked = enabled;
+    selfReportsToggle.checked = selfReportsEnabled;
 
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
 
     if (linked) {
-        helpEl.textContent = 'Telegram уже привязан. Если нужно привязать другой аккаунт — нажми «Получить код» и отправь /start <код> боту.';
+        helpEl.textContent = 'Telegram уже привязан. Чтобы привязать другой аккаунт: нажми «Получить код», затем отправь в Telegram команду из кнопки «Скопировать /start». (Важно: между /start и кодом есть пробел.)';
     } else {
-        helpEl.textContent = 'Нажми «Получить код», затем отправь команду /start <код> в чат с ботом Telegram.';
+        helpEl.textContent = 'Нажми «Получить код», затем отправь в Telegram команду из кнопки «Скопировать /start». (Важно: между /start и кодом есть пробел.)';
     }
 
     try {
@@ -420,6 +424,29 @@ function renderTelegramSection() {
             showError(e && e.message ? e.message : 'Ошибка');
         } finally {
             getCodeBtn.disabled = false;
+        }
+    };
+
+    refreshBtn.onclick = async () => {
+        try {
+            refreshBtn.disabled = true;
+            const data = await telegramApiRequest('/user/api/profile', { method: 'GET' });
+            const nextUser = data && data.user ? data.user : null;
+            if (!nextUser) {
+                throw new Error('Не удалось обновить профиль');
+            }
+            if (UM) {
+                UM.userData = Object.assign({}, UM.userData || {}, nextUser);
+                if (typeof UM._saveUserCache === 'function') {
+                    UM._saveUserCache(UM.userData);
+                }
+            }
+            renderTelegramSection();
+            showSuccess('Обновлено');
+        } catch (e) {
+            showError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            refreshBtn.disabled = false;
         }
     };
 
@@ -451,6 +478,9 @@ function renderTelegramSection() {
             }
             if (UM && UM.userData) {
                 UM.userData.telegram_enabled = Boolean(data.enabled);
+                if (typeof UM._saveUserCache === 'function') {
+                    UM._saveUserCache(UM.userData);
+                }
             }
             showSuccess('Сохранено');
         } catch (e) {
@@ -458,6 +488,32 @@ function renderTelegramSection() {
             showError(e && e.message ? e.message : 'Ошибка');
         } finally {
             enabledToggle.disabled = false;
+        }
+    };
+
+    selfReportsToggle.onchange = async () => {
+        const next = Boolean(selfReportsToggle.checked);
+        try {
+            selfReportsToggle.disabled = true;
+            const data = await telegramApiRequest('/user/api/telegram/self_reports_enabled', {
+                method: 'POST',
+                body: JSON.stringify({ enabled: next }),
+            });
+            if (!data || !data.success) {
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+            }
+            if (UM && UM.userData) {
+                UM.userData.telegram_self_reports_enabled = Boolean(data.enabled);
+                if (typeof UM._saveUserCache === 'function') {
+                    UM._saveUserCache(UM.userData);
+                }
+            }
+            showSuccess('Сохранено');
+        } catch (e) {
+            selfReportsToggle.checked = !next;
+            showError(e && e.message ? e.message : 'Ошибка');
+        } finally {
+            selfReportsToggle.disabled = false;
         }
     };
 

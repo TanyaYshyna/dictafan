@@ -157,13 +157,24 @@
                             Получить код
                         </button>
                         <input type="text" id="telegramLinkCodeInput" readonly placeholder="код" style="flex: 1;">
-                        <button type="button" id="telegramCopyStartCmdBtn" class="topbar-icon-btn" title="Скопировать /start <code>">
+                        <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="Скопировать команду для Telegram">
                             <i data-lucide="copy"></i>
+                            Скопировать /start
                         </button>
+                    </div>
+                    <div class="form-row" style="display: flex; align-items: center; gap: 12px;">
+                        <button type="button" id="telegramRefreshStatusBtn" class="topbar-icon-btn" title="Обновить статус">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                        <div style="color: #666; font-size: 12px;">После команды в Telegram нажми обновить, чтобы увидеть статус без перезагрузки страницы.</div>
                     </div>
                     <div class="form-row">
                         <label for="telegramEnabledToggle">Включить уведомления</label>
                         <input type="checkbox" id="telegramEnabledToggle">
+                    </div>
+                    <div class="form-row">
+                        <label for="telegramSelfReportsEnabledToggle">Присылать отчёты мне</label>
+                        <input type="checkbox" id="telegramSelfReportsEnabledToggle">
                     </div>
                     <div id="telegramHelpText" style="color: #666; font-size: 12px; line-height: 1.4; margin-top: 6px;"></div>
                 </div>
