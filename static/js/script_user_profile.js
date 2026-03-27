@@ -392,13 +392,13 @@ function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
     const helpEl = document.getElementById('telegramHelpText');
     const codeInput = document.getElementById('telegramLinkCodeInput');
-    const enabledToggle = document.getElementById('telegramEnabledToggle');
-    const selfReportsToggle = document.getElementById('telegramSelfReportsEnabledToggle');
+    const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
+    const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
 
-    if (!statusEl || !helpEl || !codeInput || !enabledToggle || !selfReportsToggle || !getCodeBtn || !copyBtn || !refreshBtn) return;
+    if (!statusEl || !helpEl || !codeInput || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
     const user = (UM && UM.userData) ? UM.userData : {};
     const chatId = user.telegram_chat_id;
@@ -407,8 +407,22 @@ function renderTelegramSection() {
     const linked = Boolean(chatId);
 
     statusEl.textContent = linked ? `Привязан (chat_id: ${chatId})` : 'Не привязан';
-    enabledToggle.checked = enabled;
-    selfReportsToggle.checked = selfReportsEnabled;
+
+    const _setBtnState = (btn, value) => {
+        if (!btn) return;
+        btn.dataset.checked = value ? '1' : '0';
+        btn.setAttribute('aria-pressed', value ? 'true' : 'false');
+        btn.innerHTML = `<i data-lucide="${value ? 'circle-check-big' : 'circle'}"></i>`;
+        try {
+            if (window.lucide) {
+                window.lucide.createIcons({ root: btn });
+            }
+        } catch (e) {
+        }
+    };
+
+    _setBtnState(enabledToggleBtn, enabled);
+    _setBtnState(selfReportsToggleBtn, selfReportsEnabled);
 
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
@@ -483,10 +497,10 @@ function renderTelegramSection() {
         }
     };
 
-    enabledToggle.onchange = async () => {
-        const next = Boolean(enabledToggle.checked);
+    enabledToggleBtn.onclick = async () => {
+        const next = !(enabledToggleBtn.dataset.checked === '1');
         try {
-            enabledToggle.disabled = true;
+            enabledToggleBtn.disabled = true;
             const data = await telegramApiRequest('/user/api/telegram/enabled', {
                 method: 'POST',
                 body: JSON.stringify({ enabled: next }),
@@ -500,19 +514,19 @@ function renderTelegramSection() {
                     UM._saveUserCache(UM.userData);
                 }
             }
+            _setBtnState(enabledToggleBtn, Boolean(data.enabled));
             showSuccess('Сохранено');
         } catch (e) {
-            enabledToggle.checked = !next;
             showError(e && e.message ? e.message : 'Ошибка');
         } finally {
-            enabledToggle.disabled = false;
+            enabledToggleBtn.disabled = false;
         }
     };
 
-    selfReportsToggle.onchange = async () => {
-        const next = Boolean(selfReportsToggle.checked);
+    selfReportsToggleBtn.onclick = async () => {
+        const next = !(selfReportsToggleBtn.dataset.checked === '1');
         try {
-            selfReportsToggle.disabled = true;
+            selfReportsToggleBtn.disabled = true;
             const data = await telegramApiRequest('/user/api/telegram/self_reports_enabled', {
                 method: 'POST',
                 body: JSON.stringify({ enabled: next }),
@@ -526,12 +540,12 @@ function renderTelegramSection() {
                     UM._saveUserCache(UM.userData);
                 }
             }
+            _setBtnState(selfReportsToggleBtn, Boolean(data.enabled));
             showSuccess('Сохранено');
         } catch (e) {
-            selfReportsToggle.checked = !next;
             showError(e && e.message ? e.message : 'Ошибка');
         } finally {
-            selfReportsToggle.disabled = false;
+            selfReportsToggleBtn.disabled = false;
         }
     };
 
@@ -592,7 +606,7 @@ function renderStudentsTable(students) {
         const status = document.createElement('div');
         status.className = 'groups-student-status';
         const st = String(s.status || '').toLowerCase();
-        status.textContent = st === 'active' ? 'подтвердил' : 'не подтвердил';
+        status.textContent = st === 'active' ? '' : 'не подтвердил';
 
         const notifyWrap = document.createElement('div');
         notifyWrap.className = 'groups-student-notify';

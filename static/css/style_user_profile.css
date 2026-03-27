@@ -189,14 +189,35 @@
     line-height: 1.2;
  }
 
- .form-row .telegram-toggle-checkbox {
+ .telegram-lucide-toggle {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 8px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text, #1f2933);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: none;
+    outline: none;
+ }
+
+ .telegram-lucide-toggle:focus {
+    outline: none;
+    box-shadow: none;
+ }
+
+ .telegram-lucide-toggle:disabled {
+    opacity: 0.4;
+    cursor: default;
+ }
+
+ .telegram-lucide-toggle i[data-lucide] {
     width: 18px;
     height: 18px;
-    padding: 0;
-    border-radius: 6px;
-    border: 1px solid var(--color-border-light, #ced4da);
-    accent-color: var(--color-button-yellow, #fbbf24);
-    background: #fff;
  }
 
 .form-row input {
@@ -210,8 +231,7 @@
 }
 
  .form-row input.telegram-toggle-checkbox {
-    width: 18px;
-    padding: 0;
+    display: none;
  }
 
 .form-row input[readonly] {
@@ -747,13 +767,20 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     height: 28px;
     padding: 0;
     border-radius: 8px;
-    border: 1px solid var(--color-border-light, #e9ecef);
-    background: #fff;
+    border: 0;
+    background: transparent;
     color: var(--color-text, #1f2933);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
+    box-shadow: none;
+    outline: none;
+ }
+
+ .groups-lucide-toggle:focus {
+    outline: none;
+    box-shadow: none;
  }
 
  .groups-lucide-toggle:disabled {
