@@ -633,6 +633,21 @@ button.audio-btn i[data-lucide] {
     flex-wrap: wrap;
 }
 
+ .start-modal-language-row #startModalLangPair {
+    position: relative;
+ }
+
+ .start-modal-language-row #startModalLangPair .flag-pair-side[data-side] {
+    cursor: pointer;
+ }
+
+ .start-modal-language-row #startModalLangPair .flag-pair-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 1100;
+ }
+
 .start-modal-language-row #startModalOriginalLanguage,
 .start-modal-language-row #startModalTranslationLanguage {
     display: flex;

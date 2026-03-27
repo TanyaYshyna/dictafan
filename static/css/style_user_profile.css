@@ -172,7 +172,7 @@
 
 .form-row label {
     font-weight: 600;
-    color: #495057;
+    color: var(--color-text, #1f2933);
 }
 
  .telegram-panels {
@@ -244,6 +244,18 @@
     margin-top: 10px;
  }
 
+ .telegram-link-controls input#telegramLinkCodeInput {
+    height: 44px;
+    padding: 10px 12px;
+    font-size: 16px;
+    box-sizing: border-box;
+    color: var(--color-text, #1f2933);
+ }
+
+ #telegramSection #telegramRefreshStatusBtn {
+    color: var(--color-text, #1f2933);
+ }
+
  @media (max-width: 900px) {
     .telegram-panels {
         grid-template-columns: 1fr;
@@ -303,7 +315,13 @@
     font-size: 20px;
     box-sizing: border-box;
     background: #fff;
+    color: var(--color-text, #1f2933);
 }
+
+ .form-row select,
+ .form-row textarea {
+    color: var(--color-text, #1f2933);
+ }
 
  .form-row input.telegram-toggle-checkbox {
     display: none;
@@ -898,6 +916,7 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    color: var(--color-text, #1f2933);
  }
 
  .form-section h3.profile-section-header .profile-section-toggle {
@@ -909,6 +928,7 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     height: 40px;
     padding: 0;
     flex: 0 0 auto;
+    color: var(--color-text, #1f2933);
  }
 
  .form-section h3.profile-section-header .profile-section-toggle i[data-lucide] {
@@ -916,21 +936,25 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     height: 20px;
  }
 
-.profile-header {
+ .profile-header {
     text-align: center;
     margin-bottom: 30px;
-}
+ }
 
-.profile-header h2 {
-    color: #333;
+ .profile-header h2 {
+    color: var(--color-text, #1f2933);
     font-size: 2em;
     margin: 0;
     display: inline-flex;
     align-items: center;
     gap: 8px;
-}
+ }
 
-.toast-notice.toast-with-icon {
+ #avatarUploadButton {
+    color: var(--color-text, #1f2933);
+ }
+
+ .toast-notice.toast-with-icon {
     display: flex;
     align-items: center;
     gap: 10px;

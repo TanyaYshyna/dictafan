@@ -8621,35 +8621,56 @@ function initStartModalLanguageSelector() {
                 const baseData = window.LanguageManager ? window.LanguageManager.getLanguageData() : null;
                 if (!baseData) return;
 
-                // Exclude original language from translation list; exclude translation from original list.
-                const rightList = Object.keys(baseData)
+                const allLangs = Object.keys(baseData)
                     .map(x => String(x || '').toLowerCase())
-                    .filter(Boolean)
-                    .filter(x => x !== leftDefault);
-                const leftList = Object.keys(baseData)
-                    .map(x => String(x || '').toLowerCase())
-                    .filter(Boolean)
-                    .filter(x => x !== rightDefault);
+                    .filter(Boolean);
+
+                // UX requirement:
+                // - clicking the LEFT flag allows choosing any language (no exclusions)
+                // - clicking the RIGHT flag allows choosing any language except the current original
+                const leftList = allLangs;
+                const rightList = allLangs.filter(x => x !== leftDefault);
 
                 container.innerHTML = '';
 
-                startModalLanguageSelector = window.initLanguageSelector('startModalLangPair', {
-                    mode: 'flag-pair-dropdown-both',
-                    currentLearning: leftDefault,
-                    nativeLanguage: rightDefault,
-                    learningLanguages: leftList,
-                    nativeLanguages: rightList,
-                    languageData: baseData,
-                    onLanguageChange: function (values) {
-                        try {
-                            const left = values && values.currentLearning ? String(values.currentLearning).toLowerCase() : '';
-                            const right = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
-                            if (left) currentDictation.language_original = left;
-                            if (right) currentDictation.language_translation = right;
-                        } catch (e) {
-                        }
+                const buildSelector = ({ left, right }) => {
+                    const leftCode = left ? String(left).toLowerCase() : '';
+                    const rightCode = right ? String(right).toLowerCase() : '';
+
+                    const nextLeft = leftCode || leftDefault;
+                    let nextRight = rightCode || rightDefault;
+                    if (nextRight === nextLeft) {
+                        nextRight = (allLangs.find(x => x !== nextLeft) || rightDefault || 'ru');
                     }
-                });
+
+                    container.innerHTML = '';
+                    startModalLanguageSelector = window.initLanguageSelector('startModalLangPair', {
+                        mode: 'flag-pair-dropdown-both',
+                        currentLearning: nextLeft,
+                        nativeLanguage: nextRight,
+                        learningLanguages: allLangs,
+                        nativeLanguages: allLangs.filter(x => x !== nextLeft),
+                        languageData: baseData,
+                        onLanguageChange: function (values) {
+                            try {
+                                const leftV = values && values.currentLearning ? String(values.currentLearning).toLowerCase() : '';
+                                const rightV = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
+                                if (leftV) currentDictation.language_original = leftV;
+                                if (rightV) currentDictation.language_translation = rightV;
+                            } catch (e) {
+                            }
+                            try {
+                                buildSelector({
+                                    left: values && values.currentLearning ? values.currentLearning : nextLeft,
+                                    right: values && values.nativeLanguage ? values.nativeLanguage : nextRight,
+                                });
+                            } catch (e2) {
+                            }
+                        }
+                    });
+                };
+
+                buildSelector({ left: leftDefault, right: rightDefault });
             } catch (e) {
             }
         };

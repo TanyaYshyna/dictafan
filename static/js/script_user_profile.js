@@ -225,6 +225,7 @@ function setSelectedGroup(groupId) {
 async function refreshInviteForSelectedGroup() {
     const g = getSelectedGroup();
     if (!g) return;
+    if (g.is_personal) return;
 
     try {
         const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite/latest`, { method: 'GET' });
@@ -461,7 +462,7 @@ function renderTelegramSection() {
     helpEl.innerHTML = `
         <div>${helpPrefix}</div>
         <div class="telegram-help-bullets">
-            <div>- нажми «Получить код»,</div>
+            <div>- <span class="telegram-inline-icon"><i data-lucide="key"></i></span> нажми «Получить код»,</div>
             <div>- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span></div>
         </div>
     `;
