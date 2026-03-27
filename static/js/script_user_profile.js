@@ -12,6 +12,24 @@ let profileTestIsRecording = false;
 let profileTestTimerId = null;
 let profileTestAutoStopId = null;
 
+function createLucideToggleButton({ checked, title, disabled }) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'groups-lucide-toggle';
+    btn.title = title || '';
+    btn.disabled = Boolean(disabled);
+    btn.dataset.checked = checked ? '1' : '0';
+    btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+    btn.innerHTML = `<i data-lucide="${checked ? 'check' : 'minus'}"></i>`;
+    try {
+        if (window.lucide) {
+            window.lucide.createIcons({ root: btn });
+        }
+    } catch (e) {
+    }
+    return btn;
+}
+
 async function swRequest(action, payload = {}) {
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
         throw new Error('Service Worker не активен');
@@ -577,36 +595,44 @@ function renderStudentsTable(students) {
         status.textContent = st === 'active' ? 'подтвердил' : 'не подтвердил';
 
         const notifyWrap = document.createElement('div');
-        notifyWrap.className = 'groups-student-status';
-        notifyWrap.style.display = 'flex';
-        notifyWrap.style.alignItems = 'center';
-        notifyWrap.style.justifyContent = 'flex-end';
-        notifyWrap.style.gap = '8px';
+        notifyWrap.className = 'groups-student-notify';
 
         const notifyLabel = document.createElement('span');
+        notifyLabel.className = 'groups-student-notify-label';
         notifyLabel.textContent = 'TG';
-        notifyLabel.style.fontSize = '12px';
-        notifyLabel.style.color = '#666';
 
-        const notifyToggle = document.createElement('input');
-        notifyToggle.type = 'checkbox';
-        notifyToggle.title = 'Уведомлять учителя о выполнении этим учеником';
-        notifyToggle.checked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
-        notifyToggle.disabled = isEmailInviteRow;
-        notifyToggle.addEventListener('click', (e) => {
+        const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
+        const notifyBtn = createLucideToggleButton({
+            checked: startChecked,
+            title: 'Уведомлять учителя о выполнении этим учеником',
+            disabled: isEmailInviteRow,
+        });
+        notifyBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
         });
-        notifyToggle.addEventListener('change', async () => {
+        notifyBtn.addEventListener('click', async () => {
             if (isEmailInviteRow) return;
             const g = getSelectedGroup();
             if (!g) return;
-            const next = Boolean(notifyToggle.checked);
+            const current = notifyBtn.dataset.checked === '1';
+            const next = !current;
             try {
-                notifyToggle.disabled = true;
+                notifyBtn.disabled = true;
                 await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
                     method: 'POST',
                     body: JSON.stringify({ enabled: next }),
                 });
+                notifyBtn.dataset.checked = next ? '1' : '0';
+                notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+                notifyBtn.innerHTML = `<i data-lucide="${next ? 'check' : 'minus'}"></i>`;
+                try {
+                    if (window.lucide) {
+                        window.lucide.createIcons({ root: notifyBtn });
+                    }
+                } catch (e) {
+                }
+
                 const cache = Array.isArray(groupsUiState._studentsCache) ? groupsUiState._studentsCache : [];
                 const idx = cache.findIndex((x) => String(x.id) === String(s.id));
                 if (idx >= 0) {
@@ -615,15 +641,14 @@ function renderStudentsTable(students) {
                 groupsUiState._studentsCache = cache;
                 showSuccess('Сохранено');
             } catch (e) {
-                notifyToggle.checked = !next;
                 showError(e && e.message ? e.message : 'Ошибка');
             } finally {
-                notifyToggle.disabled = false;
+                notifyBtn.disabled = false;
             }
         });
 
         notifyWrap.appendChild(notifyLabel);
-        notifyWrap.appendChild(notifyToggle);
+        notifyWrap.appendChild(notifyBtn);
 
         row.appendChild(avatar);
         row.appendChild(name);

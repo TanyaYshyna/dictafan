@@ -175,6 +175,30 @@
     color: #495057;
 }
 
+ .form-row.telegram-toggle-row {
+    display: block;
+ }
+
+ .form-row .telegram-toggle-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 400;
+    color: var(--color-text, #1f2933);
+    white-space: nowrap;
+    line-height: 1.2;
+ }
+
+ .form-row .telegram-toggle-checkbox {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border-radius: 6px;
+    border: 1px solid var(--color-border-light, #ced4da);
+    accent-color: var(--color-button-yellow, #fbbf24);
+    background: #fff;
+ }
+
 .form-row input {
     width: 100%;
     padding: 10px 12px;
@@ -184,6 +208,11 @@
     box-sizing: border-box;
     background: #fff;
 }
+
+ .form-row input.telegram-toggle-checkbox {
+    width: 18px;
+    padding: 0;
+ }
 
 .form-row input[readonly] {
     background: #f5f5f5;
@@ -671,7 +700,7 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
 
  .groups-students-table-row {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 160px;
+    grid-template-columns: 44px minmax(0, 1fr) 140px 70px;
     gap: 12px;
     padding: 10px 12px;
     align-items: center;
@@ -699,6 +728,42 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
  .groups-student-status {
     color: #666;
     text-align: right;
+ }
+
+ .groups-student-notify {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+ }
+
+ .groups-student-notify-label {
+    font-size: 12px;
+    color: #666;
+ }
+
+ .groups-lucide-toggle {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 8px;
+    border: 1px solid var(--color-border-light, #e9ecef);
+    background: #fff;
+    color: var(--color-text, #1f2933);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+ }
+
+ .groups-lucide-toggle:disabled {
+    opacity: 0.4;
+    cursor: default;
+ }
+
+ .groups-lucide-toggle i[data-lucide] {
+    width: 16px;
+    height: 16px;
  }
 
  .form-section h3.profile-section-header {

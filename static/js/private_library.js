@@ -271,6 +271,26 @@ function _teacherStudentsRender(data) {
   const summary = data && data.summary ? data.summary : {};
   const students = Array.isArray(data && data.students ? data.students : null) ? data.students : [];
 
+  let deadlineDate = null;
+  try {
+    const ed = assignment && assignment.end_date ? String(assignment.end_date) : '';
+    if (ed) {
+      const d = new Date(ed);
+      if (!isNaN(d.getTime())) {
+        d.setHours(0, 0, 0, 0);
+        deadlineDate = d;
+      }
+    }
+  } catch (e) {
+  }
+  let todayDate = null;
+  try {
+    const t = new Date();
+    t.setHours(0, 0, 0, 0);
+    todayDate = t;
+  } catch (e) {
+  }
+
   if (titleEl) titleEl.textContent = assignment && assignment.dictation_title ? String(assignment.dictation_title) : 'Ученики';
   if (subtitleEl) {
     const pct = typeof summary.percent_completed === 'number' ? summary.percent_completed : 0;
@@ -291,6 +311,12 @@ function _teacherStudentsRender(data) {
     const req = Number(s && typeof s.required !== 'undefined' ? s.required : 1);
     const isDone = Boolean(s && s.is_done);
     const avatarUrl = String(s && s.avatar_small_url ? s.avatar_small_url : '');
+    const isOverdue = Boolean(!isDone && deadlineDate && todayDate && todayDate.getTime() > deadlineDate.getTime());
+
+    const statusText = isDone ? 'выполнил' : (isOverdue ? 'просрочил' : 'не выполнил');
+    const statusBg = isDone ? 'rgba(34,197,94,0.14)' : (isOverdue ? 'rgba(239,68,68,0.14)' : 'rgba(0,0,0,0.06)');
+    const statusColor = isDone ? '#166534' : (isOverdue ? '#991b1b' : 'rgba(0,0,0,0.65)');
+
     const badgeBg = isDone ? 'rgba(34,197,94,0.14)' : 'rgba(0,0,0,0.06)';
     const badgeColor = isDone ? '#166534' : 'rgba(0,0,0,0.65)';
     const leftBg = avatarUrl ? `url(${escapeHtml(avatarUrl)})` : 'none';
@@ -303,7 +329,10 @@ function _teacherStudentsRender(data) {
             <div style="font-weight:650; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(username)}</div>
           </div>
         </div>
-        <div style="flex-shrink:0; padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${done}/${req}</div>
+        <div style="flex-shrink:0; display:flex; align-items:center; gap:8px;">
+          <div style="padding:6px 10px; border-radius:999px; background:${statusBg}; color:${statusColor}; font-weight:800; font-size:12px;">${escapeHtml(statusText)}</div>
+          <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${done}/${req}</div>
+        </div>
       </div>
     `;
   }).join('');
@@ -610,7 +639,7 @@ function _teacherAssignmentsRender(items) {
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
-              <i data-lucide="badge-check"></i>
+              <i data-lucide="user"></i>
             </button>
             ${leftBadge}
             <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
@@ -620,7 +649,7 @@ function _teacherAssignmentsRender(items) {
           </div>
         </div>
       </div>
-    `;
+    `
   }).join('');
 
   list.innerHTML = blocks;
@@ -663,6 +692,21 @@ function _teacherAssignmentsRender(items) {
         await _teacherAssignmentsReload();
       } catch (err) {
         try { showToast('Не удалось вернуть', { durationMs: 2500 }); } catch (e2) { }
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  list.querySelectorAll('[data-action="teacher-view-assignment-students"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-assignment-id');
+      if (!id) return;
+      btn.disabled = true;
+      try {
+        await openTeacherAssignmentStudentsModal(id);
       } finally {
         btn.disabled = false;
       }

@@ -9103,6 +9103,8 @@ async function registerCompletedDictation() {
             const totalPerfect = s.number_of_perfect || 0;
             const totalCorrected = s.number_of_corrected || 0;
             const totalAudio = Number(s.number_of_audio) || 0;
+            const totalAttempts = Number(s.attempts_total) || 0;
+            const totalErrors = Number(s.error_count) || 0;
 
             if (totalPerfect > 0 || totalCorrected > 0 || totalAudio > 0) {
                 sentences_data.push({
@@ -9110,6 +9112,8 @@ async function registerCompletedDictation() {
                     perfect_count: totalPerfect,
                     corrected_count: totalCorrected,
                     audio_count: totalAudio,
+                    attempts_total: totalAttempts,
+                    error_count: totalErrors,
                     selection_state: s.selection_state || 'unchecked'
                 });
             }

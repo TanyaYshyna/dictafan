@@ -168,13 +168,17 @@
                         </button>
                         <div style="color: #666; font-size: 12px;">После команды в Telegram нажми обновить, чтобы увидеть статус без перезагрузки страницы.</div>
                     </div>
-                    <div class="form-row">
-                        <label for="telegramEnabledToggle">Включить уведомления</label>
-                        <input type="checkbox" id="telegramEnabledToggle">
+                    <div class="form-row telegram-toggle-row">
+                        <label for="telegramEnabledToggle" class="telegram-toggle-label">
+                            <input type="checkbox" id="telegramEnabledToggle" class="telegram-toggle-checkbox">
+                            получать уведомленя от учеников в Телеграм
+                        </label>
                     </div>
-                    <div class="form-row">
-                        <label for="telegramSelfReportsEnabledToggle">Присылать отчёты мне</label>
-                        <input type="checkbox" id="telegramSelfReportsEnabledToggle">
+                    <div class="form-row telegram-toggle-row">
+                        <label for="telegramSelfReportsEnabledToggle" class="telegram-toggle-label">
+                            <input type="checkbox" id="telegramSelfReportsEnabledToggle" class="telegram-toggle-checkbox">
+                            отправлять мне в Телеграм итоги о моих выполненных заданиях
+                        </label>
                     </div>
                     <div id="telegramHelpText" style="color: #666; font-size: 12px; line-height: 1.4; margin-top: 6px;"></div>
                 </div>

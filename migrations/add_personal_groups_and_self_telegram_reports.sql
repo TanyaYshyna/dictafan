@@ -17,6 +17,11 @@ ALTER TABLE users
 ADD COLUMN IF NOT EXISTS telegram_self_reports_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- Backfill: создать личную группу для каждого пользователя, если ее нет
+CREATE TEMP TABLE tmp_created_personal_groups (
+    group_id INTEGER NOT NULL,
+    owner_user_id INTEGER NOT NULL
+) ON COMMIT DROP;
+
 WITH to_create AS (
     SELECT u.id AS user_id, u.username AS username
     FROM users u
@@ -47,14 +52,18 @@ WITH to_create AS (
     FROM to_create tc
     RETURNING id, personal_owner_user_id
 )
+INSERT INTO tmp_created_personal_groups (group_id, owner_user_id)
+SELECT cg.id, cg.personal_owner_user_id
+FROM created_groups cg;
+
 INSERT INTO group_teachers (group_id, teacher_user_id, role)
-SELECT cg.id, cg.personal_owner_user_id, 'owner'
-FROM created_groups cg
+SELECT t.group_id, t.owner_user_id, 'owner'
+FROM tmp_created_personal_groups t
 ON CONFLICT DO NOTHING;
 
 INSERT INTO group_students (group_id, student_user_id, status, joined_at, removed_at)
-SELECT cg.id, cg.personal_owner_user_id, 'active', CURRENT_TIMESTAMP, NULL
-FROM created_groups cg
+SELECT t.group_id, t.owner_user_id, 'active', CURRENT_TIMESTAMP, NULL
+FROM tmp_created_personal_groups t
 ON CONFLICT (group_id, student_user_id)
 DO UPDATE SET status='active', removed_at=NULL, joined_at=CURRENT_TIMESTAMP;
 

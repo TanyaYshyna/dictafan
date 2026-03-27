@@ -14,6 +14,7 @@ from helpers.db_history import (
 )
 from helpers.db_telegram import list_teacher_chat_ids_for_student_success, get_student_and_dictation_info
 from helpers.telegram import is_telegram_enabled, send_telegram_message
+from helpers.db_dictations import get_sentence_by_key
 
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
@@ -298,6 +299,7 @@ def save_success():
         attempts_total = data.get('attempts_total', 0)
         error_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
+        sentences_data = data.get('sentences_data')
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -364,11 +366,89 @@ def save_success():
                     student_username = info.get('student_username') or 'Вы'
                     dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
                     dictation_level = info.get('dictation_level') or '—'
+
+                    def _fmt_duration(ms: int) -> str:
+                        try:
+                            ms = int(ms or 0)
+                        except Exception:
+                            ms = 0
+                        sec = max(0, ms // 1000)
+                        m = sec // 60
+                        s = sec % 60
+                        if m <= 0:
+                            return f"{s}с"
+                        return f"{m}м {s:02d}с"
+
+                    def _safe(v: str) -> str:
+                        v = str(v or '')
+                        return (
+                            v.replace('&', '&amp;')
+                            .replace('<', '&lt;')
+                            .replace('>', '&gt;')
+                        )
+
+                    # Build per-sentence table from payload + DB texts
+                    rows = []
+                    if isinstance(sentences_data, list):
+                        for r in sentences_data:
+                            if not isinstance(r, dict):
+                                continue
+                            skey = r.get('sentence_key')
+                            if not skey:
+                                continue
+                            try:
+                                sentence = get_sentence_by_key(dictation_int, 'en', str(skey))
+                            except Exception:
+                                sentence = None
+                            text_sentence = ''
+                            if isinstance(sentence, dict):
+                                text_sentence = sentence.get('text') or ''
+
+                            rows.append(
+                                {
+                                    'sentence_key': str(skey),
+                                    'perfect_count': int(r.get('perfect_count') or 0),
+                                    'corrected_count': int(r.get('corrected_count') or 0),
+                                    'audio_count': int(r.get('audio_count') or 0),
+                                    'attempts_total': int(r.get('attempts_total') or 0),
+                                    'error_count': int(r.get('error_count') or 0),
+                                    'text': text_sentence,
+                                }
+                            )
+
+                    # Sort by sentence key and keep message bounded
+                    try:
+                        rows.sort(key=lambda x: x.get('sentence_key'))
+                    except Exception:
+                        pass
+                    max_rows = 35
+                    rows = rows[:max_rows]
+
+                    lines = []
+                    if rows:
+                        lines.append('<b>Предложения</b>')
+                        lines.append('№ | ⭐/½⭐/🎤 | попыток | ошибок | текст')
+                        for rr in rows:
+                            idx = _safe(rr.get('sentence_key'))
+                            stars = f"{rr.get('perfect_count')}/{rr.get('corrected_count')}/{rr.get('audio_count')}"
+                            att = rr.get('attempts_total')
+                            err = rr.get('error_count')
+                            sent_text = _safe(rr.get('text'))
+                            if sent_text and len(sent_text) > 120:
+                                sent_text = sent_text[:117] + '...'
+                            lines.append(f"{idx} | {stars} | {att} | {err} | {sent_text}")
+
                     text = (
-                        f"✅ <b>{student_username}</b>, вы успешно выполнили диктант\n"
-                        f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
-                        f"Дата: {success_date_iso}"
+                        f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
+                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)})\n"
+                        f"Дата: {success_date_iso}\n"
+                        f"Длительность: {_fmt_duration(time_ms)}\n"
+                        f"Итоги: ⭐ {int(perfect_count or 0)} · ½⭐ {int(corrected_count or 0)} · 🎤 {int(audio_count or 0)}\n"
+                        f"Попыток: {int(attempts_total or 0)} · Ошибок: {int(error_count or 0)}"
                     )
+                    if lines:
+                        text = text + "\n\n" + "\n".join(lines)
+
                     send_telegram_message(int(user.get('telegram_chat_id')), text)
         except Exception:
             pass
