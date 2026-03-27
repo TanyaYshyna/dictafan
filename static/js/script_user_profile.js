@@ -20,7 +20,7 @@ function createLucideToggleButton({ checked, title, disabled }) {
     btn.disabled = Boolean(disabled);
     btn.dataset.checked = checked ? '1' : '0';
     btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
-    btn.innerHTML = `<i data-lucide="${checked ? 'check' : 'minus'}"></i>`;
+    btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
     try {
         if (window.lucide) {
             window.lucide.createIcons({ root: btn });
@@ -625,7 +625,7 @@ function renderStudentsTable(students) {
                 });
                 notifyBtn.dataset.checked = next ? '1' : '0';
                 notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
-                notifyBtn.innerHTML = `<i data-lucide="${next ? 'check' : 'minus'}"></i>`;
+                notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
                 try {
                     if (window.lucide) {
                         window.lucide.createIcons({ root: notifyBtn });
