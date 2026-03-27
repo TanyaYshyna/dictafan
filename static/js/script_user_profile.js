@@ -408,13 +408,13 @@ function renderTelegramSection() {
     const selfReportsEnabled = Boolean(user.telegram_self_reports_enabled);
     const linked = Boolean(chatId);
 
-    statusEl.textContent = linked ? `Привязан (chat_id: ${chatId})` : 'Не привязан';
+    statusEl.textContent = linked ? `привязан (chat_id: ${chatId})` : 'не привязан';
 
     const _setLinkCollapsed = (collapsed) => {
         if (!collapseBtn || !linkBody) return;
         collapseBtn.dataset.collapsed = collapsed ? '1' : '0';
         linkBody.style.display = collapsed ? 'none' : '';
-        collapseBtn.innerHTML = `<i data-lucide="${collapsed ? 'chevrons-up' : 'chevrons-down'}"></i>`;
+        collapseBtn.innerHTML = `<i data-lucide="${collapsed ? 'chevrons-down' : 'chevrons-up'}"></i>`;
         try {
             if (window.lucide) {
                 window.lucide.createIcons({ root: collapseBtn });
@@ -653,12 +653,14 @@ function renderStudentsTable(students) {
         notifyLabel.className = 'groups-student-notify-label';
         notifyLabel.textContent = 'TG';
 
-        notifyWrap.appendChild(notifyLabel);
         if (hideNotifyToggle) {
+            notifyLabel.style.visibility = 'hidden';
+            notifyWrap.appendChild(notifyLabel);
             const spacer = document.createElement('div');
             spacer.className = 'groups-student-notify-spacer';
             notifyWrap.appendChild(spacer);
         } else {
+            notifyWrap.appendChild(notifyLabel);
             const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
             const notifyBtn = createLucideToggleButton({
                 checked: startChecked,
