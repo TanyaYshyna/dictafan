@@ -397,6 +397,8 @@ function renderTelegramSection() {
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
+    const collapseBtn = document.getElementById('telegramLinkCollapseBtn');
+    const linkBody = document.getElementById('telegramLinkBody');
 
     if (!statusEl || !helpEl || !codeInput || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
@@ -407,6 +409,34 @@ function renderTelegramSection() {
     const linked = Boolean(chatId);
 
     statusEl.textContent = linked ? `Привязан (chat_id: ${chatId})` : 'Не привязан';
+
+    const _setLinkCollapsed = (collapsed) => {
+        if (!collapseBtn || !linkBody) return;
+        collapseBtn.dataset.collapsed = collapsed ? '1' : '0';
+        linkBody.style.display = collapsed ? 'none' : '';
+        collapseBtn.innerHTML = `<i data-lucide="${collapsed ? 'chevrons-up' : 'chevrons-down'}"></i>`;
+        try {
+            if (window.lucide) {
+                window.lucide.createIcons({ root: collapseBtn });
+            }
+        } catch (e) {
+        }
+    };
+
+    if (collapseBtn && linkBody) {
+        if (!collapseBtn.dataset._bound) {
+            collapseBtn.dataset._bound = '1';
+            collapseBtn.onclick = () => {
+                const nextCollapsed = !(collapseBtn.dataset.collapsed === '1');
+                _setLinkCollapsed(nextCollapsed);
+            };
+        }
+        if (collapseBtn.dataset.collapsed !== '1' && collapseBtn.dataset.collapsed !== '0') {
+            _setLinkCollapsed(false);
+        } else {
+            _setLinkCollapsed(collapseBtn.dataset.collapsed === '1');
+        }
+    }
 
     const _setBtnState = (btn, value) => {
         if (!btn) return;
@@ -427,11 +457,14 @@ function renderTelegramSection() {
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
 
-    if (linked) {
-        helpEl.textContent = 'Telegram уже привязан. Чтобы привязать другой аккаунт: нажми «Получить код», затем отправь в Telegram команду из кнопки «Скопировать /start». (Важно: между /start и кодом есть пробел.)';
-    } else {
-        helpEl.textContent = 'Нажми «Получить код», затем отправь в Telegram команду из кнопки «Скопировать /start». (Важно: между /start и кодом есть пробел.)';
-    }
+    const helpPrefix = linked ? 'Чтобы привязать другой аккаунт:' : 'Чтобы привязать Telegram:';
+    helpEl.innerHTML = `
+        <div>${helpPrefix}</div>
+        <div class="telegram-help-bullets">
+            <div>- нажми «Получить код»,</div>
+            <div>- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span></div>
+        </div>
+    `;
 
     try {
         getCodeBtn.disabled = false;
@@ -562,6 +595,8 @@ function renderStudentsTable(students) {
     if (!table) return;
     table.innerHTML = '';
 
+    const currentUserId = (UM && UM.userData && UM.userData.id != null) ? String(UM.userData.id) : null;
+
     if (!groupsUiState.selectedGroupId) {
         const empty = document.createElement('div');
         empty.style.padding = '12px';
@@ -585,6 +620,9 @@ function renderStudentsTable(students) {
         row.className = 'groups-students-table-row';
         row.dataset.studentId = String(s.id);
         const isEmailInviteRow = String(s.kind || '') === 'email_invite' || String(s.id || '').startsWith('email_invite:');
+        const g = getSelectedGroup();
+        const isSelfRow = !isEmailInviteRow && currentUserId && String(s.id) === currentUserId;
+        const hideNotifyToggle = Boolean(g && g.is_personal) && isSelfRow;
         if (!isEmailInviteRow && String(s.id) === String(groupsUiState.selectedStudentId)) {
             row.classList.add('selected');
         }
@@ -615,59 +653,65 @@ function renderStudentsTable(students) {
         notifyLabel.className = 'groups-student-notify-label';
         notifyLabel.textContent = 'TG';
 
-        const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
-        const notifyBtn = createLucideToggleButton({
-            checked: startChecked,
-            title: 'Уведомлять учителя о выполнении этим учеником',
-            disabled: isEmailInviteRow,
-        });
-        notifyBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        });
-        notifyBtn.addEventListener('click', async () => {
-            if (isEmailInviteRow) return;
-            const g = getSelectedGroup();
-            if (!g) return;
-            const current = notifyBtn.dataset.checked === '1';
-            const next = !current;
-            try {
-                notifyBtn.disabled = true;
-                await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
-                    method: 'POST',
-                    body: JSON.stringify({ enabled: next }),
-                });
-                notifyBtn.dataset.checked = next ? '1' : '0';
-                notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
-                notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
-                try {
-                    if (window.lucide) {
-                        window.lucide.createIcons({ root: notifyBtn });
-                    }
-                } catch (e) {
-                }
-
-                const cache = Array.isArray(groupsUiState._studentsCache) ? groupsUiState._studentsCache : [];
-                const idx = cache.findIndex((x) => String(x.id) === String(s.id));
-                if (idx >= 0) {
-                    cache[idx] = Object.assign({}, cache[idx], { notify_teacher_on_success: next });
-                }
-                groupsUiState._studentsCache = cache;
-                showSuccess('Сохранено');
-            } catch (e) {
-                showError(e && e.message ? e.message : 'Ошибка');
-            } finally {
-                notifyBtn.disabled = false;
-            }
-        });
-
         notifyWrap.appendChild(notifyLabel);
-        notifyWrap.appendChild(notifyBtn);
+        if (hideNotifyToggle) {
+            const spacer = document.createElement('div');
+            spacer.className = 'groups-student-notify-spacer';
+            notifyWrap.appendChild(spacer);
+        } else {
+            const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
+            const notifyBtn = createLucideToggleButton({
+                checked: startChecked,
+                title: 'Уведомлять учителя о выполнении этим учеником',
+                disabled: isEmailInviteRow,
+            });
+            notifyBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+            notifyBtn.addEventListener('click', async () => {
+                if (isEmailInviteRow) return;
+                const g = getSelectedGroup();
+                if (!g) return;
+                const current = notifyBtn.dataset.checked === '1';
+                const next = !current;
+                try {
+                    notifyBtn.disabled = true;
+                    await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
+                        method: 'POST',
+                        body: JSON.stringify({ enabled: next }),
+                    });
+                    notifyBtn.dataset.checked = next ? '1' : '0';
+                    notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+                    notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
+                    try {
+                        if (window.lucide) {
+                            window.lucide.createIcons({ root: notifyBtn });
+                        }
+                    } catch (e) {
+                    }
+
+                    const cache = Array.isArray(groupsUiState._studentsCache) ? groupsUiState._studentsCache : [];
+                    const idx = cache.findIndex((x) => String(x.id) === String(s.id));
+                    if (idx >= 0) {
+                        cache[idx] = Object.assign({}, cache[idx], { notify_teacher_on_success: next });
+                    }
+                    groupsUiState._studentsCache = cache;
+                    showSuccess('Сохранено');
+                } catch (e) {
+                    showError(e && e.message ? e.message : 'Ошибка');
+                } finally {
+                    notifyBtn.disabled = false;
+                }
+            });
+
+            notifyWrap.appendChild(notifyBtn);
+        }
 
         row.appendChild(avatar);
         row.appendChild(name);
-        row.appendChild(status);
         row.appendChild(notifyWrap);
+        row.appendChild(status);
 
         row.addEventListener('click', () => {
             if (isEmailInviteRow) {
