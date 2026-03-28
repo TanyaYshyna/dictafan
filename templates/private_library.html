@@ -106,6 +106,9 @@
         <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
         <div class="desk-zone">
             <div class="tool-palette tool-palette--desk" id="toolPalette">
+                <button id="btnNewDictationQuick" class="tool-palette-btn" title="Создать диктант">
+                    <i data-lucide="plus"></i>
+                </button>
                 <button id="btnHomeLibrary" class="tool-palette-btn" title="Моя библиотека">
                     <i data-lucide="home"></i>
                 </button>
@@ -335,7 +338,7 @@
     <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/idb_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cover_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/private_library.js') }}?v=36"></script>
+    <script src="{{ url_for('static', filename='js/private_library.js') }}?v={{ app_cache_revision }}"></script>
 </body>
 
 </html>

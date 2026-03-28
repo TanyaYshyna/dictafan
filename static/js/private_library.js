@@ -1608,6 +1608,8 @@ let deskLoadSeq = 0;
 let deskLoadInFlight = null;
 let pendingDeleteDictationId = null;
 
+let __workbookBookId = null;
+
 let lastOwnBooks = [];
 let lastShelfBooks = [];
 let currentBooksFilterLanguage = null;
@@ -2170,6 +2172,45 @@ async function showDeskDictationInBook(dictationId) {
 
     const data = await apiRequest(`/library/api/dictation/${numId}/book`);
     if (!data || !data.success || !data.book_id) {
+      // Orphan dictation: open workbook instead.
+      try {
+        let wbId = __workbookBookId;
+        if (!wbId) {
+          const booksData = await apiRequest('/library/api/user-books');
+          const own = (booksData && booksData.success) ? (booksData.own_books || []) : [];
+          const wb = Array.isArray(own) ? own.find(b => b && b.is_workbook) : null;
+          wbId = wb && wb.id ? Number(wb.id) : null;
+          if (wbId) __workbookBookId = wbId;
+        }
+        if (wbId) {
+          await openBookViewBook(wbId, true);
+          setTimeout(() => {
+            try {
+              const card = document.querySelector(`#book-view-modal .short-card[data-dictation-id="dict_${CSS.escape(String(numId))}"]`)
+                || document.querySelector(`#book-view-modal .short-card[data-dictation-id="${CSS.escape(String(raw))}"]`);
+              if (card) {
+                try {
+                  if (__selectedBookDictationCard && __selectedBookDictationCard !== card) {
+                    __selectedBookDictationCard.classList.remove('short-card--selected');
+                  }
+                  card.classList.add('short-card--selected');
+                  __selectedBookDictationCard = card;
+                } catch (e2) {
+                }
+                try {
+                  card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+                } catch (e3) {
+                  card.scrollIntoView();
+                }
+              }
+            } catch (e) {
+            }
+          }, 150);
+          return;
+        }
+      } catch (e) {
+      }
+
       try { showToast('Этот диктант не находится ни в одной книге', 'info'); } catch (e) {}
       return;
     }
@@ -4797,6 +4838,40 @@ function installEventHandlers() {
   const homeLibraryBtn = document.getElementById('btnHomeLibrary');
   if (homeLibraryBtn) {
     homeLibraryBtn.addEventListener('click', () => openHomeLibraryModal());
+  }
+
+  const newDictationQuickBtn = document.getElementById('btnNewDictationQuick');
+  if (newDictationQuickBtn) {
+    newDictationQuickBtn.addEventListener('click', async () => {
+      try {
+        // Ensure workbook id is known.
+        if (!__workbookBookId) {
+          try {
+            const token = getToken();
+            if (token) {
+              const resp = await fetch('/library/api/user-books', {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              const j = await resp.json();
+              const own = (j && j.success) ? (j.own_books || []) : [];
+              const wb = Array.isArray(own) ? own.find(b => b && b.is_workbook) : null;
+              __workbookBookId = wb && wb.id ? Number(wb.id) : null;
+            }
+          } catch (e0) {
+          }
+        }
+
+        if (__workbookBookId) {
+          try { setDictationTargetBook(__workbookBookId); } catch (e1) {}
+        } else {
+          // Fallback: still open editor; it will remain orphan until user moves to book.
+          try { sessionStorage.removeItem('dictationTargetBook'); } catch (e2) {}
+        }
+        window.location.href = '/dictation_editor/new';
+      } catch (e) {
+        window.location.href = '/dictation_editor/new';
+      }
+    });
   }
 
   const studentPlanBtn = document.getElementById('btnStudentPlan');

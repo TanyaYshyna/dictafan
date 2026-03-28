@@ -506,31 +506,24 @@ def api_get_user_books():
 
     try:
         own_books, shelf_books = get_user_library_books(user["id"])
-        
-        # Проверяем наличие бесхозных диктантов
-        orphan_dictations = get_orphan_dictations(user["id"])
-        
-        # Если есть бесхозные диктанты, создаём/получаем "Рабочую тетрадь"
-        if orphan_dictations:
-            workbook = get_or_create_workbook(user["id"])
-            
-            # Ищем рабочую тетрадь в списке своих книг
-            workbook_index = next((i for i, book in enumerate(own_books) if book["id"] == workbook["id"]), None)
-            
-            if workbook_index is not None:
-                # Если рабочая тетрадь уже есть в списке, просто обновляем её флаги
-                own_books[workbook_index]["is_workbook"] = True
-                own_books[workbook_index]["orphan_count"] = len(orphan_dictations)
-                # Переносим в начало списка, если она не первая
-                if workbook_index > 0:
-                    workbook_data = own_books.pop(workbook_index)
-                    own_books.insert(0, workbook_data)
-            else:
-                # Если рабочей тетради нет в списке (что странно), добавляем
-                workbook["is_workbook"] = True
-                workbook["orphan_count"] = len(orphan_dictations)
-                own_books = [workbook] + own_books
-        
+
+        # Workbook must exist for every user (even when there are no orphan dictations).
+        orphan_dictations = get_orphan_dictations(user["id"]) or []
+        workbook = get_or_create_workbook(user["id"])
+
+        # Ensure workbook is present, first, and has flags.
+        workbook_index = next((i for i, book in enumerate(own_books) if book["id"] == workbook["id"]), None)
+        if workbook_index is not None:
+            own_books[workbook_index]["is_workbook"] = True
+            own_books[workbook_index]["orphan_count"] = len(orphan_dictations)
+            if workbook_index > 0:
+                workbook_data = own_books.pop(workbook_index)
+                own_books.insert(0, workbook_data)
+        else:
+            workbook["is_workbook"] = True
+            workbook["orphan_count"] = len(orphan_dictations)
+            own_books = [workbook] + own_books
+
         return jsonify({
             "success": True,
             "own_books": own_books,
