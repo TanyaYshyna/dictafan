@@ -462,7 +462,7 @@ function renderTelegramSection() {
     helpEl.innerHTML = `
         <div>${helpPrefix}</div>
         <div class="telegram-help-bullets">
-            <div>- <span class="telegram-inline-icon"><i data-lucide="key"></i></span> нажми «Получить код»,</div>
+            <div>-  нажми «<span class="telegram-inline-icon"><i data-lucide="key"></i></span> Получить код»,</div>
             <div>- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span></div>
         </div>
     `;

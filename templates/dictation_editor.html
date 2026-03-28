@@ -793,24 +793,21 @@
         "dictation_id": dictation_id,
         "original_language": original_language,
         "translation_language": translation_language,
+        "lang_notice": lang_notice|default(''),
         "original_data": original_data,
         "translation_data": translation_data,
         "translations_data": translations_data|default({}),
-        "audio_file": audio_file,
         "title": title,
-        "title_translations": title_translations|default({}),
-        "translation_flags": translation_flags|default({}),
+        "title_translations": title_translations,
+        "translation_flags": translation_flags,
         "level": level,
-        "audio_words": audio_words,
-        "safe_email": safe_email,
-        "category_info": category_info,
         "is_dialog": is_dialog,
         "speakers": speakers,
-        "cover_url": cover_url,
-        "author_materials_url": info.get("author_materials_url") if info else None
-     } | tojson }}
+        "author_materials_url": author_materials_url,
+        "safe_email": safe_email,
+        "audio_words": audio_words,
+    } | tojson | safe }}
     </script>
-
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
      <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>

@@ -10006,6 +10006,15 @@ function getPlaySequenceValues() {
 
 // Инициализация при загрузке
 document.addEventListener('DOMContentLoaded', async function () {
+    try {
+        const dataNode = document.getElementById('dictation-data');
+        const notice = dataNode ? String(dataNode.getAttribute('data-lang-notice') || '').trim() : '';
+        if (notice && typeof showSaveToast === 'function') {
+            showSaveToast(notice, 'info', 4500);
+        }
+    } catch (e) {
+    }
+
     // Загружаем настройки аудио из данных пользователя (асинхронно)
     await loadAudioSettingsFromUser();
 

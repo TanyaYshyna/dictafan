@@ -373,6 +373,9 @@ function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
     const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
       ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
       : '';
+
+    // NOTE: dictationLanguageCode must be the dictation's original language.
+    // (Not the user's current learning language.)
     const langOriginal = String(dictationLanguageCode || 'en').trim().toLowerCase() || 'en';
     const langTranslation = (nativeLang || langOriginal || 'en');
     const openUrl = `/dictation/dict_${Number(dictationId)}/${langOriginal}/${langTranslation}`;
@@ -383,6 +386,37 @@ function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
     } catch (e2) {
     }
   }
+}
+
+function _pickTranslationLanguageForOpen({ preferredNative, availableTranslations, fallbackLang }) {
+  const available = Array.isArray(availableTranslations)
+    ? availableTranslations.map(x => String(x || '').trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  const preferred = preferredNative ? String(preferredNative).trim().toLowerCase() : '';
+  const fallback = fallbackLang ? String(fallbackLang).trim().toLowerCase() : '';
+
+  if (preferred && available.includes(preferred)) {
+    return { lang: preferred, usedFallback: false, reason: '' };
+  }
+
+  if (available.length === 1) {
+    return {
+      lang: available[0],
+      usedFallback: !!preferred && available[0] !== preferred,
+      reason: preferred ? `Перевода на «${preferred}» нет — открыт единственный доступный перевод.` : ''
+    };
+  }
+
+  if (fallback && available.includes(fallback)) {
+    return { lang: fallback, usedFallback: false, reason: '' };
+  }
+
+  if (available.length > 1) {
+    return { lang: available[0], usedFallback: !!preferred, reason: preferred ? `Перевода на «${preferred}» нет — открыт другой доступный перевод.` : '' };
+  }
+
+  return { lang: fallback || 'en', usedFallback: false, reason: '' };
 }
 
 function _studentPlanRender(panel, dateIso, items) {
@@ -3055,7 +3089,9 @@ function createDictationCard(item, isDeskCard = false) {
     // Карточка для рабочего стола
     const dictationId = item.dictation_id;
     const dictationIdFormatted = `dict_${dictationId}`;
-    const langOriginal = item.language_code || 'en';
+
+    // Important: original language must come from dictation meta, not from user profile.
+    const langOriginal = (item.language_original || item.language_code || 'en');
     const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
       ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
       : '';
@@ -3064,11 +3100,15 @@ function createDictationCard(item, isDeskCard = false) {
       ? item.translation_languages.map(x => String(x || '').trim().toLowerCase()).filter(Boolean)
       : [];
 
-    const preferredNative = (nativeLang && availableTranslations.includes(nativeLang))
-      ? nativeLang
-      : '';
+    const preferredNative = nativeLang;
 
-    const langTranslation = preferredNative || item.language_translation || nativeLang || item.language_code || 'en';
+    const pick = _pickTranslationLanguageForOpen({
+      preferredNative,
+      availableTranslations,
+      fallbackLang: (item.language_translation || nativeLang || langOriginal || 'en')
+    });
+
+    const langTranslation = pick.lang;
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const coverUrl = maybeCacheBustDictationCover(item.cover_url);
@@ -3086,9 +3126,11 @@ function createDictationCard(item, isDeskCard = false) {
       : 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
     const coverLoading = isCachedRender ? 'eager' : 'lazy';
 
+    const noticeMessage = pick && pick.reason ? String(pick.reason) : '';
+
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
-          <div class="short-thumb" data-href="${openUrl}" role="link" tabindex="0">
+          <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${escapeHtml(noticeMessage)}" role="link" tabindex="0">
             <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async">
             <div class="card-progress-stats"></div>
           </div>
@@ -4857,6 +4899,13 @@ function installEventHandlers() {
       e.stopPropagation();
       const href = deskThumb.getAttribute('data-href') || deskThumb.getAttribute('href');
       if (href) {
+        try {
+          const notice = String(deskThumb.getAttribute('data-lang-notice') || '').trim();
+          if (notice && typeof showToast === 'function') {
+            showToast(notice, { durationMs: 3500 });
+          }
+        } catch (e2) {
+        }
         window.location.href = href;
       }
     } catch (err) {

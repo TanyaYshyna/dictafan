@@ -1,4 +1,4 @@
-from flask import Blueprint, abort, after_this_request, current_app, jsonify, render_template, send_from_directory, url_for, request
+from flask import Blueprint, abort, after_this_request, current_app, jsonify, render_template, send_from_directory, url_for, request, redirect
 import os
 import re
 import tempfile
@@ -194,6 +194,15 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             is_dialog = has_real_speaker
             current_app.logger.info(f"[show_dictation] speakers={speakers}, is_dialog={is_dialog}")
         
+        # Enforce original language from dictation meta (avoid opening with user's current learning language)
+        real_orig = str(dictation_data.get('language_code') or '').strip().lower()
+        req_orig = (lang_orig or '').strip().lower()
+        if real_orig and req_orig and real_orig != req_orig:
+            try:
+                return redirect(f"/dictation/{dictation_id}/{real_orig}/{(lang_tr or '').strip().lower() or real_orig}")
+            except Exception:
+                return redirect(f"/dictation/{dictation_id}/{real_orig}/{real_orig}")
+
         # Получаем переводы заголовка
         title_translations = dictation_data.get('title_translations', {})
         dictation_lang = dictation_data.get('language_code', '')
@@ -257,6 +266,8 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
         except Exception:
             user_native = ''
 
+        lang_notice = ''
+
         if user_native and user_native in available_translations:
             effective_lang_tr = user_native
         elif effective_lang_tr and effective_lang_tr in available_translations:
@@ -265,6 +276,23 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             effective_lang_tr = available_translations[0]
         else:
             effective_lang_tr = (lang_orig or '').strip().lower()
+
+        try:
+            if user_native and user_native not in available_translations and available_translations:
+                if len(available_translations) == 1 and effective_lang_tr == available_translations[0]:
+                    lang_notice = f"Перевода на «{user_native}» нет — открыт единственный доступный перевод ({effective_lang_tr})."
+                elif effective_lang_tr in available_translations:
+                    lang_notice = f"Перевода на «{user_native}» нет — открыт другой доступный перевод ({effective_lang_tr})."
+        except Exception:
+            lang_notice = ''
+
+        # If URL translation doesn't match effective translation, redirect to canonical URL.
+        req_tr = (lang_tr or '').strip().lower()
+        if req_tr and effective_lang_tr and req_tr != effective_lang_tr:
+            try:
+                return redirect(f"/dictation/{dictation_id}/{(lang_orig or '').strip().lower()}/{effective_lang_tr}")
+            except Exception:
+                pass
 
         # Получаем предложения для языка перевода из БД
         translation_sentences = get_dictation_sentences(db_id, effective_lang_tr)
@@ -336,6 +364,7 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             level=level,
             language_original=lang_orig,
             language_translation=lang_tr,
+            lang_notice=lang_notice,
             sentences=None,  # Предложения больше не передаются через шаблон
             current_user=current_user,
             is_dialog=is_dialog,

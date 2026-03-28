@@ -474,7 +474,7 @@
 
     <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
     <div id="dictation-data" data-language-original="{{ language_original }}"
-        data-language-translation="{{ language_translation }}" data-title-orig="{{ title_orig }}"
+        data-language-translation="{{ language_translation }}" data-lang-notice="{{ lang_notice|default('') }}" data-title-orig="{{ title_orig }}"
         data-dictation-id="{{ dictation_id }}" data-is-dialog="{{ 'true' if is_dialog else 'false' }}"
         data-speakers='{{ speakers | tojson | safe }}' {% if author_materials_url
         %}data-author-materials-url="{{ author_materials_url }}" {% endif %} style="display: none;">

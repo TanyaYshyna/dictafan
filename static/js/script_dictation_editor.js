@@ -2597,6 +2597,14 @@ async function initDictationGenerator() {
     // 2. Превращаем в объект
     const initData = JSON.parse(initRaw);
 
+    try {
+        const notice = initData && initData.lang_notice ? String(initData.lang_notice).trim() : '';
+        if (notice && typeof window.showToast === 'function') {
+            window.showToast(notice, 'info');
+        }
+    } catch (e) {
+    }
+
     // Получаем safe_email из UserManager
     let safe_email = window.UM.getSafeEmail();
     if (safe_email === 'anonymous') {

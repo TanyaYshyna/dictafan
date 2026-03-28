@@ -1,5 +1,5 @@
 import json
-from flask import request, jsonify
+from flask import request, jsonify, redirect
 import os
 import re
 import shutil
@@ -355,12 +355,32 @@ def dictation_editor(dictation_id, language_original, language_translation):
     translations_data = {}
     
     translation_flags = {}
+    real_original = ''
+    lang_notice = ''
+
     if dictation_id.startswith('dict_') and not dictation_id.startswith('dict_temp_'):
         try:
             # Извлекаем ID из формата dict_<id>
             db_id = int(dictation_id.replace('dict_', ''))
             dictation = get_dictation_by_id(db_id)
             if dictation:
+                try:
+                    real_original = str(dictation.get('language_code') or '').strip().lower()
+                except Exception:
+                    real_original = ''
+
+                # Enforce original language from dictation meta
+                try:
+                    req_orig = str(language_original or '').strip().lower()
+                except Exception:
+                    req_orig = ''
+
+                if real_original and req_orig and real_original != req_orig:
+                    try:
+                        return redirect(f"/dictation_editor/{dictation_id}/{real_original}/{str(language_translation or '').strip().lower() or real_original}")
+                    except Exception:
+                        return redirect(f"/dictation_editor/{dictation_id}/{real_original}/{real_original}")
+
                 # Получаем переводы заголовка из БД
                 title_translations = dictation.get('title_translations', {})
                 
@@ -429,6 +449,62 @@ def dictation_editor(dictation_id, language_original, language_translation):
                 except Exception:
                     translations_data = {}
 
+                # If requested translation does not exist, fall back:
+                # - user's native (if exists)
+                # - otherwise first available translation
+                # - otherwise original (no translations)
+                available_translations = []
+                try:
+                    req_tr = str(language_translation or '').strip().lower()
+                except Exception:
+                    req_tr = ''
+
+                try:
+                    available_translations = sorted([
+                        str(k).strip().lower()
+                        for k in (translations_data or {}).keys()
+                        if k and str(k).strip().lower() != (str(language_original or '').strip().lower())
+                    ])
+                except Exception:
+                    available_translations = []
+
+                # Prefer opening with user's native language as active translation, if that translation exists.
+                user_native = ''
+                try:
+                    from helpers.user_helpers import get_current_user
+                    current_user = get_current_user()
+                    user_native = (current_user or {}).get('native_language')
+                    user_native = str(user_native).strip().lower() if user_native else ''
+                except Exception:
+                    user_native = ''
+
+                effective_tr = req_tr
+                if user_native and user_native in translations_data:
+                    effective_tr = user_native
+                elif req_tr and req_tr in translations_data:
+                    effective_tr = req_tr
+                elif available_translations:
+                    effective_tr = available_translations[0]
+                else:
+                    effective_tr = str(language_original or '').strip().lower()
+
+                try:
+                    if user_native and user_native not in translations_data and available_translations:
+                        if len(available_translations) == 1 and effective_tr == available_translations[0]:
+                            lang_notice = f"Перевода на «{user_native}» нет — открыт единственный доступный перевод ({effective_tr})."
+                        elif effective_tr in available_translations:
+                            lang_notice = f"Перевода на «{user_native}» нет — открыт другой доступный перевод ({effective_tr})."
+                except Exception:
+                    pass
+
+                if req_tr and effective_tr and req_tr != effective_tr:
+                    try:
+                        return redirect(f"/dictation_editor/{dictation_id}/{str(language_original or '').strip().lower()}/{effective_tr}")
+                    except Exception:
+                        pass
+
+                language_translation = effective_tr
+
                 # translation_data: backward-compatible single bucket for the requested translation language
                 if language_translation in sentences_by_lang:
                     # Используем перевод заголовка из title_translations для языка перевода
@@ -456,16 +532,6 @@ def dictation_editor(dictation_id, language_original, language_translation):
     from helpers.user_helpers import get_current_user
     current_user = get_current_user()
 
-    # Prefer opening with user's native language as active translation, if that translation exists.
-    try:
-        user_native = (current_user or {}).get('native_language')
-        user_native = str(user_native).strip().lower() if user_native else ''
-        if user_native and user_native in translations_data:
-            language_translation = user_native
-            translation_data = translations_data.get(user_native, translation_data)
-    except Exception:
-        pass
-
     # Получаем safe_email из JWT токена
     safe_email = get_safe_email_from_token()
     
@@ -484,6 +550,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
         dictation_id=dictation_id,
         original_language=language_original,
         translation_language=language_translation,
+        lang_notice=lang_notice,
         title=info.get("title", ""),
         title_translations=info.get("title_translations", {}),
         translation_flags=translation_flags,
