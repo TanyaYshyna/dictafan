@@ -604,7 +604,9 @@ def dictation_editor_new():
             dictation_id='new',
             original_language=language_original,
             translation_language=language_translation,
+            lang_notice='',
             title='',
+            title_translations={},
             level="A1",
             is_dialog=False,
             speakers={},
@@ -621,8 +623,10 @@ def dictation_editor_new():
                 "speakers": {},
                 "sentences": []
             },
+            translations_data={},
             audio_file=None,
             audio_words=[],
+            author_materials_url=None,
             current_user=current_user,
             safe_email=safe_email,
             # edit_mode удален - определяется по dictation_id
