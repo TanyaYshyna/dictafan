@@ -1118,6 +1118,14 @@ def save_dictation_final():
                 category_key = "other"  # Дефолтная категория
             logger.info(f"📁 Используем category_key: {category_key}")
         
+        # Determine original language from payload (SSOT for dictations.language_code)
+        try:
+            payload_original_lang = str(data.get('language_original') or data.get('language_code') or '').strip().lower()
+        except Exception:
+            payload_original_lang = ''
+        if not payload_original_lang:
+            payload_original_lang = 'en'
+
         # Если это новый диктант (temp_id начинается с dict_temp_) - создаём в БД
         is_new_dictation = dictation_id.startswith('dict_temp_') or (temp_id and temp_id.startswith('dict_temp_'))
         
@@ -1138,7 +1146,7 @@ def save_dictation_final():
                 # create_dictation возвращает словарь, а не просто ID
                 dictation = create_dictation(
                     title=data.get("title", "Новый диктант"),
-                    language_code=data.get("language_original", "en"),
+                    language_code=payload_original_lang,
                     level=data.get("level", "A1"),
                     owner_id=owner_id,
                     is_public=True,
@@ -1166,6 +1174,7 @@ def save_dictation_final():
             update_dictation(
                 dictation_id=db_id,
                 title=data.get("title", "Новый диктант"),
+                language_code=payload_original_lang,
                 level=data.get("level", "A1"),
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
@@ -1176,6 +1185,7 @@ def save_dictation_final():
             update_dictation(
                 dictation_id=db_id,
                 title=data.get("title"),
+                language_code=payload_original_lang,
                 level=data.get("level"),
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
@@ -1190,15 +1200,7 @@ def save_dictation_final():
         sentences_data = data.get('sentences', {})
         logger.info(f"📝 Сохранение предложений для диктанта {dictation_id} (db_id={db_id}), языков: {list(sentences_data.keys())}")
 
-        try:
-            orig_lang = str(data.get('language_original') or data.get('language_code') or '').strip().lower()
-        except Exception:
-            orig_lang = ''
-        if not orig_lang:
-            try:
-                orig_lang = str(data.get('language_original') or 'en').strip().lower()
-            except Exception:
-                orig_lang = 'en'
+        orig_lang = payload_original_lang
 
         try:
             orig_payload = sentences_data.get(orig_lang) if isinstance(sentences_data, dict) else None
