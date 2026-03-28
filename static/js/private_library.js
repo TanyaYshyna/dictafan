@@ -2155,6 +2155,83 @@ async function openBookViewBook(bookId, isWorkbook = false) {
   renderBookContentTo(structure, sections, dictations, isWorkbook);
 }
 
+async function showDeskDictationInBook(dictationId) {
+  try {
+    const raw = String(dictationId || '').trim();
+    if (!raw) return;
+
+    const numId = raw.startsWith('dict_')
+      ? parseInt(raw.replace('dict_', ''), 10)
+      : parseInt(raw, 10);
+    if (!numId || !isFinite(numId)) {
+      try { showToast('Некорректный id диктанта', 'error'); } catch (e) {}
+      return;
+    }
+
+    const data = await apiRequest(`/library/api/dictation/${numId}/book`);
+    if (!data || !data.success || !data.book_id) {
+      try { showToast('Этот диктант не находится ни в одной книге', 'info'); } catch (e) {}
+      return;
+    }
+
+    const directBookId = Number(data.book_id) || null;
+    const rootBookId = Number(data.root_book_id) || directBookId;
+    if (!rootBookId) {
+      try { showToast('Не удалось определить книгу для диктанта', 'error'); } catch (e) {}
+      return;
+    }
+
+    await openBookViewBook(rootBookId, false);
+
+    // If dictation is stored under a section (directBookId != rootBookId), try to expand that section.
+    try {
+      if (directBookId && directBookId !== rootBookId) {
+        const structure = document.getElementById('bookViewStructure');
+        if (structure) {
+          const sectionEl = structure.querySelector(`.structure-item.structure-section[data-section-id="${CSS.escape(String(directBookId))}"]`);
+          if (sectionEl) {
+            const contentDiv = structure.querySelector(`.structure-item-content[data-section-content-id="${CSS.escape(String(directBookId))}"]`);
+            const isOpen = contentDiv && contentDiv.style.display !== 'none';
+            if (!isOpen) {
+              await toggleSectionInContainer(directBookId, structure);
+            }
+          }
+        }
+      }
+    } catch (e) {
+    }
+
+    // Scroll and highlight dictation card inside the opened book modal.
+    setTimeout(() => {
+      try {
+        const card = document.querySelector(`#book-view-modal .short-card[data-dictation-id="dict_${CSS.escape(String(numId))}"]`)
+          || document.querySelector(`#book-view-modal .short-card[data-dictation-id="${CSS.escape(String(raw))}"]`);
+        if (card) {
+          try {
+            if (__selectedBookDictationCard && __selectedBookDictationCard !== card) {
+              __selectedBookDictationCard.classList.remove('short-card--selected');
+            }
+            card.classList.add('short-card--selected');
+            __selectedBookDictationCard = card;
+          } catch (e2) {
+          }
+          try {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+          } catch (e3) {
+            card.scrollIntoView();
+          }
+        } else {
+          try { showToast('Диктант не найден в книге (возможно, в подразделе)', 'info'); } catch (e4) {}
+        }
+      } catch (e) {
+      }
+    }, 150);
+  } catch (error) {
+    console.error('showDeskDictationInBook error:', error);
+    try { showToast('Не удалось показать диктант в книге', 'error'); } catch (e2) {}
+  }
+}
+
 async function toggleSectionInContainer(sectionId, rootContainer) {
   if (!rootContainer) return;
   const sectionItem = rootContainer.querySelector(`.structure-section[data-section-id="${String(sectionId)}"]`);
