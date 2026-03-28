@@ -3840,12 +3840,35 @@ function renderBooksList(ownBooks, shelfBooks) {
     ...(shelfBooks || []).map(book => ({ ...book, isOwn: false }))
   ];
 
+  // Deduplicate by book id to avoid double rendering when a book is both own and on shelf.
+  const byId = new Map();
+  allBooksRaw.forEach(b => {
+    if (!b || b.id == null) return;
+    const id = Number(b.id);
+    if (!isFinite(id)) return;
+    const prev = byId.get(id);
+    if (!prev) {
+      byId.set(id, b);
+      return;
+    }
+    // Prefer own copy if both exist.
+    if (prev.isOwn) return;
+    if (b.isOwn) {
+      byId.set(id, b);
+      return;
+    }
+  });
+
+  const allBooksDeduped = Array.from(byId.values());
+
   const allBooks = filterLang
-    ? allBooksRaw.filter(b => {
+    ? allBooksDeduped.filter(b => {
+      // Workbook is multilingual: always show, regardless of filter.
+      if (b && b.is_workbook) return true;
       const lang = normalizeBookLang(b);
       return !lang || lang === String(filterLang).toLowerCase();
     })
-    : allBooksRaw;
+    : allBooksDeduped;
 
   if (allBooks.length === 0) {
     container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--color-text-secondary);">Нет книг</div>';

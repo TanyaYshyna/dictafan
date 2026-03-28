@@ -430,7 +430,9 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
             LEFT JOIN book_category_links l ON l.book_id = b.id
             LEFT JOIN book_categories c ON c.id = l.category_id
             LEFT JOIN book_dictations bd ON bd.book_id = b.id
-            WHERE ub.user_id = %s AND b.parent_id IS NULL
+            WHERE ub.user_id = %s
+              AND b.parent_id IS NULL
+              AND COALESCE(b.creator_user_id, 0) <> %s
             GROUP BY
                 b.id,
                 b.title,
@@ -451,7 +453,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 ub.created_at
             ORDER BY COALESCE(b.order_index, 0), ub.created_at DESC
             """,
-            (user_id,),
+            (user_id, user_id),
         )
         shelf_rows = cur.fetchall()
 
