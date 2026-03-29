@@ -2856,11 +2856,14 @@
 .create-assignment-modal-content {
   max-width: 1040px;
   width: calc(100% - 32px);
+  max-height: 90vh;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
   overflow: hidden;
   color: #222;
+  display: flex;
+  flex-direction: column;
 }
 
 .create-assignment-modal-header {
@@ -2930,6 +2933,9 @@
 
 .create-assignment-modal-body {
   padding: 14px 16px 16px 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .create-assignment-top {
@@ -3049,6 +3055,8 @@
   grid-template-columns: 420px 1fr;
   gap: 12px;
   margin-top: 14px;
+  flex: 1;
+  min-height: 0;
 }
 
 .create-assignment-panel {
@@ -3059,6 +3067,12 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+}
+
+.create-assignment-panel--sentences {
+  border-radius: 0;
+  overflow: visible;
 }
 
 .create-assignment-panel-actions {
@@ -3084,7 +3098,6 @@
 .create-assignment-panel-body {
   padding: 0;
   overflow: auto;
-  height: 360px;
   min-height: 0;
   position: relative;
   flex: 1;
