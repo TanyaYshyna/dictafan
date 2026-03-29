@@ -10,7 +10,122 @@ function setBookEditDirty(nextDirty) {
   if (star) {
     star.style.display = bookEditDirty ? 'inline' : 'none';
   }
+}
 
+function getAssignmentLastGroupId() {
+  try {
+    const v = String(localStorage.getItem('assignments_last_group_id') || '').trim();
+    return v || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function setAssignmentLastGroupId(groupId) {
+  try {
+    const v = String(groupId || '').trim();
+    if (!v) return;
+    localStorage.setItem('assignments_last_group_id', v);
+  } catch (e) {
+  }
+}
+
+async function loadDictationMetaForAssignmentModal(dictationId) {
+  const id = Number(dictationId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const res = await apiRequest(`/api/dictation/${encodeURIComponent(id)}`, { method: 'GET' });
+  if (!res || !res.success || !res.dictation) return null;
+  return res.dictation;
+}
+
+async function loadDictationSentencesForAssignmentModal(dictationId) {
+  const id = Number(dictationId);
+  if (!Number.isFinite(id) || id <= 0) return [];
+  const meta = await loadDictationMetaForAssignmentModal(id);
+  const langOrig = meta && meta.language_code ? String(meta.language_code) : 'en';
+  const url = `/api/dictation/${encodeURIComponent(id)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langOrig)}/sentences`;
+  const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+  if (!res.ok) return [];
+  const data = await res.json();
+  const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
+  return sentences.filter(s => s && typeof s === 'object');
+}
+
+function getCreateAssignmentSentencesState(modal) {
+  try {
+    const raw = modal.dataset.sentencesState;
+    if (!raw) return { sentences: [], selectedPositions: null };
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : { sentences: [], selectedPositions: null };
+  } catch (e) {
+    return { sentences: [], selectedPositions: null };
+  }
+}
+
+function setCreateAssignmentSentencesState(modal, state) {
+  try {
+    modal.dataset.sentencesState = JSON.stringify(state && typeof state === 'object' ? state : { sentences: [], selectedPositions: null });
+  } catch (e) {
+  }
+}
+
+function renderCreateAssignmentSentencesTable(modal) {
+  const tbody = document.getElementById('create-assignment-sentences-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const state = getCreateAssignmentSentencesState(modal);
+  const sentences = Array.isArray(state.sentences) ? state.sentences : [];
+  const selected = Array.isArray(state.selectedPositions) ? new Set(state.selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))) : null;
+
+  if (!sentences.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="3" style="padding:10px; color: rgba(0,0,0,0.55);">Нет предложений</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  const allPositions = sentences.map(s => Number(s.position)).filter(p => Number.isFinite(p));
+  const allSelected = !selected || allPositions.every(p => selected.has(p));
+
+  sentences.forEach((s, idx) => {
+    const pos = Number(s.position);
+    const fullPos = Number.isFinite(pos) ? pos : null;
+    const isChecked = allSelected ? true : (fullPos != null && selected && selected.has(fullPos));
+    const shortIndex = String(idx + 1).padStart(2, '0');
+    const labelNum = fullPos != null ? `${shortIndex}/${fullPos}` : shortIndex;
+    const text = String(s.text || '');
+
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
+    tr.innerHTML = `
+      <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums;">${escapeHtml(labelNum)}</td>
+      <td style="padding:8px 10px;">
+        <input type="checkbox" class="create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" ${isChecked ? 'checked' : ''} ${fullPos == null ? 'disabled' : ''} />
+      </td>
+      <td style="padding:8px 10px;">${escapeHtml(text)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (!tbody.dataset.listenerAttached) {
+    tbody.dataset.listenerAttached = '1';
+    tbody.addEventListener('change', () => {
+      const cur = getCreateAssignmentSentencesState(modal);
+      const sents = Array.isArray(cur.sentences) ? cur.sentences : [];
+      const allPos = sents.map(x => Number(x.position)).filter(p => Number.isFinite(p));
+      const selectedNow = [];
+      tbody.querySelectorAll('.create-assignment-sentence-check').forEach(cb => {
+        if (!(cb instanceof HTMLInputElement)) return;
+        const p = Number(cb.dataset.position);
+        if (!Number.isFinite(p)) return;
+        if (cb.checked) selectedNow.push(p);
+      });
+
+      const setAll = allPos.length > 0 && selectedNow.length === allPos.length;
+      setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: setAll ? null : selectedNow }));
+    });
+  }
 }
 
 function ensureCreateAssignmentModal() {
@@ -34,59 +149,107 @@ function ensureCreateAssignmentModal() {
   modal.style.zIndex = '10094';
 
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 720px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
-      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px;">
-        <h3 style="margin:0;">Задание</h3>
-        <button type="button" id="create-assignment-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer;">
-          <i data-lucide="x"></i>
-        </button>
+    <div class="modal-content" style="max-width: 980px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(0,0,0,0.08);">
+        <div style="display:flex; align-items:center; gap:10px; min-width: 0;">
+          <div style="width:36px; height:36px; border-radius:12px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex:0 0 auto;">
+            <i data-lucide="clipboard-list"></i>
+          </div>
+          <div style="min-width:0;">
+            <div style="font-weight:800; font-size:16px; line-height:1.1;">Задание</div>
+            <div id="create-assignment-dictation-title" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" id="create-assignment-save" class="button-color-yellow" style="height:38px; padding:0 14px; border-radius:12px; display:inline-flex; align-items:center; gap:8px;">
+            <i data-lucide="save" style="width:18px; height:18px;"></i>
+            <span>Сохранить</span>
+          </button>
+          <button type="button" id="create-assignment-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
-      <div class="modal-body" style="padding:0 16px 16px 16px;">
+
+      <div class="modal-body" style="padding:14px 16px 16px 16px;">
         <input type="hidden" id="create-assignment-dictation-id" value="">
 
-        <div class="form-row" style="margin-top: 6px;">
-          <label for="create-assignment-group">Группа</label>
-          <select id="create-assignment-group"></select>
-        </div>
-
-        <div class="form-row" style="margin-top: 12px;">
-          <label for="create-assignment-type">Тип задания</label>
-          <select id="create-assignment-type">
-            <option value="period">на период</option>
-            <option value="days">по дням</option>
-          </select>
-        </div>
-
-        <div id="create-assignment-type-period" style="margin-top: 12px;">
-          <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <div class="form-row" style="margin-top: 0;">
-              <label for="create-assignment-from">с</label>
-              <input type="date" id="create-assignment-from">
+        <div style="display:grid; grid-template-columns: 200px 1fr; gap:14px; align-items:start;">
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="width:200px; height:200px; border-radius:14px; overflow:hidden; background: rgba(0,0,0,0.06); border:1px solid rgba(0,0,0,0.08);">
+              <img id="create-assignment-cover-img" alt="" style="width:100%; height:100%; object-fit:cover; display:block;" />
             </div>
-            <div class="form-row" style="margin-top: 0;">
-              <label for="create-assignment-to">по</label>
-              <input type="date" id="create-assignment-to">
+            <div id="create-assignment-cover-meta" style="font-size:12px; color: rgba(0,0,0,0.6);"></div>
+          </div>
+
+          <div style="min-width:0;">
+            <div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+              <div style="display:flex; flex-direction:column; gap:6px; min-width: 220px;">
+                <div style="font-size:12px; color: rgba(0,0,0,0.55);">Группа</div>
+                <select id="create-assignment-group" style="height:40px;"></select>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:6px; min-width: 160px;">
+                <div style="font-size:12px; color: rgba(0,0,0,0.55);">Тип</div>
+                <select id="create-assignment-type" style="height:40px;">
+                  <option value="period">на период</option>
+                  <option value="days">по дням</option>
+                </select>
+              </div>
+
+              <div id="create-assignment-type-period" style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">с</div>
+                  <input type="date" id="create-assignment-from" style="height:40px;" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">по</div>
+                  <input type="date" id="create-assignment-to" style="height:40px;" />
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px; min-width:160px;">
+                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">На медальку</div>
+                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px;" />
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top: 14px;">
+              <div id="create-assignment-days-panel" style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+                <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div style="font-weight:700;">По дням</div>
+                  <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
+                    <i data-lucide="plus"></i>
+                  </button>
+                </div>
+                <div style="padding:10px; overflow:auto; max-height: 320px;">
+                  <div id="create-assignment-days-table"></div>
+                </div>
+              </div>
+
+              <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+                <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                  <div style="font-weight:700;">Предложения</div>
+                  <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:36px; height:36px;">
+                    <i data-lucide="check-square"></i>
+                  </button>
+                </div>
+                <div style="overflow:auto; max-height: 320px;">
+                  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead>
+                      <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
+                        <th style="text-align:left; padding:8px 10px; width:86px; font-weight:700;">№</th>
+                        <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;"> </th>
+                        <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
+                      </tr>
+                    </thead>
+                    <tbody id="create-assignment-sentences-body"></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="form-row" style="margin-top: 12px;">
-            <label for="create-assignment-attempts">Сколько раз пройти на медальку</label>
-            <input type="number" id="create-assignment-attempts" min="1" step="1" value="1">
-          </div>
         </div>
-
-        <div id="create-assignment-type-days" style="margin-top: 12px; display:none;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
-            <div style="font-weight:600;">План по дням</div>
-            <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день">
-              <i data-lucide="plus"></i>
-            </button>
-          </div>
-          <div id="create-assignment-days-table" style="margin-top: 10px;"></div>
-        </div>
-      </div>
-      <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:12px; padding:0 16px 16px 16px;">
-        <button type="button" id="create-assignment-cancel" class="button-secondary">Отмена</button>
-        <button type="button" id="create-assignment-save" class="button-color-yellow">Сохранить</button>
       </div>
     </div>
   `;
@@ -963,10 +1126,6 @@ async function openCreateAssignmentModal(dictationId) {
   const groupSelect = document.getElementById('create-assignment-group');
   if (groupSelect) {
     groupSelect.innerHTML = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = '— выбери группу —';
-    groupSelect.appendChild(opt);
   }
 
   try {
@@ -978,13 +1137,51 @@ async function openCreateAssignmentModal(dictationId) {
         o.textContent = String(g.title || `Группа ${g.id}`);
         groupSelect.appendChild(o);
       });
+
+      const last = getAssignmentLastGroupId();
+      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
+        groupSelect.value = last;
+      } else if (groups.length > 0) {
+        groupSelect.value = String(groups[0].id);
+      }
     }
   } catch (e) {
   }
 
+  if (groupSelect) {
+    groupSelect.onchange = () => {
+      setAssignmentLastGroupId(groupSelect.value);
+    };
+  }
+
+  try {
+    const meta = await loadDictationMetaForAssignmentModal(dictationId);
+    const titleEl = document.getElementById('create-assignment-dictation-title');
+    const coverImg = document.getElementById('create-assignment-cover-img');
+    const metaEl = document.getElementById('create-assignment-cover-meta');
+    if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
+    if (coverImg) coverImg.src = meta && meta.cover_url ? String(meta.cover_url) : '';
+    if (metaEl) {
+      const level = meta && meta.level ? String(meta.level) : '—';
+      const lang = meta && meta.language_code ? String(meta.language_code) : '—';
+      metaEl.textContent = `${lang.toUpperCase()} · ${level}`;
+    }
+  } catch (e) {
+  }
+
+  try {
+    const sentences = await loadDictationSentencesForAssignmentModal(dictationId);
+    setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: null });
+    renderCreateAssignmentSentencesTable(modal);
+  } catch (e) {
+    setCreateAssignmentSentencesState(modal, { sentences: [], selectedPositions: null });
+    renderCreateAssignmentSentencesTable(modal);
+  }
+
   const typeSelect = document.getElementById('create-assignment-type');
   const periodBlock = document.getElementById('create-assignment-type-period');
-  const daysBlock = document.getElementById('create-assignment-type-days');
+  const daysPanel = document.getElementById('create-assignment-days-panel');
+  const daysAddBtn = document.getElementById('create-assignment-days-add');
   const fromEl = document.getElementById('create-assignment-from');
   const toEl = document.getElementById('create-assignment-to');
   const attemptsEl = document.getElementById('create-assignment-attempts');
@@ -999,8 +1196,9 @@ async function openCreateAssignmentModal(dictationId) {
 
   const updateTypeUi = () => {
     const v = typeSelect ? String(typeSelect.value || 'period') : 'period';
-    if (periodBlock) periodBlock.style.display = v === 'period' ? 'block' : 'none';
-    if (daysBlock) daysBlock.style.display = v === 'days' ? 'block' : 'none';
+    if (periodBlock) periodBlock.style.display = v === 'period' ? 'flex' : 'none';
+    if (daysPanel) daysPanel.style.display = v === 'days' ? 'flex' : 'none';
+    if (daysAddBtn) daysAddBtn.style.display = v === 'days' ? 'inline-flex' : 'none';
   };
 
   if (typeSelect) {
@@ -1009,9 +1207,8 @@ async function openCreateAssignmentModal(dictationId) {
   }
   updateTypeUi();
 
-  const addDayBtn = document.getElementById('create-assignment-days-add');
-  if (addDayBtn) {
-    addDayBtn.onclick = () => {
+  if (daysAddBtn) {
+    daysAddBtn.onclick = () => {
       const cur = getCreateAssignmentDaysState(modal);
       const last = cur.length > 0 ? cur[cur.length - 1] : null;
       const lastDate = last && last.date ? String(last.date) : today;
@@ -1021,8 +1218,25 @@ async function openCreateAssignmentModal(dictationId) {
     };
   }
 
+  const toggleAllBtn = document.getElementById('create-assignment-sentences-toggle-all');
+  if (toggleAllBtn) {
+    toggleAllBtn.onclick = () => {
+      const cur = getCreateAssignmentSentencesState(modal);
+      const sents = Array.isArray(cur.sentences) ? cur.sentences : [];
+      const allPos = sents.map(x => Number(x.position)).filter(p => Number.isFinite(p));
+      if (!allPos.length) return;
+
+      const selected = Array.isArray(cur.selectedPositions)
+        ? new Set(cur.selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x)))
+        : null;
+      const allSelected = !selected || allPos.every(p => selected.has(p));
+
+      setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: allSelected ? [] : null }));
+      renderCreateAssignmentSentencesTable(modal);
+    };
+  }
+
   const closeBtn = document.getElementById('create-assignment-close');
-  const cancelBtn = document.getElementById('create-assignment-cancel');
   const saveBtn = document.getElementById('create-assignment-save');
 
   const close = () => {
@@ -1030,7 +1244,6 @@ async function openCreateAssignmentModal(dictationId) {
   };
 
   if (closeBtn) closeBtn.onclick = () => close();
-  if (cancelBtn) cancelBtn.onclick = () => close();
   modal.onclick = (e) => {
     if (e.target === modal) close();
   };
@@ -1067,6 +1280,14 @@ async function openCreateAssignmentModal(dictationId) {
           const end_date = toEl ? String(toEl.value || '').trim() : '';
           const required_completions = attemptsEl ? Number(attemptsEl.value || 1) : 1;
 
+          const sentenceState = getCreateAssignmentSentencesState(modal);
+          const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
+
+          if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
+            showToast('Выбери хотя бы одно предложение');
+            return;
+          }
+
           if (!start_date || !end_date) {
             showToast('Выбери даты');
             return;
@@ -1084,7 +1305,8 @@ async function openCreateAssignmentModal(dictationId) {
               mode: 'period',
               start_date,
               end_date,
-              required_completions
+              required_completions,
+              selected_sentence_positions
             })
           });
 
@@ -1105,6 +1327,14 @@ async function openCreateAssignmentModal(dictationId) {
             required_completions: Number(x?.count || 1)
           })).filter(x => x.date);
 
+          const sentenceState = getCreateAssignmentSentencesState(modal);
+          const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
+
+          if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
+            showToast('Выбери хотя бы одно предложение');
+            return;
+          }
+
           if (!days.length) {
             showToast('Добавь хотя бы один день');
             return;
@@ -1122,7 +1352,8 @@ async function openCreateAssignmentModal(dictationId) {
               group_id,
               dictation_id,
               mode: 'days',
-              days
+              days,
+              selected_sentence_positions
             })
           });
 

@@ -53,6 +53,7 @@ def api_teacher_create_assignment():
     group_id = data.get("group_id")
     dictation_id = data.get("dictation_id")
     mode = (data.get("mode") or data.get("type") or "").strip().lower()
+    selected_sentence_positions = data.get("selected_sentence_positions")
 
     try:
         group_id_int = int(group_id)
@@ -69,6 +70,7 @@ def api_teacher_create_assignment():
                 start_date=data.get("start_date"),
                 end_date=data.get("end_date"),
                 required_completions=data.get("required_completions"),
+                selected_sentence_positions=selected_sentence_positions,
             )
             return jsonify({"success": True, "assignment": item})
 
@@ -78,6 +80,7 @@ def api_teacher_create_assignment():
                 dictation_id_int,
                 user["id"],
                 days=data.get("days") or data.get("plan") or [],
+                selected_sentence_positions=selected_sentence_positions,
             )
             return jsonify({"success": True, "assignments": items})
 

@@ -67,6 +67,7 @@ def create_assignment_period(
     start_date: Any,
     end_date: Any,
     required_completions: Any,
+    selected_sentence_positions: Any = None,
 ) -> dict:
     start_d = _parse_date(start_date)
     end_d = _parse_date(end_date)
@@ -87,6 +88,14 @@ def create_assignment_period(
         _ensure_teacher_of_group(cur, group_id, teacher_user_id)
         _check_overlap(cur, group_id=group_id, dictation_id=dictation_id, start_date=start_d, end_date=end_d)
 
+        positions = selected_sentence_positions
+        if isinstance(positions, list):
+            positions = [int(x) for x in positions if x is not None]
+            if not positions:
+                positions = None
+        else:
+            positions = None
+
         cur.execute(
             """
             INSERT INTO assignments (
@@ -96,14 +105,15 @@ def create_assignment_period(
                 start_date,
                 end_date,
                 required_completions,
+                selected_sentence_positions,
                 created_at,
                 updated_at,
                 archived_at
             )
-            VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, created_at, updated_at, archived_at
+            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
             """,
-            (group_id, dictation_id, teacher_user_id, start_d, end_d, req),
+            (group_id, dictation_id, teacher_user_id, start_d, end_d, req, positions),
         )
         row = cur.fetchone() or {}
         conn.commit()
@@ -270,6 +280,7 @@ def create_assignment_days(
     teacher_user_id: int,
     *,
     days: list[dict],
+    selected_sentence_positions: Any = None,
 ) -> list[dict]:
     if not isinstance(days, list) or not days:
         raise ValueError("days is required")
@@ -295,6 +306,14 @@ def create_assignment_days(
         for day_d, _ in prepared:
             _check_overlap(cur, group_id=group_id, dictation_id=dictation_id, start_date=day_d, end_date=day_d)
 
+        positions = selected_sentence_positions
+        if isinstance(positions, list):
+            positions = [int(x) for x in positions if x is not None]
+            if not positions:
+                positions = None
+        else:
+            positions = None
+
         rows: list[dict] = []
         for day_d, req in prepared:
             cur.execute(
@@ -306,14 +325,15 @@ def create_assignment_days(
                     start_date,
                     end_date,
                     required_completions,
+                    selected_sentence_positions,
                     created_at,
                     updated_at,
                     archived_at
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
-                RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, created_at, updated_at, archived_at
+                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
+                RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
                 """,
-                (group_id, dictation_id, teacher_user_id, day_d, day_d, req),
+                (group_id, dictation_id, teacher_user_id, day_d, day_d, req, positions),
             )
             row = cur.fetchone() or {}
             rows.append(_row_to_assignment(row))
@@ -335,6 +355,7 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             f"""
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
                    a.start_date, a.end_date, a.required_completions,
+                   a.selected_sentence_positions,
                    a.created_at, a.updated_at, a.archived_at,
                    g.title AS group_title,
                    d.title AS dictation_title,
@@ -419,6 +440,7 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             """
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
                    a.start_date, a.end_date, a.required_completions,
+                   a.selected_sentence_positions,
                    a.created_at, a.updated_at, a.archived_at,
                    g.title AS group_title,
                    d.title AS dictation_title,
@@ -505,6 +527,7 @@ def _row_to_assignment(row: dict) -> dict:
         "start_date": row.get("start_date").isoformat() if row.get("start_date") else None,
         "end_date": row.get("end_date").isoformat() if row.get("end_date") else None,
         "required_completions": int(row.get("required_completions")) if row.get("required_completions") is not None else None,
+        "selected_sentence_positions": list(row.get("selected_sentence_positions") or []) if row.get("selected_sentence_positions") is not None else None,
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
         "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
