@@ -3084,9 +3084,15 @@
 .create-assignment-panel-body {
   padding: 0;
   overflow: auto;
-  max-height: 360px;
+  height: 360px;
   min-height: 0;
   position: relative;
+  flex: 1;
+  scroll-padding-top: 0;
+}
+
+.create-assignment-panel-body table {
+  margin: 0;
 }
 
 .create-assignment-table {
