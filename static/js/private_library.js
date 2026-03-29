@@ -220,12 +220,12 @@ function ensureCreateAssignmentModal() {
             <div style="width:220px; height:120px; border-radius:14px; overflow:hidden; background: rgba(0,0,0,0.06); border:1px solid rgba(0,0,0,0.08);">
               <img id="create-assignment-cover-img" alt="" style="width:100%; height:100%; object-fit:cover; object-position:center center; display:block;" />
             </div>
-            <div id="create-assignment-cover-meta" style="font-size:12px; color: rgba(0,0,0,0.6);"></div>
           </div>
 
           <!-- верхняя-правая: инфо -->
           <div style="min-width:0;">
             <div id="create-assignment-dictation-title" style="font-size:20px; color: rgba(0,0,0,0.55); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div id="create-assignment-cover-meta" style="font-size:12px; color: rgba(0,0,0,0.6);"></div>
             <div style="display:flex; flex-direction:column; gap:10px;">
               <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                 <select id="create-assignment-group" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);"></select>
@@ -253,31 +253,29 @@ function ensureCreateAssignmentModal() {
         </div>
 
         <!-- НИЖНЯЯ ПАНЕЛЬ -->
-        <div style="display:grid; grid-template-columns: 420px 1fr; gap:12px; margin-top: 14px;">
-          <div id="create-assignment-days-panel" style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
-            <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <div></div>
-              <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
-                <i data-lucide="plus"></i>
-              </button>
-            </div>
-            <div style="padding:10px; overflow:auto; max-height: 320px;">
+        <div id="create-assignment-bottom" style="display:grid; grid-template-columns: 420px 1fr; gap:12px; margin-top: 14px;">
+          <div id="create-assignment-days-panel" style="border:0; border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+            <div style="padding:10px; overflow:auto; max-height: 360px;">
+              <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
+                  <i data-lucide="plus"></i>
+                </button>
+              </div>
               <div id="create-assignment-days-table"></div>
             </div>
           </div>
 
-          <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column; min-width:0;">
-            <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:36px; height:36px;">
-                <i data-lucide="circle"></i>
-              </button>
-            </div>
-            <div style="overflow:auto; max-height: 320px;">
+          <div style="border:0; border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column; min-width:0;">
+            <div style="overflow:auto; max-height: 360px;">
               <table style="width:100%; border-collapse:collapse; font-size:13px;">
                 <thead>
                   <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
                     <th style="text-align:left; padding:8px 10px; width:70px; font-weight:700;">№</th>
-                    <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;"></th>
+                    <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;">
+                      <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;">
+                        <i data-lucide="circle"></i>
+                      </button>
+                    </th>
                     <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
                   </tr>
                 </thead>
@@ -1102,10 +1100,13 @@ function renderCreateAssignmentDaysTable(modal) {
     dateInput.value = row && row.date ? String(row.date) : '';
     dateInput.style.height = '40px';
     dateInput.style.width = '100%';
-    dateInput.style.padding = '0 10px';
+    dateInput.style.padding = '0 6px';
     dateInput.style.borderRadius = '0';
     dateInput.style.border = '0';
     dateInput.style.background = 'transparent';
+    dateInput.style.boxSizing = 'border-box';
+    dateInput.style.minWidth = '0';
+    dateInput.style.overflow = 'hidden';
     dateTd.appendChild(dateInput);
 
     const medalTd = document.createElement('td');
@@ -1125,6 +1126,7 @@ function renderCreateAssignmentDaysTable(modal) {
     countInput.style.borderRadius = '0';
     countInput.style.border = '0';
     countInput.style.background = 'transparent';
+    countInput.style.boxSizing = 'border-box';
     medalWrap.appendChild(countInput);
     medalTd.appendChild(medalWrap);
 
@@ -1246,6 +1248,7 @@ async function openCreateAssignmentModal(dictationId) {
   const periodBlock = document.getElementById('create-assignment-type-period');
   const daysPanel = document.getElementById('create-assignment-days-panel');
   const daysAddBtn = document.getElementById('create-assignment-days-add');
+  const bottom = document.getElementById('create-assignment-bottom');
   const fromEl = document.getElementById('create-assignment-from');
   const toEl = document.getElementById('create-assignment-to');
   const attemptsEl = document.getElementById('create-assignment-attempts');
@@ -1263,11 +1266,19 @@ async function openCreateAssignmentModal(dictationId) {
     if (periodBlock) periodBlock.style.display = v === 'period' ? 'flex' : 'none';
     if (daysPanel) daysPanel.style.display = v === 'days' ? 'flex' : 'none';
     if (daysAddBtn) daysAddBtn.style.display = v === 'days' ? 'inline-flex' : 'none';
+
+    if (bottom) {
+      if (v === 'period') {
+        bottom.style.gridTemplateColumns = '1fr';
+      } else {
+        bottom.style.gridTemplateColumns = '420px 1fr';
+      }
+    }
   };
 
   if (typeSelect) {
     typeSelect.onchange = () => updateTypeUi();
-    typeSelect.value = 'period';
+    typeSelect.value = 'days';
   }
   updateTypeUi();
 
