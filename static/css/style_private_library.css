@@ -3064,7 +3064,7 @@
 .create-assignment-panel-actions {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  padding: 10px 10px 0 10px;
 }
 
 .create-assignment-icon-btn {
@@ -3082,10 +3082,11 @@
 }
 
 .create-assignment-panel-body {
-  padding: 10px;
+  padding: 0;
   overflow: auto;
   max-height: 360px;
   min-height: 0;
+  position: relative;
 }
 
 .create-assignment-table {
@@ -3103,6 +3104,10 @@
   text-align: left;
   padding: 8px 10px;
   font-weight: 700;
+}
+
+.create-assignment-table tbody td {
+  padding: 8px 10px;
 }
 
 .create-assignment-th-num {

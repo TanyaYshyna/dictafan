@@ -1133,9 +1133,13 @@ function renderCreateAssignmentDaysTable(modal) {
     delBtn.type = 'button';
     delBtn.className = 'topbar-icon-btn';
     delBtn.title = 'Удалить день';
-    delBtn.style.width = '36px';
-    delBtn.style.height = '36px';
-    delBtn.style.margin = '0 auto';
+    delBtn.style.width = '100%';
+    delBtn.style.height = '40px';
+    delBtn.style.margin = '0';
+    delBtn.style.borderRadius = '0';
+    delBtn.style.display = 'flex';
+    delBtn.style.alignItems = 'center';
+    delBtn.style.justifyContent = 'center';
     delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
     delTd.appendChild(delBtn);
 
@@ -1267,7 +1271,7 @@ async function openCreateAssignmentModal(dictationId) {
       if (v === 'period') {
         bottom.style.gridTemplateColumns = '1fr';
       } else {
-        bottom.style.gridTemplateColumns = '420px 1fr';
+        bottom.style.gridTemplateColumns = '300px 1fr';
       }
     }
   };
