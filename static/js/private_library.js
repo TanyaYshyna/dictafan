@@ -70,6 +70,21 @@ function setCreateAssignmentSentencesState(modal, state) {
   }
 }
 
+function renderLucideCheckboxButton(btn, checked, disabled) {
+  if (!btn) return;
+  btn.dataset.checked = checked ? '1' : '0';
+  btn.dataset.disabled = disabled ? '1' : '0';
+  btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+  btn.disabled = Boolean(disabled);
+  btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: btn });
+    }
+  } catch (e) {
+  }
+}
+
 function renderCreateAssignmentSentencesTable(modal) {
   const tbody = document.getElementById('create-assignment-sentences-body');
   if (!tbody) return;
@@ -89,6 +104,12 @@ function renderCreateAssignmentSentencesTable(modal) {
   const allPositions = sentences.map(s => Number(s.position)).filter(p => Number.isFinite(p));
   const allSelected = !selected || allPositions.every(p => selected.has(p));
 
+  const headerToggleBtn = document.getElementById('create-assignment-sentences-toggle-all');
+  if (headerToggleBtn) {
+    renderLucideCheckboxButton(headerToggleBtn, allSelected, !allPositions.length);
+    headerToggleBtn.title = allSelected ? 'Снять выделение' : 'Выбрать все';
+  }
+
   sentences.forEach((s, idx) => {
     const pos = Number(s.position);
     const fullPos = Number.isFinite(pos) ? pos : null;
@@ -101,29 +122,47 @@ function renderCreateAssignmentSentencesTable(modal) {
     tr.innerHTML = `
       <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums; white-space:nowrap;">${escapeHtml(labelNum)}</td>
       <td style="padding:8px 10px; width:46px;">
-        <input type="checkbox" class="create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" ${isChecked ? 'checked' : ''} ${fullPos == null ? 'disabled' : ''} />
+        <button type="button" class="topbar-icon-btn create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" aria-label="Выбрать предложение" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
       </td>
       <td style="padding:8px 10px;">${escapeHtml(text)}</td>
     `;
     tbody.appendChild(tr);
+
+    const btn = tr.querySelector('.create-assignment-sentence-check');
+    renderLucideCheckboxButton(btn, Boolean(isChecked), fullPos == null);
   });
 
   if (!tbody.dataset.listenerAttached) {
     tbody.dataset.listenerAttached = '1';
-    tbody.addEventListener('change', () => {
+    tbody.addEventListener('click', (e) => {
+      const btn = e.target && e.target.closest ? e.target.closest('.create-assignment-sentence-check') : null;
+      if (!(btn instanceof HTMLButtonElement)) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (btn.disabled) return;
+
       const cur = getCreateAssignmentSentencesState(modal);
       const sents = Array.isArray(cur.sentences) ? cur.sentences : [];
       const allPos = sents.map(x => Number(x.position)).filter(p => Number.isFinite(p));
-      const selectedNow = [];
-      tbody.querySelectorAll('.create-assignment-sentence-check').forEach(cb => {
-        if (!(cb instanceof HTMLInputElement)) return;
-        const p = Number(cb.dataset.position);
-        if (!Number.isFinite(p)) return;
-        if (cb.checked) selectedNow.push(p);
-      });
 
-      const setAll = allPos.length > 0 && selectedNow.length === allPos.length;
-      setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: setAll ? null : selectedNow }));
+      const p = Number(btn.dataset.position);
+      if (!Number.isFinite(p)) return;
+
+      const selectedNow = Array.isArray(cur.selectedPositions)
+        ? cur.selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : allPos.slice();
+
+      const set = new Set(selectedNow);
+      if (set.has(p)) set.delete(p);
+      else set.add(p);
+
+      const nextSelected = Array.from(set);
+      nextSelected.sort((a, b) => a - b);
+
+      const setAll = allPos.length > 0 && nextSelected.length === allPos.length;
+      setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: setAll ? null : nextSelected }));
+      renderCreateAssignmentSentencesTable(modal);
     });
   }
 }
@@ -157,7 +196,6 @@ function ensureCreateAssignmentModal() {
           </div>
           <div style="min-width:0;">
             <div style="font-weight:800; font-size:16px; line-height:1.1;">Задание</div>
-            <div id="create-assignment-dictation-title" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
           </div>
         </div>
 
@@ -187,12 +225,15 @@ function ensureCreateAssignmentModal() {
 
           <!-- верхняя-правая: инфо -->
           <div style="min-width:0;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-              <select id="create-assignment-group" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);"></select>
-              <select id="create-assignment-type" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);">
+            <div id="create-assignment-dictation-title" style="font-size:20px; color: rgba(0,0,0,0.55); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <select id="create-assignment-group" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);"></select>
+                <select id="create-assignment-type" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);">
                 <option value="period">на период</option>
                 <option value="days">по дням</option>
-              </select>
+                </select>
+              </div>
 
               <div id="create-assignment-type-period" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:8px;">
@@ -225,11 +266,10 @@ function ensureCreateAssignmentModal() {
             </div>
           </div>
 
-          <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+          <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column; min-width:0;">
             <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <div style="font-weight:700;">Предложения</div>
               <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:36px; height:36px;">
-                <i data-lucide="check-square"></i>
+                <i data-lucide="circle"></i>
               </button>
             </div>
             <div style="overflow:auto; max-height: 320px;">
@@ -3532,10 +3572,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <i data-lucide="more-vertical"></i>
               </button>
               <div class="dropdown-menu short-card-actions-menu" style="display: none;">
-                <a class="dropdown-menu-item" href="${editUrl}" onclick="event.stopPropagation();">
+                <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
                   <i data-lucide="pencil-ruler"></i>
                   <span>Редактировать</span>
-                </a>
+                </button>
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
                   <i data-lucide="clipboard-list"></i>
                   <span>Задание</span>
@@ -3621,10 +3661,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <i data-lucide="more-vertical"></i>
               </button>
               <div class="dropdown-menu short-card-actions-menu" style="display: none;">
-                <a class="dropdown-menu-item" href="${editUrl}" onclick="event.stopPropagation();">
+                <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
                   <i data-lucide="pencil-ruler"></i>
                   <span>Редактировать</span>
-                </a>
+                </button>
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dbId}">
                   <i data-lucide="clipboard-list"></i>
                   <span>Задание</span>
@@ -5655,6 +5695,23 @@ function installEventHandlers() {
       }
     }
 
+    if (e.target.closest('[data-action="edit-dictation"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="edit-dictation"]');
+      const editUrl = btn ? String(btn.getAttribute('data-edit-url') || '').trim() : '';
+      if (!editUrl) return;
+
+      const menu = btn.closest('.short-card-actions-menu');
+      if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+      }
+
+      window.location.href = editUrl;
+      return;
+    }
+
     // Удалить (на карточке диктанта)
     if (e.target.closest('[data-action="delete-dictation"]')) {
       const btn = e.target.closest('[data-action="delete-dictation"]');
@@ -5674,7 +5731,7 @@ function installEventHandlers() {
       const itemId = btn.getAttribute('data-desk-item-id');
       const dictationId = btn.getAttribute('data-dictation-id');
       if (itemId && dictationId) {
-        removeFromDesk(itemId, dictationId);
+        await removeDictationFromDesk(itemId, dictationId);
       }
     }
 
