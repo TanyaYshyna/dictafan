@@ -43,7 +43,8 @@ async function loadDictationSentencesForAssignmentModal(dictationId) {
   if (!Number.isFinite(id) || id <= 0) return [];
   const meta = await loadDictationMetaForAssignmentModal(id);
   const langOrig = meta && meta.language_code ? String(meta.language_code) : 'en';
-  const url = `/api/dictation/${encodeURIComponent(id)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langOrig)}/sentences`;
+  // ВАЖНО: endpoint ожидает dict_<id>, иначе отдаёт 400
+  const url = `/api/dictation/${encodeURIComponent(`dict_${id}`)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langOrig)}/sentences`;
   const res = await fetch(url, { method: 'GET', cache: 'no-store' });
   if (!res.ok) return [];
   const data = await res.json();
@@ -149,8 +150,8 @@ function ensureCreateAssignmentModal() {
   modal.style.zIndex = '10094';
 
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 980px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
-      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid rgba(0,0,0,0.08);">
+    <div class="modal-content" style="max-width: 1040px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
+      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px; border-bottom:1px solid rgba(0,0,0,0.08);">
         <div style="display:flex; align-items:center; gap:10px; min-width: 0;">
           <div style="width:36px; height:36px; border-radius:12px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex:0 0 auto;">
             <i data-lucide="clipboard-list"></i>
@@ -162,7 +163,7 @@ function ensureCreateAssignmentModal() {
         </div>
 
         <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="create-assignment-save" class="button-color-yellow" style="height:38px; padding:0 14px; border-radius:12px; display:inline-flex; align-items:center; gap:8px;">
+          <button type="button" id="create-assignment-save" class="btn-primary" style="height:40px; padding:0 14px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
             <i data-lucide="save" style="width:18px; height:18px;"></i>
             <span>Сохранить</span>
           </button>
@@ -175,78 +176,74 @@ function ensureCreateAssignmentModal() {
       <div class="modal-body" style="padding:14px 16px 16px 16px;">
         <input type="hidden" id="create-assignment-dictation-id" value="">
 
-        <div style="display:grid; grid-template-columns: 200px 1fr; gap:14px; align-items:start;">
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <div style="width:200px; height:200px; border-radius:14px; overflow:hidden; background: rgba(0,0,0,0.06); border:1px solid rgba(0,0,0,0.08);">
-              <img id="create-assignment-cover-img" alt="" style="width:100%; height:100%; object-fit:cover; display:block;" />
+        <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+        <div style="display:grid; grid-template-columns: 220px 1fr; gap:14px; align-items:start;">
+          <!-- верхняя-левая: ковер стандартного вида как в карточках -->
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="width:220px; height:120px; border-radius:14px; overflow:hidden; background: rgba(0,0,0,0.06); border:1px solid rgba(0,0,0,0.08);">
+              <img id="create-assignment-cover-img" alt="" style="width:100%; height:100%; object-fit:cover; object-position:center center; display:block;" />
             </div>
             <div id="create-assignment-cover-meta" style="font-size:12px; color: rgba(0,0,0,0.6);"></div>
           </div>
 
+          <!-- верхняя-правая: инфо -->
           <div style="min-width:0;">
-            <div style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
-              <div style="display:flex; flex-direction:column; gap:6px; min-width: 220px;">
-                <div style="font-size:12px; color: rgba(0,0,0,0.55);">Группа</div>
-                <select id="create-assignment-group" style="height:40px;"></select>
-              </div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <select id="create-assignment-group" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);"></select>
+              <select id="create-assignment-type" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);">
+                <option value="period">на период</option>
+                <option value="days">по дням</option>
+              </select>
 
-              <div style="display:flex; flex-direction:column; gap:6px; min-width: 160px;">
-                <div style="font-size:12px; color: rgba(0,0,0,0.55);">Тип</div>
-                <select id="create-assignment-type" style="height:40px;">
-                  <option value="period">на период</option>
-                  <option value="days">по дням</option>
-                </select>
-              </div>
+              <div id="create-assignment-type-period" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="color: rgba(0,0,0,0.6);">с</span>
+                  <input type="date" id="create-assignment-from" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
+                  <span style="color: rgba(0,0,0,0.6);">по</span>
+                  <input type="date" id="create-assignment-to" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
+                </div>
 
-              <div id="create-assignment-type-period" style="display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap;">
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">с</div>
-                  <input type="date" id="create-assignment-from" style="height:40px;" />
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">по</div>
-                  <input type="date" id="create-assignment-to" style="height:40px;" />
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px; min-width:160px;">
-                  <div style="font-size:12px; color: rgba(0,0,0,0.55);">На медальку</div>
-                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px;" />
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <i data-lucide="medal" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>
+                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px; width:110px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
                 </div>
               </div>
             </div>
+          </div>
+        </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top: 14px;">
-              <div id="create-assignment-days-panel" style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
-                <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                  <div style="font-weight:700;">По дням</div>
-                  <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
-                    <i data-lucide="plus"></i>
-                  </button>
-                </div>
-                <div style="padding:10px; overflow:auto; max-height: 320px;">
-                  <div id="create-assignment-days-table"></div>
-                </div>
-              </div>
+        <!-- НИЖНЯЯ ПАНЕЛЬ -->
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top: 14px;">
+          <div id="create-assignment-days-panel" style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+            <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div style="font-weight:700;">По дням</div>
+              <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
+                <i data-lucide="plus"></i>
+              </button>
+            </div>
+            <div style="padding:10px; overflow:auto; max-height: 320px;">
+              <div id="create-assignment-days-table"></div>
+            </div>
+          </div>
 
-              <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
-                <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                  <div style="font-weight:700;">Предложения</div>
-                  <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:36px; height:36px;">
-                    <i data-lucide="check-square"></i>
-                  </button>
-                </div>
-                <div style="overflow:auto; max-height: 320px;">
-                  <table style="width:100%; border-collapse:collapse; font-size:13px;">
-                    <thead>
-                      <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
-                        <th style="text-align:left; padding:8px 10px; width:86px; font-weight:700;">№</th>
-                        <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;"> </th>
-                        <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
-                      </tr>
-                    </thead>
-                    <tbody id="create-assignment-sentences-body"></tbody>
-                  </table>
-                </div>
-              </div>
+          <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
+            <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
+              <div style="font-weight:700;">Предложения</div>
+              <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:36px; height:36px;">
+                <i data-lucide="check-square"></i>
+              </button>
+            </div>
+            <div style="overflow:auto; max-height: 320px;">
+              <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                <thead>
+                  <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
+                    <th style="text-align:left; padding:8px 10px; width:86px; font-weight:700;">№</th>
+                    <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;"></th>
+                    <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
+                  </tr>
+                </thead>
+                <tbody id="create-assignment-sentences-body"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1039,44 +1036,73 @@ function renderCreateAssignmentDaysTable(modal) {
     return;
   }
 
-  const header = document.createElement('div');
-  header.style.display = 'grid';
-  header.style.gridTemplateColumns = '1fr 200px 36px';
-  header.style.gap = '10px';
-  header.style.fontSize = '12px';
-  header.style.color = '#666';
-  header.style.padding = '0 0 6px 0';
-  header.innerHTML = '<div>Дата</div><div>Диктантов в день</div><div></div>';
-  table.appendChild(header);
+  const tableEl = document.createElement('table');
+  tableEl.style.width = '100%';
+  tableEl.style.borderCollapse = 'collapse';
+  tableEl.style.fontSize = '13px';
 
+  const thead = document.createElement('thead');
+  thead.innerHTML = `
+    <tr style="border-bottom:1px solid rgba(0,0,0,0.08);">
+      <th style="text-align:left; padding:8px 6px; font-weight:700;">Дата</th>
+      <th style="text-align:left; padding:8px 6px; width:160px; font-weight:700;"></th>
+      <th style="text-align:right; padding:8px 6px; width:46px; font-weight:700;"></th>
+    </tr>
+  `;
+  tableEl.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
   days.forEach((row, idx) => {
-    const wrap = document.createElement('div');
-    wrap.style.display = 'grid';
-    wrap.style.gridTemplateColumns = '1fr 200px 36px';
-    wrap.style.gap = '10px';
-    wrap.style.alignItems = 'center';
-    wrap.style.padding = '6px 0';
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
 
+    const dateTd = document.createElement('td');
+    dateTd.style.padding = '8px 6px';
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.value = row && row.date ? String(row.date) : '';
+    dateInput.style.height = '40px';
+    dateInput.style.padding = '0 10px';
+    dateInput.style.borderRadius = '8px';
+    dateInput.style.border = '1px solid rgba(0,0,0,0.16)';
+    dateTd.appendChild(dateInput);
 
+    const medalTd = document.createElement('td');
+    medalTd.style.padding = '8px 6px';
+    const medalWrap = document.createElement('div');
+    medalWrap.style.display = 'flex';
+    medalWrap.style.alignItems = 'center';
+    medalWrap.style.gap = '8px';
+    medalWrap.innerHTML = '<i data-lucide="medal" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>';
     const countInput = document.createElement('input');
     countInput.type = 'number';
     countInput.min = '1';
     countInput.step = '1';
     countInput.value = row && row.count ? String(row.count) : '1';
+    countInput.style.height = '40px';
+    countInput.style.width = '90px';
+    countInput.style.padding = '0 10px';
+    countInput.style.borderRadius = '8px';
+    countInput.style.border = '1px solid rgba(0,0,0,0.16)';
+    medalWrap.appendChild(countInput);
+    medalTd.appendChild(medalWrap);
 
-    if (isWeekendIsoDate(dateInput.value)) {
-      dateInput.style.borderColor = '#d33';
-      countInput.style.borderColor = '#d33';
-    }
+    const delTd = document.createElement('td');
+    delTd.style.padding = '8px 6px';
+    delTd.style.textAlign = 'right';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'topbar-icon-btn';
+    delBtn.title = 'Удалить день';
+    delBtn.style.width = '36px';
+    delBtn.style.height = '36px';
+    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+    delTd.appendChild(delBtn);
 
     dateInput.addEventListener('change', () => {
       const next = getCreateAssignmentDaysState(modal);
       next[idx] = Object.assign({}, next[idx], { date: String(dateInput.value || '') });
       setCreateAssignmentDaysState(modal, next);
-      renderCreateAssignmentDaysTable(modal);
     });
     countInput.addEventListener('change', () => {
       const next = getCreateAssignmentDaysState(modal);
@@ -1084,12 +1110,6 @@ function renderCreateAssignmentDaysTable(modal) {
       next[idx] = Object.assign({}, next[idx], { count: Number.isFinite(v) && v > 0 ? v : 1 });
       setCreateAssignmentDaysState(modal, next);
     });
-
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'topbar-icon-btn';
-    delBtn.title = 'Удалить день';
-    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
     delBtn.addEventListener('click', () => {
       const next = getCreateAssignmentDaysState(modal);
       next.splice(idx, 1);
@@ -1097,11 +1117,13 @@ function renderCreateAssignmentDaysTable(modal) {
       renderCreateAssignmentDaysTable(modal);
     });
 
-    wrap.appendChild(dateInput);
-    wrap.appendChild(countInput);
-    wrap.appendChild(delBtn);
-    table.appendChild(wrap);
+    tr.appendChild(dateTd);
+    tr.appendChild(medalTd);
+    tr.appendChild(delTd);
+    tbody.appendChild(tr);
   });
+  tableEl.appendChild(tbody);
+  table.appendChild(tableEl);
 
   try {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
