@@ -2853,3 +2853,262 @@
   100% { transform: rotate(360deg); }
 }
 
+.create-assignment-modal-content {
+  max-width: 1040px;
+  width: calc(100% - 32px);
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+  color: #222;
+}
+
+.create-assignment-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.create-assignment-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.create-assignment-modal-title-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.create-assignment-modal-title-icon i {
+  width: 18px;
+  height: 18px;
+}
+
+.create-assignment-modal-title-text {
+  font-weight: 800;
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.create-assignment-modal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.create-assignment-save-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.create-assignment-save-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.create-assignment-close-btn {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 6px;
+}
+
+.create-assignment-modal-body {
+  padding: 14px 16px 16px 16px;
+}
+
+.create-assignment-top {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 14px;
+  align-items: start;
+}
+
+.create-assignment-cover {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.create-assignment-cover-box {
+  width: 220px;
+  height: 120px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.create-assignment-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+
+.create-assignment-top-right {
+  min-width: 0;
+}
+
+.create-assignment-dictation-title {
+  font-size: 20px;
+  color: rgba(0, 0, 0, 0.55);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.create-assignment-cover-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.create-assignment-top-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.create-assignment-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.create-assignment-select {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.create-assignment-period-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.create-assignment-dates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.create-assignment-inline-label {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.create-assignment-date {
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.create-assignment-medals {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.create-assignment-award-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-button-yellow-dark, #eab308);
+}
+
+.create-assignment-medals-input {
+  height: 40px;
+  width: 52px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.create-assignment-bottom {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.create-assignment-panel {
+  border: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.create-assignment-panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.create-assignment-icon-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-assignment-icon-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.create-assignment-panel-body {
+  padding: 10px;
+  overflow: auto;
+  max-height: 360px;
+  min-height: 0;
+}
+
+.create-assignment-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.create-assignment-table thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 700;
+}
+
+.create-assignment-th-num {
+  width: 70px;
+}
+
+.create-assignment-th-check {
+  width: 46px;
+}

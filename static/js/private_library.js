@@ -188,64 +188,60 @@ function ensureCreateAssignmentModal() {
   modal.style.zIndex = '10094';
 
   modal.innerHTML = `
-    <div class="modal-content" style="max-width: 1040px; width: calc(100% - 32px); background: #fff; border-radius: 16px; box-shadow: 0 12px 40px rgba(0,0,0,0.35); overflow: hidden; color: #222;">
-      <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px 12px 16px; border-bottom:1px solid rgba(0,0,0,0.08);">
-        <div style="display:flex; align-items:center; gap:10px; min-width: 0;">
-          <div style="width:36px; height:36px; border-radius:12px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex:0 0 auto;">
-            <i data-lucide="clipboard-list"></i>
-          </div>
-          <div style="min-width:0;">
-            <div style="font-weight:800; font-size:16px; line-height:1.1;">Задание</div>
-          </div>
+    <div class="modal-content create-assignment-modal-content">
+      <div class="modal-header create-assignment-modal-header">
+        <div class="create-assignment-modal-title">
+          <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
+          <div class="create-assignment-modal-title-text">Задание</div>
         </div>
 
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="create-assignment-save" class="btn-primary" style="height:40px; padding:0 14px; border-radius:8px; display:inline-flex; align-items:center; gap:8px;">
-            <i data-lucide="save" style="width:18px; height:18px;"></i>
+        <div class="create-assignment-modal-header-actions">
+          <button type="button" id="create-assignment-save" class="btn-primary create-assignment-save-btn">
+            <i data-lucide="save"></i>
             <span>Сохранить</span>
           </button>
-          <button type="button" id="create-assignment-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+          <button type="button" id="create-assignment-close" class="modal-close create-assignment-close-btn" title="Закрыть">
             <i data-lucide="x"></i>
           </button>
         </div>
       </div>
 
-      <div class="modal-body" style="padding:14px 16px 16px 16px;">
+      <div class="modal-body create-assignment-modal-body">
         <input type="hidden" id="create-assignment-dictation-id" value="">
 
         <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
-        <div style="display:grid; grid-template-columns: 220px 1fr; gap:14px; align-items:start;">
+        <div class="create-assignment-top">
           <!-- верхняя-левая: ковер стандартного вида как в карточках -->
-          <div style="display:flex; flex-direction:column; gap:8px;">
-            <div style="width:220px; height:120px; border-radius:14px; overflow:hidden; background: rgba(0,0,0,0.06); border:1px solid rgba(0,0,0,0.08);">
-              <img id="create-assignment-cover-img" alt="" style="width:100%; height:100%; object-fit:cover; object-position:center center; display:block;" />
+          <div class="create-assignment-cover">
+            <div class="create-assignment-cover-box">
+              <img id="create-assignment-cover-img" alt="" class="create-assignment-cover-img" />
             </div>
           </div>
 
           <!-- верхняя-правая: инфо -->
-          <div style="min-width:0;">
-            <div id="create-assignment-dictation-title" style="font-size:20px; color: rgba(0,0,0,0.55); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-            <div id="create-assignment-cover-meta" style="font-size:12px; color: rgba(0,0,0,0.6);"></div>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <select id="create-assignment-group" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);"></select>
-                <select id="create-assignment-type" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);">
+          <div class="create-assignment-top-right">
+            <div id="create-assignment-dictation-title" class="create-assignment-dictation-title"></div>
+            <div id="create-assignment-cover-meta" class="create-assignment-cover-meta"></div>
+            <div class="create-assignment-top-controls">
+              <div class="create-assignment-top-row">
+                <select id="create-assignment-group" class="create-assignment-select"></select>
+                <select id="create-assignment-type" class="create-assignment-select">
                 <option value="period">на период</option>
                 <option value="days">по дням</option>
                 </select>
               </div>
 
-              <div id="create-assignment-type-period" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <span style="color: rgba(0,0,0,0.6);">с</span>
-                  <input type="date" id="create-assignment-from" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
-                  <span style="color: rgba(0,0,0,0.6);">по</span>
-                  <input type="date" id="create-assignment-to" style="height:40px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
+              <div id="create-assignment-type-period" class="create-assignment-period-row">
+                <div class="create-assignment-dates">
+                  <span class="create-assignment-inline-label">с</span>
+                  <input type="date" id="create-assignment-from" class="create-assignment-date" />
+                  <span class="create-assignment-inline-label">по</span>
+                  <input type="date" id="create-assignment-to" class="create-assignment-date" />
                 </div>
 
-                <div style="display:flex; align-items:center; gap:8px;">
-                  <i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>
-                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px; width:52px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
+                <div class="create-assignment-medals">
+                  <i data-lucide="award" class="create-assignment-award-icon"></i>
+                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" class="create-assignment-medals-input" />
                 </div>
               </div>
             </div>
@@ -253,11 +249,11 @@ function ensureCreateAssignmentModal() {
         </div>
 
         <!-- НИЖНЯЯ ПАНЕЛЬ -->
-        <div id="create-assignment-bottom" style="display:grid; grid-template-columns: 420px 1fr; gap:12px; margin-top: 14px;">
-          <div id="create-assignment-days-panel" style="border:0; border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
-            <div style="padding:10px; overflow:auto; max-height: 360px;">
-              <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
+        <div id="create-assignment-bottom" class="create-assignment-bottom">
+          <div id="create-assignment-days-panel" class="create-assignment-panel create-assignment-panel--days">
+            <div class="create-assignment-panel-body">
+              <div class="create-assignment-panel-actions">
+                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn create-assignment-icon-btn" title="Добавить день">
                   <i data-lucide="plus"></i>
                 </button>
               </div>
@@ -265,18 +261,18 @@ function ensureCreateAssignmentModal() {
             </div>
           </div>
 
-          <div style="border:0; border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column; min-width:0;">
-            <div style="overflow:auto; max-height: 360px;">
-              <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <div class="create-assignment-panel create-assignment-panel--sentences">
+            <div class="create-assignment-panel-body">
+              <table class="create-assignment-table create-assignment-table--sentences">
                 <thead>
-                  <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
-                    <th style="text-align:left; padding:8px 10px; width:70px; font-weight:700;">№</th>
-                    <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;">
-                      <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn" title="Выбрать все" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;">
+                  <tr>
+                    <th class="create-assignment-th-num">№</th>
+                    <th class="create-assignment-th-check">
+                      <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn create-assignment-icon-btn" title="Выбрать все">
                         <i data-lucide="circle"></i>
                       </button>
                     </th>
-                    <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
+                    <th class="create-assignment-th-text">Текст</th>
                   </tr>
                 </thead>
                 <tbody id="create-assignment-sentences-body"></tbody>
