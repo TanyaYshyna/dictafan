@@ -562,6 +562,7 @@ def dictation_editor(dictation_id, language_original, language_translation):
         translations_data=translations_data,
         audio_file=None,
         audio_words=audio_words,
+        author_materials_url=info.get("author_materials_url"),
         current_user=current_user,
         safe_email=safe_email,
             # edit_mode удален - определяется по dictation_id

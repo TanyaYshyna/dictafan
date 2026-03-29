@@ -93,15 +93,14 @@ function renderCreateAssignmentSentencesTable(modal) {
     const pos = Number(s.position);
     const fullPos = Number.isFinite(pos) ? pos : null;
     const isChecked = allSelected ? true : (fullPos != null && selected && selected.has(fullPos));
-    const shortIndex = String(idx + 1).padStart(2, '0');
-    const labelNum = fullPos != null ? `${shortIndex}/${fullPos}` : shortIndex;
+    const labelNum = fullPos != null ? String(fullPos) : String(idx + 1);
     const text = String(s.text || '');
 
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
     tr.innerHTML = `
-      <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums;">${escapeHtml(labelNum)}</td>
-      <td style="padding:8px 10px;">
+      <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums; white-space:nowrap;">${escapeHtml(labelNum)}</td>
+      <td style="padding:8px 10px; width:46px;">
         <input type="checkbox" class="create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" ${isChecked ? 'checked' : ''} ${fullPos == null ? 'disabled' : ''} />
       </td>
       <td style="padding:8px 10px;">${escapeHtml(text)}</td>
@@ -204,8 +203,8 @@ function ensureCreateAssignmentModal() {
                 </div>
 
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <i data-lucide="medal" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>
-                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px; width:110px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
+                  <i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>
+                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" style="height:40px; width:52px; padding:0 10px; border-radius:8px; border:1px solid rgba(0,0,0,0.16);" />
                 </div>
               </div>
             </div>
@@ -213,10 +212,10 @@ function ensureCreateAssignmentModal() {
         </div>
 
         <!-- НИЖНЯЯ ПАНЕЛЬ -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top: 14px;">
+        <div style="display:grid; grid-template-columns: 420px 1fr; gap:12px; margin-top: 14px;">
           <div id="create-assignment-days-panel" style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; overflow:hidden; min-height: 260px; display:flex; flex-direction:column;">
             <div style="padding:10px 10px 8px 10px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-              <div style="font-weight:700;">По дням</div>
+              <div></div>
               <button type="button" id="create-assignment-days-add" class="topbar-icon-btn" title="Добавить день" style="width:36px; height:36px;">
                 <i data-lucide="plus"></i>
               </button>
@@ -237,7 +236,7 @@ function ensureCreateAssignmentModal() {
               <table style="width:100%; border-collapse:collapse; font-size:13px;">
                 <thead>
                   <tr style="position:sticky; top:0; background:#fff; border-bottom:1px solid rgba(0,0,0,0.08);">
-                    <th style="text-align:left; padding:8px 10px; width:86px; font-weight:700;">№</th>
+                    <th style="text-align:left; padding:8px 10px; width:70px; font-weight:700;">№</th>
                     <th style="text-align:left; padding:8px 10px; width:46px; font-weight:700;"></th>
                     <th style="text-align:left; padding:8px 10px; font-weight:700;">Текст</th>
                   </tr>
@@ -1044,9 +1043,9 @@ function renderCreateAssignmentDaysTable(modal) {
   const thead = document.createElement('thead');
   thead.innerHTML = `
     <tr style="border-bottom:1px solid rgba(0,0,0,0.08);">
-      <th style="text-align:left; padding:8px 6px; font-weight:700;">Дата</th>
-      <th style="text-align:left; padding:8px 6px; width:160px; font-weight:700;"></th>
-      <th style="text-align:right; padding:8px 6px; width:46px; font-weight:700;"></th>
+      <th style="text-align:left; padding:8px 6px; font-weight:700; width:60%;">Дата</th>
+      <th style="text-align:left; padding:8px 6px; width:96px; font-weight:700;"><i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i></th>
+      <th style="text-align:center; padding:8px 6px; width:46px; font-weight:700;"></th>
     </tr>
   `;
   tableEl.appendChild(thead);
@@ -1057,45 +1056,48 @@ function renderCreateAssignmentDaysTable(modal) {
     tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
 
     const dateTd = document.createElement('td');
-    dateTd.style.padding = '8px 6px';
+    dateTd.style.padding = '0';
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.value = row && row.date ? String(row.date) : '';
     dateInput.style.height = '40px';
+    dateInput.style.width = '100%';
     dateInput.style.padding = '0 10px';
-    dateInput.style.borderRadius = '8px';
-    dateInput.style.border = '1px solid rgba(0,0,0,0.16)';
+    dateInput.style.borderRadius = '0';
+    dateInput.style.border = '0';
+    dateInput.style.background = 'transparent';
     dateTd.appendChild(dateInput);
 
     const medalTd = document.createElement('td');
-    medalTd.style.padding = '8px 6px';
+    medalTd.style.padding = '0';
     const medalWrap = document.createElement('div');
     medalWrap.style.display = 'flex';
-    medalWrap.style.alignItems = 'center';
-    medalWrap.style.gap = '8px';
-    medalWrap.innerHTML = '<i data-lucide="medal" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i>';
+    medalWrap.style.alignItems = 'stretch';
+    medalWrap.style.gap = '0';
     const countInput = document.createElement('input');
     countInput.type = 'number';
     countInput.min = '1';
     countInput.step = '1';
     countInput.value = row && row.count ? String(row.count) : '1';
     countInput.style.height = '40px';
-    countInput.style.width = '90px';
+    countInput.style.width = '100%';
     countInput.style.padding = '0 10px';
-    countInput.style.borderRadius = '8px';
-    countInput.style.border = '1px solid rgba(0,0,0,0.16)';
+    countInput.style.borderRadius = '0';
+    countInput.style.border = '0';
+    countInput.style.background = 'transparent';
     medalWrap.appendChild(countInput);
     medalTd.appendChild(medalWrap);
 
     const delTd = document.createElement('td');
-    delTd.style.padding = '8px 6px';
-    delTd.style.textAlign = 'right';
+    delTd.style.padding = '0';
+    delTd.style.textAlign = 'center';
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'topbar-icon-btn';
     delBtn.title = 'Удалить день';
     delBtn.style.width = '36px';
     delBtn.style.height = '36px';
+    delBtn.style.margin = '0 auto';
     delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
     delTd.appendChild(delBtn);
 
