@@ -1259,6 +1259,79 @@ async function loadAudioSettingsFromUser() {
 // let allSentences = JSON.parse(rawJson); // все предложения всего диктанта (самый широкий)
 let allSentences = [];
 
+function getAssignmentLaunchContext() {
+    try {
+        const raw = localStorage.getItem('dictafan_assignment_launch_ctx');
+        if (!raw) return null;
+        const ctx = JSON.parse(raw);
+        if (!ctx || typeof ctx !== 'object') return null;
+        const ts = Number(ctx.ts || 0);
+        if (Number.isFinite(ts) && ts > 0) {
+            const ageMs = Date.now() - ts;
+            if (ageMs > 1000 * 60 * 10) {
+                return null;
+            }
+        }
+        return ctx;
+    } catch (e) {
+        return null;
+    }
+}
+
+function clearAssignmentLaunchContext() {
+    try {
+        localStorage.removeItem('dictafan_assignment_launch_ctx');
+    } catch (e) {
+    }
+}
+
+function applyAssignmentSentenceSubsetIfNeeded() {
+    const ctx = getAssignmentLaunchContext();
+    if (!ctx) return false;
+
+    try {
+        const ctxDictId = ctx.dictation_id;
+        const curIdRaw = String(currentDictation && currentDictation.id ? currentDictation.id : '');
+        const curNumeric = parseInt(curIdRaw.replace(/^dict_/, ''), 10);
+        const sameDict = Number.isFinite(Number(ctxDictId))
+            ? (Number(ctxDictId) === curNumeric)
+            : false;
+        if (!sameDict) return false;
+    } catch (e) {
+        return false;
+    }
+
+    const positions = Array.isArray(ctx.selected_sentence_positions)
+        ? ctx.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : null;
+    if (!positions || !positions.length) {
+        return false;
+    }
+
+    const allowed = new Set(positions);
+    const before = Array.isArray(allSentences) ? allSentences.slice() : [];
+    const filtered = before.filter(s => {
+        const p = (s && s.position !== undefined && s.position !== null && isFinite(Number(s.position)))
+            ? Number(s.position)
+            : null;
+        return p !== null && allowed.has(p);
+    });
+
+    allSentences = filtered;
+    try {
+        allSentences.sort((a, b) => Number(a.position) - Number(b.position));
+    } catch (e) {
+    }
+
+    try {
+        window.assignmentId = ctx.assignment_id;
+        window.assignmentRequiredCompletions = Number(ctx.required_completions || 0) || 0;
+    } catch (e) {
+    }
+
+    return true;
+}
+
 // суммы по итогам предыдущих кругов
 let number_of_perfect = 0;          // 1 — с первого раза (сумарно по всем кругам)
 let number_of_corrected = 0;       // 1 — со 2-й и далее (сумарно по всем кругам)
@@ -7010,6 +7083,14 @@ async function initializeDictation() {
             showNoSelectionModal('Не удалось сохранить диктант в кеш. Обнови страницу.');
             return;
         }
+    }
+
+    try {
+        const applied = applyAssignmentSentenceSubsetIfNeeded();
+        if (applied) {
+            clearAssignmentLaunchContext();
+        }
+    } catch (e) {
     }
 
     // Инициализируем виртуальную клавиатуру с обработкой ошибок

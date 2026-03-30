@@ -2312,13 +2312,27 @@ function initLevelSelector(initialLevel = 'A1') {
         optionElements = Array.from(list.querySelectorAll('li'));
     }
 
+    let isFirstLevelSet = true;
+
     const setLevelValue = (value) => {
         const normalized = LEVEL_OPTIONS.includes(value) ? value : 'A1';
+        const prev = (currentDictation && currentDictation.level) ? String(currentDictation.level) : '';
         currentDictation.level = normalized;
         valueEl.textContent = normalized;
         optionElements.forEach(li => {
             li.classList.toggle('selected', li.dataset.value === normalized);
         });
+
+        if (!isFirstLevelSet && prev && prev !== normalized) {
+            try {
+                setDirtyFlags({ db: true });
+            } catch (e) {
+            }
+            try {
+                updateUnsavedStar();
+            } catch (e) {
+            }
+        }
     };
 
     if (!wrapper.dataset.initialized) {
@@ -2353,6 +2367,7 @@ function initLevelSelector(initialLevel = 'A1') {
     }
 
     setLevelValue(initialLevel);
+    isFirstLevelSet = false;
 }
 
 

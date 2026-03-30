@@ -581,6 +581,55 @@ function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
   }
 }
 
+function _setAssignmentLaunchContext(ctx) {
+  try {
+    if (!ctx || typeof ctx !== 'object') return;
+    localStorage.setItem('dictafan_assignment_launch_ctx', JSON.stringify(Object.assign({ ts: Date.now() }, ctx)));
+  } catch (e) {
+  }
+}
+
+function _getStudentPlanCache() {
+  try {
+    const raw = localStorage.getItem('dictafan_student_plan_cache_v1');
+    if (!raw) return { byDate: {} };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { byDate: {} };
+    if (!parsed.byDate || typeof parsed.byDate !== 'object') parsed.byDate = {};
+    return parsed;
+  } catch (e) {
+    return { byDate: {} };
+  }
+}
+
+function _setStudentPlanCacheForDate(dateIso, assignments) {
+  try {
+    const d = String(dateIso || '').trim();
+    if (!d) return;
+    const cache = _getStudentPlanCache();
+    cache.byDate[d] = {
+      ts: Date.now(),
+      assignments: Array.isArray(assignments) ? assignments : [],
+    };
+    localStorage.setItem('dictafan_student_plan_cache_v1', JSON.stringify(cache));
+  } catch (e) {
+  }
+}
+
+function _getStudentPlanCacheForDate(dateIso) {
+  try {
+    const d = String(dateIso || '').trim();
+    if (!d) return null;
+    const cache = _getStudentPlanCache();
+    const entry = cache.byDate && cache.byDate[d] ? cache.byDate[d] : null;
+    if (!entry || typeof entry !== 'object') return null;
+    const items = Array.isArray(entry.assignments) ? entry.assignments : [];
+    return { ts: entry.ts, assignments: items };
+  } catch (e) {
+    return null;
+  }
+}
+
 function _pickTranslationLanguageForOpen({ preferredNative, availableTranslations, fallbackLang }) {
   const available = Array.isArray(availableTranslations)
     ? availableTranslations.map(x => String(x || '').trim().toLowerCase()).filter(Boolean)
@@ -646,6 +695,11 @@ function _studentPlanRender(panel, dateIso, items) {
       const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || dateIso);
       const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
       const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
+      const assignmentId = a && a.id ? Number(a.id) : null;
+      const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
+        ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : null;
+      const selectedPositionsAttr = Array.isArray(selectedPositions) ? selectedPositions.join(',') : '';
 
       return `
         <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px;">
@@ -656,7 +710,7 @@ function _studentPlanRender(panel, dateIso, items) {
             </div>
             <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
               <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
-              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
+              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
             </div>
           </div>
         </div>
@@ -679,7 +733,21 @@ function _studentPlanRender(panel, dateIso, items) {
       e.stopPropagation();
       const dictationId = btn.getAttribute('data-dictation-id');
       const lang = btn.getAttribute('data-dictation-lang');
+      const assignmentId = btn.getAttribute('data-assignment-id');
+      const selectedPositionsStr = btn.getAttribute('data-selected-positions');
+      const requiredCompletions = btn.getAttribute('data-required-completions');
       if (dictationId) {
+        const positions = String(selectedPositionsStr || '')
+          .split(',')
+          .map(x => Number(String(x || '').trim()))
+          .filter(x => Number.isFinite(x));
+
+        _setAssignmentLaunchContext({
+          assignment_id: Number(assignmentId),
+          dictation_id: Number(dictationId),
+          selected_sentence_positions: positions.length ? positions : null,
+          required_completions: Number(requiredCompletions || 0) || 0,
+        });
         _studentPlanOpenDictation(dictationId, lang);
       }
     });
@@ -722,15 +790,32 @@ async function openStudentPlanPanel(dateIso = null) {
     const d = dateInput ? String(dateInput.value || '').trim() : '';
     if (!d) return;
     const list = document.getElementById('student-plan-list');
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+
+    const cached = _getStudentPlanCacheForDate(d);
+    if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
+      _studentPlanRender(panel, d, cached.assignments);
+    } else {
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+    }
     try {
       const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
       if (!res || !res.success) {
+        const fallback = _getStudentPlanCacheForDate(d);
+        if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
+          _studentPlanRender(panel, d, fallback.assignments);
+          return;
+        }
         if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
         return;
       }
+      _setStudentPlanCacheForDate(d, res.assignments || []);
       _studentPlanRender(panel, d, res.assignments || []);
     } catch (e) {
+      const fallback = _getStudentPlanCacheForDate(d);
+      if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
+        _studentPlanRender(panel, d, fallback.assignments);
+        return;
+      }
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
     }
   };
