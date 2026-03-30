@@ -2936,6 +2936,8 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .create-assignment-top {
@@ -2943,6 +2945,7 @@
   grid-template-columns: 220px 1fr;
   gap: 14px;
   align-items: start;
+  flex: 0 0 auto;
 }
 
 .create-assignment-cover {
@@ -3052,7 +3055,7 @@
 
 .create-assignment-bottom {
   display: grid;
-  grid-template-columns: 420px 1fr;
+  grid-template-columns: 300px 1fr;
   gap: 12px;
   margin-top: 14px;
   flex: 1;
