@@ -300,6 +300,8 @@ def save_success():
         error_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
         sentences_data = data.get('sentences_data')
+        completed_at_ms = data.get('completed_at_ms')
+        completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -367,6 +369,14 @@ def save_success():
                     dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
                     dictation_level = info.get('dictation_level') or '—'
 
+                    try:
+                        from helpers.db_dictations import get_dictation_info
+
+                        dictation_info = get_dictation_info(dictation_int) or {}
+                        dictation_lang = dictation_info.get('language_code') or 'en'
+                    except Exception:
+                        dictation_lang = 'en'
+
                     def _fmt_duration(ms: int) -> str:
                         try:
                             ms = int(ms or 0)
@@ -387,6 +397,27 @@ def save_success():
                             .replace('>', '&gt;')
                         )
 
+                    def _fmt_user_local_dt(ts_ms, tz_offset_min) -> str:
+                        try:
+                            ts_ms = int(ts_ms or 0)
+                        except Exception:
+                            ts_ms = 0
+                        try:
+                            tz_offset_min = int(tz_offset_min or 0)
+                        except Exception:
+                            tz_offset_min = 0
+
+                        if ts_ms <= 0:
+                            return ''
+
+                        try:
+                            # tz_offset_min: minutes east of UTC (e.g. +180)
+                            dt_utc = datetime.utcfromtimestamp(ts_ms / 1000.0)
+                            dt_local = dt_utc + timedelta(minutes=tz_offset_min)
+                            return dt_local.strftime('%Y-%m-%d %H:%M')
+                        except Exception:
+                            return ''
+
                     # Build per-sentence table from payload + DB texts
                     rows = []
                     if isinstance(sentences_data, list):
@@ -397,16 +428,19 @@ def save_success():
                             if not skey:
                                 continue
                             try:
-                                sentence = get_sentence_by_key(dictation_int, 'en', str(skey))
+                                sentence = get_sentence_by_key(dictation_int, dictation_lang, str(skey))
                             except Exception:
                                 sentence = None
                             text_sentence = ''
+                            position = None
                             if isinstance(sentence, dict):
                                 text_sentence = sentence.get('text') or ''
+                                position = sentence.get('position')
 
                             rows.append(
                                 {
                                     'sentence_key': str(skey),
+                                    'position': position,
                                     'perfect_count': int(r.get('perfect_count') or 0),
                                     'corrected_count': int(r.get('corrected_count') or 0),
                                     'audio_count': int(r.get('audio_count') or 0),
@@ -416,9 +450,18 @@ def save_success():
                                 }
                             )
 
-                    # Sort by sentence key and keep message bounded
+                    # Sort by dictation position (fallback to sentence_key) and keep message bounded
                     try:
-                        rows.sort(key=lambda x: x.get('sentence_key'))
+                        def _row_sort_key(x: dict):
+                            p = x.get('position')
+                            try:
+                                if p is not None:
+                                    return (0, int(p))
+                            except Exception:
+                                pass
+                            return (1, str(x.get('sentence_key') or ''))
+
+                        rows.sort(key=_row_sort_key)
                     except Exception:
                         pass
                     max_rows = 35
@@ -427,24 +470,34 @@ def save_success():
                     lines = []
                     if rows:
                         lines.append('<b>Предложения</b>')
-                        lines.append('№ | ⭐/½⭐/🎤 | попыток | ошибок | текст')
-                        for rr in rows:
-                            idx = _safe(rr.get('sentence_key'))
-                            stars = f"{rr.get('perfect_count')}/{rr.get('corrected_count')}/{rr.get('audio_count')}"
+                        lines.append('№) | ⭐-½⭐-🎤-попыток-ошибок | текст')
+                        for i, rr in enumerate(rows, start=1):
+                            stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
                             att = rr.get('attempts_total')
                             err = rr.get('error_count')
+                            compact = f"{stars}-{att}-{err}"
                             sent_text = _safe(rr.get('text'))
                             if sent_text and len(sent_text) > 120:
                                 sent_text = sent_text[:117] + '...'
-                            lines.append(f"{idx} | {stars} | {att} | {err} | {sent_text}")
+                            lines.append(f"{i}) {compact} | {sent_text}")
+
+                    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
+                    date_line = success_date_iso
+                    if when_local:
+                        date_line = when_local
+
+                    totals_compact = (
+                        f"{int(perfect_count or 0)}-{int(corrected_count or 0)}-{int(audio_count or 0)}-"
+                        f"{int(attempts_total or 0)}-{int(error_count or 0)}"
+                    )
 
                     text = (
                         f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
                         f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)})\n"
-                        f"Дата: {success_date_iso}\n"
-                        f"Длительность: {_fmt_duration(time_ms)}\n"
-                        f"Итоги: ⭐ {int(perfect_count or 0)} · ½⭐ {int(corrected_count or 0)} · 🎤 {int(audio_count or 0)}\n"
-                        f"Попыток: {int(attempts_total or 0)} · Ошибок: {int(error_count or 0)}"
+                        f"Дата: {date_line}\n"
+                        f"Длительность: {_fmt_duration(time_ms)}\n\n"
+                        f"⭐-½⭐-🎤-попыток-ошибок\n"
+                        f"Итоги: {totals_compact}"
                     )
                     if lines:
                         text = text + "\n\n" + "\n".join(lines)

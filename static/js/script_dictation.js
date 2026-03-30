@@ -938,7 +938,9 @@ async function enqueueOfflineSuccess(payload) {
             error_count: (Number(existing.payload.error_count) || 0) + (Number(payload.error_count) || 0),
             time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
             sentences_data: mergeSentencesData(existing.payload.sentences_data, payload.sentences_data),
-            settings_json: payload.settings_json || existing.payload.settings_json
+            settings_json: payload.settings_json || existing.payload.settings_json,
+            completed_at_ms: existing.payload.completed_at_ms || payload.completed_at_ms,
+            completed_at_tz_offset_min: existing.payload.completed_at_tz_offset_min || payload.completed_at_tz_offset_min
         } : payload;
 
         await idbPut('success_outbox', {
@@ -9235,6 +9237,8 @@ async function registerCompletedDictation() {
 
             const totalAttempts = allSentences.reduce((sum, s) => sum + (Number(s.attempts_total) || 0), 0);
             const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.error_count) || 0), 0);
+            const completedAtMs = Date.now();
+            const completedAtTzOffsetMin = -new Date().getTimezoneOffset();
             const successResponse = await fetch('/api/statistics/success', {
                 method: 'POST',
                 headers: {
@@ -9249,6 +9253,8 @@ async function registerCompletedDictation() {
                     attempts_total: totalAttempts,
                     error_count: totalErrors,
                     time_ms: totalTimeMs,
+                    completed_at_ms: completedAtMs,
+                    completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
                     settings_json: settings_json
                 })
@@ -9301,6 +9307,8 @@ async function registerCompletedDictation() {
                     attempts_total: totalAttempts,
                     error_count: totalErrors,
                     time_ms: totalTimeMs,
+                    completed_at_ms: completedAtMs,
+                    completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
                     settings_json: settings_json
                 });
@@ -9321,6 +9329,8 @@ async function registerCompletedDictation() {
                 attempts_total: totalAttempts,
                 error_count: totalErrors,
                 time_ms: totalTimeMs,
+                completed_at_ms: completedAtMs,
+                completed_at_tz_offset_min: completedAtTzOffsetMin,
                 sentences_data: sentences_data,
                 settings_json: settings_json
             });
