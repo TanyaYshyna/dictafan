@@ -409,6 +409,7 @@ function ensureStudentPlanPanel() {
 
   panel = document.createElement('div');
   panel.id = 'student-plan-panel';
+  panel.tabIndex = -1;
   panel.style.display = 'none';
   panel.style.position = 'fixed';
   panel.style.left = '0';
@@ -418,9 +419,10 @@ function ensureStudentPlanPanel() {
   panel.style.zIndex = '100000';
   panel.style.background = 'rgba(0,0,0,0.35)';
   panel.style.backdropFilter = 'blur(4px)';
+  panel.style.outline = 'none';
 
   panel.innerHTML = `
-    <div id="student-plan-panel-drawer" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
+    <div id="student-plan-panel-drawer" tabindex="-1" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column; outline:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
         <div style="display:flex; align-items:center; gap:10px;">
           <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
