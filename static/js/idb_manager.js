@@ -50,6 +50,13 @@
           }
         } catch (e) {
         }
+
+        try {
+          if (!db.objectStoreNames.contains('student_plan_cache')) {
+            db.createObjectStore('student_plan_cache', { keyPath: 'key' });
+          }
+        } catch (e) {
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

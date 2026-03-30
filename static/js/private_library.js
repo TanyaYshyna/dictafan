@@ -12,6 +12,50 @@ function setBookEditDirty(nextDirty) {
   }
 }
 
+function diffDaysIsoDate(aIso, bIso) {
+  try {
+    const a = String(aIso || '').split('-');
+    const b = String(bIso || '').split('-');
+    if (a.length !== 3 || b.length !== 3) return null;
+    const da = new Date(Number(a[0]), Number(a[1]) - 1, Number(a[2]));
+    const db = new Date(Number(b[0]), Number(b[1]) - 1, Number(b[2]));
+    const ms = db.getTime() - da.getTime();
+    if (!isFinite(ms)) return null;
+    return Math.round(ms / (1000 * 60 * 60 * 24));
+  } catch (e) {
+    return null;
+  }
+}
+
+function clampAssignmentRangePeriod(fromEl, toEl) {
+  if (!fromEl || !toEl) return;
+  const start = String(fromEl.value || '').trim();
+  const end = String(toEl.value || '').trim();
+  if (!start || !end) return;
+
+  const d = diffDaysIsoDate(start, end);
+  if (d == null) return;
+  if (d < 0) {
+    toEl.value = start;
+    return;
+  }
+  if (d > 6) {
+    toEl.value = addDaysIsoDate(start, 6);
+    try { showToast('Максимум 7 дней'); } catch (e) { }
+  }
+}
+
+function validateAssignmentDaysWeekLimit(modal) {
+  const cur = getCreateAssignmentDaysState(modal);
+  const dates = cur.map(x => String(x && x.date ? x.date : '').trim()).filter(Boolean);
+  if (!dates.length) return { ok: true, reason: '' };
+  const uniq = Array.from(new Set(dates)).sort();
+  if (uniq.length > 7) return { ok: false, reason: 'Максимум 7 дней' };
+  const span = diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]);
+  if (span != null && span > 6) return { ok: false, reason: 'Максимум 7 дней' };
+  return { ok: true, reason: '' };
+}
+
 function getAssignmentLastGroupId() {
   try {
     const v = String(localStorage.getItem('assignments_last_group_id') || '').trim();
@@ -589,44 +633,63 @@ function _setAssignmentLaunchContext(ctx) {
   }
 }
 
-function _getStudentPlanCache() {
-  try {
-    const raw = localStorage.getItem('dictafan_student_plan_cache_v1');
-    if (!raw) return { byDate: {} };
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return { byDate: {} };
-    if (!parsed.byDate || typeof parsed.byDate !== 'object') parsed.byDate = {};
-    return parsed;
-  } catch (e) {
-    return { byDate: {} };
-  }
+const STUDENT_PLAN_CACHE_STORE = 'student_plan_cache';
+const STUDENT_PLAN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+
+function _getStudentPlanCacheKey(dateIso) {
+  const d = String(dateIso || '').trim();
+  if (!d) return null;
+  const userId = getDraftUserIdForKey();
+  if (!userId) return null;
+  return `${String(userId)}:${d}`;
 }
 
-function _setStudentPlanCacheForDate(dateIso, assignments) {
+async function _getStudentPlanCacheForDateIdb(dateIso) {
   try {
-    const d = String(dateIso || '').trim();
-    if (!d) return;
-    const cache = _getStudentPlanCache();
-    cache.byDate[d] = {
-      ts: Date.now(),
-      assignments: Array.isArray(assignments) ? assignments : [],
-    };
-    localStorage.setItem('dictafan_student_plan_cache_v1', JSON.stringify(cache));
-  } catch (e) {
-  }
-}
-
-function _getStudentPlanCacheForDate(dateIso) {
-  try {
-    const d = String(dateIso || '').trim();
-    if (!d) return null;
-    const cache = _getStudentPlanCache();
-    const entry = cache.byDate && cache.byDate[d] ? cache.byDate[d] : null;
-    if (!entry || typeof entry !== 'object') return null;
-    const items = Array.isArray(entry.assignments) ? entry.assignments : [];
-    return { ts: entry.ts, assignments: items };
+    const key = _getStudentPlanCacheKey(dateIso);
+    if (!key) return null;
+    const row = await idbGet(STUDENT_PLAN_CACHE_STORE, key);
+    if (!row || typeof row !== 'object') return null;
+    const assignments = Array.isArray(row.assignments) ? row.assignments : [];
+    return { ts: row.updatedAt || row.ts, assignments };
   } catch (e) {
     return null;
+  }
+}
+
+async function _setStudentPlanCacheForDateIdb(dateIso, assignments) {
+  try {
+    const d = String(dateIso || '').trim();
+    const key = _getStudentPlanCacheKey(d);
+    if (!key) return;
+    await idbPut(STUDENT_PLAN_CACHE_STORE, {
+      key,
+      userId: String(getDraftUserIdForKey()),
+      dateIso: d,
+      updatedAt: Date.now(),
+      assignments: Array.isArray(assignments) ? assignments : [],
+    });
+  } catch (e) {
+  }
+}
+
+async function _cleanupStudentPlanCacheIdb() {
+  try {
+    const rows = await idbGetAll(STUDENT_PLAN_CACHE_STORE);
+    if (!Array.isArray(rows) || !rows.length) return;
+    const now = Date.now();
+    for (const row of rows) {
+      try {
+        const ts = Number(row && (row.updatedAt || row.ts) ? (row.updatedAt || row.ts) : 0) || 0;
+        if (ts && now - ts > STUDENT_PLAN_CACHE_TTL_MS) {
+          if (row && row.key) {
+            await idbDelete(STUDENT_PLAN_CACHE_STORE, row.key);
+          }
+        }
+      } catch (e) {
+      }
+    }
+  } catch (e) {
   }
 }
 
@@ -791,7 +854,12 @@ async function openStudentPlanPanel(dateIso = null) {
     if (!d) return;
     const list = document.getElementById('student-plan-list');
 
-    const cached = _getStudentPlanCacheForDate(d);
+    try {
+      await _cleanupStudentPlanCacheIdb();
+    } catch (e) {
+    }
+
+    const cached = await _getStudentPlanCacheForDateIdb(d);
     if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
       _studentPlanRender(panel, d, cached.assignments);
     } else {
@@ -800,7 +868,7 @@ async function openStudentPlanPanel(dateIso = null) {
     try {
       const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
       if (!res || !res.success) {
-        const fallback = _getStudentPlanCacheForDate(d);
+        const fallback = await _getStudentPlanCacheForDateIdb(d);
         if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
           _studentPlanRender(panel, d, fallback.assignments);
           return;
@@ -808,10 +876,10 @@ async function openStudentPlanPanel(dateIso = null) {
         if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
         return;
       }
-      _setStudentPlanCacheForDate(d, res.assignments || []);
+      await _setStudentPlanCacheForDateIdb(d, res.assignments || []);
       _studentPlanRender(panel, d, res.assignments || []);
     } catch (e) {
-      const fallback = _getStudentPlanCacheForDate(d);
+      const fallback = await _getStudentPlanCacheForDateIdb(d);
       if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
         _studentPlanRender(panel, d, fallback.assignments);
         return;
@@ -950,6 +1018,9 @@ function _teacherAssignmentsRender(items) {
             </div>
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
+            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment='${escapeHtml(JSON.stringify(a || {}))}' title="Редактировать" style="width:34px; height:34px;">
+              <i data-lucide="pencil"></i>
+            </button>
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
               <i data-lucide="user"></i>
             </button>
@@ -1019,6 +1090,28 @@ function _teacherAssignmentsRender(items) {
       btn.disabled = true;
       try {
         await openTeacherAssignmentStudentsModal(id);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  list.querySelectorAll('[data-action="teacher-edit-assignment"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const raw = btn.getAttribute('data-assignment');
+      if (!raw) return;
+      btn.disabled = true;
+      try {
+        const a = JSON.parse(raw);
+        if (!a || !a.id || !a.dictation_id) {
+          try { showToast('Не удалось открыть задание'); } catch (e2) { }
+          return;
+        }
+        await openCreateAssignmentModal(Number(a.dictation_id), { editAssignment: a });
+      } catch (err) {
+        try { showToast('Не удалось открыть задание'); } catch (e2) { }
       } finally {
         btn.disabled = false;
       }
@@ -1229,9 +1322,18 @@ function renderCreateAssignmentDaysTable(modal) {
     delTd.appendChild(delBtn);
 
     dateInput.addEventListener('change', () => {
+      const prev = row && row.date ? String(row.date) : '';
       const next = getCreateAssignmentDaysState(modal);
       next[idx] = Object.assign({}, next[idx], { date: String(dateInput.value || '') });
       setCreateAssignmentDaysState(modal, next);
+
+      const v = validateAssignmentDaysWeekLimit(modal);
+      if (!v.ok) {
+        next[idx] = Object.assign({}, next[idx], { date: prev });
+        setCreateAssignmentDaysState(modal, next);
+        dateInput.value = prev;
+        try { showToast(v.reason); } catch (e) { }
+      }
     });
     countInput.addEventListener('change', () => {
       const next = getCreateAssignmentDaysState(modal);
@@ -1271,6 +1373,14 @@ async function loadMyGroupsForAssignmentModal() {
 
 async function openCreateAssignmentModal(dictationId) {
   const modal = ensureCreateAssignmentModal();
+  const options = arguments && arguments.length > 1 ? arguments[1] : null;
+  const editAssignment = options && options.editAssignment ? options.editAssignment : null;
+
+  try {
+    modal.dataset.editAssignmentId = editAssignment && editAssignment.id ? String(editAssignment.id) : '';
+  } catch (e) {
+  }
+
   const idInput = document.getElementById('create-assignment-dictation-id');
   if (idInput) idInput.value = String(dictationId || '');
 
@@ -1367,13 +1477,36 @@ async function openCreateAssignmentModal(dictationId) {
   }
   updateTypeUi();
 
+  if (fromEl && toEl) {
+    fromEl.addEventListener('change', () => {
+      clampAssignmentRangePeriod(fromEl, toEl);
+    });
+    toEl.addEventListener('change', () => {
+      clampAssignmentRangePeriod(fromEl, toEl);
+    });
+  }
+
   if (daysAddBtn) {
     daysAddBtn.onclick = () => {
+      const cur0 = getCreateAssignmentDaysState(modal);
+      const uniq0 = Array.from(new Set(cur0.map(x => String(x && x.date ? x.date : '').trim()).filter(Boolean)));
+      if (uniq0.length >= 7) {
+        try { showToast('Максимум 7 дней'); } catch (e) { }
+        return;
+      }
       const cur = getCreateAssignmentDaysState(modal);
       const last = cur.length > 0 ? cur[cur.length - 1] : null;
       const lastDate = last && last.date ? String(last.date) : today;
       cur.push({ date: addDaysIsoDate(lastDate, 1), count: 1 });
       setCreateAssignmentDaysState(modal, cur);
+
+      const v = validateAssignmentDaysWeekLimit(modal);
+      if (!v.ok) {
+        cur.pop();
+        setCreateAssignmentDaysState(modal, cur);
+        try { showToast(v.reason); } catch (e) { }
+        return;
+      }
       renderCreateAssignmentDaysTable(modal);
     };
   }
@@ -1411,6 +1544,11 @@ async function openCreateAssignmentModal(dictationId) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
+        const editIdRaw = (() => {
+          try { return modal.dataset.editAssignmentId || ''; } catch (e) { return ''; }
+        })();
+        const editId = editIdRaw ? Number(editIdRaw) : null;
+
         const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
         const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
         const mode = typeSelect ? String(typeSelect.value || 'period').trim() : 'period';
@@ -1452,14 +1590,25 @@ async function openCreateAssignmentModal(dictationId) {
             showToast('Выбери даты');
             return;
           }
+          const span = diffDaysIsoDate(start_date, end_date);
+          if (span != null && span > 6) {
+            showToast('Максимум 7 дней');
+            return;
+          }
           if (!Number.isFinite(required_completions) || required_completions <= 0) {
             showToast('Неверное число попыток');
             return;
           }
 
-          const res = await apiRequest('/api/assignments/teacher/create', {
-            method: 'POST',
-            body: JSON.stringify({
+          const url = editId ? `/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}/update` : '/api/assignments/teacher/create';
+          const body = editId
+            ? {
+              start_date,
+              end_date,
+              required_completions,
+              selected_sentence_positions
+            }
+            : {
               group_id,
               dictation_id,
               mode: 'period',
@@ -1467,7 +1616,11 @@ async function openCreateAssignmentModal(dictationId) {
               end_date,
               required_completions,
               selected_sentence_positions
-            })
+            };
+
+          const res = await apiRequest(url, {
+            method: 'POST',
+            body: JSON.stringify(body)
           });
 
           if (!res || !res.success) {
@@ -1477,6 +1630,7 @@ async function openCreateAssignmentModal(dictationId) {
 
           showToast('Задание сохранено', { durationMs: 2500 });
           close();
+          try { await _teacherAssignmentsReload(); } catch (e) { }
           return;
         }
 
@@ -1499,11 +1653,28 @@ async function openCreateAssignmentModal(dictationId) {
             showToast('Добавь хотя бы один день');
             return;
           }
+
+          if (editId) {
+            showToast('Редактирование доступно только для режима «на период»');
+            return;
+          }
+
           for (const d of days) {
             if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
               showToast('Неверное число попыток в плане');
               return;
             }
+          }
+
+          const uniq = Array.from(new Set(days.map(x => x.date))).sort();
+          if (uniq.length > 7) {
+            showToast('Максимум 7 дней');
+            return;
+          }
+          const span = uniq.length ? diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]) : 0;
+          if (span != null && span > 6) {
+            showToast('Максимум 7 дней');
+            return;
           }
 
           const res = await apiRequest('/api/assignments/teacher/create', {
@@ -1535,6 +1706,54 @@ async function openCreateAssignmentModal(dictationId) {
   }
 
   modal.style.display = 'flex';
+
+  if (editAssignment) {
+    try {
+      const t = document.querySelector('.create-assignment-modal-title-text');
+      if (t) t.textContent = 'Редактирование';
+    } catch (e) {
+    }
+
+    try {
+      if (groupSelect) groupSelect.disabled = true;
+      if (typeSelect) typeSelect.disabled = true;
+    } catch (e) {
+    }
+
+    try {
+      if (attemptsEl) attemptsEl.value = String(editAssignment.required_completions || 1);
+      const sd = editAssignment.start_date ? String(editAssignment.start_date) : today;
+      const ed = editAssignment.end_date ? String(editAssignment.end_date) : sd;
+      if (fromEl) fromEl.value = sd;
+      if (toEl) toEl.value = ed;
+      clampAssignmentRangePeriod(fromEl, toEl);
+
+      if (typeSelect) typeSelect.value = 'period';
+      updateTypeUi();
+    } catch (e) {
+    }
+
+    try {
+      const sentenceState = getCreateAssignmentSentencesState(modal);
+      const selected = Array.isArray(editAssignment.selected_sentence_positions)
+        ? editAssignment.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : null;
+      setCreateAssignmentSentencesState(modal, Object.assign({}, sentenceState, { selectedPositions: selected && selected.length ? selected : null }));
+      renderCreateAssignmentSentencesTable(modal);
+    } catch (e) {
+    }
+  } else {
+    try {
+      const t = document.querySelector('.create-assignment-modal-title-text');
+      if (t) t.textContent = 'Задание';
+    } catch (e) {
+    }
+    try {
+      if (groupSelect) groupSelect.disabled = false;
+      if (typeSelect) typeSelect.disabled = false;
+    } catch (e) {
+    }
+  }
 
   try {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {

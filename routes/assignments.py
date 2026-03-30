@@ -11,6 +11,7 @@ from helpers.db_assignments import (
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
+    update_assignment,
     unarchive_assignments,
 )
 
@@ -92,6 +93,36 @@ def api_teacher_create_assignment():
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.error("Ошибка создания задания: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@assignments_bp.route("/teacher/assignment/<int:assignment_id>/update", methods=["POST"])
+@jwt_required()
+def api_teacher_update_assignment(assignment_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    selected_sentence_positions = data.get("selected_sentence_positions")
+
+    try:
+        item = update_assignment(
+            int(assignment_id),
+            user["id"],
+            start_date=data.get("start_date"),
+            end_date=data.get("end_date"),
+            required_completions=data.get("required_completions"),
+            selected_sentence_positions=selected_sentence_positions,
+        )
+        return jsonify({"success": True, "assignment": item})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка обновления задания %s: %s", assignment_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

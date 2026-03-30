@@ -6,6 +6,9 @@ from typing import Any, Optional
 from .db import get_db_cursor
 
 
+MAX_ASSIGNMENT_RANGE_DAYS = 7
+
+
 def _parse_date(value: Any) -> Optional[date]:
     if value is None or value == "":
         return None
@@ -59,6 +62,13 @@ def _check_overlap(cur, *, group_id: int, dictation_id: int, start_date: date, e
         raise ValueError("Assignment date range overlaps with existing assignment")
 
 
+def _validate_max_range(start_d: date, end_d: date) -> None:
+    if not start_d or not end_d:
+        return
+    if (end_d - start_d).days > (MAX_ASSIGNMENT_RANGE_DAYS - 1):
+        raise ValueError("Assignment date range must be <= 7 days")
+
+
 def create_assignment_period(
     group_id: int,
     dictation_id: int,
@@ -75,6 +85,7 @@ def create_assignment_period(
         raise ValueError("start_date and end_date are required")
     if end_d < start_d:
         raise ValueError("end_date must be >= start_date")
+    _validate_max_range(start_d, end_d)
 
     try:
         req = int(required_completions)
@@ -298,6 +309,12 @@ def create_assignment_days(
             raise ValueError("required_completions must be > 0")
         prepared.append((day_d, req))
 
+    uniq_dates = sorted({d for d, _ in prepared})
+    if len(uniq_dates) > MAX_ASSIGNMENT_RANGE_DAYS:
+        raise ValueError("Assignment days count must be <= 7")
+    if uniq_dates:
+        _validate_max_range(uniq_dates[0], uniq_dates[-1])
+
     conn, cur = get_db_cursor()
     try:
         _ensure_teacher_of_group(cur, group_id, teacher_user_id)
@@ -340,6 +357,93 @@ def create_assignment_days(
 
         conn.commit()
         return rows
+    finally:
+        cur.close()
+        conn.close()
+
+
+def update_assignment(
+    assignment_id: int,
+    teacher_user_id: int,
+    *,
+    start_date: Any,
+    end_date: Any,
+    required_completions: Any,
+    selected_sentence_positions: Any = None,
+) -> dict:
+    start_d = _parse_date(start_date)
+    end_d = _parse_date(end_date)
+    if not start_d or not end_d:
+        raise ValueError("start_date and end_date are required")
+    if end_d < start_d:
+        raise ValueError("end_date must be >= start_date")
+    _validate_max_range(start_d, end_d)
+
+    try:
+        req = int(required_completions)
+    except Exception:
+        raise ValueError("required_completions must be int")
+    if req <= 0:
+        raise ValueError("required_completions must be > 0")
+
+    positions = selected_sentence_positions
+    if isinstance(positions, list):
+        positions = [int(x) for x in positions if x is not None]
+        if not positions:
+            positions = None
+    else:
+        positions = None
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id, a.group_id, a.dictation_id
+            FROM assignments a
+            WHERE a.id = %s
+              AND EXISTS (
+                SELECT 1
+                FROM group_teachers gt
+                JOIN groups g ON g.id = gt.group_id
+                WHERE gt.group_id = a.group_id
+                  AND gt.teacher_user_id = %s
+                  AND g.archived_at IS NULL
+              )
+            """,
+            (assignment_id, teacher_user_id),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise PermissionError("Forbidden")
+
+        group_id = int(row.get("group_id"))
+        dictation_id = int(row.get("dictation_id"))
+
+        _check_overlap(
+            cur,
+            group_id=group_id,
+            dictation_id=dictation_id,
+            start_date=start_d,
+            end_date=end_d,
+            ignore_ids=[int(assignment_id)],
+        )
+
+        cur.execute(
+            """
+            UPDATE assignments a
+            SET start_date = %s,
+                end_date = %s,
+                required_completions = %s,
+                selected_sentence_positions = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE a.id = %s
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+            """,
+            (start_d, end_d, req, positions, assignment_id),
+        )
+        updated = cur.fetchone() or {}
+        conn.commit()
+        return _row_to_assignment(updated)
     finally:
         cur.close()
         conn.close()
