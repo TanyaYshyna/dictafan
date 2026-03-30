@@ -359,6 +359,7 @@ let activityHistory = null; // История активности пользо�
 let progressPanel = null; // Панель прогресса
 let hasDraftLoaded = false; // Флаг загрузки черновика (для определения isResume в startGame)
 let dictationCompletionSaved = false; // Флаг: успех записан, черновик нужно не пересоздавать
+let dictationErrorWordCounts = {};
 // let userManager = null;
 // circleBtn будет переопределен после рендера панели прогресса
 let circleBtn = document.getElementById('btn-circle-number');
@@ -528,7 +529,7 @@ function playRecordingStartBeep() {
 }
 const checkNextDiv = document.getElementById('checkNext');
 const checkPreviosDiv = document.getElementById('checkPrevios');
-const correctAnswerDiv = document.getElementById('correctAnswer'); id = "btn-new-circle"
+const correctAnswerDiv = document.getElementById('correctAnswer'); 
 // const translationDiv = document.getElementById('translation');
 const btnNewCircle = document.getElementById('btn-new-circle');
 window.pendingExitAction = null;
@@ -923,14 +924,33 @@ async function enqueueOfflineSuccess(payload) {
                     p.perfect_count = (Number(p.perfect_count) || 0) + (Number(row.perfect_count) || 0);
                     p.corrected_count = (Number(p.corrected_count) || 0) + (Number(row.corrected_count) || 0);
                     p.audio_count = (Number(p.audio_count) || 0) + (Number(row.audio_count) || 0);
+                    p.attempts_total = (Number(p.attempts_total) || 0) + (Number(row.attempts_total) || 0);
+                    p.error_count = (Number(p.error_count) || 0) + (Number(row.error_count) || 0);
                     map.set(row.sentence_key, p);
                 }
             }
             return Array.from(map.values());
         }
 
-        const mergedPayload = existing && existing.payload ? {
+        function mergeErrorWords(a, b) {
+            try {
+                const aa = (a && typeof a === 'object') ? a : {};
+                const bb = (b && typeof b === 'object') ? b : {};
+                const out = { ...aa };
+                Object.keys(bb).forEach((k) => {
+                    const prev = Number(out[k] || 0) || 0;
+                    const next = Number(bb[k] || 0) || 0;
+                    if (next > 0) out[k] = prev + next;
+                });
+                return out;
+            } catch (e) {
+                return (a && typeof a === 'object') ? a : ((b && typeof b === 'object') ? b : {});
+            }
+        }
+
+        const mergedPayload = existing?.payload ? {
             ...existing.payload,
+            dictation_id: payload.dictation_id,
             perfect_count: (Number(existing.payload.perfect_count) || 0) + (Number(payload.perfect_count) || 0),
             corrected_count: (Number(existing.payload.corrected_count) || 0) + (Number(payload.corrected_count) || 0),
             audio_count: (Number(existing.payload.audio_count) || 0) + (Number(payload.audio_count) || 0),
@@ -939,6 +959,7 @@ async function enqueueOfflineSuccess(payload) {
             time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
             sentences_data: mergeSentencesData(existing.payload.sentences_data, payload.sentences_data),
             settings_json: payload.settings_json || existing.payload.settings_json,
+            error_words: mergeErrorWords(existing.payload.error_words, payload.error_words),
             completed_at_ms: existing.payload.completed_at_ms || payload.completed_at_ms,
             completed_at_tz_offset_min: existing.payload.completed_at_tz_offset_min || payload.completed_at_tz_offset_min
         } : payload;
@@ -3332,6 +3353,7 @@ function resetDictationProgress() {
     number_of_corrected = 0;
     number_of_audio = 0;
     circle_number = 0;
+    dictationErrorWordCounts = {};
 
     // Очищаем localStorage черновика
     clearLocalStorageDraft();
@@ -6045,11 +6067,20 @@ function initWebSpeechRecognition() {
         const origASR = simplifyText(prepareTextForASR(original)).join(" ");
         const spokASR = simplifyText(prepareTextForASR(spoken)).join(" ");
         if (origASR === spokASR) {
-            // может в этом месте надо ставить отметку о вполненном аудио
-            disableRecordButton(false);
+            // Засчитываем ОДНУ успешную попытку и двигаемся дальше только когда выполнены все повторы.
+            try {
+                playSuccessSound();
+            } catch (e) {
+            }
 
-            const nextBtn = document.getElementById('checkNext');
-            if (nextBtn) nextBtn.focus();
+            try {
+                decreaseAudioCounter();
+            } catch (e) {
+                // fallback: если по какой-то причине не удалось обновить счетчик,
+                // не уводим фокус на "следующее" раньше времени
+                const recordButton = document.getElementById('recordButton');
+                if (recordButton) recordButton.focus();
+            }
         } else {
             console.log("Голос не совпал с текстом.");
             // Пробуем продолжить распознавание, если запись еще идет
@@ -7351,7 +7382,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
         inputField.innerHTML = currentSentence.text;
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = currentSentence.text_translation;
-        correctAnswerDiv.style.color = 'var(--color-button-gray)';
+        correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
         disableCheckButton(0);
     } else if (corrected > 0) {
         // ИСПРАВЛЕНО: Если только corrected (полузвезда), текст НЕ заполняется,
@@ -8986,6 +9017,27 @@ function checkText() {
 
     const allCorrect = result.every(word => word.type === "correct");
 
+    try {
+        if (!allCorrect) {
+            for (const w of result) {
+                if (!w || typeof w !== 'object') continue;
+                if (w.type !== 'error' && w.type !== 'missing') continue;
+                const rawWord = (w.type === 'error')
+                    ? (w.correctText || '')
+                    : (w.text || '');
+                let norm = '';
+                try {
+                    norm = String(rawWord || '').toLowerCase().replace(PUNCTUATION_REGEX, '').replace(/\s+/g, ' ').trim();
+                } catch (e) {
+                    norm = String(rawWord || '').toLowerCase().replace(/[.,!?:;"«»()\[\]{}]/g, '').replace(/\s+/g, ' ').trim();
+                }
+                if (!norm) continue;
+                dictationErrorWordCounts[norm] = (Number(dictationErrorWordCounts[norm]) || 0) + 1;
+            }
+        }
+    } catch (e) {
+    }
+
     // error_count: число неуспешных нажатий "Проверить" по предложению
     // Инкрементируем ТОЛЬКО когда проверка не прошла (нужно исправляться)
     if (currentSentence && !allCorrect) {
@@ -9256,6 +9308,7 @@ async function registerCompletedDictation() {
                     completed_at_ms: completedAtMs,
                     completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
+                    error_words: dictationErrorWordCounts,
                     settings_json: settings_json
                 })
             });
@@ -9310,6 +9363,7 @@ async function registerCompletedDictation() {
                     completed_at_ms: completedAtMs,
                     completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
+                    error_words: dictationErrorWordCounts,
                     settings_json: settings_json
                 });
 
@@ -9332,6 +9386,7 @@ async function registerCompletedDictation() {
                 completed_at_ms: completedAtMs,
                 completed_at_tz_offset_min: completedAtTzOffsetMin,
                 sentences_data: sentences_data,
+                error_words: dictationErrorWordCounts,
                 settings_json: settings_json
             });
 

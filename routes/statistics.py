@@ -300,6 +300,7 @@ def save_success():
         error_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
         sentences_data = data.get('sentences_data')
+        error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         
@@ -340,11 +341,34 @@ def save_success():
                     student_username = info.get('student_username') or 'Ученик'
                     dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
                     dictation_level = info.get('dictation_level') or '—'
+
+                    error_words_lines = []
+                    try:
+                        ew = error_words if isinstance(error_words, dict) else {}
+                        items = []
+                        for k, v in ew.items():
+                            try:
+                                w = str(k or '').strip()
+                                c = int(v or 0)
+                            except Exception:
+                                continue
+                            if not w or c <= 0:
+                                continue
+                            items.append((w, c))
+                        items.sort(key=lambda x: (-x[1], x[0]))
+                        items = items[:15]
+                        for w, c in items:
+                            error_words_lines.append(f"{_safe(w)} - {c}")
+                    except Exception:
+                        error_words_lines = []
+
                     text = (
                         f"✅ <b>{student_username}</b> выполнил(а) задание\n"
                         f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
                         f"Дата: {success_date_iso}"
                     )
+                    if error_words_lines:
+                        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
                     for cid in teacher_chat_ids:
                         try:
                             send_telegram_message(cid, text)
@@ -469,8 +493,7 @@ def save_success():
 
                     lines = []
                     if rows:
-                        lines.append('<b>Предложения</b>')
-                        lines.append('№) | ⭐-½⭐-🎤-попыток-ошибок | текст')
+                        # lines.append('№) ⭐ - ½⭐ - 🎤 - попыток - ошибок  текст')
                         for i, rr in enumerate(rows, start=1):
                             stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
                             att = rr.get('attempts_total')
@@ -479,7 +502,7 @@ def save_success():
                             sent_text = _safe(rr.get('text'))
                             if sent_text and len(sent_text) > 120:
                                 sent_text = sent_text[:117] + '...'
-                            lines.append(f"{i}) {compact} | {sent_text}")
+                            lines.append(f"{i}) {compact}   {sent_text}")
 
                     when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
                     date_line = success_date_iso
@@ -491,14 +514,36 @@ def save_success():
                         f"{int(attempts_total or 0)}-{int(error_count or 0)}"
                     )
 
+                    error_words_lines = []
+                    try:
+                        ew = error_words if isinstance(error_words, dict) else {}
+                        items = []
+                        for k, v in ew.items():
+                            try:
+                                w = str(k or '').strip()
+                                c = int(v or 0)
+                            except Exception:
+                                continue
+                            if not w or c <= 0:
+                                continue
+                            items.append((w, c))
+                        items.sort(key=lambda x: (-x[1], x[0]))
+                        items = items[:30]
+                        for w, c in items:
+                            error_words_lines.append(f"{_safe(w)} - {c}")
+                    except Exception:
+                        error_words_lines = []
+
                     text = (
                         f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
                         f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)})\n"
                         f"Дата: {date_line}\n"
                         f"Длительность: {_fmt_duration(time_ms)}\n\n"
-                        f"⭐-½⭐-🎤-попыток-ошибок\n"
+                        f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
                         f"Итоги: {totals_compact}"
                     )
+                    if error_words_lines:
+                        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
                     if lines:
                         text = text + "\n\n" + "\n".join(lines)
 

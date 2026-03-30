@@ -4229,7 +4229,7 @@ body.playing-audio::after {
    min-width: 18px;
    font-size: 13px;
    line-height: 1;
-   color: var(--color-button-gray);
+   color: var(--color-button-text-gray, #343434);
    /* opacity: 0.55; */
    text-align: center;
    user-select: none;

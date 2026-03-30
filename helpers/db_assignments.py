@@ -581,6 +581,14 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             a["dictation_language_code"] = r.get("dictation_language_code")
             a["dictation_level"] = r.get("dictation_level")
 
+            try:
+                from routes.index import get_cover_url_for_id
+
+                lang = a.get("dictation_language_code")
+                a["dictation_cover_url"] = get_cover_url_for_id(f"dict_{a.get('dictation_id')}", lang)
+            except Exception:
+                a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
+
             start_d = _parse_date(a.get("start_date"))
             end_d = _parse_date(a.get("end_date"))
             is_day = (start_d == end_d) if (start_d and end_d) else False

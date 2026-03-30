@@ -748,6 +748,7 @@ function _studentPlanRender(panel, dateIso, items) {
     const cards = groupItems.map(a => {
       const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
       const level = a && a.dictation_level ? String(a.dictation_level) : '—';
+      const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
       const req = Number(a && a.required_completions ? a.required_completions : 1);
       const done = Number(a && typeof a.done !== 'undefined' ? a.done : 0);
       const overdue = !!(a && a.overdue);
@@ -764,12 +765,19 @@ function _studentPlanRender(panel, dateIso, items) {
         : null;
       const selectedPositionsAttr = Array.isArray(selectedPositions) ? selectedPositions.join(',') : '';
 
+      const coverStyle = coverUrl
+        ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
+        : '';
+
       return `
         <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px;">
           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-            <div style="min-width:0;">
-              <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+            <div style="min-width:0; display:flex; gap:10px;">
+              <div style="width:56px; height:56px; border-radius:12px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+              <div style="min-width:0;">
+                <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+                <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+              </div>
             </div>
             <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
               <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
@@ -1011,7 +1019,7 @@ function _teacherAssignmentsRender(items) {
       <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
           <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:44px; height:44px; border-radius:10px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+            <div style="width:100px; height:100px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
             <div style="min-width:0;">
               <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
               <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentencesCount || 0))} предлож.</div>
@@ -1104,6 +1112,11 @@ function _teacherAssignmentsRender(items) {
       if (!raw) return;
       btn.disabled = true;
       try {
+        try {
+          const panel = document.getElementById('teacher-assignments-panel');
+          if (panel) panel.style.display = 'none';
+        } catch (e2) {
+        }
         const a = JSON.parse(raw);
         if (!a || !a.id || !a.dictation_id) {
           try { showToast('Не удалось открыть задание'); } catch (e2) { }
