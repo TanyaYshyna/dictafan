@@ -350,7 +350,6 @@ function ensureCreateAssignmentModal() {
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row">
                 <select id="create-assignment-group" class="create-assignment-select"></select>
-                <div style="height:40px; display:flex; align-items:center; padding:0 12px; border-radius:12px; border:1px solid rgba(0,0,0,0.10); background:rgba(0,0,0,0.02); color:rgba(0,0,0,0.65); font-size:12px; user-select:none;">по дням</div>
               </div>
             </div>
           </div>
@@ -1569,18 +1568,12 @@ async function openCreateAssignmentModal(dictationId) {
     renderCreateAssignmentSentencesTable(modal);
   }
 
-  const daysPanel = document.getElementById('create-assignment-days-panel');
   const daysAddBtn = document.getElementById('create-assignment-days-add');
-  const bottom = document.getElementById('create-assignment-bottom');
 
   const today = getTodayIsoDate();
 
   setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
   renderCreateAssignmentDaysTable(modal);
-
-  if (daysPanel) daysPanel.style.display = 'flex';
-  if (daysAddBtn) daysAddBtn.style.display = 'inline-flex';
-  if (bottom) bottom.style.gridTemplateColumns = '300px 1fr';
 
   if (daysAddBtn) {
     daysAddBtn.onclick = () => {
@@ -1642,7 +1635,6 @@ async function openCreateAssignmentModal(dictationId) {
       try {
         const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
         const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-        const mode = 'days';
 
         if (!groupId) {
           showToast('Выбери группу');
@@ -1664,66 +1656,62 @@ async function openCreateAssignmentModal(dictationId) {
           return;
         }
 
-        if (mode === 'days') {
-          const state = getCreateAssignmentDaysState(modal);
-          const days = (Array.isArray(state) ? state : []).map(x => ({
-            date: String(x?.date || '').trim(),
-            required_completions: Number(x?.count || 1)
-          })).filter(x => x.date);
+        const state = getCreateAssignmentDaysState(modal);
+        const days = (Array.isArray(state) ? state : []).map(x => ({
+          date: String(x?.date || '').trim(),
+          required_completions: Number(x?.count || 1)
+        })).filter(x => x.date);
 
-          const sentenceState = getCreateAssignmentSentencesState(modal);
-          const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
+        const sentenceState = getCreateAssignmentSentencesState(modal);
+        const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
 
-          if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
-            showToast('Выбери хотя бы одно предложение');
-            return;
-          }
-
-          if (!days.length) {
-            showToast('Добавь хотя бы один день');
-            return;
-          }
-
-          for (const d of days) {
-            if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
-              showToast('Неверное число попыток в плане');
-              return;
-            }
-          }
-
-          const uniq = Array.from(new Set(days.map(x => x.date))).sort();
-          if (uniq.length > 7) {
-            showToast('Максимум 7 дней');
-            return;
-          }
-          const span = uniq.length ? diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]) : 0;
-          if (span != null && span > 6) {
-            showToast('Максимум 7 дней');
-            return;
-          }
-
-          const res = await apiRequest('/api/assignments/teacher/create', {
-            method: 'POST',
-            body: JSON.stringify({
-              group_id,
-              dictation_id,
-              mode: 'days',
-              days,
-              selected_sentence_positions
-            })
-          });
-
-          if (!res || !res.success) {
-            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения', { durationMs: 2500 });
-            return;
-          }
-
-          showToast('Задание сохранено', { durationMs: 2500 });
-          close();
+        if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
+          showToast('Выбери хотя бы одно предложение');
           return;
         }
 
-        showToast('Неверный тип задания');
+        if (!days.length) {
+          showToast('Добавь хотя бы один день');
+          return;
+        }
+
+        for (const d of days) {
+          if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
+            showToast('Неверное число попыток в плане');
+            return;
+          }
+        }
+
+        const uniq = Array.from(new Set(days.map(x => x.date))).sort();
+        if (uniq.length > 7) {
+          showToast('Максимум 7 дней');
+          return;
+        }
+        const span = uniq.length ? diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]) : 0;
+        if (span != null && span > 6) {
+          showToast('Максимум 7 дней');
+          return;
+        }
+
+        const res = await apiRequest('/api/assignments/teacher/create', {
+          method: 'POST',
+          body: JSON.stringify({
+            group_id,
+            dictation_id,
+            mode: 'days',
+            days,
+            selected_sentence_positions
+          })
+        });
+
+        if (!res || !res.success) {
+          showToast(res && res.error ? String(res.error) : 'Ошибка сохранения', { durationMs: 2500 });
+          return;
+        }
+
+        showToast('Задание сохранено', { durationMs: 2500 });
+        close();
+        return;
       } catch (e) {
         showToast('Ошибка сохранения', { durationMs: 2500 });
       }
