@@ -106,6 +106,35 @@ def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
         conn.close()
 
 
+def delete_assignments(ids: list[int], teacher_user_id: int) -> int:
+    if not ids:
+        return 0
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            DELETE FROM assignments a
+            WHERE a.id = ANY(%s)
+              AND EXISTS (
+                SELECT 1
+                FROM group_teachers gt
+                JOIN groups g ON g.id = gt.group_id
+                WHERE gt.group_id = a.group_id
+                  AND gt.teacher_user_id = %s
+                  AND g.archived_at IS NULL
+              )
+            """,
+            (ids, teacher_user_id),
+        )
+        deleted = cur.rowcount
+        conn.commit()
+        return int(deleted or 0)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
     conn, cur = get_db_cursor()
     try:
@@ -293,8 +322,6 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
     conn, cur = get_db_cursor()
     try:
         _ensure_teacher_of_group(cur, group_id, teacher_user_id)
-
-        archived_filter = "" if include_archived else "AND a.archived_at IS NULL"
         cur.execute(
             f"""
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
@@ -310,7 +337,6 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
             WHERE a.group_id = %s
-              {archived_filter}
             ORDER BY a.start_date DESC, a.id DESC
             """,
             (group_id,),

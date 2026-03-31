@@ -826,8 +826,8 @@ function _studentPlanRender(panel, dateIso, items) {
       const badgeColor = overdue ? '#b91c1c' : '#111827';
       const isCached = !!(a && a.__cached);
       const cacheBadge = isCached
-        ? '<div title="В кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.16); color:#065f46; flex-shrink:0;"><i data-lucide="download"></i></div>'
-        : '<div title="Не в кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55); flex-shrink:0;"><i data-lucide="cloud"></i></div>';
+        ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:rgba(0,0,0,0.75); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
+        : '';
       const start = a && a.start_date ? String(a.start_date) : '';
       const end = a && a.end_date ? String(a.end_date) : '';
       const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || dateIso);
@@ -843,19 +843,21 @@ function _studentPlanRender(panel, dateIso, items) {
         ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
         : '';
 
+      const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
+
       return `
         <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px;">
           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
             <div style="min-width:0; display:flex; gap:10px;">
-              <div style="width:56px; height:56px; border-radius:12px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+              <div style="width:120px; height:200px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
               <div style="min-width:0;">
                 <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
                 <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+                <div style="margin-top:8px;">${cacheBadge}</div>
               </div>
             </div>
             <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
               <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
-              ${cacheBadge}
               <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
             </div>
           </div>
