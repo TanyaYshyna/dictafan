@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+import logging
+import time
 from typing import Any, Optional
 
 from .db import get_db_cursor
+
+
+logger = logging.getLogger(__name__)
 
 
 MAX_ASSIGNMENT_RANGE_DAYS = 7
@@ -67,71 +72,6 @@ def _validate_max_range(start_d: date, end_d: date) -> None:
         return
     if (end_d - start_d).days > (MAX_ASSIGNMENT_RANGE_DAYS - 1):
         raise ValueError("Assignment date range must be <= 7 days")
-
-
-def create_assignment_period(
-    group_id: int,
-    dictation_id: int,
-    teacher_user_id: int,
-    *,
-    start_date: Any,
-    end_date: Any,
-    required_completions: Any,
-    selected_sentence_positions: Any = None,
-) -> dict:
-    start_d = _parse_date(start_date)
-    end_d = _parse_date(end_date)
-    if not start_d or not end_d:
-        raise ValueError("start_date and end_date are required")
-    if end_d < start_d:
-        raise ValueError("end_date must be >= start_date")
-    _validate_max_range(start_d, end_d)
-
-    try:
-        req = int(required_completions)
-    except Exception:
-        raise ValueError("required_completions must be int")
-    if req <= 0:
-        raise ValueError("required_completions must be > 0")
-
-    conn, cur = get_db_cursor()
-    try:
-        _ensure_teacher_of_group(cur, group_id, teacher_user_id)
-        _check_overlap(cur, group_id=group_id, dictation_id=dictation_id, start_date=start_d, end_date=end_d)
-
-        positions = selected_sentence_positions
-        if isinstance(positions, list):
-            positions = [int(x) for x in positions if x is not None]
-            if not positions:
-                positions = None
-        else:
-            positions = None
-
-        cur.execute(
-            """
-            INSERT INTO assignments (
-                group_id,
-                dictation_id,
-                created_by_teacher_user_id,
-                start_date,
-                end_date,
-                required_completions,
-                selected_sentence_positions,
-                created_at,
-                updated_at,
-                archived_at
-            )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
-            """,
-            (group_id, dictation_id, teacher_user_id, start_d, end_d, req, positions),
-        )
-        row = cur.fetchone() or {}
-        conn.commit()
-        return _row_to_assignment(row)
-    finally:
-        cur.close()
-        conn.close()
 
 
 def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
@@ -217,29 +157,16 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
         completed = 0
         for s in students:
             sid = int(s.get("student_user_id"))
-            if start_d and end_d and start_d == end_d:
-                cur.execute(
-                    """
-                    SELECT COUNT(*)::int AS cnt
-                    FROM history_successes hs
-                    WHERE hs.user_id = %s
-                      AND hs.dictation_id = %s
-                      AND hs.created_at::date = %s
-                    """,
-                    (sid, dictation_id, start_d),
-                )
-            else:
-                cur.execute(
-                    """
-                    SELECT COUNT(*)::int AS cnt
-                    FROM history_successes hs
-                    WHERE hs.user_id = %s
-                      AND hs.dictation_id = %s
-                      AND hs.created_at::date >= %s
-                      AND hs.created_at::date <= %s
-                    """,
-                    (sid, dictation_id, start_d, end_d),
-                )
+            cur.execute(
+                """
+                SELECT COUNT(*)::int AS cnt
+                FROM history_successes hs
+                WHERE hs.user_id = %s
+                  AND hs.dictation_id = %s
+                  AND hs.created_at::date = %s
+                """,
+                (sid, dictation_id, start_d),
+            )
 
             done = int((cur.fetchone() or {}).get("cnt") or 0)
             is_done = done >= req
@@ -362,93 +289,6 @@ def create_assignment_days(
         conn.close()
 
 
-def update_assignment(
-    assignment_id: int,
-    teacher_user_id: int,
-    *,
-    start_date: Any,
-    end_date: Any,
-    required_completions: Any,
-    selected_sentence_positions: Any = None,
-) -> dict:
-    start_d = _parse_date(start_date)
-    end_d = _parse_date(end_date)
-    if not start_d or not end_d:
-        raise ValueError("start_date and end_date are required")
-    if end_d < start_d:
-        raise ValueError("end_date must be >= start_date")
-    _validate_max_range(start_d, end_d)
-
-    try:
-        req = int(required_completions)
-    except Exception:
-        raise ValueError("required_completions must be int")
-    if req <= 0:
-        raise ValueError("required_completions must be > 0")
-
-    positions = selected_sentence_positions
-    if isinstance(positions, list):
-        positions = [int(x) for x in positions if x is not None]
-        if not positions:
-            positions = None
-    else:
-        positions = None
-
-    conn, cur = get_db_cursor()
-    try:
-        cur.execute(
-            """
-            SELECT a.id, a.group_id, a.dictation_id
-            FROM assignments a
-            WHERE a.id = %s
-              AND EXISTS (
-                SELECT 1
-                FROM group_teachers gt
-                JOIN groups g ON g.id = gt.group_id
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
-                  AND g.archived_at IS NULL
-              )
-            """,
-            (assignment_id, teacher_user_id),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise PermissionError("Forbidden")
-
-        group_id = int(row.get("group_id"))
-        dictation_id = int(row.get("dictation_id"))
-
-        _check_overlap(
-            cur,
-            group_id=group_id,
-            dictation_id=dictation_id,
-            start_date=start_d,
-            end_date=end_d,
-            ignore_ids=[int(assignment_id)],
-        )
-
-        cur.execute(
-            """
-            UPDATE assignments a
-            SET start_date = %s,
-                end_date = %s,
-                required_completions = %s,
-                selected_sentence_positions = %s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE a.id = %s
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
-            """,
-            (start_d, end_d, req, positions, assignment_id),
-        )
-        updated = cur.fetchone() or {}
-        conn.commit()
-        return _row_to_assignment(updated)
-    finally:
-        cur.close()
-        conn.close()
-
-
 def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, include_archived: bool = False) -> list[dict]:
     conn, cur = get_db_cursor()
     try:
@@ -534,12 +374,14 @@ def archive_assignments(ids: list[int], teacher_user_id: int) -> int:
 
 
 def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> list[dict]:
+    t0 = time.perf_counter()
     target_date = _parse_date(for_date)
     if not target_date:
         raise ValueError("date is required")
 
     conn, cur = get_db_cursor()
     try:
+        t_sql0 = time.perf_counter()
         cur.execute(
             """
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
@@ -571,8 +413,69 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             (target_date, target_date, student_user_id),
         )
         rows = cur.fetchall() or []
+        t_sql1 = time.perf_counter()
+
+        # Compute completion counts ("done") efficiently.
+        # Avoid N+1 queries: we fetch all relevant successes in a single aggregate query.
+        dictation_ids: list[int] = []
+        min_start: Optional[date] = None
+        max_end: Optional[date] = None
+        for r in rows:
+            try:
+                did = r.get("dictation_id")
+                if did is not None:
+                    dictation_ids.append(int(did))
+            except Exception:
+                pass
+            try:
+                sd = _parse_date(r.get("start_date"))
+                ed = _parse_date(r.get("end_date"))
+                if sd:
+                    min_start = sd if (min_start is None or sd < min_start) else min_start
+                if ed:
+                    max_end = ed if (max_end is None or ed > max_end) else max_end
+            except Exception:
+                pass
+
+        counts_by_dict_day: dict[int, dict[date, int]] = {}
+        if dictation_ids and min_start and max_end:
+            t_cnt0 = time.perf_counter()
+            cur.execute(
+                """
+                SELECT hs.dictation_id, hs.created_at::date AS d, COUNT(*)::int AS cnt
+                FROM history_successes hs
+                WHERE hs.user_id = %s
+                  AND hs.dictation_id = ANY(%s)
+                  AND hs.created_at::date >= %s
+                  AND hs.created_at::date <= %s
+                GROUP BY hs.dictation_id, hs.created_at::date
+                """,
+                (student_user_id, list(set(dictation_ids)), min_start, max_end),
+            )
+            for rr in cur.fetchall() or []:
+                try:
+                    did = int(rr.get("dictation_id"))
+                    day = rr.get("d")
+                    cnt = int(rr.get("cnt") or 0)
+                    if did not in counts_by_dict_day:
+                        counts_by_dict_day[did] = {}
+                    if isinstance(day, date):
+                        counts_by_dict_day[did][day] = cnt
+                except Exception:
+                    continue
+            t_cnt1 = time.perf_counter()
+            try:
+                logger.info(
+                    "[student_plan] history_successes aggregate: dictations=%s, days=%s, %.1fms",
+                    len(set(dictation_ids)),
+                    (max_end - min_start).days + 1 if (min_start and max_end) else 0,
+                    (t_cnt1 - t_cnt0) * 1000.0,
+                )
+            except Exception:
+                pass
 
         result: list[dict] = []
+        t_cover0 = time.perf_counter()
         for r in rows:
             a = _row_to_assignment(r)
 
@@ -591,38 +494,27 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
 
             start_d = _parse_date(a.get("start_date"))
             end_d = _parse_date(a.get("end_date"))
-            is_day = (start_d == end_d) if (start_d and end_d) else False
-            if is_day:
-                # выполнений за конкретную дату
-                cur.execute(
-                    """
-                    SELECT COUNT(*)::int AS cnt
-                    FROM history_successes hs
-                    WHERE hs.user_id = %s
-                      AND hs.dictation_id = %s
-                      AND hs.created_at::date = %s
-                    """,
-                    (student_user_id, a.get("dictation_id"), target_date),
-                )
+            did = a.get("dictation_id")
+            did_int = int(did) if did is not None else None
+            if did_int is not None and did_int in counts_by_dict_day and target_date:
+                a["done"] = int(counts_by_dict_day.get(did_int, {}).get(target_date, 0) or 0)
             else:
-                # выполнений в период
-                cur.execute(
-                    """
-                    SELECT COUNT(*)::int AS cnt
-                    FROM history_successes hs
-                    WHERE hs.user_id = %s
-                      AND hs.dictation_id = %s
-                      AND hs.created_at::date >= %s
-                      AND hs.created_at::date <= %s
-                    """,
-                    (student_user_id, a.get("dictation_id"), start_d, end_d),
-                )
-
-            cnt = (cur.fetchone() or {}).get("cnt") or 0
-            a["done"] = int(cnt)
-            a["mode"] = "days" if is_day else "period"
+                a["done"] = 0
+            a["mode"] = "days"
             a["overdue"] = bool(end_d and (target_date > end_d))
             result.append(a)
+
+        t_cover1 = time.perf_counter()
+        try:
+            logger.info(
+                "[student_plan] assignments rows=%s sql=%.1fms cover+calc=%.1fms total=%.1fms",
+                len(rows),
+                (t_sql1 - t_sql0) * 1000.0,
+                (t_cover1 - t_cover0) * 1000.0,
+                (time.perf_counter() - t0) * 1000.0,
+            )
+        except Exception:
+            pass
 
         return result
     finally:

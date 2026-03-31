@@ -421,6 +421,9 @@ def api_update_profile():
         # Для обратной совместимости также поддерживаем audio_settings_json
         elif 'audio_settings_json' in updates:
             db_updates['audio_settings_json'] = updates['audio_settings_json']
+
+        if 'assignment_history_retention_days' in updates:
+            db_updates['assignment_history_retention_days'] = updates['assignment_history_retention_days']
         
         # Обновляем данные в БД
         if db_updates:
@@ -456,6 +459,9 @@ def api_update_profile():
             user_response['settings_json'] = updated_user['settings_json']
         elif 'audio_settings_json' in updated_user:
             user_response['audio_settings_json'] = updated_user['audio_settings_json']
+
+        if 'assignment_history_retention_days' in updated_user:
+            user_response['assignment_history_retention_days'] = updated_user.get('assignment_history_retention_days')
         
         return jsonify({
             'message': 'Profile updated successfully',
@@ -501,6 +507,9 @@ def api_get_profile():
         user_response['settings_json'] = user_db['settings_json']
     elif 'audio_settings_json' in user_db:
         user_response['audio_settings_json'] = user_db['audio_settings_json']
+
+    if 'assignment_history_retention_days' in user_db:
+        user_response['assignment_history_retention_days'] = user_db.get('assignment_history_retention_days')
 
     return jsonify({'user': user_response})
 

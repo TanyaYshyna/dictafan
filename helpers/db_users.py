@@ -57,7 +57,7 @@ def create_user(
                     "without_entering_text": False,
                     "show_text": False,
                     "speech_recognition_mode": "route",
-                }
+                },
             },
             ensure_ascii=False,
         )
@@ -158,6 +158,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
             WHERE table_name='users' AND column_name IN (
                 'settings_json',
                 'audio_settings_json',
+                'assignment_history_retention_days',
                 'telegram_chat_id',
                 'telegram_enabled',
                 'telegram_link_code',
@@ -169,6 +170,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         columns = {row['column_name'] if isinstance(row, dict) else row[0] for row in rows}
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
+        has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
         has_telegram_chat_id = 'telegram_chat_id' in columns
         has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
@@ -184,6 +186,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.settings_json")
         if has_audio_settings_json:
             select_fields.append("u.audio_settings_json")
+        if has_assignment_history_retention_days:
+            select_fields.append("u.assignment_history_retention_days")
         if has_telegram_chat_id:
             select_fields.append("u.telegram_chat_id")
         if has_telegram_enabled:
@@ -236,6 +240,9 @@ def get_user_by_email(email: str) -> Optional[dict]:
             result["settings_json"] = row.get("settings_json")
         elif has_audio_settings_json and "audio_settings_json" in row:
             result["audio_settings_json"] = row.get("audio_settings_json")
+
+        if has_assignment_history_retention_days and "assignment_history_retention_days" in row:
+            result["assignment_history_retention_days"] = row.get("assignment_history_retention_days")
 
         if has_telegram_chat_id and "telegram_chat_id" in row:
             result["telegram_chat_id"] = row.get("telegram_chat_id")
@@ -331,13 +338,14 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
             update_fields.append("streak_days = %s")
             update_values.append(updates['streak_days'])
         
-        # Проверяем наличие колонок settings_json, audio_settings_json и telegram_self_reports_enabled
+        # Проверяем наличие колонок settings_json, audio_settings_json, assignment_history_retention_days и telegram_self_reports_enabled
         cur.execute("""
             SELECT column_name 
             FROM information_schema.columns 
             WHERE table_name='users' AND column_name IN (
                 'settings_json',
                 'audio_settings_json',
+                'assignment_history_retention_days',
                 'telegram_self_reports_enabled'
             )
         """)
@@ -346,7 +354,25 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         columns = {row['column_name'] if isinstance(row, dict) else row[0] for row in rows}
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
+        has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
+
+        if 'assignment_history_retention_days' in updates:
+            if has_assignment_history_retention_days:
+                v = updates.get('assignment_history_retention_days')
+                try:
+                    v_int = int(v)
+                except Exception:
+                    v_int = 7
+                if v_int not in (0, 7, 30):
+                    v_int = 7
+                update_fields.append("assignment_history_retention_days = %s")
+                update_values.append(v_int)
+            else:
+                raise RuntimeError(
+                    "DB schema mismatch: column users.assignment_history_retention_days is missing. "
+                    "Apply migrations/add_assignment_history_retention_days_to_users.sql"
+                )
         
         # Обновляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
         if 'settings_json' in updates:

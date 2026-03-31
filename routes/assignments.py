@@ -1,4 +1,5 @@
 import logging
+import time
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
@@ -7,11 +8,9 @@ from helpers.db_users import get_user_by_email
 from helpers.db_assignments import (
     archive_assignments,
     create_assignment_days,
-    create_assignment_period,
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
-    update_assignment,
     unarchive_assignments,
 )
 
@@ -63,18 +62,6 @@ def api_teacher_create_assignment():
         return jsonify({"success": False, "error": "group_id and dictation_id must be int"}), 400
 
     try:
-        if mode in ("period", "на период", "range"):
-            item = create_assignment_period(
-                group_id_int,
-                dictation_id_int,
-                user["id"],
-                start_date=data.get("start_date"),
-                end_date=data.get("end_date"),
-                required_completions=data.get("required_completions"),
-                selected_sentence_positions=selected_sentence_positions,
-            )
-            return jsonify({"success": True, "assignment": item})
-
         if mode in ("days", "по дням", "day"):
             items = create_assignment_days(
                 group_id_int,
@@ -85,7 +72,7 @@ def api_teacher_create_assignment():
             )
             return jsonify({"success": True, "assignments": items})
 
-        return jsonify({"success": False, "error": "mode must be period or days"}), 400
+        return jsonify({"success": False, "error": "mode must be days"}), 400
 
     except PermissionError:
         return jsonify({"success": False, "error": "Forbidden"}), 403
@@ -93,36 +80,6 @@ def api_teacher_create_assignment():
         return jsonify({"success": False, "error": str(exc)}), 400
     except Exception as exc:
         logger.error("Ошибка создания задания: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@assignments_bp.route("/teacher/assignment/<int:assignment_id>/update", methods=["POST"])
-@jwt_required()
-def api_teacher_update_assignment(assignment_id: int):
-    current_email = get_jwt_identity()
-    user = get_user_by_email(current_email)
-    if not user:
-        return jsonify({"success": False, "error": "User not found"}), 404
-
-    data = request.get_json(silent=True) or {}
-    selected_sentence_positions = data.get("selected_sentence_positions")
-
-    try:
-        item = update_assignment(
-            int(assignment_id),
-            user["id"],
-            start_date=data.get("start_date"),
-            end_date=data.get("end_date"),
-            required_completions=data.get("required_completions"),
-            selected_sentence_positions=selected_sentence_positions,
-        )
-        return jsonify({"success": True, "assignment": item})
-    except PermissionError:
-        return jsonify({"success": False, "error": "Forbidden"}), 403
-    except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
-    except Exception as exc:
-        logger.error("Ошибка обновления задания %s: %s", assignment_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
@@ -199,6 +156,7 @@ def api_teacher_assignment_students_progress(assignment_id: int):
 @assignments_bp.route("/student/my", methods=["GET"])
 @jwt_required()
 def api_student_my_assignments():
+    t0 = time.perf_counter()
     current_email = get_jwt_identity()
     user = get_user_by_email(current_email)
     if not user:
@@ -209,7 +167,20 @@ def api_student_my_assignments():
         return jsonify({"success": False, "error": "date is required"}), 400
 
     try:
+        t_db0 = time.perf_counter()
         items = list_my_assignments_for_student(user["id"], for_date=for_date)
+        t_db1 = time.perf_counter()
+        try:
+            logger.info(
+                "[student_plan] /api/assignments/student/my user=%s date=%s items=%s db=%.1fms total=%.1fms",
+                user.get("id"),
+                for_date,
+                len(items) if isinstance(items, list) else None,
+                (t_db1 - t_db0) * 1000.0,
+                (time.perf_counter() - t0) * 1000.0,
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "assignments": items})
     except ValueError as exc:
         return jsonify({"success": False, "error": str(exc)}), 400

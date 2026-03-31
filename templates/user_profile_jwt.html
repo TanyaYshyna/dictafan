@@ -140,6 +140,30 @@
 
         <div class="form-section">
             <h3 class="profile-section-header">
+                История заданий
+                <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#assignmentHistorySection" aria-label="Свернуть/развернуть">
+                    <i data-lucide="chevrons-down"></i>
+                </button>
+            </h3>
+            <div id="assignmentHistorySection" class="profile-panel" style="display: none;">
+                <div class="panel-content">
+                    <div class="form-row">
+                        <label for="assignmentHistoryRetentionDays">Хранить историю заданий</label>
+                        <select id="assignmentHistoryRetentionDays" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);">
+                            <option value="0">0 дней</option>
+                            <option value="7">7 дней</option>
+                            <option value="30">30 дней</option>
+                        </select>
+                        <div style="margin-top:8px; font-size:12px; color: rgba(0,0,0,0.55);">
+                            История заданий хранится максимум 30 дней. Всё, что старше — может быть удалено.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3 class="profile-section-header">
                 Telegram
                 <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#telegramSection" aria-label="Свернуть/развернуть">
                     <i data-lucide="chevrons-down"></i>

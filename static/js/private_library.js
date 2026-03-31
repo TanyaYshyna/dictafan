@@ -12,6 +12,105 @@ function setBookEditDirty(nextDirty) {
   }
 }
 
+function _nowTs() {
+  try {
+    return (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
+      ? performance.now()
+      : Date.now();
+  } catch (e) {
+    return Date.now();
+  }
+}
+
+function _fmtMs(ms) {
+  try {
+    return `${(Number(ms) || 0).toFixed(1)}ms`;
+  } catch (e) {
+    return `${ms}ms`;
+  }
+}
+
+function _planLog(label, t0) {
+  try {
+    const dt = (typeof t0 === 'number') ? (_nowTs() - t0) : null;
+    if (dt == null) {
+      console.log(`[student_plan] ${label}`);
+    } else {
+      console.log(`[student_plan] ${label}: ${_fmtMs(dt)}`);
+    }
+  } catch (e) {
+  }
+}
+
+async function _getCachedDictationIdSetIdb() {
+  try {
+    const t0 = _nowTs();
+    const db = await openDraftDb();
+    try {
+      return await new Promise((resolve) => {
+        const out = new Set();
+        const tx = db.transaction('dictations', 'readonly');
+        const store = tx.objectStore('dictations');
+        const req = store.openCursor();
+        req.onsuccess = () => {
+          const cursor = req.result;
+          if (!cursor) {
+            try { _planLog(`idb_dictations_scan(size=${out.size})`, t0); } catch (e) {}
+            return resolve(out);
+          }
+          const v = cursor.value;
+          try {
+            const raw = v && (v.dictationId != null) ? String(v.dictationId) : '';
+            const cleaned = raw.replace(/^dict_/, '').trim();
+            if (cleaned) out.add(cleaned);
+          } catch (e) {
+          }
+          cursor.continue();
+        };
+        req.onerror = () => resolve(new Set());
+      });
+    } finally {
+      try { db.close(); } catch (e) {}
+    }
+  } catch (e) {
+    return new Set();
+  }
+}
+
+async function _isDictationCachedIdb(dictationId) {
+  try {
+    const rawUserId = String(getDraftUserIdForKey());
+    const dictId = String(dictationId || '').trim();
+    if (!dictId) return false;
+    const keys = [];
+    keys.push(`${rawUserId}:${dictId}`);
+    keys.push(`${rawUserId}:dict_${dictId}`);
+    keys.push(`anon:${dictId}`);
+    keys.push(`anon:dict_${dictId}`);
+
+    const langPairs = [
+      ['en', 'ru'],
+      ['ru', 'en'],
+      ['en', 'uk'],
+      ['uk', 'en'],
+    ];
+    for (const [lo, lt] of langPairs) {
+      keys.push(`${rawUserId}:${dictId}:${lo}:${lt}`);
+      keys.push(`${rawUserId}:dict_${dictId}:${lo}:${lt}`);
+      keys.push(`anon:${dictId}:${lo}:${lt}`);
+      keys.push(`anon:dict_${dictId}:${lo}:${lt}`);
+    }
+
+    for (const k of keys) {
+      const row = await idbGet('dictations', k);
+      if (row && Array.isArray(row.sentences) && row.sentences.length) return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 function diffDaysIsoDate(aIso, bIso) {
   try {
     const a = String(aIso || '').split('-');
@@ -24,24 +123,6 @@ function diffDaysIsoDate(aIso, bIso) {
     return Math.round(ms / (1000 * 60 * 60 * 24));
   } catch (e) {
     return null;
-  }
-}
-
-function clampAssignmentRangePeriod(fromEl, toEl) {
-  if (!fromEl || !toEl) return;
-  const start = String(fromEl.value || '').trim();
-  const end = String(toEl.value || '').trim();
-  if (!start || !end) return;
-
-  const d = diffDaysIsoDate(start, end);
-  if (d == null) return;
-  if (d < 0) {
-    toEl.value = start;
-    return;
-  }
-  if (d > 6) {
-    toEl.value = addDaysIsoDate(start, 6);
-    try { showToast('Максимум 7 дней'); } catch (e) { }
   }
 }
 
@@ -269,24 +350,7 @@ function ensureCreateAssignmentModal() {
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row">
                 <select id="create-assignment-group" class="create-assignment-select"></select>
-                <select id="create-assignment-type" class="create-assignment-select">
-                <option value="period">на период</option>
-                <option value="days">по дням</option>
-                </select>
-              </div>
-
-              <div id="create-assignment-type-period" class="create-assignment-period-row">
-                <div class="create-assignment-dates">
-                  <span class="create-assignment-inline-label">с</span>
-                  <input type="date" id="create-assignment-from" class="create-assignment-date" />
-                  <span class="create-assignment-inline-label">по</span>
-                  <input type="date" id="create-assignment-to" class="create-assignment-date" />
-                </div>
-
-                <div class="create-assignment-medals">
-                  <i data-lucide="award" class="create-assignment-award-icon"></i>
-                  <input type="number" id="create-assignment-attempts" min="1" step="1" value="1" class="create-assignment-medals-input" />
-                </div>
+                <div style="height:40px; display:flex; align-items:center; padding:0 12px; border-radius:12px; border:1px solid rgba(0,0,0,0.10); background:rgba(0,0,0,0.02); color:rgba(0,0,0,0.65); font-size:12px; user-select:none;">по дням</div>
               </div>
             </div>
           </div>
@@ -448,7 +512,12 @@ function ensureStudentPlanPanel() {
             <i data-lucide="chevron-right"></i>
           </button>
         </div>
-        <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">Сегодня</button>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">Сегодня</button>
+          <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="Получить свежие данные" style="width:40px; height:40px;">
+            <i data-lucide="refresh-cw"></i>
+          </button>
+        </div>
       </div>
 
       <div id="student-plan-list" style="padding:14px; overflow:auto; flex:1;"></div>
@@ -756,6 +825,10 @@ function _studentPlanRender(panel, dateIso, items) {
       const overdue = !!(a && a.overdue);
       const badgeBg = overdue ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.06)';
       const badgeColor = overdue ? '#b91c1c' : '#111827';
+      const isCached = !!(a && a.__cached);
+      const cacheBadge = isCached
+        ? '<div title="В кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.16); color:#065f46; flex-shrink:0;"><i data-lucide="download"></i></div>'
+        : '<div title="Не в кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55); flex-shrink:0;"><i data-lucide="cloud"></i></div>';
       const start = a && a.start_date ? String(a.start_date) : '';
       const end = a && a.end_date ? String(a.end_date) : '';
       const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || dateIso);
@@ -783,6 +856,7 @@ function _studentPlanRender(panel, dateIso, items) {
             </div>
             <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
               <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
+              ${cacheBadge}
               <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
             </div>
           </div>
@@ -841,6 +915,7 @@ async function openStudentPlanPanel(dateIso = null) {
   const prevBtn = document.getElementById('student-plan-prev');
   const nextBtn = document.getElementById('student-plan-next');
   const todayBtn = document.getElementById('student-plan-today');
+  const refreshBtn = document.getElementById('student-plan-refresh');
 
   const today = getTodayIsoDate();
   const initial = String(dateIso || (dateInput && dateInput.value) || today);
@@ -859,24 +934,47 @@ async function openStudentPlanPanel(dateIso = null) {
 
   if (closeBtn) closeBtn.onclick = () => close();
 
-  const load = async () => {
+  const updateTodayVisibility = () => {
+    try {
+      if (!todayBtn) return;
+      const v = dateInput ? String(dateInput.value || '').trim() : '';
+      todayBtn.style.display = (v && v === today) ? 'none' : 'inline-flex';
+    } catch (e) {
+    }
+  };
+
+  const load = async (opts = {}) => {
+    const forceRefresh = !!(opts && opts.forceRefresh);
+    const tLoad0 = _nowTs();
     const d = dateInput ? String(dateInput.value || '').trim() : '';
     if (!d) return;
     const list = document.getElementById('student-plan-list');
 
+    updateTodayVisibility();
+
     try {
+      const tClean0 = _nowTs();
       await _cleanupStudentPlanCacheIdb();
+      _planLog('cleanup_cache', tClean0);
     } catch (e) {
     }
 
-    const cached = await _getStudentPlanCacheForDateIdb(d);
-    if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
-      _studentPlanRender(panel, d, cached.assignments);
+    if (!forceRefresh) {
+      const tIdb0 = _nowTs();
+      const cached = await _getStudentPlanCacheForDateIdb(d);
+      _planLog('idb_read', tIdb0);
+      if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
+        _studentPlanRender(panel, d, cached.assignments);
+      } else {
+        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+      }
     } else {
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
     }
     try {
+      const tNet0 = _nowTs();
       const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
+      _planLog('api_fetch', tNet0);
       if (!res || !res.success) {
         const fallback = await _getStudentPlanCacheForDateIdb(d);
         if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
@@ -886,8 +984,31 @@ async function openStudentPlanPanel(dateIso = null) {
         if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
         return;
       }
-      await _setStudentPlanCacheForDateIdb(d, res.assignments || []);
-      _studentPlanRender(panel, d, res.assignments || []);
+      const items = Array.isArray(res.assignments) ? res.assignments : [];
+
+      try {
+        const tCache0 = _nowTs();
+        const cachedIds = await _getCachedDictationIdSetIdb();
+        for (const it of items) {
+          try {
+            const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
+            const cleaned = did.replace(/^dict_/, '').trim();
+            if (cleaned) it.__cached = cachedIds.has(cleaned);
+          } catch (e) {
+          }
+        }
+        _planLog('check_dictations_cache', tCache0);
+      } catch (e) {
+      }
+
+      const tIdbW0 = _nowTs();
+      await _setStudentPlanCacheForDateIdb(d, items);
+      _planLog('idb_write', tIdbW0);
+
+      const tRender0 = _nowTs();
+      _studentPlanRender(panel, d, items);
+      _planLog('render', tRender0);
+      _planLog(`load_total(force=${forceRefresh ? '1' : '0'})`, tLoad0);
     } catch (e) {
       const fallback = await _getStudentPlanCacheForDateIdb(d);
       if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
@@ -902,6 +1023,9 @@ async function openStudentPlanPanel(dateIso = null) {
   if (todayBtn) todayBtn.onclick = () => {
     if (dateInput) dateInput.value = today;
     load();
+  };
+  if (refreshBtn) refreshBtn.onclick = () => {
+    load({ forceRefresh: true });
   };
   if (prevBtn) prevBtn.onclick = () => {
     if (!dateInput) return;
@@ -925,6 +1049,7 @@ async function openStudentPlanPanel(dateIso = null) {
   } catch (e) {
   }
 
+  updateTodayVisibility();
   await load();
 }
 
@@ -1005,6 +1130,7 @@ function _teacherAssignmentsRender(items) {
     const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
     const req = Number(a && a.required_completions ? a.required_completions : 1);
     const isArchived = Boolean(a && a.archived_at);
+    const isCached = !!(a && a.__cached);
     const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
     const badgeBg = isArchived ? 'rgba(0,0,0,0.06)' : 'rgba(245,158,11,0.16)';
     const badgeColor = isArchived ? 'rgba(0,0,0,0.6)' : '#92400e';
@@ -1017,24 +1143,26 @@ function _teacherAssignmentsRender(items) {
       ? ''
       : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
 
+    const cacheBadge = isCached
+      ? '<div title="В кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.16); color:#065f46; flex-shrink:0;"><i data-lucide="download"></i></div>'
+      : '<div title="Не в кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55); flex-shrink:0;"><i data-lucide="cloud"></i></div>';
+
     return `
       <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
           <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:100px; height:100px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+            <div style="width:56px; height:56px; border-radius:12px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
             <div style="min-width:0;">
               <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
               <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentencesCount || 0))} предлож.</div>
             </div>
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
-            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment='${escapeHtml(JSON.stringify(a || {}))}' title="Редактировать" style="width:34px; height:34px;">
-              <i data-lucide="pencil"></i>
-            </button>
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
               <i data-lucide="user"></i>
             </button>
             ${leftBadge}
+            ${cacheBadge}
             <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
             ${isArchived
               ? `<button type="button" class="topbar-icon-btn" data-action="teacher-unarchive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Вернуть из архива" style="width:34px; height:34px;"><i data-lucide="rotate-ccw"></i></button>`
@@ -1106,33 +1234,6 @@ function _teacherAssignmentsRender(items) {
     });
   });
 
-  list.querySelectorAll('[data-action="teacher-edit-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const raw = btn.getAttribute('data-assignment');
-      if (!raw) return;
-      btn.disabled = true;
-      try {
-        try {
-          const panel = document.getElementById('teacher-assignments-panel');
-          if (panel) panel.style.display = 'none';
-        } catch (e2) {
-        }
-        const a = JSON.parse(raw);
-        if (!a || !a.id || !a.dictation_id) {
-          try { showToast('Не удалось открыть задание'); } catch (e2) { }
-          return;
-        }
-        await openCreateAssignmentModal(Number(a.dictation_id), { editAssignment: a });
-      } catch (err) {
-        try { showToast('Не удалось открыть задание'); } catch (e2) { }
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
   try {
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       window.lucide.createIcons({ root: list });
@@ -1159,6 +1260,18 @@ async function _teacherAssignmentsReload() {
       return;
     }
     const items = Array.isArray(res.assignments) ? res.assignments : [];
+    try {
+      const cachedIds = await _getCachedDictationIdSetIdb();
+      for (const it of items) {
+        try {
+          const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
+          const cleaned = did.replace(/^dict_/, '').trim();
+          if (cleaned) it.__cached = cachedIds.has(cleaned);
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
     for (const a of items) {
       try {
         const sid = a && a.id ? String(a.id) : '';
@@ -1211,8 +1324,15 @@ async function openTeacherAssignmentsPanel() {
         o.textContent = String(g.title || `Группа ${g.id}`);
         groupSelect.appendChild(o);
       });
-      if (groups.length === 1) {
+      const last = getAssignmentLastGroupId();
+      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
+        groupSelect.value = last;
+      } else if (groups.length === 1) {
         groupSelect.value = String(groups[0].id);
+        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
+      } else if (groups.length > 0) {
+        groupSelect.value = String(groups[0].id);
+        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
       }
     }
   } catch (e) {
@@ -1221,6 +1341,7 @@ async function openTeacherAssignmentsPanel() {
 
   if (groupSelect) {
     groupSelect.onchange = () => {
+      try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
       _teacherAssignmentsReload().catch(() => { });
     };
   }
@@ -1389,12 +1510,6 @@ async function loadMyGroupsForAssignmentModal() {
 async function openCreateAssignmentModal(dictationId) {
   const modal = ensureCreateAssignmentModal();
   const options = arguments && arguments.length > 1 ? arguments[1] : null;
-  const editAssignment = options && options.editAssignment ? options.editAssignment : null;
-
-  try {
-    modal.dataset.editAssignmentId = editAssignment && editAssignment.id ? String(editAssignment.id) : '';
-  } catch (e) {
-  }
 
   const idInput = document.getElementById('create-assignment-dictation-id');
   if (idInput) idInput.value = String(dictationId || '');
@@ -1454,52 +1569,18 @@ async function openCreateAssignmentModal(dictationId) {
     renderCreateAssignmentSentencesTable(modal);
   }
 
-  const typeSelect = document.getElementById('create-assignment-type');
-  const periodBlock = document.getElementById('create-assignment-type-period');
   const daysPanel = document.getElementById('create-assignment-days-panel');
   const daysAddBtn = document.getElementById('create-assignment-days-add');
   const bottom = document.getElementById('create-assignment-bottom');
-  const fromEl = document.getElementById('create-assignment-from');
-  const toEl = document.getElementById('create-assignment-to');
-  const attemptsEl = document.getElementById('create-assignment-attempts');
 
   const today = getTodayIsoDate();
-  if (fromEl) fromEl.value = today;
-  if (toEl) toEl.value = addDaysIsoDate(today, 1);
-  if (attemptsEl) attemptsEl.value = '1';
 
   setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
   renderCreateAssignmentDaysTable(modal);
 
-  const updateTypeUi = () => {
-    const v = typeSelect ? String(typeSelect.value || 'period') : 'period';
-    if (periodBlock) periodBlock.style.display = v === 'period' ? 'flex' : 'none';
-    if (daysPanel) daysPanel.style.display = v === 'days' ? 'flex' : 'none';
-    if (daysAddBtn) daysAddBtn.style.display = v === 'days' ? 'inline-flex' : 'none';
-
-    if (bottom) {
-      if (v === 'period') {
-        bottom.style.gridTemplateColumns = '1fr';
-      } else {
-        bottom.style.gridTemplateColumns = '300px 1fr';
-      }
-    }
-  };
-
-  if (typeSelect) {
-    typeSelect.onchange = () => updateTypeUi();
-    typeSelect.value = 'days';
-  }
-  updateTypeUi();
-
-  if (fromEl && toEl) {
-    fromEl.addEventListener('change', () => {
-      clampAssignmentRangePeriod(fromEl, toEl);
-    });
-    toEl.addEventListener('change', () => {
-      clampAssignmentRangePeriod(fromEl, toEl);
-    });
-  }
+  if (daysPanel) daysPanel.style.display = 'flex';
+  if (daysAddBtn) daysAddBtn.style.display = 'inline-flex';
+  if (bottom) bottom.style.gridTemplateColumns = '300px 1fr';
 
   if (daysAddBtn) {
     daysAddBtn.onclick = () => {
@@ -1559,14 +1640,9 @@ async function openCreateAssignmentModal(dictationId) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
-        const editIdRaw = (() => {
-          try { return modal.dataset.editAssignmentId || ''; } catch (e) { return ''; }
-        })();
-        const editId = editIdRaw ? Number(editIdRaw) : null;
-
         const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
         const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-        const mode = typeSelect ? String(typeSelect.value || 'period').trim() : 'period';
+        const mode = 'days';
 
         if (!groupId) {
           showToast('Выбери группу');
@@ -1588,67 +1664,6 @@ async function openCreateAssignmentModal(dictationId) {
           return;
         }
 
-        if (mode === 'period') {
-          const start_date = fromEl ? String(fromEl.value || '').trim() : '';
-          const end_date = toEl ? String(toEl.value || '').trim() : '';
-          const required_completions = attemptsEl ? Number(attemptsEl.value || 1) : 1;
-
-          const sentenceState = getCreateAssignmentSentencesState(modal);
-          const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
-
-          if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
-            showToast('Выбери хотя бы одно предложение');
-            return;
-          }
-
-          if (!start_date || !end_date) {
-            showToast('Выбери даты');
-            return;
-          }
-          const span = diffDaysIsoDate(start_date, end_date);
-          if (span != null && span > 6) {
-            showToast('Максимум 7 дней');
-            return;
-          }
-          if (!Number.isFinite(required_completions) || required_completions <= 0) {
-            showToast('Неверное число попыток');
-            return;
-          }
-
-          const url = editId ? `/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}/update` : '/api/assignments/teacher/create';
-          const body = editId
-            ? {
-              start_date,
-              end_date,
-              required_completions,
-              selected_sentence_positions
-            }
-            : {
-              group_id,
-              dictation_id,
-              mode: 'period',
-              start_date,
-              end_date,
-              required_completions,
-              selected_sentence_positions
-            };
-
-          const res = await apiRequest(url, {
-            method: 'POST',
-            body: JSON.stringify(body)
-          });
-
-          if (!res || !res.success) {
-            showToast(res && res.error ? String(res.error) : 'Ошибка сохранения');
-            return;
-          }
-
-          showToast('Задание сохранено', { durationMs: 2500 });
-          close();
-          try { await _teacherAssignmentsReload(); } catch (e) { }
-          return;
-        }
-
         if (mode === 'days') {
           const state = getCreateAssignmentDaysState(modal);
           const days = (Array.isArray(state) ? state : []).map(x => ({
@@ -1666,11 +1681,6 @@ async function openCreateAssignmentModal(dictationId) {
 
           if (!days.length) {
             showToast('Добавь хотя бы один день');
-            return;
-          }
-
-          if (editId) {
-            showToast('Редактирование доступно только для режима «на период»');
             return;
           }
 
@@ -1722,52 +1732,10 @@ async function openCreateAssignmentModal(dictationId) {
 
   modal.style.display = 'flex';
 
-  if (editAssignment) {
-    try {
-      const t = document.querySelector('.create-assignment-modal-title-text');
-      if (t) t.textContent = 'Редактирование';
-    } catch (e) {
-    }
-
-    try {
-      if (groupSelect) groupSelect.disabled = true;
-      if (typeSelect) typeSelect.disabled = true;
-    } catch (e) {
-    }
-
-    try {
-      if (attemptsEl) attemptsEl.value = String(editAssignment.required_completions || 1);
-      const sd = editAssignment.start_date ? String(editAssignment.start_date) : today;
-      const ed = editAssignment.end_date ? String(editAssignment.end_date) : sd;
-      if (fromEl) fromEl.value = sd;
-      if (toEl) toEl.value = ed;
-      clampAssignmentRangePeriod(fromEl, toEl);
-
-      if (typeSelect) typeSelect.value = 'period';
-      updateTypeUi();
-    } catch (e) {
-    }
-
-    try {
-      const sentenceState = getCreateAssignmentSentencesState(modal);
-      const selected = Array.isArray(editAssignment.selected_sentence_positions)
-        ? editAssignment.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-        : null;
-      setCreateAssignmentSentencesState(modal, Object.assign({}, sentenceState, { selectedPositions: selected && selected.length ? selected : null }));
-      renderCreateAssignmentSentencesTable(modal);
-    } catch (e) {
-    }
-  } else {
-    try {
-      const t = document.querySelector('.create-assignment-modal-title-text');
-      if (t) t.textContent = 'Задание';
-    } catch (e) {
-    }
-    try {
-      if (groupSelect) groupSelect.disabled = false;
-      if (typeSelect) typeSelect.disabled = false;
-    } catch (e) {
-    }
+  try {
+    const t = document.querySelector('.create-assignment-modal-title-text');
+    if (t) t.textContent = 'Задание';
+  } catch (e) {
   }
 
   try {

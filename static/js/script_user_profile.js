@@ -1448,6 +1448,18 @@ function setupPasswordToggles() {
 function loadUserData() {
     const userData = UM.userData;
     // console.log('userData:', userData);
+
+    let assignmentHistoryRetentionDays = 7;
+    try {
+        if (userData) {
+            const n = Number(userData.assignment_history_retention_days);
+            if (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) {
+                assignmentHistoryRetentionDays = n;
+            }
+        }
+    } catch (e) {
+    }
+
     originalData = {
         username: userData.username,
         email: userData.email,
@@ -1461,12 +1473,25 @@ function loadUserData() {
         audio_success: userData.audio_success || '',
         audio_repeats: userData.audio_repeats || 3,
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
-        speech_recognition_mode: userData.speech_recognition_mode || 'route'
+        speech_recognition_mode: userData.speech_recognition_mode || 'route',
+        assignment_history_retention_days: assignmentHistoryRetentionDays,
     };
 
     document.getElementById('username').value = originalData.username;
     document.getElementById('email').value = originalData.email;
     updateAvatarDisplay(originalData.avatar);
+
+    try {
+        const sel = document.getElementById('assignmentHistoryRetentionDays');
+        if (sel) {
+            sel.value = String(originalData.assignment_history_retention_days ?? 7);
+            sel.onchange = () => {
+                checkForChanges();
+            };
+        }
+    } catch (e) {
+    }
+
     renderTelegramSection();
     setUnsavedState(false);
 }
@@ -1801,7 +1826,8 @@ function checkForChanges() {
         currentValues.audio_success !== (originalData.audio_success || '') ||
         currentValues.audio_repeats !== (originalData.audio_repeats || 3) ||
         currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3) ||
-        currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route');
+        currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route') ||
+        currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7);
 
     setUnsavedState(hasChanges);
 }
@@ -1874,7 +1900,16 @@ function getCurrentFormValues() {
         audio_success: audioSettings.audio_success,
         audio_repeats: audioSettings.audio_repeats,
         audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
-        speech_recognition_mode: audioSettings.speech_recognition_mode
+        speech_recognition_mode: audioSettings.speech_recognition_mode,
+        assignment_history_retention_days: (() => {
+            try {
+                const el = document.getElementById('assignmentHistoryRetentionDays');
+                const n = Number(el ? el.value : 7);
+                return (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) ? n : 7;
+            } catch (e) {
+                return 7;
+            }
+        })(),
     };
 }
 
@@ -1975,27 +2010,43 @@ async function saveProfile(options = {}) {
             updateData.password = formValues.password;
         }
 
-        // Добавляем настройки аудио в формате settings_json
+        updateData.assignment_history_retention_days = formValues.assignment_history_retention_days;
+
+        // audio остаётся в settings_json
         if (audioSettingsPanel) {
-            // Получаем настройки из панели (включая новые поля without_entering_text и show_text)
-            const settings = audioSettingsPanel.getSettings();
-            
-            // Формируем settings_json в новом формате
-            const settingsJson = JSON.stringify({
-                audio: {
-                    start: (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto',
-                    typo: (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o',
-                    success: (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot',
-                    repeats: settings.repeats !== undefined ? settings.repeats : 3,
-                    required_passed_star_half: settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3,
-                    without_entering_text: Boolean(settings.without_entering_text),
-                    show_text: Boolean(settings.show_text),
-                    speech_recognition_mode: settings.speech_recognition_mode || 'route'
+            let merged = {};
+            try {
+                const raw = (UM && UM.userData && UM.userData.settings_json) ? UM.userData.settings_json : '';
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === 'object') {
+                        merged = parsed;
+                    }
                 }
-            });
-            
-            updateData.settings_json = settingsJson;
-            
+            } catch (e) {
+            }
+
+            const settings = audioSettingsPanel.getSettings();
+            try {
+                if (!merged.audio || typeof merged.audio !== 'object') {
+                    merged.audio = {};
+                }
+                merged.audio.start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
+                merged.audio.typo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
+                merged.audio.success = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
+                merged.audio.repeats = settings.repeats !== undefined ? settings.repeats : 3;
+                merged.audio.required_passed_star_half = settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3;
+                merged.audio.without_entering_text = Boolean(settings.without_entering_text);
+                merged.audio.show_text = Boolean(settings.show_text);
+                merged.audio.speech_recognition_mode = settings.speech_recognition_mode || 'route';
+            } catch (e) {
+            }
+
+            try {
+                updateData.settings_json = JSON.stringify(merged);
+            } catch (e) {
+            }
+
             // Для обратной совместимости также отправляем отдельные поля (если бэкенд их еще использует)
             updateData.audio_start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
             updateData.audio_typo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
@@ -2092,6 +2143,15 @@ async function saveProfile(options = {}) {
             audioSettings.speech_recognition_mode = updateData.speech_recognition_mode;
         }
         
+        let assignmentHistoryRetentionDaysAfterSave = 7;
+        try {
+            const n = Number(updatedUser && updatedUser.assignment_history_retention_days);
+            if (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) {
+                assignmentHistoryRetentionDaysAfterSave = n;
+            }
+        } catch (e) {
+        }
+
         originalData = {
             ...originalData,
             username: updatedUser.username,
@@ -2103,7 +2163,8 @@ async function saveProfile(options = {}) {
             audio_success: audioSettings.audio_success,
             audio_repeats: audioSettings.audio_repeats,
             audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
-            speech_recognition_mode: audioSettings.speech_recognition_mode
+            speech_recognition_mode: audioSettings.speech_recognition_mode,
+            assignment_history_retention_days: assignmentHistoryRetentionDaysAfterSave,
         };
         
         // Обновляем UM.userData, чтобы при следующей загрузке страницы данные были актуальными
@@ -2143,6 +2204,16 @@ async function saveProfile(options = {}) {
             // Сохраняем settings_json если он есть
             if (updatedUser.settings_json) {
                 UM.userData.settings_json = updatedUser.settings_json;
+            }
+
+            if (updatedUser.assignment_history_retention_days !== undefined && updatedUser.assignment_history_retention_days !== null) {
+                UM.userData.assignment_history_retention_days = updatedUser.assignment_history_retention_days;
+            }
+
+            try {
+                const sel = document.getElementById('assignmentHistoryRetentionDays');
+                if (sel) sel.value = String(originalData.assignment_history_retention_days ?? 7);
+            } catch (e) {
             }
             // Также сохраняем отдельные поля для обратной совместимости
             UM.userData.audio_start = originalData.audio_start;
