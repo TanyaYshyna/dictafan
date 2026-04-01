@@ -129,6 +129,133 @@ def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user
         conn.close()
 
 
+def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
+                   a.start_date, a.end_date, a.required_completions,
+                   a.selected_sentence_positions,
+                   a.created_at, a.updated_at, a.archived_at,
+                   g.title AS group_title,
+                   d.title AS dictation_title,
+                   d.language_code AS dictation_language_code,
+                   d.level AS dictation_level,
+                   d.sentences_count AS dictation_sentences_count
+            FROM assignments a
+            JOIN groups g ON g.id = a.group_id
+            JOIN dictations d ON d.id = a.dictation_id
+            WHERE a.id = %s
+              AND EXISTS (
+                SELECT 1
+                FROM group_teachers gt
+                WHERE gt.group_id = a.group_id
+                  AND gt.teacher_user_id = %s
+              )
+            """,
+            (assignment_id, teacher_user_id),
+        )
+        r = cur.fetchone() or None
+        if not r:
+            raise PermissionError("Forbidden")
+
+        a = _row_to_assignment(r)
+        a["group_title"] = r.get("group_title")
+        a["dictation_title"] = r.get("dictation_title")
+        a["dictation_language_code"] = r.get("dictation_language_code")
+        a["dictation_level"] = r.get("dictation_level")
+        a["dictation_sentences_count"] = int(r.get("dictation_sentences_count") or 0)
+        try:
+            from routes.index import get_cover_url_for_id
+
+            lang = a.get("dictation_language_code")
+            a["dictation_cover_url"] = get_cover_url_for_id(f"dict_{a.get('dictation_id')}", lang)
+        except Exception:
+            a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
+        return a
+    finally:
+        cur.close()
+        conn.close()
+
+
+def update_assignment_for_teacher(
+    assignment_id: int,
+    teacher_user_id: int,
+    *,
+    group_id: int,
+    day_date: Any,
+    required_completions: int,
+    selected_sentence_positions: Any = None,
+) -> dict:
+    if required_completions <= 0:
+        raise ValueError("required_completions must be > 0")
+
+    day_d = _parse_date(day_date)
+    if not day_d:
+        raise ValueError("day date is required")
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date
+            FROM assignments a
+            WHERE a.id = %s
+            """,
+            (assignment_id,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            raise ValueError("Assignment not found")
+
+        old_group_id = int(row.get("group_id"))
+        dictation_id = int(row.get("dictation_id"))
+
+        _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
+        _ensure_teacher_of_group(cur, int(group_id), teacher_user_id)
+
+        _check_overlap(
+            cur,
+            group_id=int(group_id),
+            dictation_id=dictation_id,
+            start_date=day_d,
+            end_date=day_d,
+            ignore_ids=[int(assignment_id)],
+        )
+
+        positions = selected_sentence_positions
+        if isinstance(positions, list):
+            positions = [int(x) for x in positions if x is not None]
+            if not positions:
+                positions = None
+        else:
+            positions = None
+
+        cur.execute(
+            """
+            UPDATE assignments a
+            SET group_id = %s,
+                start_date = %s,
+                end_date = %s,
+                required_completions = %s,
+                selected_sentence_positions = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE a.id = %s
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+            """,
+            (int(group_id), day_d, day_d, int(required_completions), positions, int(assignment_id)),
+        )
+        updated = cur.fetchone() or None
+        if not updated:
+            raise ValueError("Assignment not found")
+        conn.commit()
+        return _row_to_assignment(updated)
+    finally:
+        cur.close()
+        conn.close()
+
+
 def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
     if not ids:
         return 0

@@ -8,10 +8,12 @@ from helpers.db_users import get_user_by_email
 from helpers.db_assignments import (
     create_assignment_days,
     delete_assignments,
+    get_assignment_for_teacher,
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
     move_assignment_to_group,
+    update_assignment_for_teacher,
 )
 
 
@@ -151,6 +153,65 @@ def api_teacher_assignment_students_progress(assignment_id: int):
         return jsonify({"success": False, "error": "Forbidden"}), 403
     except Exception as exc:
         logger.error("Ошибка получения прогресса по заданию %s: %s", assignment_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@assignments_bp.route("/teacher/assignment/<int:assignment_id>", methods=["GET"])
+@jwt_required()
+def api_teacher_get_assignment(assignment_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        a = get_assignment_for_teacher(assignment_id, user["id"])
+        return jsonify({"success": True, "assignment": a})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка получения задания %s: %s", assignment_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@assignments_bp.route("/teacher/assignment/<int:assignment_id>", methods=["PUT"])
+@jwt_required()
+def api_teacher_update_assignment(assignment_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    group_id = data.get("group_id")
+    day_date = data.get("date") or data.get("day_date") or data.get("start_date")
+    required_completions = data.get("required_completions")
+    selected_sentence_positions = data.get("selected_sentence_positions")
+
+    try:
+        group_id_int = int(group_id)
+        req_int = int(required_completions)
+    except Exception:
+        return jsonify({"success": False, "error": "group_id and required_completions must be int"}), 400
+
+    try:
+        a = update_assignment_for_teacher(
+            assignment_id,
+            user["id"],
+            group_id=group_id_int,
+            day_date=day_date,
+            required_completions=req_int,
+            selected_sentence_positions=selected_sentence_positions,
+        )
+        return jsonify({"success": True, "assignment": a})
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except Exception as exc:
+        logger.error("Ошибка обновления задания %s: %s", assignment_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

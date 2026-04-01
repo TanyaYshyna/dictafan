@@ -1212,7 +1212,7 @@ function _teacherAssignmentsRender(items) {
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
               <i data-lucide="user"></i>
             </button>
-            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment-id="${escapeHtml(String(a.id))}" data-group-id="${escapeHtml(String(a.group_id))}" title="Редактировать (перенести в другую группу)" style="width:34px; height:34px;">
+            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment-id="${escapeHtml(String(a.id))}" data-group-id="${escapeHtml(String(a.group_id))}" data-dictation-id="${escapeHtml(String(a.dictation_id))}" title="Редактировать" style="width:34px; height:34px;">
               <i data-lucide="pencil"></i>
             </button>
             ${leftBadge}
@@ -1271,10 +1271,27 @@ function _teacherAssignmentsRender(items) {
       e.stopPropagation();
       const id = btn.getAttribute('data-assignment-id');
       if (!id) return;
-      const gid = btn.getAttribute('data-group-id');
       btn.disabled = true;
       try {
-        await _teacherAssignmentMoveToGroupPrompt(id, gid);
+        let dictationId = null;
+        try {
+          const raw = btn.getAttribute('data-dictation-id');
+          const n = Number(String(raw || '').trim());
+          dictationId = (Number.isFinite(n) && n > 0) ? n : null;
+        } catch (e2) {
+        }
+
+        if (!dictationId) {
+          const a = await loadAssignmentForTeacherModal(id);
+          dictationId = (a && a.dictation_id != null) ? Number(a.dictation_id) : null;
+        }
+
+        if (!dictationId) {
+          try { showToast('Не найден dictation_id', { durationMs: 2500 }); } catch (e3) { }
+          return;
+        }
+
+        await openCreateAssignmentModal(dictationId, { edit_assignment_id: Number(id) });
       } finally {
         btn.disabled = false;
       }
@@ -1545,9 +1562,30 @@ async function loadMyGroupsForAssignmentModal() {
   return groups.filter(g => !g.archived_at);
 }
 
+async function loadAssignmentForTeacherModal(assignmentId) {
+  const id = Number(assignmentId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  const res = await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(id))}`, { method: 'GET' });
+  if (!res || !res.success) return null;
+  return res.assignment || null;
+}
+
 async function openCreateAssignmentModal(dictationId) {
   const modal = ensureCreateAssignmentModal();
   const options = arguments && arguments.length > 1 ? arguments[1] : null;
+
+  try {
+    if (options && typeof options === 'object') {
+      if (options.edit_assignment_id != null) {
+        modal.dataset.editAssignmentId = String(options.edit_assignment_id);
+      } else {
+        delete modal.dataset.editAssignmentId;
+      }
+    } else {
+      delete modal.dataset.editAssignmentId;
+    }
+  } catch (e) {
+  }
 
   const idInput = document.getElementById('create-assignment-dictation-id');
   if (idInput) idInput.value = String(dictationId || '');
@@ -1613,6 +1651,57 @@ async function openCreateAssignmentModal(dictationId) {
 
   setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
   renderCreateAssignmentDaysTable(modal);
+
+  const editAssignmentId = (() => {
+    try {
+      const raw = modal.dataset.editAssignmentId;
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch (e) {
+      return null;
+    }
+  })();
+
+  if (editAssignmentId) {
+    try {
+      const a = await loadAssignmentForTeacherModal(editAssignmentId);
+      if (a && typeof a === 'object') {
+        try {
+          if (groupSelect && a.group_id != null) {
+            const v = String(a.group_id);
+            if (groupSelect.querySelector(`option[value="${CSS.escape(v)}"]`)) {
+              groupSelect.value = v;
+              setAssignmentLastGroupId(v);
+            }
+          }
+        } catch (e) {
+        }
+
+        try {
+          const day = a.start_date ? String(a.start_date) : today;
+          const cnt = Number(a.required_completions || 1) || 1;
+          setCreateAssignmentDaysState(modal, [{ date: day, count: cnt }]);
+          renderCreateAssignmentDaysTable(modal);
+          if (daysAddBtn) daysAddBtn.disabled = true;
+        } catch (e) {
+        }
+
+        try {
+          const curSent = getCreateAssignmentSentencesState(modal);
+          const selected = Array.isArray(a.selected_sentence_positions)
+            ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+            : null;
+          setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: selected && selected.length ? selected : null }));
+          renderCreateAssignmentSentencesTable(modal);
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+  } else {
+    if (daysAddBtn) daysAddBtn.disabled = false;
+  }
 
   if (daysAddBtn) {
     daysAddBtn.onclick = () => {
@@ -1732,16 +1821,33 @@ async function openCreateAssignmentModal(dictationId) {
           return;
         }
 
-        const res = await apiRequest('/api/assignments/teacher/create', {
-          method: 'POST',
-          body: JSON.stringify({
-            group_id,
-            dictation_id,
-            mode: 'days',
-            days,
-            selected_sentence_positions
+        const editIdRaw = (() => {
+          try { return modal.dataset.editAssignmentId || ''; } catch (e) { return ''; }
+        })();
+        const editId = Number(editIdRaw);
+
+        const isEdit = Number.isFinite(editId) && editId > 0;
+
+        const res = isEdit
+          ? await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              group_id,
+              date: (days[0] && days[0].date) ? days[0].date : null,
+              required_completions: (days[0] && days[0].required_completions) ? days[0].required_completions : 1,
+              selected_sentence_positions
+            })
           })
-        });
+          : await apiRequest('/api/assignments/teacher/create', {
+            method: 'POST',
+            body: JSON.stringify({
+              group_id,
+              dictation_id,
+              mode: 'days',
+              days,
+              selected_sentence_positions
+            })
+          });
 
         if (!res || !res.success) {
           showToast(res && res.error ? String(res.error) : 'Ошибка сохранения', { durationMs: 2500 });
@@ -1750,6 +1856,10 @@ async function openCreateAssignmentModal(dictationId) {
 
         showToast('Задание сохранено', { durationMs: 2500 });
         close();
+        try {
+          await _teacherAssignmentsReload();
+        } catch (e) {
+        }
         return;
       } catch (e) {
         showToast('Ошибка сохранения', { durationMs: 2500 });
@@ -1761,7 +1871,7 @@ async function openCreateAssignmentModal(dictationId) {
 
   try {
     const t = document.querySelector('.create-assignment-modal-title-text');
-    if (t) t.textContent = 'Задание';
+    if (t) t.textContent = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
   } catch (e) {
   }
 
