@@ -111,6 +111,24 @@ async function _isDictationCachedIdb(dictationId) {
   }
 }
 
+async function applyCachedDictationCardStyles(container) {
+  try {
+    if (!container) return;
+    const cachedIds = await _getCachedDictationIdSetIdb();
+    const cards = container.querySelectorAll('.short-card[data-dictation-id]');
+    for (const card of cards) {
+      try {
+        const raw = String(card.dataset.dictationId || '').trim();
+        const cleaned = raw.replace(/^dict_/, '').trim();
+        const isCached = cleaned ? cachedIds.has(cleaned) : false;
+        card.classList.toggle('short-card--cached', !!isCached);
+      } catch (e) {
+      }
+    }
+  } catch (e) {
+  }
+}
+
 function diffDaysIsoDate(aIso, bIso) {
   try {
     const a = String(aIso || '').split('-');
@@ -826,7 +844,7 @@ function _studentPlanRender(panel, dateIso, items) {
       const badgeColor = overdue ? '#b91c1c' : '#111827';
       const isCached = !!(a && a.__cached);
       const cacheBadge = isCached
-        ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:rgba(0,0,0,0.75); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
+        ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
         : '';
       const start = a && a.start_date ? String(a.start_date) : '';
       const end = a && a.end_date ? String(a.end_date) : '';
@@ -844,12 +862,13 @@ function _studentPlanRender(panel, dateIso, items) {
         : '';
 
       const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
+      const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
 
       return `
-        <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px;">
+        <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
           <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
             <div style="min-width:0; display:flex; gap:10px;">
-              <div style="width:120px; height:200px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
+              <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
               <div style="min-width:0;">
                 <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
                 <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
@@ -1097,10 +1116,6 @@ function ensureTeacherAssignmentsPanel() {
             <i data-lucide="refresh-cw"></i>
           </button>
         </div>
-        <label style="display:flex; align-items:center; gap:10px; font-size:12px; color: rgba(0,0,0,0.65); user-select:none;">
-          <input id="teacher-assignments-include-archived" type="checkbox" />
-          <span>Показать архив</span>
-        </label>
       </div>
 
       <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
@@ -1130,11 +1145,10 @@ function _teacherAssignmentsRender(items) {
     const end = a && a.end_date ? String(a.end_date) : '';
     const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
     const req = Number(a && a.required_completions ? a.required_completions : 1);
-    const isArchived = Boolean(a && a.archived_at);
     const isCached = !!(a && a.__cached);
     const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
-    const badgeBg = isArchived ? 'rgba(0,0,0,0.06)' : 'rgba(245,158,11,0.16)';
-    const badgeColor = isArchived ? 'rgba(0,0,0,0.6)' : '#92400e';
+    const badgeBg = 'rgba(245,158,11,0.16)';
+    const badgeColor = '#92400e';
 
     const coverStyle = coverUrl
       ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
@@ -1145,17 +1159,21 @@ function _teacherAssignmentsRender(items) {
       : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
 
     const cacheBadge = isCached
-      ? '<div title="В кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.16); color:#065f46; flex-shrink:0;"><i data-lucide="download"></i></div>'
-      : '<div title="Не в кеше" style="width:28px; height:28px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.06); color:rgba(0,0,0,0.55); flex-shrink:0;"><i data-lucide="cloud"></i></div>';
+      ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
+      : '';
+
+    const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
+    const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
 
     return `
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; opacity:${isArchived ? '0.6' : '1'};">
+      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
         <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
           <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:56px; height:56px; border-radius:12px; background:#eee; flex-shrink:0; ${coverStyle}"></div>
+            <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
             <div style="min-width:0;">
               <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
               <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentencesCount || 0))} предлож.</div>
+              <div style="margin-top:8px;">${cacheBadge}</div>
             </div>
           </div>
           <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
@@ -1163,11 +1181,8 @@ function _teacherAssignmentsRender(items) {
               <i data-lucide="user"></i>
             </button>
             ${leftBadge}
-            ${cacheBadge}
             <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
-            ${isArchived
-              ? `<button type="button" class="topbar-icon-btn" data-action="teacher-unarchive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Вернуть из архива" style="width:34px; height:34px;"><i data-lucide="rotate-ccw"></i></button>`
-              : `<button type="button" class="topbar-icon-btn" data-action="teacher-archive-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Архивировать" style="width:34px; height:34px;"><i data-lucide="file-archive"></i></button>`}
+            <button type="button" class="topbar-icon-btn" data-action="teacher-delete-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Удалить" style="width:34px; height:34px;"><i data-lucide="trash-2"></i></button>
           </div>
         </div>
       </div>
@@ -1176,44 +1191,24 @@ function _teacherAssignmentsRender(items) {
 
   list.innerHTML = blocks;
 
-  list.querySelectorAll('[data-action="teacher-archive-assignment"]').forEach(btn => {
+  list.querySelectorAll('[data-action="teacher-delete-assignment"]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       const id = btn.getAttribute('data-assignment-id');
       if (!id) return;
+      const ok = window.confirm('Удалить задание?');
+      if (!ok) return;
       btn.disabled = true;
       try {
-        await apiRequest('/api/assignments/teacher/archive', {
+        await apiRequest('/api/assignments/teacher/delete', {
           method: 'POST',
           body: JSON.stringify({ ids: [Number(id)] }),
         });
-        try { showToast('Задание архивировано', { durationMs: 2000 }); } catch (e2) { }
+        try { showToast('Задание удалено', { durationMs: 2000 }); } catch (e2) { }
         await _teacherAssignmentsReload();
       } catch (err) {
-        try { showToast('Не удалось архивировать', { durationMs: 2500 }); } catch (e2) { }
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  list.querySelectorAll('[data-action="teacher-unarchive-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      btn.disabled = true;
-      try {
-        await apiRequest('/api/assignments/teacher/unarchive', {
-          method: 'POST',
-          body: JSON.stringify({ ids: [Number(id)] }),
-        });
-        try { showToast('Задание возвращено', { durationMs: 2000 }); } catch (e2) { }
-        await _teacherAssignmentsReload();
-      } catch (err) {
-        try { showToast('Не удалось вернуть', { durationMs: 2500 }); } catch (e2) { }
+        try { showToast('Не удалось удалить', { durationMs: 2500 }); } catch (e2) { }
       } finally {
         btn.disabled = false;
       }
@@ -1246,8 +1241,6 @@ function _teacherAssignmentsRender(items) {
 async function _teacherAssignmentsReload() {
   const groupSelect = document.getElementById('teacher-assignments-group');
   const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
-  const includeArchivedEl = document.getElementById('teacher-assignments-include-archived');
-  const includeArchived = includeArchivedEl ? !!includeArchivedEl.checked : false;
   const list = document.getElementById('teacher-assignments-list');
   if (!groupId) {
     if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
@@ -1255,7 +1248,7 @@ async function _teacherAssignmentsReload() {
   }
   if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
   try {
-    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}?include_archived=${includeArchived ? '1' : '0'}`, { method: 'GET' });
+    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}`, { method: 'GET' });
     if (!res || !res.success) {
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
       return;
@@ -1295,7 +1288,6 @@ async function openTeacherAssignmentsPanel() {
   const closeBtn = document.getElementById('teacher-assignments-close');
   const refreshBtn = document.getElementById('teacher-assignments-refresh');
   const groupSelect = document.getElementById('teacher-assignments-group');
-  const includeArchivedEl = document.getElementById('teacher-assignments-include-archived');
   const list = document.getElementById('teacher-assignments-list');
 
   const close = () => {
@@ -1348,12 +1340,6 @@ async function openTeacherAssignmentsPanel() {
   }
   if (refreshBtn) {
     refreshBtn.onclick = () => {
-      _teacherAssignmentsReload().catch(() => { });
-    };
-  }
-
-  if (includeArchivedEl) {
-    includeArchivedEl.onchange = () => {
       _teacherAssignmentsReload().catch(() => { });
     };
   }
@@ -4332,6 +4318,7 @@ function renderDeskCards(items) {
     (async () => {
       const t2Start = performance.now();
       await applyDeskCovers(container);
+      await applyCachedDictationCardStyles(container);
       const t2End = performance.now();
       console.log('[desk-render] stage2 covers applied:', { ms: Math.round(t2End - t2Start) });
 
@@ -4676,6 +4663,11 @@ function renderBookContentTo(container, sections, dictations, isWorkbook = false
 
   if (typeof lucide !== 'undefined') {
     lucide.createIcons();
+  }
+
+  try {
+    applyCachedDictationCardStyles(container);
+  } catch (e) {
   }
 
   setTimeout(() => {
