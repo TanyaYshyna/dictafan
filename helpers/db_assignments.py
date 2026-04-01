@@ -74,6 +74,61 @@ def _validate_max_range(start_d: date, end_d: date) -> None:
         raise ValueError("Assignment date range must be <= 7 days")
 
 
+def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user_id: int) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date
+            FROM assignments a
+            WHERE a.id = %s
+            """,
+            (assignment_id,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            raise ValueError("Assignment not found")
+
+        old_group_id = int(row.get("group_id"))
+        dictation_id = int(row.get("dictation_id"))
+        start_d = _parse_date(row.get("start_date"))
+        end_d = _parse_date(row.get("end_date"))
+        if not start_d or not end_d:
+            raise ValueError("Assignment has invalid dates")
+
+        if int(new_group_id) == int(old_group_id):
+            return {"moved": False, "assignment": _row_to_assignment(row)}
+
+        _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
+        _ensure_teacher_of_group(cur, int(new_group_id), teacher_user_id)
+
+        _check_overlap(
+            cur,
+            group_id=int(new_group_id),
+            dictation_id=dictation_id,
+            start_date=start_d,
+            end_date=end_d,
+            ignore_ids=[int(assignment_id)],
+        )
+
+        cur.execute(
+            """
+            UPDATE assignments a
+            SET group_id = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE a.id = %s
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+            """,
+            (int(new_group_id), int(assignment_id)),
+        )
+        updated = cur.fetchone() or {}
+        conn.commit()
+        return {"moved": True, "assignment": _row_to_assignment(updated)}
+    finally:
+        cur.close()
+        conn.close()
+
+
 def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
     if not ids:
         return 0

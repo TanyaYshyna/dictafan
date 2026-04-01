@@ -1126,6 +1126,38 @@ function ensureTeacherAssignmentsPanel() {
   return panel;
 }
 
+async function _teacherAssignmentMoveToGroupPrompt(assignmentId, currentGroupId) {
+  try {
+    const groups = await loadMyGroupsForAssignmentModal();
+    const available = Array.isArray(groups) ? groups.filter(g => g && String(g.id) !== String(currentGroupId)) : [];
+    if (!available.length) {
+      try { showToast('Нет другой группы для переноса', { durationMs: 2500 }); } catch (e2) { }
+      return;
+    }
+
+    const label = available
+      .map(g => `${g.id}: ${g.title || `Группа ${g.id}`}`)
+      .join('\n');
+    const raw = window.prompt(`Перенести задание в группу (введи id):\n${label}`, String(available[0].id));
+    if (raw == null) return;
+    const newGroupId = Number(String(raw).trim());
+    if (!Number.isFinite(newGroupId) || newGroupId <= 0) {
+      try { showToast('Некорректный id группы', { durationMs: 2500 }); } catch (e2) { }
+      return;
+    }
+
+    await apiRequest('/api/assignments/teacher/move', {
+      method: 'POST',
+      body: JSON.stringify({ assignment_id: Number(assignmentId), new_group_id: newGroupId }),
+    });
+
+    try { showToast('Задание перенесено', { durationMs: 2000 }); } catch (e2) { }
+    await _teacherAssignmentsReload();
+  } catch (e) {
+    try { showToast('Не удалось перенести', { durationMs: 2500 }); } catch (e2) { }
+  }
+}
+
 function _teacherAssignmentsRender(items) {
   const list = document.getElementById('teacher-assignments-list');
   if (!list) return;
@@ -1180,6 +1212,9 @@ function _teacherAssignmentsRender(items) {
             <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
               <i data-lucide="user"></i>
             </button>
+            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment-id="${escapeHtml(String(a.id))}" data-group-id="${escapeHtml(String(a.group_id))}" title="Редактировать (перенести в другую группу)" style="width:34px; height:34px;">
+              <i data-lucide="pencil"></i>
+            </button>
             ${leftBadge}
             <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
             <button type="button" class="topbar-icon-btn" data-action="teacher-delete-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Удалить" style="width:34px; height:34px;"><i data-lucide="trash-2"></i></button>
@@ -1224,6 +1259,22 @@ function _teacherAssignmentsRender(items) {
       btn.disabled = true;
       try {
         await openTeacherAssignmentStudentsModal(id);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  list.querySelectorAll('[data-action="teacher-edit-assignment"]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-assignment-id');
+      if (!id) return;
+      const gid = btn.getAttribute('data-group-id');
+      btn.disabled = true;
+      try {
+        await _teacherAssignmentMoveToGroupPrompt(id, gid);
       } finally {
         btn.disabled = false;
       }

@@ -1334,15 +1334,33 @@ function applyAssignmentSentenceSubsetIfNeeded() {
     const allowed = new Set(positions);
     const before = Array.isArray(allSentences) ? allSentences.slice() : [];
     const filtered = before.filter(s => {
-        const p = (s && s.position !== undefined && s.position !== null && isFinite(Number(s.position)))
-            ? Number(s.position)
-            : null;
+        const p = (() => {
+            try {
+                if (!s || typeof s !== 'object') return null;
+                const v1 = (s.position !== undefined && s.position !== null) ? Number(s.position) : NaN;
+                if (Number.isFinite(v1)) return v1;
+                const v2 = (s.serial_number !== undefined && s.serial_number !== null) ? Number(s.serial_number) : NaN;
+                if (Number.isFinite(v2)) return v2;
+                return null;
+            } catch (e) {
+                return null;
+            }
+        })();
         return p !== null && allowed.has(p);
     });
 
+    if (!filtered.length) {
+        return false;
+    }
+
     allSentences = filtered;
     try {
-        allSentences.sort((a, b) => Number(a.position) - Number(b.position));
+        allSentences.sort((a, b) => {
+            const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
+            const bp = (b && b.position !== undefined && b.position !== null && isFinite(Number(b.position))) ? Number(b.position) : null;
+            if (ap !== null && bp !== null) return ap - bp;
+            return 0;
+        });
     } catch (e) {
     }
 
