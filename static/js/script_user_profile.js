@@ -262,26 +262,6 @@ function renderMembershipsTable() {
     if (!table) return;
     table.innerHTML = '';
 
-    const header = document.createElement('div');
-    header.className = 'groups-students-table-header';
-
-    const h1 = document.createElement('div');
-    h1.className = 'groups-student-name';
-    h1.textContent = 'Группа';
-
-    const h2 = document.createElement('div');
-    h2.className = 'groups-student-notify';
-    h2.textContent = 'TG';
-
-    const h3 = document.createElement('div');
-    h3.className = 'groups-student-status';
-    h3.textContent = 'Учитель';
-
-    header.appendChild(h1);
-    header.appendChild(h2);
-    header.appendChild(h3);
-    table.appendChild(header);
-
     const memberships = Array.isArray(groupsUiState.memberships) ? groupsUiState.memberships : [];
     memberships.forEach((m) => {
         const row = document.createElement('div');
@@ -350,7 +330,16 @@ function renderMembershipsTable() {
 
         const teacher = document.createElement('div');
         teacher.className = 'groups-student-status';
-        teacher.textContent = String(m.teacher_username || '');
+        const teacherAvatar = document.createElement('img');
+        teacherAvatar.className = 'groups-student-avatar';
+        teacherAvatar.alt = 'avatar';
+        teacherAvatar.src = m.teacher_user_id ? avatarUrlForUser(m.teacher_user_id) : '';
+
+        const teacherName = document.createElement('span');
+        teacherName.textContent = String(m.teacher_username || '');
+
+        teacher.appendChild(teacherAvatar);
+        teacher.appendChild(teacherName);
 
         row.appendChild(name);
         row.appendChild(notifyWrap);
@@ -883,7 +872,15 @@ async function refreshGroups() {
     try {
         const data = await groupsApiRequest('/groups/api/my', { method: 'GET' });
         const groups = data && Array.isArray(data.groups) ? data.groups : [];
-        groupsUiState.groups = groups;
+        const currentUserId = (UM && UM.userData && UM.userData.id != null) ? String(UM.userData.id) : null;
+        const filtered = (groups || []).filter((g) => {
+            if (!g) return false;
+            if (!currentUserId) return true;
+            if (!g.is_personal) return true;
+            if (g.personal_owner_user_id == null) return true;
+            return String(g.personal_owner_user_id) !== String(currentUserId);
+        });
+        groupsUiState.groups = filtered;
         renderGroupsTable();
 
         const visible = getVisibleGroups();

@@ -497,6 +497,9 @@ def _ensure_not_personal_group_for_student(cur, group_id: int, student_user_id: 
 def list_groups_for_student(student_user_id: int) -> list[dict]:
     conn, cur = get_db_cursor()
     try:
+        gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+        exclude_personal = 'is_personal' in gcols and 'personal_owner_user_id' in gcols
+
         cur.execute(
             """
             SELECT column_name
@@ -507,6 +510,12 @@ def list_groups_for_student(student_user_id: int) -> list[dict]:
         )
         has_notify = bool(cur.fetchone())
         extra_select = ", gs.notify_teacher_on_success" if has_notify else ""
+
+        extra_where = ""
+        params: list[Any] = [int(student_user_id)]
+        if exclude_personal:
+            extra_where = " AND NOT (g.is_personal = TRUE AND g.personal_owner_user_id = %s)"
+            params.append(int(student_user_id))
 
         cur.execute(
             f"""
@@ -533,9 +542,10 @@ def list_groups_for_student(student_user_id: int) -> list[dict]:
             WHERE gs.student_user_id = %s
               AND gs.removed_at IS NULL
               AND gs.status = 'active'
+              {extra_where}
             ORDER BY g.archived_at NULLS FIRST, g.id DESC
             """,
-            (int(student_user_id),),
+            tuple(params),
         )
 
         rows = cur.fetchall() or []
