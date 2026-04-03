@@ -31,6 +31,7 @@ from helpers.db_users import (
     reset_password_by_token,
     update_user,
 )
+from helpers.email_sender import send_email_smtp
 from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
 from helpers.db_groups import ensure_personal_group_for_user
 from helpers.b2_storage import b2_storage
@@ -337,8 +338,20 @@ def api_password_reset_request():
             return jsonify({'success': False, 'error': 'Email is required'}), 400
 
         token = create_password_reset_token(email)
-        reset_url = f"{request.host_url.rstrip('/')}/reset-password?token={token}" if token else None
-        return jsonify({'success': True, 'reset_url': reset_url, 'token': token})
+        if token:
+            reset_url = f"{request.host_url.rstrip('/')}/reset-password?token={token}"
+            subject = 'Сброс пароля Dictafan'
+            text_body = (
+                'Вы запросили сброс пароля.\n\n'
+                f'Откройте ссылку, чтобы задать новый пароль:\n{reset_url}\n\n'
+                'Если это были не вы — просто проигнорируйте письмо.'
+            )
+            try:
+                send_email_smtp(email, subject, text_body)
+            except Exception as e:
+                print(f"❌ Ошибка отправки email password_reset: {e}")
+
+        return jsonify({'success': True})
     except Exception as e:
         print(f"❌ Ошибка password_reset/request: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 500

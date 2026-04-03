@@ -538,20 +538,13 @@ class LoginModal {
             }
 
             if (infoMessage) {
-                const url = data.reset_url ? String(data.reset_url) : '';
                 infoMessage.style.display = 'block';
                 infoMessage.style.background = '#ecfdf5';
                 infoMessage.style.color = '#065f46';
                 infoMessage.style.border = '1px solid #a7f3d0';
                 infoMessage.style.padding = '10px';
                 infoMessage.style.borderRadius = '6px';
-                infoMessage.textContent = url ? `Ссылка для сброса: ${url}` : 'Если аккаунт существует — ссылка будет отправлена.';
-            }
-
-            if (data && data.token) {
-                const tokenInput = document.getElementById('resetModalToken');
-                if (tokenInput) tokenInput.value = String(data.token);
-                this.switchToReset();
+                infoMessage.textContent = 'Если аккаунт существует — ссылка для сброса пароля отправлена на почту.';
             }
         } catch (e) {
             this.showError(e && e.message ? e.message : 'Ошибка', 'forgot');

@@ -153,7 +153,7 @@ def _ensure_users_password_reset_columns(cur) -> None:
         SELECT column_name
         FROM information_schema.columns
         WHERE table_name='users'
-          AND column_name IN ('password_reset_token', 'password_reset_expires_at')
+          AND column_name IN ('password_reset_token', 'password_reset_expires_at', 'password_reset_last_request_at')
         """
     )
     rows = cur.fetchall() or []
@@ -162,9 +162,11 @@ def _ensure_users_password_reset_columns(cur) -> None:
         cur.execute("ALTER TABLE users ADD COLUMN password_reset_token TEXT")
     if 'password_reset_expires_at' not in cols:
         cur.execute("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP")
+    if 'password_reset_last_request_at' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN password_reset_last_request_at TIMESTAMP")
 
 
-def create_password_reset_token(email: str, ttl_minutes: int = 30) -> Optional[str]:
+def create_password_reset_token(email: str, ttl_minutes: int = 30, cooldown_seconds: int = 120) -> Optional[str]:
     email_norm = (email or '').strip().lower()
     if not email_norm:
         return None
@@ -172,11 +174,31 @@ def create_password_reset_token(email: str, ttl_minutes: int = 30) -> Optional[s
     conn, cur = get_db_cursor()
     try:
         _ensure_users_password_reset_columns(cur)
-        cur.execute("SELECT id FROM users WHERE email = %s", (email_norm,))
+        cur.execute(
+            """
+            SELECT id,
+                   password_reset_last_request_at
+            FROM users
+            WHERE email = %s
+            """,
+            (email_norm,),
+        )
         row = cur.fetchone() or None
         if not row:
             conn.commit()
             return None
+
+        last_req = row.get('password_reset_last_request_at')
+        if last_req is not None:
+            cur.execute("SELECT EXTRACT(EPOCH FROM (NOW() - %s)) AS diff", (last_req,))
+            diff = (cur.fetchone() or {}).get('diff')
+            try:
+                diff_f = float(diff) if diff is not None else None
+            except Exception:
+                diff_f = None
+            if diff_f is not None and diff_f < float(cooldown_seconds):
+                conn.commit()
+                return None
 
         token = secrets.token_urlsafe(24)
         expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(ttl_minutes))
@@ -186,6 +208,7 @@ def create_password_reset_token(email: str, ttl_minutes: int = 30) -> Optional[s
             UPDATE users
             SET password_reset_token = %s,
                 password_reset_expires_at = %s,
+                password_reset_last_request_at = NOW(),
                 updated_at = CURRENT_TIMESTAMP
             WHERE email = %s
             """,
