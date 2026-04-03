@@ -8,7 +8,7 @@ class LoginModal {
         this.modal = null;
         this.isVisible = false;
         this.pendingResolve = null;
-        this.mode = 'login'; // 'login' или 'register'
+        this.mode = 'login'; // 'login' или 'register' или 'forgot' или 'reset'
         this.languageSelector = null;
     }
 
@@ -90,8 +90,87 @@ class LoginModal {
                             </button>
                         </div>
 
+                        <p class="form-note" style="margin-top: 10px;">
+                            <a href="#" id="switchToForgotLink">Забыл пароль?</a>
+                        </p>
+
                         <p class="form-note">
                             Нет аккаунта? <a href="#" id="switchToRegisterLink">Зарегистрироваться</a>
+                        </p>
+                    </form>
+
+                    <form id="forgotModalForm" class="login-form" style="display: none;" autocomplete="off">
+                        <div class="form-row">
+                            <label for="forgotModalEmail">Почта</label>
+                            <input
+                                id="forgotModalEmail"
+                                class="text-input auth-input"
+                                type="email"
+                                name="email"
+                                placeholder="you@example.com"
+                                required
+                                autocomplete="username"
+                            >
+                        </div>
+
+                        <div id="forgotModalInfoMessage" class="form-message" style="display: none;"></div>
+                        <div id="forgotModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                        <div class="login-form-actions">
+                            <button type="submit" class="button-color-yellow auth-submit" id="forgotModalSubmitBtn">
+                                Отправить
+                            </button>
+                        </div>
+
+                        <p class="form-note" style="margin-top: 10px;">
+                            <a href="#" id="switchBackToLoginFromForgotLink">Назад ко входу</a>
+                        </p>
+                    </form>
+
+                    <form id="resetModalForm" class="login-form" style="display: none;" autocomplete="off">
+                        <div class="form-row">
+                            <label for="resetModalToken">Код</label>
+                            <input
+                                id="resetModalToken"
+                                class="text-input auth-input"
+                                type="text"
+                                name="token"
+                                placeholder="вставь код из ссылки"
+                                required
+                                autocomplete="off"
+                            >
+                        </div>
+
+                        <div class="form-row">
+                            <label for="resetModalPassword">Новый пароль</label>
+                            <div class="password-input-wrapper">
+                                <input
+                                    id="resetModalPassword"
+                                    class="text-input auth-input"
+                                    type="password"
+                                    name="password"
+                                    placeholder="Минимум 6 символов"
+                                    required
+                                    minlength="6"
+                                    autocomplete="new-password"
+                                >
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="resetModalPassword">
+                                    <i data-lucide="eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="resetModalInfoMessage" class="form-message" style="display: none;"></div>
+                        <div id="resetModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                        <div class="login-form-actions">
+                            <button type="submit" class="button-color-yellow auth-submit" id="resetModalSubmitBtn">
+                                Сохранить
+                            </button>
+                        </div>
+
+                        <p class="form-note" style="margin-top: 10px;">
+                            <a href="#" id="switchBackToLoginFromResetLink">Назад ко входу</a>
                         </p>
                     </form>
 
@@ -199,6 +278,22 @@ class LoginModal {
             });
         }
 
+        const forgotForm = document.getElementById('forgotModalForm');
+        if (forgotForm) {
+            forgotForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleForgot();
+            });
+        }
+
+        const resetForm = document.getElementById('resetModalForm');
+        if (resetForm) {
+            resetForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await this.handleReset();
+            });
+        }
+
         // Форма регистрации
         const registerForm = document.getElementById('registerModalForm');
         if (registerForm) {
@@ -245,6 +340,30 @@ class LoginModal {
         const switchToLoginLink = document.getElementById('switchToLoginLink');
         if (switchToLoginLink) {
             switchToLoginLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchToLogin();
+            });
+        }
+
+        const switchToForgotLink = document.getElementById('switchToForgotLink');
+        if (switchToForgotLink) {
+            switchToForgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchToForgot();
+            });
+        }
+
+        const switchBackToLoginFromForgotLink = document.getElementById('switchBackToLoginFromForgotLink');
+        if (switchBackToLoginFromForgotLink) {
+            switchBackToLoginFromForgotLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchToLogin();
+            });
+        }
+
+        const switchBackToLoginFromResetLink = document.getElementById('switchBackToLoginFromResetLink');
+        if (switchBackToLoginFromResetLink) {
+            switchBackToLoginFromResetLink.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.switchToLogin();
             });
@@ -330,29 +449,176 @@ class LoginModal {
         this.updateModalView();
     }
 
+    switchToForgot() {
+        this.mode = 'forgot';
+        this.updateModalView();
+    }
+
+    switchToReset() {
+        this.mode = 'reset';
+        this.updateModalView();
+    }
+
     /**
      * Обновить вид модального окна в зависимости от режима
      */
     updateModalView() {
         const loginForm = document.getElementById('loginModalForm');
         const registerForm = document.getElementById('registerModalForm');
+        const forgotForm = document.getElementById('forgotModalForm');
+        const resetForm = document.getElementById('resetModalForm');
         const title = document.getElementById('loginModalTitle');
         const message = document.getElementById('loginModalMessage');
 
         if (this.mode === 'login') {
             if (loginForm) loginForm.style.display = 'block';
             if (registerForm) registerForm.style.display = 'none';
+            if (forgotForm) forgotForm.style.display = 'none';
+            if (resetForm) resetForm.style.display = 'none';
             if (title) title.textContent = 'Требуется авторизация';
             if (message) message.textContent = 'Для работы с приложением необходимо войти в систему';
-        } else {
+        } else if (this.mode === 'register') {
             if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'block';
+            if (forgotForm) forgotForm.style.display = 'none';
+            if (resetForm) resetForm.style.display = 'none';
             if (title) title.textContent = 'Регистрация';
             if (message) message.textContent = 'Создайте доступ к диктантам и личному кабинету';
+        } else if (this.mode === 'forgot') {
+            if (loginForm) loginForm.style.display = 'none';
+            if (registerForm) registerForm.style.display = 'none';
+            if (forgotForm) forgotForm.style.display = 'block';
+            if (resetForm) resetForm.style.display = 'none';
+            if (title) title.textContent = 'Восстановление пароля';
+            if (message) message.textContent = 'Введи почту — мы отправим ссылку для сброса пароля';
+        } else {
+            if (loginForm) loginForm.style.display = 'none';
+            if (registerForm) registerForm.style.display = 'none';
+            if (forgotForm) forgotForm.style.display = 'none';
+            if (resetForm) resetForm.style.display = 'block';
+            if (title) title.textContent = 'Новый пароль';
+            if (message) message.textContent = 'Вставь код и задай новый пароль';
         }
 
         // Очищаем ошибки
         this.clearErrors();
+    }
+
+    async handleForgot() {
+        const emailInput = document.getElementById('forgotModalEmail');
+        const submitBtn = document.getElementById('forgotModalSubmitBtn');
+        const infoMessage = document.getElementById('forgotModalInfoMessage');
+
+        const email = emailInput?.value?.trim();
+        if (!email) {
+            this.showError('Введи почту', 'forgot');
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Отправляем...';
+        }
+        this.clearErrors();
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+            infoMessage.textContent = '';
+        }
+
+        try {
+            const res = await fetch('/user/api/password_reset/request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.error || data.message) ? String(data.error || data.message) : `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+
+            if (infoMessage) {
+                const url = data.reset_url ? String(data.reset_url) : '';
+                infoMessage.style.display = 'block';
+                infoMessage.style.background = '#ecfdf5';
+                infoMessage.style.color = '#065f46';
+                infoMessage.style.border = '1px solid #a7f3d0';
+                infoMessage.style.padding = '10px';
+                infoMessage.style.borderRadius = '6px';
+                infoMessage.textContent = url ? `Ссылка для сброса: ${url}` : 'Если аккаунт существует — ссылка будет отправлена.';
+            }
+
+            if (data && data.token) {
+                const tokenInput = document.getElementById('resetModalToken');
+                if (tokenInput) tokenInput.value = String(data.token);
+                this.switchToReset();
+            }
+        } catch (e) {
+            this.showError(e && e.message ? e.message : 'Ошибка', 'forgot');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Отправить';
+            }
+        }
+    }
+
+    async handleReset() {
+        const tokenInput = document.getElementById('resetModalToken');
+        const passwordInput = document.getElementById('resetModalPassword');
+        const submitBtn = document.getElementById('resetModalSubmitBtn');
+        const infoMessage = document.getElementById('resetModalInfoMessage');
+
+        const token = tokenInput?.value?.trim();
+        const password = passwordInput?.value;
+        if (!token || !password) {
+            this.showError('Заполни все поля', 'reset');
+            return;
+        }
+        if (String(password).length < 6) {
+            this.showError('Пароль должен содержать не менее 6 символов', 'reset');
+            return;
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Сохраняем...';
+        }
+        this.clearErrors();
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+            infoMessage.textContent = '';
+        }
+
+        try {
+            const res = await fetch('/user/api/password_reset/confirm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token, password }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.error || data.message) ? String(data.error || data.message) : `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+            if (infoMessage) {
+                infoMessage.style.display = 'block';
+                infoMessage.style.background = '#ecfdf5';
+                infoMessage.style.color = '#065f46';
+                infoMessage.style.border = '1px solid #a7f3d0';
+                infoMessage.style.padding = '10px';
+                infoMessage.style.borderRadius = '6px';
+                infoMessage.textContent = 'Пароль обновлён. Теперь можно войти.';
+            }
+            this.switchToLogin();
+        } catch (e) {
+            this.showError(e && e.message ? e.message : 'Ошибка', 'reset');
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Сохранить';
+            }
+        }
     }
 
     /**
@@ -594,9 +860,9 @@ class LoginModal {
      */
     showError(message, mode = null) {
         const currentMode = mode || this.mode;
-        const errorMessageId = currentMode === 'login' 
-            ? 'loginModalErrorMessage' 
-            : 'registerModalErrorMessage';
+        const errorMessageId = currentMode === 'login'
+            ? 'loginModalErrorMessage'
+            : (currentMode === 'forgot' ? 'forgotModalErrorMessage' : (currentMode === 'reset' ? 'resetModalErrorMessage' : 'registerModalErrorMessage'));
         const errorMessage = document.getElementById(errorMessageId);
         if (errorMessage) {
             errorMessage.textContent = message;
@@ -610,6 +876,8 @@ class LoginModal {
     clearErrors() {
         const loginError = document.getElementById('loginModalErrorMessage');
         const registerError = document.getElementById('registerModalErrorMessage');
+        const forgotError = document.getElementById('forgotModalErrorMessage');
+        const resetError = document.getElementById('resetModalErrorMessage');
         if (loginError) {
             loginError.style.display = 'none';
             loginError.textContent = '';
@@ -617,6 +885,14 @@ class LoginModal {
         if (registerError) {
             registerError.style.display = 'none';
             registerError.textContent = '';
+        }
+        if (forgotError) {
+            forgotError.style.display = 'none';
+            forgotError.textContent = '';
+        }
+        if (resetError) {
+            resetError.style.display = 'none';
+            resetError.textContent = '';
         }
     }
 

@@ -4,6 +4,8 @@
 
 from typing import Optional, List
 import json
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -140,6 +142,111 @@ def create_user(
         if has_settings_json and "settings_json" in user_row:
             result["settings_json"] = user_row.get("settings_json")
         return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def _ensure_users_password_reset_columns(cur) -> None:
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name='users'
+          AND column_name IN ('password_reset_token', 'password_reset_expires_at')
+        """
+    )
+    rows = cur.fetchall() or []
+    cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+    if 'password_reset_token' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN password_reset_token TEXT")
+    if 'password_reset_expires_at' not in cols:
+        cur.execute("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP")
+
+
+def create_password_reset_token(email: str, ttl_minutes: int = 30) -> Optional[str]:
+    email_norm = (email or '').strip().lower()
+    if not email_norm:
+        return None
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_password_reset_columns(cur)
+        cur.execute("SELECT id FROM users WHERE email = %s", (email_norm,))
+        row = cur.fetchone() or None
+        if not row:
+            conn.commit()
+            return None
+
+        token = secrets.token_urlsafe(24)
+        expires_at = datetime.now(timezone.utc) + timedelta(minutes=int(ttl_minutes))
+
+        cur.execute(
+            """
+            UPDATE users
+            SET password_reset_token = %s,
+                password_reset_expires_at = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE email = %s
+            """,
+            (token, expires_at, email_norm),
+        )
+        conn.commit()
+        return token
+    finally:
+        cur.close()
+        conn.close()
+
+
+def reset_password_by_token(token: str, new_password: str) -> bool:
+    t = (token or '').strip()
+    if not t:
+        return False
+    if not new_password or len(str(new_password)) < 6:
+        return False
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_users_password_reset_columns(cur)
+        cur.execute(
+            """
+            SELECT id, password_reset_expires_at
+            FROM users
+            WHERE password_reset_token = %s
+            LIMIT 1
+            """,
+            (t,),
+        )
+        row = cur.fetchone() or None
+        if not row:
+            conn.commit()
+            return False
+
+        expires_at = row.get('password_reset_expires_at')
+        if expires_at is None:
+            conn.commit()
+            return False
+
+        cur.execute("SELECT NOW() > %s AS expired", (expires_at,))
+        expired = (cur.fetchone() or {}).get('expired')
+        if expired:
+            conn.commit()
+            return False
+
+        password_hash = generate_password_hash(str(new_password))
+        cur.execute(
+            """
+            UPDATE users
+            SET password_hash = %s,
+                password_reset_token = NULL,
+                password_reset_expires_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+            """,
+            (password_hash, int(row.get('id'))),
+        )
+        conn.commit()
+        return True
     finally:
         cur.close()
         conn.close()

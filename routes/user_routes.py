@@ -27,6 +27,8 @@ from helpers.db_users import (
     create_user,
     get_user_by_email,
     verify_user_password,
+    create_password_reset_token,
+    reset_password_by_token,
     update_user,
 )
 from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
@@ -324,6 +326,42 @@ def api_login():
     except Exception as e:
         print(f"❌ Ошибка при логине: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+
+@user_bp.route('/api/password_reset/request', methods=['POST'])
+def api_password_reset_request():
+    try:
+        data = request.get_json(silent=True) or {}
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+        token = create_password_reset_token(email)
+        reset_url = f"{request.host_url.rstrip('/')}/reset-password?token={token}" if token else None
+        return jsonify({'success': True, 'reset_url': reset_url, 'token': token})
+    except Exception as e:
+        print(f"❌ Ошибка password_reset/request: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
+@user_bp.route('/api/password_reset/confirm', methods=['POST'])
+def api_password_reset_confirm():
+    try:
+        data = request.get_json(silent=True) or {}
+        token = (data.get('token') or '').strip()
+        password = data.get('password')
+        if not token or not password:
+            return jsonify({'success': False, 'error': 'token and password are required'}), 400
+        if len(str(password)) < 6:
+            return jsonify({'success': False, 'error': 'Password too short'}), 400
+
+        ok = reset_password_by_token(token, str(password))
+        if not ok:
+            return jsonify({'success': False, 'error': 'Invalid or expired token'}), 400
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Ошибка password_reset/confirm: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 
 @user_bp.route('/api/me', methods=['GET'])
