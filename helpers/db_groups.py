@@ -474,6 +474,145 @@ def decline_email_invite(invite_id: int, student_user_id: int, student_email: st
         conn.close()
 
 
+def _ensure_not_personal_group_for_student(cur, group_id: int, student_user_id: int) -> None:
+    gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+    if 'is_personal' not in gcols or 'personal_owner_user_id' not in gcols:
+        return
+    cur.execute(
+        """
+        SELECT is_personal, personal_owner_user_id
+        FROM groups
+        WHERE id = %s
+        """,
+        (int(group_id),),
+    )
+    row = cur.fetchone() or {}
+    if not row:
+        return
+    if bool(row.get('is_personal')) and row.get('personal_owner_user_id') is not None:
+        if int(row.get('personal_owner_user_id')) == int(student_user_id):
+            raise PermissionError('Personal group is read-only')
+
+
+def list_groups_for_student(student_user_id: int) -> list[dict]:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='group_students'
+              AND column_name='notify_teacher_on_success'
+            """
+        )
+        has_notify = bool(cur.fetchone())
+        extra_select = ", gs.notify_teacher_on_success" if has_notify else ""
+
+        cur.execute(
+            f"""
+            SELECT
+                g.id AS group_id,
+                g.title AS group_title,
+                g.description AS group_description,
+                g.archived_at,
+                gs.status,
+                gs.joined_at
+                {extra_select},
+                tu.id AS teacher_user_id,
+                tu.username AS teacher_username
+            FROM group_students gs
+            JOIN groups g ON g.id = gs.group_id
+            JOIN LATERAL (
+                SELECT gt.teacher_user_id
+                FROM group_teachers gt
+                WHERE gt.group_id = gs.group_id
+                ORDER BY (gt.role = 'owner') DESC, gt.teacher_user_id ASC
+                LIMIT 1
+            ) t ON TRUE
+            JOIN users tu ON tu.id = t.teacher_user_id
+            WHERE gs.student_user_id = %s
+              AND gs.removed_at IS NULL
+              AND gs.status = 'active'
+            ORDER BY g.archived_at NULLS FIRST, g.id DESC
+            """,
+            (int(student_user_id),),
+        )
+
+        rows = cur.fetchall() or []
+        result: list[dict] = []
+        for r in rows:
+            result.append(
+                {
+                    "group_id": int(r.get("group_id")) if r.get("group_id") is not None else None,
+                    "group_title": r.get("group_title"),
+                    "group_description": r.get("group_description"),
+                    "archived_at": r.get("archived_at").isoformat() if r.get("archived_at") else None,
+                    "status": r.get("status"),
+                    "joined_at": r.get("joined_at").isoformat() if r.get("joined_at") else None,
+                    "notify_teacher_on_success": bool(r.get("notify_teacher_on_success")) if has_notify else True,
+                    "teacher_user_id": int(r.get("teacher_user_id")) if r.get("teacher_user_id") is not None else None,
+                    "teacher_username": r.get("teacher_username"),
+                }
+            )
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def set_my_group_notify_teacher_on_success(group_id: int, student_user_id: int, enabled: bool) -> None:
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_not_personal_group_for_student(cur, group_id, student_user_id)
+        cur.execute(
+            """
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='group_students'
+              AND column_name='notify_teacher_on_success'
+            """,
+        )
+        if not cur.fetchone():
+            raise RuntimeError("DB schema mismatch: group_students.notify_teacher_on_success is missing")
+
+        cur.execute(
+            """
+            UPDATE group_students
+            SET notify_teacher_on_success = %s
+            WHERE group_id = %s AND student_user_id = %s
+              AND removed_at IS NULL
+            """,
+            (bool(enabled), int(group_id), int(student_user_id)),
+        )
+        if cur.rowcount <= 0:
+            raise PermissionError("Not a group student")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
+def leave_group_as_student(group_id: int, student_user_id: int) -> None:
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_not_personal_group_for_student(cur, group_id, student_user_id)
+        cur.execute(
+            """
+            UPDATE group_students
+            SET status = 'left', removed_at = CURRENT_TIMESTAMP
+            WHERE group_id = %s AND student_user_id = %s
+              AND removed_at IS NULL
+            """,
+            (int(group_id), int(student_user_id)),
+        )
+        if cur.rowcount <= 0:
+            raise PermissionError("Not a group student")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 def list_my_groups(user_id: int) -> list[dict]:
     conn, cur = get_db_cursor()
     try:

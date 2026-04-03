@@ -185,6 +185,8 @@ let groupsUiState = {
     selectedGroupId: null,
     selectedStudentId: null,
     filterMode: 'active',
+    memberships: [],
+    selectedMembershipGroupId: null,
 };
 
 function getGroupsFilterMode() {
@@ -248,6 +250,154 @@ async function refreshInviteForSelectedGroup() {
 function setSelectedStudent(studentId) {
     groupsUiState.selectedStudentId = studentId != null ? String(studentId) : null;
     renderStudentsTable(groupsUiState._studentsCache || []);
+}
+
+function setSelectedMembership(groupId) {
+    groupsUiState.selectedMembershipGroupId = groupId != null ? String(groupId) : null;
+    renderMembershipsTable();
+}
+
+function renderMembershipsTable() {
+    const table = document.getElementById('groupsMembershipsTable');
+    if (!table) return;
+    table.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'groups-students-table-header';
+
+    const h1 = document.createElement('div');
+    h1.className = 'groups-student-name';
+    h1.textContent = 'Группа';
+
+    const h2 = document.createElement('div');
+    h2.className = 'groups-student-notify';
+    h2.textContent = 'TG';
+
+    const h3 = document.createElement('div');
+    h3.className = 'groups-student-status';
+    h3.textContent = 'Учитель';
+
+    header.appendChild(h1);
+    header.appendChild(h2);
+    header.appendChild(h3);
+    table.appendChild(header);
+
+    const memberships = Array.isArray(groupsUiState.memberships) ? groupsUiState.memberships : [];
+    memberships.forEach((m) => {
+        const row = document.createElement('div');
+        row.className = 'groups-students-table-row';
+        row.dataset.groupId = String(m.group_id);
+        if (String(m.group_id) === String(groupsUiState.selectedMembershipGroupId)) {
+            row.classList.add('selected');
+        }
+
+        const name = document.createElement('div');
+        name.className = 'groups-student-name';
+        const groupTitle = String(m.group_title || '');
+        name.textContent = groupTitle;
+
+        const notifyWrap = document.createElement('div');
+        notifyWrap.className = 'groups-student-notify';
+
+        const notifyLabel = document.createElement('span');
+        notifyLabel.className = 'groups-student-notify-label';
+        notifyLabel.textContent = 'TG';
+        notifyWrap.appendChild(notifyLabel);
+
+        const startChecked = m.notify_teacher_on_success !== false;
+        const notifyBtn = createLucideToggleButton({
+            checked: startChecked,
+            title: 'Уведомлять учителя о моих выполнениях',
+            disabled: false,
+        });
+        notifyBtn.addEventListener('click', async (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const current = notifyBtn.dataset.checked === '1';
+            const next = !current;
+            try {
+                notifyBtn.disabled = true;
+                await groupsApiRequest(`/groups/api/memberships/${m.group_id}/notify_teacher_on_success`, {
+                    method: 'POST',
+                    body: JSON.stringify({ enabled: next }),
+                });
+                notifyBtn.dataset.checked = next ? '1' : '0';
+                notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+                notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
+                try {
+                    if (window.lucide) {
+                        window.lucide.createIcons({ root: notifyBtn });
+                    }
+                } catch (e) {
+                }
+
+                const list = Array.isArray(groupsUiState.memberships) ? groupsUiState.memberships : [];
+                const idx = list.findIndex((x) => String(x.group_id) === String(m.group_id));
+                if (idx >= 0) {
+                    list[idx] = Object.assign({}, list[idx], { notify_teacher_on_success: next });
+                    groupsUiState.memberships = list;
+                }
+                showSuccess('Сохранено');
+            } catch (e) {
+                showError(e && e.message ? e.message : 'Ошибка');
+            } finally {
+                notifyBtn.disabled = false;
+            }
+        });
+        notifyWrap.appendChild(notifyBtn);
+
+        const teacher = document.createElement('div');
+        teacher.className = 'groups-student-status';
+        teacher.textContent = String(m.teacher_username || '');
+
+        row.appendChild(name);
+        row.appendChild(notifyWrap);
+        row.appendChild(teacher);
+
+        row.addEventListener('click', () => {
+            setSelectedMembership(m.group_id);
+        });
+
+        table.appendChild(row);
+    });
+}
+
+async function refreshMemberships() {
+    try {
+        const data = await groupsApiRequest('/groups/api/memberships', { method: 'GET' });
+        const memberships = data && Array.isArray(data.memberships) ? data.memberships : [];
+        groupsUiState.memberships = memberships;
+        if (!groupsUiState.selectedMembershipGroupId && memberships.length > 0) {
+            groupsUiState.selectedMembershipGroupId = String(memberships[0].group_id);
+        }
+        renderMembershipsTable();
+    } catch (e) {
+        groupsUiState.memberships = [];
+        renderMembershipsTable();
+    }
+}
+
+async function leaveSelectedMembershipGroup() {
+    const groupId = groupsUiState.selectedMembershipGroupId;
+    if (!groupId) {
+        showInfo('Выбери группу');
+        return;
+    }
+    const membership = (groupsUiState.memberships || []).find((x) => String(x.group_id) === String(groupId)) || null;
+    const name = membership ? String(membership.group_title || '') : '';
+    if (!confirm(`Выйти из группы${name ? ` «${name}»` : ''}?`)) return;
+
+    try {
+        await groupsApiRequest(`/groups/api/memberships/${groupId}/leave`, { method: 'POST' });
+        showSuccess('Готово');
+        groupsUiState.selectedMembershipGroupId = null;
+        await refreshMemberships();
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : 'Ошибка');
+    }
 }
 
 function renderGroupsTable() {
@@ -1006,6 +1156,9 @@ function initializeGroupsSection() {
     const studentsInviteLinkBtn = document.getElementById('groupsStudentsInviteLinkBtn');
     const studentsDeleteBtn = document.getElementById('groupsStudentsDeleteBtn');
 
+    const membershipsRefreshBtn = document.getElementById('groupsMembershipsRefreshBtn');
+    const membershipsLeaveBtn = document.getElementById('groupsMembershipsLeaveBtn');
+
     const emailInviteModal = document.getElementById('groupEmailInviteModal');
     const emailInviteModalClose = document.getElementById('groupEmailInviteModalClose');
     const emailInviteModalCancel = document.getElementById('groupEmailInviteModalCancel');
@@ -1061,6 +1214,13 @@ function initializeGroupsSection() {
     studentsInviteLinkBtn && studentsInviteLinkBtn.addEventListener('click', () => copyInviteLink());
     studentsDeleteBtn && studentsDeleteBtn.addEventListener('click', () => removeSelectedStudent());
 
+    membershipsRefreshBtn && membershipsRefreshBtn.addEventListener('click', async () => {
+        await refreshMemberships();
+    });
+    membershipsLeaveBtn && membershipsLeaveBtn.addEventListener('click', async () => {
+        await leaveSelectedMembershipGroup();
+    });
+
     if (emailInviteModal && emailInviteModalClose && emailInviteModalCancel && emailInviteModalSend) {
         emailInviteModalClose.addEventListener('click', () => toggleGroupEmailInviteModal(false));
         emailInviteModalCancel.addEventListener('click', () => toggleGroupEmailInviteModal(false));
@@ -1093,6 +1253,7 @@ function initializeGroupsSection() {
     }
 
     refreshGroups();
+    refreshMemberships();
 }
 
 async function checkAppCacheRevision() {

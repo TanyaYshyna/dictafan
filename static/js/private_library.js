@@ -598,7 +598,12 @@ function _teacherStudentsRender(data) {
 
   let deadlineDate = null;
   try {
-    const ed = assignment && assignment.end_date ? String(assignment.end_date) : '';
+    const days = Array.isArray(assignment && assignment.days ? assignment.days : null) ? assignment.days : [];
+    const ds = days
+      .map(x => String(x && (x.date || x.day_date) ? (x.date || x.day_date) : '').trim())
+      .filter(Boolean)
+      .sort();
+    const ed = ds.length ? ds[ds.length - 1] : '';
     if (ed) {
       const d = new Date(ed);
       if (!isNaN(d.getTime())) {
@@ -846,9 +851,7 @@ function _studentPlanRender(panel, dateIso, items) {
       const cacheBadge = isCached
         ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
         : '';
-      const start = a && a.start_date ? String(a.start_date) : '';
-      const end = a && a.end_date ? String(a.end_date) : '';
-      const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || dateIso);
+      const range = dateIso ? String(dateIso) : '—';
       const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
       const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
       const assignmentId = a && a.id ? Number(a.id) : null;
@@ -1173,10 +1176,22 @@ function _teacherAssignmentsRender(items) {
     const level = a && a.dictation_level ? String(a.dictation_level) : '—';
     const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
     const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
-    const start = a && a.start_date ? String(a.start_date) : '';
-    const end = a && a.end_date ? String(a.end_date) : '';
+    const days = Array.isArray(a && a.days ? a.days : null) ? a.days : [];
+    const dayDates = days
+      .map(d => String(d && (d.date || d.day_date) ? (d.date || d.day_date) : '').trim())
+      .filter(Boolean)
+      .sort();
+    const start = dayDates.length ? dayDates[0] : '';
+    const end = dayDates.length ? dayDates[dayDates.length - 1] : '';
     const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
-    const req = Number(a && a.required_completions ? a.required_completions : 1);
+    const req = (() => {
+      let maxReq = 1;
+      for (const d of days) {
+        const v = Number(d && (d.required_completions ?? d.count) ? (d.required_completions ?? d.count) : 1);
+        if (Number.isFinite(v) && v > maxReq) maxReq = v;
+      }
+      return maxReq;
+    })();
     const isCached = !!(a && a.__cached);
     const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
     const badgeBg = 'rgba(245,158,11,0.16)';
@@ -1679,11 +1694,17 @@ async function openCreateAssignmentModal(dictationId) {
         }
 
         try {
-          const day = a.start_date ? String(a.start_date) : today;
-          const cnt = Number(a.required_completions || 1) || 1;
-          setCreateAssignmentDaysState(modal, [{ date: day, count: cnt }]);
+          const daysSrc = Array.isArray(a.days) ? a.days : [];
+          const preparedDays = (daysSrc.length ? daysSrc : [{ date: today, required_completions: 1 }])
+            .map(x => ({
+              date: String(x && (x.date || x.day_date) ? (x.date || x.day_date) : '').trim(),
+              count: Number(x && (x.required_completions ?? x.count) ? (x.required_completions ?? x.count) : 1) || 1,
+            }))
+            .filter(x => x.date);
+
+          setCreateAssignmentDaysState(modal, preparedDays.length ? preparedDays : [{ date: today, count: 1 }]);
           renderCreateAssignmentDaysTable(modal);
-          if (daysAddBtn) daysAddBtn.disabled = true;
+          if (daysAddBtn) daysAddBtn.disabled = false;
         } catch (e) {
         }
 
@@ -1833,8 +1854,7 @@ async function openCreateAssignmentModal(dictationId) {
             method: 'PUT',
             body: JSON.stringify({
               group_id,
-              date: (days[0] && days[0].date) ? days[0].date : null,
-              required_completions: (days[0] && days[0].required_completions) ? days[0].required_completions : 1,
+              days,
               selected_sentence_positions
             })
           })

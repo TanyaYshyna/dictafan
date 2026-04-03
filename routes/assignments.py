@@ -186,23 +186,30 @@ def api_teacher_update_assignment(assignment_id: int):
 
     data = request.get_json(silent=True) or {}
     group_id = data.get("group_id")
-    day_date = data.get("date") or data.get("day_date") or data.get("start_date")
-    required_completions = data.get("required_completions")
+    days = data.get("days") or data.get("plan")
     selected_sentence_positions = data.get("selected_sentence_positions")
+
+    # Backward compatibility: allow updating a single day via {date, required_completions}
+    if not isinstance(days, list) or not days:
+        day_date = data.get("date") or data.get("day_date") or data.get("start_date")
+        required_completions = data.get("required_completions")
+        if day_date is not None:
+            days = [{"date": day_date, "required_completions": required_completions}]
 
     try:
         group_id_int = int(group_id)
-        req_int = int(required_completions)
     except Exception:
-        return jsonify({"success": False, "error": "group_id and required_completions must be int"}), 400
+        return jsonify({"success": False, "error": "group_id must be int"}), 400
+
+    if not isinstance(days, list) or not days:
+        return jsonify({"success": False, "error": "days is required"}), 400
 
     try:
         a = update_assignment_for_teacher(
             assignment_id,
             user["id"],
             group_id=group_id_int,
-            day_date=day_date,
-            required_completions=req_int,
+            days=days,
             selected_sentence_positions=selected_sentence_positions,
         )
         return jsonify({"success": True, "assignment": a})

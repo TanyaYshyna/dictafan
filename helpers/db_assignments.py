@@ -43,28 +43,28 @@ def _ensure_teacher_of_group(cur, group_id: int, teacher_user_id: int) -> None:
         raise PermissionError("Not a group teacher")
 
 
-def _check_overlap(cur, *, group_id: int, dictation_id: int, start_date: date, end_date: date, ignore_ids: Optional[list[int]] = None) -> None:
-    params: list[Any] = [group_id, dictation_id, start_date, end_date]
+def _check_overlap_day(cur, *, group_id: int, dictation_id: int, day_date: date, ignore_assignment_ids: Optional[list[int]] = None) -> None:
+    params: list[Any] = [group_id, dictation_id, day_date]
     ignore_sql = ""
-    if ignore_ids:
+    if ignore_assignment_ids:
         ignore_sql = " AND a.id <> ALL(%s)"
-        params.append(ignore_ids)
+        params.append(ignore_assignment_ids)
 
     cur.execute(
         f"""
         SELECT 1
-        FROM assignments a
+        FROM assignments_by_date abd
+        JOIN assignments a ON a.id = abd.assignment_id
         WHERE a.group_id = %s
           AND a.dictation_id = %s
-          AND a.archived_at IS NULL
-          AND NOT (a.end_date < %s OR a.start_date > %s)
+          AND abd.day_date = %s
           {ignore_sql}
         LIMIT 1
         """,
         params,
     )
     if cur.fetchone():
-        raise ValueError("Assignment date range overlaps with existing assignment")
+        raise ValueError("Assignment date overlaps with existing assignment")
 
 
 def _validate_max_range(start_d: date, end_d: date) -> None:
@@ -79,7 +79,7 @@ def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user
     try:
         cur.execute(
             """
-            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date
+            SELECT a.id, a.group_id, a.dictation_id
             FROM assignments a
             WHERE a.id = %s
             """,
@@ -91,10 +91,6 @@ def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user
 
         old_group_id = int(row.get("group_id"))
         dictation_id = int(row.get("dictation_id"))
-        start_d = _parse_date(row.get("start_date"))
-        end_d = _parse_date(row.get("end_date"))
-        if not start_d or not end_d:
-            raise ValueError("Assignment has invalid dates")
 
         if int(new_group_id) == int(old_group_id):
             return {"moved": False, "assignment": _row_to_assignment(row)}
@@ -102,14 +98,24 @@ def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user
         _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
         _ensure_teacher_of_group(cur, int(new_group_id), teacher_user_id)
 
-        _check_overlap(
-            cur,
-            group_id=int(new_group_id),
-            dictation_id=dictation_id,
-            start_date=start_d,
-            end_date=end_d,
-            ignore_ids=[int(assignment_id)],
+        cur.execute(
+            """
+            SELECT day_date
+            FROM assignments_by_date
+            WHERE assignment_id = %s
+            """,
+            (int(assignment_id),),
         )
+        for rr in cur.fetchall() or []:
+            day_d = rr.get("day_date")
+            if isinstance(day_d, date):
+                _check_overlap_day(
+                    cur,
+                    group_id=int(new_group_id),
+                    dictation_id=dictation_id,
+                    day_date=day_d,
+                    ignore_assignment_ids=[int(assignment_id)],
+                )
 
         cur.execute(
             """
@@ -117,7 +123,7 @@ def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user
             SET group_id = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE a.id = %s
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, selected_sentence_positions, created_at, updated_at
             """,
             (int(new_group_id), int(assignment_id)),
         )
@@ -135,9 +141,8 @@ def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict
         cur.execute(
             """
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
-                   a.start_date, a.end_date, a.required_completions,
                    a.selected_sentence_positions,
-                   a.created_at, a.updated_at, a.archived_at,
+                   a.created_at, a.updated_at,
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
@@ -173,6 +178,24 @@ def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict
             a["dictation_cover_url"] = get_cover_url_for_id(f"dict_{a.get('dictation_id')}", lang)
         except Exception:
             a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
+
+        cur.execute(
+            """
+            SELECT id, day_date, required_completions
+            FROM assignments_by_date
+            WHERE assignment_id = %s
+            ORDER BY day_date ASC, id ASC
+            """,
+            (int(assignment_id),),
+        )
+        a["days"] = [
+            {
+                "id": int(rr.get("id")),
+                "date": rr.get("day_date").isoformat() if rr.get("day_date") else None,
+                "required_completions": int(rr.get("required_completions") or 1),
+            }
+            for rr in (cur.fetchall() or [])
+        ]
         return a
     finally:
         cur.close()
@@ -184,22 +207,36 @@ def update_assignment_for_teacher(
     teacher_user_id: int,
     *,
     group_id: int,
-    day_date: Any,
-    required_completions: int,
+    days: list[dict],
     selected_sentence_positions: Any = None,
 ) -> dict:
-    if required_completions <= 0:
-        raise ValueError("required_completions must be > 0")
+    if not isinstance(days, list) or not days:
+        raise ValueError("days is required")
 
-    day_d = _parse_date(day_date)
-    if not day_d:
-        raise ValueError("day date is required")
+    prepared: list[tuple[date, int]] = []
+    for d in days:
+        day_d = _parse_date((d or {}).get("date") or (d or {}).get("day_date"))
+        if not day_d:
+            raise ValueError("day date is required")
+        try:
+            req = int((d or {}).get("required_completions") or 1)
+        except Exception:
+            raise ValueError("required_completions must be int")
+        if req <= 0:
+            raise ValueError("required_completions must be > 0")
+        prepared.append((day_d, req))
+
+    uniq_dates = sorted({d for d, _ in prepared})
+    if len(uniq_dates) > MAX_ASSIGNMENT_RANGE_DAYS:
+        raise ValueError("Assignment days count must be <= 7")
+    if uniq_dates:
+        _validate_max_range(uniq_dates[0], uniq_dates[-1])
 
     conn, cur = get_db_cursor()
     try:
         cur.execute(
             """
-            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date
+            SELECT a.id, a.group_id, a.dictation_id
             FROM assignments a
             WHERE a.id = %s
             """,
@@ -215,14 +252,14 @@ def update_assignment_for_teacher(
         _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
         _ensure_teacher_of_group(cur, int(group_id), teacher_user_id)
 
-        _check_overlap(
-            cur,
-            group_id=int(group_id),
-            dictation_id=dictation_id,
-            start_date=day_d,
-            end_date=day_d,
-            ignore_ids=[int(assignment_id)],
-        )
+        for day_d, _ in prepared:
+            _check_overlap_day(
+                cur,
+                group_id=int(group_id),
+                dictation_id=dictation_id,
+                day_date=day_d,
+                ignore_assignment_ids=[int(assignment_id)],
+            )
 
         positions = selected_sentence_positions
         if isinstance(positions, list):
@@ -236,53 +273,43 @@ def update_assignment_for_teacher(
             """
             UPDATE assignments a
             SET group_id = %s,
-                start_date = %s,
-                end_date = %s,
-                required_completions = %s,
                 selected_sentence_positions = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE a.id = %s
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, selected_sentence_positions, created_at, updated_at
             """,
-            (int(group_id), day_d, day_d, int(required_completions), positions, int(assignment_id)),
+            (int(group_id), positions, int(assignment_id)),
         )
         updated = cur.fetchone() or None
         if not updated:
             raise ValueError("Assignment not found")
-        conn.commit()
-        return _row_to_assignment(updated)
-    finally:
-        cur.close()
-        conn.close()
 
-
-def unarchive_assignments(ids: list[int], teacher_user_id: int) -> int:
-    if not ids:
-        return 0
-
-    conn, cur = get_db_cursor()
-    try:
         cur.execute(
             """
-            UPDATE assignments a
-            SET archived_at = NULL,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE a.id = ANY(%s)
-              AND a.archived_at IS NOT NULL
-              AND EXISTS (
-                SELECT 1
-                FROM group_teachers gt
-                JOIN groups g ON g.id = gt.group_id
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
-                  AND g.archived_at IS NULL
-              )
+            DELETE FROM assignments_by_date
+            WHERE assignment_id = %s
             """,
-            (ids, teacher_user_id),
+            (int(assignment_id),),
         )
-        updated = cur.rowcount
+
+        for day_d, req in prepared:
+            cur.execute(
+                """
+                INSERT INTO assignments_by_date (assignment_id, day_date, required_completions, created_at, updated_at)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id
+                """,
+                (int(assignment_id), day_d, int(req)),
+            )
+            cur.fetchone()
+
         conn.commit()
-        return int(updated or 0)
+        result = _row_to_assignment(updated)
+        result["days"] = [
+            {"date": d.isoformat(), "required_completions": int(req)}
+            for d, req in sorted(prepared, key=lambda x: x[0])
+        ]
+        return result
     finally:
         cur.close()
         conn.close()
@@ -322,7 +349,7 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
     try:
         cur.execute(
             """
-            SELECT a.id, a.group_id, a.dictation_id, a.start_date, a.end_date, a.required_completions,
+            SELECT a.id, a.group_id, a.dictation_id,
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
@@ -344,11 +371,38 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
         if not arow:
             raise PermissionError("Forbidden")
 
-        start_d = _parse_date(arow.get("start_date"))
-        end_d = _parse_date(arow.get("end_date"))
-        req = int(arow.get("required_completions") or 1)
         dictation_id = int(arow.get("dictation_id"))
         group_id = int(arow.get("group_id"))
+
+        cur.execute(
+            """
+            SELECT day_date, required_completions
+            FROM assignments_by_date
+            WHERE assignment_id = %s
+            ORDER BY day_date ASC, id ASC
+            """,
+            (int(assignment_id),),
+        )
+        day_rows = cur.fetchall() or []
+        if not day_rows:
+            raise ValueError("Assignment has no days")
+
+        days = []
+        for rr in day_rows:
+            dd = rr.get("day_date")
+            if not isinstance(dd, date):
+                continue
+            try:
+                req_d = int(rr.get("required_completions") or 1)
+            except Exception:
+                req_d = 1
+            days.append({"date": dd.isoformat(), "required_completions": req_d})
+
+        # Compute progress for the latest day in the plan.
+        end_d = day_rows[-1].get("day_date")
+        req = int(day_rows[-1].get("required_completions") or 1)
+        start_d = day_rows[0].get("day_date")
+        progress_day = end_d
 
         cur.execute(
             """
@@ -376,7 +430,7 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
                   AND hs.dictation_id = %s
                   AND hs.created_at::date = %s
                 """,
-                (sid, dictation_id, start_d),
+                (sid, dictation_id, progress_day),
             )
 
             done = int((cur.fetchone() or {}).get("cnt") or 0)
@@ -403,9 +457,7 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
                 "id": int(arow.get("id")),
                 "group_id": group_id,
                 "dictation_id": dictation_id,
-                "start_date": start_d.isoformat() if start_d else None,
-                "end_date": end_d.isoformat() if end_d else None,
-                "required_completions": req,
+                "days": days,
                 "group_title": arow.get("group_title"),
                 "dictation_title": arow.get("dictation_title"),
                 "dictation_language_code": arow.get("dictation_language_code"),
@@ -459,7 +511,7 @@ def create_assignment_days(
 
         # проверим пересечения по каждой дате
         for day_d, _ in prepared:
-            _check_overlap(cur, group_id=group_id, dictation_id=dictation_id, start_date=day_d, end_date=day_d)
+            _check_overlap_day(cur, group_id=group_id, dictation_id=dictation_id, day_date=day_d)
 
         positions = selected_sentence_positions
         if isinstance(positions, list):
@@ -469,32 +521,43 @@ def create_assignment_days(
         else:
             positions = None
 
-        rows: list[dict] = []
+        cur.execute(
+            """
+            INSERT INTO assignments (
+                group_id,
+                dictation_id,
+                created_by_teacher_user_id,
+                selected_sentence_positions,
+                created_at,
+                updated_at
+            )
+            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, selected_sentence_positions, created_at, updated_at
+            """,
+            (group_id, dictation_id, teacher_user_id, positions),
+        )
+        row = cur.fetchone() or {}
+        assignment_id = int(row.get("id"))
+
         for day_d, req in prepared:
             cur.execute(
                 """
-                INSERT INTO assignments (
-                    group_id,
-                    dictation_id,
-                    created_by_teacher_user_id,
-                    start_date,
-                    end_date,
-                    required_completions,
-                    selected_sentence_positions,
-                    created_at,
-                    updated_at,
-                    archived_at
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL)
-                RETURNING id, group_id, dictation_id, created_by_teacher_user_id, start_date, end_date, required_completions, selected_sentence_positions, created_at, updated_at, archived_at
+                INSERT INTO assignments_by_date (assignment_id, day_date, required_completions, created_at, updated_at)
+                VALUES (%s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id
                 """,
-                (group_id, dictation_id, teacher_user_id, day_d, day_d, req, positions),
+                (assignment_id, day_d, int(req)),
             )
-            row = cur.fetchone() or {}
-            rows.append(_row_to_assignment(row))
+            cur.fetchone()
+
+        created = _row_to_assignment(row)
+        created["days"] = [
+            {"date": d.isoformat(), "required_completions": int(req)}
+            for d, req in sorted(prepared, key=lambda x: x[0])
+        ]
 
         conn.commit()
-        return rows
+        return [created]
     finally:
         cur.close()
         conn.close()
@@ -507,19 +570,22 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
         cur.execute(
             f"""
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
-                   a.start_date, a.end_date, a.required_completions,
                    a.selected_sentence_positions,
-                   a.created_at, a.updated_at, a.archived_at,
+                   a.created_at, a.updated_at,
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
                    d.level AS dictation_level,
-                   d.sentences_count AS dictation_sentences_count
+                   d.sentences_count AS dictation_sentences_count,
+                   ARRAY_AGG(abd.day_date ORDER BY abd.day_date ASC) AS day_dates,
+                   ARRAY_AGG(abd.required_completions ORDER BY abd.day_date ASC) AS day_required
             FROM assignments a
+            LEFT JOIN assignments_by_date abd ON abd.assignment_id = a.id
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
             WHERE a.group_id = %s
-            ORDER BY a.start_date DESC, a.id DESC
+            GROUP BY a.id, g.title, d.title, d.language_code, d.level, d.sentences_count
+            ORDER BY MAX(abd.day_date) DESC NULLS LAST, a.id DESC
             """,
             (group_id,),
         )
@@ -534,6 +600,24 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
             a["dictation_level"] = r.get("dictation_level")
             a["dictation_sentences_count"] = int(r.get("dictation_sentences_count") or 0)
 
+            day_dates = r.get("day_dates") or []
+            day_required = r.get("day_required") or []
+            days: list[dict] = []
+            for i, dd in enumerate(day_dates):
+                try:
+                    if not isinstance(dd, date):
+                        continue
+                    req = 1
+                    if i < len(day_required):
+                        try:
+                            req = int(day_required[i] or 1)
+                        except Exception:
+                            req = 1
+                    days.append({"date": dd.isoformat(), "required_completions": req})
+                except Exception:
+                    continue
+            a["days"] = days
+
             try:
                 from routes.index import get_cover_url_for_id
 
@@ -543,39 +627,6 @@ def list_group_assignments_for_teacher(group_id: int, teacher_user_id: int, *, i
                 a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
             result.append(a)
         return result
-    finally:
-        cur.close()
-        conn.close()
-
-
-def archive_assignments(ids: list[int], teacher_user_id: int) -> int:
-    if not ids:
-        return 0
-
-    conn, cur = get_db_cursor()
-    try:
-        # только те assignments, которые принадлежат группам, где учитель teacher_user_id
-        cur.execute(
-            """
-            UPDATE assignments a
-            SET archived_at = CURRENT_TIMESTAMP,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE a.id = ANY(%s)
-              AND a.archived_at IS NULL
-              AND EXISTS (
-                SELECT 1
-                FROM group_teachers gt
-                JOIN groups g ON g.id = gt.group_id
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
-                  AND g.archived_at IS NULL
-              )
-            """,
-            (ids, teacher_user_id),
-        )
-        updated = cur.rowcount
-        conn.commit()
-        return int(updated or 0)
     finally:
         cur.close()
         conn.close()
@@ -593,19 +644,18 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
         cur.execute(
             """
             SELECT a.id, a.group_id, a.dictation_id, a.created_by_teacher_user_id,
-                   a.start_date, a.end_date, a.required_completions,
                    a.selected_sentence_positions,
-                   a.created_at, a.updated_at, a.archived_at,
+                   a.created_at, a.updated_at,
+                   abd.required_completions,
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
                    d.level AS dictation_level
             FROM assignments a
+            JOIN assignments_by_date abd ON abd.assignment_id = a.id
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
-            WHERE a.archived_at IS NULL
-              AND a.start_date <= %s
-              AND a.end_date >= %s
+            WHERE abd.day_date = %s
               AND EXISTS (
                 SELECT 1
                 FROM group_students gs
@@ -616,9 +666,9 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                   AND g.archived_at IS NULL
               )
               AND g.archived_at IS NULL
-            ORDER BY a.start_date ASC, a.id ASC
+            ORDER BY abd.day_date ASC, a.id ASC
             """,
-            (target_date, target_date, student_user_id),
+            (target_date, student_user_id),
         )
         rows = cur.fetchall() or []
         t_sql1 = time.perf_counter()
@@ -635,15 +685,10 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                     dictation_ids.append(int(did))
             except Exception:
                 pass
-            try:
-                sd = _parse_date(r.get("start_date"))
-                ed = _parse_date(r.get("end_date"))
-                if sd:
-                    min_start = sd if (min_start is None or sd < min_start) else min_start
-                if ed:
-                    max_end = ed if (max_end is None or ed > max_end) else max_end
-            except Exception:
-                pass
+            # For day-based plan, the relevant range is just the target day.
+            if target_date:
+                min_start = target_date if (min_start is None or target_date < min_start) else min_start
+                max_end = target_date if (max_end is None or target_date > max_end) else max_end
 
         counts_by_dict_day: dict[int, dict[date, int]] = {}
         if dictation_ids and min_start and max_end:
@@ -700,16 +745,20 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             except Exception:
                 a["dictation_cover_url"] = f"/static/data/covers/cover_{(a.get('dictation_language_code') or 'en')}.webp"
 
-            start_d = _parse_date(a.get("start_date"))
-            end_d = _parse_date(a.get("end_date"))
+            start_d = target_date
+            end_d = target_date
             did = a.get("dictation_id")
             did_int = int(did) if did is not None else None
             if did_int is not None and did_int in counts_by_dict_day and target_date:
                 a["done"] = int(counts_by_dict_day.get(did_int, {}).get(target_date, 0) or 0)
             else:
                 a["done"] = 0
+            try:
+                a["required_completions"] = int(r.get("required_completions") or a.get("required_completions") or 1)
+            except Exception:
+                a["required_completions"] = 1
             a["mode"] = "days"
-            a["overdue"] = bool(end_d and (target_date > end_d))
+            a["overdue"] = False
             result.append(a)
 
         t_cover1 = time.perf_counter()
@@ -736,11 +785,11 @@ def _row_to_assignment(row: dict) -> dict:
         "group_id": int(row.get("group_id")) if row.get("group_id") is not None else None,
         "dictation_id": int(row.get("dictation_id")) if row.get("dictation_id") is not None else None,
         "created_by_teacher_user_id": int(row.get("created_by_teacher_user_id")) if row.get("created_by_teacher_user_id") is not None else None,
-        "start_date": row.get("start_date").isoformat() if row.get("start_date") else None,
-        "end_date": row.get("end_date").isoformat() if row.get("end_date") else None,
-        "required_completions": int(row.get("required_completions")) if row.get("required_completions") is not None else None,
+        "start_date": None,
+        "end_date": None,
+        "required_completions": None,
         "selected_sentence_positions": list(row.get("selected_sentence_positions") or []) if row.get("selected_sentence_positions") is not None else None,
         "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
         "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
-        "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
+        "archived_at": None,
     }
