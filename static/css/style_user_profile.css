@@ -842,6 +842,31 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     background: #fff;
  }
 
+ .groups-memberships-table-row {
+    grid-template-columns: minmax(0, 1fr) 140px 220px;
+ }
+
+ .groups-memberships-table-row .groups-student-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+ }
+
+ .groups-memberships-teacher {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+ }
+
+ .groups-memberships-teacher .groups-student-avatar {
+    width: 32px;
+    height: 32px;
+    flex: 0 0 auto;
+ }
+
  .groups-students-table-row.selected {
     background: rgba(255, 236, 153, 0.6);
  }

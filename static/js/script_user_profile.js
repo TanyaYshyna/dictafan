@@ -265,7 +265,7 @@ function renderMembershipsTable() {
     const memberships = Array.isArray(groupsUiState.memberships) ? groupsUiState.memberships : [];
     memberships.forEach((m) => {
         const row = document.createElement('div');
-        row.className = 'groups-students-table-row';
+        row.className = 'groups-students-table-row groups-memberships-table-row';
         row.dataset.groupId = String(m.group_id);
         if (String(m.group_id) === String(groupsUiState.selectedMembershipGroupId)) {
             row.classList.add('selected');
@@ -329,7 +329,7 @@ function renderMembershipsTable() {
         notifyWrap.appendChild(notifyBtn);
 
         const teacher = document.createElement('div');
-        teacher.className = 'groups-student-status';
+        teacher.className = 'groups-student-status groups-memberships-teacher';
         const teacherAvatar = document.createElement('img');
         teacherAvatar.className = 'groups-student-avatar';
         teacherAvatar.alt = 'avatar';
