@@ -758,6 +758,14 @@ def index():
     )
 
 
+@index_bp.route('/reset-password')
+def reset_password_page():
+    token = (request.args.get('token') or '').strip()
+    if not token:
+        return redirect('/')
+    return redirect('/?reset_token=' + token)
+
+
 @index_bp.route('/join-group/<string:token>')
 def join_group_link(token: str):
     try:

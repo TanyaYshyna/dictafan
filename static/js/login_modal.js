@@ -1078,3 +1078,21 @@ class LoginModal {
 if (!window.loginModal) {
     window.loginModal = new LoginModal();
 }
+
+try {
+    const params = new URLSearchParams(window.location.search || '');
+    const token = (params.get('reset_token') || '').trim();
+    if (token) {
+        window.loginModal.show('reset');
+        const tokenInput = document.getElementById('resetModalToken');
+        if (tokenInput) {
+            tokenInput.value = token;
+        }
+        params.delete('reset_token');
+        const nextQuery = params.toString();
+        const nextUrl = window.location.pathname + (nextQuery ? `?${nextQuery}` : '') + (window.location.hash || '');
+        window.history.replaceState({}, '', nextUrl);
+    }
+} catch (e) {
+    // ignore
+}
