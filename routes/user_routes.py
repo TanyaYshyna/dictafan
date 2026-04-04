@@ -7,7 +7,7 @@ import json
 import shutil
 from datetime import datetime
 import uuid
-from flask import Blueprint, request, jsonify, render_template, send_file, redirect, make_response
+from flask import Blueprint, jsonify, render_template, request, redirect, make_response
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
@@ -33,6 +33,7 @@ from helpers.db_users import (
 )
 from helpers.email_sender import send_email
 from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
+from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_groups import ensure_personal_group_for_user
 from helpers.b2_storage import b2_storage
 
@@ -354,6 +355,47 @@ def api_password_reset_request():
         return jsonify({'success': True})
     except Exception as e:
         print(f"❌ Ошибка password_reset/request: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
+@user_bp.route('/api/password_reset/request_telegram', methods=['POST'])
+def api_password_reset_request_telegram():
+    try:
+        data = request.get_json(silent=True) or {}
+        email = (data.get('email') or '').strip().lower()
+        if not email:
+            return jsonify({'success': False, 'error': 'Email is required'}), 400
+
+        if not is_telegram_enabled():
+            return jsonify({'success': True})
+
+        user_db = get_user_by_email(email)
+        if not user_db:
+            return jsonify({'success': True})
+
+        chat_id = user_db.get('telegram_chat_id')
+        telegram_enabled = bool(user_db.get('telegram_enabled'))
+        if not chat_id or not telegram_enabled:
+            return jsonify({'success': True})
+
+        token = create_password_reset_token(email)
+        if not token:
+            return jsonify({'success': True})
+
+        reset_url = f"{request.host_url.rstrip('/')}/reset-password?token={token}"
+        text_body = (
+            "Вы запросили сброс пароля в Dictafan.\n\n"
+            f"Откройте ссылку, чтобы задать новый пароль:\n{reset_url}\n\n"
+            "Если это были не вы — просто проигнорируйте это сообщение."
+        )
+        try:
+            send_telegram_message(int(chat_id), text_body)
+        except Exception as e:
+            print(f"❌ Ошибка отправки telegram password_reset: {e}")
+
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"❌ Ошибка password_reset/request_telegram: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 

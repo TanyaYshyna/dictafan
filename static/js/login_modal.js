@@ -122,6 +122,12 @@ class LoginModal {
                             </button>
                         </div>
 
+                        <div class="login-form-actions" style="margin-top: 10px;">
+                            <button type="button" class="button-color-gray auth-submit" id="forgotModalTelegramBtn">
+                                Отправить в Telegram
+                            </button>
+                        </div>
+
                         <p class="form-note" style="margin-top: 10px;">
                             <a href="#" id="switchBackToLoginFromForgotLink">Назад ко входу</a>
                         </p>
@@ -283,6 +289,14 @@ class LoginModal {
             forgotForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 await this.handleForgot();
+            });
+        }
+
+        const forgotTelegramBtn = document.getElementById('forgotModalTelegramBtn');
+        if (forgotTelegramBtn) {
+            forgotTelegramBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                await this.handleForgotTelegram();
             });
         }
 
@@ -490,7 +504,7 @@ class LoginModal {
             if (forgotForm) forgotForm.style.display = 'block';
             if (resetForm) resetForm.style.display = 'none';
             if (title) title.textContent = 'Восстановление пароля';
-            if (message) message.textContent = 'Введи почту — мы отправим ссылку для сброса пароля';
+            if (message) message.textContent = 'Введи почту — мы отправим ссылку для сброса пароля на почту или в Telegram';
         } else {
             if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'none';
@@ -507,6 +521,7 @@ class LoginModal {
     async handleForgot() {
         const emailInput = document.getElementById('forgotModalEmail');
         const submitBtn = document.getElementById('forgotModalSubmitBtn');
+        const telegramBtn = document.getElementById('forgotModalTelegramBtn');
         const infoMessage = document.getElementById('forgotModalInfoMessage');
 
         const email = emailInput?.value?.trim();
@@ -518,6 +533,9 @@ class LoginModal {
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.textContent = 'Отправляем...';
+        }
+        if (telegramBtn) {
+            telegramBtn.disabled = true;
         }
         this.clearErrors();
         if (infoMessage) {
@@ -552,6 +570,68 @@ class LoginModal {
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Отправить';
+            }
+            if (telegramBtn) {
+                telegramBtn.disabled = false;
+            }
+        }
+    }
+
+    async handleForgotTelegram() {
+        const emailInput = document.getElementById('forgotModalEmail');
+        const submitBtn = document.getElementById('forgotModalSubmitBtn');
+        const telegramBtn = document.getElementById('forgotModalTelegramBtn');
+        const infoMessage = document.getElementById('forgotModalInfoMessage');
+
+        const email = emailInput?.value?.trim();
+        if (!email) {
+            this.showError('Введи почту', 'forgot');
+            return;
+        }
+
+        if (telegramBtn) {
+            telegramBtn.disabled = true;
+            telegramBtn.textContent = 'Отправляем...';
+        }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+        }
+        this.clearErrors();
+        if (infoMessage) {
+            infoMessage.style.display = 'none';
+            infoMessage.textContent = '';
+        }
+
+        try {
+            const res = await fetch('/user/api/password_reset/request_telegram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok || !data || !data.success) {
+                const msg = data && (data.error || data.message) ? String(data.error || data.message) : `HTTP ${res.status}`;
+                throw new Error(msg);
+            }
+
+            if (infoMessage) {
+                infoMessage.style.display = 'block';
+                infoMessage.style.background = '#ecfdf5';
+                infoMessage.style.color = '#065f46';
+                infoMessage.style.border = '1px solid #a7f3d0';
+                infoMessage.style.padding = '10px';
+                infoMessage.style.borderRadius = '6px';
+                infoMessage.textContent = 'Если аккаунт существует и Telegram привязан — ссылка для сброса пароля отправлена в Telegram.';
+            }
+        } catch (e) {
+            this.showError(e && e.message ? e.message : 'Ошибка', 'forgot');
+        } finally {
+            if (telegramBtn) {
+                telegramBtn.disabled = false;
+                telegramBtn.textContent = 'Отправить в Telegram';
+            }
+            if (submitBtn) {
+                submitBtn.disabled = false;
             }
         }
     }
