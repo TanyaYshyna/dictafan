@@ -31,7 +31,7 @@ from helpers.db_users import (
     reset_password_by_token,
     update_user,
 )
-from helpers.email_sender import send_email_smtp
+from helpers.email_sender import send_email
 from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
 from helpers.db_groups import ensure_personal_group_for_user
 from helpers.b2_storage import b2_storage
@@ -347,7 +347,7 @@ def api_password_reset_request():
                 'Если это были не вы — просто проигнорируйте письмо.'
             )
             try:
-                send_email_smtp(email, subject, text_body)
+                send_email(email, subject, text_body)
             except Exception as e:
                 print(f"❌ Ошибка отправки email password_reset: {e}")
 
