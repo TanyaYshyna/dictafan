@@ -12,6 +12,24 @@ class LoginModal {
         this.languageSelector = null;
     }
 
+    _consumeResetTokenFromUrl() {
+        try {
+            const params = new URLSearchParams(window.location.search || '');
+            const token = (params.get('reset_token') || '').trim();
+            if (!token) {
+                return null;
+            }
+
+            params.delete('reset_token');
+            const nextQuery = params.toString();
+            const nextUrl = window.location.pathname + (nextQuery ? `?${nextQuery}` : '') + (window.location.hash || '');
+            window.history.replaceState({}, '', nextUrl);
+            return token;
+        } catch (e) {
+            return null;
+        }
+    }
+
     /**
      * Создать модальное окно для логина/регистрации
      */
@@ -977,8 +995,20 @@ class LoginModal {
             this.createModal();
         }
 
+        const resetToken = this._consumeResetTokenFromUrl();
+        if (resetToken && mode === 'login') {
+            mode = 'reset';
+        }
+
         this.mode = mode;
         this.updateModalView();
+
+        if (resetToken && mode === 'reset') {
+            const tokenInput = document.getElementById('resetModalToken');
+            if (tokenInput) {
+                tokenInput.value = resetToken;
+            }
+        }
 
         this.modal.style.display = 'flex';
         this.isVisible = true;
@@ -1077,22 +1107,4 @@ class LoginModal {
 // Создаем глобальный экземпляр
 if (!window.loginModal) {
     window.loginModal = new LoginModal();
-}
-
-try {
-    const params = new URLSearchParams(window.location.search || '');
-    const token = (params.get('reset_token') || '').trim();
-    if (token) {
-        window.loginModal.show('reset');
-        const tokenInput = document.getElementById('resetModalToken');
-        if (tokenInput) {
-            tokenInput.value = token;
-        }
-        params.delete('reset_token');
-        const nextQuery = params.toString();
-        const nextUrl = window.location.pathname + (nextQuery ? `?${nextQuery}` : '') + (window.location.hash || '');
-        window.history.replaceState({}, '', nextUrl);
-    }
-} catch (e) {
-    // ignore
 }
