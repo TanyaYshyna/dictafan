@@ -1,5 +1,6 @@
 import os
 import smtplib
+import socket
 from email.message import EmailMessage
 from typing import Optional
 
@@ -39,10 +40,18 @@ def send_email_smtp(
     else:
         msg.set_content(text_body)
 
+    prefer_ipv4 = (os.getenv('SMTP_PREFER_IPV4') or '1').strip().lower() in ('1', 'true', 'yes', 'on')
+    connect_host = host
+    if prefer_ipv4:
+        try:
+            connect_host = socket.gethostbyname(host)
+        except Exception:
+            connect_host = host
+
     if use_ssl:
-        server = smtplib.SMTP_SSL(host, port, timeout=20)
+        server = smtplib.SMTP_SSL(connect_host, port, timeout=20)
     else:
-        server = smtplib.SMTP(host, port, timeout=20)
+        server = smtplib.SMTP(connect_host, port, timeout=20)
 
     try:
         server.ehlo()
