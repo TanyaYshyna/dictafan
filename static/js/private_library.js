@@ -876,42 +876,37 @@ function _studentPlanRender(panel, dateIso, items) {
 
       return `
         <tr>
-          <td style="padding:8px 10px; font-weight:700; font-size:12px; color: rgba(0,0,0,0.78); white-space:nowrap;">${escapeHtml(String(groupTitle))}</td>
-          <td style="padding:8px 10px;">
-            <div style="display:inline-flex; padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${done}/${req}</div>
+          <td style="padding:4px 6px 4px 0; font-weight:800; font-size:12px; color: rgba(0,0,0,0.72); text-align:right; white-space:nowrap;">${escapeHtml(String(groupTitle))}</td>
+          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right;">
+            <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:900; font-size:12px; line-height:1;">${done}/${req}</div>
           </td>
-          <td style="padding:8px 10px; text-align:right;">
-            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Запустить</button>
+          <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right;">
+            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:30px; padding:0 10px;">Запустить</button>
           </td>
         </tr>
       `;
     }).join('');
 
     blocks.push(`
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-          <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
-            <div style="min-width:0;">
-              <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
-              <div style="margin-top:8px;">${cacheBadge}</div>
+      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:10px; margin-top:10px; ${cardBg}">
+        <div style="display:flex; align-items:flex-start; gap:12px;">
+          <div style="width:96px; height:96px; border-radius:16px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
+          <div style="min-width:0; flex:1; display:flex; flex-direction:column; align-items:flex-end;">
+            <div style="width:100%; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
+              <div style="min-width:0; text-align:right;">
+                <div style="font-weight:900; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+                <div style="margin-top:2px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+              </div>
+              <div style="flex-shrink:0;">${cacheBadge}</div>
+            </div>
+            <div style="margin-top:8px; width:auto; margin-left:auto;">
+              <table style="width:auto; border-collapse:separate; border-spacing:0 6px; margin-left:auto;">
+                <tbody>
+                  ${rowsHtml}
+                </tbody>
+              </table>
             </div>
           </div>
-        </div>
-        <div style="margin-top:10px;">
-          <table style="width:100%; border-collapse:separate; border-spacing:0;">
-            <thead>
-              <tr>
-                <th style="text-align:left; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">Группа</th>
-                <th style="text-align:left; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">Выполнено/план</th>
-                <th style="text-align:right; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">&nbsp;</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
         </div>
       </div>
     `);
