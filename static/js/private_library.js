@@ -876,19 +876,19 @@ function _studentPlanRender(panel, dateIso, items) {
 
       return `
         <tr>
-          <td style="padding:4px 6px 4px 0; font-weight:800; font-size:12px; color: rgba(0,0,0,0.72); text-align:right; white-space:nowrap;">${escapeHtml(String(groupTitle))}</td>
-          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right;">
+          <td style="padding:4px 6px 4px 0; font-weight:800; font-size:12px; color: rgba(0,0,0,0.72); text-align:right; white-space:nowrap; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">${escapeHtml(String(groupTitle))}</td>
+          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
             <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:900; font-size:12px; line-height:1;">${done}/${req}</div>
           </td>
-          <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right;">
-            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:30px; padding:0 10px;">Запустить</button>
+          <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
+            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 10px;">Запустить</button>
           </td>
         </tr>
       `;
     }).join('');
 
     blocks.push(`
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:10px; margin-top:10px; ${cardBg}">
+      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:10px 10px 8px 10px; margin-top:10px; ${cardBg}">
         <div style="display:flex; align-items:flex-start; gap:12px;">
           <div style="width:96px; height:96px; border-radius:16px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
           <div style="min-width:0; flex:1; display:flex; flex-direction:column; align-items:flex-end;">
@@ -899,8 +899,8 @@ function _studentPlanRender(panel, dateIso, items) {
               </div>
               <div style="flex-shrink:0;">${cacheBadge}</div>
             </div>
-            <div style="margin-top:8px; width:auto; margin-left:auto;">
-              <table style="width:auto; border-collapse:separate; border-spacing:0 6px; margin-left:auto;">
+            <div style="margin-top:6px; width:auto; margin-left:auto;">
+              <table style="width:auto; border:none !important; border-collapse:separate; border-spacing:0 4px; margin-left:auto; background:transparent !important;">
                 <tbody>
                   ${rowsHtml}
                 </tbody>
@@ -1162,12 +1162,15 @@ function _teacherAssignmentsRender(items) {
 
   const blocks = rows.map(a => {
     const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
+    const groupTitle = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : '');
     const level = a && a.dictation_level ? String(a.dictation_level) : '—';
     const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
     const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
       ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
       : null;
     const subsetCount = (selectedPositions && selectedPositions.length) ? selectedPositions.length : null;
+    const groupSubsetCount = (subsetCount != null) ? subsetCount : (sentencesCount || 0);
+    const groupLabel = groupTitle ? `${groupTitle} (${groupSubsetCount})` : '';
     const sentenceCountLabel = (subsetCount != null && subsetCount >= 0)
       ? `${subsetCount}/${(sentencesCount || 0)}`
       : String(sentencesCount || 0);
@@ -1215,7 +1218,7 @@ function _teacherAssignmentsRender(items) {
             <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
             <div style="min-width:0;">
               <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentenceCountLabel))} предлож.</div>
+              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)}${groupLabel ? ` · ${escapeHtml(groupLabel)}` : ''} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentenceCountLabel))} предлож.</div>
               <div style="margin-top:8px;">${cacheBadge}</div>
             </div>
           </div>

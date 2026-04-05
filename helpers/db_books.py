@@ -1005,8 +1005,11 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
         """)
         has_author_materials_url = cur.fetchone() is not None
         
-        # IMPORTANT: consider dictation "in a book" only if the referenced book exists.
-        # This prevents "lost" dictations when book_dictations contains a dangling book_id.
+        # IMPORTANT:
+        # - consider dictation "in a book" only if the referenced book exists
+        #   (prevents "lost" dictations when book_dictations contains a dangling book_id)
+        # - ignore links to user's workbook ("Рабочая тетрадь") when determining orphan status.
+        #   Workbook is meant to DISPLAY orphans; linking dictations to it must not hide them.
         if has_author_materials_url:
             query = """
                 SELECT
@@ -1024,6 +1027,7 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
                     FROM book_dictations bd
                     JOIN books b ON b.id = bd.book_id
                     WHERE bd.dictation_id = d.id
+                      AND NOT (b.creator_user_id = %s AND b.title = 'Рабочая тетрадь')
                   )
                 ORDER BY d.created_at DESC
             """
@@ -1043,11 +1047,12 @@ def get_orphan_dictations(user_id: int) -> List[Dict[str, Any]]:
                     FROM book_dictations bd
                     JOIN books b ON b.id = bd.book_id
                     WHERE bd.dictation_id = d.id
+                      AND NOT (b.creator_user_id = %s AND b.title = 'Рабочая тетрадь')
                   )
                 ORDER BY d.created_at DESC
             """
         
-        cur.execute(query, (user_id,))
+        cur.execute(query, (user_id, user_id))
         rows = cur.fetchall()
         
         result = []
