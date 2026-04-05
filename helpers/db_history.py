@@ -111,7 +111,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -147,16 +147,17 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   attempts_total: {attempts_total}')
     print(f'   error_count: {error_count}')
     print(f'   time_ms: {time_ms}')
+    print(f'   source_group_id: {source_group_id}')
     
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO history_successes 
-                (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, created_at, updated_at
-            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms))
+                (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, created_at, updated_at
+            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id))
 
             row = cur.fetchone()
             conn.commit()
@@ -171,8 +172,9 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'attempts_total': row[6],
                 'error_count': row[7],
                 'time_ms': row[8],
-                'created_at': row[9].isoformat() if row[9] else None,
-                'updated_at': row[10].isoformat() if row[10] else None,
+                'source_group_id': row[9],
+                'created_at': row[10].isoformat() if row[10] else None,
+                'updated_at': row[11].isoformat() if row[11] else None,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')

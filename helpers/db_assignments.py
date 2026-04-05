@@ -74,67 +74,6 @@ def _validate_max_range(start_d: date, end_d: date) -> None:
         raise ValueError("Assignment date range must be <= 7 days")
 
 
-def move_assignment_to_group(assignment_id: int, new_group_id: int, teacher_user_id: int) -> dict:
-    conn, cur = get_db_cursor()
-    try:
-        cur.execute(
-            """
-            SELECT a.id, a.group_id, a.dictation_id
-            FROM assignments a
-            WHERE a.id = %s
-            """,
-            (assignment_id,),
-        )
-        row = cur.fetchone() or None
-        if not row:
-            raise ValueError("Assignment not found")
-
-        old_group_id = int(row.get("group_id"))
-        dictation_id = int(row.get("dictation_id"))
-
-        if int(new_group_id) == int(old_group_id):
-            return {"moved": False, "assignment": _row_to_assignment(row)}
-
-        _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
-        _ensure_teacher_of_group(cur, int(new_group_id), teacher_user_id)
-
-        cur.execute(
-            """
-            SELECT day_date
-            FROM assignments_by_date
-            WHERE assignment_id = %s
-            """,
-            (int(assignment_id),),
-        )
-        for rr in cur.fetchall() or []:
-            day_d = rr.get("day_date")
-            if isinstance(day_d, date):
-                _check_overlap_day(
-                    cur,
-                    group_id=int(new_group_id),
-                    dictation_id=dictation_id,
-                    day_date=day_d,
-                    ignore_assignment_ids=[int(assignment_id)],
-                )
-
-        cur.execute(
-            """
-            UPDATE assignments a
-            SET group_id = %s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE a.id = %s
-            RETURNING id, group_id, dictation_id, created_by_teacher_user_id, selected_sentence_positions, created_at, updated_at
-            """,
-            (int(new_group_id), int(assignment_id)),
-        )
-        updated = cur.fetchone() or {}
-        conn.commit()
-        return {"moved": True, "assignment": _row_to_assignment(updated)}
-    finally:
-        cur.close()
-        conn.close()
-
-
 def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
     conn, cur = get_db_cursor()
     try:

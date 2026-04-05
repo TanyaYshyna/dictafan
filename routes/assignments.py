@@ -12,7 +12,6 @@ from helpers.db_assignments import (
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
     list_my_assignments_for_student,
-    move_assignment_to_group,
     update_assignment_for_teacher,
 )
 
@@ -106,35 +105,6 @@ def api_teacher_delete_assignments():
         return jsonify({"success": True, "deleted": deleted})
     except Exception as exc:
         logger.error("Ошибка удаления заданий: %s", exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@assignments_bp.route("/teacher/move", methods=["POST"])
-@jwt_required()
-def api_teacher_move_assignment():
-    current_email = get_jwt_identity()
-    user = get_user_by_email(current_email)
-    if not user:
-        return jsonify({"success": False, "error": "User not found"}), 404
-
-    data = request.get_json(silent=True) or {}
-    assignment_id = data.get("assignment_id") or data.get("id")
-    new_group_id = data.get("new_group_id") or data.get("group_id")
-    try:
-        assignment_id_int = int(assignment_id)
-        new_group_id_int = int(new_group_id)
-    except Exception:
-        return jsonify({"success": False, "error": "assignment_id and new_group_id must be int"}), 400
-
-    try:
-        result = move_assignment_to_group(assignment_id_int, new_group_id_int, user["id"])
-        return jsonify({"success": True, **result})
-    except PermissionError:
-        return jsonify({"success": False, "error": "Forbidden"}), 403
-    except ValueError as exc:
-        return jsonify({"success": False, "error": str(exc)}), 400
-    except Exception as exc:
-        logger.error("Ошибка переноса задания %s в группу %s: %s", assignment_id_int, new_group_id_int, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

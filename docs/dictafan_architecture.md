@@ -422,6 +422,8 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 
 Принцип: в проекте уже есть сильная часть «диктант → прохождения → звёзды/полузвёзды/история». Нужен слой **планирования и контроля выполнения** поверх текущих сущностей.
 
+TODO: переписать систему «учитель – ученик» в этом документе под текущую реализацию проекта (мы уже заметно отклонились от плана ниже).
+
 ## Роли и терминология
 
 - **User**: существующая учетная запись (email/имя и т.п.).
@@ -442,7 +444,6 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 - `title`
 - `description` (опционально)
 - `created_at`, `updated_at`
-- `archived_at` (мягкое скрытие, чтобы не ломать историю заданий/выполнений)
 
 ### 2) `group_teachers` (Учитель ↔ Группа)
 
@@ -503,7 +504,6 @@ Many-to-many: ученик может быть в нескольких груп�
   - `by_attempts_per_day` (например: 1 раз в день до даты)
   - `by_stars_total` / `by_score_threshold` (если захотим)
 - `rule_payload` (json, пример ниже)
-- `status` (`active`, `paused`, `archived`)
 - `created_at`, `updated_at`
 
 Примеры `rule_payload`:
@@ -517,11 +517,10 @@ Many-to-many: ученик может быть в нескольких груп�
 
 - `assignment_id`
 - `student_user_id`
-- `status` (`not_started`, `in_progress`, `completed`, `overdue`, `excused`)
+- `status` (`not_started`, `in_progress`, `completed`, `excused`)
 - `attempts_done`
 - `last_attempt_at`
 - `completed_at`
-- `overdue_at` (когда стало просрочено)
 - `meta` (json: например, best score, звёзды, и т.п.)
 
 Источник истины для «факта попытки» остаётся существующая история прохождений; `assignment_progress` — производная витрина.
@@ -714,7 +713,7 @@ Many-to-many: ученик может быть в нескольких груп�
 
 - учитель привязывает свой Telegram через deep link `/start <token>`
 - в системе хранится `teacher_user_id -> telegram_chat_id`
-- при событии (completion/overdue) сервер шлёт сообщение в Telegram
+- при событии (completion) сервер шлёт сообщение в Telegram
 
 Плюсы:
 
@@ -730,7 +729,6 @@ Many-to-many: ученик может быть в нескольких груп�
 События для уведомлений:
 
 - `assignment_completed`
-- `assignment_overdue`
 - (опционально) `daily_digest` (сводка за день)
 
 ## Отчёты (Teacher)

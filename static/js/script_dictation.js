@@ -116,6 +116,22 @@ function applyAudioSettingsFromUserData(userData) {
     }
 }
 
+function renderAssignmentSourceGroupIfAny() {
+    try {
+        const el = document.getElementById('assignment-source-group');
+        if (!el) return;
+        const title = (window.assignmentSourceGroupTitle != null) ? String(window.assignmentSourceGroupTitle) : '';
+        if (title) {
+            el.textContent = `Группа: ${title}`;
+            el.style.display = 'inline-flex';
+        } else {
+            el.textContent = '';
+            el.style.display = 'none';
+        }
+    } catch (e) {
+    }
+}
+
 function normalizeDictationMediaUrl(rawUrl) {
     try {
         const am = window.AudioManager;
@@ -957,6 +973,7 @@ async function enqueueOfflineSuccess(payload) {
             attempts_total: (Number(existing.payload.attempts_total) || 0) + (Number(payload.attempts_total) || 0),
             error_count: (Number(existing.payload.error_count) || 0) + (Number(payload.error_count) || 0),
             time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
+            source_group_id: (existing.payload.source_group_id != null) ? existing.payload.source_group_id : payload.source_group_id,
             sentences_data: mergeSentencesData(existing.payload.sentences_data, payload.sentences_data),
             settings_json: payload.settings_json || existing.payload.settings_json,
             error_words: mergeErrorWords(existing.payload.error_words, payload.error_words),
@@ -1367,6 +1384,8 @@ function applyAssignmentSentenceSubsetIfNeeded() {
     try {
         window.assignmentId = ctx.assignment_id;
         window.assignmentRequiredCompletions = Number(ctx.required_completions || 0) || 0;
+        window.assignmentSourceGroupId = (ctx.source_group_id !== undefined && ctx.source_group_id !== null) ? Number(ctx.source_group_id) : null;
+        window.assignmentSourceGroupTitle = (ctx.source_group_title !== undefined && ctx.source_group_title !== null) ? String(ctx.source_group_title) : null;
     } catch (e) {
     }
 
@@ -7141,6 +7160,7 @@ async function initializeDictation() {
         if (applied) {
             clearAssignmentLaunchContext();
         }
+        renderAssignmentSourceGroupIfAny();
     } catch (e) {
     }
 
@@ -9323,6 +9343,7 @@ async function registerCompletedDictation() {
                     attempts_total: totalAttempts,
                     error_count: totalErrors,
                     time_ms: totalTimeMs,
+                    source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                     completed_at_ms: completedAtMs,
                     completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
@@ -9378,6 +9399,7 @@ async function registerCompletedDictation() {
                     attempts_total: totalAttempts,
                     error_count: totalErrors,
                     time_ms: totalTimeMs,
+                    source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                     completed_at_ms: completedAtMs,
                     completed_at_tz_offset_min: completedAtTzOffsetMin,
                     sentences_data: sentences_data,
@@ -9401,6 +9423,7 @@ async function registerCompletedDictation() {
                 attempts_total: totalAttempts,
                 error_count: totalErrors,
                 time_ms: totalTimeMs,
+                source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                 completed_at_ms: completedAtMs,
                 completed_at_tz_offset_min: completedAtTzOffsetMin,
                 sentences_data: sentences_data,

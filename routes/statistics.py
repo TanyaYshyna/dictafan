@@ -299,6 +299,7 @@ def save_success():
         attempts_total = data.get('attempts_total', 0)
         error_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
+        source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
@@ -318,7 +319,22 @@ def save_success():
         print(f'✅ [SAVE_SUCCESS] Найден user_id: {user_id} для email: {current_email}')
         
         # Сохраняем успех в БД (каждое завершение - отдельная запись)
-        success = add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total, error_count)
+        try:
+            source_group_id = int(source_group_id) if source_group_id is not None else None
+        except Exception:
+            source_group_id = None
+
+        success = add_success(
+            user_id,
+            dictation_id,
+            perfect_count,
+            corrected_count,
+            audio_count,
+            time_ms,
+            attempts_total,
+            error_count,
+            source_group_id=source_group_id,
+        )
 
         # Telegram уведомление учителю (MVP): только если есть активное задание и включены уведомления
         try:

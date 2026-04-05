@@ -880,7 +880,7 @@ function _studentPlanRender(panel, dateIso, items) {
             </div>
             <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
               <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
-              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
+              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
             </div>
           </div>
         </div>
@@ -904,6 +904,8 @@ function _studentPlanRender(panel, dateIso, items) {
       const dictationId = btn.getAttribute('data-dictation-id');
       const lang = btn.getAttribute('data-dictation-lang');
       const assignmentId = btn.getAttribute('data-assignment-id');
+      const sourceGroupId = btn.getAttribute('data-source-group-id');
+      const sourceGroupTitle = btn.getAttribute('data-source-group-title');
       const selectedPositionsStr = btn.getAttribute('data-selected-positions');
       const requiredCompletions = btn.getAttribute('data-required-completions');
       if (dictationId) {
@@ -915,6 +917,8 @@ function _studentPlanRender(panel, dateIso, items) {
         _setAssignmentLaunchContext({
           assignment_id: Number(assignmentId),
           dictation_id: Number(dictationId),
+          source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
+          source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
           selected_sentence_positions: positions.length ? positions : null,
           required_completions: Number(requiredCompletions || 0) || 0,
         });
@@ -1129,38 +1133,6 @@ function ensureTeacherAssignmentsPanel() {
   return panel;
 }
 
-async function _teacherAssignmentMoveToGroupPrompt(assignmentId, currentGroupId) {
-  try {
-    const groups = await loadMyGroupsForAssignmentModal();
-    const available = Array.isArray(groups) ? groups.filter(g => g && String(g.id) !== String(currentGroupId)) : [];
-    if (!available.length) {
-      try { showToast('Нет другой группы для переноса', { durationMs: 2500 }); } catch (e2) { }
-      return;
-    }
-
-    const label = available
-      .map(g => `${g.id}: ${g.title || `Группа ${g.id}`}`)
-      .join('\n');
-    const raw = window.prompt(`Перенести задание в группу (введи id):\n${label}`, String(available[0].id));
-    if (raw == null) return;
-    const newGroupId = Number(String(raw).trim());
-    if (!Number.isFinite(newGroupId) || newGroupId <= 0) {
-      try { showToast('Некорректный id группы', { durationMs: 2500 }); } catch (e2) { }
-      return;
-    }
-
-    await apiRequest('/api/assignments/teacher/move', {
-      method: 'POST',
-      body: JSON.stringify({ assignment_id: Number(assignmentId), new_group_id: newGroupId }),
-    });
-
-    try { showToast('Задание перенесено', { durationMs: 2000 }); } catch (e2) { }
-    await _teacherAssignmentsReload();
-  } catch (e) {
-    try { showToast('Не удалось перенести', { durationMs: 2500 }); } catch (e2) { }
-  }
-}
-
 function _teacherAssignmentsRender(items) {
   const list = document.getElementById('teacher-assignments-list');
   if (!list) return;
@@ -1321,48 +1293,31 @@ function _teacherAssignmentsRender(items) {
   }
 }
 
-async function _teacherAssignmentsReload() {
+async function _teacherAssignmentsReload(opts = {}) {
   const groupSelect = document.getElementById('teacher-assignments-group');
-  const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
   const list = document.getElementById('teacher-assignments-list');
-  if (!groupId) {
+  const groupIdRaw = groupSelect ? String(groupSelect.value || '').trim() : '';
+  if (!groupIdRaw) {
     if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
     return;
   }
+
   if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
   try {
-    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(groupId)}`, { method: 'GET' });
+    const groupIdInt = Number(groupIdRaw);
+    if (!Number.isFinite(groupIdInt) || groupIdInt <= 0) {
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Некорректная группа</div>';
+      return;
+    }
+    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(String(groupIdInt))}`, { method: 'GET' });
     if (!res || !res.success) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
       return;
     }
     const items = Array.isArray(res.assignments) ? res.assignments : [];
-    try {
-      const cachedIds = await _getCachedDictationIdSetIdb();
-      for (const it of items) {
-        try {
-          const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
-          const cleaned = did.replace(/^dict_/, '').trim();
-          if (cleaned) it.__cached = cachedIds.has(cleaned);
-        } catch (e) {
-        }
-      }
-    } catch (e) {
-    }
-    for (const a of items) {
-      try {
-        const sid = a && a.id ? String(a.id) : '';
-        if (!sid) continue;
-        const prog = await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(sid)}/students`, { method: 'GET' });
-        if (prog && prog.success && prog.summary && typeof prog.summary.percent_completed === 'number') {
-          a.class_percent_completed = prog.summary.percent_completed;
-        }
-      } catch (e) {
-      }
-    }
     _teacherAssignmentsRender(items);
   } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
   }
 }
 
