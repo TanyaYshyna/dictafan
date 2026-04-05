@@ -852,6 +852,7 @@ function _studentPlanRender(panel, dateIso, items) {
         ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
         : '';
       const range = dateIso ? String(dateIso) : '—';
+      const groupId = a && a.group_id ? Number(a.group_id) : null;
       const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
       const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
       const assignmentId = a && a.id ? Number(a.id) : null;
@@ -1147,6 +1148,13 @@ function _teacherAssignmentsRender(items) {
     const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
     const level = a && a.dictation_level ? String(a.dictation_level) : '—';
     const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
+    const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
+      ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+      : null;
+    const subsetCount = (selectedPositions && selectedPositions.length) ? selectedPositions.length : null;
+    const sentenceCountLabel = (subsetCount != null && subsetCount >= 0)
+      ? `${subsetCount}/${(sentencesCount || 0)}`
+      : String(sentencesCount || 0);
     const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
     const days = Array.isArray(a && a.days ? a.days : null) ? a.days : [];
     const dayDates = days
@@ -1191,7 +1199,7 @@ function _teacherAssignmentsRender(items) {
             <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
             <div style="min-width:0;">
               <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentencesCount || 0))} предлож.</div>
+              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentenceCountLabel))} предлож.</div>
               <div style="margin-top:8px;">${cacheBadge}</div>
             </div>
           </div>
