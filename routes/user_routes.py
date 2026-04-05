@@ -7,7 +7,7 @@ import json
 import shutil
 from datetime import datetime
 import uuid
-from flask import Blueprint, jsonify, render_template, request, redirect, make_response
+from flask import Blueprint, jsonify, render_template, request, redirect, make_response, send_file
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
@@ -783,6 +783,10 @@ def api_get_avatar():
             data_base = os.path.join(current_app.root_path, 'static', 'data')
 
         user_folder = os.path.join(data_base, 'users', f'user_{user_id}')
+        try:
+            os.makedirs(user_folder, exist_ok=True)
+        except Exception:
+            pass
         avatar_filename = 'avatar.webp' if size == 'large' else 'avatar_min.webp'
         avatar_path = os.path.join(user_folder, avatar_filename)
         
@@ -790,8 +794,11 @@ def api_get_avatar():
         from helpers.b2_storage import b2_storage
         if b2_storage.enabled:
             remote_path = f"avatars/user_{user_id}/{avatar_filename}"
-            if b2_storage.file_exists(remote_path):
-                b2_storage.download_file(remote_path, avatar_path)
+            try:
+                if b2_storage.file_exists(remote_path):
+                    b2_storage.download_file(remote_path, avatar_path)
+            except Exception as e:
+                print(f"Error getting avatar from B2: {e}")
         
         # Проверяем локальный кэш или дефолтный аватар
         if not os.path.exists(avatar_path):
@@ -820,8 +827,17 @@ def api_get_avatar():
         return send_file(avatar_path, mimetype=mimetype)
         
     except Exception as e:
-        print(f"Error getting avatar: {e}")
-        return jsonify({'error': str(e)}), 500
+        # Для UI аватар НЕ должен ломать страницу: возвращаем дефолтный аватар.
+        try:
+            from flask import current_app
+            fallback_size = request.args.get('size', 'large')
+            default_path = os.path.join(current_app.root_path, 'static', 'icons', f'default-avatar-{fallback_size}.svg')
+            if not os.path.exists(default_path):
+                default_path = os.path.join(current_app.root_path, 'static', 'icons', 'logo.svg')
+            return send_file(default_path, mimetype='image/svg+xml')
+        except Exception as e2:
+            print(f"Error getting avatar (fatal): {e} / {e2}")
+            return jsonify({'error': 'Avatar not available'}), 404
 
 # ==================== ИСТОРИЯ АКТИВНОСТИ ПОЛЬЗОВАТЕЛЯ ====================
 

@@ -829,69 +829,90 @@ function _studentPlanRender(panel, dateIso, items) {
     return;
   }
 
-  const byGroup = new Map();
+  // Group by dictation first, then show per-group rows inside dictation card.
+  const byDictation = new Map();
   for (const a of rows) {
-    const g = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : 'Группа');
-    if (!byGroup.has(g)) byGroup.set(g, []);
-    byGroup.get(g).push(a);
+    const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
+    const key = dictationId != null ? String(dictationId) : `no_dict_${Math.random()}`;
+    if (!byDictation.has(key)) byDictation.set(key, []);
+    byDictation.get(key).push(a);
   }
 
   const blocks = [];
-  for (const [groupTitle, groupItems] of byGroup.entries()) {
-    const cards = groupItems.map(a => {
-      const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
-      const level = a && a.dictation_level ? String(a.dictation_level) : '—';
-      const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
+  for (const [dictKey, dictItems] of byDictation.entries()) {
+    const first = dictItems[0] || {};
+    const dictationTitle = String(first && first.dictation_title ? first.dictation_title : `Диктант ${first.dictation_id}`);
+    const level = first && first.dictation_level ? String(first.dictation_level) : '—';
+    const coverUrl = String(first && first.dictation_cover_url ? first.dictation_cover_url : '');
+    const isCached = !!(first && first.__cached);
+    const cacheBadge = isCached
+      ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
+      : '';
+    const range = dateIso ? String(dateIso) : '—';
+
+    const coverStyle = coverUrl
+      ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
+      : '';
+    const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
+    const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
+
+    const rowsHtml = dictItems.map(a => {
+      const groupTitle = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : 'Группа');
+      const groupId = a && a.group_id ? Number(a.group_id) : null;
+      const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
+      const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
+      const assignmentId = a && a.id ? Number(a.id) : null;
+
       const req = Number(a && a.required_completions ? a.required_completions : 1);
       const done = Number(a && typeof a.done !== 'undefined' ? a.done : 0);
       const overdue = !!(a && a.overdue);
       const badgeBg = overdue ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.06)';
       const badgeColor = overdue ? '#b91c1c' : '#111827';
-      const isCached = !!(a && a.__cached);
-      const cacheBadge = isCached
-        ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
-        : '';
-      const range = dateIso ? String(dateIso) : '—';
-      const groupId = a && a.group_id ? Number(a.group_id) : null;
-      const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
-      const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
-      const assignmentId = a && a.id ? Number(a.id) : null;
+
       const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
         ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
         : null;
       const selectedPositionsAttr = Array.isArray(selectedPositions) ? selectedPositions.join(',') : '';
 
-      const coverStyle = coverUrl
-        ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
-        : '';
-
-      const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
-      const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
-
       return `
-        <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
-          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-            <div style="min-width:0; display:flex; gap:10px;">
-              <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
-              <div style="min-width:0;">
-                <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-                <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
-                <div style="margin-top:8px;">${cacheBadge}</div>
-              </div>
-            </div>
-            <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
-              <div style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:700; font-size:12px;">${done}/${req}</div>
-              <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Открыть</button>
-            </div>
-          </div>
-        </div>
+        <tr>
+          <td style="padding:8px 10px; font-weight:700; font-size:12px; color: rgba(0,0,0,0.78); white-space:nowrap;">${escapeHtml(String(groupTitle))}</td>
+          <td style="padding:8px 10px;">
+            <div style="display:inline-flex; padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${done}/${req}</div>
+          </td>
+          <td style="padding:8px 10px; text-align:right;">
+            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 12px;">Запустить</button>
+          </td>
+        </tr>
       `;
     }).join('');
 
     blocks.push(`
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800; font-size:13px; color: rgba(0,0,0,0.75);">${escapeHtml(String(groupTitle))}</div>
-        ${cards}
+      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+          <div style="min-width:0; display:flex; gap:10px;">
+            <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
+            <div style="min-width:0;">
+              <div style="font-weight:800; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
+              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
+              <div style="margin-top:8px;">${cacheBadge}</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:10px;">
+          <table style="width:100%; border-collapse:separate; border-spacing:0;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">Группа</th>
+                <th style="text-align:left; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">Выполнено/план</th>
+                <th style="text-align:right; padding:8px 10px; font-size:11px; color: rgba(0,0,0,0.45); font-weight:800;">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
       </div>
     `);
   }
