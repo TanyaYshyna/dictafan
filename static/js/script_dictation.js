@@ -3421,9 +3421,14 @@ function resetDictationProgress() {
         s.number_of_audio = 0;
         s.attempts_total = 0;
         s.error_count = 0;
+        s.all_audio_completed = false;
         // ИСПРАВЛЕНО: Убраны поля circle_number_of_* - они больше не используются
-        // Сбрасываем состояние выбора - все становятся checked (кроме completed, но их не будет после сброса)
-        s.selection_state = 'checked';
+
+        // Сбрасываем состояние выбора предложения
+        // Возвращаем completed предложения в checked для повторного прохождения
+        if (s.selection_state === 'completed') {
+            s.selection_state = 'checked';
+        }
     });
 
     number_of_perfect = 0;
@@ -9098,6 +9103,14 @@ function check(original, userInput, currentKey) {
 }
 
 function checkText() {
+    try {
+        // Если предложение уже выполнено на ⭐ — не даём повторным Enter'ом накручивать ½⭐.
+        if (currentSentence && Number(currentSentence.number_of_perfect) > 0) {
+            return;
+        }
+    } catch (e) {
+    }
+
     const userInput = inputField.innerText;
     const original = currentSentence.text;
     let userNorm = '';
@@ -9183,6 +9196,26 @@ function checkText() {
         correctAnswerDiv.dataset.showTextHint = 'false';
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
         updateTableRowStatus(currentSentence);
+
+        // После ⭐: если аудио по этому предложению уже не требуется/выполнено — сразу переходим дальше.
+        // Иначе переводим фокус на запись (как и было задумано).
+        try {
+            setTimeout(() => {
+                try {
+                    const remainingAudio = (typeof getRemainingAudio === 'function') ? getRemainingAudio(currentSentence) : 0;
+                    if (Number(REQUIRED_PASSED_COUNT || 0) === 0 || Number(remainingAudio || 0) === 0) {
+                        nextSentence();
+                        return;
+                    }
+                    const recordButton = document.getElementById('recordButton');
+                    if (recordButton && !recordButton.disabled) {
+                        recordButton.focus();
+                    }
+                } catch (e) {
+                }
+            }, 0);
+        } catch (e) {
+        }
     } else {
         // translationDiv.style.display = "none";
         // Сбрасываем флаг "показывать текст" при неправильном ответе
