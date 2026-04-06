@@ -3,6 +3,46 @@
 let originalAudioVisual = null;
 let translationPlayButton = null;
 
+function updateTopbarMedalBadge(count) {
+    try {
+        const wrap = document.getElementById('dictation-topbar-medal');
+        const label = document.getElementById('dictation-topbar-medal-count');
+        if (!wrap || !label) return;
+        const n = Number(count);
+        if (!Number.isFinite(n) || n <= 0) {
+            wrap.style.display = 'none';
+            label.textContent = '0';
+            return;
+        }
+        label.textContent = String(n);
+        wrap.style.display = 'inline-flex';
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: wrap });
+            }
+        } catch (e) {
+        }
+    } catch (e) {
+    }
+}
+
+async function refreshTopbarMedalBadgeFromIdb() {
+    try {
+        const dictationIdForDb = (() => {
+            const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
+            const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
+            return Number.isFinite(parsed) ? parsed : null;
+        })();
+        if (!dictationIdForDb) return;
+        if (typeof idbGet !== 'function') return;
+        const cached = await idbGet('desk_items', 'completion_counts');
+        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
+        const n = Number(counts[String(dictationIdForDb)] ?? counts[`dict_${String(dictationIdForDb)}`] ?? 0) || 0;
+        updateTopbarMedalBadge(n);
+    } catch (e) {
+    }
+}
+
 function applyAudioSettingsFromUserData(userData) {
     try {
         if (!userData) return false;
@@ -3473,6 +3513,33 @@ function resetDictationProgress() {
     renderSelectionTable();
     updateStats();
     updateErrorCountLabel(0);
+
+    // После сброса важно пересинхронизировать аудио-панель.
+    // Иначе при повторном старте сессии UI аудио может остаться скрытым/в неконсистентном состоянии.
+    try {
+        if (typeof stopAllAudios === 'function') {
+            stopAllAudios();
+        }
+    } catch (e) {
+    }
+    try {
+        if (typeof updateAudioPanelVisibility === 'function') {
+            updateAudioPanelVisibility();
+        }
+        if (typeof refreshAudioUIForCurrentSentence === 'function') {
+            refreshAudioUIForCurrentSentence();
+        }
+        if (typeof renderUserAudioTablo === 'function') {
+            renderUserAudioTablo();
+        }
+        if (typeof setRecordStateIcon === 'function') {
+            setRecordStateIcon('square');
+        }
+        if (typeof updateRecordingIndicator === 'function') {
+            updateRecordingIndicator(false);
+        }
+    } catch (e) {
+    }
     showSaveToast('Прогресс по предложениям очищен.');
 }
 
@@ -7579,6 +7646,13 @@ async function onloadInitializeDictation() {
     updateRecordingIndicator(false);  // ← инициализируем индикатор записи (серый)
     refreshAudioUIForCurrentSentence();
 
+    // Медалька с числом выполнений (как на карточках) — берём из IDB кеша.
+    // Кеш пополняется при успешном прохождении (registerCompletedDictation).
+    try {
+        await refreshTopbarMedalBadgeFromIdb();
+    } catch (e) {
+    }
+
     // Инициализация AudioPlayerVisual для оригинала
     const originalAudioContainer = document.getElementById('originalAudioPlayer');
     if (originalAudioContainer && typeof AudioPlayerVisual !== 'undefined') {
@@ -9382,6 +9456,10 @@ async function registerCompletedDictation() {
                 console.log('[Register] ✅ Успех сохранен в history_successes:', result.success_data);
                 dictationCompletionSaved = true;
                 await bumpCompletionCountsCache(dictationIdForDb);
+                try {
+                    await refreshTopbarMedalBadgeFromIdb();
+                } catch (e) {
+                }
                 stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
             } else {
@@ -9410,6 +9488,10 @@ async function registerCompletedDictation() {
                 // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
                 dictationCompletionSaved = true;
                 await bumpCompletionCountsCache(dictationIdForDb);
+                try {
+                    await refreshTopbarMedalBadgeFromIdb();
+                } catch (e) {
+                }
                 stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
             }

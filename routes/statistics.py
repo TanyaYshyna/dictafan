@@ -552,7 +552,7 @@ def save_success():
 
                     text = (
                         f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
-                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)})\n"
+                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)}) 🥇\n"
                         f"Дата: {date_line}\n"
                         f"Длительность: {_fmt_duration(time_ms)}\n\n"
                         f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
