@@ -638,6 +638,37 @@ function showSaveToast(message, type = 'info', duration = 2500) {
     }, duration + 250);
 }
 
+function showUserInputNotice(message, type = 'info', duration = 4500) {
+    try {
+        const notice = document.getElementById('userInputNotice');
+        if (!notice) {
+            if (typeof showSaveToast === 'function') {
+                showSaveToast(message, type, duration);
+            }
+            return;
+        }
+
+        notice.textContent = message;
+        notice.classList.remove('error', 'info', 'success');
+        if (type) notice.classList.add(type);
+        notice.style.display = '';
+
+        if (notice._hideTimer) {
+            clearTimeout(notice._hideTimer);
+        }
+        notice._hideTimer = window.setTimeout(() => {
+            try {
+                notice.style.display = 'none';
+                notice.textContent = '';
+                notice.classList.remove('error', 'info', 'success');
+            } catch (e) {
+            }
+            delete notice._hideTimer;
+        }, duration);
+    } catch (e) {
+    }
+}
+
 
 // Эти элементы будут переопределены после рендера панели прогресса
 let btnModalTimer = document.getElementById('btn-modal-timer');
@@ -8059,7 +8090,7 @@ function showInputScriptNoticeOnce() {
         if (typeof showSaveToast === 'function') {
             const script = getDictationScript();
             const hint = script === 'cyrillic' ? 'RU/UK' : (script === 'arabic' ? 'AR' : 'EN');
-            showSaveToast(`Для этого диктанта включи раскладку ${hint}`, 'error', 2000);
+            showUserInputNotice(`Для этого диктанта включи раскладку ${hint}`, 'error', 6000);
         }
     } catch {
     }
@@ -9156,11 +9187,17 @@ function checkText() {
         origNorm = String(original || '').trim();
     }
     if (userNorm.length === 0) {
-        console.log('хоть какой-то текст введи!!!');
+        try {
+            showUserInputNotice('Ты ещё ни одной буквы не набрал — что ты хочешь проверять?', 'error', 6000);
+        } catch (e) {
+        }
         return;
     }    
     if (userNorm.length <= Math.floor(origNorm.length / 2)) {
-        console.log('Хоть половину текста введи!!!');
+        try {
+            showUserInputNotice('Введи хотя бы половину предложения, а потом проверяй.', 'error', 6000);
+        } catch (e) {
+        }
         return;
     }
     const translation = currentSentence.translation;
