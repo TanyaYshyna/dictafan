@@ -870,9 +870,24 @@ body.playing-audio::after {
   margin-bottom: 30px;
 }
 
+.completion-medal-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
 .completion-icon {
   width: 80px;
   height: 80px;
+  color: var(--color-button-mint);
+  animation: scaleIn 0.5s ease-out;
+}
+
+.completion-medal-count {
+  font-size: 80px;
+  font-weight: 800;
+  line-height: 1;
   color: var(--color-button-mint);
   animation: scaleIn 0.5s ease-out;
 }

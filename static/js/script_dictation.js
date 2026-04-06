@@ -43,6 +43,31 @@ async function refreshTopbarMedalBadgeFromIdb() {
     }
 }
 
+async function refreshCompletionModalMedalCountFromIdb() {
+    try {
+        const el = document.getElementById('completionMedalCount');
+        if (!el) return;
+        const dictationIdForDb = (() => {
+            const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
+            const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
+            return Number.isFinite(parsed) ? parsed : null;
+        })();
+        if (!dictationIdForDb) return;
+        if (typeof idbGet !== 'function') return;
+        const cached = await idbGet('desk_items', 'completion_counts');
+        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
+        const n = Number(counts[String(dictationIdForDb)] ?? counts[`dict_${String(dictationIdForDb)}`] ?? 0) || 0;
+        if (n > 0) {
+            el.textContent = String(n);
+            el.style.display = '';
+        } else {
+            el.textContent = '0';
+            el.style.display = 'none';
+        }
+    } catch (e) {
+    }
+}
+
 function applyAudioSettingsFromUserData(userData) {
     try {
         if (!userData) return false;
@@ -2495,6 +2520,11 @@ function showCompletionModal() {
 
     // Показываем модальное окно
     completionModal.style.display = 'flex';
+
+    try {
+        refreshCompletionModalMedalCountFromIdb();
+    } catch (e) {
+    }
 
     // Инициализируем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
