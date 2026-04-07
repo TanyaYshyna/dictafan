@@ -304,6 +304,7 @@ def save_success():
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
+        completion_count_after = data.get('completion_count_after')
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -358,6 +359,16 @@ def save_success():
                     dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
                     dictation_level = info.get('dictation_level') or '—'
 
+                    try:
+                        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
+                    except Exception:
+                        completion_count_value = None
+                    if completion_count_value is None:
+                        try:
+                            completion_count_value = int(get_success_count(user_id, dictation_int) or 0)
+                        except Exception:
+                            completion_count_value = None
+
                     error_words_lines = []
                     try:
                         ew = error_words if isinstance(error_words, dict) else {}
@@ -383,6 +394,8 @@ def save_success():
                         f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
                         f"Дата: {success_date_iso}"
                     )
+                    if completion_count_value is not None:
+                        text = text + f"\n🥇 Медали: {completion_count_value}"
                     if error_words_lines:
                         text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
                     for cid in teacher_chat_ids:
@@ -530,6 +543,35 @@ def save_success():
                         f"{int(attempts_total or 0)}-{int(error_count or 0)}"
                     )
 
+                    try:
+                        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
+                    except Exception:
+                        completion_count_value = None
+                    if completion_count_value is None:
+                        try:
+                            completion_count_value = int(get_success_count(user_id, dictation_int) or 0)
+                        except Exception:
+                            completion_count_value = None
+
+                    audio_scheme_line = ''
+                    try:
+                        sj = data.get('settings_json')
+                        if isinstance(sj, str) and sj.strip():
+                            sj_obj = json.loads(sj)
+                        elif isinstance(sj, dict):
+                            sj_obj = sj
+                        else:
+                            sj_obj = None
+                        if isinstance(sj_obj, dict):
+                            audio_cfg = sj_obj.get('audio') if isinstance(sj_obj.get('audio'), dict) else {}
+                            start = str(audio_cfg.get('start') or '').strip()
+                            typo = str(audio_cfg.get('typo') or '').strip()
+                            success_scheme = str(audio_cfg.get('success') or '').strip()
+                            if start or typo or success_scheme:
+                                audio_scheme_line = f"Схема аудио: {start} - {typo} - {success_scheme}\n"
+                    except Exception:
+                        audio_scheme_line = ''
+
                     error_words_lines = []
                     try:
                         ew = error_words if isinstance(error_words, dict) else {}
@@ -554,7 +596,10 @@ def save_success():
                         f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
                         f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)}) 🥇\n"
                         f"Дата: {date_line}\n"
-                        f"Длительность: {_fmt_duration(time_ms)}\n\n"
+                        f"Длительность: {_fmt_duration(time_ms)}\n"
+                        + (f"🥇 Медали: {completion_count_value}\n" if completion_count_value is not None else "")
+                        + (audio_scheme_line or "")
+                        + "\n"
                         f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
                         f"Итоги: {totals_compact}"
                     )

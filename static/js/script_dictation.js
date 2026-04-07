@@ -3,6 +3,92 @@
 let originalAudioVisual = null;
 let translationPlayButton = null;
 
+let completionCountsCacheLoaded = false;
+let completionCountsCacheCounts = {};
+
+function getCurrentDictationIdForDb() {
+    try {
+        const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
+        const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
+        return Number.isFinite(parsed) ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function loadCompletionCountsCacheFromIdb() {
+    try {
+        if (completionCountsCacheLoaded) return;
+        completionCountsCacheLoaded = true;
+        completionCountsCacheCounts = {};
+        if (typeof idbGet !== 'function') return;
+        const cached = await idbGet('desk_items', 'completion_counts');
+        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
+        completionCountsCacheCounts = counts;
+    } catch (e) {
+    }
+}
+
+function getCompletionCountFromCache(dictationIdForDb) {
+    try {
+        if (!dictationIdForDb) return 0;
+        const counts = completionCountsCacheCounts && typeof completionCountsCacheCounts === 'object'
+            ? completionCountsCacheCounts
+            : {};
+        const key = String(dictationIdForDb);
+        const dictKey = `dict_${key}`;
+        return Number(counts[key] ?? counts[dictKey] ?? 0) || 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+function updateCompletionModalMedalCount(count) {
+    try {
+        const el = document.getElementById('completionMedalCount');
+        if (!el) return;
+        const n = Number(count);
+        if (!Number.isFinite(n) || n <= 0) {
+            el.textContent = '0';
+            el.style.display = 'none';
+            return;
+        }
+        el.textContent = String(n);
+        el.style.display = '';
+    } catch (e) {
+    }
+}
+
+function refreshMedalBadgesFromCache() {
+    try {
+        const id = getCurrentDictationIdForDb();
+        const n = getCompletionCountFromCache(id);
+        updateTopbarMedalBadge(n);
+        updateCompletionModalMedalCount(n);
+    } catch (e) {
+    }
+}
+
+async function bumpCompletionCountsCache(dictationIdForDb) {
+    try {
+        if (!dictationIdForDb) return 0;
+        await loadCompletionCountsCacheFromIdb();
+        const key = String(dictationIdForDb);
+        const dictKey = `dict_${key}`;
+        const current = Number(completionCountsCacheCounts[key] ?? completionCountsCacheCounts[dictKey] ?? 0) || 0;
+        const next = current + 1;
+        completionCountsCacheCounts[key] = next;
+        completionCountsCacheCounts[dictKey] = next;
+        if (typeof idbPut === 'function') {
+            await idbPut('desk_items', { key: 'completion_counts', updatedAt: Date.now(), counts: completionCountsCacheCounts });
+        }
+        refreshMedalBadgesFromCache();
+        return next;
+    } catch (e) {
+        return 0;
+    }
+}
+
 function updateTopbarMedalBadge(count) {
     try {
         const wrap = document.getElementById('dictation-topbar-medal');
@@ -28,42 +114,16 @@ function updateTopbarMedalBadge(count) {
 
 async function refreshTopbarMedalBadgeFromIdb() {
     try {
-        const dictationIdForDb = (() => {
-            const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
-            const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
-            return Number.isFinite(parsed) ? parsed : null;
-        })();
-        if (!dictationIdForDb) return;
-        if (typeof idbGet !== 'function') return;
-        const cached = await idbGet('desk_items', 'completion_counts');
-        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
-        const n = Number(counts[String(dictationIdForDb)] ?? counts[`dict_${String(dictationIdForDb)}`] ?? 0) || 0;
-        updateTopbarMedalBadge(n);
+        await loadCompletionCountsCacheFromIdb();
+        refreshMedalBadgesFromCache();
     } catch (e) {
     }
 }
 
 async function refreshCompletionModalMedalCountFromIdb() {
     try {
-        const el = document.getElementById('completionMedalCount');
-        if (!el) return;
-        const dictationIdForDb = (() => {
-            const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
-            const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
-            return Number.isFinite(parsed) ? parsed : null;
-        })();
-        if (!dictationIdForDb) return;
-        if (typeof idbGet !== 'function') return;
-        const cached = await idbGet('desk_items', 'completion_counts');
-        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
-        const n = Number(counts[String(dictationIdForDb)] ?? counts[`dict_${String(dictationIdForDb)}`] ?? 0) || 0;
-        if (n > 0) {
-            el.textContent = String(n);
-            el.style.display = '';
-        } else {
-            el.textContent = '0';
-            el.style.display = 'none';
-        }
+        await loadCompletionCountsCacheFromIdb();
+        refreshMedalBadgesFromCache();
     } catch (e) {
     }
 }
@@ -4815,7 +4875,19 @@ function checkIfAllCompleted() {
     // Если диктант полностью завершен, показываем модальное окно завершения
     if (allCompleted) {
         // Регистрируем завершенный диктант и удаляем черновик
-        registerCompletedDictation();
+        (async () => {
+            try {
+                await registerCompletedDictation();
+            } catch (e) {
+            }
+
+            // Показываем модальное окно завершения после попытки регистрации,
+            // чтобы число медалек было синхронизировано с шапкой.
+            try {
+                showCompletionModal();
+            } catch (e) {
+            }
+        })();
 
         // Сохраняем завершение сессии
         const panel = getProgressPanelInstance();
@@ -4835,8 +4907,6 @@ function checkIfAllCompleted() {
             panel._playVictorySound();
         }
 
-        // Показываем модальное окно завершения
-        showCompletionModal();
         return;
     }
 
@@ -9503,6 +9573,16 @@ async function registerCompletedDictation() {
             const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.error_count) || 0), 0);
             const completedAtMs = Date.now();
             const completedAtTzOffsetMin = -new Date().getTimezoneOffset();
+
+            let completionCountAfter = null;
+            try {
+                await loadCompletionCountsCacheFromIdb();
+                const currentCount = getCompletionCountFromCache(dictationIdForDb);
+                completionCountAfter = (Number(currentCount) || 0) + 1;
+            } catch (e) {
+                completionCountAfter = null;
+            }
+
             const successResponse = await fetch('/api/statistics/success', {
                 method: 'POST',
                 headers: {
@@ -9520,36 +9600,12 @@ async function registerCompletedDictation() {
                     source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                     completed_at_ms: completedAtMs,
                     completed_at_tz_offset_min: completedAtTzOffsetMin,
+                    completion_count_after: completionCountAfter,
                     sentences_data: sentences_data,
                     error_words: dictationErrorWordCounts,
                     settings_json: settings_json
                 })
             });
-
-            const bumpCompletionCountsCache = async (id) => {
-                try {
-                    if (!id) return;
-                    const store = 'desk_items';
-                    const key = 'completion_counts';
-                    const existing = await (typeof idbGet === 'function' ? idbGet(store, key) : null);
-                    const payload = (existing && typeof existing === 'object') ? existing : { key, updatedAt: 0, counts: {} };
-                    const counts = (payload.counts && typeof payload.counts === 'object') ? payload.counts : {};
-
-                    const numeric = String(id);
-                    const dictKey = `dict_${numeric}`;
-                    const current = Number(counts[numeric] ?? counts[dictKey] ?? 0) || 0;
-                    const next = current + 1;
-                    counts[numeric] = next;
-                    counts[dictKey] = next;
-
-                    payload.counts = counts;
-                    payload.updatedAt = Date.now();
-                    if (typeof idbPut === 'function') {
-                        await idbPut(store, payload);
-                    }
-                } catch (e) {
-                }
-            };
 
             if (successResponse.ok) {
                 const result = await successResponse.json();
@@ -9616,28 +9672,9 @@ async function registerCompletedDictation() {
             // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
             dictationCompletionSaved = true;
             try {
-                const dictationIdForDb2 = (() => {
-                    const raw = String(currentDictation.id ?? '').trim();
-                    const parsed = parseInt(raw.replace(/^dict_/, ''), 10);
-                    return Number.isFinite(parsed) ? parsed : null;
-                })();
-                const store = 'desk_items';
-                const key = 'completion_counts';
-                const existing = await (typeof idbGet === 'function' ? idbGet(store, key) : null);
-                const payload = (existing && typeof existing === 'object') ? existing : { key, updatedAt: 0, counts: {} };
-                const counts = (payload.counts && typeof payload.counts === 'object') ? payload.counts : {};
+                const dictationIdForDb2 = getCurrentDictationIdForDb();
                 if (dictationIdForDb2) {
-                    const numeric = String(dictationIdForDb2);
-                    const dictKey = `dict_${numeric}`;
-                    const current = Number(counts[numeric] ?? counts[dictKey] ?? 0) || 0;
-                    const next = current + 1;
-                    counts[numeric] = next;
-                    counts[dictKey] = next;
-                    payload.counts = counts;
-                    payload.updatedAt = Date.now();
-                    if (typeof idbPut === 'function') {
-                        await idbPut(store, payload);
-                    }
+                    await bumpCompletionCountsCache(dictationIdForDb2);
                 }
             } catch (e2) {
             }
