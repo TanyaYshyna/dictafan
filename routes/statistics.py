@@ -12,11 +12,246 @@ from helpers.db_users import get_user_by_email, update_user
 from helpers.db_history import (
     add_activity, add_success, get_success_count, get_success_counts_for_dictations,
 )
-from helpers.db_telegram import list_teacher_chat_ids_for_student_success, get_student_and_dictation_info
+from helpers.db_telegram import (
+    filter_manual_teacher_chat_ids,
+    list_teacher_chat_ids_for_student_success,
+    list_teacher_recipients_for_student_manual_report,
+    get_student_and_dictation_info,
+)
 from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_dictations import get_sentence_by_key
 
+try:
+    from helpers.db_dictations import get_dictation_by_id
+except Exception:
+    get_dictation_by_id = None
+
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
+
+
+def _today_iso_local() -> str:
+    try:
+        return datetime.now().date().isoformat()
+    except Exception:
+        return datetime.utcnow().date().isoformat()
+
+
+def _safe_html(v: str) -> str:
+    v = str(v or '')
+    return (
+        v.replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+    )
+
+
+def _fmt_duration(ms: int) -> str:
+    try:
+        ms = int(ms or 0)
+    except Exception:
+        ms = 0
+    sec = max(0, ms // 1000)
+    m = sec // 60
+    s = sec % 60
+    if m <= 0:
+        return f"{s}с"
+    return f"{m}м {s:02d}с"
+
+
+def _build_teacher_report_text(*, student_username: str, dictation_title: str, dictation_level: str, date_iso: str,
+                              completion_count_value, error_words) -> str:
+    error_words_lines = []
+    try:
+        ew = error_words if isinstance(error_words, dict) else {}
+        items = []
+        for k, v in ew.items():
+            try:
+                w = str(k or '').strip()
+                c = int(v or 0)
+            except Exception:
+                continue
+            if not w or c <= 0:
+                continue
+            items.append((w, c))
+        items.sort(key=lambda x: (-x[1], x[0]))
+        items = items[:15]
+        for w, c in items:
+            error_words_lines.append(f"{_safe_html(w)} - {c}")
+    except Exception:
+        error_words_lines = []
+
+    text = (
+        f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант\n"
+        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)})\n"
+        f"Дата: {date_iso}"
+    )
+    if completion_count_value is not None:
+        text = text + f"\n🥇 Медали: {completion_count_value}"
+    if error_words_lines:
+        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
+    return text
+
+
+@statistics_bp.route('/teacher_report/recipients', methods=['POST'])
+@jwt_required()
+def teacher_report_recipients():
+    """Return eligible teacher recipients for manual report and whether auto-report would fire today."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': True, 'auto_would_send': False, 'teachers': []})
+
+    data = request.get_json(silent=True) or {}
+    dictation_id_raw = data.get('dictation_id')
+    try:
+        dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
+    except Exception:
+        return jsonify({'success': False, 'error': 'Некорректный dictation_id'}), 400
+
+    dictation_lang = None
+    try:
+        if callable(get_dictation_by_id):
+            info = get_dictation_by_id(dictation_int) or {}
+            dictation_lang = (info.get('language_code') or '').strip().lower()
+    except Exception:
+        dictation_lang = None
+
+    if not dictation_lang:
+        return jsonify({'success': True, 'auto_would_send': False, 'teachers': []})
+
+    today_iso = _today_iso_local()
+    auto_chat_ids = []
+    try:
+        auto_chat_ids = list_teacher_chat_ids_for_student_success(
+            student_user_id=int(user.get('id')),
+            dictation_id=int(dictation_int),
+            success_date_iso=today_iso,
+        )
+    except Exception:
+        auto_chat_ids = []
+
+    teachers = []
+    try:
+        rec = list_teacher_recipients_for_student_manual_report(
+            int(user.get('id')),
+            dictation_language_code=dictation_lang,
+        )
+        for r in rec:
+            try:
+                teachers.append(
+                    {
+                        'teacher_user_id': int(r.get('teacher_user_id')),
+                        'teacher_username': r.get('teacher_username') or '',
+                    }
+                )
+            except Exception:
+                continue
+    except Exception:
+        teachers = []
+
+    return jsonify({'success': True, 'auto_would_send': bool(auto_chat_ids), 'teachers': teachers})
+
+
+@statistics_bp.route('/teacher_report/send', methods=['POST'])
+@jwt_required()
+def teacher_report_send():
+    """Send a manual teacher report in Telegram when completion is outside today's plan."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': False, 'error': 'Telegram disabled'}), 400
+
+    data = request.get_json(silent=True) or {}
+    dictation_id_raw = data.get('dictation_id')
+    teacher_user_ids = data.get('teacher_user_ids') or []
+
+    try:
+        dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
+    except Exception:
+        return jsonify({'success': False, 'error': 'Некорректный dictation_id'}), 400
+
+    dictation_lang = None
+    try:
+        if callable(get_dictation_by_id):
+            info = get_dictation_by_id(dictation_int) or {}
+            dictation_lang = (info.get('language_code') or '').strip().lower()
+    except Exception:
+        dictation_lang = None
+
+    if not dictation_lang:
+        return jsonify({'success': False, 'error': 'Не удалось определить язык диктанта'}), 400
+
+    today_iso = _today_iso_local()
+    try:
+        auto_chat_ids = list_teacher_chat_ids_for_student_success(
+            student_user_id=int(user.get('id')),
+            dictation_id=int(dictation_int),
+            success_date_iso=today_iso,
+        )
+    except Exception:
+        auto_chat_ids = []
+
+    if auto_chat_ids:
+        return jsonify({'success': False, 'error': 'auto_report_available'}), 409
+
+    chat_ids = []
+    try:
+        chat_ids = filter_manual_teacher_chat_ids(
+            int(user.get('id')),
+            teacher_user_ids,
+            dictation_language_code=dictation_lang,
+        )
+    except Exception:
+        chat_ids = []
+
+    if not chat_ids:
+        return jsonify({'success': False, 'error': 'no_recipients'}), 400
+
+    try:
+        completion_count_after = data.get('completion_count_after')
+        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
+    except Exception:
+        completion_count_value = None
+    if completion_count_value is None:
+        try:
+            completion_count_value = int(get_success_count(int(user.get('id')), int(dictation_int)) or 0)
+        except Exception:
+            completion_count_value = None
+
+    try:
+        info = get_student_and_dictation_info(int(user.get('id')), int(dictation_int))
+        student_username = info.get('student_username') or 'Ученик'
+        dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
+        dictation_level = info.get('dictation_level') or '—'
+    except Exception:
+        student_username = user.get('username') or 'Ученик'
+        dictation_title = f'Диктант {dictation_int}'
+        dictation_level = '—'
+
+    text = _build_teacher_report_text(
+        student_username=student_username,
+        dictation_title=dictation_title,
+        dictation_level=dictation_level,
+        date_iso=today_iso,
+        completion_count_value=completion_count_value,
+        error_words=data.get('error_words'),
+    )
+
+    sent = 0
+    for cid in chat_ids:
+        try:
+            send_telegram_message(int(cid), text)
+            sent += 1
+        except Exception:
+            continue
+
+    return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids)})
 
 
 @statistics_bp.route('/history', methods=['GET'])
@@ -594,10 +829,11 @@ def save_success():
 
                     text = (
                         f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
-                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)}) 🥇\n"
+                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)}) 🥇"
+                        + (f"{completion_count_value}" if completion_count_value is not None else "")
+                        + "\n"
                         f"Дата: {date_line}\n"
                         f"Длительность: {_fmt_duration(time_ms)}\n"
-                        + (f"🥇 Медали: {completion_count_value}\n" if completion_count_value is not None else "")
                         + (audio_scheme_line or "")
                         + "\n"
                         f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"

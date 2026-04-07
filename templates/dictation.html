@@ -246,6 +246,10 @@
             </div>
             <p class="completion-message">Вы успешно завершили диктант!</p>
             <div class="completion-buttons">
+                <button id="completionSendTeacherReportBtn" class="completion-transparent-btn" title="Отправить отчет учителю" style="display:none;">
+                    <i data-lucide="send"></i>
+                    Отправить отчет учителю
+                </button>
                 <button id="completionResultsBtn" class="completion-transparent-btn" title="Посмотреть результаты">
                     <i data-lucide="list-check"></i>
                     Посмотреть результаты
@@ -254,6 +258,25 @@
                     <i data-lucide="log-out"></i>
                     Выйти
                 </button>
+            </div>
+
+            <div id="completionTeacherReportPanel" style="display:none; margin-top: 10px; width: 100%;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap: 12px; margin-bottom: 8px;">
+                    <div style="display:flex; align-items:center; gap: 8px;">
+                        <i data-lucide="graduation-cap"></i>
+                        <span style="font-weight: 600;">Кому отправить</span>
+                    </div>
+                    <button id="completionTeacherReportClosePanelBtn" class="start-modal-close-btn" title="Закрыть" style="height: 32px; width: 32px; padding: 0;">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div id="completionTeacherReportList" style="display:flex; flex-direction: column; gap: 8px; margin-bottom: 10px;"></div>
+                <div style="display:flex; gap: 10px; justify-content: flex-end;">
+                    <button id="completionTeacherReportSendBtn" class="button-color-green" title="Отправить">
+                        <i data-lucide="send"></i>
+                        Отправить
+                    </button>
+                </div>
             </div>
         </div>
     </div>

@@ -178,3 +178,126 @@ def get_student_and_dictation_info(student_user_id: int, dictation_id: int) -> d
     finally:
         cur.close()
         conn.close()
+
+
+def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, dictation_language_code: str) -> list[dict]:
+    """List eligible teachers for a student's manual report (outside today's plan).
+
+    Rules:
+    - student is active in group_students
+    - COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE (student agrees)
+    - teacher is in group_teachers, teacher has telegram_chat_id and telegram_enabled
+    - teacher language filter: teacher.current_learning == dictation_language_code OR teacher learning_languages contains it
+    """
+    lang = (dictation_language_code or '').strip().lower()
+    if not lang:
+        return []
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT DISTINCT
+                u.id AS teacher_user_id,
+                u.username AS teacher_username,
+                u.telegram_chat_id
+            FROM group_students gs
+            JOIN group_teachers gt ON gt.group_id = gs.group_id
+            JOIN users u ON u.id = gt.teacher_user_id
+            LEFT JOIN user_learning_languages ull ON ull.user_id = u.id
+            WHERE gs.student_user_id = %s
+              AND gs.status = 'active'
+              AND gs.removed_at IS NULL
+              AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+              AND u.telegram_chat_id IS NOT NULL
+              AND u.telegram_enabled = TRUE
+              AND (
+                LOWER(COALESCE(u.current_learning, '')) = %s
+                OR LOWER(COALESCE(ull.language_code, '')) = %s
+              )
+            ORDER BY u.username ASC, u.id ASC
+            """,
+            (int(student_user_id), lang, lang),
+        )
+        rows = cur.fetchall() or []
+        result: list[dict] = []
+        for r in rows:
+            try:
+                tid = int(r.get('teacher_user_id'))
+                cid = r.get('telegram_chat_id')
+                if cid is None:
+                    continue
+                result.append(
+                    {
+                        'teacher_user_id': tid,
+                        'teacher_username': r.get('teacher_username') or '',
+                        'telegram_chat_id': int(cid),
+                    }
+                )
+            except Exception:
+                continue
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def filter_manual_teacher_chat_ids(
+    student_user_id: int,
+    teacher_user_ids: list[int],
+    *,
+    dictation_language_code: str,
+) -> list[int]:
+    """Filter requested teacher_user_ids to allowed telegram_chat_ids for manual report."""
+    if not isinstance(teacher_user_ids, list) or not teacher_user_ids:
+        return []
+
+    lang = (dictation_language_code or '').strip().lower()
+    if not lang:
+        return []
+
+    ids: list[int] = []
+    for x in teacher_user_ids:
+        try:
+            ids.append(int(x))
+        except Exception:
+            continue
+    if not ids:
+        return []
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT DISTINCT u.telegram_chat_id
+            FROM group_students gs
+            JOIN group_teachers gt ON gt.group_id = gs.group_id
+            JOIN users u ON u.id = gt.teacher_user_id
+            LEFT JOIN user_learning_languages ull ON ull.user_id = u.id
+            WHERE gs.student_user_id = %s
+              AND gs.status = 'active'
+              AND gs.removed_at IS NULL
+              AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+              AND gt.teacher_user_id = ANY(%s)
+              AND u.telegram_chat_id IS NOT NULL
+              AND u.telegram_enabled = TRUE
+              AND (
+                LOWER(COALESCE(u.current_learning, '')) = %s
+                OR LOWER(COALESCE(ull.language_code, '')) = %s
+              )
+            """,
+            (int(student_user_id), ids, lang, lang),
+        )
+        rows = cur.fetchall() or []
+        chat_ids: list[int] = []
+        for r in rows:
+            try:
+                cid = r.get('telegram_chat_id') if isinstance(r, dict) else None
+                if cid is not None:
+                    chat_ids.append(int(cid))
+            except Exception:
+                continue
+        return chat_ids
+    finally:
+        cur.close()
+        conn.close()

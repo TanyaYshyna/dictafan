@@ -422,7 +422,156 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 
 Принцип: в проекте уже есть сильная часть «диктант → прохождения → звёзды/полузвёзды/история». Нужен слой **планирования и контроля выполнения** поверх текущих сущностей.
 
-TODO: переписать систему «учитель – ученик» в этом документе под текущую реализацию проекта (мы уже заметно отклонились от плана ниже).
+## Актуальная реализация (как работает сейчас)
+
+Ниже — описание **текущей работающей схемы** в коде (backend + frontend), без "как планировалось".
+
+### Сущности (БД)
+
+- `groups` — группы (включая персональные группы, если включено `is_personal`).
+- `group_teachers` — привязка учителей к группам.
+- `group_students` — привязка учеников к группам.
+  - важный флаг: `notify_teacher_on_success` (если включён, учителю приходят Telegram-уведомления при успешном завершении)
+- `group_invites` — инвайты:
+  - `mode='link'` — инвайт-ссылка (`/join-group/<token>`)
+  - `mode='email'` — инвайт по email (ученик видит приглашение после логина)
+- `assignments` — назначение диктанта группе.
+  - поле `selected_sentence_positions` (если задано) ограничивает, какие предложения считаются в задании
+- `assignments_by_date` — план по дням (на каждый день: `required_completions`)
+- `history_successes` — факты "полного завершения диктанта" (медали). Это источник факта выполнения.
+
+### Backend API (группы)
+
+Файл: `routes/groups.py`.
+
+- `GET /groups/api/my`
+  - список групп, где пользователь — учитель
+- `GET /groups/api/memberships`
+  - список групп, где пользователь — ученик
+- `POST /groups/api/group`
+  - создание группы (учитель)
+- `GET /groups/api/group/<group_id>` / `PUT /groups/api/group/<group_id>`
+  - детали/обновление группы (учитель)
+
+Инвайты:
+
+- `POST /groups/api/group/<group_id>/invite`
+  - создать/обновить инвайт-ссылку
+- `GET /groups/api/group/<group_id>/invite/latest`
+  - получить последний активный инвайт (чтобы показывать ссылку в UI)
+- `GET /groups/api/join/<token>/preview`
+  - preview (ученик видит что за группа)
+- `POST /groups/api/join/<token>`
+  - вступление по ссылке
+
+Email-инвайты:
+
+- `POST /groups/api/group/<group_id>/invite/email` `{ email }`
+  - учитель создаёт email-инвайт
+- `GET /groups/api/my-invites`
+  - ученик получает список pending инвайтов
+- `POST /groups/api/invite/<invite_id>/accept`
+- `POST /groups/api/invite/<invite_id>/decline`
+
+Управление учениками группы:
+
+- `GET /groups/api/group/<group_id>/students`
+- `POST /groups/api/group/<group_id>/students/<student_user_id>/remove`
+- `POST /groups/api/group/<group_id>/students/<student_user_id>/notify_teacher_on_success`
+- `POST /groups/api/memberships/<group_id>/notify_teacher_on_success`
+
+### Backend API (задания)
+
+Файл: `routes/assignments.py`.
+
+Учитель:
+
+- `GET /api/assignments/teacher/group/<group_id>`
+  - список назначений для группы
+- `POST /api/assignments/teacher/create`
+  - создание задания в режиме "days" (план по датам), + опционально `selected_sentence_positions`
+- `POST /api/assignments/teacher/delete` `{ ids: [...] }`
+- `GET /api/assignments/teacher/assignment/<assignment_id>`
+- `PUT /api/assignments/teacher/assignment/<assignment_id>`
+- `GET /api/assignments/teacher/assignment/<assignment_id>/students`
+  - прогресс по ученикам для задания
+
+Ученик:
+
+- `GET /api/assignments/student/my?date=YYYY-MM-DD`
+  - задания на дату (используется модалкой "План")
+
+### Как ученик видит "План" (frontend)
+
+Файл: `static/js/private_library.js`.
+
+- UI показывает задания на выбранную дату.
+- Данные берутся из `GET /api/assignments/student/my?date=...`.
+- В ответе приходит список заданий, включающий:
+  - `dictation_id`, `dictation_title`, `dictation_level`, `dictation_cover_url`
+  - `required_completions` на дату
+  - `done` / `done_unique` (сколько завершений на дату/в окне задания)
+
+### Как попытка засчитывается в задание
+
+Источник факта выполнения: `history_successes` (медаль).
+
+- При полном завершении диктанта frontend вызывает `POST /api/statistics/success`.
+- Backend сохраняет запись в `history_successes`.
+- Прогресс заданий считается через запросы в `helpers/db_assignments.py` (на основе дат/диктанта/групп и фактов success).
+
+Инвариант (MVP): в задание засчитываются только **полные завершения**, т.е. ровно те случаи, когда выдаётся медаль.
+
+### Telegram уведомления и отчёты
+
+Файл: `routes/statistics.py`, помощник: `helpers/db_telegram.py`.
+
+Событие: успешное завершение диктанта (`/api/statistics/success`).
+
+1) Уведомление учителю (если включено):
+
+- выбираются учителя через `list_teacher_chat_ids_for_student_success(...)`:
+  - ученик состоит в группе, статус `active`
+  - `group_students.notify_teacher_on_success = TRUE`
+  - у группы есть активный teacher
+  - у учителя есть `telegram_chat_id` и `telegram_enabled = TRUE`
+  - существует активное assignment для этого `dictation_id` и дня
+
+Ручная отправка отчёта учителю (когда прохождение было вне плана):
+
+- на фронте есть кнопка в модалке успеха «Отправить отчет учителю»
+- кнопка показывается **только если** на текущую дату авто-отчёт учителю **не будет отправлен** (нет активного assignment на сегодня), но есть подходящие учителя
+- backend:
+  - `POST /api/statistics/teacher_report/recipients` — вернуть `auto_would_send` и список учителей, которым *в принципе* можно отправить ручной отчёт
+  - `POST /api/statistics/teacher_report/send` — отправить Telegram-отчёт выбранным учителям (с повторной проверкой условий)
+
+Фильтры/проверки для ручного отчёта:
+
+- ученик должен состоять в группе (`group_students.status='active'`, `removed_at IS NULL`)
+- требуется согласие ученика на уведомления: `COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE`
+- у учителя должен быть Telegram: `telegram_chat_id IS NOT NULL` и `telegram_enabled = TRUE`
+- учитель фильтруется по языку диктанта (язык оригинала):
+  - `users.current_learning == dictation.language_code` или
+  - `user_learning_languages.language_code == dictation.language_code`
+
+2) Self-report ученику (если включено):
+
+- если у пользователя есть `telegram_chat_id` и включены флаги `telegram_enabled` и `telegram_self_reports_enabled`.
+
+В тексте self-report дополнительно выводится:
+
+- количество медалей по диктанту (🥇N)
+- схема аудио из `settings_json` (например `Схема аудио: oto - o - ot`)
+
+### Инварианты / важные ограничения (реализация)
+
+- факт выполнения = запись в `history_successes` (медаль). Именно это учитывается как «completion»
+- Telegram-уведомление учителю по умолчанию привязано к наличию задания на текущую дату (без задания — авто-уведомления нет)
+- ручной отчёт допускается только если на текущую дату авто-уведомления не будет (backend возвращает `409 auto_report_available`, если всё же есть assignment)
+- язык для фильтра учителей берётся из `dictations.language_code` (язык оригинала)
+- согласие ученика на уведомления хранится в `group_students.notify_teacher_on_success` и применяется и к авто-, и к ручным отчётам
+
+## Запланированная модель (исторический план, требует актуализации)
 
 ## Роли и терминология
 
