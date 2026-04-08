@@ -92,6 +92,160 @@ def _build_teacher_report_text(*, student_username: str, dictation_title: str, d
     return text
 
 
+def _fmt_user_local_dt(ts_ms, tz_offset_min) -> str:
+    try:
+        ts_ms = int(ts_ms or 0)
+    except Exception:
+        ts_ms = 0
+    try:
+        tz_offset_min = int(tz_offset_min or 0)
+    except Exception:
+        tz_offset_min = 0
+
+    if ts_ms <= 0:
+        return ''
+
+    try:
+        dt_utc = datetime.utcfromtimestamp(ts_ms / 1000.0)
+        dt_local = dt_utc + timedelta(minutes=tz_offset_min)
+        return dt_local.strftime('%Y-%m-%d %H:%M')
+    except Exception:
+        return ''
+
+
+def _build_teacher_report_text_full(*, student_username: str, dictation_title: str, dictation_level: str,
+                                   completed_at_ms, completed_at_tz_offset_min, time_ms,
+                                   completion_count_value, perfect_count, corrected_count, audio_count,
+                                   attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
+                                   settings_json, error_words) -> str:
+    # Date line
+    success_date_iso = datetime.now().date().isoformat()
+    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
+    date_line = when_local or success_date_iso
+
+    # Totals
+    def _int_or_0(x):
+        try:
+            return int(x or 0)
+        except Exception:
+            return 0
+
+    totals_compact = f"{_int_or_0(perfect_count)}-{_int_or_0(corrected_count)}-{_int_or_0(audio_count)}-{_int_or_0(attempts_total)}-{_int_or_0(error_count)}"
+
+    # Audio scheme
+    audio_scheme_line = ''
+    try:
+        sj = settings_json
+        if isinstance(sj, str) and sj.strip():
+            sj_obj = json.loads(sj)
+        elif isinstance(sj, dict):
+            sj_obj = sj
+        else:
+            sj_obj = None
+        if isinstance(sj_obj, dict):
+            audio_cfg = sj_obj.get('audio') if isinstance(sj_obj.get('audio'), dict) else {}
+            start = str(audio_cfg.get('start') or '').strip()
+            typo = str(audio_cfg.get('typo') or '').strip()
+            success_scheme = str(audio_cfg.get('success') or '').strip()
+            if start or typo or success_scheme:
+                audio_scheme_line = f"Схема аудио: {start} - {typo} - {success_scheme}\n"
+    except Exception:
+        audio_scheme_line = ''
+
+    # Per-sentence lines
+    lines = []
+    rows = []
+    if isinstance(sentences_data, list):
+        for r in sentences_data:
+            if not isinstance(r, dict):
+                continue
+            skey = r.get('sentence_key')
+            if not skey:
+                continue
+            try:
+                sentence = get_sentence_by_key(dictation_int, dictation_lang, str(skey))
+            except Exception:
+                sentence = None
+            text_sentence = ''
+            position = None
+            if isinstance(sentence, dict):
+                text_sentence = sentence.get('text') or ''
+                position = sentence.get('position')
+
+            rows.append(
+                {
+                    'sentence_key': str(skey),
+                    'position': position,
+                    'perfect_count': _int_or_0(r.get('perfect_count')),
+                    'corrected_count': _int_or_0(r.get('corrected_count')),
+                    'audio_count': _int_or_0(r.get('audio_count')),
+                    'attempts_total': _int_or_0(r.get('attempts_total')),
+                    'error_count': _int_or_0(r.get('error_count')),
+                    'text': text_sentence,
+                }
+            )
+
+    try:
+        def _row_sort_key(x: dict):
+            p = x.get('position')
+            try:
+                if p is not None:
+                    return (0, int(p))
+            except Exception:
+                pass
+            return (1, str(x.get('sentence_key') or ''))
+
+        rows.sort(key=_row_sort_key)
+    except Exception:
+        pass
+
+    rows = rows[:35]
+    for i, rr in enumerate(rows, start=1):
+        stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
+        compact = f"{stars}-{rr.get('attempts_total')}-{rr.get('error_count')}"
+        sent_text = _safe_html(rr.get('text'))
+        if sent_text and len(sent_text) > 120:
+            sent_text = sent_text[:117] + '...'
+        lines.append(f"{i}) {compact}   {sent_text}")
+
+    # Error words (reuse short builder logic)
+    short_part = _build_teacher_report_text(
+        student_username=student_username,
+        dictation_title=dictation_title,
+        dictation_level=dictation_level,
+        date_iso=success_date_iso,
+        completion_count_value=completion_count_value,
+        error_words=error_words,
+    )
+
+    header = (
+        f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант\n"
+        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)})\n"
+        f"Дата: {date_line}\n"
+        f"Длительность: {_fmt_duration(time_ms)}\n"
+        + (audio_scheme_line or '')
+        + "\n"
+        f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
+        f"Итоги: {totals_compact}"
+    )
+
+    # Extract error-words block from short_part (everything after first double newline)
+    extra = ''
+    try:
+        if '\n\n' in short_part:
+            extra = short_part.split('\n\n', 1)[1]
+            extra = '\n\n' + extra
+    except Exception:
+        extra = ''
+
+    body_lines = "\n" + "\n".join(lines) if lines else ''
+    medals_line = ''
+    if completion_count_value is not None:
+        medals_line = f"\n🥇 Медали: {completion_count_value}"
+
+    return header + medals_line + (extra or '') + ("\n\n" + body_lines if body_lines else '')
+
+
 @statistics_bp.route('/teacher_report/recipients', methods=['POST'])
 @jwt_required()
 def teacher_report_recipients():
@@ -234,14 +388,38 @@ def teacher_report_send():
         dictation_title = f'Диктант {dictation_int}'
         dictation_level = '—'
 
-    text = _build_teacher_report_text(
-        student_username=student_username,
-        dictation_title=dictation_title,
-        dictation_level=dictation_level,
-        date_iso=today_iso,
-        completion_count_value=completion_count_value,
-        error_words=data.get('error_words'),
-    )
+    # Prefer full report when enough data is provided
+    want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
+    if want_full:
+        text = _build_teacher_report_text_full(
+            student_username=student_username,
+            dictation_title=dictation_title,
+            dictation_level=dictation_level,
+            completed_at_ms=data.get('completed_at_ms'),
+            completed_at_tz_offset_min=data.get('completed_at_tz_offset_min'),
+            time_ms=data.get('time_ms') or 0,
+            completion_count_value=completion_count_value,
+            perfect_count=data.get('perfect_count') or 0,
+            corrected_count=data.get('corrected_count') or 0,
+            audio_count=data.get('audio_count') or 0,
+            attempts_total=data.get('attempts_total') or 0,
+            error_count=data.get('error_count') or 0,
+            sentences_data=data.get('sentences_data') or [],
+            dictation_int=int(dictation_int),
+            dictation_lang=str(dictation_lang),
+            settings_json=data.get('settings_json'),
+            error_words=data.get('error_words'),
+        )
+    else:
+        today_iso = _today_iso_local()
+        text = _build_teacher_report_text(
+            student_username=student_username,
+            dictation_title=dictation_title,
+            dictation_level=dictation_level,
+            date_iso=today_iso,
+            completion_count_value=completion_count_value,
+            error_words=data.get('error_words'),
+        )
 
     sent = 0
     for cid in chat_ids:
@@ -387,8 +565,6 @@ def teacher_report_send_auto():
         except Exception:
             completion_count_value = None
 
-    today_iso = _today_iso_local()
-
     try:
         info = get_student_and_dictation_info(int(user.get('id')), int(dictation_int))
         student_username = info.get('student_username') or 'Ученик'
@@ -399,14 +575,37 @@ def teacher_report_send_auto():
         dictation_title = f'Диктант {dictation_int}'
         dictation_level = '—'
 
-    text = _build_teacher_report_text(
-        student_username=student_username,
-        dictation_title=dictation_title,
-        dictation_level=dictation_level,
-        date_iso=today_iso,
-        completion_count_value=completion_count_value,
-        error_words=data.get('error_words'),
-    )
+    want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
+    if want_full:
+        text = _build_teacher_report_text_full(
+            student_username=student_username,
+            dictation_title=dictation_title,
+            dictation_level=dictation_level,
+            completed_at_ms=data.get('completed_at_ms'),
+            completed_at_tz_offset_min=data.get('completed_at_tz_offset_min'),
+            time_ms=data.get('time_ms') or 0,
+            completion_count_value=completion_count_value,
+            perfect_count=data.get('perfect_count') or 0,
+            corrected_count=data.get('corrected_count') or 0,
+            audio_count=data.get('audio_count') or 0,
+            attempts_total=data.get('attempts_total') or 0,
+            error_count=data.get('error_count') or 0,
+            sentences_data=data.get('sentences_data') or [],
+            dictation_int=int(dictation_int),
+            dictation_lang=str(dictation_lang),
+            settings_json=data.get('settings_json'),
+            error_words=data.get('error_words'),
+        )
+    else:
+        today_iso = _today_iso_local()
+        text = _build_teacher_report_text(
+            student_username=student_username,
+            dictation_title=dictation_title,
+            dictation_level=dictation_level,
+            date_iso=today_iso,
+            completion_count_value=completion_count_value,
+            error_words=data.get('error_words'),
+        )
 
     sent = 0
     for cid in chat_ids:
@@ -744,9 +943,9 @@ def save_success():
             source_group_id=source_group_id,
         )
 
-        # Telegram уведомление учителю (MVP): только если есть активное задание и включены уведомления
+        # Telegram уведомления отправляются отдельной процедурой /teacher_report/send_auto
         try:
-            if is_telegram_enabled():
+            if False and is_telegram_enabled():
                 dictation_int = None
                 if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
                     dictation_int = int(dictation_id.replace('dict_', ''))
@@ -813,9 +1012,9 @@ def save_success():
         except Exception:
             pass
 
-        # Telegram self-report студенту (если включено): при любом success
+        # Telegram self-report студенту отправляется отдельной процедурой /teacher_report/send_auto
         try:
-            if is_telegram_enabled():
+            if False and is_telegram_enabled():
                 if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')) and bool(user.get('telegram_self_reports_enabled')):
                     dictation_int = None
                     if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):

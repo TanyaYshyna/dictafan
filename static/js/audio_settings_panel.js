@@ -37,10 +37,7 @@ class AudioSettingsPanel {
         // Описание значений букв (только для пользователя, без p и p_a)
         this.explanations = {
             'o': 'аудио оригинала',
-            't': 'аудио перевода',
-            'a': 'аудио созданное автоматически',
-            'f': 'аудио вырезанное из файла',
-            'm': 'аудио с микрофона'
+            't': 'аудио перевода'
         };
 
         this.isInitialized = false;
@@ -605,57 +602,6 @@ class AudioSettingsPanel {
 
         return `
             <div class="audio-settings-top-panel">
-                <div class="play-sequence-container">
-                    <label>Проигрываем аудио:</label>
-                    <div class="play-sequence-item">
-                        <label>при старте:</label>
-                        <input type="text" 
-                               id="${prefix}playSequenceStart" 
-                               class="play-sequence-input" 
-                               maxlength="5"
-                               placeholder="oto" 
-                               pattern="[to]*"
-                               autocomplete="off"
-                               autocapitalize="off"
-                               autocorrect="off"
-                               spellcheck="false"
-                               value="${this.settings.start}"
-                               title="Используйте только буквы 't' (translation) и 'o' (original)">
-                    </div>
-                    <div class="play-sequence-item">
-                        <label>при ошибке:</label>
-                        <input type="text" 
-                               id="${prefix}playSequenceTypo" 
-                               class="play-sequence-input" 
-                               maxlength="5"
-                               placeholder="o" 
-                               pattern="[to]*"
-                               autocomplete="off"
-                               autocapitalize="off"
-                               autocorrect="off"
-                               spellcheck="false"
-                               value="${this.settings.typo}"
-                               title="Используйте только буквы 't' (translation) и 'o' (original)">
-                    </div>
-                    <div class="play-sequence-item">
-                        <label>при успехе:</label>
-                        <input type="text" 
-                               id="${prefix}playSequenceSuccess" 
-                               class="play-sequence-input"
-                               maxlength="5" 
-                               placeholder="ot" 
-                               pattern="[to]*"
-                               autocomplete="off"
-                               autocapitalize="off"
-                               autocorrect="off"
-                               spellcheck="false"
-                               value="${this.settings.success}"
-                               title="Используйте только буквы 't' (translation) и 'o' (original)">
-                    </div>
-                </div>
-                ${explanationsHTML}
-            </div>
-            <div class="audio-settings-bottom-panel">
                 <div class="play-sequence-item" id="${prefix}requiredPassedStarHalfRow" style="${this.settings.without_entering_text ? 'display: none;' : ''}">
                     <div class="required-passed-count-control">
                         <i data-lucide="star" class="required-passed-star"></i>
@@ -716,6 +662,59 @@ class AudioSettingsPanel {
                         ${isLocalMode ? `<div class="speech-recognition-model-inline" style="font-size: 12px; color: ${modelInfoColor}; white-space: nowrap;">${this._getSelectedModelDisplayName(currentLang) || modelInfoText}</div>` : ''}
                     </div>
                     ${isLocalMode && (!this._getSelectedModelDisplayName(currentLang)) ? `<div class="speech-recognition-model-info" style="margin-top: 6px; font-size: 12px; color: ${modelInfoColor};">${modelInfoText}</div>` : ''}
+                </div>
+            </div>
+            <div class="audio-settings-bottom-panel">
+                <div class="audio-settings-play-and-explanations">
+                    <div class="play-sequence-container">
+                        <label>Проигрываем аудио:</label>
+                        <div class="play-sequence-item">
+                            <label>при старте:</label>
+                            <input type="text" 
+                                   id="${prefix}playSequenceStart" 
+                                   class="play-sequence-input" 
+                                   maxlength="5"
+                                   placeholder="oto" 
+                                   pattern="[to]*"
+                                   autocomplete="off"
+                                   autocapitalize="off"
+                                   autocorrect="off"
+                                   spellcheck="false"
+                                   value="${this.settings.start}"
+                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                        </div>
+                        <div class="play-sequence-item">
+                            <label>при ошибке:</label>
+                            <input type="text" 
+                                   id="${prefix}playSequenceTypo" 
+                                   class="play-sequence-input" 
+                                   maxlength="5"
+                                   placeholder="o" 
+                                   pattern="[to]*"
+                                   autocomplete="off"
+                                   autocapitalize="off"
+                                   autocorrect="off"
+                                   spellcheck="false"
+                                   value="${this.settings.typo}"
+                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                        </div>
+                        <div class="play-sequence-item">
+                            <label>при успехе:</label>
+                            <input type="text" 
+                                   id="${prefix}playSequenceSuccess" 
+                                   class="play-sequence-input"
+                                   maxlength="5" 
+                                   placeholder="ot" 
+                                   pattern="[to]*"
+                                   autocomplete="off"
+                                   autocapitalize="off"
+                                   autocorrect="off"
+                                   spellcheck="false"
+                                   value="${this.settings.success}"
+                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                        </div>
+                    </div>
+                    ${explanationsHTML}
                 </div>
             </div>
         `;

@@ -238,7 +238,20 @@ async function fetchTeacherReportRecipientsInBackground() {
     renderTeacherReportRecipientsSettings();
 }
 
-async function autoSendTeacherReportAfterSuccess({ completionCountAfter, errorWords }) {
+async function autoSendTeacherReportAfterSuccess({
+    completionCountAfter,
+    errorWords,
+    perfectCount,
+    correctedCount,
+    audioCount,
+    attemptsTotal,
+    errorCount,
+    timeMs,
+    completedAtMs,
+    completedAtTzOffsetMin,
+    sentencesData,
+    settingsJson,
+}) {
     if (teacherReportRecipientsState.sending) return;
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
@@ -268,6 +281,16 @@ async function autoSendTeacherReportAfterSuccess({ completionCountAfter, errorWo
                 teacher_user_ids,
                 send_to_self,
                 completion_count_after: completionCountAfter != null ? completionCountAfter : null,
+                perfect_count: perfectCount != null ? perfectCount : null,
+                corrected_count: correctedCount != null ? correctedCount : null,
+                audio_count: audioCount != null ? audioCount : null,
+                attempts_total: attemptsTotal != null ? attemptsTotal : null,
+                error_count: errorCount != null ? errorCount : null,
+                time_ms: timeMs != null ? timeMs : null,
+                completed_at_ms: completedAtMs != null ? completedAtMs : null,
+                completed_at_tz_offset_min: completedAtTzOffsetMin != null ? completedAtTzOffsetMin : null,
+                sentences_data: Array.isArray(sentencesData) ? sentencesData : null,
+                settings_json: settingsJson != null ? settingsJson : null,
                 error_words: (typeof errorWords === 'object' && errorWords) ? errorWords : null,
             })
         });
@@ -9862,6 +9885,16 @@ async function registerCompletedDictation() {
                     await autoSendTeacherReportAfterSuccess({
                         completionCountAfter,
                         errorWords: dictationErrorWordCounts,
+                        perfectCount: totalPerfect,
+                        correctedCount: totalCorrected,
+                        audioCount: totalAudio,
+                        attemptsTotal: totalAttempts,
+                        errorCount: totalErrors,
+                        timeMs: totalTimeMs,
+                        completedAtMs,
+                        completedAtTzOffsetMin,
+                        sentencesData: sentences_data,
+                        settingsJson: settings_json,
                     });
                 } catch (e) {
                 }
