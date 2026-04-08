@@ -392,6 +392,14 @@ h2 {
     box-sizing: border-box;
 }
 
+#userInput.text-input {
+    min-height: 54px;
+}
+
+body.dictation-vk-enabled #userInput.text-input {
+    min-height: 96px;
+}
+
  .password-input-wrapper {
      position: relative;
      width: 100%;

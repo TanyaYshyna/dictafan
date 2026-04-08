@@ -1911,6 +1911,49 @@ let virtualKeyboardShiftPressed = false;
 let lastKeyboardHintLayout = null;
 let keyboardHintRenderScheduled = false;
 
+const VK_ENABLED_STORAGE_KEY = 'dictation_virtual_keyboard_enabled';
+
+function focusUserInputIfPossible() {
+    try {
+        const userInput = document.getElementById('userInput');
+        if (!userInput) return;
+        if (userInput.style.display === 'none') return;
+        if (userInput.contentEditable === 'false') return;
+        userInput.focus();
+    } catch (e) {
+    }
+}
+
+function getVirtualKeyboardPreference() {
+    try {
+        const raw = localStorage.getItem(VK_ENABLED_STORAGE_KEY);
+        if (raw === '1' || raw === 'true') return true;
+        if (raw === '0' || raw === 'false') return false;
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setVirtualKeyboardPreference(enabled) {
+    try {
+        localStorage.setItem(VK_ENABLED_STORAGE_KEY, enabled ? '1' : '0');
+    } catch (e) {
+    }
+}
+
+function syncVkEnabledBodyClass() {
+    try {
+        const enabled = Boolean(virtualKeyboardToggle && virtualKeyboardToggle.checked);
+        if (enabled) {
+            document.body.classList.add('dictation-vk-enabled');
+        } else {
+            document.body.classList.remove('dictation-vk-enabled');
+        }
+    } catch (e) {
+    }
+}
+
 function doesVirtualKeyboardFitViewport() {
     try {
         if (!virtualKeyboardContainer) return true;
@@ -7200,6 +7243,21 @@ async function setupVirtualKeyboard(langCode) {
                         virtualKeyboardContainer.setAttribute('hidden', 'true');
                         virtualKeyboardContainer.style.display = 'none';
                     }
+
+                    try {
+                        syncVkEnabledBodyClass();
+                    } catch (e) {
+                    }
+
+                    try {
+                        setVirtualKeyboardPreference(isChecked);
+                    } catch (e) {
+                    }
+
+                    try {
+                        focusUserInputIfPossible();
+                    } catch (e) {
+                    }
                 } catch (error) {
                     console.error('❌ Ошибка при переключении виртуальной клавиатуры:', error);
                     // Скрываем клавиатуру при ошибке
@@ -7210,9 +7268,33 @@ async function setupVirtualKeyboard(langCode) {
                         virtualKeyboardContainer.setAttribute('hidden', 'true');
                         virtualKeyboardContainer.style.display = 'none';
                     }
+
+                    try {
+                        setVirtualKeyboardPreference(false);
+                    } catch (e) {
+                    }
+
+                    try {
+                        syncVkEnabledBodyClass();
+                    } catch (e) {
+                    }
                 }
             });
             virtualKeyboardToggle.dataset.listenerAttached = 'true';
+        }
+
+        // Restore preference (if any) once per setup.
+        try {
+            const pref = getVirtualKeyboardPreference();
+            if (pref !== null && virtualKeyboardToggle && !virtualKeyboardToggle.disabled) {
+                virtualKeyboardToggle.checked = Boolean(pref);
+            }
+        } catch (e) {
+        }
+
+        try {
+            syncVkEnabledBodyClass();
+        } catch (e) {
         }
 
         if (virtualKeyboardToggle && virtualKeyboardToggle.checked) {
@@ -7250,6 +7332,8 @@ function hideVirtualKeyboardIfActive() {
             virtualKeyboardContainer.setAttribute('hidden', 'true');
             virtualKeyboardContainer.style.display = 'none';
         }
+
+        syncVkEnabledBodyClass();
     } catch (error) {
         console.error('❌ Ошибка при скрытии виртуальной клавиатуры:', error);
         // Принудительно скрываем контейнер при ошибке
@@ -7257,6 +7341,8 @@ function hideVirtualKeyboardIfActive() {
             virtualKeyboardContainer.setAttribute('hidden', 'true');
             virtualKeyboardContainer.style.display = 'none';
         }
+
+        syncVkEnabledBodyClass();
     }
 }
 
@@ -8056,6 +8142,18 @@ async function onloadInitializeDictation() {
     if (originalAudioContainer && typeof AudioPlayerVisual !== 'undefined') {
         // Create and store both locally and globally for early/late access
         originalAudioVisual = new AudioPlayerVisual(originalAudioContainer);
+
+        try {
+            if (originalAudioVisual && originalAudioVisual.playButton) {
+                originalAudioVisual.playButton.title = 'Ctrl+1';
+            }
+        } catch (e) {
+        }
+
+        // Глобальная ссылка для других модулей
+        window.originalAudioVisual = originalAudioVisual;
+
+        // Initialize with current sentence if available
         originalAudioVisual.setLanguage(currentDictation.language_original);
 
         try {
@@ -9671,6 +9769,20 @@ document.addEventListener('keydown', function (event) {
             case '0':
                 // Закончить круг раньше времени
                 checkIfAllCompleted();
+                event.preventDefault();
+                break;
+
+            case '5':
+                // Показать/скрыть виртуальную клавиатуру
+                try {
+                    const toggle = document.getElementById('virtualKeyboardToggle');
+                    if (toggle && !toggle.disabled) {
+                        toggle.checked = !toggle.checked;
+                        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+                        focusUserInputIfPossible();
+                    }
+                } catch (e) {
+                }
                 event.preventDefault();
                 break;
         }

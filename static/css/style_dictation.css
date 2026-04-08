@@ -4092,7 +4092,24 @@ body.playing-audio::after {
 }
 
 .audio-settings-modal-body {
+  padding: 0;
+}
+
+.audio-settings-modal-two-panels {
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) minmax(300px, 1fr);
+  gap: 14px;
   padding: 20px;
+}
+
+.audio-settings-modal-panel {
+  border: 1px solid var(--color-border-light);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.audio-settings-modal-panel .audio-settings-modal-body {
+  padding: 0;
 }
 
 .audio-settings-modal-body .audio-settings-top-panel {
@@ -4142,6 +4159,10 @@ body.playing-audio::after {
 
   .audio-settings-modal-body .audio-settings-bottom-panel {
     width: 100%;
+  }
+
+  .audio-settings-modal-two-panels {
+    grid-template-columns: 1fr;
   }
 }
 

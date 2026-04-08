@@ -228,18 +228,24 @@
                     <i data-lucide="x"></i>
                 </button>
             </div>
-            <div id="audioSettingsModalContainer" class="audio-settings-modal-body">
-                <!-- Сюда будет вставлена панель настроек аудио -->
-            </div>
-            <div id="teacherReportRecipientsSection" style="margin-top: 14px;">
-                <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
-                    <div style="display:flex; align-items:center; gap: 8px; font-weight: 700;">
-                        <i data-lucide="send"></i>
-                        <span>Отчет в Telegram</span>
+            <div class="audio-settings-modal-two-panels">
+                <div class="audio-settings-modal-panel audio-settings-modal-panel-left">
+                    <div id="audioSettingsModalContainer" class="audio-settings-modal-body">
+                        <!-- Сюда будет вставлена панель настроек аудио -->
                     </div>
                 </div>
-                <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">Кому отправлять отчет после завершения диктанта</div>
-                <div id="teacherReportRecipientsList" style="display:flex; flex-direction: column; gap: 8px;"></div>
+                <div class="audio-settings-modal-panel audio-settings-modal-panel-right">
+                    <div id="teacherReportRecipientsSection">
+                        <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+                            <div style="display:flex; align-items:center; gap: 8px; font-weight: 700;">
+                                <i data-lucide="send"></i>
+                                <span>Отчет в Telegram</span>
+                            </div>
+                        </div>
+                        <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">Кому отправлять отчет после завершения диктанта</div>
+                        <div id="teacherReportRecipientsList" style="display:flex; flex-direction: column; gap: 8px;"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -307,7 +313,7 @@
             <!-- Строка с панелями навигации и результатов -->
             <div class="panels-row">
                 <div class="button-group">
-                    <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()">
+                    <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()" title="Ctrl+3">
                         <i data-lucide="arrow-left"></i>
                     </button>
                     <div class="sentence-counter" id="sentenceCounter">
@@ -316,10 +322,10 @@
                             <span id="sentenceTotalNumber" class="sentence-total-number">/ 0</span>
                         </div>
                     </div>
-                    <button id="checkNext" class="button-color-transparent" onclick="nextSentence()">
+                    <button id="checkNext" class="button-color-transparent" onclick="nextSentence()" title="Ctrl+4">
                         <i data-lucide="arrow-right"></i>
                     </button>
-                    <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()">
+                    <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()" title="Ctrl+0">
                         <i data-lucide="file-text"></i>
                     </button>
                 </div>
@@ -335,7 +341,7 @@
             <!-- Кнопка перевода (простая play/pause) -->
             <div class="translation-audio-button-wrapper">
                 <span class="language">{{ language_translation }}</span>
-                <button id="translationPlayButton" class="play-btn-translation">
+                <button id="translationPlayButton" class="play-btn-translation" title="Ctrl+2">
                     <i data-lucide="play"></i>
                 </button>
             </div>
@@ -383,7 +389,7 @@
 
         <div class="virtual-keyboard-container">
             <label class="vk-toggle" for="virtualKeyboardToggle">
-                <input type="checkbox" id="virtualKeyboardToggle">
+                <input type="checkbox" id="virtualKeyboardToggle" title="Ctrl+5">
                 <span class="vk-toggle-icon" aria-hidden="true">
                     <i class="vk-toggle-icon-off" data-lucide="circle"></i>
                     <i class="vk-toggle-icon-on" data-lucide="check-circle"></i>
