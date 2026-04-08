@@ -5476,6 +5476,17 @@ async function stopRecording(cause = 'manual') {
         } catch (e) {
         }
 
+        // Online ASR: stop means "finalize". While final transcript is being produced,
+        // show a clear processing state (otherwise it looks like we returned 0%).
+        try {
+            const effectiveMode = getEffectiveSpeechRecognitionMode();
+            const userAudioAnswer = document.getElementById('userAudioAnswer');
+            if (effectiveMode === 'route' && userAudioAnswer) {
+                userAudioAnswer.innerHTML = 'Распознаю...';
+            }
+        } catch (e) {
+        }
+
         // Даем браузеру шанс отрисовать квадрат ДО тяжелых async-операций.
         try {
             await new Promise((resolve) => requestAnimationFrame(() => resolve()));

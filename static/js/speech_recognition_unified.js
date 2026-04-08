@@ -30,6 +30,11 @@
       this._lastText = '';
       this._sessionId = 0;
       this._ignoreResults = false;
+
+      this._isFinalizing = false;
+      this._finalizePromise = null;
+      this._finalizeResolve = null;
+      this._finalizeReject = null;
     }
 
     async startRecording() {
@@ -85,16 +90,36 @@
 
     async stopRecording(cause) {
       try {
-        this._ignoreResults = true;
+        const isOnline = this.state.mode === 'online';
+        const rec = this._recognition;
+        const mySessionId = this._sessionId;
 
-        if (this._recognition) {
+        // In online mode we MUST finalize on Stop (not cancel), otherwise short utterances
+        // never produce a final transcript.
+        if (isOnline && rec) {
+          this._isFinalizing = true;
+          this._finalizePromise = new Promise((resolve, reject) => {
+            this._finalizeResolve = resolve;
+            this._finalizeReject = reject;
+          });
+
           try {
-            if (typeof this._recognition.abort === 'function') {
-              this._recognition.abort();
-            } else {
-              this._recognition.stop();
-            }
+            rec.stop();
           } catch (e) {
+            // If stop fails, we still proceed to stop recorder and return what we have.
+          }
+        } else {
+          // Offline mode does not use WebSpeech results; ignore any stale events.
+          this._ignoreResults = true;
+          if (rec) {
+            try {
+              if (typeof rec.abort === 'function') {
+                rec.abort();
+              } else {
+                rec.stop();
+              }
+            } catch (e) {
+            }
           }
         }
 
@@ -119,6 +144,23 @@
           }
         }
 
+        if (isOnline && rec) {
+          // Wait briefly for final results / onend.
+          const FINALIZE_TIMEOUT_MS = 2500;
+          try {
+            await Promise.race([
+              this._finalizePromise,
+              new Promise((resolve) => setTimeout(resolve, FINALIZE_TIMEOUT_MS)),
+            ]);
+          } catch (e) {
+          }
+          // If a new session started while we were finalizing, do not leak results.
+          if (mySessionId !== this._sessionId) {
+            this._finalText = '';
+            this._lastText = '';
+          }
+        }
+
         const text = (this._finalText || this._lastText || '').trim();
         const result = {
           text,
@@ -135,6 +177,13 @@
           }
         } catch (e) {
         }
+
+        // Mark finalization complete.
+        this._isFinalizing = false;
+        this._finalizePromise = null;
+        this._finalizeResolve = null;
+        this._finalizeReject = null;
+
         this._recognition = null;
         this._finalText = '';
         this._lastText = '';
@@ -167,7 +216,9 @@
       rec.onresult = (event) => {
         if (this._ignoreResults) return;
         if (mySessionId !== this._sessionId) return;
-        if (!this.state.isRecording) return;
+
+        // Accept results both while recording and while finalizing after manual Stop.
+        if (!this.state.isRecording && !this._isFinalizing) return;
         let interim = '';
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -201,6 +252,16 @@
 
       rec.onerror = (event) => {
         this._emitError(event);
+      };
+
+      rec.onend = () => {
+        try {
+          // Resolve finalization if we were waiting for it.
+          if (this._isFinalizing && typeof this._finalizeResolve === 'function') {
+            this._finalizeResolve();
+          }
+        } catch (e) {
+        }
       };
 
       try {
