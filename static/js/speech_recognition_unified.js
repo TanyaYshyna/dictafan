@@ -123,16 +123,31 @@
           }
         }
 
-        if (this._mediaRecorder && this.state.isRecording) {
-          await new Promise((resolve) => {
-            const done = () => resolve();
-            this._mediaRecorder.addEventListener('stop', done, { once: true });
-            try {
-              this._mediaRecorder.stop();
-            } catch (e) {
-              resolve();
-            }
-          });
+        // MediaRecorder 'stop' event may occasionally never fire in some browsers / edge cases.
+        // We must never hang here, otherwise the UI stays on "Распознаю..." forever.
+        if (this._mediaRecorder) {
+          const mr = this._mediaRecorder;
+          const mrState = (mr && mr.state) ? String(mr.state) : '';
+          if (mrState === 'recording') {
+            const STOP_TIMEOUT_MS = 4000;
+            await Promise.race([
+              new Promise((resolve) => {
+                const done = () => resolve();
+                try {
+                  mr.addEventListener('stop', done, { once: true });
+                } catch (e) {
+                  resolve();
+                  return;
+                }
+                try {
+                  mr.stop();
+                } catch (e) {
+                  resolve();
+                }
+              }),
+              new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS)),
+            ]);
+          }
         }
 
         if (this._mediaStream) {
