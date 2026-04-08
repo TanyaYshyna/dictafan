@@ -254,6 +254,178 @@ def teacher_report_send():
     return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids)})
 
 
+@statistics_bp.route('/teacher_report/recipients_auto', methods=['POST'])
+@jwt_required()
+def teacher_report_recipients_auto():
+    """Return recipients for auto Telegram report after dictation completion.
+
+    Includes:
+    - self (student) if user has telegram enabled
+    - teachers that are eligible for notifications from this student (group_students.notify_teacher_on_success)
+      and match dictation language.
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': True, 'recipients': []})
+
+    data = request.get_json(silent=True) or {}
+    dictation_id_raw = data.get('dictation_id')
+    try:
+        dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
+    except Exception:
+        return jsonify({'success': False, 'error': 'Некорректный dictation_id'}), 400
+
+    dictation_lang = None
+    try:
+        if callable(get_dictation_by_id):
+            info = get_dictation_by_id(dictation_int) or {}
+            dictation_lang = (info.get('language_code') or '').strip().lower()
+    except Exception:
+        dictation_lang = None
+
+    recipients = []
+
+    # self
+    try:
+        if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')):
+            recipients.append({'type': 'self', 'label': 'Я'})
+    except Exception:
+        pass
+
+    # teachers
+    try:
+        if dictation_lang:
+            teachers = list_teacher_recipients_for_student_manual_report(
+                int(user.get('id')),
+                dictation_language_code=dictation_lang,
+            )
+            for t in teachers:
+                try:
+                    recipients.append(
+                        {
+                            'type': 'teacher',
+                            'teacher_user_id': int(t.get('teacher_user_id')),
+                            'teacher_username': t.get('teacher_username') or '',
+                            'label': (t.get('teacher_username') or '').strip() or f"Учитель #{int(t.get('teacher_user_id'))}",
+                        }
+                    )
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+    return jsonify({'success': True, 'recipients': recipients})
+
+
+@statistics_bp.route('/teacher_report/send_auto', methods=['POST'])
+@jwt_required()
+def teacher_report_send_auto():
+    """Send auto Telegram report after dictation completion to selected recipients."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': False, 'error': 'Telegram disabled'}), 400
+
+    data = request.get_json(silent=True) or {}
+    dictation_id_raw = data.get('dictation_id')
+    teacher_user_ids = data.get('teacher_user_ids') or []
+    send_to_self = bool(data.get('send_to_self'))
+
+    try:
+        dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
+    except Exception:
+        return jsonify({'success': False, 'error': 'Некорректный dictation_id'}), 400
+
+    dictation_lang = None
+    try:
+        if callable(get_dictation_by_id):
+            info = get_dictation_by_id(dictation_int) or {}
+            dictation_lang = (info.get('language_code') or '').strip().lower()
+    except Exception:
+        dictation_lang = None
+
+    if not dictation_lang:
+        return jsonify({'success': False, 'error': 'Не удалось определить язык диктанта'}), 400
+
+    # teachers: filter for this student + language + teacher telegram
+    chat_ids = []
+    try:
+        chat_ids = filter_manual_teacher_chat_ids(
+            int(user.get('id')),
+            teacher_user_ids,
+            dictation_language_code=dictation_lang,
+        )
+    except Exception:
+        chat_ids = []
+
+    # self chat
+    self_chat_id = None
+    try:
+        if send_to_self and user.get('telegram_chat_id') and bool(user.get('telegram_enabled')):
+            self_chat_id = int(user.get('telegram_chat_id'))
+    except Exception:
+        self_chat_id = None
+
+    if not chat_ids and self_chat_id is None:
+        return jsonify({'success': True, 'sent': 0, 'recipients': 0})
+
+    try:
+        completion_count_after = data.get('completion_count_after')
+        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
+    except Exception:
+        completion_count_value = None
+    if completion_count_value is None:
+        try:
+            completion_count_value = int(get_success_count(int(user.get('id')), int(dictation_int)) or 0)
+        except Exception:
+            completion_count_value = None
+
+    today_iso = _today_iso_local()
+
+    try:
+        info = get_student_and_dictation_info(int(user.get('id')), int(dictation_int))
+        student_username = info.get('student_username') or 'Ученик'
+        dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
+        dictation_level = info.get('dictation_level') or '—'
+    except Exception:
+        student_username = user.get('username') or 'Ученик'
+        dictation_title = f'Диктант {dictation_int}'
+        dictation_level = '—'
+
+    text = _build_teacher_report_text(
+        student_username=student_username,
+        dictation_title=dictation_title,
+        dictation_level=dictation_level,
+        date_iso=today_iso,
+        completion_count_value=completion_count_value,
+        error_words=data.get('error_words'),
+    )
+
+    sent = 0
+    for cid in chat_ids:
+        try:
+            send_telegram_message(int(cid), text)
+            sent += 1
+        except Exception:
+            continue
+
+    if self_chat_id is not None:
+        try:
+            send_telegram_message(int(self_chat_id), text)
+            sent += 1
+        except Exception:
+            pass
+
+    return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids) + (1 if self_chat_id is not None else 0)})
+
+
 @statistics_bp.route('/history', methods=['GET'])
 @jwt_required()
 def get_history():

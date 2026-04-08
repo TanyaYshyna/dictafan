@@ -8557,15 +8557,7 @@ function setupStartModalHandlers() {
         }
     });
 
-    // Закрытие модального окна по клику вне его
     const startModal = document.getElementById('startModal');
-    if (startModal) {
-        startModal.addEventListener('click', (e) => {
-            if (e.target === startModal) {
-                closeStartModal();
-            }
-        });
-    }
 }
 
 function openStartModal() {

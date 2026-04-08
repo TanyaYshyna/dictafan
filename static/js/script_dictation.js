@@ -17,46 +17,180 @@ function getCurrentDictationIdForDb() {
 
 }
 
-let completionTeacherReportState = {
+function escapeHtml(str) {
+    const s = String(str || '');
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+let teacherReportRecipientsState = {
     loaded: false,
-    autoWouldSend: false,
-    teachers: [],
+    recipients: [],
     selectedTeacherUserIds: new Set(),
+    sendToSelf: true,
     sending: false,
 };
 
-function resetCompletionTeacherReportUi() {
-    completionTeacherReportState.loaded = false;
-    completionTeacherReportState.autoWouldSend = false;
-    completionTeacherReportState.teachers = [];
-    completionTeacherReportState.selectedTeacherUserIds = new Set();
-    completionTeacherReportState.sending = false;
-
-    const btn = document.getElementById('completionSendTeacherReportBtn');
-    if (btn) btn.style.display = 'none';
-    const panel = document.getElementById('completionTeacherReportPanel');
-    if (panel) panel.style.display = 'none';
-    const list = document.getElementById('completionTeacherReportList');
-    if (list) list.innerHTML = '';
+function getTeacherReportLocalStorageKey(dictationIdForDb) {
+    return `teacher_report_recipients_selected_dict_${String(dictationIdForDb || '')}`;
 }
 
-async function initCompletionTeacherReportUi() {
-    resetCompletionTeacherReportUi();
+function hasTeacherReportSelectionInLocalStorage(dictationIdForDb) {
+    try {
+        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
+        return localStorage.getItem(key) != null;
+    } catch (e) {
+        return false;
+    }
+}
 
-    const btn = document.getElementById('completionSendTeacherReportBtn');
-    const panel = document.getElementById('completionTeacherReportPanel');
-    const list = document.getElementById('completionTeacherReportList');
-    if (!btn || !panel || !list) return;
+function loadTeacherReportSelectionFromLocalStorage(dictationIdForDb) {
+    try {
+        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
+        const raw = localStorage.getItem(key);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw);
+        teacherReportRecipientsState.sendToSelf = Boolean(parsed && parsed.send_to_self);
+        teacherReportRecipientsState.selectedTeacherUserIds = new Set(
+            Array.isArray(parsed && parsed.teacher_user_ids)
+                ? parsed.teacher_user_ids
+                    .map((x) => Number(x))
+                    .filter((x) => Number.isFinite(x) && x > 0)
+                : []
+        );
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
 
+function saveTeacherReportSelectionToLocalStorage(dictationIdForDb) {
+    try {
+        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
+        localStorage.setItem(
+            key,
+            JSON.stringify({
+                send_to_self: Boolean(teacherReportRecipientsState.sendToSelf),
+                teacher_user_ids: Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []),
+            })
+        );
+    } catch (e) {
+    }
+}
+
+function renderTeacherReportRecipientsSettings() {
+    const list = document.getElementById('teacherReportRecipientsList');
+    if (!list) return;
+
+    const dictationIdForDb = getCurrentDictationIdForDb();
+    if (!dictationIdForDb) {
+        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Нет данных о диктанте</div>';
+        return;
+    }
+
+    if (!teacherReportRecipientsState.loaded) {
+        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Загрузка…</div>';
+        return;
+    }
+
+    const recips = Array.isArray(teacherReportRecipientsState.recipients) ? teacherReportRecipientsState.recipients : [];
+    if (!recips.length) {
+        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Нет доступных получателей</div>';
+        return;
+    }
+
+    const rows = [];
+    for (const r of recips) {
+        const type = String(r && r.type ? r.type : '').toLowerCase();
+        if (type === 'self') {
+            const checked = Boolean(teacherReportRecipientsState.sendToSelf);
+            const label = String(r && r.label ? r.label : 'Я');
+            rows.push(
+                `<button class="all-checkbox-btn" data-recipient-type="self" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
+                    <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
+                    <span>${escapeHtml(label)}</span>
+                </button>`
+            );
+            continue;
+        }
+
+        const teacherId = Number(r && r.teacher_user_id);
+        if (!teacherId) continue;
+        const checked = teacherReportRecipientsState.selectedTeacherUserIds.has(teacherId);
+        const label = String(r && r.label ? r.label : (r && r.teacher_username ? r.teacher_username : `Учитель #${teacherId}`));
+        rows.push(
+            `<button class="all-checkbox-btn" data-recipient-type="teacher" data-teacher-user-id="${teacherId}" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
+                <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
+                <span>${escapeHtml(label)}</span>
+            </button>`
+        );
+    }
+
+    list.innerHTML = rows.join('');
+
+    for (const btn of list.querySelectorAll('button[data-recipient-type]')) {
+        btn.addEventListener('click', () => {
+            const t = String(btn.getAttribute('data-recipient-type') || '').toLowerCase();
+            if (t === 'self') {
+                teacherReportRecipientsState.sendToSelf = !teacherReportRecipientsState.sendToSelf;
+                saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
+                renderTeacherReportRecipientsSettings();
+                try {
+                    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                        window.lucide.createIcons({ root: list });
+                    }
+                } catch (e) {
+                }
+                return;
+            }
+
+            const tid = Number(btn.getAttribute('data-teacher-user-id'));
+            if (!tid) return;
+            if (teacherReportRecipientsState.selectedTeacherUserIds.has(tid)) {
+                teacherReportRecipientsState.selectedTeacherUserIds.delete(tid);
+            } else {
+                teacherReportRecipientsState.selectedTeacherUserIds.add(tid);
+            }
+            saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
+            renderTeacherReportRecipientsSettings();
+            try {
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons({ root: list });
+                }
+            } catch (e) {
+            }
+        });
+    }
+
+    try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons({ root: list });
+        }
+    } catch (e) {
+    }
+}
+
+async function fetchTeacherReportRecipientsInBackground() {
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
 
     const dictationIdForDb = getCurrentDictationIdForDb();
     if (!dictationIdForDb) return;
 
+    if (teacherReportRecipientsState.loaded) return;
+
+    const hadSelection = hasTeacherReportSelectionInLocalStorage(dictationIdForDb);
+    if (hadSelection) {
+        loadTeacherReportSelectionFromLocalStorage(dictationIdForDb);
+    }
+
     let res = null;
     try {
-        res = await fetch('/api/statistics/teacher_report/recipients', {
+        res = await fetch('/api/statistics/teacher_report/recipients_auto', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -74,167 +208,72 @@ async function initCompletionTeacherReportUi() {
     } catch (e) {
         js = null;
     }
+    if (!(res && res.ok && js && js.success)) return;
 
-    const ok = !!(res && res.ok && js && js.success);
-    if (!ok) return;
+    teacherReportRecipientsState.loaded = true;
+    teacherReportRecipientsState.recipients = Array.isArray(js.recipients) ? js.recipients : [];
 
-    completionTeacherReportState.loaded = true;
-    completionTeacherReportState.autoWouldSend = !!js.auto_would_send;
-    completionTeacherReportState.teachers = Array.isArray(js.teachers) ? js.teachers : [];
-    completionTeacherReportState.selectedTeacherUserIds = new Set();
-
-    if (completionTeacherReportState.autoWouldSend) {
-        btn.style.display = 'none';
-        panel.style.display = 'none';
-        return;
-    }
-    if (!completionTeacherReportState.teachers.length) {
-        btn.style.display = 'none';
-        panel.style.display = 'none';
-        return;
+    const hasSelf = teacherReportRecipientsState.recipients.some((r) => String(r && r.type ? r.type : '').toLowerCase() === 'self');
+    if (!hasSelf) {
+        teacherReportRecipientsState.sendToSelf = false;
     }
 
-    btn.style.display = '';
+    const teacherIdsAllowed = new Set(
+        teacherReportRecipientsState.recipients
+            .filter((r) => String(r && r.type ? r.type : '').toLowerCase() === 'teacher')
+            .map((r) => Number(r && r.teacher_user_id))
+            .filter((x) => Number.isFinite(x) && x > 0)
+    );
 
-    if (completionTeacherReportState.teachers.length === 1) {
-        try {
-            const tid = Number(completionTeacherReportState.teachers[0]?.teacher_user_id);
-            if (tid) completionTeacherReportState.selectedTeacherUserIds.add(tid);
-        } catch (e) {
-        }
-    }
-
-    renderCompletionTeacherReportList();
-
-    try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons();
-        }
-    } catch (e) {
-    }
-}
-
-function renderCompletionTeacherReportList() {
-    const list = document.getElementById('completionTeacherReportList');
-    if (!list) return;
-    const teachers = completionTeacherReportState.teachers || [];
-
-    const rows = [];
-    for (const t of teachers) {
-        const teacherId = Number(t?.teacher_user_id);
-        if (!teacherId) continue;
-        const checked = completionTeacherReportState.selectedTeacherUserIds.has(teacherId);
-        const username = String(t?.teacher_username || '').trim();
-        const label = username ? username : `Учитель #${teacherId}`;
-
-        rows.push(
-            `<button class="all-checkbox-btn" data-teacher-user-id="${teacherId}" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
-                <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
-                <span>${escapeHtml(label)}</span>
-            </button>`
+    if (!hadSelection) {
+        teacherReportRecipientsState.selectedTeacherUserIds = new Set(Array.from(teacherIdsAllowed));
+        teacherReportRecipientsState.sendToSelf = hasSelf;
+    } else {
+        teacherReportRecipientsState.selectedTeacherUserIds = new Set(
+            Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []).filter((x) => teacherIdsAllowed.has(Number(x)))
         );
     }
 
-    list.innerHTML = rows.join('');
-
-    for (const btn of list.querySelectorAll('button[data-teacher-user-id]')) {
-        btn.addEventListener('click', () => {
-            const tid = Number(btn.getAttribute('data-teacher-user-id'));
-            if (!tid) return;
-            const isChecked = completionTeacherReportState.selectedTeacherUserIds.has(tid);
-            if (isChecked) {
-                completionTeacherReportState.selectedTeacherUserIds.delete(tid);
-            } else {
-                completionTeacherReportState.selectedTeacherUserIds.add(tid);
-            }
-            renderCompletionTeacherReportList();
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons();
-                }
-            } catch (e) {
-            }
-        });
-    }
+    saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
+    renderTeacherReportRecipientsSettings();
 }
 
-function escapeHtml(str) {
-    const s = String(str || '');
-    return s
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-}
-
-async function sendCompletionTeacherReport() {
-    if (completionTeacherReportState.sending) return;
+async function autoSendTeacherReportAfterSuccess({ completionCountAfter, errorWords }) {
+    if (teacherReportRecipientsState.sending) return;
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
 
     const dictationIdForDb = getCurrentDictationIdForDb();
     if (!dictationIdForDb) return;
 
-    const teacher_user_ids = Array.from(completionTeacherReportState.selectedTeacherUserIds || []);
-    if (!teacher_user_ids.length) {
-        alert('Выберите хотя бы одного учителя');
-        return;
+    try {
+        await fetchTeacherReportRecipientsInBackground();
+    } catch (e) {
     }
 
-    completionTeacherReportState.sending = true;
+    const teacher_user_ids = Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []);
+    const send_to_self = Boolean(teacherReportRecipientsState.sendToSelf);
+    if (!teacher_user_ids.length && !send_to_self) return;
+
+    teacherReportRecipientsState.sending = true;
     try {
-        let completionCountAfter = null;
-        try {
-            await loadCompletionCountsCacheFromIdb();
-            completionCountAfter = getCompletionCountFromCache(dictationIdForDb);
-        } catch (e) {
-            completionCountAfter = null;
-        }
-
-        const payload = {
-            dictation_id: dictationIdForDb,
-            teacher_user_ids,
-            completion_count_after: completionCountAfter,
-            error_words: (typeof dictationErrorWordCounts === 'object' && dictationErrorWordCounts) ? dictationErrorWordCounts : null,
-        };
-
-        const res = await fetch('/api/statistics/teacher_report/send', {
+        await fetch('/api/statistics/teacher_report/send_auto', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                dictation_id: dictationIdForDb,
+                teacher_user_ids,
+                send_to_self,
+                completion_count_after: completionCountAfter != null ? completionCountAfter : null,
+                error_words: (typeof errorWords === 'object' && errorWords) ? errorWords : null,
+            })
         });
-
-        let js = null;
-        try {
-            js = await res.json();
-        } catch (e) {
-            js = null;
-        }
-
-        if (res && res.ok && js && js.success) {
-            alert('Отчет отправлен');
-            const btn = document.getElementById('completionSendTeacherReportBtn');
-            if (btn) btn.style.display = 'none';
-            const panel = document.getElementById('completionTeacherReportPanel');
-            if (panel) panel.style.display = 'none';
-            return;
-        }
-
-        if (js && js.error === 'auto_report_available') {
-            alert('Отчет уже будет отправлен автоматически сегодня');
-        } else if (js && js.error === 'no_recipients') {
-            alert('Не удалось отправить: нет доступных учителей');
-        } else {
-            alert('Не удалось отправить отчет');
-        }
     } catch (e) {
-        alert('Не удалось отправить отчет');
     } finally {
-        completionTeacherReportState.sending = false;
+        teacherReportRecipientsState.sending = false;
     }
 }
 
@@ -2839,11 +2878,6 @@ function showCompletionModal() {
     } catch (e) {
     }
 
-    try {
-        initCompletionTeacherReportUi();
-    } catch (e) {
-    }
-
     // Инициализируем иконки Lucide
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
@@ -2873,36 +2907,10 @@ function setupCompletionModalHandlers() {
     const completionModal = document.getElementById('completionModal');
     const exitBtn = document.getElementById('completionExitBtn');
     const resultsBtn = document.getElementById('completionResultsBtn');
-    const sendTeacherBtn = document.getElementById('completionSendTeacherReportBtn');
-    const reportPanel = document.getElementById('completionTeacherReportPanel');
-    const reportCloseBtn = document.getElementById('completionTeacherReportClosePanelBtn');
-    const reportSendBtn = document.getElementById('completionTeacherReportSendBtn');
  
     if (!completionModal || !exitBtn ) {
         console.warn('Элементы модального окна завершения не найдены');
         return;
-    }
-
-    if (sendTeacherBtn && reportPanel) {
-        sendTeacherBtn.addEventListener('click', () => {
-            reportPanel.style.display = (reportPanel.style.display === 'none' || !reportPanel.style.display) ? '' : 'none';
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons();
-                }
-            } catch (e) {
-            }
-        });
-    }
-    if (reportCloseBtn && reportPanel) {
-        reportCloseBtn.addEventListener('click', () => {
-            reportPanel.style.display = 'none';
-        });
-    }
-    if (reportSendBtn) {
-        reportSendBtn.addEventListener('click', async () => {
-            await sendCompletionTeacherReport();
-        });
     }
 
     if (resultsBtn) {
@@ -2932,44 +2940,10 @@ function setupCompletionModalHandlers() {
     // Не нужно показывать модальное окно сохранения прогресса - сразу выходим
     exitBtn.addEventListener('click', () => {
         hideCompletionModal();
-        try {
-            resetCompletionTeacherReportUi();
-        } catch (e) {
-        }
         // При полном завершении сразу перенаправляем на главную
         // История уже сохранена через registerCompletedDictation()
         // Черновик уже удален, временный прогресс не нужен
         window.location.href = "/library/private";
-    });
-
-
-
-    // Закрытие по клику вне контента
-    // При полном завершении сразу выходим, без модального окна сохранения прогресса
-    completionModal.addEventListener('click', (e) => {
-        if (e.target === completionModal) {
-            hideCompletionModal();
-            try {
-                resetCompletionTeacherReportUi();
-            } catch (e2) {
-            }
-            // При полном завершении сразу перенаправляем на главную
-            window.location.href = "/library/private";
-        }
-    });
-
-    // Закрытие по клавише Escape
-    // При полном завершении сразу выходим, без модального окна сохранения прогресса
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && completionModal.style.display === 'flex') {
-            hideCompletionModal();
-            try {
-                resetCompletionTeacherReportUi();
-            } catch (e2) {
-            }
-            // При полном завершении сразу перенаправляем на главную
-            window.location.href = "/library/private";
-        }
     });
 }
 
@@ -9883,6 +9857,14 @@ async function registerCompletedDictation() {
                 }
                 stopDraftAutosaveTimers();
                 await clearDraftFromIndexedDb();
+
+                try {
+                    await autoSendTeacherReportAfterSuccess({
+                        completionCountAfter,
+                        errorWords: dictationErrorWordCounts,
+                    });
+                } catch (e) {
+                }
             } else {
                 const errorText = await successResponse.text();
                 console.error('[Register] ❌ Ошибка сохранения успеха в БД:', {
@@ -10756,6 +10738,18 @@ function disableProfileNavigation() {
 
 document.addEventListener('DOMContentLoaded', disableProfileNavigation);
 
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        setTimeout(() => {
+            try {
+                fetchTeacherReportRecipientsInBackground();
+            } catch (e) {
+            }
+        }, 30);
+    } catch (e) {
+    }
+});
+
 // Инициализация модального окна настроек аудио
 function initAudioSettingsModal() {
     const audioSettingsModal = document.getElementById('audioSettingsModal');
@@ -10962,6 +10956,16 @@ function initAudioSettingsModal() {
         audioSettingsModal.style.display = 'flex';
         if (window.lucide && window.lucide.createIcons) {
             window.lucide.createIcons();
+        }
+
+        try {
+            renderTeacherReportRecipientsSettings();
+        } catch (e) {
+        }
+
+        try {
+            fetchTeacherReportRecipientsInBackground();
+        } catch (e) {
         }
 
         try {
