@@ -631,13 +631,14 @@ class AudioSettingsPanel {
                     </div>
                 </div>
                 <div class="play-sequence-item">
-                    <label>Только аудио (без ввода текста):</label>
                     <button type="button" 
                             id="${prefix}withoutEnteringTextButton" 
-                            class="audio-setting-checkbox-btn" 
+                            class="all-checkbox-btn audio-setting-checkbox-btn" 
                             data-checked="${this.settings.without_entering_text}"
-                            title="Если включено, поле ввода текста будет недоступно">
+                            title="Если включено, поле ввода текста будет недоступно"
+                            style="justify-content:flex-start; width:100%;">
                         <i data-lucide="${this.settings.without_entering_text ? 'circle-check-big' : 'circle'}"></i>
+                        <span>Только аудио (без ввода текста):</span>
                     </button>
                 </div>
                 <div class="play-sequence-item" id="${prefix}showTextRow" style="${this.settings.without_entering_text ? '' : 'display: none;'}">
@@ -651,8 +652,8 @@ class AudioSettingsPanel {
                     </button>
                 </div>
                 <div class="play-sequence-item">
-                    <label>Распознавание речи:</label>
-                    <div style="display:flex; align-items:center; gap:10px;">
+                    <div class="speech-recognition-row">
+                        <label>Распознавание речи:</label>
                         <div class="speech-recognition-toggle-button" 
                              data-prefix="${prefix}"
                              data-mode="${this.settings.speech_recognition_mode}">
@@ -713,8 +714,8 @@ class AudioSettingsPanel {
                                    value="${this.settings.success}"
                                    title="Используйте только буквы 't' (translation) и 'o' (original)">
                         </div>
+                        ${explanationsHTML}
                     </div>
-                    ${explanationsHTML}
                 </div>
             </div>
         `;
@@ -892,11 +893,15 @@ class AudioSettingsPanel {
                 
                 // Обновляем иконку (просто, как в allCheckbox)
                 const newIconName = checked ? 'circle-check-big' : 'circle';
-                withoutEnteringTextButton.innerHTML = `<i data-lucide="${newIconName}"></i>`;
-                
-                // Обновляем иконки Lucide
-                if (window.lucide && window.lucide.createIcons) {
-                    window.lucide.createIcons();
+                try {
+                    const iconEl = withoutEnteringTextButton.querySelector('i[data-lucide]');
+                    if (iconEl) {
+                        iconEl.setAttribute('data-lucide', newIconName);
+                    }
+                    if (window.lucide && window.lucide.createIcons) {
+                        window.lucide.createIcons({ root: withoutEnteringTextButton });
+                    }
+                } catch (e) {
                 }
                 this._updateSetting('without_entering_text', checked);
                 if (repeatsInput) {
@@ -959,11 +964,15 @@ class AudioSettingsPanel {
                 
                 // Обновляем иконку (просто, как в allCheckbox)
                 const newIconName = checked ? 'circle-check-big' : 'circle';
-                showTextButton.innerHTML = `<i data-lucide="${newIconName}"></i>`;
-                
-                // Обновляем иконки Lucide
-                if (window.lucide && window.lucide.createIcons) {
-                    window.lucide.createIcons();
+                try {
+                    const iconEl = showTextButton.querySelector('i[data-lucide]');
+                    if (iconEl) {
+                        iconEl.setAttribute('data-lucide', newIconName);
+                    }
+                    if (window.lucide && window.lucide.createIcons) {
+                        window.lucide.createIcons({ root: showTextButton });
+                    }
+                } catch (e) {
                 }
                 
                 this._updateSetting('show_text', checked);

@@ -4113,12 +4113,47 @@ body.playing-audio::after {
 }
 
 .audio-settings-modal-body .audio-settings-top-panel {
-  display: grid;
-  grid-template-columns: max-content 260px;
-  column-gap: 40px;
-  align-items: start;
-  width: fit-content;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  width: 100%;
   max-width: 100%;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .play-sequence-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .play-sequence-item > label {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .play-sequence-item .required-passed-count-control {
+  flex: 0 0 auto;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .audio-setting-checkbox-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .speech-recognition-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.audio-settings-modal-body .audio-settings-top-panel .speech-recognition-row > label {
+  white-space: nowrap;
 }
 
 .audio-settings-modal-body .audio-settings-top-panel .play-sequence-container {
@@ -4141,6 +4176,35 @@ body.playing-audio::after {
   border: none;
   width: fit-content;
   max-width: 100%;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-container > label {
+  font-weight: 700;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-container .audio-explanations {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-container .audio-explanations > label {
+  font-weight: 700;
+}
+
+.audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-container .audio-explanations .explanations-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.teacher-report-recipient-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  object-fit: cover;
+  border: 1px solid var(--color-border-light);
+  flex: 0 0 auto;
 }
 
 .audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-item {

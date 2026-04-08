@@ -109,9 +109,20 @@ function renderTeacherReportRecipientsSettings() {
         if (type === 'self') {
             const checked = Boolean(teacherReportRecipientsState.sendToSelf);
             const label = String(r && r.label ? r.label : 'Я');
+            let avatarHtml = '';
+            try {
+                const uid = window.UM && typeof window.UM.getCurrentUser === 'function'
+                    ? Number(window.UM.getCurrentUser()?.id)
+                    : 0;
+                if (uid) {
+                    avatarHtml = `<img class="teacher-report-recipient-avatar" src="/user/api/avatar?user_id=${uid}&size=small" alt="">`;
+                }
+            } catch (e) {
+            }
             rows.push(
                 `<button class="all-checkbox-btn" data-recipient-type="self" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
                     <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
+                    ${avatarHtml}
                     <span>${escapeHtml(label)}</span>
                 </button>`
             );
@@ -125,6 +136,7 @@ function renderTeacherReportRecipientsSettings() {
         rows.push(
             `<button class="all-checkbox-btn" data-recipient-type="teacher" data-teacher-user-id="${teacherId}" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
                 <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
+                <img class="teacher-report-recipient-avatar" src="/user/api/avatar?user_id=${teacherId}&size=small" alt="">
                 <span>${escapeHtml(label)}</span>
             </button>`
         );
@@ -530,13 +542,9 @@ function renderAssignmentSourceGroupIfAny() {
         const el = document.getElementById('assignment-source-group');
         if (!el) return;
         const title = (window.assignmentSourceGroupTitle != null) ? String(window.assignmentSourceGroupTitle) : '';
-        if (title) {
-            el.textContent = `Группа: ${title}`;
-            el.style.display = 'inline-flex';
-        } else {
-            el.textContent = '';
-            el.style.display = 'none';
-        }
+        // По UX не выводим "Группа" в шапку (если нужно — пользователь увидит в настройках/профиле).
+        el.textContent = '';
+        el.style.display = 'none';
     } catch (e) {
     }
 }
@@ -5886,6 +5894,14 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             }
         }
         console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
+
+        try {
+            if (userAudioAnswer) {
+                const safeText = (typeof spokenText === 'string') ? spokenText.trim() : '';
+                userAudioAnswer.innerHTML = safeText ? escapeHtml(safeText) : '';
+            }
+        } catch (e) {
+        }
         
         // Для офлайн-режима показываем анимацию печати если нужно
         if (result.mode === 'offline' && spokenText) {

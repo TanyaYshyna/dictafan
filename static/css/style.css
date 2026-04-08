@@ -397,7 +397,7 @@ h2 {
 }
 
 body.dictation-vk-enabled #userInput.text-input {
-    min-height: 96px;
+    min-height: 54px;
 }
 
  .password-input-wrapper {
