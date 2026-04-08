@@ -10,6 +10,20 @@ class StatisticsReport {
         this.groupBy = options.groupBy || 'days'; // days, weeks, months
     }
 
+    async ensureHistoryLoaded() {
+        try {
+            if (!this.history) return;
+            if (this.history._allHistoryCache && typeof this.history._allHistoryCache === 'object') return;
+            if (typeof this.history.loadAllHistory === 'function') {
+                const all = await this.history.loadAllHistory();
+                if (all && typeof all === 'object') {
+                    this.history._allHistoryCache = all;
+                }
+            }
+        } catch (e) {
+        }
+    }
+
     /**
      * Создать модальное окно для статистики
      */
@@ -31,9 +45,12 @@ class StatisticsReport {
             <div class="modal-content statistics-modal-content">
                 <div class="statistics-header">
                     <h2>Статистика занятий</h2>
-                    <button class="close-statistics-btn" id="closeStatisticsBtn">
-                        <i data-lucide="x"></i>
-                    </button>
+                    <div style="display:flex; align-items:center; gap: 10px;">
+                        <button id="updateStatisticsBtn" class="button-color-yellow">Сформировать</button>
+                        <button class="close-statistics-btn" id="closeStatisticsBtn">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="statistics-controls">
@@ -51,7 +68,6 @@ class StatisticsReport {
                             <option value="months">По месяцам</option>
                         </select>
                     </div>
-                    <button id="updateStatisticsBtn" class="button-color-green">Обновить</button>
                 </div>
 
                 <div class="statistics-chart" id="statisticsChart">
@@ -148,6 +164,10 @@ class StatisticsReport {
         }
 
         this.modal.style.display = 'flex';
+        try {
+            await this.ensureHistoryLoaded();
+        } catch (e) {
+        }
         await this.updateStatistics();
     }
 
@@ -170,12 +190,29 @@ class StatisticsReport {
 
         if (!startDateInput || !endDateInput || !groupBySelect) return;
 
+        const chartContainer = document.getElementById('statisticsChart');
+        if (chartContainer) {
+            chartContainer.innerHTML = '<p class="no-data">Формируем отчет…</p>';
+        }
+
         const startDate = new Date(startDateInput.value);
         const endDate = new Date(endDateInput.value);
         this.groupBy = groupBySelect.value;
 
         // Получаем статистику за период
-        const stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy);
+        let stats = [];
+        try {
+            await this.ensureHistoryLoaded();
+        } catch (e) {
+        }
+
+        try {
+            if (this.history && typeof this.history.getStatisticsByPeriod === 'function') {
+                stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy);
+            }
+        } catch (e) {
+            stats = [];
+        }
 
         // Рисуем график
         this.renderChart(stats);

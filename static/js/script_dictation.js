@@ -2939,7 +2939,7 @@ function setupCompletionModalHandlers() {
         // При полном завершении сразу перенаправляем на главную
         // История уже сохранена через registerCompletedDictation()
         // Черновик уже удален, временный прогресс не нужен
-        window.location.href = "/";
+        window.location.href = "/library/private";
     });
 
 
@@ -2954,7 +2954,7 @@ function setupCompletionModalHandlers() {
             } catch (e2) {
             }
             // При полном завершении сразу перенаправляем на главную
-            window.location.href = "/";
+            window.location.href = "/library/private";
         }
     });
 
@@ -2968,7 +2968,7 @@ function setupCompletionModalHandlers() {
             } catch (e2) {
             }
             // При полном завершении сразу перенаправляем на главную
-            window.location.href = "/";
+            window.location.href = "/library/private";
         }
     });
 }

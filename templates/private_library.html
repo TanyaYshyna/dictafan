@@ -41,10 +41,27 @@
         <div class="user-section" id="user-section">
             <div class="auth-buttons" style="display: none;"></div>
             <div class="user-info" style="display: none;">
-                <a href="/user/profile" class="username">
-                    <div class="user-avatar-small"></div>
-                    <span class="username-text"></span>
-                </a>
+                <div class="dropdown-menu-wrapper" id="userMenuWrapper">
+                    <button type="button" class="username" id="userMenuToggle" aria-haspopup="true" aria-expanded="false">
+                        <div class="user-avatar-small"></div>
+                        <span class="username-text"></span>
+                        <i data-lucide="chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="userMenuDropdown" role="menu">
+                        <button type="button" class="dropdown-menu-item" id="userMenuProfileBtn" role="menuitem">
+                            <i data-lucide="user"></i>
+                            <span>Профиль пользователя</span>
+                        </button>
+                        <button type="button" class="dropdown-menu-item" id="userMenuActivityReportBtn" role="menuitem">
+                            <i data-lucide="bar-chart-3"></i>
+                            <span>Отчет об активности</span>
+                        </button>
+                        <button type="button" class="dropdown-menu-item" id="userMenuPlanFactBtn" role="menuitem">
+                            <i data-lucide="clipboard-check"></i>
+                            <span>Отчет План-факт</span>
+                        </button>
+                    </div>
+                </div>
                 <div class="streak" title="Несгораемая сумма дней">
                     <i data-lucide="flame"></i> <span class="streak-days">0</span>
                 </div>
@@ -338,6 +355,8 @@
     <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}"></script>
     <script src="{{ url_for('static', filename='js/idb_manager.js') }}"></script>
     <script src="{{ url_for('static', filename='js/cover_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/private_library.js') }}?v={{ app_cache_revision }}"></script>
 </body>
 

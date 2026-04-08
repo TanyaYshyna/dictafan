@@ -173,6 +173,101 @@ function setAssignmentLastGroupId(groupId) {
   }
 }
 
+function setupUserDropdownMenu() {
+  const toggleBtn = document.getElementById('userMenuToggle');
+  const dropdown = document.getElementById('userMenuDropdown');
+  const profileBtn = document.getElementById('userMenuProfileBtn');
+  const activityBtn = document.getElementById('userMenuActivityReportBtn');
+  const planFactBtn = document.getElementById('userMenuPlanFactBtn');
+
+  if (!toggleBtn || !dropdown) return;
+
+  const close = () => {
+    dropdown.classList.remove('show');
+    try { toggleBtn.setAttribute('aria-expanded', 'false'); } catch (e) {}
+  };
+
+  const open = () => {
+    dropdown.classList.add('show');
+    try { toggleBtn.setAttribute('aria-expanded', 'true'); } catch (e) {}
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons({ root: dropdown });
+      }
+    } catch (e) {
+    }
+  };
+
+  const toggle = () => {
+    const isOpen = dropdown.classList.contains('show');
+    if (isOpen) close();
+    else open();
+  };
+
+  toggleBtn.addEventListener('click', (e) => {
+    try { e.preventDefault(); } catch (e2) {}
+    try { e.stopPropagation(); } catch (e2) {}
+    toggle();
+  });
+
+  document.addEventListener('click', (e) => {
+    try {
+      if (!dropdown.classList.contains('show')) return;
+      const target = e && e.target;
+      if (!target) return;
+      if (toggleBtn.contains(target)) return;
+      if (dropdown.contains(target)) return;
+      close();
+    } catch (e2) {
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    try {
+      if (e && e.key === 'Escape' && dropdown.classList.contains('show')) {
+        close();
+      }
+    } catch (e2) {
+    }
+  });
+
+  if (profileBtn) {
+    profileBtn.addEventListener('click', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+      window.location.href = '/user/profile';
+    });
+  }
+
+  if (activityBtn) {
+    activityBtn.addEventListener('click', async (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+
+      if (typeof StatisticsReport === 'undefined') {
+        alert('Отчет об активности недоступен');
+        return;
+      }
+
+      try {
+        const history = new UserActivityHistory('/user/api');
+        await history.loadAllHistory();
+        await StatisticsReport.open(history);
+      } catch (err) {
+        alert('Не удалось открыть отчет об активности');
+      }
+    });
+  }
+
+  if (planFactBtn) {
+    planFactBtn.addEventListener('click', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+      alert('Отчет План-факт скоро будет');
+    });
+  }
+}
+
 async function loadDictationMetaForAssignmentModal(dictationId) {
   const id = Number(dictationId);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -7441,6 +7536,11 @@ function loadLibraryData() {
 // Инициализация при загрузке страницы
 document.addEventListener("DOMContentLoaded", async () => {
   installEventHandlers();
+
+  try {
+    setupUserDropdownMenu();
+  } catch (e) {
+  }
 
   checkAppCacheRevision().catch(() => { });
 

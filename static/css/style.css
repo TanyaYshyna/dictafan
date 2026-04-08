@@ -1542,6 +1542,11 @@ select {
     white-space: nowrap;
 }
 
+.statistics-header #updateStatisticsBtn {
+    padding: 8px 16px;
+    font-weight: 700;
+}
+
 .statistics-chart {
     margin-bottom: 25px;
 }
