@@ -6269,7 +6269,7 @@ function installEventHandlers() {
       const itemId = btn.getAttribute('data-desk-item-id');
       const dictationId = btn.getAttribute('data-dictation-id');
       if (itemId && dictationId) {
-        await removeDictationFromDesk(itemId, dictationId);
+        await removeFromDesk(itemId, dictationId);
       }
     }
 

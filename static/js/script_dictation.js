@@ -3017,7 +3017,7 @@ function setupCompletionModalHandlers() {
         // При полном завершении сразу перенаправляем на главную
         // История уже сохранена через registerCompletedDictation()
         // Черновик уже удален, временный прогресс не нужен
-        window.location.href = "/library/private";
+        window.location.href = "/";
     });
 }
 
@@ -5970,7 +5970,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                     try {
                         const userAudioAnswerEl = document.getElementById('userAudioAnswer');
                         if (userAudioAnswerEl) {
-                            userAudioAnswerEl.innerHTML = '<span style="color:#7c3aed;font-weight:700;">Ты молодец, ты очень упорный!<br>Защитываю аудио за 5 попыток больше 50٪!!!<br>Но поробуй уточнить с носителем или учителем что ты произносишь неправильно!</span>';
+                            userAudioAnswerEl.innerHTML = '<span style="color:var(--color-panel-text-purple);font-weight:700;">Ты молодец, ты очень упорный!<br>Защитываю аудио за 5 попыток больше 50٪!!!<br>Но поробуй уточнить с носителем или учителем что ты произносишь неправильно!</span>';
                         }
                     } catch (e) {
                     }
