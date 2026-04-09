@@ -5896,6 +5896,15 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
 
         try {
+            const userAudioAnswerEl = document.getElementById('userAudioAnswer');
+            if (userAudioAnswerEl) {
+                userAudioAnswerEl.style.color = '';
+                userAudioAnswerEl.style.fontWeight = '';
+            }
+        } catch (e) {
+        }
+
+        try {
             if (userAudioAnswer) {
                 const safeText = (typeof spokenText === 'string') ? spokenText.trim() : '';
                 userAudioAnswer.innerHTML = safeText ? escapeHtml(safeText) : '';
@@ -5939,8 +5948,37 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         scheduleDraftAutosave('saveRecording');
         
         // Проверяем «зачтено»
-        const isPassed = percent >= MIN_MATCH_PERCENT;
+        let isPassed = percent >= MIN_MATCH_PERCENT;
         console.log(`🔍 [saveRecording] Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
+
+        // Если пользователь упорно повторяет и каждый раз попадает >50%, но не может добить до MIN_MATCH_PERCENT,
+        // то после нескольких попыток засчитываем аудио, чтобы не демотивировать.
+        try {
+            const sentenceKey = String(currentSentence?.key || currentSentence?.id || currentSentence?.text || '');
+            if (sentenceKey) {
+                if (!window.__asrGoodAttemptsBySentenceKey) window.__asrGoodAttemptsBySentenceKey = {};
+                const store = window.__asrGoodAttemptsBySentenceKey;
+                const good = Number(store[sentenceKey]) || 0;
+
+                if (!isPassed && percent >= 50) {
+                    store[sentenceKey] = good + 1;
+                }
+
+                const goodNow = Number(store[sentenceKey]) || 0;
+                if (!isPassed && goodNow > 5) {
+                    isPassed = true;
+                    try {
+                        const userAudioAnswerEl = document.getElementById('userAudioAnswer');
+                        if (userAudioAnswerEl) {
+                            userAudioAnswerEl.innerHTML = '<span style="color:#7c3aed;font-weight:700;">Ты молодец, ты очень упорный!<br>Защитываю аудио за 5 попыток больше 50٪!!!<br>Но поробуй уточнить с носителем или учителем что ты произносишь неправильно!</span>';
+                        }
+                    } catch (e) {
+                    }
+                    store[sentenceKey] = 0;
+                }
+            }
+        } catch (e) {
+        }
         
         if (isPassed) {
             console.log('✅ [saveRecording] Запись засчитана, уменьшаем счетчик');
