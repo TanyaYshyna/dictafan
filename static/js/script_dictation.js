@@ -8604,11 +8604,14 @@ const ARABIC_DIACRITICS_REGEX = /[\u064B-\u0655\u0670\u0671]/g;
 // === ЧИСЛА И НОРМАЛИЗАЦИЯ ДЛЯ ASR ===
 // База слов-числительных (минимальный набор: EN + RU/UK базовые формы).
 // Этого достаточно, чтобы "числа словами" превратить в <num> для авто-стопа и процента.
+// TODO(i18n): расширять словарь/парсинг числительных для остальных языков при локализации.
 const NUM_WORDS_SET = new Set([
     // EN
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
     "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
     "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety", "hundred", "thousand",
+    // SV (Swedish) minimal
+    "nitton",
     // RU
     "ноль", "один", "одна", "одно", "два", "две", "три", "четыре", "пять", "шесть", "семь", "восемь", "девять",
     "десять", "одиннадцать", "двенадцать", "тринадцать", "четырнадцать", "пятнадцать", "шестнадцать",
@@ -9633,13 +9636,28 @@ function checkText() {
     const original = currentSentence.text;
     let userNorm = '';
     let origNorm = '';
+    const normalizeForMinLength = (raw) => {
+        try {
+            return normalizeDictationInvisibleChars(String(raw || ''))
+                .toLowerCase()
+                .replace(PUNCTUATION_REGEX, '')
+                .replace(/\s+/g, '')
+                .trim();
+        } catch (e) {
+            return String(raw || '')
+                .toLowerCase()
+                .replace(/[.,!?:;"«»()\[\]{}—–\-]/g, '')
+                .replace(/\s+/g, '')
+                .trim();
+        }
+    };
     try {
-        userNorm = normalizeDictationInvisibleChars(String(userInput || '')).replace(/\s+/g, ' ').trim();
+        userNorm = normalizeForMinLength(userInput);
     } catch (e) {
         userNorm = String(userInput || '').trim();
     }
     try {
-        origNorm = normalizeDictationInvisibleChars(String(original || '')).replace(/\s+/g, ' ').trim();
+        origNorm = normalizeForMinLength(original);
     } catch (e) {
         origNorm = String(original || '').trim();
     }
@@ -9650,7 +9668,10 @@ function checkText() {
         }
         return;
     }    
-    if (userNorm.length <= Math.floor(origNorm.length / 2)) {
+    // Требуем "хотя бы половину" по буквам/цифрам (без пунктуации и пробелов).
+    // Ровно половина — ок.
+    const minNeed = Math.ceil(origNorm.length / 2);
+    if (userNorm.length < minNeed) {
         try {
             showUserInputNotice('Введи хотя бы половину предложения, а потом проверяй.', 'error', 6000);
         } catch (e) {
