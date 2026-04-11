@@ -1150,6 +1150,7 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
 /* Crop avatar modal */
 .crop-modal-content {
     max-width: 520px;
+    width: 92vw;
 }
 
 .crop-modal-content .modal-header {
@@ -1192,11 +1193,13 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
 .crop-modal-body {
     padding: 0 16px 16px 16px;
     max-height: calc(90vh - 72px);
-    overflow: auto;
+    overflow: hidden;
 }
 
 .crop-container {
-    width: 100%;
+    width: min(100%, 70vh);
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;
 }
 
 /* Финальное переопределение для audio-explanations-column - максимальная специфичность */

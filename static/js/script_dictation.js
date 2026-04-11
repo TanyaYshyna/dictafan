@@ -8822,6 +8822,7 @@ function simplifyText(text) {
     let result = normalizeDictationInvisibleChars(originalText)
         .normalize('NFKC')          // унификация Юникода
         .toLowerCase();
+    result = normalizeTurkishDottedI(result);
 
     // Явно удаляем все варианты кавычек перед применением PUNCTUATION_REGEX
     // Это гарантирует, что все кавычки будут удалены
@@ -8843,6 +8844,11 @@ function simplifyText(text) {
     return words;
 }
 
+function normalizeTurkishDottedI(text) {
+    return (text || "")
+        .replace(/\u0307/g, '');
+}
+
 function normalizeDictationInvisibleChars(text) {
     return (text || "")
         // Different non-breaking / fixed-width spaces -> regular space
@@ -8856,6 +8862,7 @@ function normalizeDictationInvisibleChars(text) {
 function splitWordsForDisplay(text) {
     return (text || "")
         .normalize('NFKC')
+        .replace(/\u0307/g, '')
         .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
         .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
         .replace(/\u00AD/g, '')
@@ -8869,6 +8876,7 @@ function splitWordsForDisplay(text) {
 function splitUserWords(text) {
     return (text || "")
         .normalize('NFKC')
+        .replace(/\u0307/g, '')
         .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
         .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
         .replace(/\u00AD/g, '')
