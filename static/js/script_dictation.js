@@ -9469,7 +9469,6 @@ function check(original, userInput, currentKey) {
 
     const userVerified = [];
     let i = 0, j = 0;
-    let foundError = false;
     let errorCount = 0;
 
     while (i < simplOriginal.length || j < simplUser.length) {
@@ -9480,14 +9479,7 @@ function check(original, userInput, currentKey) {
         // Используем слово пользователя без пунктуации (для сравнения)
         const fullWordUser = userWords[j] || "";
 
-        if (foundError) {
-            if (j < userWords.length) {
-                userVerified.push({ type: "raw_user", text: userWords[j] });
-                j++;
-            } else {
-                break;
-            }
-        } else if (wordOrig === wordUser) {
+        if (wordOrig === wordUser) {
             // Используем оригинальное слово с пунктуацией и регистром для отображения
             userVerified.push({ type: "correct", text: fullWordOrig });
             i++; j++;
@@ -9495,7 +9487,6 @@ function check(original, userInput, currentKey) {
             // Режим «разрешить пропуск слова» — ВЫКЛ по умолчанию
             userVerified.push({ type: "missing", text: fullWordOrig });
             errorCount++;
-            foundError = true;
             i++;
         } else {
             // Проверяем эквивалентности сокращений перед тем, как считать ошибкой
@@ -9580,13 +9571,12 @@ function check(original, userInput, currentKey) {
                 });
                 errorCount++;
                 i++; j++;
-                foundError = true; // ← ключ: пропуск/несовпадение — это ошибка, а не «мягкий» missing
             }
         }
 
     }
 
-    if (!foundError) {
+    if (errorCount === 0) {
 
         const s = currentSentence;
 
@@ -9731,6 +9721,7 @@ function checkText() {
                 }
                 if (!norm) continue;
                 dictationErrorWordCounts[norm] = (Number(dictationErrorWordCounts[norm]) || 0) + 1;
+                break;
             }
         }
     } catch (e) {

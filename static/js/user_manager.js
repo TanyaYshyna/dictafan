@@ -590,6 +590,18 @@ class UserManager {
 
   async updateProfile(updateData) {
     try {
+      let prevAvatar = null;
+      let prevAvatarUploaded = '';
+      try {
+        prevAvatar = (this.userData && this.userData.avatar && typeof this.userData.avatar === 'object')
+          ? { ...this.userData.avatar }
+          : null;
+        prevAvatarUploaded = String(this.userData?.avatar?.uploaded || '').trim();
+      } catch (e) {
+        prevAvatar = null;
+        prevAvatarUploaded = '';
+      }
+
       const response = await fetch('/user/api/profile', {
         method: 'PUT',
         headers: {
@@ -602,6 +614,25 @@ class UserManager {
       if (response.ok) {
         const updatedUser = await response.json();
         this.userData = updatedUser.user;
+        try {
+          if (prevAvatar && (!this.userData.avatar || typeof this.userData.avatar !== 'object')) {
+            this.userData.avatar = { ...prevAvatar };
+          } else if (prevAvatar && this.userData.avatar && typeof this.userData.avatar === 'object') {
+            if (!this.userData.avatar.large && prevAvatar.large) this.userData.avatar.large = prevAvatar.large;
+            if (!this.userData.avatar.small && prevAvatar.small) this.userData.avatar.small = prevAvatar.small;
+            if (!this.userData.avatar.original && prevAvatar.original) this.userData.avatar.original = prevAvatar.original;
+            if (!this.userData.avatar.medium && prevAvatar.medium) this.userData.avatar.medium = prevAvatar.medium;
+          }
+          if (prevAvatarUploaded) {
+            if (!this.userData.avatar || typeof this.userData.avatar !== 'object') {
+              this.userData.avatar = {};
+            }
+            if (!this.userData.avatar.uploaded) {
+              this.userData.avatar.uploaded = prevAvatarUploaded;
+            }
+          }
+        } catch (e) {
+        }
         this._saveUserCache(this.userData);
         return updatedUser.user;
       } else {

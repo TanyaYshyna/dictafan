@@ -86,7 +86,7 @@ def _build_teacher_report_text(*, student_username: str, dictation_title: str, d
         f"Дата: {date_iso}"
     )
     if completion_count_value is not None:
-        text = text + f"\n🥇 Медали: {completion_count_value}"
+        text = text + f"\n🥇 {completion_count_value}"
     if error_words_lines:
         text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
     return text
@@ -241,7 +241,7 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
     body_lines = "\n" + "\n".join(lines) if lines else ''
     medals_line = ''
     if completion_count_value is not None:
-        medals_line = f"\n🥇 Медали: {completion_count_value}"
+        medals_line = f"\n🥇 {completion_count_value}"
 
     return header + medals_line + (extra or '') + ("\n\n" + body_lines if body_lines else '')
 
@@ -1001,7 +1001,7 @@ def save_success():
                         f"Дата: {success_date_iso}"
                     )
                     if completion_count_value is not None:
-                        text = text + f"\n🥇 Медали: {completion_count_value}"
+                        text = text + f"\n🥇 {completion_count_value}"
                     if error_words_lines:
                         text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
                     for cid in teacher_chat_ids:
