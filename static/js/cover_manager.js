@@ -286,6 +286,26 @@
       toggleDragModeOnDblclick: false,
       minCropBoxWidth: 100,
       minCropBoxHeight: 100,
+      ready: function () {
+        try {
+          const mode = activeConfig && activeConfig.fillMode ? String(activeConfig.fillMode) : '';
+          if (mode !== 'cover') return;
+          const c = this.cropper;
+          if (!c) return;
+          const container = c.getContainerData ? c.getContainerData() : null;
+          const img = c.getImageData ? c.getImageData() : null;
+          if (!container || !img) return;
+          const cw = Number(container.width) || 0;
+          const ch = Number(container.height) || 0;
+          const nw = Number(img.naturalWidth) || 0;
+          const nh = Number(img.naturalHeight) || 0;
+          if (cw <= 0 || ch <= 0 || nw <= 0 || nh <= 0) return;
+          const scale = Math.max(cw / nw, ch / nh);
+          if (!Number.isFinite(scale) || scale <= 0) return;
+          c.zoomTo(scale);
+        } catch (e) {
+        }
+      },
     });
 
     try {

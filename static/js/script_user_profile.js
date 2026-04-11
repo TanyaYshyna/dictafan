@@ -1841,10 +1841,11 @@ function initializeTopbarControls() {
                 uploadBtnId: 'avatarUploadButton',
                 previewImgId: ['avatarLarge', 'avatarSmall'],
                 aspectRatio: 1,
+                fillMode: 'cover',
                 outputWidth: 120,
                 outputHeight: 120,
                 outputType: 'image/webp',
-                outputQuality: 0.95,
+                focusConfirm: true,
                 maxFileSizeBytes: 5 * 1024 * 1024,
                 onConfirm: async (blob) => {
                     pendingAvatarBlob = blob;
