@@ -155,6 +155,11 @@ function normalizeCacheKey(requestOrUrl) {
       return `${url.origin}${path}`;
     }
 
+    // Медиа диктанта (аудио + коверы): игнорируем query-параметры, чтобы cache-busting (?v=...) не ломал офлайн.
+    if (path.startsWith('/api/dictations/') || path.startsWith('/api/dictations_covers/')) {
+      return `${url.origin}${path}`;
+    }
+
     return typeof requestOrUrl === 'string' ? raw : requestOrUrl;
   } catch (e) {
     return typeof requestOrUrl === 'string' ? requestOrUrl : requestOrUrl;
@@ -238,6 +243,7 @@ function isMediaUrl(requestUrl) {
     const url = new URL(requestUrl);
     const path = url.pathname;
     if (path.startsWith('/api/dictations/')) return true;
+    if (path.startsWith('/api/dictations_covers/')) return true;
     return false;
   } catch (e) {
     return false;
@@ -453,6 +459,55 @@ self.addEventListener('fetch', (event) => {
           'content-type': 'application/json; charset=utf-8',
           'cache-control': 'no-store',
         },
+      }));
+      return;
+    }
+  } catch (e) {
+  }
+
+  // Коверы диктантов тоже должны работать офлайн (MEDIA_CACHE_PERSIST).
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.startsWith('/api/dictations_covers/')) {
+      const label = `sw#${reqId} dictations_covers ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(MEDIA_CACHE_PERSIST);
+          const cacheKey = normalizeCacheKey(request);
+
+          let cached = await cache.match(cacheKey);
+          if (cached) return cached;
+
+          // Если закешировано без query (старые версии) — подстрахуемся.
+          cached = await cache.match(request, { ignoreSearch: true });
+          if (cached) {
+            try {
+              await cache.put(cacheKey, cached.clone());
+            } catch (e) {
+            }
+            return cached;
+          }
+
+          const netRes = await fetch(request);
+          if (netRes && netRes.ok) {
+            try {
+              await cache.put(cacheKey, netRes.clone());
+            } catch (e) {
+            }
+            return netRes;
+          }
+
+          if (netRes) return netRes;
+        } catch (e) {
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })().finally(() => {
+        swTimeEnd(label);
       }));
       return;
     }

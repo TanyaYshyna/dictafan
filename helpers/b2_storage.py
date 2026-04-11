@@ -37,6 +37,25 @@ class B2Storage:
                 self._initialize()
         else:
             logger.info("B2 Storage disabled (B2_ENABLED is not truthy)")
+
+    def _ensure_initialized(self) -> bool:
+        """Ленивая (пере)инициализация B2.
+
+        На некоторых хостингах бывают временные сетевые сбои при старте приложения.
+        Раньше мы permanently выключали B2 (enabled=False) при ошибке авторизации.
+        Это приводило к длительным 503 до следующего редеплоя.
+        """
+        try:
+            if not self.enabled:
+                return False
+            if self.bucket is not None:
+                return True
+            if not self.key_id or not self.application_key or not self.bucket_name:
+                return False
+            self._initialize()
+            return self.bucket is not None
+        except Exception:
+            return False
     
     def _initialize(self):
         """Инициализация подключения к B2"""
@@ -47,8 +66,11 @@ class B2Storage:
             self.bucket = self.api.get_bucket_by_name(self.bucket_name)
             logger.info(f"B2 Storage initialized: bucket={self.bucket_name}")
         except B2Error as e:
-            logger.error(f"Failed to initialize B2 Storage: {e}")
-            self.enabled = False
+            # Не выключаем B2 навсегда: это может быть временная ошибка сети/авторизации.
+            # Пусть эндпоинты попробуют переинициализироваться позже.
+            logger.error("Failed to initialize B2 Storage: %s", e, exc_info=True)
+            self.api = None
+            self.bucket = None
     
     def upload_file(self, local_path, remote_path):
         """
@@ -61,7 +83,7 @@ class B2Storage:
         Returns:
             URL файла или None при ошибке
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             if self.enabled and not self.bucket:
                 logger.error("B2 Storage is enabled but bucket is not initialized; cannot upload %s", remote_path)
             return None
@@ -87,7 +109,7 @@ class B2Storage:
         Args:
             remote_path: Путь к файлу в B2
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return False
         
         try:
@@ -128,7 +150,7 @@ class B2Storage:
         Returns:
         True если файл существует, False иначе
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return False
         
         try:
@@ -153,7 +175,7 @@ class B2Storage:
         Returns:
             URL или None
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return None
         
         try:
@@ -175,7 +197,7 @@ class B2Storage:
         Returns:
             True если успешно, False иначе
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return False
         
         try:
@@ -186,14 +208,16 @@ class B2Storage:
             if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                 return True
             return False
-        except B2Error:
+        except B2Error as e:
+            logger.error("B2 download_file failed for %s: %s", remote_path, e, exc_info=True)
             return False
-        except Exception:
+        except Exception as e:
+            logger.error("B2 download_file unexpected error for %s: %s", remote_path, e, exc_info=True)
             return False
 
     def list_files(self, path_prefix: str = ""):
         """Возвращает список файлов в B2, начинающихся с prefix."""
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return []
         prefix = str(path_prefix or "")
         out = []
@@ -223,7 +247,7 @@ class B2Storage:
         delete_file() через get_file_info_by_name удаляет только текущую версию.
         Поэтому здесь мы удаляем КАЖДУЮ версию, возвращаемую bucket.ls().
         """
-        if not self.enabled or not self.bucket:
+        if not self._ensure_initialized() or not self.bucket:
             return 0
 
         prefix = str(path_prefix or "")
