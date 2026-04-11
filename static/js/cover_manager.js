@@ -18,13 +18,34 @@
     }
   }
 
+  function getAvatarUploadedVersion() {
+    try {
+      const um = window && window.UM ? window.UM : null;
+      const ud = um && um.userData ? um.userData : null;
+      const av = ud && ud.avatar ? ud.avatar : null;
+      const v = av && av.uploaded ? String(av.uploaded).trim() : '';
+      return v || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
   function withCacheBust(url) {
     try {
-      if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBust === 'function') {
-        return window.BuildHelpers.withCacheBust(url, getAppBuildValue());
-      }
       const u = String(url || '');
       if (!u) return u;
+
+      // Для аватаров используем стабильную версию на основе момента загрузки.
+      // Это гарантирует, что после загрузки новый аватар не залипнет на закешированной старой картинке.
+      if (u.startsWith('/user/api/avatar')) {
+        const uploadedV = getAvatarUploadedVersion();
+        if (uploadedV) return withCacheBustVersion(u, uploadedV);
+      }
+
+      if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBust === 'function') {
+        return window.BuildHelpers.withCacheBust(u, getAppBuildValue());
+      }
+
       const sep = u.includes('?') ? '&' : '?';
       return `${u}${sep}v=${encodeURIComponent(getAppBuildValue())}`;
     } catch (e) {
