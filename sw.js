@@ -416,18 +416,40 @@ async function cacheAudioFullFileInBackground(url) {
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
+
+  // Минимальный app shell prefetch: чтобы приложение открывалось офлайн даже сразу после обновления SW.
+  // Важно: кешируем только URL без build query, которые существуют стабильно.
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+      const urls = [
+        '/',
+        '/static/css/style.css',
+        '/static/css/style_color.css',
+      ];
+      await Promise.all(urls.map(async (url) => {
+        try {
+          const absolute = new URL(url, self.location.origin).toString();
+          const key = normalizeCacheKey(absolute);
+          const cached = await cache.match(key);
+          if (cached) return;
+          const res = await fetch(new Request(url, { method: 'GET' }));
+          if (res && res.ok) {
+            await cache.put(key, res.clone());
+          }
+        } catch (e) {
+        }
+      }));
+    } catch (e) {
+    }
+  })());
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
-    const keys = await caches.keys();
-    // Удаляем только устаревшие версионированные runtime-кеши. MEDIA_CACHE_PERSIST сохраняем.
-    await Promise.all(keys.map((key) => {
-      if (key.startsWith('dictafan-runtime-') && key !== RUNTIME_CACHE_BOUNDED && key !== RUNTIME_CACHE_UNBOUNDED) {
-        return caches.delete(key);
-      }
-      return undefined;
-    }));
+    // ВАЖНО: не удаляем старые runtime-кеши автоматически.
+    // Иначе после деплоя новый SW может удалить app shell (HTML/JS/CSS), и приложение перестанет
+    // открываться офлайн до следующего успешного онлайн-прогрева.
     await self.clients.claim();
   })());
 });

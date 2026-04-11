@@ -7,6 +7,109 @@
   let croppedImageBlob = null;
   let activeConfig = null;
 
+  function getAppBuildValue() {
+    try {
+      const v = (window && (window.__APP_BUILD || window.__APP_CACHE_REVISION))
+        ? String(window.__APP_BUILD || window.__APP_CACHE_REVISION)
+        : '';
+      return v || '1';
+    } catch (e) {
+      return '1';
+    }
+  }
+
+  function withCacheBust(url) {
+    try {
+      if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBust === 'function') {
+        return window.BuildHelpers.withCacheBust(url, getAppBuildValue());
+      }
+      const u = String(url || '');
+      if (!u) return u;
+      const sep = u.includes('?') ? '&' : '?';
+      return `${u}${sep}v=${encodeURIComponent(getAppBuildValue())}`;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function withCacheBustVersion(url, version) {
+    try {
+      if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBustVersion === 'function') {
+        return window.BuildHelpers.withCacheBustVersion(url, version, getAppBuildValue());
+      }
+      const u = String(url || '');
+      if (!u) return u;
+      const v = (version !== undefined && version !== null && String(version).trim())
+        ? String(version).trim()
+        : getAppBuildValue();
+      const sep = u.includes('?') ? '&' : '?';
+      return `${u}${sep}v=${encodeURIComponent(v)}`;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function maybeCacheBustDictationCover(url) {
+    try {
+      const u = String(url || '');
+      if (!u) return u;
+      if (u.startsWith('/api/dictations_covers/')) {
+        return withCacheBust(u);
+      }
+      return u;
+    } catch (e) {
+      return url;
+    }
+  }
+
+  function avatarUrlForUser(userId, size = 'small') {
+    try {
+      if (!userId) return '';
+      const id = encodeURIComponent(String(userId));
+      const s = encodeURIComponent(String(size || 'small'));
+      return `/user/api/avatar?user_id=${id}&size=${s}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  async function prefetchUrls(urls) {
+    try {
+      if (!('serviceWorker' in navigator)) return { ok: false, error: 'no_sw' };
+      if (!navigator.serviceWorker.controller) return { ok: false, error: 'no_controller' };
+      const list = Array.isArray(urls) ? urls : [];
+      const ch = new MessageChannel();
+      const res = await new Promise((resolve) => {
+        let done = false;
+        const t = setTimeout(() => {
+          if (done) return;
+          done = true;
+          resolve({ ok: false, error: 'timeout' });
+        }, 15000);
+        ch.port1.onmessage = (ev) => {
+          if (done) return;
+          done = true;
+          clearTimeout(t);
+          const data = ev && ev.data ? ev.data : {};
+          if (data && data.success) {
+            resolve({ ok: true, result: data.result });
+          } else {
+            resolve({ ok: false, error: data.error || 'sw_error', result: data.result });
+          }
+        };
+        try {
+          navigator.serviceWorker.controller.postMessage({ action: 'prefetch', urls: list }, [ch.port2]);
+        } catch (e) {
+          clearTimeout(t);
+          resolve({ ok: false, error: 'postMessage_failed' });
+        }
+      });
+      return res;
+    } catch (e) {
+      return { ok: false, error: 'exception' };
+    }
+  }
+
   function normIdList(v) {
     if (!v) return [];
     if (Array.isArray(v)) return v.filter(Boolean).map(String);
@@ -351,5 +454,10 @@
     handleCropConfirm,
     getCroppedBlob,
     clearCroppedBlob,
+    withCacheBust,
+    withCacheBustVersion,
+    maybeCacheBustDictationCover,
+    avatarUrlForUser,
+    prefetchUrls,
   };
 })();

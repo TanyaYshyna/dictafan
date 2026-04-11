@@ -349,9 +349,7 @@ class UserManager {
       const avatarUrl = this.getAvatarUrl('small');
 
       if (avatarUrl) {
-        // Добавляем временную метку для избежания кэширования
-        const avatarUrlWithTimestamp = `${avatarUrl}&t=${Date.now()}`;
-        avatarElement.style.backgroundImage = `url(${avatarUrlWithTimestamp})`;
+        avatarElement.style.backgroundImage = `url(${window.CoverManager.withCacheBust(avatarUrl)})`;
         avatarElement.style.backgroundSize = 'cover';
         avatarElement.style.backgroundPosition = 'center';
         avatarElement.style.width = '32px';

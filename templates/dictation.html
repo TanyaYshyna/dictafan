@@ -494,6 +494,8 @@
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
 
+    <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>
+
     <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
     <div id="dictation-data" data-language-original="{{ language_original }}"
         data-language-translation="{{ language_translation }}" data-lang-notice="{{ lang_notice|default('') }}" data-title-orig="{{ title_orig }}"

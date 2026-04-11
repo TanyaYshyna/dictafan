@@ -2090,14 +2090,19 @@ function updateAvatarDisplay(avatar) {
         // Используем large, medium или original в зависимости от того, что есть
         const largeUrl = avatar.large || avatar.medium || avatar.original;
         const smallUrl = avatar.small || avatar.medium || avatar.original || largeUrl;
-        
-        // Добавляем timestamp для избежания кеширования
-        const timestamp = new Date().getTime();
-        const largeUrlWithTimestamp = largeUrl + (largeUrl.includes('?') ? '&' : '?') + 't=' + timestamp;
-        const smallUrlWithTimestamp = smallUrl + (smallUrl.includes('?') ? '&' : '?') + 't=' + timestamp;
-        
-        avatarLarge.src = largeUrlWithTimestamp;
-        avatarSmall.src = smallUrlWithTimestamp;
+
+        let finalLarge = largeUrl;
+        let finalSmall = smallUrl;
+        try {
+            if (window && window.CoverManager && typeof window.CoverManager.withCacheBust === 'function') {
+                finalLarge = window.CoverManager.withCacheBust(largeUrl);
+                finalSmall = window.CoverManager.withCacheBust(smallUrl);
+            }
+        } catch (e) {
+        }
+
+        avatarLarge.src = finalLarge;
+        avatarSmall.src = finalSmall;
         
         // console.log('Установлены URL аватаров:', { large: largeUrlWithTimestamp, small: smallUrlWithTimestamp });
     } else {

@@ -2577,30 +2577,15 @@ async function idbGetAll(storeName) {
 }
 
 function withCacheBust(url) {
-  if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBust === 'function') {
-    return window.BuildHelpers.withCacheBust(url, __APP_BUILD_LOCAL);
-  }
-  return url;
+  return window.CoverManager.withCacheBust(url);
 }
 
 function withCacheBustVersion(url, version) {
-  if (window && window.BuildHelpers && typeof window.BuildHelpers.withCacheBustVersion === 'function') {
-    return window.BuildHelpers.withCacheBustVersion(url, version, __APP_BUILD_LOCAL);
-  }
-  return url;
+  return window.CoverManager.withCacheBustVersion(url, version);
 }
 
 function maybeCacheBustDictationCover(url) {
-  try {
-    const u = String(url || '');
-    if (!u) return u;
-    if (u.startsWith('/api/dictations_covers/')) {
-      return withCacheBust(u);
-    }
-    return u;
-  } catch (e) {
-    return url;
-  }
+  return window.CoverManager.maybeCacheBustDictationCover(url);
 }
 
 async function apiRequest(url, options = {}) {

@@ -601,17 +601,7 @@ function resolveSentenceAudioUrl(sentence, fieldName) {
 }
 
 function maybeCacheBustDictationCover(url) {
-    try {
-        const u = String(url || '');
-        if (!u) return u;
-        if (u.startsWith('/api/dictations_covers/')) {
-            const sep = u.includes('?') ? '&' : '?';
-            return `${u}${sep}v=${Date.now()}`;
-        }
-        return u;
-    } catch (e) {
-        return url;
-    }
+    return window.CoverManager.maybeCacheBustDictationCover(url);
 }
 
 function showDictationCacheFetchOverlay(text) {
