@@ -441,11 +441,31 @@ def api_get_current_user():
     user_id = user_data['id']
     avatar_large_url = f'/user/api/avatar?user_id={user_id}&size=large'
     avatar_small_url = f'/user/api/avatar?user_id={user_id}&size=small'
+
+    avatar_uploaded = None
+    try:
+        data_base = os.getenv('STATIC_DATA_FOLDER')
+        if not data_base:
+            from flask import current_app
+            data_base = os.path.join(current_app.root_path, 'static', 'data')
+        user_folder = os.path.join(data_base, 'users', f'user_{user_id}')
+        avatar_path = os.path.join(user_folder, 'avatar.webp')
+        if os.path.exists(avatar_path):
+            ts = os.path.getmtime(avatar_path)
+            avatar_uploaded = datetime.utcfromtimestamp(ts).isoformat() + 'Z'
+    except Exception:
+        avatar_uploaded = None
     
     user_copy['avatar'] = {
         'large': avatar_large_url,
         'small': avatar_small_url,
     }
+
+    try:
+        if avatar_uploaded:
+            user_copy['avatar']['uploaded'] = avatar_uploaded
+    except Exception:
+        pass
     
     return jsonify(user_copy)
 

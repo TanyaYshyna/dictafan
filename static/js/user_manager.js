@@ -658,10 +658,11 @@ class UserManager {
         
         // Обновляем userData с новой информацией об аватаре
         if (this.userData) {
+          const uploadedVersion = new Date().toISOString();
           this.userData.avatar = {
             large: result.avatar_urls.large,
             small: result.avatar_urls.small,
-            uploaded: new Date().toISOString()
+            uploaded: uploadedVersion
           };
         }
         
@@ -675,11 +676,28 @@ class UserManager {
         });
         
         if (userResponse.ok) {
+          let prevUploaded = '';
+          try {
+            prevUploaded = String(this.userData?.avatar?.uploaded || '').trim();
+          } catch (e) {
+            prevUploaded = '';
+          }
+
           const updatedUserData = await userResponse.json();
           // Убираем пароль из данных
           if ('password' in updatedUserData) {
             delete updatedUserData.password;
           }
+          try {
+            if (prevUploaded) {
+              if (!updatedUserData.avatar || typeof updatedUserData.avatar !== 'object') {
+                updatedUserData.avatar = {};
+              }
+              updatedUserData.avatar.uploaded = prevUploaded;
+            }
+          } catch (e) {
+          }
+
           this.userData = updatedUserData;
           this._saveUserCache(this.userData);
         }

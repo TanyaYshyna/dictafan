@@ -35,8 +35,6 @@
       const u = String(url || '');
       if (!u) return u;
 
-      // Для аватаров используем стабильную версию на основе момента загрузки.
-      // Это гарантирует, что после загрузки новый аватар не залипнет на закешированной старой картинке.
       if (u.startsWith('/user/api/avatar')) {
         const uploadedV = getAvatarUploadedVersion();
         if (uploadedV) return withCacheBustVersion(u, uploadedV);
