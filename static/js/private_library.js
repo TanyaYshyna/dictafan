@@ -2707,7 +2707,7 @@ async function _fetchSentencesFromServer(dictKey, langOrig, langTr) {
   return sentences;
 }
 
-function _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences }) {
+function _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences, includeOriginal = true, includeTranslation = true }) {
   const urls = [];
   try {
     const am = window.AudioManager;
@@ -2722,8 +2722,8 @@ function _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences }
       if (!s || typeof s !== 'object') continue;
       const audio = s.audio != null ? String(s.audio || '').trim() : '';
       const audioTr = s.audio_tr != null ? String(s.audio_tr || '').trim() : '';
-      if (audio) urls.push(am.buildDictationAudioUrl(dictId, lo, audio));
-      if (audioTr) urls.push(am.buildDictationAudioUrl(dictId, lt, audioTr));
+      if (includeOriginal && audio) urls.push(am.buildDictationAudioUrl(dictId, lo, audio));
+      if (includeTranslation && audioTr) urls.push(am.buildDictationAudioUrl(dictId, lt, audioTr));
     }
   } catch (e) {
   }
@@ -2760,14 +2760,68 @@ async function prefetchDictationToCache({ dictationId, langOrig, translationLang
     const allAudioUrls = [];
     let cachedPairs = 0;
 
+    // First: cache original text (lo -> lo) and collect ONLY original audio once.
+    try {
+      const msg = `Текст: ${lo} → ${lo}`;
+      try {
+        const overlay = document.getElementById('loading-overlay');
+        const textEl = overlay ? overlay.querySelector('.loading-text') : null;
+        if (textEl) textEl.textContent = msg;
+      } catch (e) {
+      }
+
+      const sentences = await _fetchSentencesFromServer(dictKey, lo, lo);
+
+      const keysToWrite = new Set();
+      keysToWrite.add(`${userId}:${dictKey}:${lo}:${lo}`);
+      keysToWrite.add(`anon:${dictKey}:${lo}:${lo}`);
+      try {
+        const n = parseInt(dictKey.replace(/^dict_/, ''), 10);
+        if (Number.isFinite(n)) {
+          keysToWrite.add(`${userId}:${n}:${lo}:${lo}`);
+          keysToWrite.add(`${userId}:dict_${n}:${lo}:${lo}`);
+          keysToWrite.add(`anon:dict_${n}:${lo}:${lo}`);
+        }
+      } catch (e) {
+      }
+
+      for (const key of keysToWrite) {
+        await idbPut('dictations', {
+          key,
+          dictationId: dictKey,
+          langOrig: lo,
+          langTr: lo,
+          sentences,
+          updatedAt,
+        });
+      }
+      cachedPairs += 1;
+
+      const audioUrls = _collectAudioUrlsFromSentences({
+        dictKey,
+        langOrig: lo,
+        langTr: lo,
+        sentences,
+        includeOriginal: true,
+        includeTranslation: false,
+      });
+      for (const u of audioUrls) allAudioUrls.push(u);
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      throw new Error(`cache_text_failed_${msg}`);
+    }
+
+    // Then: cache translations (lo -> lt) and collect ONLY translation audio.
     for (const lt of finalLangs) {
+      if (lt === lo) continue;
       try {
         const msg = `Текст: ${lo} → ${lt}`;
         try {
           const overlay = document.getElementById('loading-overlay');
           const textEl = overlay ? overlay.querySelector('.loading-text') : null;
           if (textEl) textEl.textContent = msg;
-        } catch (e) {}
+        } catch (e) {
+        }
 
         const sentences = await _fetchSentencesFromServer(dictKey, lo, lt);
 
@@ -2796,7 +2850,14 @@ async function prefetchDictationToCache({ dictationId, langOrig, translationLang
         }
         cachedPairs += 1;
 
-        const audioUrls = _collectAudioUrlsFromSentences({ dictKey, langOrig: lo, langTr: lt, sentences });
+        const audioUrls = _collectAudioUrlsFromSentences({
+          dictKey,
+          langOrig: lo,
+          langTr: lt,
+          sentences,
+          includeOriginal: false,
+          includeTranslation: true,
+        });
         for (const u of audioUrls) allAudioUrls.push(u);
       } catch (e) {
         const msg = e && e.message ? e.message : String(e);
@@ -6564,7 +6625,11 @@ function installEventHandlers() {
       }
 
       try {
-        const container = document.getElementById('deskContainer') || document;
+        const card = btn && btn.closest ? btn.closest('.short-card') : null;
+        if (card) {
+          card.classList.add('short-card--cached');
+        }
+        const container = document.getElementById('deskCardsContainer') || document.getElementById('deskContainer') || document;
         await applyCachedDictationCardStyles(container);
       } catch (e) {
       }

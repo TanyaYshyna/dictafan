@@ -660,18 +660,24 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                 min_start = target_date if (min_start is None or target_date < min_start) else min_start
                 max_end = target_date if (max_end is None or target_date > max_end) else max_end
 
-        counts_by_dict_day: dict[int, dict[date, int]] = {}
+        # Completion counts depend on assignment's selected_sentence_positions.
+        # NULL means: full dictation (all sentences).
+        # For plan UI, we only count successes where hs.selected_sentence_positions matches assignment selection.
+        counts_by_dict_day_positions: dict[int, dict[date, dict[tuple[int, ...] | None, int]]] = {}
         if dictation_ids and min_start and max_end:
             t_cnt0 = time.perf_counter()
             cur.execute(
                 """
-                SELECT hs.dictation_id, hs.created_at::date AS d, COUNT(*)::int AS cnt
+                SELECT hs.dictation_id,
+                       hs.created_at::date AS d,
+                       hs.selected_sentence_positions,
+                       COUNT(*)::int AS cnt
                 FROM history_successes hs
                 WHERE hs.user_id = %s
                   AND hs.dictation_id = ANY(%s)
                   AND hs.created_at::date >= %s
                   AND hs.created_at::date <= %s
-                GROUP BY hs.dictation_id, hs.created_at::date
+                GROUP BY hs.dictation_id, hs.created_at::date, hs.selected_sentence_positions
                 """,
                 (student_user_id, list(set(dictation_ids)), min_start, max_end),
             )
@@ -680,10 +686,21 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                     did = int(rr.get("dictation_id"))
                     day = rr.get("d")
                     cnt = int(rr.get("cnt") or 0)
-                    if did not in counts_by_dict_day:
-                        counts_by_dict_day[did] = {}
+
+                    raw_pos = rr.get("selected_sentence_positions")
+                    pos_key = None
+                    if raw_pos is not None:
+                        try:
+                            pos_key = tuple(int(x) for x in list(raw_pos or []))
+                        except Exception:
+                            pos_key = None
+
+                    if did not in counts_by_dict_day_positions:
+                        counts_by_dict_day_positions[did] = {}
                     if isinstance(day, date):
-                        counts_by_dict_day[did][day] = cnt
+                        if day not in counts_by_dict_day_positions[did]:
+                            counts_by_dict_day_positions[did][day] = {}
+                        counts_by_dict_day_positions[did][day][pos_key] = cnt
                 except Exception:
                     continue
             t_cnt1 = time.perf_counter()
@@ -719,8 +736,22 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             end_d = target_date
             did = a.get("dictation_id")
             did_int = int(did) if did is not None else None
-            if did_int is not None and did_int in counts_by_dict_day and target_date:
-                a["done"] = int(counts_by_dict_day.get(did_int, {}).get(target_date, 0) or 0)
+            if did_int is not None and target_date:
+                pos_key = None
+                try:
+                    pos = a.get("selected_sentence_positions")
+                    if pos is not None:
+                        pos_key = tuple(int(x) for x in list(pos or []))
+                except Exception:
+                    pos_key = None
+
+                a["done"] = int(
+                    counts_by_dict_day_positions
+                    .get(did_int, {})
+                    .get(target_date, {})
+                    .get(pos_key, 0)
+                    or 0
+                )
             else:
                 a["done"] = 0
             try:

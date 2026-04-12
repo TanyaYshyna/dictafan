@@ -914,6 +914,7 @@ def save_success():
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         completion_count_after = data.get('completion_count_after')
+        selected_sentence_positions = data.get('selected_sentence_positions')
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -944,6 +945,7 @@ def save_success():
             attempts_total,
             error_count,
             source_group_id=source_group_id,
+            selected_sentence_positions=selected_sentence_positions,
         )
 
         # Telegram уведомления отправляются отдельной процедурой /teacher_report/send_auto

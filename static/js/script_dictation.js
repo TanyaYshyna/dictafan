@@ -1414,6 +1414,9 @@ async function enqueueOfflineSuccess(payload) {
             error_count: (Number(existing.payload.error_count) || 0) + (Number(payload.error_count) || 0),
             time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
             source_group_id: (existing.payload.source_group_id != null) ? existing.payload.source_group_id : payload.source_group_id,
+            selected_sentence_positions: (existing.payload.selected_sentence_positions != null)
+                ? existing.payload.selected_sentence_positions
+                : payload.selected_sentence_positions,
             sentences_data: mergeSentencesData(existing.payload.sentences_data, payload.sentences_data),
             settings_json: payload.settings_json || existing.payload.settings_json,
             error_words: mergeErrorWords(existing.payload.error_words, payload.error_words),
@@ -1830,6 +1833,7 @@ function applyAssignmentSentenceSubsetIfNeeded() {
         window.assignmentRequiredCompletions = Number(ctx.required_completions || 0) || 0;
         window.assignmentSourceGroupId = (ctx.source_group_id !== undefined && ctx.source_group_id !== null) ? Number(ctx.source_group_id) : null;
         window.assignmentSourceGroupTitle = (ctx.source_group_title !== undefined && ctx.source_group_title !== null) ? String(ctx.source_group_title) : null;
+        window.assignmentSelectedSentencePositions = positions;
     } catch (e) {
     }
 
@@ -10327,28 +10331,36 @@ async function registerCompletedDictation() {
                 completionCountAfter = null;
             }
 
+            const payload = {
+                dictation_id: dictationIdForDb,
+                perfect_count: totalPerfect,
+                corrected_count: totalCorrected,
+                audio_count: totalAudio,
+                attempts_total: totalAttempts,
+                error_count: totalErrors,
+                time_ms: totalTimeMs,
+                source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
+                completed_at_ms: completedAtMs,
+                completed_at_tz_offset_min: completedAtTzOffsetMin,
+                completion_count_after: completionCountAfter,
+                sentences_data: sentences_data,
+                settings_json: settings_json,
+                error_words: dictationErrorWordCounts,
+            };
+            try {
+                if (window.assignmentSelectedSentencePositions != null) {
+                    payload.selected_sentence_positions = window.assignmentSelectedSentencePositions;
+                }
+            } catch (e) {
+            }
+
             const successResponse = await fetch('/api/statistics/success', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    dictation_id: dictationIdForDb,
-                    perfect_count: totalPerfect,
-                    corrected_count: totalCorrected,
-                    audio_count: totalAudio,
-                    attempts_total: totalAttempts,
-                    error_count: totalErrors,
-                    time_ms: totalTimeMs,
-                    source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
-                    completed_at_ms: completedAtMs,
-                    completed_at_tz_offset_min: completedAtTzOffsetMin,
-                    completion_count_after: completionCountAfter,
-                    sentences_data: sentences_data,
-                    error_words: dictationErrorWordCounts,
-                    settings_json: settings_json
-                })
+                body: JSON.stringify(payload)
             });
 
             if (successResponse.ok) {
@@ -10388,19 +10400,8 @@ async function registerCompletedDictation() {
                     body: errorText
                 });
                 await enqueueOfflineSuccess({
-                    dictation_id: dictationIdForDb,
-                    perfect_count: totalPerfect,
-                    corrected_count: totalCorrected,
-                    audio_count: totalAudio,
-                    attempts_total: totalAttempts,
-                    error_count: totalErrors,
-                    time_ms: totalTimeMs,
-                    source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
-                    completed_at_ms: completedAtMs,
-                    completed_at_tz_offset_min: completedAtTzOffsetMin,
-                    sentences_data: sentences_data,
-                    error_words: dictationErrorWordCounts,
-                    settings_json: settings_json
+                    ...payload,
+                    completion_count_after: null,
                 });
 
                 // Оффлайн/ошибка сети: успех поставлен в очередь, локально завершаем диктант
