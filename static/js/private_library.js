@@ -423,7 +423,7 @@ function ensureCreateAssignmentModal() {
   modal.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
   modal.style.backdropFilter = 'blur(2px)';
   modal.style.webkitBackdropFilter = 'blur(2px)';
-  modal.style.zIndex = '10094';
+  modal.style.zIndex = '100200';
 
   modal.innerHTML = `
     <div class="modal-content create-assignment-modal-content">
@@ -918,6 +918,30 @@ function _studentPlanRender(panel, dateIso, items) {
   if (subtitle) subtitle.textContent = dateIso ? String(dateIso) : '';
   if (!list) return;
 
+  const buildSubsetLabel = (selectedPositions, totalCount) => {
+    try {
+      const total = Number(totalCount || 0) || 0;
+      const pos = Array.isArray(selectedPositions)
+        ? selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : [];
+      const uniq = Array.from(new Set(pos));
+      uniq.sort((a, b) => a - b);
+      const cnt = uniq.length;
+      const minP = cnt ? uniq[0] : null;
+      const maxP = cnt ? uniq[cnt - 1] : null;
+      if (!cnt) {
+        return total ? `${total}/${total}` : '';
+      }
+      const base = `${cnt}/${total || 0}`;
+      if (minP != null && maxP != null) {
+        return `${base} (${minP}-${maxP})`;
+      }
+      return base;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) {
     list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">На эту дату заданий нет</div>';
@@ -969,11 +993,16 @@ function _studentPlanRender(panel, dateIso, items) {
         : null;
       const selectedPositionsAttr = Array.isArray(selectedPositions) ? selectedPositions.join(',') : '';
 
+      const subsetLabel = buildSubsetLabel(selectedPositions, a && a.dictation_sentences_count);
+
       return `
         <tr>
           <td style="padding:4px 6px 4px 0; font-weight:800; font-size:12px; color: rgba(0,0,0,0.72); text-align:right; white-space:nowrap; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">${escapeHtml(String(groupTitle))}</td>
           <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
             <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:900; font-size:12px; line-height:1;">${done}/${req}</div>
+          </td>
+          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
+            <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111827; font-weight:900; font-size:12px; line-height:1;">${escapeHtml(String(subsetLabel || ''))}</div>
           </td>
           <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
             <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 10px;">Запустить</button>
@@ -1249,6 +1278,30 @@ function _teacherAssignmentsRender(items) {
   const list = document.getElementById('teacher-assignments-list');
   if (!list) return;
 
+  const buildSubsetLabel = (selectedPositions, totalCount) => {
+    try {
+      const total = Number(totalCount || 0) || 0;
+      const pos = Array.isArray(selectedPositions)
+        ? selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
+        : [];
+      const uniq = Array.from(new Set(pos));
+      uniq.sort((a, b) => a - b);
+      const cnt = uniq.length;
+      const minP = cnt ? uniq[0] : null;
+      const maxP = cnt ? uniq[cnt - 1] : null;
+      if (!cnt) {
+        return total ? `${total}/${total}` : '';
+      }
+      const base = `${cnt}/${total || 0}`;
+      if (minP != null && maxP != null) {
+        return `${base} (${minP}-${maxP})`;
+      }
+      return base;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) {
     list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Заданий нет</div>';
@@ -1263,12 +1316,9 @@ function _teacherAssignmentsRender(items) {
     const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
       ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
       : null;
-    const subsetCount = (selectedPositions && selectedPositions.length) ? selectedPositions.length : null;
-    const groupSubsetCount = (subsetCount != null) ? subsetCount : (sentencesCount || 0);
-    const groupLabel = groupTitle ? `${groupTitle} (${groupSubsetCount})` : '';
-    const sentenceCountLabel = (subsetCount != null && subsetCount >= 0)
-      ? `${subsetCount}/${(sentencesCount || 0)}`
-      : String(sentencesCount || 0);
+    const subsetLabel = buildSubsetLabel(selectedPositions, sentencesCount);
+    const groupLabel = groupTitle ? `${groupTitle}${subsetLabel ? ` · ${subsetLabel}` : ''}` : '';
+    const sentenceCountLabel = subsetLabel ? subsetLabel : String(sentencesCount || 0);
     const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
     const days = Array.isArray(a && a.days ? a.days : null) ? a.days : [];
     const dayDates = days
@@ -1667,6 +1717,13 @@ async function openCreateAssignmentModal(dictationId) {
   const options = arguments && arguments.length > 1 ? arguments[1] : null;
 
   try {
+    // Ensure create-assignment modal is always above side panels.
+    const z = parseInt(String(modal.style.zIndex || '0'), 10);
+    modal.style.zIndex = String(Number.isFinite(z) ? Math.max(z, 100200) : 100200);
+  } catch (e) {
+  }
+
+  try {
     if (options && typeof options === 'object') {
       if (options.edit_assignment_id != null) {
         modal.dataset.editAssignmentId = String(options.edit_assignment_id);
@@ -1947,7 +2004,11 @@ async function openCreateAssignmentModal(dictationId) {
           });
 
         if (!res || !res.success) {
-          showToast(res && res.error ? String(res.error) : 'Ошибка сохранения', { durationMs: 2500 });
+          const rawErr = res && res.error ? String(res.error) : '';
+          const friendly = (rawErr && rawErr.toLowerCase().includes('overlap'))
+            ? 'На выбранные даты уже есть задание для этого диктанта и этого же набора предложений. Если хочешь второе задание — выбери другой набор предложений или другую дату.'
+            : (rawErr || 'Ошибка сохранения');
+          showToast(friendly, { durationMs: 4000 });
           return;
         }
 
@@ -2586,6 +2647,210 @@ function withCacheBustVersion(url, version) {
 
 function maybeCacheBustDictationCover(url) {
   return window.CoverManager.maybeCacheBustDictationCover(url);
+}
+
+function getDraftUserIdForKey() {
+  try {
+    const um = window.UM;
+    const id = um && um.userData ? um.userData.id : null;
+    return id ? String(id) : 'anon';
+  } catch (e) {
+    return 'anon';
+  }
+}
+
+function _normalizeLangCodeSafe(v) {
+  try {
+    const s = String(v || '').trim().toLowerCase();
+    return s || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function _dictationIdToDictKey(dictationId) {
+  const raw = String(dictationId || '').trim();
+  if (!raw) return '';
+  return raw.startsWith('dict_') ? raw : `dict_${raw}`;
+}
+
+function _buildSentencesUrl(dictKey, langOrig, langTr) {
+  const d = _dictationIdToDictKey(dictKey);
+  const lo = _normalizeLangCodeSafe(langOrig);
+  const lt = _normalizeLangCodeSafe(langTr);
+  if (!d || !lo || !lt) return '';
+  return `/api/dictation/${encodeURIComponent(d)}/${encodeURIComponent(lo)}/${encodeURIComponent(lt)}/sentences`;
+}
+
+async function _fetchSentencesFromServer(dictKey, langOrig, langTr) {
+  const url = _buildSentencesUrl(dictKey, langOrig, langTr);
+  if (!url) throw new Error('bad_sentences_url');
+  const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+  if (!res.ok) {
+    let t = '';
+    try { t = await res.text(); } catch (e) {}
+    throw new Error(`fetch_sentences_failed_${res.status}_${t}`);
+  }
+  const data = await res.json();
+  const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
+  if (!sentences.length) throw new Error('empty_sentences');
+  sentences.sort((a, b) => {
+    const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
+    const bp = (b && b.position !== undefined && b.position !== null && isFinite(Number(b.position))) ? Number(b.position) : null;
+    if (ap !== null && bp !== null) return ap - bp;
+    if (ap !== null) return -1;
+    if (bp !== null) return 1;
+    const ak = a && a.key ? String(a.key) : '';
+    const bk = b && b.key ? String(b.key) : '';
+    return ak.localeCompare(bk);
+  });
+  return sentences;
+}
+
+function _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences }) {
+  const urls = [];
+  try {
+    const am = window.AudioManager;
+    if (!am || typeof am.buildDictationAudioUrl !== 'function' || typeof am.normalizeMediaUrl !== 'function') {
+      return [];
+    }
+    const dictId = _dictationIdToDictKey(dictKey);
+    const lo = _normalizeLangCodeSafe(langOrig);
+    const lt = _normalizeLangCodeSafe(langTr);
+    const list = Array.isArray(sentences) ? sentences : [];
+    for (const s of list) {
+      if (!s || typeof s !== 'object') continue;
+      const audio = s.audio != null ? String(s.audio || '').trim() : '';
+      const audioTr = s.audio_tr != null ? String(s.audio_tr || '').trim() : '';
+      if (audio) urls.push(am.buildDictationAudioUrl(dictId, lo, audio));
+      if (audioTr) urls.push(am.buildDictationAudioUrl(dictId, lt, audioTr));
+    }
+  } catch (e) {
+  }
+  return Array.from(new Set(urls.filter(Boolean)));
+}
+
+async function prefetchDictationToCache({ dictationId, langOrig, translationLanguages, coverUrl }) {
+  const numericId = String(dictationId || '').trim().replace(/^dict_/, '').trim();
+  const dictKey = _dictationIdToDictKey(numericId);
+  const lo = _normalizeLangCodeSafe(langOrig);
+  const langs = Array.isArray(translationLanguages)
+    ? translationLanguages.map(_normalizeLangCodeSafe).filter(Boolean)
+    : [];
+  const finalLangs = Array.from(new Set([lo, ...langs])).filter(Boolean);
+  if (!dictKey || !lo) {
+    throw new Error('missing_dictation_params');
+  }
+
+  showLoadingIndicator('Получаем в кеш…');
+
+  try {
+    try {
+      await swRequest('purgeDictation', { dictationId: dictKey });
+    } catch (e) {
+    }
+    try {
+      await idbDeleteDictationCache(dictKey);
+    } catch (e) {
+    }
+
+    const userId = String(getDraftUserIdForKey());
+    const updatedAt = Date.now();
+
+    const allAudioUrls = [];
+    let cachedPairs = 0;
+
+    for (const lt of finalLangs) {
+      try {
+        const msg = `Текст: ${lo} → ${lt}`;
+        try {
+          const overlay = document.getElementById('loading-overlay');
+          const textEl = overlay ? overlay.querySelector('.loading-text') : null;
+          if (textEl) textEl.textContent = msg;
+        } catch (e) {}
+
+        const sentences = await _fetchSentencesFromServer(dictKey, lo, lt);
+
+        const keysToWrite = new Set();
+        keysToWrite.add(`${userId}:${dictKey}:${lo}:${lt}`);
+        keysToWrite.add(`anon:${dictKey}:${lo}:${lt}`);
+        try {
+          const n = parseInt(dictKey.replace(/^dict_/, ''), 10);
+          if (Number.isFinite(n)) {
+            keysToWrite.add(`${userId}:${n}:${lo}:${lt}`);
+            keysToWrite.add(`${userId}:dict_${n}:${lo}:${lt}`);
+            keysToWrite.add(`anon:dict_${n}:${lo}:${lt}`);
+          }
+        } catch (e) {
+        }
+
+        for (const key of keysToWrite) {
+          await idbPut('dictations', {
+            key,
+            dictationId: dictKey,
+            langOrig: lo,
+            langTr: lt,
+            sentences,
+            updatedAt,
+          });
+        }
+        cachedPairs += 1;
+
+        const audioUrls = _collectAudioUrlsFromSentences({ dictKey, langOrig: lo, langTr: lt, sentences });
+        for (const u of audioUrls) allAudioUrls.push(u);
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        throw new Error(`cache_text_failed_${msg}`);
+      }
+    }
+
+    const uniqueAudio = Array.from(new Set(allAudioUrls.filter(Boolean)));
+
+    try {
+      const cover = String(coverUrl || '').trim();
+      const coverToFetch = cover
+        ? maybeCacheBustDictationCover(cover)
+        : `/api/dictations_covers/${encodeURIComponent(numericId)}.webp`;
+      try {
+        const overlay = document.getElementById('loading-overlay');
+        const textEl = overlay ? overlay.querySelector('.loading-text') : null;
+        if (textEl) textEl.textContent = 'Обложка…';
+      } catch (e) {}
+      await swRequest('prefetchStrict', { urls: [coverToFetch], ignoreLimit: true });
+    } catch (e) {
+    }
+
+    try {
+      if (uniqueAudio.length) {
+        try {
+          const overlay = document.getElementById('loading-overlay');
+          const textEl = overlay ? overlay.querySelector('.loading-text') : null;
+          if (textEl) textEl.textContent = `Аудио… (${uniqueAudio.length})`;
+        } catch (e) {}
+
+        if (window.AudioManager && typeof window.AudioManager.prefetchMediaUrls === 'function') {
+          await window.AudioManager.prefetchMediaUrls(uniqueAudio, { concurrency: 4 });
+        } else {
+          await swRequest('prefetchStrict', { urls: uniqueAudio, ignoreLimit: true });
+        }
+      }
+    } catch (e) {
+      const msg = e && e.message ? e.message : String(e);
+      throw new Error(`cache_audio_failed_${msg}`);
+    }
+
+    completeLoadingIndicator(`В кеше: ${cachedPairs} языков, аудио ${uniqueAudio.length}`, 1200);
+    return { ok: true, cachedPairs, audio: uniqueAudio.length };
+  } finally {
+    try {
+      const overlay = document.getElementById('loading-overlay');
+      if (!overlay || overlay.dataset.autoclosing !== '1') {
+        hideLoadingIndicator();
+      }
+    } catch (e) {
+      hideLoadingIndicator();
+    }
+  }
 }
 
 async function apiRequest(url, options = {}) {
@@ -4092,6 +4357,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
                   <i data-lucide="pencil-ruler"></i>
                   <span>Редактировать</span>
+                </button>
+                <button class="dropdown-menu-item" type="button" data-action="prefetch-dictation-cache" data-dictation-id="${dictationId}" data-lang-original="${escapeHtml(langOriginal)}" data-cover-url="${escapeHtml(coverUrl || '')}" data-translation-langs="${escapeHtml(availableTranslations.join(','))}">
+                  <i data-lucide="download"></i>
+                  <span>Получить в кеш</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
                   <i data-lucide="clipboard-list"></i>
@@ -6256,6 +6525,51 @@ function installEventHandlers() {
       if (itemId && dictationId) {
         await removeFromDesk(itemId, dictationId);
       }
+    }
+
+    if (e.target.closest('[data-action="prefetch-dictation-cache"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="prefetch-dictation-cache"]');
+      const dictationId = btn ? btn.getAttribute('data-dictation-id') : '';
+      const langOriginal = btn ? btn.getAttribute('data-lang-original') : '';
+      const coverUrl = btn ? btn.getAttribute('data-cover-url') : '';
+      const rawTranslations = btn ? btn.getAttribute('data-translation-langs') : '';
+      const translationLanguages = String(rawTranslations || '')
+        .split(',')
+        .map(s => String(s || '').trim())
+        .filter(Boolean);
+
+      const menu = btn.closest('.short-card-actions-menu');
+      if (menu) {
+        menu.classList.remove('show');
+        menu.style.display = 'none';
+        const card = menu.closest ? menu.closest('.short-card') : null;
+        if (card) card.classList.remove('short-card--menu-open');
+      }
+
+      try {
+        await prefetchDictationToCache({
+          dictationId,
+          langOrig: langOriginal,
+          translationLanguages,
+          coverUrl,
+        });
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        try {
+          showToast(`Не удалось получить в кеш: ${msg}`);
+        } catch (e2) {
+        }
+      }
+
+      try {
+        const container = document.getElementById('deskContainer') || document;
+        await applyCachedDictationCardStyles(container);
+      } catch (e) {
+      }
+
+      return;
     }
 
     if (e.target.closest('[data-action="show-in-book"]')) {

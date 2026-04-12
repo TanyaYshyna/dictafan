@@ -43,8 +43,16 @@ def _ensure_teacher_of_group(cur, group_id: int, teacher_user_id: int) -> None:
         raise PermissionError("Not a group teacher")
 
 
-def _check_overlap_day(cur, *, group_id: int, dictation_id: int, day_date: date, ignore_assignment_ids: Optional[list[int]] = None) -> None:
-    params: list[Any] = [group_id, dictation_id, day_date]
+def _check_overlap_day(
+    cur,
+    *,
+    group_id: int,
+    dictation_id: int,
+    day_date: date,
+    selected_sentence_positions: Any = None,
+    ignore_assignment_ids: Optional[list[int]] = None,
+) -> None:
+    params: list[Any] = [group_id, dictation_id, day_date, selected_sentence_positions]
     ignore_sql = ""
     if ignore_assignment_ids:
         ignore_sql = " AND a.id <> ALL(%s)"
@@ -58,6 +66,7 @@ def _check_overlap_day(cur, *, group_id: int, dictation_id: int, day_date: date,
         WHERE a.group_id = %s
           AND a.dictation_id = %s
           AND abd.day_date = %s
+          AND a.selected_sentence_positions IS NOT DISTINCT FROM %s
           {ignore_sql}
         LIMIT 1
         """,
@@ -191,22 +200,30 @@ def update_assignment_for_teacher(
         _ensure_teacher_of_group(cur, old_group_id, teacher_user_id)
         _ensure_teacher_of_group(cur, int(group_id), teacher_user_id)
 
+        positions = selected_sentence_positions
+        if isinstance(positions, list):
+            prepared_pos = []
+            for x in positions:
+                if x is None:
+                    continue
+                try:
+                    prepared_pos.append(int(x))
+                except Exception:
+                    continue
+            prepared_pos = sorted({p for p in prepared_pos})
+            positions = prepared_pos if prepared_pos else None
+        else:
+            positions = None
+
         for day_d, _ in prepared:
             _check_overlap_day(
                 cur,
                 group_id=int(group_id),
                 dictation_id=dictation_id,
                 day_date=day_d,
+                selected_sentence_positions=positions,
                 ignore_assignment_ids=[int(assignment_id)],
             )
-
-        positions = selected_sentence_positions
-        if isinstance(positions, list):
-            positions = [int(x) for x in positions if x is not None]
-            if not positions:
-                positions = None
-        else:
-            positions = None
 
         cur.execute(
             """
@@ -448,17 +465,30 @@ def create_assignment_days(
     try:
         _ensure_teacher_of_group(cur, group_id, teacher_user_id)
 
-        # проверим пересечения по каждой дате
-        for day_d, _ in prepared:
-            _check_overlap_day(cur, group_id=group_id, dictation_id=dictation_id, day_date=day_d)
-
         positions = selected_sentence_positions
         if isinstance(positions, list):
-            positions = [int(x) for x in positions if x is not None]
-            if not positions:
-                positions = None
+            prepared_pos = []
+            for x in positions:
+                if x is None:
+                    continue
+                try:
+                    prepared_pos.append(int(x))
+                except Exception:
+                    continue
+            prepared_pos = sorted({p for p in prepared_pos})
+            positions = prepared_pos if prepared_pos else None
         else:
             positions = None
+
+        # проверим пересечения по каждой дате
+        for day_d, _ in prepared:
+            _check_overlap_day(
+                cur,
+                group_id=group_id,
+                dictation_id=dictation_id,
+                day_date=day_d,
+                selected_sentence_positions=positions,
+            )
 
         cur.execute(
             """
@@ -589,7 +619,8 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                    g.title AS group_title,
                    d.title AS dictation_title,
                    d.language_code AS dictation_language_code,
-                   d.level AS dictation_level
+                   d.level AS dictation_level,
+                   d.sentences_count AS dictation_sentences_count
             FROM assignments a
             JOIN assignments_by_date abd ON abd.assignment_id = a.id
             JOIN groups g ON g.id = a.group_id

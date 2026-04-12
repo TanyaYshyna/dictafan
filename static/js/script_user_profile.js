@@ -12,6 +12,39 @@ let profileTestIsRecording = false;
 let profileTestTimerId = null;
 let profileTestAutoStopId = null;
 
+const PROFILE_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
+
+function installProfileSaveHotkey() {
+    try {
+        if (document.body && document.body.dataset && document.body.dataset.profileSaveHotkeyBound) {
+            return;
+        }
+        if (document.body && document.body.dataset) {
+            document.body.dataset.profileSaveHotkeyBound = '1';
+        }
+    } catch (e) {
+    }
+
+    document.addEventListener('keydown', async (event) => {
+        try {
+            if (event.repeat) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            if (event.altKey) return;
+
+            const key = (event.key || '').toLowerCase();
+            if (!(event.code === 'KeyS' || PROFILE_SAVE_KEY_VALUES.includes(key))) return;
+
+            event.preventDefault();
+
+            const saveButton = document.getElementById('saveButton');
+            if (saveButton && saveButton.disabled) return;
+
+            await handleSave();
+        } catch (e) {
+        }
+    }, true);
+}
+
 function createLucideToggleButton({ checked, title, disabled }) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1572,6 +1605,11 @@ document.addEventListener('DOMContentLoaded', async function () {
         setupFormListeners();
         initializeTopbarControls();
         setupPasswordToggles();
+
+        try {
+            installProfileSaveHotkey();
+        } catch (e) {
+        }
 
     } catch (error) {
         console.error('Ошибка инициализации:', error);

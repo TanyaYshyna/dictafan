@@ -9,6 +9,8 @@ const currentSentenceInfo = document.getElementById('currentSentenceInfo');
 const startInput = document.getElementById('audioStartTime');
 const endInput = document.getElementById('audioEndTime');
 
+const EDITOR_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
+
 function ensureSwStatusBar() {
     try {
         const id = 'swStatusBar';
@@ -37,6 +39,35 @@ function ensureSwStatusBar() {
     } catch (e) {
         return null;
     }
+}
+
+function installEditorSaveHotkey() {
+    try {
+        if (document.body && document.body.dataset && document.body.dataset.editorSaveHotkeyBound) {
+            return;
+        }
+        if (document.body && document.body.dataset) {
+            document.body.dataset.editorSaveHotkeyBound = '1';
+        }
+    } catch (e) {
+    }
+
+    document.addEventListener('keydown', async (event) => {
+        try {
+            if (event.repeat) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            if (event.altKey) return;
+
+            const key = (event.key || '').toLowerCase();
+            if (!(event.code === 'KeyS' || EDITOR_SAVE_KEY_VALUES.includes(key))) return;
+
+            event.preventDefault();
+            if (window.__DICTATION_EDITOR_IS_SAVING) return;
+
+            await handleSave();
+        } catch (e) {
+        }
+    }, true);
 }
 
 function initTranslationsTabV2() {
@@ -2636,6 +2667,11 @@ async function initDictationGenerator() {
 
     // Инициализируем language_selector для отображения флагов
     initLanguageFlags(initData);
+
+    try {
+        installEditorSaveHotkey();
+    } catch (e) {
+    }
 
     // Настраиваем обработчики для ковера
     setupCoverHandlers();
