@@ -2612,13 +2612,27 @@ async function loadExistingDictation(initData) {
         showLoadingIndicator('Загрузка таблицы...');
     } catch (e) {
     }
+    try {
+        // Give the browser a chance to paint the loading overlay before heavy DOM work.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    } catch (e) {
+    }
     await createTable();
     try {
         hideLoadingIndicator();
     } catch (e) {
     }
 
-    prewarmAllDraftAudioUrls();
+    // Audio is not always needed on open; defer prewarm to keep editor responsive.
+    try {
+        setTimeout(() => {
+            try {
+                prewarmAllDraftAudioUrls();
+            } catch (e) {
+            }
+        }, 0);
+    } catch (e) {
+    }
 
     // TODO: инициализировать колонки таблицы 
 
@@ -10563,14 +10577,27 @@ async function createTable() {
     const trBucket = getCurrentTranslationData({ createIfMissing: false });
     const translationSentences = (trBucket && Array.isArray(trBucket.sentences)) ? trBucket.sentences : [];
 
-    // Объединить оригинал и перевод по ключам
+    // Build maps to avoid O(n^2) .find() for large dictations.
+    const origByKey = new Map();
+    for (const s of originalSentences) {
+        if (s && s.key != null) origByKey.set(s.key, s);
+    }
+    const trByKey = new Map();
+    for (const s of translationSentences) {
+        if (s && s.key != null) trByKey.set(s.key, s);
+    }
+
     const allKeys = new Set();
-    originalSentences.forEach(s => allKeys.add(s.key));
-    translationSentences.forEach(s => allKeys.add(s.key));
+    for (const s of originalSentences) {
+        if (s && s.key != null) allKeys.add(s.key);
+    }
+    for (const s of translationSentences) {
+        if (s && s.key != null) allKeys.add(s.key);
+    }
 
     const items = Array.from(allKeys).map((key) => {
-        const originalSentence = originalSentences.find(s => s.key === key);
-        const translationSentence = translationSentences.find(s => s.key === key);
+        const originalSentence = origByKey.get(key) || null;
+        const translationSentence = trByKey.get(key) || null;
         const pos = (originalSentence && Number.isFinite(Number(originalSentence.position))) ? Number(originalSentence.position)
             : ((translationSentence && Number.isFinite(Number(translationSentence.position))) ? Number(translationSentence.position) : null);
         return { key, originalSentence, translationSentence, pos };
@@ -10583,10 +10610,12 @@ async function createTable() {
         return String(a.key).localeCompare(String(b.key));
     });
 
+    const frag = document.createDocumentFragment();
     items.forEach(({ key, originalSentence, translationSentence }) => {
         const row = createTableRow(key, originalSentence, translationSentence);
-        tbody.appendChild(row);
+        frag.appendChild(row);
     });
+    tbody.appendChild(frag);
 
     // Предварительно загружаем аудио файлы в плееры
     // будем подгружать аудио при первом вызвове

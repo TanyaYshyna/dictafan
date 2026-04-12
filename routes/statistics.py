@@ -80,13 +80,15 @@ def _build_teacher_report_text(*, student_username: str, dictation_title: str, d
     except Exception:
         error_words_lines = []
 
+    medals_inline = ''
+    if completion_count_value is not None:
+        medals_inline = f"  🥇 {completion_count_value}"
+
     text = (
         f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)})\n"
+        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
         f"Дата: {date_iso}"
     )
-    if completion_count_value is not None:
-        text = text + f"\n🥇 {completion_count_value}"
     if error_words_lines:
         text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
     return text
@@ -218,9 +220,13 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         error_words=error_words,
     )
 
+    medals_inline = ''
+    if completion_count_value is not None:
+        medals_inline = f"  🥇 {completion_count_value}"
+
     header = (
         f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)})\n"
+        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
         f"Дата: {date_line}\n"
         f"Длительность: {_fmt_duration(time_ms)}\n"
         + (audio_scheme_line or '')
@@ -239,11 +245,8 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         extra = ''
 
     body_lines = "\n" + "\n".join(lines) if lines else ''
-    medals_line = ''
-    if completion_count_value is not None:
-        medals_line = f"\n🥇 {completion_count_value}"
 
-    return header + medals_line + (extra or '') + ("\n\n" + body_lines if body_lines else '')
+    return header + (extra or '') + ("\n\n" + body_lines if body_lines else '')
 
 
 @statistics_bp.route('/teacher_report/recipients', methods=['POST'])

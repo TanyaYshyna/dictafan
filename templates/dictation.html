@@ -127,16 +127,6 @@
                     <div class="start-modal-title-row">
                         <span class="dikt-number-badge">{{ dikt_numer }}</span>
                         <h2 id="title-diktation">{{ title_orig }}</h2>
-                        <div class="all-checkbox-container" style="margin-left:auto; display:flex; align-items:center; gap:10px;">
-                            <button id="mixControl" class="all-checkbox-btn">
-                                <i data-lucide="move-right"></i>
-                                <span>прямой порядок</span>
-                            </button>
-                            <button id="resetProgressBtn" class="all-checkbox-btn">
-                                <i data-lucide="rotate-ccw"></i>
-                                <span>Давай по новой</span>
-                            </button>
-                        </div>
                         <div class="start-modal-header-actions">
                             <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
                                 <i data-lucide="settings"></i>
@@ -167,7 +157,7 @@
                     </button>
                 </div>
 
-                <div class="all-checkbox-container" style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+                <div class="all-checkbox-container" style="display:flex; align-items:center; gap:10px;">
                     <button id="toggleOriginalColumnBtn" class="all-checkbox-btn" type="button" title="Оригинал">
                         <i data-lucide="flag"></i>
                         <span>оригинал</span>
@@ -175,6 +165,17 @@
                     <button id="toggleTranslationColumnBtn" class="all-checkbox-btn" type="button" title="Перевод">
                         <i data-lucide="flag"></i>
                         <span>перевод</span>
+                    </button>
+                </div>
+
+                <div class="all-checkbox-container" style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+                    <button id="mixControl" class="all-checkbox-btn">
+                        <i data-lucide="move-right"></i>
+                        <span>прямой порядок</span>
+                    </button>
+                    <button id="resetProgressBtn" class="all-checkbox-btn">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>Давай по новой</span>
                     </button>
                 </div>
             </div>
