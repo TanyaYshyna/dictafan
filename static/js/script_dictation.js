@@ -783,6 +783,8 @@ let progressPanel = null; // Панель прогресса
 let hasDraftLoaded = false; // Флаг загрузки черновика (для определения isResume в startGame)
 let dictationCompletionSaved = false; // Флаг: успех записан, черновик нужно не пересоздавать
 let dictationErrorWordCounts = {};
+let __dictationCompletionHandling = false;
+let __registerCompletedInFlight = false;
 // let userManager = null;
 // circleBtn будет переопределен после рендера панели прогресса
 let circleBtn = document.getElementById('btn-circle-number');
@@ -1540,7 +1542,11 @@ function buildDictationDraftState() {
 
     const settings_json = JSON.stringify({
         audio: audioSettings,
-        sentence_order: isMixed ? 'mixed' : 'direct'
+        sentence_order: isMixed ? 'mixed' : 'direct',
+        sentence_columns: {
+            show_original: Boolean(__sentenceColumnPrefs && __sentenceColumnPrefs.show_original !== false),
+            show_translation: Boolean(__sentenceColumnPrefs && __sentenceColumnPrefs.show_translation !== false)
+        }
     });
 
     return {
@@ -1870,6 +1876,241 @@ let allCheckbox = document.getElementById('allCheckbox');
 let mixControl = document.getElementById('mixControl');
 let tableCheckboxes = [];
 let resetProgressBtn = document.getElementById('resetProgressBtn');
+
+let toggleOriginalColumnBtn = document.getElementById('toggleOriginalColumnBtn');
+let toggleTranslationColumnBtn = document.getElementById('toggleTranslationColumnBtn');
+let thSentenceOriginal = document.getElementById('thSentenceOriginal');
+let thSentenceTranslation = document.getElementById('thSentenceTranslation');
+
+let __sentenceColumnPrefs = {
+    show_original: false,
+    show_translation: false
+};
+
+let __sentenceColumnPrefsLoadContext = 'normal';
+
+function renderLucideToggleFlagButton(btn, checked, title) {
+    try {
+        if (!btn) return;
+        btn.dataset.checked = checked ? '1' : '0';
+        btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+        if (title) btn.title = String(title);
+        const icon = checked ? 'circle-check-big' : 'circle';
+        const label = (() => {
+            try {
+                const span = btn.querySelector('span');
+                return span ? span.textContent : '';
+            } catch (e) {
+                return '';
+            }
+        })();
+        btn.innerHTML = `<i data-lucide="${icon}"></i>${label ? `<span>${label}</span>` : ''}`;
+        if (window.lucide?.createIcons) {
+            window.lucide.createIcons({ root: btn });
+        }
+    } catch (e) {
+    }
+}
+
+function _safeParseJson(raw) {
+    try {
+        if (!raw) return null;
+        return JSON.parse(String(raw));
+    } catch (e) {
+        return null;
+    }
+}
+
+function _getUserSettingsObject() {
+    try {
+        const um = window.UM || userManager;
+        const raw = um?.userData?.settings_json;
+        const parsed = _safeParseJson(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _getDraftSettingsObject() {
+    try {
+        const d = dictationStatistics?.draft;
+        const raw = d?.settings_json;
+        const parsed = _safeParseJson(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function loadSentenceColumnPrefs() {
+    const defaults = { show_original: false, show_translation: false };
+
+    // Special entry points
+    try {
+        const ctx = String(__sentenceColumnPrefsLoadContext || 'normal');
+        if (ctx === 'results_force_on_once') {
+            __sentenceColumnPrefs = { show_original: true, show_translation: true };
+            __sentenceColumnPrefsLoadContext = 'normal';
+            return __sentenceColumnPrefs;
+        }
+        if (ctx === 'reset_prefer_profile_once') {
+            // Ignore draft settings; read only profile, else defaults.
+            try {
+                const userSettings = _getUserSettingsObject();
+                const sc = (userSettings && typeof userSettings.sentence_columns === 'object') ? userSettings.sentence_columns : null;
+                if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+                    __sentenceColumnPrefs = {
+                        show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
+                        show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
+                    };
+                } else {
+                    __sentenceColumnPrefs = Object.assign({}, defaults);
+                }
+            } catch (e) {
+                __sentenceColumnPrefs = Object.assign({}, defaults);
+            }
+            __sentenceColumnPrefsLoadContext = 'normal';
+            return __sentenceColumnPrefs;
+        }
+    } catch (e) {
+    }
+
+    try {
+        const draftSettings = _getDraftSettingsObject();
+        const sc = (draftSettings && typeof draftSettings.sentence_columns === 'object') ? draftSettings.sentence_columns : null;
+        if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+            __sentenceColumnPrefs = {
+                show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
+                show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
+            };
+            return __sentenceColumnPrefs;
+        }
+    } catch (e) {
+    }
+
+    try {
+        const userSettings = _getUserSettingsObject();
+        const sc = (userSettings && typeof userSettings.sentence_columns === 'object') ? userSettings.sentence_columns : null;
+        if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+            __sentenceColumnPrefs = {
+                show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
+                show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
+            };
+            return __sentenceColumnPrefs;
+        }
+    } catch (e) {
+    }
+
+    __sentenceColumnPrefs = Object.assign({}, defaults);
+    return __sentenceColumnPrefs;
+}
+
+function applySentenceColumnPrefsToUi() {
+    try {
+        const showO = __sentenceColumnPrefs.show_original !== false;
+        const showT = __sentenceColumnPrefs.show_translation !== false;
+
+        if (thSentenceOriginal) thSentenceOriginal.style.display = showO ? '' : 'none';
+        if (thSentenceTranslation) thSentenceTranslation.style.display = showT ? '' : 'none';
+
+        try {
+            const rows = document.querySelectorAll('#sentences-table tbody tr');
+            rows.forEach(row => {
+                const tdO = row.querySelector('td.sentence-text-original');
+                const tdT = row.querySelector('td.sentence-text-translation');
+                if (tdO) tdO.style.display = showO ? '' : 'none';
+                if (tdT) tdT.style.display = showT ? '' : 'none';
+            });
+        } catch (e) {
+        }
+
+        renderLucideToggleFlagButton(toggleOriginalColumnBtn, showO, 'Оригинал');
+        renderLucideToggleFlagButton(toggleTranslationColumnBtn, showT, 'Перевод');
+    } catch (e) {
+    }
+}
+
+function _updateDraftSentenceColumnPrefs() {
+    try {
+        // buildDictationDraftState() already includes sentence_columns from __sentenceColumnPrefs.
+        // So we only need to trigger draft autosave.
+        scheduleDraftAutosave('sentence_columns');
+    } catch (e) {
+    }
+}
+
+async function _saveSentenceColumnPrefsToUser() {
+    try {
+        const um = window.UM || userManager;
+        if (!um || typeof um.isAuthenticated !== 'function' || !um.isAuthenticated()) {
+            return;
+        }
+
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return;
+
+        let settings = _getUserSettingsObject() || {};
+        if (!settings || typeof settings !== 'object') settings = {};
+        if (!settings.sentence_columns || typeof settings.sentence_columns !== 'object') {
+            settings.sentence_columns = {};
+        }
+        settings.sentence_columns.show_original = Boolean(__sentenceColumnPrefs.show_original);
+        settings.sentence_columns.show_translation = Boolean(__sentenceColumnPrefs.show_translation);
+
+        const response = await fetch('/user/api/profile', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ settings_json: JSON.stringify(settings) })
+        });
+
+        if (response.ok) {
+            try {
+                const result = await response.json();
+                if (um.userData && result && result.user && result.user.settings_json) {
+                    um.userData.settings_json = result.user.settings_json;
+                }
+            } catch (e) {
+            }
+        }
+    } catch (e) {
+    }
+}
+
+function installSentenceColumnToggles() {
+    try {
+        loadSentenceColumnPrefs();
+        applySentenceColumnPrefsToUi();
+
+        if (toggleOriginalColumnBtn && !toggleOriginalColumnBtn.dataset.listenerAttached) {
+            toggleOriginalColumnBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                __sentenceColumnPrefs.show_original = !(__sentenceColumnPrefs.show_original !== false);
+                applySentenceColumnPrefsToUi();
+                _updateDraftSentenceColumnPrefs();
+                _saveSentenceColumnPrefsToUser().catch(() => { });
+            });
+            toggleOriginalColumnBtn.dataset.listenerAttached = '1';
+        }
+
+        if (toggleTranslationColumnBtn && !toggleTranslationColumnBtn.dataset.listenerAttached) {
+            toggleTranslationColumnBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                __sentenceColumnPrefs.show_translation = !(__sentenceColumnPrefs.show_translation !== false);
+                applySentenceColumnPrefsToUi();
+                _updateDraftSentenceColumnPrefs();
+                _saveSentenceColumnPrefsToUser().catch(() => { });
+            });
+            toggleTranslationColumnBtn.dataset.listenerAttached = '1';
+        }
+    } catch (e) {
+    }
+}
 
 
 let currentDictation = {
@@ -2979,8 +3220,17 @@ function setupCompletionModalHandlers() {
 
     if (resultsBtn) {
         resultsBtn.addEventListener('click', () => {
+            try {
+                if (resultsBtn.dataset.busy === '1') return;
+                resultsBtn.dataset.busy = '1';
+                resultsBtn.disabled = true;
+                resultsBtn.style.opacity = '0.6';
+                resultsBtn.style.cursor = 'not-allowed';
+            } catch (e) {
+            }
             hideCompletionModal();
             try {
+                __sentenceColumnPrefsLoadContext = 'results_force_on_once';
                 renderSelectionTable();
             } catch (e) {
             }
@@ -2991,6 +3241,7 @@ function setupCompletionModalHandlers() {
             } catch (e) {
             }
             try {
+                // Инициализируем иконки Lucide после открытия модального окна
                 if (window.lucide && typeof window.lucide.createIcons === 'function') {
                     window.lucide.createIcons();
                 }
@@ -3571,7 +3822,12 @@ function renderSelectionTable() {
 
         // Предложение (оригинал/перевод)
         const tdText = document.createElement('td');
+        tdText.className = 'sentence-text-original';
         tdText.textContent = s.text;
+
+        const tdTr = document.createElement('td');
+        tdTr.className = 'sentence-text-translation';
+        tdTr.textContent = (s && (s.translation != null)) ? String(s.translation) : '';
 
         row.appendChild(settingsCell);
         row.appendChild(rowNumberCell);  // Номер строки ПЕРВЫМ
@@ -3582,6 +3838,7 @@ function renderSelectionTable() {
         row.appendChild(audioCell);
         row.appendChild(attemptsCell);
         row.appendChild(tdText);
+        row.appendChild(tdTr);
 
         tableSentences.appendChild(row);
 
@@ -3643,6 +3900,12 @@ function renderSelectionTable() {
 
     if (window.lucide?.createIcons) {
         lucide.createIcons();
+    }
+
+    try {
+        installSentenceColumnToggles();
+        applySentenceColumnPrefsToUi();
+    } catch (e) {
     }
 
     initializeAllCheckbox();
@@ -3822,7 +4085,17 @@ function initializeResetProgressButton() {
     if (resetProgressBtn.dataset.listenerAttached) return;
 
     resetProgressBtn.addEventListener('click', () => {
+        try {
+            __sentenceColumnPrefsLoadContext = 'reset_prefer_profile_once';
+            loadSentenceColumnPrefs();
+        } catch (e) {
+        }
         resetDictationProgress();
+        try {
+            applySentenceColumnPrefsToUi();
+            _updateDraftSentenceColumnPrefs();
+        } catch (e) {
+        }
     });
     resetProgressBtn.dataset.listenerAttached = 'true';
 }
@@ -3839,6 +4112,13 @@ function clearLocalStorageDraft() {
 }
 
 function resetDictationProgress() {
+    try {
+        __dictationCompletionHandling = false;
+        __registerCompletedInFlight = false;
+        dictationCompletionSaved = false;
+    } catch (e) {
+    }
+
     allSentences.forEach(s => {
         s.number_of_perfect = 0;
         s.number_of_corrected = 0;
@@ -5177,6 +5457,13 @@ function checkIfAllCompleted() {
 
     // Если диктант полностью завершен, показываем модальное окно завершения
     if (allCompleted) {
+        try {
+            if (__dictationCompletionHandling) {
+                return;
+            }
+            __dictationCompletionHandling = true;
+        } catch (e) {
+        }
         // Регистрируем завершенный диктант и удаляем черновик
         (async () => {
             try {
@@ -9924,14 +10211,20 @@ function isAllCompleted() {
  * Регистрирует завершенный диктант в истории и удаляет файл черновика
  */
 async function registerCompletedDictation() {
+    if (__registerCompletedInFlight || dictationCompletionSaved) {
+        return;
+    }
+    __registerCompletedInFlight = true;
     if (!currentDictation.id) {
         console.warn('[Register] Нельзя зарегистрировать: нет ID диктанта');
+        __registerCompletedInFlight = false;
         return;
     }
 
     const um = window.UM || userManager;
     if (!um || typeof um.isAuthenticated !== 'function' || !um.isAuthenticated()) {
         console.warn('[Register] Пользователь не авторизован, пропускаем сохранение успеха');
+        __registerCompletedInFlight = false;
         return;
     }
 
@@ -9940,6 +10233,7 @@ async function registerCompletedDictation() {
         const token = um?.token || localStorage.getItem('jwt_token');
         if (!token) {
             console.warn('[Register] Нет токена, пропускаем сохранение успеха');
+            __registerCompletedInFlight = false;
             return;
         }
 
@@ -10015,6 +10309,7 @@ async function registerCompletedDictation() {
 
             if (!dictationIdForDb) {
                 console.error('[Register] ❌ Невозможно сохранить успех: некорректный dictation_id', currentDictation.id);
+                __registerCompletedInFlight = false;
                 return;
             }
 
@@ -10154,6 +10449,8 @@ async function registerCompletedDictation() {
     } catch (error) {
         console.error('[Register] ❌ Ошибка регистрации завершенного диктанта:', error);
     }
+
+    __registerCompletedInFlight = false;
 
     if (!dictationStatistics || !currentDictation.id) {
         console.warn('Нельзя сохранить черновик: нет статистики или ID диктанта');
