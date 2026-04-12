@@ -4354,17 +4354,17 @@ function createDictationCard(item, isDeskCard = false) {
                 <i data-lucide="more-vertical"></i>
               </button>
               <div class="dropdown-menu short-card-actions-menu" style="display: none;">
-                <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
-                  <i data-lucide="pencil-ruler"></i>
-                  <span>Редактировать</span>
+                <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
+                  <i data-lucide="clipboard-list"></i>
+                  <span>Новое задание</span>
                 </button>
                 <button class="dropdown-menu-item" type="button" data-action="prefetch-dictation-cache" data-dictation-id="${dictationId}" data-lang-original="${escapeHtml(langOriginal)}" data-cover-url="${escapeHtml(coverUrl || '')}" data-translation-langs="${escapeHtml(availableTranslations.join(','))}">
                   <i data-lucide="download"></i>
                   <span>Получить в кеш</span>
                 </button>
-                <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
-                  <i data-lucide="clipboard-list"></i>
-                  <span>Задание</span>
+                <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
+                  <i data-lucide="pencil-ruler"></i>
+                  <span>Редактировать</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="show-in-book" data-dictation-id="${dictationId}">
                   <i data-lucide="book-marked"></i>
