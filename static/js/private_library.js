@@ -4101,6 +4101,19 @@ function insertDeskCardElement(item, position = 'start') {
   const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
   if (!el) return null;
 
+  try {
+    (async () => {
+      try {
+        const did = String(item && item.dictation_id ? item.dictation_id : '').trim();
+        if (!did) return;
+        const isCached = await _isDictationCachedIdb(did);
+        el.classList.toggle('short-card--cached', !!isCached);
+      } catch (e) {
+      }
+    })().catch(() => { });
+  } catch (e) {
+  }
+
   if (window.lucide && typeof window.lucide.createIcons === 'function') {
     window.lucide.createIcons();
   }
@@ -4127,6 +4140,20 @@ function insertDeskCardElement(item, position = 'start') {
     const fresh = tmpWrap.firstElementChild;
     if (fresh) {
       el.replaceWith(fresh);
+
+      try {
+        (async () => {
+          try {
+            const did = String(item && item.dictation_id ? item.dictation_id : '').trim();
+            if (!did) return;
+            const isCached = await _isDictationCachedIdb(did);
+            fresh.classList.toggle('short-card--cached', !!isCached);
+          } catch (e) {
+          }
+        })().catch(() => { });
+      } catch (e) {
+      }
+
       return fresh;
     }
   } catch (e) {
