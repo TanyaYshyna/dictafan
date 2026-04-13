@@ -1117,7 +1117,11 @@ async function updateDictationSentencesIndexedDbCache(dictationId) {
     try {
         const dictId = String(dictationId || '').trim();
         const langOrig = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim();
-        const langTr = String(currentDictation && currentDictation.language_translation ? currentDictation.language_translation : '').trim();
+        const langTr = String(
+            (currentDictation && (currentDictation._persisted_language_translation || currentDictation.language_translation))
+                ? (currentDictation._persisted_language_translation || currentDictation.language_translation)
+                : ''
+        ).trim();
         if (!dictId || !langOrig || !langTr) return false;
         if (!dictId.startsWith('dict_')) return false;
 
