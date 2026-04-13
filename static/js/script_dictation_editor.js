@@ -9982,6 +9982,12 @@ async function saveDictationAndExit() {
             // Отмечаем диктант как сохраненный
             currentDictation.isSaved = true;
 
+            // Обновляем IDB-кеш предложений, чтобы на столе диктант сразу отмечался как "в кеше".
+            try {
+                await updateDictationSentencesIndexedDbCache(currentDictation.id);
+            } catch (e) {
+            }
+
             // Сохраняем текущую категорию в sessionStorage перед переходом
             const currentCategoryData = {
                 key: currentDictation.category_key,
