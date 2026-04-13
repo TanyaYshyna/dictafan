@@ -10519,6 +10519,36 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
 
             alert(message);
         }
+
+        // Синхронизируем спикеров и чистый текст для перевода.
+        // Важно: при авто-переводе префиксы вида "1:" могут попасть в translation.
+        try {
+            const origByKey = new Map();
+            for (const s of original) {
+                if (s && s.key != null) origByKey.set(String(s.key), s);
+            }
+
+            for (const t of translation) {
+                if (!t || t.key == null) continue;
+                const o = origByKey.get(String(t.key));
+                if (o && o.speaker) {
+                    t.speaker = o.speaker;
+                }
+                try {
+                    const rawText = (t.text != null) ? String(t.text) : '';
+                    const speakerMatch = rawText.match(/^(\d+):\s*(.+)$/);
+                    if (speakerMatch) {
+                        const foundSpeakerId = speakerMatch[1];
+                        const cleanText = String(speakerMatch[2] || '').trim();
+                        if (speakers && speakers[foundSpeakerId]) {
+                            t.text = cleanText;
+                        }
+                    }
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
     }
 
 
