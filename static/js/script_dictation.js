@@ -2012,8 +2012,11 @@ function loadSentenceColumnPrefs() {
 
 function applySentenceColumnPrefsToUi() {
     try {
-        const showO = __sentenceColumnPrefs.show_original !== false;
-        const showT = __sentenceColumnPrefs.show_translation !== false;
+        // IMPORTANT: treat prefs as strict booleans. Undefined/null must behave like false.
+        // Otherwise some flows (re-render + partial state restore) can make a column appear
+        // even when the toggle button looks unchecked.
+        const showO = __sentenceColumnPrefs.show_original === true;
+        const showT = __sentenceColumnPrefs.show_translation === true;
 
         if (thSentenceOriginal) thSentenceOriginal.style.display = showO ? '' : 'none';
         if (thSentenceTranslation) thSentenceTranslation.style.display = showT ? '' : 'none';
@@ -2093,7 +2096,7 @@ function installSentenceColumnToggles() {
             toggleOriginalColumnBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                __sentenceColumnPrefs.show_original = !(__sentenceColumnPrefs.show_original !== false);
+                __sentenceColumnPrefs.show_original = !(__sentenceColumnPrefs.show_original === true);
                 applySentenceColumnPrefsToUi();
                 _updateDraftSentenceColumnPrefs();
                 _saveSentenceColumnPrefsToUser().catch(() => { });
@@ -2105,7 +2108,7 @@ function installSentenceColumnToggles() {
             toggleTranslationColumnBtn.addEventListener('click', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                __sentenceColumnPrefs.show_translation = !(__sentenceColumnPrefs.show_translation !== false);
+                __sentenceColumnPrefs.show_translation = !(__sentenceColumnPrefs.show_translation === true);
                 applySentenceColumnPrefsToUi();
                 _updateDraftSentenceColumnPrefs();
                 _saveSentenceColumnPrefsToUser().catch(() => { });
@@ -9114,6 +9117,13 @@ function simplifyText(text) {
         .normalize('NFKC')          // унификация Юникода
         .toLowerCase();
     result = normalizeTurkishDottedI(result);
+
+    // Make '=' comparable with TTS/ASR that yields "equals".
+    // User often types '=' in text input, but audio may say the word.
+    try {
+        result = result.replace(/=/g, ' equals ');
+    } catch (e) {
+    }
 
     // Явно удаляем все варианты кавычек перед применением PUNCTUATION_REGEX
     // Это гарантирует, что все кавычки будут удалены
