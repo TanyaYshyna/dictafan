@@ -912,6 +912,10 @@ async function purgeDictationFromMediaCache(dictationId) {
   const dictKey = String(dictationId || '').trim();
   if (!dictKey) return { deleted: 0, dictationId: dictKey };
 
+  const numericId = dictKey.startsWith('dict_')
+    ? dictKey.replace(/^dict_/, '')
+    : dictKey;
+
   let deleted = 0;
   for (const req of keys) {
     try {
@@ -926,7 +930,7 @@ async function purgeDictationFromMediaCache(dictationId) {
       }
 
       // Обложка: /api/dictations_covers/<id>.webp
-      if (path === `/api/dictations_covers/${dictKey}.webp`) {
+      if (path === `/api/dictations_covers/${numericId}.webp` || path === `/api/dictations_covers/${dictKey}.webp`) {
         const ok = await cache.delete(req);
         if (ok) deleted += 1;
         continue;

@@ -251,7 +251,6 @@ function setupUserDropdownMenu() {
 
       try {
         const history = new UserActivityHistory('/user/api');
-        await history.loadAllHistory();
         await StatisticsReport.open(history);
       } catch (err) {
         alert('Не удалось открыть отчет об активности');
