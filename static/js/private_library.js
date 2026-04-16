@@ -267,6 +267,73 @@ function setupUserDropdownMenu() {
   }
 }
 
+let __userMenuReportsFallbackInstalled = false;
+
+function installUserMenuReportsClickFallback() {
+  if (__userMenuReportsFallbackInstalled) return;
+  __userMenuReportsFallbackInstalled = true;
+
+  const closeDropdown = () => {
+    try {
+      const dropdown = document.getElementById('userMenuDropdown');
+      const toggleBtn = document.getElementById('userMenuToggle');
+      if (dropdown) dropdown.classList.remove('show');
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    } catch (e) {
+    }
+  };
+
+  document.addEventListener('click', async (e) => {
+    try {
+      const target = e && e.target;
+      if (!target || !target.closest) return;
+
+      const activityBtn = target.closest('#userMenuActivityReportBtn');
+      const planFactBtn = target.closest('#userMenuPlanFactBtn');
+      if (!activityBtn && !planFactBtn) return;
+
+      try {
+        console.log('[user_menu_reports] click', { activity: !!activityBtn, planFact: !!planFactBtn });
+      } catch (e0) {
+      }
+
+      try { e.preventDefault(); } catch (e2) {}
+      closeDropdown();
+
+      if (activityBtn) {
+        if (typeof StatisticsReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
+          try {
+            console.log('[user_menu_reports] missing globals', {
+              StatisticsReport: typeof StatisticsReport,
+              UserActivityHistory: typeof UserActivityHistory,
+            });
+          } catch (e0) {
+          }
+          alert('Отчет об активности недоступен');
+          return;
+        }
+        try {
+          const history = new UserActivityHistory('/user/api');
+          await StatisticsReport.open(history);
+        } catch (err) {
+          try {
+            console.log('[user_menu_reports] open activity report failed', err);
+          } catch (e0) {
+          }
+          alert('Не удалось открыть отчет об активности');
+        }
+        return;
+      }
+
+      if (planFactBtn) {
+        alert('Отчет План-факт скоро будет');
+        return;
+      }
+    } catch (err) {
+    }
+  }, true);
+}
+
 async function loadDictationMetaForAssignmentModal(dictationId) {
   const id = Number(dictationId);
   if (!Number.isFinite(id) || id <= 0) return null;
@@ -8005,6 +8072,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   try {
     setupUserDropdownMenu();
+  } catch (e) {
+  }
+
+  try {
+    installUserMenuReportsClickFallback();
   } catch (e) {
   }
 

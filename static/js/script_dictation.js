@@ -1954,9 +1954,7 @@ function loadSentenceColumnPrefs() {
     try {
         const ctx = String(__sentenceColumnPrefsLoadContext || 'normal');
         if (ctx === 'results_force_on_once') {
-            __sentenceColumnPrefs = { show_original: true, show_translation: true };
             __sentenceColumnPrefsLoadContext = 'normal';
-            return __sentenceColumnPrefs;
         }
         if (ctx === 'reset_prefer_profile_once') {
             // Ignore draft settings; read only profile, else defaults.
@@ -3237,7 +3235,6 @@ function setupCompletionModalHandlers() {
             }
             hideCompletionModal();
             try {
-                __sentenceColumnPrefsLoadContext = 'results_force_on_once';
                 renderSelectionTable();
             } catch (e) {
             }
