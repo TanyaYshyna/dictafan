@@ -193,6 +193,49 @@ def api_b2_get_upload_url():
         return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500
 
 
+@editor_bp.route('/api/b2/get_download_url', methods=['POST'])
+@jwt_required()
+def api_b2_get_download_url():
+    try:
+        if not b2_storage.enabled or not b2_storage.bucket:
+            return jsonify({'success': False, 'error': 'B2 storage is disabled'}), 503
+
+        data = request.get_json(silent=True) or {}
+        dictation_id_raw = str(data.get('dictation_id') or '').strip()
+        lang = str(data.get('lang') or '').strip().lower()
+        filename = str(data.get('filename') or '').strip()
+
+        if not dictation_id_raw:
+            return jsonify({'success': False, 'error': 'Missing dictation_id'}), 400
+        if dictation_id_raw.isdigit():
+            dictation_id = f"dict_{dictation_id_raw}"
+        else:
+            dictation_id = dictation_id_raw
+        if not dictation_id.startswith('dict_'):
+            return jsonify({'success': False, 'error': 'Invalid dictation_id'}), 400
+        if not lang:
+            return jsonify({'success': False, 'error': 'Missing lang'}), 400
+        if not filename:
+            return jsonify({'success': False, 'error': 'Missing filename'}), 400
+
+        remote_path = f"dictations/{dictation_id}/{lang}/{filename}"
+
+        url = b2_storage.get_download_url(remote_path)
+        if not url:
+            logger.error('[b2_get_download_url] failed remote_path=%s', remote_path)
+            return jsonify({'success': False, 'error': 'Failed to get download URL'}), 502
+
+        try:
+            logger.info('[b2_get_download_url] ok dictation_id=%s lang=%s filename=%s remote_path=%s', dictation_id, lang, filename, remote_path)
+        except Exception:
+            pass
+
+        return jsonify({'success': True, 'url': url})
+    except Exception as e:
+        logger.error('api_b2_get_download_url error: %s', e, exc_info=True)
+        return jsonify({'success': False, 'error': f'Internal error: {e}'}), 500
+
+
 @editor_bp.route('/api/b2/cleanup_dictation_audio', methods=['POST'])
 @jwt_required()
 def api_b2_cleanup_dictation_audio():

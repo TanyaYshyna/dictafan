@@ -3459,7 +3459,7 @@ function pauseGame(isInactivityPause = false) {
     }
 
     try {
-        const coverImg = document.querySelector('img.dictation-cover, #dictation-cover, #coverImage, .dictation-cover-img');
+        const coverImg = document.querySelector('img.dictation-cover, #dictation-cover, #coverImage, .dictation-cover-img, .dictation-cover-image');
         if (coverImg && coverImg.getAttribute) {
             const src = coverImg.getAttribute('src') || '';
             const next = maybeCacheBustDictationCover(src);

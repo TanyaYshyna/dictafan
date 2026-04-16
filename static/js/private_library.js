@@ -2707,6 +2707,63 @@ async function _fetchSentencesFromServer(dictKey, langOrig, langTr) {
   return sentences;
 }
 
+const __B2_DIRECT_PREFETCH_TEST = false;
+
+async function _b2DirectPrefetchTest(dictKey, urls) {
+  if (!__B2_DIRECT_PREFETCH_TEST) return;
+  try {
+    const list = Array.isArray(urls) ? urls.filter(Boolean) : [];
+    if (!list.length) return;
+
+    const sample = list.slice(0, 3);
+    console.log('[B2_DIRECT_TEST] start', { dictKey, sampleCount: sample.length });
+
+    for (const u of sample) {
+      try {
+        const abs = new URL(String(u), location.origin);
+        const m = abs.pathname.match(/^\/api\/dictations\/(dict_[^/]+)\/([^/]+)\/(.+)$/);
+        if (!m) {
+          console.log('[B2_DIRECT_TEST] skip (not dictation api url)', u);
+          continue;
+        }
+        const dictation_id = m[1];
+        const lang = m[2];
+        const filename = decodeURIComponent(m[3]).split('?', 1)[0].split('/').pop();
+        if (!filename) {
+          console.log('[B2_DIRECT_TEST] skip (no filename)', u);
+          continue;
+        }
+
+        const t0 = performance.now();
+        const j = await apiRequest('/api/b2/get_download_url', {
+          method: 'POST',
+          body: JSON.stringify({ dictation_id, lang, filename }),
+        });
+        const directUrl = j && j.url ? String(j.url) : '';
+        if (!directUrl) {
+          console.log('[B2_DIRECT_TEST] no direct url', { u, dictation_id, lang, filename, j });
+          continue;
+        }
+
+        let status = 'no_response';
+        let ok = false;
+        try {
+          const res = await fetch(directUrl, { method: 'GET', cache: 'no-store' });
+          status = res ? res.status : 'no_response';
+          ok = !!(res && res.ok);
+        } catch (e) {
+          status = `error_${e && e.name ? e.name : 'fetch_error'}`;
+        }
+        const ms = Math.round(performance.now() - t0);
+        console.log('[B2_DIRECT_TEST] result', { ok, status, ms, apiUrl: u, directUrl });
+      } catch (e) {
+        console.log('[B2_DIRECT_TEST] exception', e);
+      }
+    }
+  } catch (e) {
+  }
+}
+
 function _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences, includeOriginal = true, includeTranslation = true }) {
   const urls = [];
   try {
@@ -2866,6 +2923,11 @@ async function prefetchDictationToCache({ dictationId, langOrig, translationLang
     }
 
     const uniqueAudio = Array.from(new Set(allAudioUrls.filter(Boolean)));
+
+    try {
+      await _b2DirectPrefetchTest(dictKey, uniqueAudio);
+    } catch (e) {
+    }
 
     try {
       const cover = String(coverUrl || '').trim();
@@ -6655,6 +6717,20 @@ function installEventHandlers() {
         const card = btn && btn.closest ? btn.closest('.short-card') : null;
         if (card) {
           card.classList.add('short-card--cached');
+
+          try {
+            const img = card.querySelector ? card.querySelector('img.short-cover') : null;
+            if (img) {
+              const numericId = String(dictationId || '').trim().replace(/^dict_/, '').trim();
+              const baseUrl = String(coverUrl || '').trim() || (numericId ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp` : '');
+              const nextSrc = baseUrl ? maybeCacheBustDictationCover(baseUrl) : '';
+              if (nextSrc) {
+                img.dataset.coverApplied = '1';
+                img.src = nextSrc;
+              }
+            }
+          } catch (e) {
+          }
         }
         const container = document.getElementById('deskCardsContainer') || document.getElementById('deskContainer') || document;
         await applyCachedDictationCardStyles(container);

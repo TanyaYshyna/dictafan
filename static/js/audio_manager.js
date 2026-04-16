@@ -13,6 +13,57 @@ class AudioManagerClass {
         this._objectUrlByCanonicalUrl = {};
         this._b2LedgerDbName = 'dictafan_drafts';
         this._b2LedgerStoreName = 'b2_upload_ledger';
+
+        this._storageOutageLastShownAt = 0;
+    }
+
+    _notifyStorageOutageOnce(details = {}) {
+        try {
+            const now = Date.now();
+            const last = Number(this._storageOutageLastShownAt || 0);
+            if (last && (now - last) < 15000) {
+                return;
+            }
+            this._storageOutageLastShownAt = now;
+
+            const msg = 'Сейчас проблемы с получением данных с хранилища. Повторите попытку позже!';
+            try {
+                if (typeof window !== 'undefined' && typeof window.showToast === 'function') {
+                    window.showToast(msg, { durationMs: 7000 });
+                    return;
+                }
+            } catch (e) {
+            }
+            try {
+                if (typeof window !== 'undefined' && typeof window.showSaveToast === 'function') {
+                    window.showSaveToast(msg, 'error', 7000);
+                    return;
+                }
+            } catch (e) {
+            }
+            try {
+                if (typeof alert === 'function') {
+                    alert(msg);
+                }
+            } catch (e) {
+            }
+        } catch (e) {
+        }
+    }
+
+    _maybeNotifyStorageOutageFromResponse(url, response) {
+        try {
+            const u = String(url || '');
+            const status = response && typeof response.status === 'number' ? response.status : 0;
+            if (!u) return;
+            // Most common symptoms: 503 when B2 is unavailable.
+            if (status === 503 || status === 502) {
+                if (u.includes('/api/dictations/') || u.includes('/api/dictations_covers/') || u.includes('/api/b2/')) {
+                    this._notifyStorageOutageOnce({ url: u, status });
+                }
+            }
+        } catch (e) {
+        }
     }
 
     setWaveformCanvas(waveformCanvas) {
@@ -865,7 +916,13 @@ class AudioManagerClass {
             if (existing) return true;
 
             const fetchRes = await fetch(u, { cache: 'no-store' });
-            if (!fetchRes || !fetchRes.ok) return false;
+            if (!fetchRes || !fetchRes.ok) {
+                try {
+                    this._maybeNotifyStorageOutageFromResponse(u, fetchRes);
+                } catch (e) {
+                }
+                return false;
+            }
             await cache.put(cacheKey, fetchRes.clone());
             return true;
         } catch (e) {
@@ -969,6 +1026,11 @@ class AudioManagerClass {
                         } catch (e) {
                         }
                         res = fetchRes;
+                    } else {
+                        try {
+                            this._maybeNotifyStorageOutageFromResponse(u, fetchRes);
+                        } catch (e) {
+                        }
                     }
                 } catch (e) {
                 }
