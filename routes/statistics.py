@@ -84,10 +84,15 @@ def _group_activity_rows(rows, group_by: str):
                 'perfect': 0,
                 'corrected': 0,
                 'audio': 0,
+                'time_ms': 0,
             }
         grouped[key]['perfect'] += int(r.get('perfect') or 0)
         grouped[key]['corrected'] += int(r.get('corrected') or 0)
         grouped[key]['audio'] += int(r.get('audio') or 0)
+        try:
+            grouped[key]['time_ms'] += int(r.get('time_ms') or 0)
+        except Exception:
+            pass
 
     return sorted(grouped.values(), key=lambda x: str(x.get('date') or ''))
 

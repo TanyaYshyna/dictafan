@@ -65,17 +65,17 @@ class StatisticsReport {
                         <h2 style="margin: 0; white-space: nowrap;">Отчет об активности</h2>
                         <div id="statisticsHeaderLegend" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(90, 208, 208, 0.9);"></span>
+                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
                                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
                                 <span style="white-space: nowrap;">Perfect (без ошибок с 1-й попытки)</span>
                             </div>
                             <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(116, 219, 146, 0.9);"></span>
+                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-lightgreen, #86efac);"></span>
                                 <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
                                 <span style="white-space: nowrap;">Corrected (исправленные)</span>
                             </div>
                             <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(160, 150, 255, 0.9);"></span>
+                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-purple, #a78bfa);"></span>
                                 <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
                                 <span style="white-space: nowrap;">Audio (аудио контроль)</span>
                             </div>
@@ -94,7 +94,7 @@ class StatisticsReport {
                     <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
                         <div style="display:flex; align-items:center; gap: 10px;">
                             <div id="activityUserPicker" style="position: relative; min-width: 220px;">
-                                <button id="activityUserPickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between;">
+                                <button id="activityUserPickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500;">
                                     <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
                                         <img id="activityUserPickerAvatar" src="" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
                                         <span id="activityUserPickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
@@ -300,6 +300,7 @@ class StatisticsReport {
                     perfect: Number(s.perfect) || 0,
                     corrected: Number(s.corrected) || 0,
                     audio: Number(s.audio) || 0,
+                    time_ms: Number(s.time_ms) || 0,
                 });
             }
 
@@ -310,7 +311,7 @@ class StatisticsReport {
             last.setHours(0, 0, 0, 0);
             while (cur.getTime() <= last.getTime()) {
                 const id = this.dateToId(cur);
-                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0 });
+                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0, time_ms: 0 });
                 cur.setDate(cur.getDate() + 1);
             }
             return out;
@@ -356,7 +357,7 @@ class StatisticsReport {
                         const url = this.avatarUrlForUser(o.id);
                         const active = Number(o.id) === Number(this.selectedUserId);
                         return `
-                            <button type="button" data-user-id="${o.id}" style="width:100%; display:flex; align-items:center; gap: 10px; padding: 8px 10px; border: 0; background: ${active ? 'rgba(35, 99, 235, 0.08)' : 'transparent'}; border-radius: 10px; cursor: pointer; text-align:left;">
+                            <button type="button" data-user-id="${o.id}" style="width:100%; display:flex; align-items:center; gap: 10px; padding: 8px 10px; border: 0; background: ${active ? 'rgba(35, 99, 235, 0.08)' : 'transparent'}; border-radius: 10px; cursor: pointer; text-align:left; font-size: 14px; font-weight: 400;">
                                 <img src="${url}" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
                                 <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(o.label)}</span>
                             </button>
@@ -515,6 +516,9 @@ class StatisticsReport {
         // Находим максимальное значение для масштабирования
         const maxValue = Math.max(...stats.map(s => s.perfect + s.corrected + s.audio));
 
+        const maxTimeMs = Math.max(...stats.map(s => Number(s.time_ms) || 0));
+        const dayMs = 24 * 60 * 60 * 1000;
+
         let html = '<div class="chart-container">';
 
         stats.forEach(stat => {
@@ -523,9 +527,20 @@ class StatisticsReport {
             const correctedPercent = maxValue > 0 ? (stat.corrected / maxValue) * 100 : 0;
             const audioPercent = maxValue > 0 ? (stat.audio / maxValue) * 100 : 0;
 
+            const timeMs = Number(stat.time_ms) || 0;
+            const timePercent = dayMs > 0 ? Math.max(0, Math.min(100, (timeMs / dayMs) * 100)) : 0;
+            const timeLabel = this.formatDurationHhMmSs(timeMs);
+
+            const dow = (this.groupBy === 'days') ? this.getWeekdayShort(stat.date) : '';
+            const dowStyle = (this.groupBy === 'days') ? this.getWeekdayBadgeStyle(stat.date) : '';
+
             html += `
                 <div class="chart-row">
-                    <div class="chart-date">${this.formatDate(stat.date)}</div>
+                    ${this.groupBy === 'days' ? `<div style="flex: 0 0 auto; width: 34px; border-radius: 10px; display:flex; align-items:center; justify-content:center; ${dowStyle}">${dow}</div>` : ''}
+                    <div class="chart-date" style="text-align:left; min-width: 120px; padding-top: 0;">
+                        <div style="font-size: 14px; font-weight: 500; line-height: 1.2;">${this.formatDate(stat.date)}</div>
+                        ${this.groupBy === 'days' ? `<div style="margin-top: 4px; font-size: 13px; font-weight: 500; color: rgba(31,41,51,0.75); line-height: 1.1;">${timeLabel}</div>` : ''}
+                    </div>
                     <div class="chart-bars">
                         <div class="bar-container">
                             ${stat.perfect > 0 ? `
@@ -551,6 +566,14 @@ class StatisticsReport {
                             ` : ''}
                             <span class="bar-label">${stat.audio}</span>
                         </div>
+                        ${this.groupBy === 'days' ? `
+                            <div class="bar-container" style="height: 10px;">
+                                ${timeMs > 0 ? `
+                                    <div class="bar" style="width: ${timePercent}%; background: rgba(31, 41, 51, 0.25);" title="Время: ${timeLabel}"></div>
+                                ` : ''}
+                                <span class="bar-label" style="font-weight: 400; color: rgba(31,41,51,0.7);"> </span>
+                            </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -558,6 +581,56 @@ class StatisticsReport {
 
         html += '</div>';
         chartContainer.innerHTML = html;
+    }
+
+    formatDurationHhMmSs(ms) {
+        try {
+            const sec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        } catch (e) {
+            return '00:00:00';
+        }
+    }
+
+    getWeekdayShort(dateId) {
+        try {
+            const s = String(dateId || '');
+            if (!/^[0-9]{8}$/.test(s)) return '';
+            const y = parseInt(s.substring(0, 4), 10);
+            const m = parseInt(s.substring(4, 6), 10) - 1;
+            const d = parseInt(s.substring(6, 8), 10);
+            const dt = new Date(y, m, d);
+            const jsDay = dt.getDay();
+            const map = { 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб', 0: 'вс' };
+            return map[jsDay] || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    getWeekdayBadgeStyle(dateId) {
+        try {
+            const s = String(dateId || '');
+            if (!/^[0-9]{8}$/.test(s)) return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 600;';
+            const y = parseInt(s.substring(0, 4), 10);
+            const m = parseInt(s.substring(4, 6), 10) - 1;
+            const d = parseInt(s.substring(6, 8), 10);
+            const dt = new Date(y, m, d);
+            const jsDay = dt.getDay();
+            const isWeekend = (jsDay === 0 || jsDay === 6);
+            if (isWeekend) {
+                return 'background: rgba(255, 143, 171, 0.28); color: rgba(127, 29, 29, 0.85); font-weight: 700;';
+            }
+            const tone = (jsDay % 2 === 0)
+                ? 'background: rgba(31,41,51,0.16); color: rgba(31,41,51,0.85);'
+                : 'background: rgba(31,41,51,0.10); color: rgba(31,41,51,0.80);';
+            return `${tone} font-weight: 700;`;
+        } catch (e) {
+            return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 600;';
+        }
     }
 
     /**
