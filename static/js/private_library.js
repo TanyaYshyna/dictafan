@@ -2996,16 +2996,20 @@ async function prefetchDictationToCache({ dictationId, langOrig, translationLang
     }
 
     try {
-      const cover = String(coverUrl || '').trim();
-      const coverToFetch = cover
-        ? maybeCacheBustDictationCover(cover)
-        : `/api/dictations_covers/${encodeURIComponent(numericId)}.webp`;
+      const coverPath = numericId
+        ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp`
+        : '';
+      const coverToFetch = coverPath
+        ? `${coverPath}${coverPath.includes('?') ? '&' : '?'}ts=${Date.now()}`
+        : '';
       try {
         const overlay = document.getElementById('loading-overlay');
         const textEl = overlay ? overlay.querySelector('.loading-text') : null;
         if (textEl) textEl.textContent = 'Обложка…';
       } catch (e) {}
-      await swRequest('prefetchStrict', { urls: [coverToFetch], ignoreLimit: true });
+      if (coverToFetch) {
+        await swRequest('prefetchStrict', { urls: [coverToFetch], ignoreLimit: true });
+      }
     } catch (e) {
     }
 
@@ -6749,7 +6753,9 @@ function installEventHandlers() {
       const btn = e.target.closest('[data-action="prefetch-dictation-cache"]');
       const dictationId = btn ? btn.getAttribute('data-dictation-id') : '';
       const langOriginal = btn ? btn.getAttribute('data-lang-original') : '';
-      const coverUrl = btn ? btn.getAttribute('data-cover-url') : '';
+      const numericId = String(dictationId || '').trim().replace(/^dict_/, '').trim();
+      const canonicalCover = numericId ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp` : '';
+      const coverUrl = canonicalCover;
       const rawTranslations = btn ? btn.getAttribute('data-translation-langs') : '';
       const translationLanguages = String(rawTranslations || '')
         .split(',')
@@ -6787,12 +6793,11 @@ function installEventHandlers() {
           try {
             const img = card.querySelector ? card.querySelector('img.short-cover') : null;
             if (img) {
-              const numericId = String(dictationId || '').trim().replace(/^dict_/, '').trim();
-              const baseUrl = String(coverUrl || '').trim() || (numericId ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp` : '');
-              const nextSrc = baseUrl ? maybeCacheBustDictationCover(baseUrl) : '';
-              if (nextSrc) {
+              const baseUrl = String(canonicalCover || '').trim();
+              if (baseUrl) {
                 img.dataset.coverApplied = '1';
-                img.src = nextSrc;
+                img.dataset.coverUrl = baseUrl;
+                img.src = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`;
               }
             }
           } catch (e) {
@@ -6804,6 +6809,7 @@ function installEventHandlers() {
       }
 
       return;
+// ...
     }
 
     if (e.target.closest('[data-action="show-in-book"]')) {
