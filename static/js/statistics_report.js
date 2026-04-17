@@ -40,6 +40,16 @@ class StatisticsReport {
         modal.id = 'statistics-modal';
         modal.className = 'modal';
         modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modal.style.backdropFilter = 'blur(4px)';
+        modal.style.overflowY = 'auto';
         // На странице приватной библиотеки много элементов с высоким z-index
         // (карточки, дропдауны, оверлеи). Ставим выше, чтобы модалка была видна.
         modal.style.zIndex = '10150';

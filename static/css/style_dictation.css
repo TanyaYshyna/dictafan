@@ -2069,9 +2069,13 @@ body.playing-audio::after {
   height: 32px;
   cursor: pointer;
   vertical-align: middle;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#startModalExitToIndexBtn {
+.start-modal-settings-btn {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -2081,12 +2085,27 @@ body.playing-audio::after {
   cursor: pointer;
   vertical-align: middle;
   pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#startModalOpenSettingsBtn i {
+.start-modal-settings-btn i, #startModalOpenSettingsBtn i, #startModalExitToIndexBtn i, .start-modal-close-btn i {
   width: 20px;
   height: 20px;
   color: var(--color-text-secondary);
+}
+
+.start-modal-settings-btn i,
+.start-modal-settings-btn svg {
+  width: 20px;
+  height: 20px;
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+.start-modal-settings-btn svg {
+  stroke-width: 2;
 }
 
 #startModalExitToIndexBtn i {
