@@ -59,7 +59,7 @@ def _fmt_duration(ms: int) -> str:
 
 
 def _build_teacher_report_text(*, student_username: str, dictation_title: str, dictation_level: str, date_iso: str,
-                              completion_count_value, error_words) -> str:
+                              completion_count_value, error_words, report_header_mode: str = 'success') -> str:
     error_words_lines = []
     try:
         ew = error_words if isinstance(error_words, dict) else {}
@@ -84,8 +84,14 @@ def _build_teacher_report_text(*, student_username: str, dictation_title: str, d
     if completion_count_value is not None:
         medals_inline = f"  🥇 {completion_count_value}"
 
+    mode = str(report_header_mode or 'success').strip().lower()
+    if mode == 'interim':
+        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
+    else:
+        first_line = f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант"
+
     text = (
-        f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант\n"
+        f"{first_line}\n"
         f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
         f"Дата: {date_iso}"
     )
@@ -119,7 +125,7 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                                    completed_at_ms, completed_at_tz_offset_min, time_ms,
                                    completion_count_value, perfect_count, corrected_count, audio_count,
                                    attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
-                                   settings_json, error_words) -> str:
+                                   settings_json, error_words, report_header_mode: str = 'success') -> str:
     # Date line
     success_date_iso = datetime.now().date().isoformat()
     when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
@@ -218,14 +224,21 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         date_iso=success_date_iso,
         completion_count_value=completion_count_value,
         error_words=error_words,
+        report_header_mode=report_header_mode,
     )
 
     medals_inline = ''
     if completion_count_value is not None:
         medals_inline = f"  🥇 {completion_count_value}"
 
+    mode = str(report_header_mode or 'success').strip().lower()
+    if mode == 'interim':
+        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
+    else:
+        first_line = f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант"
+
     header = (
-        f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант\n"
+        f"{first_line}\n"
         f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
         f"Дата: {date_line}\n"
         f"Длительность: {_fmt_duration(time_ms)}\n"
@@ -328,6 +341,12 @@ def teacher_report_send():
     dictation_id_raw = data.get('dictation_id')
     teacher_user_ids = data.get('teacher_user_ids') or []
 
+    report_header_mode = None
+    try:
+        report_header_mode = str(data.get('report_header_mode') or '').strip().lower() or None
+    except Exception:
+        report_header_mode = None
+
     try:
         dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
     except Exception:
@@ -412,6 +431,7 @@ def teacher_report_send():
             dictation_lang=str(dictation_lang),
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
+            report_header_mode=report_header_mode or 'success',
         )
     else:
         today_iso = _today_iso_local()
@@ -422,6 +442,7 @@ def teacher_report_send():
             date_iso=today_iso,
             completion_count_value=completion_count_value,
             error_words=data.get('error_words'),
+            report_header_mode=report_header_mode or 'success',
         )
 
     sent = 0
@@ -519,6 +540,12 @@ def teacher_report_send_auto():
     teacher_user_ids = data.get('teacher_user_ids') or []
     send_to_self = bool(data.get('send_to_self'))
 
+    report_header_mode = None
+    try:
+        report_header_mode = str(data.get('report_header_mode') or '').strip().lower() or None
+    except Exception:
+        report_header_mode = None
+
     try:
         dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
     except Exception:
@@ -598,6 +625,7 @@ def teacher_report_send_auto():
             dictation_lang=str(dictation_lang),
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
+            report_header_mode=report_header_mode or 'success',
         )
     else:
         today_iso = _today_iso_local()
@@ -608,6 +636,7 @@ def teacher_report_send_auto():
             date_iso=today_iso,
             completion_count_value=completion_count_value,
             error_words=data.get('error_words'),
+            report_header_mode=report_header_mode or 'success',
         )
 
     sent = 0

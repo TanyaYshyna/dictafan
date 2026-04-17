@@ -40,6 +40,9 @@ class StatisticsReport {
         modal.id = 'statistics-modal';
         modal.className = 'modal';
         modal.style.display = 'none';
+        // На странице приватной библиотеки много элементов с высоким z-index
+        // (карточки, дропдауны, оверлеи). Ставим выше, чтобы модалка была видна.
+        modal.style.zIndex = '10150';
 
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
@@ -90,6 +93,12 @@ class StatisticsReport {
                 </div>
             </div>
         `;
+
+        try {
+            const content = modal.querySelector('.modal-content');
+            if (content) content.style.zIndex = '10151';
+        } catch (e) {
+        }
 
         document.body.appendChild(modal);
         this.modal = modal;

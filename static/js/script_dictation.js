@@ -14,9 +14,7 @@ function getCurrentDictationIdForDb() {
     } catch (e) {
         return null;
     }
-
 }
-
 function escapeHtml(str) {
     const s = String(str || '');
     return s
@@ -263,6 +261,7 @@ async function autoSendTeacherReportAfterSuccess({
     completedAtTzOffsetMin,
     sentencesData,
     settingsJson,
+    reportHeaderMode,
 }) {
     if (teacherReportRecipientsState.sending) return;
     const token = window.UM?.token || localStorage.getItem('jwt_token');
@@ -270,6 +269,114 @@ async function autoSendTeacherReportAfterSuccess({
 
     const dictationIdForDb = getCurrentDictationIdForDb();
     if (!dictationIdForDb) return;
+
+    // Если параметры не переданы (например, промежуточный отчёт),
+    // собираем снапшот из текущего состояния — чтобы и финальный, и промежуточный
+    // отчёты проходили через одну и ту же процедуру.
+    let snapshot = null;
+    try {
+        const needSnapshot = (
+            perfectCount == null || correctedCount == null || audioCount == null ||
+            attemptsTotal == null || errorCount == null || timeMs == null ||
+            completedAtMs == null || completedAtTzOffsetMin == null ||
+            sentencesData == null || settingsJson == null || errorWords == null ||
+            completionCountAfter === undefined
+        );
+
+        if (needSnapshot) {
+            let totalPerfect = 0;
+            let totalCorrected = 0;
+            let totalAudio = 0;
+            let totalAttempts = 0;
+            let totalErrors = 0;
+
+            const sentences_data = [];
+            try {
+                (allSentences || []).forEach((s) => {
+                    const p = Number(s.number_of_perfect) || 0;
+                    const c = Number(s.number_of_corrected) || 0;
+                    const a = Number(s.number_of_audio) || 0;
+                    const at = Number(s.attempts_total) || 0;
+                    const er = Number(s.error_count) || 0;
+
+                    totalPerfect += p;
+                    totalCorrected += c;
+                    totalAudio += a;
+                    totalAttempts += at;
+                    totalErrors += er;
+
+                    if (p > 0 || c > 0 || a > 0) {
+                        sentences_data.push({
+                            sentence_key: s.key,
+                            perfect_count: p,
+                            corrected_count: c,
+                            audio_count: a,
+                            attempts_total: at,
+                            error_count: er,
+                            selection_state: s.selection_state || 'unchecked'
+                        });
+                    }
+                });
+            } catch (e2) {
+            }
+
+            const timerSnapshot = getProgressTimerSnapshot();
+            const totalTimeMs = timerSnapshot.accumulatedMs || 0;
+            const nowMs = Date.now();
+            const tzOffsetMin = -new Date().getTimezoneOffset();
+
+            const sequences = getPlaySequenceValues();
+            const isMixed = mixControl && mixControl.dataset.checked === 'true';
+            let audioRepeats = REQUIRED_PASSED_COUNT;
+            if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
+                try {
+                    const settings = audioSettingsPanel.getSettings();
+                    audioRepeats = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : REQUIRED_PASSED_COUNT;
+                } catch (e3) {
+                }
+            }
+
+            const settings_json = JSON.stringify({
+                audio: {
+                    start: (sequences.start !== undefined && sequences.start !== null) ? sequences.start : playSequenceStart,
+                    typo: (sequences.typo !== undefined && sequences.typo !== null) ? sequences.typo : playSequenceTypo,
+                    success: (sequences.success !== undefined && sequences.success !== null) ? sequences.success : playSequenceSuccess,
+                    repeats: audioRepeats,
+                    required_passed_star_half: REQUIRED_PASSED_STAR_HALF
+                },
+                sentence_order: isMixed ? 'mixed' : 'direct'
+            });
+
+            let completion_count_after = completionCountAfter;
+            if (completion_count_after === undefined) {
+                completion_count_after = null;
+                try {
+                    await loadCompletionCountsCacheFromIdb();
+                    const currentCount = getCompletionCountFromCache(dictationIdForDb);
+                    completion_count_after = (Number(currentCount) || 0);
+                } catch (e4) {
+                    completion_count_after = null;
+                }
+            }
+
+            snapshot = {
+                completionCountAfter: completion_count_after,
+                errorWords: (typeof dictationErrorWordCounts === 'object' && dictationErrorWordCounts) ? dictationErrorWordCounts : null,
+                perfectCount: totalPerfect,
+                correctedCount: totalCorrected,
+                audioCount: totalAudio,
+                attemptsTotal: totalAttempts,
+                errorCount: totalErrors,
+                timeMs: totalTimeMs,
+                completedAtMs: nowMs,
+                completedAtTzOffsetMin: tzOffsetMin,
+                sentencesData: sentences_data,
+                settingsJson: settings_json,
+            };
+        }
+    } catch (e1) {
+        snapshot = null;
+    }
 
     try {
         await fetchTeacherReportRecipientsInBackground();
@@ -282,6 +389,19 @@ async function autoSendTeacherReportAfterSuccess({
 
     teacherReportRecipientsState.sending = true;
     try {
+        const finalCompletionCountAfter = completionCountAfter != null ? completionCountAfter : (snapshot ? snapshot.completionCountAfter : null);
+        const finalErrorWords = (typeof errorWords === 'object' && errorWords) ? errorWords : (snapshot ? snapshot.errorWords : null);
+        const finalPerfect = perfectCount != null ? perfectCount : (snapshot ? snapshot.perfectCount : null);
+        const finalCorrected = correctedCount != null ? correctedCount : (snapshot ? snapshot.correctedCount : null);
+        const finalAudio = audioCount != null ? audioCount : (snapshot ? snapshot.audioCount : null);
+        const finalAttempts = attemptsTotal != null ? attemptsTotal : (snapshot ? snapshot.attemptsTotal : null);
+        const finalErrors = errorCount != null ? errorCount : (snapshot ? snapshot.errorCount : null);
+        const finalTimeMs = timeMs != null ? timeMs : (snapshot ? snapshot.timeMs : null);
+        const finalCompletedAtMs = completedAtMs != null ? completedAtMs : (snapshot ? snapshot.completedAtMs : null);
+        const finalCompletedAtTzOffsetMin = completedAtTzOffsetMin != null ? completedAtTzOffsetMin : (snapshot ? snapshot.completedAtTzOffsetMin : null);
+        const finalSentencesData = Array.isArray(sentencesData) ? sentencesData : (snapshot ? snapshot.sentencesData : null);
+        const finalSettingsJson = settingsJson != null ? settingsJson : (snapshot ? snapshot.settingsJson : null);
+
         await fetch('/api/statistics/teacher_report/send_auto', {
             method: 'POST',
             headers: {
@@ -292,18 +412,19 @@ async function autoSendTeacherReportAfterSuccess({
                 dictation_id: dictationIdForDb,
                 teacher_user_ids,
                 send_to_self,
-                completion_count_after: completionCountAfter != null ? completionCountAfter : null,
-                perfect_count: perfectCount != null ? perfectCount : null,
-                corrected_count: correctedCount != null ? correctedCount : null,
-                audio_count: audioCount != null ? audioCount : null,
-                attempts_total: attemptsTotal != null ? attemptsTotal : null,
-                error_count: errorCount != null ? errorCount : null,
-                time_ms: timeMs != null ? timeMs : null,
-                completed_at_ms: completedAtMs != null ? completedAtMs : null,
-                completed_at_tz_offset_min: completedAtTzOffsetMin != null ? completedAtTzOffsetMin : null,
-                sentences_data: Array.isArray(sentencesData) ? sentencesData : null,
-                settings_json: settingsJson != null ? settingsJson : null,
-                error_words: (typeof errorWords === 'object' && errorWords) ? errorWords : null,
+                report_header_mode: (reportHeaderMode != null ? String(reportHeaderMode) : 'success'),
+                completion_count_after: finalCompletionCountAfter,
+                perfect_count: finalPerfect,
+                corrected_count: finalCorrected,
+                audio_count: finalAudio,
+                attempts_total: finalAttempts,
+                error_count: finalErrors,
+                time_ms: finalTimeMs,
+                completed_at_ms: finalCompletedAtMs,
+                completed_at_tz_offset_min: finalCompletedAtTzOffsetMin,
+                sentences_data: finalSentencesData,
+                settings_json: finalSettingsJson,
+                error_words: finalErrorWords,
             })
         });
     } catch (e) {
@@ -11262,6 +11383,31 @@ function disableProfileNavigation() {
 }
 
 document.addEventListener('DOMContentLoaded', disableProfileNavigation);
+
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        const btn = document.getElementById('startModalSendInterimReportBtn');
+        if (!btn) return;
+
+        btn.addEventListener('click', async (e) => {
+            try {
+                e.preventDefault();
+                e.stopPropagation();
+            } catch (e2) {
+            }
+
+            try {
+                await autoSendTeacherReportAfterSuccess({
+                    reportHeaderMode: 'interim',
+                });
+                alert('Промежуточный отчет отправлен');
+            } catch (e5) {
+                alert('Не удалось отправить отчет');
+            }
+        });
+    } catch (e) {
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     try {
