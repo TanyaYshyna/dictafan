@@ -1396,7 +1396,7 @@ function getLocalDateId() {
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return `${y}${m}${day}`;
 }
 
 async function enqueueOfflineActivity(type_activity, number = 1) {
@@ -1404,11 +1404,14 @@ async function enqueueOfflineActivity(type_activity, number = 1) {
         const userId = getDraftUserIdForKey();
         if (!userId) return false;
         const dateId = getLocalDateId();
-        const key = `${userId}:${dateId}`;
+        const dictationId = (currentDictation && currentDictation.id) ? currentDictation.id : null;
+        if (!dictationId) return false;
+        const key = `${userId}:${dateId}:${dictationId}`;
         const existing = (await idbGet('activity_outbox', key)) || {
             key,
             userId,
             date: dateId,
+            dictation_id: dictationId,
             perfect_count: 0,
             corrected_count: 0,
             audio_count: 0,
@@ -1442,6 +1445,20 @@ async function syncOfflineActivityOutbox() {
             if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
             if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
 
+            let dictationId = row.dictation_id || row.dictationId || null;
+            if (!dictationId) {
+                try {
+                    const parts = String(row.key || '').split(':');
+                    // legacy: userId:dateId  OR new: userId:dateId:dictationId
+                    if (parts.length >= 3) dictationId = parts.slice(2).join(':');
+                } catch (e) {
+                }
+            }
+            if (!dictationId) {
+                // нечего отправлять (невалидная запись)
+                continue;
+            }
+
             let sentAll = true;
             for (const item of toSend) {
                 const response = await fetch('/api/statistics/activity', {
@@ -1451,7 +1468,8 @@ async function syncOfflineActivityOutbox() {
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        dictation_id: currentDictation?.id || 'offline',
+                        dictation_id: dictationId,
+                        // Всегда YYYYMMDD
                         date: row.date,
                         type_activity: item.type_activity,
                         number: item.number
@@ -7873,15 +7891,16 @@ async function saveActivityToDB(type_activity) {
         console.log(`   type_activity: ${type_activity}`);
         console.log(`   dictation_id: ${currentDictation.id}`);
 
-        if (!currentDictation.id || !window.UM) {
-            console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет dictation_id или UserManager');
+        if (!currentDictation.id) {
+            console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет dictation_id');
             return;
         }
 
         // Получаем токен из UserManager (это свойство, а не метод)
         const token = window.UM?.token || localStorage.getItem('jwt_token');
         if (!token) {
-            console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет токена');
+            console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет токена (кладу в outbox)');
+            await enqueueOfflineActivity(type_activity, 1);
             return;
         }
 
@@ -7890,6 +7909,12 @@ async function saveActivityToDB(type_activity) {
             type_activity: type_activity,
             number: 1
         };
+
+        // Всегда отправляем локальную дату в формате YYYYMMDD
+        try {
+            requestData.date = getLocalDateId();
+        } catch (e) {
+        }
 
         console.log('📤 [CLIENT] Данные для отправки:', requestData);
 
@@ -7907,6 +7932,14 @@ async function saveActivityToDB(type_activity) {
             const errorText = await response.text();
             console.warn(`⚠️ [CLIENT] Текст ошибки:`, errorText);
             await enqueueOfflineActivity(type_activity, 1);
+            // Если интернет есть, но запрос не прошёл (например, временная ошибка/401),
+            // попробуем отправить outbox сразу, чтобы активность не "застряла" до следующего события online.
+            try {
+                if (navigator.onLine) {
+                    syncOfflineActivityOutbox().catch(() => {});
+                }
+            } catch (e) {
+            }
             return;
         }
 
@@ -7915,6 +7948,12 @@ async function saveActivityToDB(type_activity) {
     } catch (error) {
         console.error(`❌ [CLIENT] Ошибка при сохранении активности ${type_activity}:`, error);
         await enqueueOfflineActivity(type_activity, 1);
+        try {
+            if (navigator.onLine) {
+                syncOfflineActivityOutbox().catch(() => {});
+            }
+        } catch (e) {
+        }
         // Не прерываем выполнение, ошибка не критична
     }
 }

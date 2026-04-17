@@ -10,6 +10,26 @@ class UserActivityHistory {
         this.monthData = null;
     }
 
+    async listActivityReportUsers() {
+        try {
+            const token = this.getToken();
+            if (!token) return [];
+
+            const res = await fetch('/api/statistics/activity/users', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success && Array.isArray(js.users))) return [];
+            return js.users;
+        } catch (e) {
+            return [];
+        }
+    }
+
     /**
      * Получить идентификатор месяца в формате YYYYMM (год и месяц)
      */
@@ -283,41 +303,37 @@ class UserActivityHistory {
     /**
      * Получить статистику за период
      */
-    async getStatisticsByPeriod(startDate, endDate, groupBy = 'days') {
-        const allHistory = await this.loadAllHistory();
-        const stats = [];
+    async getStatisticsByPeriod(startDate, endDate, groupBy = 'days', userId = null) {
+        try {
+            const token = this.getToken();
+            if (!token) return [];
 
-        // Преобразуем даты в числовой формат
-        const startId = this.getDateIdentifier(startDate);
-        const endId = this.getDateIdentifier(endDate);
+            const startIso = (startDate instanceof Date)
+                ? startDate.toISOString().slice(0, 10)
+                : new Date(startDate).toISOString().slice(0, 10);
+            const endIso = (endDate instanceof Date)
+                ? endDate.toISOString().slice(0, 10)
+                : new Date(endDate).toISOString().slice(0, 10);
 
-        // Собираем все записи за период
-        for (const monthData of Object.values(allHistory)) {
-            const statistics = monthData.statistics || [];
-            if (!statistics || statistics.length === 0) continue;
-
-            for (const stat of statistics) {
-                const statDate = stat.date;
-                if (!statDate) continue;
-                
-                // Преобразуем дату в число для сравнения
-                const dateValue = typeof statDate === 'number' ? statDate : parseInt(statDate);
-                
-                if (dateValue >= startId && dateValue <= endId) {
-                    // Нормализуем объект статистики
-                    const normalizedStat = {
-                        date: statDate,
-                        perfect: stat.perfect || 0,
-                        corrected: stat.corrected || 0,
-                        audio: stat.audio || 0
-                    };
-                    stats.push(normalizedStat);
-                }
-            }
+            const res = await fetch('/api/statistics/activity/report', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    start_date: startIso,
+                    end_date: endIso,
+                    group_by: groupBy,
+                    user_id: (userId != null ? userId : null),
+                })
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success && Array.isArray(js.stats))) return [];
+            return js.stats;
+        } catch (e) {
+            return [];
         }
-
-        // Группируем по дням/неделям/месяцам
-        return this.groupStatistics(stats, groupBy);
     }
 
     /**

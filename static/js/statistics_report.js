@@ -8,6 +8,7 @@ class StatisticsReport {
         this.modal = null;
         this.container = null;
         this.groupBy = options.groupBy || 'days'; // days, weeks, months
+        this.selectedUserId = options.userId || null;
     }
 
     async ensureHistoryLoaded() {
@@ -67,6 +68,10 @@ class StatisticsReport {
                 </div>
                 
                 <div class="statistics-controls">
+                    <div class="group-by-controls">
+                        <label>Пользователь:</label>
+                        <select id="activityUserSelect" class="group-select"></select>
+                    </div>
                     <div class="date-range-controls">
                         <label>Период:</label>
                         <input type="date" id="startDate" class="date-input">
@@ -141,6 +146,60 @@ class StatisticsReport {
 
         document.getElementById('startDate').value = this.formatDateForInput(startDate);
         document.getElementById('endDate').value = this.formatDateForInput(endDate);
+
+        try {
+            const userSelect = document.getElementById('activityUserSelect');
+            if (userSelect) {
+                userSelect.addEventListener('change', () => {
+                    const raw = userSelect.value;
+                    const parsed = parseInt(String(raw || ''), 10);
+                    this.selectedUserId = Number.isFinite(parsed) ? parsed : null;
+                    this.updateStatistics();
+                });
+            }
+        } catch (e) {
+        }
+    }
+
+    async ensureUsersLoaded() {
+        try {
+            if (!this.history || typeof this.history.listActivityReportUsers !== 'function') return;
+            const userSelect = document.getElementById('activityUserSelect');
+            if (!userSelect) return;
+            if (userSelect.options && userSelect.options.length > 0) return;
+
+            const users = await this.history.listActivityReportUsers();
+            if (!Array.isArray(users) || users.length === 0) return;
+
+            const opts = [];
+            for (const u of users) {
+                const id = Number(u && u.id);
+                if (!Number.isFinite(id)) continue;
+                const label = String(u && u.label ? u.label : (u && u.username ? u.username : `User #${id}`));
+                opts.push({ id, label });
+            }
+            if (!opts.length) return;
+
+            userSelect.innerHTML = opts
+                .map(o => `<option value="${o.id}">${this.escapeHtml(o.label)}</option>`)
+                .join('');
+
+            if (this.selectedUserId == null) {
+                this.selectedUserId = opts[0].id;
+            }
+            userSelect.value = String(this.selectedUserId);
+        } catch (e) {
+        }
+    }
+
+    escapeHtml(v) {
+        const s = String(v || '');
+        return s
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
     }
 
     /**
@@ -187,6 +246,10 @@ class StatisticsReport {
             await this.ensureHistoryLoaded();
         } catch (e) {
         }
+        try {
+            await this.ensureUsersLoaded();
+        } catch (e) {
+        }
         await this.updateStatistics();
     }
 
@@ -227,7 +290,7 @@ class StatisticsReport {
 
         try {
             if (this.history && typeof this.history.getStatisticsByPeriod === 'function') {
-                stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy);
+                stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy, this.selectedUserId);
             }
         } catch (e) {
             stats = [];

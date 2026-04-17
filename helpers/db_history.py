@@ -50,8 +50,24 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
         target_date = datetime.now().date()
     else:
         if isinstance(date_override, str):
-            # ожидаем YYYY-MM-DD
-            target_date = datetime.fromisoformat(date_override).date()
+            raw = date_override.strip()
+            # ожидаем YYYY-MM-DD, но иногда клиент присылает YYYYMMDD
+            if raw.isdigit() and len(raw) == 8:
+                year = int(raw[:4])
+                month = int(raw[4:6])
+                day = int(raw[6:8])
+                target_date = datetime(year, month, day).date()
+            else:
+                target_date = datetime.fromisoformat(raw).date()
+        elif isinstance(date_override, int):
+            raw = str(date_override)
+            if raw.isdigit() and len(raw) == 8:
+                year = int(raw[:4])
+                month = int(raw[4:6])
+                day = int(raw[6:8])
+                target_date = datetime(year, month, day).date()
+            else:
+                target_date = datetime.now().date()
         else:
             target_date = date_override
     
@@ -107,6 +123,73 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     except Exception as e:
         conn.rollback()
         raise Exception(f"Failed to add activity: {e}")
+    finally:
+        conn.close()
+
+
+def get_activity_totals_by_period(user_id, start_date, end_date):
+    """Вернуть агрегированную активность пользователя по дням за период.
+
+    Args:
+        user_id: int
+        start_date: datetime.date или str YYYY-MM-DD
+        end_date: datetime.date или str YYYY-MM-DD
+
+    Returns:
+        list[dict]: [{date: 'YYYY-MM-DD', perfect: int, corrected: int, audio: int}, ...]
+    """
+    conn = get_db_connection()
+    try:
+        if isinstance(start_date, str):
+            start_date = datetime.fromisoformat(start_date).date()
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date).date()
+
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    date,
+                    COALESCE(SUM(perfect_count), 0) AS perfect,
+                    COALESCE(SUM(corrected_count), 0) AS corrected,
+                    COALESCE(SUM(audio_count), 0) AS audio
+                FROM history_activity
+                WHERE user_id = %s
+                  AND date >= %s
+                  AND date <= %s
+                GROUP BY date
+                ORDER BY date ASC
+                """,
+                (int(user_id), start_date, end_date),
+            )
+            rows = cur.fetchall() or []
+
+        out = []
+        for r in rows:
+            # psycopg2 может вернуть tuple или dict (RealDictCursor). Поддержим оба.
+            if isinstance(r, dict):
+                d = r.get("date")
+                out.append(
+                    {
+                        "date": d.isoformat() if hasattr(d, "isoformat") else str(d),
+                        "perfect": int(r.get("perfect") or 0),
+                        "corrected": int(r.get("corrected") or 0),
+                        "audio": int(r.get("audio") or 0),
+                    }
+                )
+            else:
+                d = r[0]
+                out.append(
+                    {
+                        "date": d.isoformat() if hasattr(d, "isoformat") else str(d),
+                        "perfect": int(r[1] or 0),
+                        "corrected": int(r[2] or 0),
+                        "audio": int(r[3] or 0),
+                    }
+                )
+        return out
+    except Exception as e:
+        raise Exception(f"Failed to get activity totals by period: {e}")
     finally:
         conn.close()
 

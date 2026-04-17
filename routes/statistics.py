@@ -11,6 +11,7 @@ from helpers.user_helpers import get_user_folder
 from helpers.db_users import get_user_by_email, update_user
 from helpers.db_history import (
     add_activity, add_success, get_success_count, get_success_counts_for_dictations,
+    get_activity_totals_by_period,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -20,6 +21,7 @@ from helpers.db_telegram import (
 )
 from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_dictations import get_sentence_by_key
+from helpers.db import get_db_connection
 
 try:
     from helpers.db_dictations import get_dictation_by_id
@@ -27,6 +29,67 @@ except Exception:
     get_dictation_by_id = None
 
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
+
+
+def _can_teacher_view_student_activity(*, teacher_user_id: int, student_user_id: int) -> bool:
+    try:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM group_students gs
+                    JOIN group_teachers gt ON gt.group_id = gs.group_id
+                    WHERE gt.teacher_user_id = %s
+                      AND gs.student_user_id = %s
+                      AND gs.status = 'active'
+                      AND gs.removed_at IS NULL
+                      AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+                    LIMIT 1
+                    """,
+                    (int(teacher_user_id), int(student_user_id)),
+                )
+                return bool(cur.fetchone())
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
+def _group_activity_rows(rows, group_by: str):
+    grouped = {}
+
+    for r in rows or []:
+        date_iso = str(r.get('date') or '')
+        if not date_iso:
+            continue
+        try:
+            d = datetime.fromisoformat(date_iso).date()
+        except Exception:
+            continue
+
+        if group_by == 'months':
+            key = f"{d.year}{d.month:02d}"
+        elif group_by == 'weeks':
+            # ISO week
+            iso_year, iso_week, _ = d.isocalendar()
+            key = f"{iso_year}W{iso_week:02d}"
+        else:
+            key = f"{d.year}{d.month:02d}{d.day:02d}"
+
+        if key not in grouped:
+            grouped[key] = {
+                'date': key,
+                'perfect': 0,
+                'corrected': 0,
+                'audio': 0,
+            }
+        grouped[key]['perfect'] += int(r.get('perfect') or 0)
+        grouped[key]['corrected'] += int(r.get('corrected') or 0)
+        grouped[key]['audio'] += int(r.get('audio') or 0)
+
+    return sorted(grouped.values(), key=lambda x: str(x.get('date') or ''))
 
 
 def _today_iso_local() -> str:
@@ -915,6 +978,95 @@ def save_activity():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Ошибка сохранения активности'}), 500
+
+
+@statistics_bp.route('/activity/report', methods=['POST'])
+@jwt_required()
+def api_activity_report():
+    """Вернуть активность из history_activity за период (для отчёта "Статистика занятий")."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        data = request.get_json() or {}
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        group_by = str(data.get('group_by') or 'days').lower()
+        requested_user_id = data.get('user_id')
+
+        if not start_date or not end_date:
+            return jsonify({"success": False, "error": "Missing start_date/end_date"}), 400
+
+        if group_by not in ('days', 'weeks', 'months'):
+            group_by = 'days'
+
+        current_user_id = int(user.get('id'))
+        target_user_id = current_user_id
+        if requested_user_id is not None:
+            try:
+                target_user_id = int(requested_user_id)
+            except Exception:
+                return jsonify({"success": False, "error": "Invalid user_id"}), 400
+
+        if target_user_id != current_user_id:
+            if not _can_teacher_view_student_activity(
+                teacher_user_id=current_user_id,
+                student_user_id=target_user_id,
+            ):
+                return jsonify({"success": False, "error": "Forbidden"}), 403
+
+        rows = get_activity_totals_by_period(target_user_id, start_date, end_date)
+        grouped = _group_activity_rows(rows, group_by)
+        return jsonify({"success": True, "stats": grouped})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@statistics_bp.route('/activity/users', methods=['GET'])
+@jwt_required()
+def api_activity_users():
+    """Список пользователей, по которым можно смотреть активность: self + ученики, давшие доступ."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        current_user_id = int(user.get('id'))
+        out = [{"id": current_user_id, "label": str(user.get('username') or 'Я'), "type": "self"}]
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT u.id AS user_id, u.username
+                    FROM group_students gs
+                    JOIN group_teachers gt ON gt.group_id = gs.group_id
+                    JOIN users u ON u.id = gs.student_user_id
+                    WHERE gt.teacher_user_id = %s
+                      AND gs.status = 'active'
+                      AND gs.removed_at IS NULL
+                      AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+                    ORDER BY u.id ASC
+                    """,
+                    (current_user_id,),
+                )
+                rows = cur.fetchall() or []
+                for r in rows:
+                    uid = int(r.get('user_id') if isinstance(r, dict) else r[0])
+                    uname = (r.get('username') if isinstance(r, dict) else r[1])
+                    if uid == current_user_id:
+                        continue
+                    out.append({"id": uid, "label": str(uname or f"User #{uid}"), "type": "student"})
+        finally:
+            conn.close()
+
+        return jsonify({"success": True, "users": out})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
 
 
 @statistics_bp.route('/success', methods=['POST'])
