@@ -63,7 +63,7 @@ class StatisticsReport {
                 <div class="statistics-header">
                     <div style="display:flex; align-items:center; gap: 14px; min-width: 0;">
                         <h2 style="margin: 0; white-space: nowrap;">Отчет об активности</h2>
-                        <div id="statisticsHeaderLegend" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap; min-width: 0;">
+                        <div id="statisticsHeaderLegend" style="display:flex; align-items:center; gap: 8px; flex-wrap: wrap; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 6px;">
                                 <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
                                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
@@ -513,15 +513,17 @@ class StatisticsReport {
             return;
         }
 
-        // Находим максимальное значение для масштабирования
-        const maxValue = Math.max(...stats.map(s => s.perfect + s.corrected + s.audio));
+        const orderedStats = Array.isArray(stats) ? [...stats].reverse() : [];
 
-        const maxTimeMs = Math.max(...stats.map(s => Number(s.time_ms) || 0));
+        // Находим максимальное значение для масштабирования
+        const maxValue = Math.max(...orderedStats.map(s => s.perfect + s.corrected + s.audio));
+
+        const maxTimeMs = Math.max(...orderedStats.map(s => Number(s.time_ms) || 0));
         const dayMs = 24 * 60 * 60 * 1000;
 
         let html = '<div class="chart-container">';
 
-        stats.forEach(stat => {
+        orderedStats.forEach(stat => {
             const total = stat.perfect + stat.corrected + stat.audio;
             const perfectPercent = maxValue > 0 ? (stat.perfect / maxValue) * 100 : 0;
             const correctedPercent = maxValue > 0 ? (stat.corrected / maxValue) * 100 : 0;
@@ -566,14 +568,6 @@ class StatisticsReport {
                             ` : ''}
                             <span class="bar-label">${stat.audio}</span>
                         </div>
-                        ${this.groupBy === 'days' ? `
-                            <div class="bar-container" style="height: 10px;">
-                                ${timeMs > 0 ? `
-                                    <div class="bar" style="width: ${timePercent}%; background: rgba(31, 41, 51, 0.25);" title="Время: ${timeLabel}"></div>
-                                ` : ''}
-                                <span class="bar-label" style="font-weight: 400; color: rgba(31,41,51,0.7);"> </span>
-                            </div>
-                        ` : ''}
                     </div>
                 </div>
             `;
@@ -614,7 +608,7 @@ class StatisticsReport {
     getWeekdayBadgeStyle(dateId) {
         try {
             const s = String(dateId || '');
-            if (!/^[0-9]{8}$/.test(s)) return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 600;';
+            if (!/^[0-9]{8}$/.test(s)) return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
             const y = parseInt(s.substring(0, 4), 10);
             const m = parseInt(s.substring(4, 6), 10) - 1;
             const d = parseInt(s.substring(6, 8), 10);
@@ -622,14 +616,14 @@ class StatisticsReport {
             const jsDay = dt.getDay();
             const isWeekend = (jsDay === 0 || jsDay === 6);
             if (isWeekend) {
-                return 'background: rgba(255, 143, 171, 0.28); color: rgba(127, 29, 29, 0.85); font-weight: 700;';
+                return 'background: rgba(255, 143, 171, 0.28); color: rgba(127, 29, 29, 0.85); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
             }
             const tone = (jsDay % 2 === 0)
                 ? 'background: rgba(31,41,51,0.16); color: rgba(31,41,51,0.85);'
                 : 'background: rgba(31,41,51,0.10); color: rgba(31,41,51,0.80);';
-            return `${tone} font-weight: 700;`;
+            return `${tone} font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;`;
         } catch (e) {
-            return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 600;';
+            return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
         }
     }
 
