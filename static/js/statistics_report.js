@@ -50,7 +50,8 @@ class StatisticsReport {
         modal.style.justifyContent = 'center';
         modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
         modal.style.backdropFilter = 'blur(4px)';
-        modal.style.overflowY = 'auto';
+        // Скролл должен быть внутри модалки, а не у страницы.
+        modal.style.overflow = 'hidden';
         // На странице приватной библиотеки много элементов с высоким z-index
         // (карточки, дропдауны, оверлеи). Ставим выше, чтобы модалка была видна.
         modal.style.zIndex = '10150';
@@ -58,8 +59,28 @@ class StatisticsReport {
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
                 <div class="statistics-header">
-                    <h2>Статистика занятий</h2>
-                    <div style="display:flex; align-items:center; gap: 10px;">
+                    <div style="display:flex; align-items:center; gap: 14px; min-width: 0;">
+                        <h2 style="margin: 0; white-space: nowrap;">Отчет об активности</h2>
+                        <div id="statisticsHeaderLegend" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap; min-width: 0;">
+                            <div style="display:flex; align-items:center; gap: 6px;">
+                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(90, 208, 208, 0.9);"></span>
+                                <i data-lucide="star" style="width: 18px; height: 18px;"></i>
+                                <span style="white-space: nowrap;">Perfect (без ошибок с 1-й попытки)</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px;">
+                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(116, 219, 146, 0.9);"></span>
+                                <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
+                                <span style="white-space: nowrap;">Corrected (исправленные)</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px;">
+                                <span style="display:inline-block; width: 18px; height: 6px; border-radius: 6px; background: rgba(160, 150, 255, 0.9);"></span>
+                                <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
+                                <span style="white-space: nowrap;">Audio (аудио контроль)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
                         <button id="updateStatisticsBtn" class="button-color-yellow">Сформировать</button>
                         <button class="close-statistics-btn" id="closeStatisticsBtn">
                             <i data-lucide="x"></i>
@@ -91,27 +112,37 @@ class StatisticsReport {
                 <div class="statistics-chart" id="statisticsChart">
                     <!-- Здесь будет график -->
                 </div>
-
-                <div class="statistics-legend">
-                    <div class="legend-item">
-                        <span class="legend-color perfect-color"></span>
-                        <span>Perfect (без ошибок с 1-й попытки)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color corrected-color"></span>
-                        <span>Corrected (исправленные)</span>
-                    </div>
-                    <div class="legend-item">
-                        <span class="legend-color audio-color"></span>
-                        <span>Audio (аудио контроль)</span>
-                    </div>
-                </div>
             </div>
         `;
 
         try {
             const content = modal.querySelector('.modal-content');
-            if (content) content.style.zIndex = '10151';
+            if (content) {
+                content.style.zIndex = '10151';
+                content.style.maxHeight = '90vh';
+                content.style.height = '90vh';
+                content.style.display = 'flex';
+                content.style.flexDirection = 'column';
+                content.style.overflow = 'hidden';
+                content.style.boxSizing = 'border-box';
+            }
+
+            const header = modal.querySelector('.statistics-header');
+            if (header) {
+                header.style.flexShrink = '0';
+            }
+
+            const controls = modal.querySelector('.statistics-controls');
+            if (controls) {
+                controls.style.flexShrink = '0';
+            }
+
+            const chart = modal.querySelector('#statisticsChart');
+            if (chart) {
+                chart.style.flex = '1 1 auto';
+                chart.style.overflowY = 'auto';
+                chart.style.minHeight = '0';
+            }
         } catch (e) {
         }
 
