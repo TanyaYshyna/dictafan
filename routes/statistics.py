@@ -1029,6 +1029,142 @@ def api_activity_report():
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@statistics_bp.route('/rating', methods=['POST'])
+@jwt_required()
+def api_rating_report():
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        data = request.get_json() or {}
+        period_key = str(data.get('period') or 'today').strip().lower()
+        if period_key in ('1', 'day', 'today', 'сегодня'):
+            period_days = 1
+        elif period_key in ('3', '3days', '3d'):
+            period_days = 3
+        elif period_key in ('7', '7days', '7d'):
+            period_days = 7
+        elif period_key in ('30', '30days', '30d'):
+            period_days = 30
+        else:
+            try:
+                period_days = int(data.get('period_days') or 1)
+            except Exception:
+                period_days = 1
+
+        if period_days <= 0:
+            period_days = 1
+        if period_days > 365:
+            period_days = 365
+
+        current_user_id = int(user.get('id'))
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=int(period_days) - 1)
+
+        candidates = {current_user_id: str(user.get('username') or 'Я')}
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT u.id AS user_id, u.username
+                    FROM group_students gs
+                    JOIN group_teachers gt ON gt.group_id = gs.group_id
+                    JOIN users u ON u.id = gs.student_user_id
+                    WHERE gt.teacher_user_id = %s
+                      AND gs.status = 'active'
+                      AND gs.removed_at IS NULL
+                      AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+                    ORDER BY u.id ASC
+                    """,
+                    (current_user_id,),
+                )
+                rows = cur.fetchall() or []
+                for r in rows:
+                    uid = int(r.get('user_id') if isinstance(r, dict) else r[0])
+                    if uid == current_user_id:
+                        continue
+                    uname = (r.get('username') if isinstance(r, dict) else r[1])
+                    candidates[uid] = str(uname or f"User #{uid}")
+
+                user_ids = list(candidates.keys())
+                aggregates = {}
+                if user_ids:
+                    cur.execute(
+                        """
+                        SELECT
+                            user_id,
+                            COALESCE(SUM(perfect_count), 0) AS perfect,
+                            COALESCE(SUM(corrected_count), 0) AS corrected,
+                            COALESCE(SUM(audio_count), 0) AS audio,
+                            COALESCE(SUM(time_ms), 0) AS time_ms
+                        FROM history_successes
+                        WHERE user_id = ANY(%s)
+                          AND created_at::date >= %s
+                          AND created_at::date <= %s
+                        GROUP BY user_id
+                        """,
+                        (user_ids, start_date, end_date),
+                    )
+                    arows = cur.fetchall() or []
+                    for ar in arows:
+                        if isinstance(ar, dict):
+                            uid = int(ar.get('user_id') or 0)
+                            aggregates[uid] = {
+                                'perfect': int(ar.get('perfect') or 0),
+                                'corrected': int(ar.get('corrected') or 0),
+                                'audio': int(ar.get('audio') or 0),
+                                'time_ms': int(ar.get('time_ms') or 0),
+                            }
+                        else:
+                            uid = int(ar[0] or 0)
+                            aggregates[uid] = {
+                                'perfect': int(ar[1] or 0),
+                                'corrected': int(ar[2] or 0),
+                                'audio': int(ar[3] or 0),
+                                'time_ms': int(ar[4] or 0),
+                            }
+        finally:
+            conn.close()
+
+        out = []
+        for uid, uname in candidates.items():
+            agg = aggregates.get(uid) or {}
+            out.append(
+                {
+                    'user_id': int(uid),
+                    'username': str(uname or f"User #{uid}"),
+                    'perfect': int(agg.get('perfect') or 0),
+                    'corrected': int(agg.get('corrected') or 0),
+                    'audio': int(agg.get('audio') or 0),
+                    'time_ms': int(agg.get('time_ms') or 0),
+                }
+            )
+
+        out.sort(
+            key=lambda x: (
+                -int(x.get('perfect') or 0),
+                -int(x.get('audio') or 0),
+                int(x.get('corrected') or 0),
+                int(x.get('time_ms') or 0),
+            )
+        )
+
+        return jsonify(
+            {
+                'success': True,
+                'period_days': int(period_days),
+                'start_date': start_date.isoformat(),
+                'end_date': end_date.isoformat(),
+                'rating': out,
+            }
+        )
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @statistics_bp.route('/activity/users', methods=['GET'])
 @jwt_required()
 def api_activity_users():

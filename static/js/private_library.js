@@ -178,6 +178,7 @@ function setupUserDropdownMenu() {
   const dropdown = document.getElementById('userMenuDropdown');
   const profileBtn = document.getElementById('userMenuProfileBtn');
   const activityBtn = document.getElementById('userMenuActivityReportBtn');
+  const ratingBtn = document.getElementById('userMenuRatingReportBtn');
   const planFactBtn = document.getElementById('userMenuPlanFactBtn');
 
   if (!toggleBtn || !dropdown) return;
@@ -239,6 +240,24 @@ function setupUserDropdownMenu() {
     });
   }
 
+  if (ratingBtn) {
+    ratingBtn.addEventListener('click', async (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+
+      if (typeof RatingReport === 'undefined') {
+        alert('Рейтинг недоступен');
+        return;
+      }
+
+      try {
+        await RatingReport.open();
+      } catch (err) {
+        alert('Не удалось открыть рейтинг');
+      }
+    });
+  }
+
   if (activityBtn) {
     activityBtn.addEventListener('click', async (e) => {
       try { e.preventDefault(); } catch (e2) {}
@@ -289,8 +308,9 @@ function installUserMenuReportsClickFallback() {
       if (!target || !target.closest) return;
 
       const activityBtn = target.closest('#userMenuActivityReportBtn');
+      const ratingBtn = target.closest('#userMenuRatingReportBtn');
       const planFactBtn = target.closest('#userMenuPlanFactBtn');
-      if (!activityBtn && !planFactBtn) return;
+      if (!activityBtn && !ratingBtn && !planFactBtn) return;
 
       try {
         console.log('[user_menu_reports] click', { activity: !!activityBtn, planFact: !!planFactBtn });

@@ -635,3 +635,259 @@ class StatisticsReport {
         await report.show();
     }
 }
+
+class RatingReport {
+    constructor(options = {}) {
+        this.modal = null;
+        this.selectedPeriod = options.period || 'today';
+    }
+
+    getToken() {
+        try {
+            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
+                return window.UM.token;
+            }
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
+    avatarUrlForUser(userId) {
+        try {
+            const id = encodeURIComponent(String(userId));
+            return `/user/api/avatar?user_id=${id}&size=small`;
+        } catch (e) {
+            return '/static/icons/default-avatar-small.svg';
+        }
+    }
+
+    createModal() {
+        let modal = document.getElementById('rating-modal');
+        if (modal) {
+            this.modal = modal;
+            return;
+        }
+
+        modal = document.createElement('div');
+        modal.id = 'rating-modal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modal.style.backdropFilter = 'blur(4px)';
+        modal.style.overflow = 'hidden';
+        modal.style.zIndex = '10150';
+
+        modal.innerHTML = `
+            <div class="modal-content statistics-modal-content">
+                <div class="statistics-header">
+                    <div style="display:flex; align-items:center; gap: 12px; min-width: 0;">
+                        <h2 style="margin: 0; white-space: nowrap;">Рейтинг</h2>
+                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 200px;">
+                            <option value="today">За сегодня</option>
+                            <option value="3">За 3 дня</option>
+                            <option value="7">За 7 дней</option>
+                            <option value="30">За 30 дней</option>
+                        </select>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                        <button class="close-statistics-btn" id="closeRatingBtn">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="statistics-chart" id="ratingList" style="overflow-y:auto;">
+                </div>
+            </div>
+        `;
+
+        try {
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                content.style.zIndex = '10151';
+                content.style.maxHeight = '90vh';
+                content.style.height = '90vh';
+                content.style.display = 'flex';
+                content.style.flexDirection = 'column';
+                content.style.overflow = 'hidden';
+                content.style.boxSizing = 'border-box';
+            }
+
+            const list = modal.querySelector('#ratingList');
+            if (list) {
+                list.style.flex = '1 1 auto';
+                list.style.minHeight = '0';
+            }
+        } catch (e) {
+        }
+
+        document.body.appendChild(modal);
+        this.modal = modal;
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        const closeBtn = document.getElementById('closeRatingBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.hide());
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.hide();
+            }
+        });
+
+        try {
+            const sel = document.getElementById('ratingPeriodSelect');
+            if (sel) {
+                sel.value = String(this.selectedPeriod);
+                sel.addEventListener('change', () => {
+                    this.selectedPeriod = String(sel.value || 'today');
+                    this.updateRating();
+                });
+            }
+        } catch (e) {
+        }
+    }
+
+    async show() {
+        if (!this.modal) {
+            this.createModal();
+        }
+        this.modal.style.display = 'flex';
+        await this.updateRating();
+    }
+
+    hide() {
+        if (this.modal) {
+            this.modal.style.display = 'none';
+        }
+    }
+
+    formatDurationHhMmSs(ms) {
+        try {
+            const sec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        } catch (e) {
+            return '00:00:00';
+        }
+    }
+
+    async updateRating() {
+        const root = document.getElementById('ratingList');
+        if (root) {
+            root.innerHTML = '<p class="no-data">Формируем рейтинг…</p>';
+        }
+
+        const token = this.getToken();
+        if (!token) {
+            if (root) root.innerHTML = '<p class="no-data">Не найден токен</p>';
+            return;
+        }
+
+        let rating = [];
+        try {
+            const res = await fetch('/api/statistics/rating', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    period: this.selectedPeriod,
+                })
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success && Array.isArray(js.rating))) {
+                rating = [];
+            } else {
+                rating = js.rating;
+            }
+        } catch (e) {
+            rating = [];
+        }
+
+        if (!root) return;
+        if (!rating.length) {
+            root.innerHTML = '<p class="no-data">Нет данных</p>';
+            return;
+        }
+
+        const rows = rating.map((r, idx) => {
+            const uid = Number(r && r.user_id);
+            const name = String(r && r.username ? r.username : '');
+            const perfect = Number(r && r.perfect) || 0;
+            const corrected = Number(r && r.corrected) || 0;
+            const audio = Number(r && r.audio) || 0;
+            const timeMs = Number(r && r.time_ms) || 0;
+            const avatar = this.avatarUrlForUser(uid);
+            const timeLabel = this.formatDurationHhMmSs(timeMs);
+
+            return `
+                <div class="chart-row" style="align-items:center; gap: 12px;">
+                    <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">${idx + 1}</div>
+                    <img src="${avatar}" alt="" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
+                    <div style="flex: 1 1 auto; min-width: 0;">
+                        <div style="font-size: 15px; font-weight: 600; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(name)}</div>
+                        <div style="margin-top: 6px; display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-mint, #059669);">
+                                <i data-lucide="star" style="width: 18px; height: 18px;"></i>
+                                <span style="font-size: 16px; font-weight: 700;">${perfect}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-lightgreen, #16a34a);">
+                                <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
+                                <span style="font-size: 16px; font-weight: 700;">${corrected}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-purple, #7c3aed);">
+                                <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
+                                <span style="font-size: 16px; font-weight: 700;">${audio}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: rgba(31,41,51,0.65);">
+                                <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
+                                <span style="font-size: 14px; font-weight: 600;">${timeLabel}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        root.innerHTML = `<div class="chart-container">${rows}</div>`;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    escapeHtml(v) {
+        const s = String(v || '');
+        return s
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    static async open() {
+        const rep = new RatingReport();
+        await rep.show();
+    }
+}
