@@ -9,6 +9,8 @@ class StatisticsReport {
         this.container = null;
         this.groupBy = options.groupBy || 'days'; // days, weeks, months
         this.selectedUserId = options.userId || null;
+        this._activityUsers = [];
+        this._userDropdownOpen = false;
     }
 
     async ensureHistoryLoaded() {
@@ -89,23 +91,31 @@ class StatisticsReport {
                 </div>
                 
                 <div class="statistics-controls">
-                    <div class="group-by-controls">
-                        <label>Пользователь:</label>
-                        <select id="activityUserSelect" class="group-select"></select>
-                    </div>
-                    <div class="date-range-controls">
-                        <label>Период:</label>
-                        <input type="date" id="startDate" class="date-input">
-                        <span>—</span>
-                        <input type="date" id="endDate" class="date-input">
-                    </div>
-                    <div class="group-by-controls">
-                        <label>Группировка:</label>
-                        <select id="groupBySelect" class="group-select">
-                            <option value="days">По дням</option>
-                            <option value="weeks">По неделям</option>
-                            <option value="months">По месяцам</option>
-                        </select>
+                    <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <div id="activityUserPicker" style="position: relative; min-width: 220px;">
+                                <button id="activityUserPickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between;">
+                                    <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
+                                        <img id="activityUserPickerAvatar" src="" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
+                                        <span id="activityUserPickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                    </span>
+                                    <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
+                                </button>
+                                <div id="activityUserPickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 5; padding: 6px;"></div>
+                            </div>
+                            <select id="activityUserSelect" class="group-select" style="display:none;"></select>
+                            <select id="groupBySelect" class="group-select">
+                                <option value="days">По дням</option>
+                                <option value="weeks">По неделям</option>
+                                <option value="months">По месяцам</option>
+                            </select>
+                        </div>
+
+                        <div class="date-range-controls" style="margin-left: auto;">
+                            <input type="date" id="startDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                            <span>—</span>
+                            <input type="date" id="endDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                        </div>
                     </div>
                 </div>
 
@@ -185,10 +195,127 @@ class StatisticsReport {
                     const raw = userSelect.value;
                     const parsed = parseInt(String(raw || ''), 10);
                     this.selectedUserId = Number.isFinite(parsed) ? parsed : null;
+                    try {
+                        this.updateUserPickerUI();
+                    } catch (e) {
+                    }
                     this.updateStatistics();
                 });
             }
         } catch (e) {
+        }
+
+        try {
+            const btn = document.getElementById('activityUserPickerBtn');
+            const menu = document.getElementById('activityUserPickerMenu');
+            if (btn && menu) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!this._userDropdownOpen) return;
+                    const root = document.getElementById('activityUserPicker');
+                    if (root && !root.contains(e.target)) {
+                        this.closeUserDropdown();
+                    }
+                });
+            }
+        } catch (e) {
+        }
+    }
+
+    avatarUrlForUser(userId) {
+        try {
+            const id = encodeURIComponent(String(userId));
+            return `/user/api/avatar?user_id=${id}&size=small`;
+        } catch (e) {
+            return '/static/icons/default-avatar-small.svg';
+        }
+    }
+
+    toggleUserDropdown() {
+        if (this._userDropdownOpen) {
+            this.closeUserDropdown();
+        } else {
+            this.openUserDropdown();
+        }
+    }
+
+    openUserDropdown() {
+        try {
+            const menu = document.getElementById('activityUserPickerMenu');
+            if (!menu) return;
+            menu.style.display = 'block';
+            this._userDropdownOpen = true;
+        } catch (e) {
+        }
+    }
+
+    closeUserDropdown() {
+        try {
+            const menu = document.getElementById('activityUserPickerMenu');
+            if (!menu) return;
+            menu.style.display = 'none';
+            this._userDropdownOpen = false;
+        } catch (e) {
+        }
+    }
+
+    updateUserPickerUI() {
+        try {
+            const labelEl = document.getElementById('activityUserPickerLabel');
+            const avatarEl = document.getElementById('activityUserPickerAvatar');
+            if (!labelEl || !avatarEl) return;
+
+            const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(this.selectedUserId));
+            const label = String(u && u.label ? u.label : '');
+            labelEl.textContent = label;
+            const uid = Number(u && u.id);
+            avatarEl.src = Number.isFinite(uid) ? this.avatarUrlForUser(uid) : '/static/icons/default-avatar-small.svg';
+            avatarEl.onerror = function () {
+                try { this.onerror = null; this.src = '/static/icons/default-avatar-small.svg'; } catch (e) {}
+            };
+        } catch (e) {
+        }
+    }
+
+    dateToId(dateObj) {
+        const d = (dateObj instanceof Date) ? dateObj : new Date(dateObj);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}${m}${day}`;
+    }
+
+    fillMissingDays(stats, startDate, endDate) {
+        try {
+            const map = new Map();
+            for (const s of stats || []) {
+                if (!s || !s.date) continue;
+                map.set(String(s.date), {
+                    date: String(s.date),
+                    perfect: Number(s.perfect) || 0,
+                    corrected: Number(s.corrected) || 0,
+                    audio: Number(s.audio) || 0,
+                });
+            }
+
+            const out = [];
+            const cur = new Date(startDate);
+            const last = new Date(endDate);
+            cur.setHours(0, 0, 0, 0);
+            last.setHours(0, 0, 0, 0);
+            while (cur.getTime() <= last.getTime()) {
+                const id = this.dateToId(cur);
+                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0 });
+                cur.setDate(cur.getDate() + 1);
+            }
+            return out;
+        } catch (e) {
+            return stats || [];
         }
     }
 
@@ -201,6 +328,8 @@ class StatisticsReport {
 
             const users = await this.history.listActivityReportUsers();
             if (!Array.isArray(users) || users.length === 0) return;
+
+            this._activityUsers = users;
 
             const opts = [];
             for (const u of users) {
@@ -219,6 +348,42 @@ class StatisticsReport {
                 this.selectedUserId = opts[0].id;
             }
             userSelect.value = String(this.selectedUserId);
+
+            try {
+                const menu = document.getElementById('activityUserPickerMenu');
+                if (menu) {
+                    menu.innerHTML = opts.map(o => {
+                        const url = this.avatarUrlForUser(o.id);
+                        const active = Number(o.id) === Number(this.selectedUserId);
+                        return `
+                            <button type="button" data-user-id="${o.id}" style="width:100%; display:flex; align-items:center; gap: 10px; padding: 8px 10px; border: 0; background: ${active ? 'rgba(35, 99, 235, 0.08)' : 'transparent'}; border-radius: 10px; cursor: pointer; text-align:left;">
+                                <img src="${url}" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
+                                <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(o.label)}</span>
+                            </button>
+                        `;
+                    }).join('');
+
+                    menu.querySelectorAll('button[data-user-id]').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const uid = parseInt(String(btn.getAttribute('data-user-id') || ''), 10);
+                            if (!Number.isFinite(uid)) return;
+                            this.selectedUserId = uid;
+                            try { userSelect.value = String(uid); } catch (e2) {}
+                            this.updateUserPickerUI();
+                            this.closeUserDropdown();
+                            this.updateStatistics();
+                        });
+                    });
+                }
+            } catch (e) {
+            }
+
+            try {
+                this.updateUserPickerUI();
+            } catch (e) {
+            }
         } catch (e) {
         }
     }
@@ -325,6 +490,10 @@ class StatisticsReport {
             }
         } catch (e) {
             stats = [];
+        }
+
+        if (this.groupBy === 'days') {
+            stats = this.fillMissingDays(stats, startDate, endDate);
         }
 
         // Рисуем график
