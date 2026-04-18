@@ -28,29 +28,103 @@ class StatisticsReport {
         return {};
     }
 
-    renderLanguageSelect(selectEl) {
-        if (!selectEl) return;
+    getLanguageLabel(code) {
+        if (!code || String(code).toLowerCase() === 'all') return 'Все языки';
+        const data = this.getLanguageData();
+        const c = String(code).trim().toLowerCase();
+        try {
+            const entry = data[c];
+            if (entry && (entry.language_ru || entry.language_en)) {
+                return String(entry.language_ru || entry.language_en || c);
+            }
+        } catch (e) {
+        }
+        return c;
+    }
+
+    getLanguageFlagUrl(code) {
+        try {
+            const c = String(code || '').trim().toLowerCase();
+            if (!c || c === 'all') return '';
+            const cc = window.LanguageManager && typeof window.LanguageManager.getCountryCode === 'function'
+                ? window.LanguageManager.getCountryCode(c)
+                : '';
+            const country = String(cc || '').trim().toLowerCase();
+            if (!country) return '';
+            return `/static/flags/${country}.svg`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    ensureLanguagePickerRendered() {
+        const btn = document.getElementById('activityLanguagePickerBtn');
+        const label = document.getElementById('activityLanguagePickerLabel');
+        const img = document.getElementById('activityLanguagePickerFlag');
+        if (!btn || !label || !img) return;
+
+        const val = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
+        const flagUrl = this.getLanguageFlagUrl(val);
+        if (flagUrl) {
+            img.src = flagUrl;
+            img.style.display = '';
+        } else {
+            img.src = '';
+            img.style.display = 'none';
+        }
+        label.textContent = this.getLanguageLabel(val);
+    }
+
+    closeLanguageDropdown() {
+        const menu = document.getElementById('activityLanguagePickerMenu');
+        if (menu) menu.style.display = 'none';
+    }
+
+    openLanguageDropdown() {
+        const menu = document.getElementById('activityLanguagePickerMenu');
+        if (menu) menu.style.display = 'block';
+    }
+
+    toggleLanguageDropdown() {
+        const menu = document.getElementById('activityLanguagePickerMenu');
+        if (!menu) return;
+        if (menu.style.display === 'block') this.closeLanguageDropdown();
+        else this.openLanguageDropdown();
+    }
+
+    renderLanguageDropdownItems() {
+        const menu = document.getElementById('activityLanguagePickerMenu');
+        if (!menu) return;
+
         const data = this.getLanguageData();
         const codes = Object.keys(data || {}).filter(Boolean).map(s => String(s).toLowerCase()).sort();
         const options = ['all', ...codes];
+        const current = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
 
-        selectEl.innerHTML = options.map(c => {
-            if (c === 'all') return '<option value="all">Все языки</option>';
-            let label = c;
-            try {
-                const entry = data[c];
-                if (entry && (entry.language_ru || entry.language_en)) {
-                    label = String(entry.language_ru || entry.language_en || c);
-                }
-            } catch (e) {
-            }
-            return `<option value="${this.escapeHtml(c)}">${this.escapeHtml(label)}</option>`;
+        menu.innerHTML = options.map(code => {
+            const label = this.getLanguageLabel(code);
+            const flagUrl = this.getLanguageFlagUrl(code);
+            const isSelected = code === current;
+            const flagHtml = flagUrl
+                ? `<img src="${this.escapeHtml(flagUrl)}" alt="" style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex: 0 0 auto;" onerror="this.style.display='none'">`
+                : `<span style="width: 18px; height: 18px; display:inline-block; flex: 0 0 auto;"></span>`;
+            return `
+                <div class="activity-lang-item" data-lang="${this.escapeHtml(code)}" style="display:flex; align-items:center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; ${isSelected ? 'background: rgba(0,0,0,0.06);' : ''}">
+                    ${flagHtml}
+                    <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(label)}</span>
+                </div>
+            `;
         }).join('');
 
-        try {
-            selectEl.value = String(this.selectedLanguage || 'all');
-        } catch (e) {
-        }
+        menu.querySelectorAll('.activity-lang-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const v = String(el.dataset.lang || 'all').trim().toLowerCase() || 'all';
+                this.selectedLanguage = v;
+                this.ensureLanguagePickerRendered();
+                this.closeLanguageDropdown();
+                this.updateStatistics();
+            });
+        });
     }
 
     formatDateForInput(dt) {
@@ -114,9 +188,20 @@ class StatisticsReport {
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
                 <div class="statistics-header">
-                    <div style="display:flex; align-items:center; gap: 14px; min-width: 0;">
+                    <div style="display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
                         <h2 style="margin: 0; white-space: nowrap;">Отчет об активности</h2>
-                        <div id="statisticsHeaderLegend" style="display:flex; align-items:center; gap: 8px; flex-wrap: wrap; min-width: 0;">
+                        <div id="activityLanguagePicker" style="position: relative; min-width: 210px;">
+                            <button id="activityLanguagePickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500; padding-left: 12px; padding-right: 10px;">
+                                <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
+                                    <img id="activityLanguagePickerFlag" src="" alt="" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
+                                    <span id="activityLanguagePickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                </span>
+                                <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
+                            </button>
+                            <div id="activityLanguagePickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;"></div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap: 18px; flex-wrap: wrap;">
                             <div style="display:flex; align-items:center; gap: 6px;">
                                 <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
                                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
@@ -136,7 +221,9 @@ class StatisticsReport {
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
-                        <button id="updateStatisticsBtn" class="button-color-yellow">Сформировать</button>
+                        <button id="updateStatisticsBtn" class="action-btn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                            <i data-lucide="rotate-cw" style="width: 18px; height: 18px;"></i>
+                        </button>
                         <button class="close-statistics-btn" id="closeStatisticsBtn">
                             <i data-lucide="x"></i>
                         </button>
@@ -162,7 +249,6 @@ class StatisticsReport {
                                 <option value="weeks">По неделям</option>
                                 <option value="months">По месяцам</option>
                             </select>
-                            <select id="activityLanguageSelect" class="group-select" style="min-width: 160px;"></select>
                         </div>
 
                         <div class="date-range-controls" style="margin-left: auto;">
@@ -228,14 +314,27 @@ class StatisticsReport {
         });
 
         try {
-            const langSelect = document.getElementById('activityLanguageSelect');
-            if (langSelect) {
-                this.renderLanguageSelect(langSelect);
-                langSelect.addEventListener('change', () => {
-                    this.selectedLanguage = String(langSelect.value || 'all');
-                    this.updateStatistics();
+            this.ensureLanguagePickerRendered();
+            this.renderLanguageDropdownItems();
+            const btn = document.getElementById('activityLanguagePickerBtn');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.renderLanguageDropdownItems();
+                    this.toggleLanguageDropdown();
                 });
             }
+        } catch (e) {
+        }
+
+        try {
+            const onDocClick = (e) => {
+                const wrap = document.getElementById('activityLanguagePicker');
+                if (!wrap) return;
+                if (!wrap.contains(e.target)) this.closeLanguageDropdown();
+            };
+            document.addEventListener('click', onDocClick);
         } catch (e) {
         }
 
@@ -289,6 +388,19 @@ class StatisticsReport {
                     }
                 });
             }
+        } catch (e) {
+        }
+
+        try {
+            const groupBy = document.getElementById('groupBySelect');
+            if (groupBy) {
+                groupBy.addEventListener('change', () => this.updateStatistics());
+            }
+        } catch (e) {
+        }
+        try {
+            if (document.getElementById('startDate')) document.getElementById('startDate').addEventListener('change', () => this.updateStatistics());
+            if (document.getElementById('endDate')) document.getElementById('endDate').addEventListener('change', () => this.updateStatistics());
         } catch (e) {
         }
     }
@@ -464,9 +576,6 @@ class StatisticsReport {
             .replaceAll("'", '&#39;');
     }
 
-    /**
-     * Форматировать дату для input[type="date"]
-     */
     formatDateForInput(date) {
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -531,7 +640,6 @@ class StatisticsReport {
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
         const groupBySelect = document.getElementById('groupBySelect');
-        const langSelect = document.getElementById('activityLanguageSelect');
 
         if (!startDateInput || !endDateInput || !groupBySelect) return;
 
@@ -543,9 +651,6 @@ class StatisticsReport {
         const startDate = new Date(startDateInput.value);
         const endDate = new Date(endDateInput.value);
         this.groupBy = groupBySelect.value;
-        if (langSelect) {
-            this.selectedLanguage = String(langSelect.value || 'all');
-        }
 
         // Получаем статистику за период
         let stats = [];
@@ -726,31 +831,6 @@ class RatingReport {
         return {};
     }
 
-    renderLanguageSelect(selectEl) {
-        if (!selectEl) return;
-        const data = this.getLanguageData();
-        const codes = Object.keys(data || {}).filter(Boolean).map(s => String(s).toLowerCase()).sort();
-        const options = ['all', ...codes];
-
-        selectEl.innerHTML = options.map(c => {
-            if (c === 'all') return '<option value="all">Все языки</option>';
-            let label = c;
-            try {
-                const entry = data[c];
-                if (entry && (entry.language_ru || entry.language_en)) {
-                    label = String(entry.language_ru || entry.language_en || c);
-                }
-            } catch (e) {
-            }
-            return `<option value="${this.escapeHtml(c)}">${this.escapeHtml(label)}</option>`;
-        }).join('');
-
-        try {
-            selectEl.value = String(this.selectedLanguage || 'all');
-        } catch (e) {
-        }
-    }
-
     getToken() {
         try {
             if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
@@ -883,7 +963,7 @@ class RatingReport {
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
                 <div class="statistics-header">
-                    <div style="display:flex; align-items:center; gap: 12px; min-width: 0;">
+                    <div style="display:flex; align-items:center; gap: 10px; min-width: 0; flex-wrap: wrap;">
                         <h2 style="margin: 0; white-space: nowrap;">Рейтинг</h2>
                         <select id="ratingPeriodSelect" class="group-select" style="min-width: 120px;">
                             <option value="today">За сегодня</option>
@@ -892,13 +972,22 @@ class RatingReport {
                             <option value="30">За 30 дней</option>
                             <option value="custom">За период</option>
                         </select>
-                        <select id="ratingLanguageSelect" class="group-select" style="min-width: 160px;"></select>
+                        <div id="ratingLanguagePicker" style="position: relative; min-width: 210px;">
+                            <button id="ratingLanguagePickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500; padding-left: 12px; padding-right: 10px;">
+                                <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
+                                    <img id="ratingLanguagePickerFlag" src="" alt="" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
+                                    <span id="ratingLanguagePickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                </span>
+                                <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
+                            </button>
+                            <div id="ratingLanguagePickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;"></div>
+                        </div>
                     </div>
 
-                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 8px;">
-                        <input type="date" id="ratingStartDate" class="date-input" style="width: 120px; padding-right: 34px;">
+                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap;">
+                        <input type="date" id="ratingStartDate" class="date-input" style="width: 128px; padding-right: 20px;">
                         <span>—</span>
-                        <input type="date" id="ratingEndDate" class="date-input" style="width: 120px; padding-right: 34px;">
+                        <input type="date" id="ratingEndDate" class="date-input" style="width: 128px; padding-right: 20px;">
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
@@ -973,14 +1062,27 @@ class RatingReport {
         }
 
         try {
-            const langSelect = document.getElementById('ratingLanguageSelect');
-            if (langSelect) {
-                this.renderLanguageSelect(langSelect);
-                langSelect.addEventListener('change', () => {
-                    this.selectedLanguage = String(langSelect.value || 'all');
-                    this.updateRating();
+            this.ensureLanguagePickerRendered();
+            this.renderLanguageDropdownItems();
+            const btn = document.getElementById('ratingLanguagePickerBtn');
+            if (btn) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.renderLanguageDropdownItems();
+                    this.toggleLanguageDropdown();
                 });
             }
+        } catch (e) {
+        }
+
+        try {
+            const onDocClick = (e) => {
+                const wrap = document.getElementById('ratingLanguagePicker');
+                if (!wrap) return;
+                if (!wrap.contains(e.target)) this.closeLanguageDropdown();
+            };
+            document.addEventListener('click', onDocClick);
         } catch (e) {
         }
 
@@ -1042,15 +1144,11 @@ class RatingReport {
             const isCustom = String(this.selectedPeriod) === 'custom';
             const startInput = document.getElementById('ratingStartDate');
             const endInput = document.getElementById('ratingEndDate');
-            const langSelect = document.getElementById('ratingLanguageSelect');
             let startDate = null;
             let endDate = null;
             let languageCode = null;
 
-            if (langSelect) {
-                languageCode = String(langSelect.value || 'all');
-                this.selectedLanguage = languageCode;
-            }
+            languageCode = String(this.selectedLanguage || 'all');
 
             if (isCustom && startInput && endInput) {
                 this.validateAndNormalizeCustomRange();
@@ -1078,6 +1176,16 @@ class RatingReport {
             }
         } catch (e) {
             rating = [];
+        }
+
+        try {
+            rating = (Array.isArray(rating) ? rating : []).filter(r => {
+                const p = Number(r?.perfect || 0);
+                const a = Number(r?.audio || 0);
+                const c = Number(r?.corrected || 0);
+                return (p + a + c) > 0;
+            });
+        } catch (e) {
         }
 
         if (!root) return;
