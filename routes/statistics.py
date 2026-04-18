@@ -84,15 +84,10 @@ def _group_activity_rows(rows, group_by: str):
                 'perfect': 0,
                 'corrected': 0,
                 'audio': 0,
-                'time_ms': 0,
             }
         grouped[key]['perfect'] += int(r.get('perfect') or 0)
         grouped[key]['corrected'] += int(r.get('corrected') or 0)
         grouped[key]['audio'] += int(r.get('audio') or 0)
-        try:
-            grouped[key]['time_ms'] += int(r.get('time_ms') or 0)
-        except Exception:
-            pass
 
     return sorted(grouped.values(), key=lambda x: str(x.get('date') or ''))
 
@@ -1098,12 +1093,11 @@ def api_rating_report():
                             user_id,
                             COALESCE(SUM(perfect_count), 0) AS perfect,
                             COALESCE(SUM(corrected_count), 0) AS corrected,
-                            COALESCE(SUM(audio_count), 0) AS audio,
-                            COALESCE(SUM(time_ms), 0) AS time_ms
-                        FROM history_successes
+                            COALESCE(SUM(audio_count), 0) AS audio
+                        FROM history_activity
                         WHERE user_id = ANY(%s)
-                          AND created_at::date >= %s
-                          AND created_at::date <= %s
+                          AND date >= %s
+                          AND date <= %s
                         GROUP BY user_id
                         """,
                         (user_ids, start_date, end_date),
@@ -1116,7 +1110,6 @@ def api_rating_report():
                                 'perfect': int(ar.get('perfect') or 0),
                                 'corrected': int(ar.get('corrected') or 0),
                                 'audio': int(ar.get('audio') or 0),
-                                'time_ms': int(ar.get('time_ms') or 0),
                             }
                         else:
                             uid = int(ar[0] or 0)
@@ -1124,7 +1117,6 @@ def api_rating_report():
                                 'perfect': int(ar[1] or 0),
                                 'corrected': int(ar[2] or 0),
                                 'audio': int(ar[3] or 0),
-                                'time_ms': int(ar[4] or 0),
                             }
         finally:
             conn.close()
@@ -1139,7 +1131,6 @@ def api_rating_report():
                     'perfect': int(agg.get('perfect') or 0),
                     'corrected': int(agg.get('corrected') or 0),
                     'audio': int(agg.get('audio') or 0),
-                    'time_ms': int(agg.get('time_ms') or 0),
                 }
             )
 
@@ -1148,7 +1139,7 @@ def api_rating_report():
                 -int(x.get('perfect') or 0),
                 -int(x.get('audio') or 0),
                 int(x.get('corrected') or 0),
-                int(x.get('time_ms') or 0),
+                int(x.get('user_id') or 0),
             )
         )
 

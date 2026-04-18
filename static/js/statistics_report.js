@@ -300,7 +300,6 @@ class StatisticsReport {
                     perfect: Number(s.perfect) || 0,
                     corrected: Number(s.corrected) || 0,
                     audio: Number(s.audio) || 0,
-                    time_ms: Number(s.time_ms) || 0,
                 });
             }
 
@@ -311,7 +310,7 @@ class StatisticsReport {
             last.setHours(0, 0, 0, 0);
             while (cur.getTime() <= last.getTime()) {
                 const id = this.dateToId(cur);
-                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0, time_ms: 0 });
+                out.push(map.get(id) || { date: id, perfect: 0, corrected: 0, audio: 0 });
                 cur.setDate(cur.getDate() + 1);
             }
             return out;
@@ -518,7 +517,6 @@ class StatisticsReport {
         // Находим максимальное значение для масштабирования
         const maxValue = Math.max(...orderedStats.map(s => s.perfect + s.corrected + s.audio));
 
-        const maxTimeMs = Math.max(...orderedStats.map(s => Number(s.time_ms) || 0));
         const dayMs = 24 * 60 * 60 * 1000;
 
         let html = '<div class="chart-container">';
@@ -530,8 +528,7 @@ class StatisticsReport {
             const audioPercent = maxValue > 0 ? (stat.audio / maxValue) * 100 : 0;
 
             const timeMs = Number(stat.time_ms) || 0;
-            const timePercent = dayMs > 0 ? Math.max(0, Math.min(100, (timeMs / dayMs) * 100)) : 0;
-            const timeLabel = this.formatDurationHhMmSs(timeMs);
+            const timeLabel = timeMs > 0 ? this.formatDurationHhMmSs(timeMs) : '';
 
             const dow = (this.groupBy === 'days') ? this.getWeekdayShort(stat.date) : '';
             const dowStyle = (this.groupBy === 'days') ? this.getWeekdayBadgeStyle(stat.date) : '';
@@ -541,7 +538,7 @@ class StatisticsReport {
                     ${this.groupBy === 'days' ? `<div style="flex: 0 0 auto; width: 34px; border-radius: 10px; display:flex; align-items:center; justify-content:center; ${dowStyle}">${dow}</div>` : ''}
                     <div class="chart-date" style="text-align:left; min-width: 120px; padding-top: 0;">
                         <div style="font-size: 14px; font-weight: 500; line-height: 1.2;">${this.formatDate(stat.date)}</div>
-                        ${this.groupBy === 'days' ? `<div style="margin-top: 4px; font-size: 13px; font-weight: 500; color: rgba(31,41,51,0.75); line-height: 1.1;">${timeLabel}</div>` : ''}
+                        ${this.groupBy === 'days' && timeMs > 0 ? `<div style="margin-top: 4px; font-size: 13px; font-weight: 500; color: rgba(31,41,51,0.75); line-height: 1.1;">${timeLabel}</div>` : ''}
                     </div>
                     <div class="chart-bars">
                         <div class="bar-container">
@@ -837,9 +834,7 @@ class RatingReport {
             const perfect = Number(r && r.perfect) || 0;
             const corrected = Number(r && r.corrected) || 0;
             const audio = Number(r && r.audio) || 0;
-            const timeMs = Number(r && r.time_ms) || 0;
             const avatar = this.avatarUrlForUser(uid);
-            const timeLabel = this.formatDurationHhMmSs(timeMs);
 
             return `
                 <div class="chart-row" style="align-items:center; gap: 12px;">
@@ -859,10 +854,6 @@ class RatingReport {
                             <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-purple, #7c3aed);">
                                 <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
                                 <span style="font-size: 16px; font-weight: 700;">${audio}</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: rgba(31,41,51,0.65);">
-                                <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
-                                <span style="font-size: 14px; font-weight: 600;">${timeLabel}</span>
                             </div>
                         </div>
                     </div>

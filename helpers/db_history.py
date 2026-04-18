@@ -145,7 +145,6 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
         if isinstance(end_date, str):
             end_date = datetime.fromisoformat(end_date).date()
 
-        time_by_date = {}
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -165,39 +164,6 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
             )
             rows = cur.fetchall() or []
 
-            try:
-                cur.execute(
-                    """
-                    SELECT
-                        created_at::date AS date,
-                        COALESCE(SUM(time_ms), 0) AS time_ms
-                    FROM history_successes
-                    WHERE user_id = %s
-                      AND created_at::date >= %s
-                      AND created_at::date <= %s
-                    GROUP BY created_at::date
-                    ORDER BY created_at::date ASC
-                    """,
-                    (int(user_id), start_date, end_date),
-                )
-                trows = cur.fetchall() or []
-                for tr in trows:
-                    if isinstance(tr, dict):
-                        d = tr.get('date')
-                        ms = tr.get('time_ms')
-                    else:
-                        d = tr[0]
-                        ms = tr[1]
-                    if d is None:
-                        continue
-                    key = d.isoformat() if hasattr(d, 'isoformat') else str(d)
-                    try:
-                        time_by_date[key] = int(ms or 0)
-                    except Exception:
-                        time_by_date[key] = 0
-            except Exception:
-                time_by_date = {}
-
         out = []
         for r in rows:
             # psycopg2 может вернуть tuple или dict (RealDictCursor). Поддержим оба.
@@ -210,7 +176,6 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
                         "perfect": int(r.get("perfect") or 0),
                         "corrected": int(r.get("corrected") or 0),
                         "audio": int(r.get("audio") or 0),
-                        "time_ms": int(time_by_date.get(date_iso) or 0),
                     }
                 )
             else:
@@ -222,7 +187,6 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
                         "perfect": int(r[1] or 0),
                         "corrected": int(r[2] or 0),
                         "audio": int(r[3] or 0),
-                        "time_ms": int(time_by_date.get(date_iso) or 0),
                     }
                 )
         return out
