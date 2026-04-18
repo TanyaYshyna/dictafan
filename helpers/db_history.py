@@ -7,7 +7,7 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
-def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None):
+def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
     
@@ -78,6 +78,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     print(f'   type_activity: {type_activity}')
     print(f'   number: {number}')
     print(f'   date: {target_date}')
+    print(f'   dictation_language_code: {dictation_language_code}')
     
     conn = get_db_connection()
     try:
@@ -92,16 +93,17 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
             query = sql.SQL("""
                 INSERT INTO history_activity 
-                (user_id, dictation_id, date, {field}, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                (user_id, dictation_id, date, dictation_language_code, {field}, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, dictation_id, date) 
                 DO UPDATE SET 
                     {field} = history_activity.{field} + %s,
+                    dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, date, perfect_count, corrected_count, audio_count, created_at, updated_at
+                RETURNING id, user_id, dictation_id, date, dictation_language_code, perfect_count, corrected_count, audio_count, created_at, updated_at
             """).format(field=sql.Identifier(update_field))
 
-            cur.execute(query, (user_id, dictation_id, target_date, number, number))
+            cur.execute(query, (user_id, dictation_id, target_date, dictation_language_code, number, number))
 
             row = cur.fetchone()
             conn.commit()
@@ -111,11 +113,12 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
                 'user_id': row[1],
                 'dictation_id': row[2],
                 'date': row[3].isoformat() if row[3] else None,
-                'perfect_count': row[4],
-                'corrected_count': row[5],
-                'audio_count': row[6],
-                'created_at': row[7].isoformat() if row[7] else None,
-                'updated_at': row[8].isoformat() if row[8] else None,
+                'dictation_language_code': row[4],
+                'perfect_count': row[5],
+                'corrected_count': row[6],
+                'audio_count': row[7],
+                'created_at': row[8].isoformat() if row[8] else None,
+                'updated_at': row[9].isoformat() if row[9] else None,
             }
 
             print(f'✅ [HISTORY_ACTIVITY] Активность сохранена: id={activity["id"]}, date={activity["date"]}, {update_field}={activity[update_field]}')
@@ -127,7 +130,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
         conn.close()
 
 
-def get_activity_totals_by_period(user_id, start_date, end_date):
+def get_activity_totals_by_period(user_id, start_date, end_date, language_code=None):
     """Вернуть агрегированную активность пользователя по дням за период.
 
     Args:
@@ -146,22 +149,41 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
             end_date = datetime.fromisoformat(end_date).date()
 
         with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT
-                    date,
-                    COALESCE(SUM(perfect_count), 0) AS perfect,
-                    COALESCE(SUM(corrected_count), 0) AS corrected,
-                    COALESCE(SUM(audio_count), 0) AS audio
-                FROM history_activity
-                WHERE user_id = %s
-                  AND date >= %s
-                  AND date <= %s
-                GROUP BY date
-                ORDER BY date ASC
-                """,
-                (int(user_id), start_date, end_date),
-            )
+            if language_code and str(language_code).strip().lower() not in ('all', '*'):
+                cur.execute(
+                    """
+                    SELECT
+                        date,
+                        COALESCE(SUM(perfect_count), 0) AS perfect,
+                        COALESCE(SUM(corrected_count), 0) AS corrected,
+                        COALESCE(SUM(audio_count), 0) AS audio
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date >= %s
+                      AND date <= %s
+                      AND dictation_language_code = %s
+                    GROUP BY date
+                    ORDER BY date ASC
+                    """,
+                    (int(user_id), start_date, end_date, str(language_code).strip().lower()),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT
+                        date,
+                        COALESCE(SUM(perfect_count), 0) AS perfect,
+                        COALESCE(SUM(corrected_count), 0) AS corrected,
+                        COALESCE(SUM(audio_count), 0) AS audio
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date >= %s
+                      AND date <= %s
+                    GROUP BY date
+                    ORDER BY date ASC
+                    """,
+                    (int(user_id), start_date, end_date),
+                )
             rows = cur.fetchall() or []
 
         out = []
@@ -196,7 +218,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date):
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -234,16 +256,17 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   time_ms: {time_ms}')
     print(f'   source_group_id: {source_group_id}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
+    print(f'   dictation_language_code: {dictation_language_code}')
     
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO history_successes 
-                (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at
-            """, (user_id, dictation_id, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions))
+                (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at
+            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions))
 
             row = cur.fetchone()
             conn.commit()
@@ -252,16 +275,17 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'id': row[0],
                 'user_id': row[1],
                 'dictation_id': row[2],
-                'perfect_count': row[3],
-                'corrected_count': row[4],
-                'audio_count': row[5],
-                'attempts_total': row[6],
-                'error_count': row[7],
-                'time_ms': row[8],
-                'source_group_id': row[9],
-                'selected_sentence_positions': list(row[10] or []) if row[10] is not None else None,
-                'created_at': row[11].isoformat() if row[11] else None,
-                'updated_at': row[12].isoformat() if row[12] else None,
+                'dictation_language_code': row[3],
+                'perfect_count': row[4],
+                'corrected_count': row[5],
+                'audio_count': row[6],
+                'attempts_total': row[7],
+                'error_count': row[8],
+                'time_ms': row[9],
+                'source_group_id': row[10],
+                'selected_sentence_positions': list(row[11] or []) if row[11] is not None else None,
+                'created_at': row[12].isoformat() if row[12] else None,
+                'updated_at': row[13].isoformat() if row[13] else None,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')

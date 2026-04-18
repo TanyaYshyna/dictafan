@@ -11,6 +11,46 @@ class StatisticsReport {
         this.selectedUserId = options.userId || null;
         this._activityUsers = [];
         this._userDropdownOpen = false;
+        this.selectedLanguage = 'all';
+    }
+
+    getLanguageData() {
+        try {
+            if (window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function') {
+                return window.LanguageManager.getLanguageData() || {};
+            }
+        } catch (e) {
+        }
+        try {
+            return (window.LANGUAGE_DATA && typeof window.LANGUAGE_DATA === 'object') ? window.LANGUAGE_DATA : {};
+        } catch (e) {
+        }
+        return {};
+    }
+
+    renderLanguageSelect(selectEl) {
+        if (!selectEl) return;
+        const data = this.getLanguageData();
+        const codes = Object.keys(data || {}).filter(Boolean).map(s => String(s).toLowerCase()).sort();
+        const options = ['all', ...codes];
+
+        selectEl.innerHTML = options.map(c => {
+            if (c === 'all') return '<option value="all">Все языки</option>';
+            let label = c;
+            try {
+                const entry = data[c];
+                if (entry && (entry.language_ru || entry.language_en)) {
+                    label = String(entry.language_ru || entry.language_en || c);
+                }
+            } catch (e) {
+            }
+            return `<option value="${this.escapeHtml(c)}">${this.escapeHtml(label)}</option>`;
+        }).join('');
+
+        try {
+            selectEl.value = String(this.selectedLanguage || 'all');
+        } catch (e) {
+        }
     }
 
     formatDateForInput(dt) {
@@ -122,6 +162,7 @@ class StatisticsReport {
                                 <option value="weeks">По неделям</option>
                                 <option value="months">По месяцам</option>
                             </select>
+                            <select id="activityLanguageSelect" class="group-select" style="min-width: 160px;"></select>
                         </div>
 
                         <div class="date-range-controls" style="margin-left: auto;">
@@ -185,6 +226,18 @@ class StatisticsReport {
         document.getElementById('updateStatisticsBtn').addEventListener('click', () => {
             this.updateStatistics();
         });
+
+        try {
+            const langSelect = document.getElementById('activityLanguageSelect');
+            if (langSelect) {
+                this.renderLanguageSelect(langSelect);
+                langSelect.addEventListener('change', () => {
+                    this.selectedLanguage = String(langSelect.value || 'all');
+                    this.updateStatistics();
+                });
+            }
+        } catch (e) {
+        }
 
         // Закрытие по клику вне модального окна
         modal.addEventListener('click', (e) => {
@@ -478,6 +531,7 @@ class StatisticsReport {
         const startDateInput = document.getElementById('startDate');
         const endDateInput = document.getElementById('endDate');
         const groupBySelect = document.getElementById('groupBySelect');
+        const langSelect = document.getElementById('activityLanguageSelect');
 
         if (!startDateInput || !endDateInput || !groupBySelect) return;
 
@@ -489,6 +543,9 @@ class StatisticsReport {
         const startDate = new Date(startDateInput.value);
         const endDate = new Date(endDateInput.value);
         this.groupBy = groupBySelect.value;
+        if (langSelect) {
+            this.selectedLanguage = String(langSelect.value || 'all');
+        }
 
         // Получаем статистику за период
         let stats = [];
@@ -499,7 +556,7 @@ class StatisticsReport {
 
         try {
             if (this.history && typeof this.history.getStatisticsByPeriod === 'function') {
-                stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy, this.selectedUserId);
+                stats = await this.history.getStatisticsByPeriod(startDate, endDate, this.groupBy, this.selectedUserId, this.selectedLanguage);
             }
         } catch (e) {
             stats = [];
@@ -652,6 +709,46 @@ class RatingReport {
         this.selectedPeriod = options.period || 'today';
         this.customStartDate = null;
         this.customEndDate = null;
+        this.selectedLanguage = 'all';
+    }
+
+    getLanguageData() {
+        try {
+            if (window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function') {
+                return window.LanguageManager.getLanguageData() || {};
+            }
+        } catch (e) {
+        }
+        try {
+            return (window.LANGUAGE_DATA && typeof window.LANGUAGE_DATA === 'object') ? window.LANGUAGE_DATA : {};
+        } catch (e) {
+        }
+        return {};
+    }
+
+    renderLanguageSelect(selectEl) {
+        if (!selectEl) return;
+        const data = this.getLanguageData();
+        const codes = Object.keys(data || {}).filter(Boolean).map(s => String(s).toLowerCase()).sort();
+        const options = ['all', ...codes];
+
+        selectEl.innerHTML = options.map(c => {
+            if (c === 'all') return '<option value="all">Все языки</option>';
+            let label = c;
+            try {
+                const entry = data[c];
+                if (entry && (entry.language_ru || entry.language_en)) {
+                    label = String(entry.language_ru || entry.language_en || c);
+                }
+            } catch (e) {
+            }
+            return `<option value="${this.escapeHtml(c)}">${this.escapeHtml(label)}</option>`;
+        }).join('');
+
+        try {
+            selectEl.value = String(this.selectedLanguage || 'all');
+        } catch (e) {
+        }
     }
 
     getToken() {
@@ -788,25 +885,25 @@ class RatingReport {
                 <div class="statistics-header">
                     <div style="display:flex; align-items:center; gap: 12px; min-width: 0;">
                         <h2 style="margin: 0; white-space: nowrap;">Рейтинг</h2>
-                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 200px;">
+                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 120px;">
                             <option value="today">За сегодня</option>
                             <option value="3">За 3 дня</option>
                             <option value="7">За 7 дней</option>
                             <option value="30">За 30 дней</option>
                             <option value="custom">За период</option>
                         </select>
+                        <select id="ratingLanguageSelect" class="group-select" style="min-width: 160px;"></select>
                     </div>
 
-                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 10px;">
-                        <input type="date" id="ratingStartDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 8px;">
+                        <input type="date" id="ratingStartDate" class="date-input" style="width: 120px; padding-right: 34px;">
                         <span>—</span>
-                        <input type="date" id="ratingEndDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                        <input type="date" id="ratingEndDate" class="date-input" style="width: 120px; padding-right: 34px;">
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
-                        <button class="action-btn" id="refreshRatingBtn" style="display:flex; align-items:center; gap: 8px;">
+                        <button class="action-btn" id="refreshRatingBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
                             <i data-lucide="rotate-cw"></i>
-                            <span>Обновить</span>
                         </button>
                         <button class="close-statistics-btn" id="closeRatingBtn">
                             <i data-lucide="x"></i>
@@ -876,6 +973,18 @@ class RatingReport {
         }
 
         try {
+            const langSelect = document.getElementById('ratingLanguageSelect');
+            if (langSelect) {
+                this.renderLanguageSelect(langSelect);
+                langSelect.addEventListener('change', () => {
+                    this.selectedLanguage = String(langSelect.value || 'all');
+                    this.updateRating();
+                });
+            }
+        } catch (e) {
+        }
+
+        try {
             const startInput = document.getElementById('ratingStartDate');
             const endInput = document.getElementById('ratingEndDate');
             const onDateChange = () => {
@@ -933,8 +1042,15 @@ class RatingReport {
             const isCustom = String(this.selectedPeriod) === 'custom';
             const startInput = document.getElementById('ratingStartDate');
             const endInput = document.getElementById('ratingEndDate');
+            const langSelect = document.getElementById('ratingLanguageSelect');
             let startDate = null;
             let endDate = null;
+            let languageCode = null;
+
+            if (langSelect) {
+                languageCode = String(langSelect.value || 'all');
+                this.selectedLanguage = languageCode;
+            }
 
             if (isCustom && startInput && endInput) {
                 this.validateAndNormalizeCustomRange();
@@ -951,6 +1067,7 @@ class RatingReport {
                 body: JSON.stringify({
                     period: this.selectedPeriod,
                     ...(isCustom && startDate && endDate ? { start_date: startDate, end_date: endDate } : {}),
+                    ...(languageCode && String(languageCode).trim().toLowerCase() !== 'all' ? { language_code: String(languageCode).trim().toLowerCase() } : {}),
                 })
             });
             const js = await res.json().catch(() => null);

@@ -942,6 +942,7 @@ def save_activity():
         type_activity = data.get('type_activity')  # 'perfect', 'corrected' или 'audio'
         number = data.get('number', 1)  # опционально, по умолчанию 1
         activity_date = data.get('date')  # опционально: YYYY-MM-DD
+        dictation_language_code = data.get('dictation_language_code')
         
         if not dictation_id or not type_activity:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указаны dictation_id или type_activity')
@@ -961,7 +962,7 @@ def save_activity():
         print(f'✅ [SAVE_ACTIVITY] Найден user_id: {user_id} для email: {current_email}')
         
         # Сохраняем активность в БД (агрегируется по дням)
-        activity = add_activity(user_id, dictation_id, type_activity, number, activity_date)
+        activity = add_activity(user_id, dictation_id, type_activity, number, activity_date, dictation_language_code)
         
         print(f'✅ [SAVE_ACTIVITY] Активность успешно сохранена в БД')
         
@@ -995,6 +996,7 @@ def api_activity_report():
         end_date = data.get('end_date')
         group_by = str(data.get('group_by') or 'days').lower()
         requested_user_id = data.get('user_id')
+        language_code = data.get('language_code')
 
         if not start_date or not end_date:
             return jsonify({"success": False, "error": "Missing start_date/end_date"}), 400
@@ -1017,7 +1019,7 @@ def api_activity_report():
             ):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
 
-        rows = get_activity_totals_by_period(target_user_id, start_date, end_date)
+        rows = get_activity_totals_by_period(target_user_id, start_date, end_date, language_code=language_code)
         grouped = _group_activity_rows(rows, group_by)
         return jsonify({"success": True, "stats": grouped})
     except Exception as exc:
@@ -1038,6 +1040,7 @@ def api_rating_report():
         period_key = str(data.get('period') or 'today').strip().lower()
         start_date_raw = data.get('start_date')
         end_date_raw = data.get('end_date')
+        language_code = data.get('language_code')
 
         start_date = None
         end_date = None
@@ -1115,21 +1118,39 @@ def api_rating_report():
                 user_ids = list(candidates.keys())
                 aggregates = {}
                 if user_ids:
-                    cur.execute(
-                        """
-                        SELECT
-                            user_id,
-                            COALESCE(SUM(perfect_count), 0) AS perfect,
-                            COALESCE(SUM(corrected_count), 0) AS corrected,
-                            COALESCE(SUM(audio_count), 0) AS audio
-                        FROM history_activity
-                        WHERE user_id = ANY(%s)
-                          AND date >= %s
-                          AND date <= %s
-                        GROUP BY user_id
-                        """,
-                        (user_ids, start_date, end_date),
-                    )
+                    if language_code and str(language_code).strip().lower() not in ('all', '*'):
+                        cur.execute(
+                            """
+                            SELECT
+                                user_id,
+                                COALESCE(SUM(perfect_count), 0) AS perfect,
+                                COALESCE(SUM(corrected_count), 0) AS corrected,
+                                COALESCE(SUM(audio_count), 0) AS audio
+                            FROM history_activity
+                            WHERE user_id = ANY(%s)
+                              AND date >= %s
+                              AND date <= %s
+                              AND dictation_language_code = %s
+                            GROUP BY user_id
+                            """,
+                            (user_ids, start_date, end_date, str(language_code).strip().lower()),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            SELECT
+                                user_id,
+                                COALESCE(SUM(perfect_count), 0) AS perfect,
+                                COALESCE(SUM(corrected_count), 0) AS corrected,
+                                COALESCE(SUM(audio_count), 0) AS audio
+                            FROM history_activity
+                            WHERE user_id = ANY(%s)
+                              AND date >= %s
+                              AND date <= %s
+                            GROUP BY user_id
+                            """,
+                            (user_ids, start_date, end_date),
+                        )
                     arows = cur.fetchall() or []
                     for ar in arows:
                         if isinstance(ar, dict):
@@ -1256,6 +1277,7 @@ def save_success():
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         completion_count_after = data.get('completion_count_after')
         selected_sentence_positions = data.get('selected_sentence_positions')
+        dictation_language_code = data.get('dictation_language_code')
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -1287,6 +1309,7 @@ def save_success():
             error_count,
             source_group_id=source_group_id,
             selected_sentence_positions=selected_sentence_positions,
+            dictation_language_code=dictation_language_code,
         )
 
         # Telegram уведомления отправляются отдельной процедурой /teacher_report/send_auto

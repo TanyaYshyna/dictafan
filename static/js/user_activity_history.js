@@ -303,7 +303,7 @@ class UserActivityHistory {
     /**
      * Получить статистику за период
      */
-    async getStatisticsByPeriod(startDate, endDate, groupBy = 'days', userId = null) {
+    async getStatisticsByPeriod(startDate, endDate, groupBy = 'days', userId = null, languageCode = null) {
         try {
             const token = this.getToken();
             if (!token) return [];
@@ -326,6 +326,7 @@ class UserActivityHistory {
                     end_date: endIso,
                     group_by: groupBy,
                     user_id: (userId != null ? userId : null),
+                    ...(languageCode && String(languageCode).trim().toLowerCase() !== 'all' ? { language_code: String(languageCode).trim().toLowerCase() } : {}),
                 })
             });
             const js = await res.json().catch(() => null);

@@ -1461,6 +1461,13 @@ async function syncOfflineActivityOutbox() {
 
             let sentAll = true;
             for (const item of toSend) {
+                let dictLang = null;
+                try {
+                    dictLang = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+                    if (dictLang.includes('-')) dictLang = dictLang.split('-')[0];
+                } catch (e) {
+                    dictLang = null;
+                }
                 const response = await fetch('/api/statistics/activity', {
                     method: 'POST',
                     headers: {
@@ -1472,7 +1479,8 @@ async function syncOfflineActivityOutbox() {
                         // Всегда YYYYMMDD
                         date: row.date,
                         type_activity: item.type_activity,
-                        number: item.number
+                        number: item.number,
+                        dictation_language_code: dictLang
                     })
                 });
                 if (!response.ok) {
@@ -7932,6 +7940,13 @@ async function saveActivityToDB(type_activity) {
             number: 1
         };
 
+        try {
+            let dictLang = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+            if (dictLang.includes('-')) dictLang = dictLang.split('-')[0];
+            if (dictLang) requestData.dictation_language_code = dictLang;
+        } catch (e) {
+        }
+
         // Всегда отправляем локальную дату в формате YYYYMMDD
         try {
             requestData.date = getLocalDateId();
@@ -10536,6 +10551,12 @@ async function registerCompletedDictation() {
                 settings_json: settings_json,
                 error_words: dictationErrorWordCounts,
             };
+            try {
+                let dictLang = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+                if (dictLang.includes('-')) dictLang = dictLang.split('-')[0];
+                if (dictLang) payload.dictation_language_code = dictLang;
+            } catch (e) {
+            }
             try {
                 if (window.assignmentSelectedSentencePositions != null) {
                     payload.selected_sentence_positions = window.assignmentSelectedSentencePositions;
