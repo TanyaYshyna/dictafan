@@ -28,105 +28,6 @@ class StatisticsReport {
         return {};
     }
 
-    getLanguageLabel(code) {
-        if (!code || String(code).toLowerCase() === 'all') return 'Все языки';
-        const data = this.getLanguageData();
-        const c = String(code).trim().toLowerCase();
-        try {
-            const entry = data[c];
-            if (entry && (entry.language_ru || entry.language_en)) {
-                return String(entry.language_ru || entry.language_en || c);
-            }
-        } catch (e) {
-        }
-        return c;
-    }
-
-    getLanguageFlagUrl(code) {
-        try {
-            const c = String(code || '').trim().toLowerCase();
-            if (!c || c === 'all') return '';
-            const cc = window.LanguageManager && typeof window.LanguageManager.getCountryCode === 'function'
-                ? window.LanguageManager.getCountryCode(c)
-                : '';
-            const country = String(cc || '').trim().toLowerCase();
-            if (!country) return '';
-            return `/static/flags/${country}.svg`;
-        } catch (e) {
-            return '';
-        }
-    }
-
-    ensureLanguagePickerRendered() {
-        const btn = document.getElementById('activityLanguagePickerBtn');
-        const label = document.getElementById('activityLanguagePickerLabel');
-        const img = document.getElementById('activityLanguagePickerFlag');
-        if (!btn || !label || !img) return;
-
-        const val = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
-        const flagUrl = this.getLanguageFlagUrl(val);
-        if (flagUrl) {
-            img.src = flagUrl;
-            img.style.display = '';
-        } else {
-            img.src = '';
-            img.style.display = 'none';
-        }
-        label.textContent = this.getLanguageLabel(val);
-    }
-
-    closeLanguageDropdown() {
-        const menu = document.getElementById('activityLanguagePickerMenu');
-        if (menu) menu.style.display = 'none';
-    }
-
-    openLanguageDropdown() {
-        const menu = document.getElementById('activityLanguagePickerMenu');
-        if (menu) menu.style.display = 'block';
-    }
-
-    toggleLanguageDropdown() {
-        const menu = document.getElementById('activityLanguagePickerMenu');
-        if (!menu) return;
-        if (menu.style.display === 'block') this.closeLanguageDropdown();
-        else this.openLanguageDropdown();
-    }
-
-    renderLanguageDropdownItems() {
-        const menu = document.getElementById('activityLanguagePickerMenu');
-        if (!menu) return;
-
-        const data = this.getLanguageData();
-        const codes = Object.keys(data || {}).filter(Boolean).map(s => String(s).toLowerCase()).sort();
-        const options = ['all', ...codes];
-        const current = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
-
-        menu.innerHTML = options.map(code => {
-            const label = this.getLanguageLabel(code);
-            const flagUrl = this.getLanguageFlagUrl(code);
-            const isSelected = code === current;
-            const flagHtml = flagUrl
-                ? `<img src="${this.escapeHtml(flagUrl)}" alt="" style="width: 18px; height: 18px; border-radius: 50%; object-fit: cover; flex: 0 0 auto;" onerror="this.style.display='none'">`
-                : `<span style="width: 18px; height: 18px; display:inline-block; flex: 0 0 auto;"></span>`;
-            return `
-                <div class="activity-lang-item" data-lang="${this.escapeHtml(code)}" style="display:flex; align-items:center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; ${isSelected ? 'background: rgba(0,0,0,0.06);' : ''}">
-                    ${flagHtml}
-                    <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(label)}</span>
-                </div>
-            `;
-        }).join('');
-
-        menu.querySelectorAll('.activity-lang-item').forEach(el => {
-            el.addEventListener('click', () => {
-                const v = String(el.dataset.lang || 'all').trim().toLowerCase() || 'all';
-                this.selectedLanguage = v;
-                this.ensureLanguagePickerRendered();
-                this.closeLanguageDropdown();
-                this.updateStatistics();
-            });
-        });
-    }
-
     formatDateForInput(dt) {
         try {
             const d = (dt instanceof Date) ? dt : new Date(dt);
@@ -188,39 +89,34 @@ class StatisticsReport {
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
                 <div class="statistics-header">
-                    <div style="display:flex; align-items:center; gap: 10px; flex-wrap: wrap;">
-                        <h2 style="margin: 0; white-space: nowrap;">Отчет об активности</h2>
-                        <div id="activityLanguagePicker" style="position: relative; min-width: 210px;">
-                            <button id="activityLanguagePickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500; padding-left: 12px; padding-right: 10px;">
-                                <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
-                                    <img id="activityLanguagePickerFlag" src="" alt="" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
-                                    <span id="activityLanguagePickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                                </span>
-                                <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
-                            </button>
-                            <div id="activityLanguagePickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;"></div>
-                        </div>
+                    <div style="display:flex; align-items:flex-start; gap: 14px; min-width: 0; flex: 1 1 auto;">
+                        <div style="display:flex; align-items:stretch; gap: 12px; min-width: 0;">
+                            <div style="display:flex; flex-direction: column; align-items:flex-start; gap: 8px; min-width: 240px;">
+                                <div style="font-size: 22px; font-weight: 700; line-height: 1.1;">Отчет об активности</div>
+                                <div id="activityLanguagePicker" style="position: relative; min-width: 210px; width: 100%;"></div>
+                            </div>
 
-                        <div style="display:flex; align-items:center; gap: 18px; flex-wrap: wrap;">
-                            <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
-                                <i data-lucide="star" style="width: 18px; height: 18px;"></i>
-                                <span style="white-space: nowrap;">Perfect (без ошибок с 1-й попытки)</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-lightgreen, #86efac);"></span>
-                                <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
-                                <span style="white-space: nowrap;">Corrected (исправленные)</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px;">
-                                <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-purple, #a78bfa);"></span>
-                                <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
-                                <span style="white-space: nowrap;">Audio (аудио контроль)</span>
+                            <div style="display:flex; flex-direction: column; align-items:flex-start; gap: 8px; padding-top: 2px;">
+                                <div style="display:flex; align-items:center; gap: 6px;">
+                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-mint, #6ee7b7);"></span>
+                                    <i data-lucide="star" style="width: 18px; height: 18px;"></i>
+                                    <span style="white-space: nowrap;">Perfect (без ошибок с 1-й попытки)</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap: 6px;">
+                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-lightgreen, #86efac);"></span>
+                                    <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
+                                    <span style="white-space: nowrap;">Corrected (исправленные)</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap: 6px;">
+                                    <span style="display:inline-block; width: 38px; height: 10px; border-radius: 6px; background: var(--color-button-purple, #a78bfa);"></span>
+                                    <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
+                                    <span style="white-space: nowrap;">Audio (аудио контроль)</span>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0; padding-top: 2px;">
                         <button id="updateStatisticsBtn" class="action-btn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
                             <i data-lucide="rotate-cw" style="width: 18px; height: 18px;"></i>
                         </button>
@@ -252,9 +148,9 @@ class StatisticsReport {
                         </div>
 
                         <div class="date-range-controls" style="margin-left: auto;">
-                            <input type="date" id="startDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                            <input type="date" id="startDate" class="date-input" style="width: 128px; padding-right: 20px;">
                             <span>—</span>
-                            <input type="date" id="endDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                            <input type="date" id="endDate" class="date-input" style="width: 128px; padding-right: 20px;">
                         </div>
                     </div>
                 </div>
@@ -314,27 +210,24 @@ class StatisticsReport {
         });
 
         try {
-            this.ensureLanguagePickerRendered();
-            this.renderLanguageDropdownItems();
-            const btn = document.getElementById('activityLanguagePickerBtn');
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.renderLanguageDropdownItems();
-                    this.toggleLanguageDropdown();
+            const wrap = document.getElementById('activityLanguagePicker');
+            if (wrap && typeof LanguageSelector !== 'undefined') {
+                const raw = this.getLanguageData() || {};
+                const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+                const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
+                new LanguageSelector({
+                    container: wrap,
+                    mode: 'report-selector',
+                    languageData: dataWithAll,
+                    nativeLanguage: 'all',
+                    learningLanguages: codes,
+                    currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
+                    onLanguageChange: ({ currentLearning }) => {
+                        this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
+                        this.updateStatistics();
+                    }
                 });
             }
-        } catch (e) {
-        }
-
-        try {
-            const onDocClick = (e) => {
-                const wrap = document.getElementById('activityLanguagePicker');
-                if (!wrap) return;
-                if (!wrap.contains(e.target)) this.closeLanguageDropdown();
-            };
-            document.addEventListener('click', onDocClick);
         } catch (e) {
         }
 
@@ -962,41 +855,37 @@ class RatingReport {
 
         modal.innerHTML = `
             <div class="modal-content statistics-modal-content">
-                <div class="statistics-header">
-                    <div style="display:flex; align-items:center; gap: 10px; min-width: 0; flex-wrap: wrap;">
-                        <h2 style="margin: 0; white-space: nowrap;">Рейтинг</h2>
-                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 120px;">
+                <div class="statistics-header" style="flex-direction: column; align-items: stretch;">
+                    <div style="display:flex; align-items:center; gap: 10px; min-width: 0;">
+                        <div style="display:flex; align-items:center; gap: 10px; min-width: 0; flex: 1 1 auto;">
+                            <h2 style="margin: 0; white-space: nowrap;">Рейтинг</h2>
+                            <div id="ratingLanguagePicker" style="position: relative; min-width: 210px;"></div>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                            <button class="action-btn" id="refreshRatingBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                                <i data-lucide="rotate-cw"></i>
+                            </button>
+                            <button class="close-statistics-btn" id="closeRatingBtn">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap: 10px; margin-top: 8px; flex-wrap: wrap; justify-content:flex-start;">
+                        <select id="ratingPeriodSelect" class="group-select" style="min-width: 160px;">
                             <option value="today">За сегодня</option>
                             <option value="3">За 3 дня</option>
                             <option value="7">За 7 дней</option>
                             <option value="30">За 30 дней</option>
                             <option value="custom">За период</option>
                         </select>
-                        <div id="ratingLanguagePicker" style="position: relative; min-width: 210px;">
-                            <button id="ratingLanguagePickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500; padding-left: 12px; padding-right: 10px;">
-                                <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
-                                    <img id="ratingLanguagePickerFlag" src="" alt="" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
-                                    <span id="ratingLanguagePickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                                </span>
-                                <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
-                            </button>
-                            <div id="ratingLanguagePickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;"></div>
+
+                        <div class="date-range-controls" style="display:flex; align-items:center; gap: 8px; flex-wrap: nowrap;">
+                            <input type="date" id="ratingStartDate" class="date-input" style="width: 112px; padding-right: 18px;">
+                            <span>—</span>
+                            <input type="date" id="ratingEndDate" class="date-input" style="width: 112px; padding-right: 18px;">
                         </div>
-                    </div>
-
-                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 8px; flex-wrap: nowrap;">
-                        <input type="date" id="ratingStartDate" class="date-input" style="width: 128px; padding-right: 20px;">
-                        <span>—</span>
-                        <input type="date" id="ratingEndDate" class="date-input" style="width: 128px; padding-right: 20px;">
-                    </div>
-
-                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
-                        <button class="action-btn" id="refreshRatingBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                            <i data-lucide="rotate-cw"></i>
-                        </button>
-                        <button class="close-statistics-btn" id="closeRatingBtn">
-                            <i data-lucide="x"></i>
-                        </button>
                     </div>
                 </div>
 
@@ -1062,27 +951,24 @@ class RatingReport {
         }
 
         try {
-            this.ensureLanguagePickerRendered();
-            this.renderLanguageDropdownItems();
-            const btn = document.getElementById('ratingLanguagePickerBtn');
-            if (btn) {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.renderLanguageDropdownItems();
-                    this.toggleLanguageDropdown();
+            const wrap = document.getElementById('ratingLanguagePicker');
+            if (wrap && typeof LanguageSelector !== 'undefined') {
+                const raw = this.getLanguageData() || {};
+                const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+                const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
+                new LanguageSelector({
+                    container: wrap,
+                    mode: 'report-selector',
+                    languageData: dataWithAll,
+                    nativeLanguage: 'all',
+                    learningLanguages: codes,
+                    currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
+                    onLanguageChange: ({ currentLearning }) => {
+                        this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
+                        this.updateRating();
+                    }
                 });
             }
-        } catch (e) {
-        }
-
-        try {
-            const onDocClick = (e) => {
-                const wrap = document.getElementById('ratingLanguagePicker');
-                if (!wrap) return;
-                if (!wrap.contains(e.target)) this.closeLanguageDropdown();
-            };
-            document.addEventListener('click', onDocClick);
         } catch (e) {
         }
 

@@ -5,6 +5,7 @@
 // learning-list - список изучаемых языков с чекбоксами
 // flag-combo - комбинация флагов (изучаемый → родной)
 // header-selector - выпадающий селектор для шапки
+// report-selector - текстовый селектор для отчетов (без флагов, включает "Все языки")
 // profile-panels - ДВЕ ПАНЕЛИ для профиля (родной + изучаемые)
 // registration - для регистрации (родной + изучаемый)
 class LanguageSelector {
@@ -270,6 +271,34 @@ class LanguageSelector {
         `;
     }
 
+    createReportSelector() {
+        const current = this.options.currentLearning;
+        const availableLanguages = Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : [];
+        const getLabel = (code) => {
+            const c = String(code || '').trim().toLowerCase();
+            if (!c || c === 'all') return 'Все языки';
+            return this.getLanguageName(c);
+        };
+
+        return `
+            <div class="report-language-combo" style="display:flex; align-items:center; justify-content: space-between; gap: 10px; cursor:pointer; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(0,0,0,0.12); background: #fff; min-height: 44px;">
+                <span class="report-language-label" style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500;">${getLabel(current)}</span>
+                <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
+            </div>
+            <div class="report-language-dropdown" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;">
+                ${availableLanguages.map(code => {
+                    const c = String(code || '').trim().toLowerCase();
+                    const selected = c === String(current || '').trim().toLowerCase();
+                    return `
+                        <div class="report-language-option ${selected ? 'selected' : ''}" data-value="${c}" style="display:flex; align-items:center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; ${selected ? 'background: rgba(0,0,0,0.06);' : ''}">
+                            <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px;">${getLabel(c)}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
     _ensureModelsCentricModal() {
         if (this._modelsCentricModalEl) return;
 
@@ -447,6 +476,39 @@ class LanguageSelector {
                 browserUsage = estimate.usage;
                 browserAvailable = (browserQuota != null && browserUsage != null) ? (browserQuota - browserUsage) : null;
             } catch (e) {
+            }
+        }
+
+        // 4b. Обработчик для report-selector режима
+        if (this.options.mode === 'report-selector') {
+            const combo = this.options.container.querySelector('.report-language-combo');
+            const dropdown = this.options.container.querySelector('.report-language-dropdown');
+
+            if (combo && dropdown) {
+                combo.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const isVisible = dropdown.style.display === 'block';
+                    dropdown.style.display = isVisible ? 'none' : 'block';
+                });
+
+                dropdown.querySelectorAll('.report-language-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const value = option.dataset.value;
+                        this.options.currentLearning = value;
+                        this.render();
+                        dropdown.style.display = 'none';
+                        this.triggerChange({
+                            currentLearning: value
+                        });
+                    });
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!combo.contains(e.target) && !dropdown.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                    }
+                });
             }
         }
 
@@ -1498,6 +1560,9 @@ class LanguageSelector {
                 break;
             case 'header-selector':
                 html = this.createHeaderSelector();
+                break;
+            case 'report-selector':
+                html = this.createReportSelector();
                 break;
             case 'profile-panels':
                 html = this.createProfilePanels();
