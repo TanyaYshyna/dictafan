@@ -280,17 +280,25 @@ class LanguageSelector {
             return this.getLanguageName(c);
         };
 
+        const currentCode = String(current || '').trim().toLowerCase();
+        const currentFlag = currentCode && currentCode !== 'all' ? this.createFlagElement(currentCode) : '';
+
         return `
             <div class="report-language-combo" style="display:flex; align-items:center; justify-content: space-between; gap: 10px; cursor:pointer; padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #fff; min-height: 36px;">
-                <span class="report-language-label" style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500;">${getLabel(current)}</span>
+                <div style="display:flex; align-items:center; gap: 8px; min-width: 0;">
+                    ${currentFlag ? currentFlag : ''}
+                    <span class="report-language-label" style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500;">${getLabel(current)}</span>
+                </div>
                 <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
             </div>
             <div class="report-language-dropdown" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;">
                 ${availableLanguages.map(code => {
                     const c = String(code || '').trim().toLowerCase();
                     const selected = c === String(current || '').trim().toLowerCase();
+                    const flagHtml = (c && c !== 'all') ? this.createFlagElement(c) : '';
                     return `
                         <div class="report-language-option ${selected ? 'selected' : ''}" data-value="${c}" style="display:flex; align-items:center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; ${selected ? 'background: rgba(0,0,0,0.06);' : ''}">
+                            ${flagHtml ? `<div style="display:flex; align-items:center; flex: 0 0 auto;">${flagHtml}</div>` : ''}
                             <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px;">${getLabel(c)}</span>
                         </div>
                     `;
@@ -1579,28 +1587,60 @@ class LanguageSelector {
         }
 
         if (this.options.mode === 'report-selector') {
-            if (this._reportSelectorBound) {
-                return;
+            try {
+                const cur = String(this.options.currentLearning || '');
+                console.debug('[LanguageSelector][report-selector] bindEvents', {
+                    containerId: this.options.container && this.options.container.id,
+                    currentLearning: cur,
+                });
+            } catch (e) {
             }
-            this._reportSelectorBound = true;
 
             const combo = this.options.container.querySelector('.report-language-combo');
             const dropdown = this.options.container.querySelector('.report-language-dropdown');
 
             if (!combo || !dropdown) {
+                try {
+                    console.debug('[LanguageSelector][report-selector] missing combo/dropdown', {
+                        hasCombo: !!combo,
+                        hasDropdown: !!dropdown,
+                        containerId: this.options.container && this.options.container.id,
+                    });
+                } catch (e) {
+                }
                 return;
+            }
+
+            if (this._onReportSelectorDocumentClick) {
+                document.removeEventListener('click', this._onReportSelectorDocumentClick);
+                this._onReportSelectorDocumentClick = null;
             }
 
             combo.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const isVisible = dropdown.style.display === 'block';
                 dropdown.style.display = isVisible ? 'none' : 'block';
+                try {
+                    console.debug('[LanguageSelector][report-selector] combo click', {
+                        containerId: this.options.container && this.options.container.id,
+                        wasVisible: isVisible,
+                        nowDisplay: dropdown.style.display,
+                    });
+                } catch (e) {
+                }
             });
 
             dropdown.querySelectorAll('.report-language-option').forEach(option => {
                 option.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const value = option.dataset.value;
+                    try {
+                        console.debug('[LanguageSelector][report-selector] option click', {
+                            containerId: this.options.container && this.options.container.id,
+                            value,
+                        });
+                    } catch (e) {
+                    }
                     this.options.currentLearning = value;
                     this.render();
                     dropdown.style.display = 'none';
@@ -1613,6 +1653,12 @@ class LanguageSelector {
             this._onReportSelectorDocumentClick = (e) => {
                 if (!combo.contains(e.target) && !dropdown.contains(e.target)) {
                     dropdown.style.display = 'none';
+                    try {
+                        console.debug('[LanguageSelector][report-selector] outside click -> close', {
+                            containerId: this.options.container && this.options.container.id,
+                        });
+                    } catch (e) {
+                    }
                 }
             };
             document.addEventListener('click', this._onReportSelectorDocumentClick);
