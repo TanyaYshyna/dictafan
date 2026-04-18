@@ -13,6 +13,19 @@ class StatisticsReport {
         this._userDropdownOpen = false;
     }
 
+    formatDateForInput(dt) {
+        try {
+            const d = (dt instanceof Date) ? dt : new Date(dt);
+            if (Number.isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
     async ensureHistoryLoaded() {
         try {
             if (!this.history) return;
@@ -637,6 +650,8 @@ class RatingReport {
     constructor(options = {}) {
         this.modal = null;
         this.selectedPeriod = options.period || 'today';
+        this.customStartDate = null;
+        this.customEndDate = null;
     }
 
     getToken() {
@@ -661,6 +676,88 @@ class RatingReport {
         } catch (e) {
             return '/static/icons/default-avatar-small.svg';
         }
+    }
+
+    formatDateForInput(dt) {
+        try {
+            const d = (dt instanceof Date) ? dt : new Date(dt);
+            if (Number.isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    getPeriodRange(periodKey) {
+        const end = new Date();
+        end.setHours(0, 0, 0, 0);
+        const start = new Date(end);
+        const key = String(periodKey || 'today');
+
+        if (key === '3') {
+            start.setDate(start.getDate() - 2);
+        } else if (key === '7') {
+            start.setDate(start.getDate() - 6);
+        } else if (key === '30') {
+            start.setDate(start.getDate() - 29);
+        } else {
+            // today
+        }
+        return { start, end };
+    }
+
+    applyPeriodToDateInputs() {
+        const startInput = document.getElementById('ratingStartDate');
+        const endInput = document.getElementById('ratingEndDate');
+        if (!startInput || !endInput) return;
+
+        const isCustom = String(this.selectedPeriod) === 'custom';
+        startInput.disabled = !isCustom;
+        endInput.disabled = !isCustom;
+
+        if (!isCustom) {
+            const { start, end } = this.getPeriodRange(this.selectedPeriod);
+            startInput.value = this.formatDateForInput(start);
+            endInput.value = this.formatDateForInput(end);
+            return;
+        }
+
+        // custom
+        if (!this.customStartDate || !this.customEndDate) {
+            const { start, end } = this.getPeriodRange('30');
+            this.customStartDate = this.formatDateForInput(start);
+            this.customEndDate = this.formatDateForInput(end);
+        }
+        startInput.value = String(this.customStartDate || '');
+        endInput.value = String(this.customEndDate || '');
+        this.validateAndNormalizeCustomRange();
+    }
+
+    validateAndNormalizeCustomRange() {
+        const startInput = document.getElementById('ratingStartDate');
+        const endInput = document.getElementById('ratingEndDate');
+        if (!startInput || !endInput) return;
+
+        const s = String(startInput.value || '');
+        const e = String(endInput.value || '');
+        if (!s || !e) return;
+
+        const sd = new Date(s);
+        const ed = new Date(e);
+        if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
+
+        // Если пользователь перепутал даты, подтягиваем вторую к первой.
+        if (sd.getTime() > ed.getTime()) {
+            endInput.value = s;
+        } else if (ed.getTime() < sd.getTime()) {
+            startInput.value = e;
+        }
+
+        this.customStartDate = String(startInput.value || '');
+        this.customEndDate = String(endInput.value || '');
     }
 
     createModal() {
@@ -696,10 +793,21 @@ class RatingReport {
                             <option value="3">За 3 дня</option>
                             <option value="7">За 7 дней</option>
                             <option value="30">За 30 дней</option>
+                            <option value="custom">За период</option>
                         </select>
                     </div>
 
+                    <div class="date-range-controls" style="margin-left: auto; display:flex; align-items:center; gap: 10px;">
+                        <input type="date" id="ratingStartDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                        <span>—</span>
+                        <input type="date" id="ratingEndDate" class="date-input" style="width: 150px; padding-right: 34px;">
+                    </div>
+
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                        <button class="action-btn" id="refreshRatingBtn" style="display:flex; align-items:center; gap: 8px;">
+                            <i data-lucide="rotate-cw"></i>
+                            <span>Обновить</span>
+                        </button>
                         <button class="close-statistics-btn" id="closeRatingBtn">
                             <i data-lucide="x"></i>
                         </button>
@@ -743,6 +851,11 @@ class RatingReport {
             closeBtn.addEventListener('click', () => this.hide());
         }
 
+        const refreshBtn = document.getElementById('refreshRatingBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.updateRating());
+        }
+
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 this.hide();
@@ -755,11 +868,26 @@ class RatingReport {
                 sel.value = String(this.selectedPeriod);
                 sel.addEventListener('change', () => {
                     this.selectedPeriod = String(sel.value || 'today');
+                    this.applyPeriodToDateInputs();
                     this.updateRating();
                 });
             }
         } catch (e) {
         }
+
+        try {
+            const startInput = document.getElementById('ratingStartDate');
+            const endInput = document.getElementById('ratingEndDate');
+            const onDateChange = () => {
+                this.validateAndNormalizeCustomRange();
+                this.updateRating();
+            };
+            if (startInput) startInput.addEventListener('change', onDateChange);
+            if (endInput) endInput.addEventListener('change', onDateChange);
+        } catch (e) {
+        }
+
+        this.applyPeriodToDateInputs();
     }
 
     async show() {
@@ -802,6 +930,18 @@ class RatingReport {
 
         let rating = [];
         try {
+            const isCustom = String(this.selectedPeriod) === 'custom';
+            const startInput = document.getElementById('ratingStartDate');
+            const endInput = document.getElementById('ratingEndDate');
+            let startDate = null;
+            let endDate = null;
+
+            if (isCustom && startInput && endInput) {
+                this.validateAndNormalizeCustomRange();
+                startDate = String(startInput.value || '');
+                endDate = String(endInput.value || '');
+            }
+
             const res = await fetch('/api/statistics/rating', {
                 method: 'POST',
                 headers: {
@@ -810,6 +950,7 @@ class RatingReport {
                 },
                 body: JSON.stringify({
                     period: this.selectedPeriod,
+                    ...(isCustom && startDate && endDate ? { start_date: startDate, end_date: endDate } : {}),
                 })
             });
             const js = await res.json().catch(() => null);

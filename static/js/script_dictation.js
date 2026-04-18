@@ -3568,6 +3568,15 @@ function pauseGame(isInactivityPause = false) {
     // Если уже на паузе - ничего не делаем
     if (pauseModal.style.display === 'flex') return;
 
+    // Если время остановлено — паузу не включаем.
+    try {
+        const snap = getProgressTimerSnapshot();
+        if (!snap || !snap.isRunning) {
+            return;
+        }
+    } catch (e) {
+    }
+
     // Останавливаем основной таймер (и таймер обратного отсчета, если включен)
     // чтобы в паузе цифры не продолжали тикать.
     try {
@@ -3700,6 +3709,19 @@ function resetInactivityTimer() {
     // ЕСЛИ ИГРА ЕЩЕ НЕ НАЧАЛАСЬ - НИЧЕГО НЕ ДЕЛАЕМ
     if (!gameHasAlreadyBegun) {
         return;
+    }
+
+    // Если время остановлено — таймер бездействия не запускаем.
+    try {
+        const snap = getProgressTimerSnapshot();
+        if (!snap || !snap.isRunning) {
+            if (inactivityTimer) {
+                clearTimeout(inactivityTimer);
+                inactivityTimer = null;
+            }
+            return;
+        }
+    } catch (e) {
     }
 
     // Очищаем предыдущий таймер

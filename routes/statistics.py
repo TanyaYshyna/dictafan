@@ -1027,36 +1027,64 @@ def api_activity_report():
 @statistics_bp.route('/rating', methods=['POST'])
 @jwt_required()
 def api_rating_report():
+    """Рейтинг активности: агрегируем perfect/corrected/audio за период по self + ученики."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
         if not user:
             return jsonify({"success": False, "error": "User not found"}), 404
 
-        data = request.get_json() or {}
+        data = request.get_json(silent=True) or {}
         period_key = str(data.get('period') or 'today').strip().lower()
-        if period_key in ('1', 'day', 'today', 'сегодня'):
-            period_days = 1
-        elif period_key in ('3', '3days', '3d'):
-            period_days = 3
-        elif period_key in ('7', '7days', '7d'):
-            period_days = 7
-        elif period_key in ('30', '30days', '30d'):
-            period_days = 30
-        else:
-            try:
-                period_days = int(data.get('period_days') or 1)
-            except Exception:
-                period_days = 1
+        start_date_raw = data.get('start_date')
+        end_date_raw = data.get('end_date')
 
-        if period_days <= 0:
-            period_days = 1
-        if period_days > 365:
-            period_days = 365
-
+        start_date = None
+        end_date = None
+        try:
+            if start_date_raw and end_date_raw:
+                start_date = datetime.fromisoformat(str(start_date_raw)).date()
+                end_date = datetime.fromisoformat(str(end_date_raw)).date()
+        except Exception:
+            start_date = None
+            end_date = None
         current_user_id = int(user.get('id'))
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=int(period_days) - 1)
+
+        if start_date and end_date:
+            # Корректируем диапазон, если пользователь перепутал даты.
+            if start_date > end_date:
+                end_date = start_date
+            if end_date < start_date:
+                start_date = end_date
+            period_days = (end_date - start_date).days + 1
+            if period_days <= 0:
+                period_days = 1
+                end_date = start_date
+            if period_days > 365:
+                start_date = end_date - timedelta(days=364)
+                period_days = 365
+        else:
+            if period_key in ('today', '1', 'day', '1d'):
+                period_days = 1
+            elif period_key in ('3', '3days', '3d'):
+                period_days = 3
+            elif period_key in ('7', '7days', '7d'):
+                period_days = 7
+            elif period_key in ('30', '30days', '30d'):
+                period_days = 30
+            else:
+                try:
+                    period_days = int(data.get('period_days') or 1)
+                except Exception:
+                    period_days = 1
+
+            if period_days <= 0:
+                period_days = 1
+            if period_days > 365:
+                period_days = 365
+
+            end_date = datetime.now().date()
+            start_date = end_date - timedelta(days=int(period_days) - 1)
 
         candidates = {current_user_id: str(user.get('username') or 'Я')}
         conn = get_db_connection()
