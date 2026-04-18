@@ -281,8 +281,8 @@ class LanguageSelector {
         };
 
         return `
-            <div class="report-language-combo" style="display:flex; align-items:center; justify-content: space-between; gap: 10px; cursor:pointer; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(0,0,0,0.12); background: #fff; min-height: 44px;">
-                <span class="report-language-label" style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500;">${getLabel(current)}</span>
+            <div class="report-language-combo" style="display:flex; align-items:center; justify-content: space-between; gap: 10px; cursor:pointer; padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #fff; min-height: 36px;">
+                <span class="report-language-label" style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 500;">${getLabel(current)}</span>
                 <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
             </div>
             <div class="report-language-dropdown" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 6; padding: 6px;">
@@ -476,39 +476,6 @@ class LanguageSelector {
                 browserUsage = estimate.usage;
                 browserAvailable = (browserQuota != null && browserUsage != null) ? (browserQuota - browserUsage) : null;
             } catch (e) {
-            }
-        }
-
-        // 4b. Обработчик для report-selector режима
-        if (this.options.mode === 'report-selector') {
-            const combo = this.options.container.querySelector('.report-language-combo');
-            const dropdown = this.options.container.querySelector('.report-language-dropdown');
-
-            if (combo && dropdown) {
-                combo.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const isVisible = dropdown.style.display === 'block';
-                    dropdown.style.display = isVisible ? 'none' : 'block';
-                });
-
-                dropdown.querySelectorAll('.report-language-option').forEach(option => {
-                    option.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const value = option.dataset.value;
-                        this.options.currentLearning = value;
-                        this.render();
-                        dropdown.style.display = 'none';
-                        this.triggerChange({
-                            currentLearning: value
-                        });
-                    });
-                });
-
-                document.addEventListener('click', (e) => {
-                    if (!combo.contains(e.target) && !dropdown.contains(e.target)) {
-                        dropdown.style.display = 'none';
-                    }
-                });
             }
         }
 
@@ -1608,6 +1575,47 @@ class LanguageSelector {
     bindEvents() {
         if (this.options.mode === 'models-centric') {
             this.bindModelsCentricEvents();
+            return;
+        }
+
+        if (this.options.mode === 'report-selector') {
+            if (this._reportSelectorBound) {
+                return;
+            }
+            this._reportSelectorBound = true;
+
+            const combo = this.options.container.querySelector('.report-language-combo');
+            const dropdown = this.options.container.querySelector('.report-language-dropdown');
+
+            if (!combo || !dropdown) {
+                return;
+            }
+
+            combo.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = dropdown.style.display === 'block';
+                dropdown.style.display = isVisible ? 'none' : 'block';
+            });
+
+            dropdown.querySelectorAll('.report-language-option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const value = option.dataset.value;
+                    this.options.currentLearning = value;
+                    this.render();
+                    dropdown.style.display = 'none';
+                    this.triggerChange({
+                        currentLearning: value
+                    });
+                });
+            });
+
+            this._onReportSelectorDocumentClick = (e) => {
+                if (!combo.contains(e.target) && !dropdown.contains(e.target)) {
+                    dropdown.style.display = 'none';
+                }
+            };
+            document.addEventListener('click', this._onReportSelectorDocumentClick);
             return;
         }
 
