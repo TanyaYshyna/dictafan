@@ -977,22 +977,37 @@ class RatingReport {
             const audio = Number(r && r.audio) || 0;
             const avatar = this.avatarUrlForUser(uid);
 
+            let currentUserId = null;
+            try {
+                if (window.UM && typeof window.UM.getCurrentUser === 'function') {
+                    currentUserId = Number(window.UM.getCurrentUser()?.id);
+                } else if (window.UM && window.UM.userData && window.UM.userData.id != null) {
+                    currentUserId = Number(window.UM.userData.id);
+                }
+            } catch (e) {
+                currentUserId = null;
+            }
+            const isSelf = (currentUserId != null && !Number.isNaN(currentUserId) && uid === currentUserId);
+            const rowStyle = isSelf
+                ? 'border: 2px solid var(--color-button-text-yellow, rgb(255, 198, 9)); border-radius: 12px; padding: 10px 12px;'
+                : 'padding: 10px 12px;';
+
             return `
-                <div class="chart-row" style="align-items:center; gap: 12px;">
+                <div class="chart-row" style="align-items:center; gap: 12px; ${rowStyle}">
                     <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">${idx + 1}</div>
                     <img src="${avatar}" alt="" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
-                    <div style="flex: 1 1 auto; min-width: 0;">
+                    <div style="flex: 1 1 auto; min-width: 0; display:flex; align-items:center; gap: 12px;">
                         <div style="font-size: 15px; font-weight: 600; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(name)}</div>
-                        <div style="margin-top: 6px; display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-mint, #059669);">
+                        <div style="margin-left: auto; display:flex; align-items:center; gap: 12px; flex: 0 0 auto;">
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
                                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
                                 <span style="font-size: 16px; font-weight: 700;">${perfect}</span>
                             </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-lightgreen, #16a34a);">
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
                                 <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
                                 <span style="font-size: 16px; font-weight: 700;">${corrected}</span>
                             </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-text-purple, #7c3aed);">
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
                                 <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
                                 <span style="font-size: 16px; font-weight: 700;">${audio}</span>
                             </div>
