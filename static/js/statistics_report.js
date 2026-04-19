@@ -1584,7 +1584,7 @@ class PlanFactReport {
 
         const endDate = new Date();
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 30);
+        startDate.setTime(endDate.getTime());
         try {
             const startInput = document.getElementById('planfactStartDate');
             const endInput = document.getElementById('planfactEndDate');
@@ -1673,7 +1673,28 @@ class PlanFactReport {
             if (!arr.length) return 'все предложения';
             const uniq = [...new Set(arr.map(x => Number(x)).filter(n => Number.isFinite(n)))].sort((a, b) => a - b);
             if (!uniq.length) return 'все предложения';
-            return `предл.: ${uniq.join(',')}`;
+            const ranges = [];
+            let start = null;
+            let prev = null;
+            for (const n of uniq) {
+                if (start == null) {
+                    start = n;
+                    prev = n;
+                    continue;
+                }
+                if (n === prev + 1) {
+                    prev = n;
+                    continue;
+                }
+                ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+                start = n;
+                prev = n;
+            }
+            if (start != null && prev != null) {
+                ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+            }
+            const compact = ranges.join(',');
+            return compact ? `(${compact})` : 'все предложения';
         } catch (e) {
             return '';
         }
@@ -1878,6 +1899,19 @@ class PlanFactReport {
         if (!startInput || !endInput) return;
         this.validateAndNormalizeCustomRange();
 
+        let userId = this.selectedUserId;
+        try {
+            const userSelect = document.getElementById('planfactUserSelect');
+            if (userSelect && String(userSelect.value || '').trim() !== '') {
+                const parsed = parseInt(String(userSelect.value || ''), 10);
+                if (Number.isFinite(parsed)) {
+                    userId = parsed;
+                    this.selectedUserId = parsed;
+                }
+            }
+        } catch (e) {
+        }
+
         const startDate = String(startInput.value || '');
         const endDate = String(endInput.value || '');
         if (!startDate || !endDate) {
@@ -1900,7 +1934,7 @@ class PlanFactReport {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    user_id: this.selectedUserId,
+                    user_id: userId,
                     start_date: startDate,
                     end_date: endDate,
                     ...(languageCode && languageCode !== 'all' ? { language_code: languageCode } : {}),

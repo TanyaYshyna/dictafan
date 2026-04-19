@@ -723,6 +723,7 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             a["dictation_title"] = r.get("dictation_title")
             a["dictation_language_code"] = r.get("dictation_language_code")
             a["dictation_level"] = r.get("dictation_level")
+            a["dictation_sentences_count"] = int(r.get("dictation_sentences_count") or 0)
 
             try:
                 from routes.index import get_cover_url_for_id
