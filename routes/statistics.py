@@ -1279,7 +1279,40 @@ def api_planfact_report():
                         'teacher_username': str(r.get('teacher_username') or ''),
                     }
                 else:
-                    continue
+                    # tuple row
+                    day = r[0]
+                    day_iso = day.isoformat() if hasattr(day, 'isoformat') else str(day)
+                    did = int(r[4] or 0)
+                    raw_pos = r[6]
+                    pos_key = ''
+                    if raw_pos is not None:
+                        try:
+                            pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                        except Exception:
+                            pos_key = ''
+                    req = int(r[1] or 1)
+                    done = int(successes.get((did, day_iso, pos_key), 0) or 0)
+                    act = activities.get((did, day_iso, pos_key)) or {'perfect': 0, 'corrected': 0, 'audio': 0}
+                    item = {
+                        'assignment_id': int(r[2] or 0),
+                        'group_id': int(r[3] or 0),
+                        'group_title': str(r[7] or ''),
+                        'dictation_id': did,
+                        'dictation_title': str(r[8] or ''),
+                        'dictation_language_code': str(r[9] or ''),
+                        'dictation_level': r[10],
+                        'dictation_sentences_count': int(r[11] or 0),
+                        'selected_sentence_positions': list(raw_pos or []) if raw_pos is not None else None,
+                        'required_completions': req,
+                        'done': done,
+                        'completed': bool(done >= req and req > 0),
+                        'activity': {
+                            'perfect': int(act.get('perfect') or 0),
+                            'corrected': int(act.get('corrected') or 0),
+                            'audio': int(act.get('audio') or 0),
+                        },
+                        'teacher_username': str(r[12] or ''),
+                    }
 
                 if day_iso not in days:
                     days[day_iso] = {'date': day_iso, 'items': []}

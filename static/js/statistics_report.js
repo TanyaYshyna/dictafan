@@ -1180,6 +1180,35 @@ class PlanFactReport {
         this._activityUsers = [];
         this._userDropdownOpen = false;
         this.selectedLanguage = 'all';
+        this._languageSelectorInited = false;
+    }
+
+    initLanguageSelector() {
+        try {
+            const wrap = document.getElementById('planfactLanguagePicker');
+            if (!wrap) return;
+            if (this._languageSelectorInited) return;
+            if (typeof LanguageSelector === 'undefined') return;
+
+            const raw = this.getLanguageData() || {};
+            const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+            const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
+
+            new LanguageSelector({
+                container: wrap,
+                mode: 'report-selector',
+                languageData: dataWithAll,
+                nativeLanguage: 'all',
+                learningLanguages: codes,
+                currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
+                onLanguageChange: ({ currentLearning }) => {
+                    this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
+                    this.updateReport();
+                }
+            });
+            this._languageSelectorInited = true;
+        } catch (e) {
+        }
     }
 
     formatIsoDate(d) {
@@ -1603,6 +1632,10 @@ class PlanFactReport {
             this.createModal();
         }
         this.modal.style.display = 'flex';
+        try {
+            this.initLanguageSelector();
+        } catch (e) {
+        }
         try {
             await this.ensureUsersLoaded();
         } catch (e) {
