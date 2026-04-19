@@ -1149,3 +1149,560 @@ class RatingReport {
         await rep.show();
     }
 }
+
+class PlanFactReport {
+    constructor(activityHistory, options = {}) {
+        this.history = activityHistory;
+        this.modal = null;
+        this.selectedUserId = options.userId || null;
+        this._activityUsers = [];
+        this._userDropdownOpen = false;
+    }
+
+    getToken() {
+        try {
+            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
+                return window.UM.token;
+            }
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
+    avatarUrlForUser(userId) {
+        try {
+            const id = encodeURIComponent(String(userId));
+            return `/user/api/avatar?user_id=${id}&size=small`;
+        } catch (e) {
+            return '/static/icons/default-avatar-small.svg';
+        }
+    }
+
+    formatDateForInput(dt) {
+        try {
+            const d = (dt instanceof Date) ? dt : new Date(dt);
+            if (Number.isNaN(d.getTime())) return '';
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    escapeHtml(v) {
+        const s = String(v || '');
+        return s
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    toggleUserDropdown() {
+        if (this._userDropdownOpen) {
+            this.closeUserDropdown();
+        } else {
+            this.openUserDropdown();
+        }
+    }
+
+    openUserDropdown() {
+        try {
+            const menu = document.getElementById('planfactUserPickerMenu');
+            if (!menu) return;
+            menu.style.display = 'block';
+            this._userDropdownOpen = true;
+        } catch (e) {
+        }
+    }
+
+    closeUserDropdown() {
+        try {
+            const menu = document.getElementById('planfactUserPickerMenu');
+            if (!menu) return;
+            menu.style.display = 'none';
+            this._userDropdownOpen = false;
+        } catch (e) {
+        }
+    }
+
+    updateUserPickerUI() {
+        try {
+            const labelEl = document.getElementById('planfactUserPickerLabel');
+            const avatarEl = document.getElementById('planfactUserPickerAvatar');
+            if (!labelEl || !avatarEl) return;
+
+            const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(this.selectedUserId));
+            const label = String(u && u.label ? u.label : '');
+            labelEl.textContent = label;
+            const uid = Number(u && u.id);
+            avatarEl.src = Number.isFinite(uid) ? this.avatarUrlForUser(uid) : '/static/icons/default-avatar-small.svg';
+            avatarEl.onerror = function () {
+                try { this.onerror = null; this.src = '/static/icons/default-avatar-small.svg'; } catch (e) {}
+            };
+        } catch (e) {
+        }
+    }
+
+    async ensureUsersLoaded() {
+        try {
+            if (!this.history || typeof this.history.listActivityReportUsers !== 'function') return;
+            const userSelect = document.getElementById('planfactUserSelect');
+            if (!userSelect) return;
+            if (userSelect.options && userSelect.options.length > 0) return;
+
+            const users = await this.history.listActivityReportUsers();
+            if (!Array.isArray(users) || users.length === 0) return;
+
+            this._activityUsers = users;
+
+            const opts = [];
+            for (const u of users) {
+                const id = Number(u && u.id);
+                if (!Number.isFinite(id)) continue;
+                const label = String(u && u.label ? u.label : (u && u.username ? u.username : `User #${id}`));
+                opts.push({ id, label });
+            }
+            if (!opts.length) return;
+
+            userSelect.innerHTML = opts
+                .map(o => `<option value="${o.id}">${this.escapeHtml(o.label)}</option>`)
+                .join('');
+
+            if (this.selectedUserId == null) {
+                this.selectedUserId = opts[0].id;
+            }
+            userSelect.value = String(this.selectedUserId);
+
+            try {
+                const menu = document.getElementById('planfactUserPickerMenu');
+                if (menu) {
+                    menu.innerHTML = opts.map(o => {
+                        const url = this.avatarUrlForUser(o.id);
+                        const active = Number(o.id) === Number(this.selectedUserId);
+                        return `
+                            <button type="button" data-user-id="${o.id}" style="width:100%; display:flex; align-items:center; gap: 10px; padding: 8px 10px; border: 0; background: ${active ? 'rgba(35, 99, 235, 0.08)' : 'transparent'}; border-radius: 10px; cursor: pointer; text-align:left; font-size: 14px; font-weight: 400;">
+                                <img src="${url}" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
+                                <span style="overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(o.label)}</span>
+                            </button>
+                        `;
+                    }).join('');
+
+                    menu.querySelectorAll('button[data-user-id]').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const uid = parseInt(String(btn.getAttribute('data-user-id') || ''), 10);
+                            if (!Number.isFinite(uid)) return;
+                            this.selectedUserId = uid;
+                            try { userSelect.value = String(uid); } catch (e2) {}
+                            this.updateUserPickerUI();
+                            this.closeUserDropdown();
+                            this.updateReport();
+                        });
+                    });
+                }
+            } catch (e) {
+            }
+
+            try {
+                this.updateUserPickerUI();
+            } catch (e) {
+            }
+        } catch (e) {
+        }
+    }
+
+    validateAndNormalizeCustomRange() {
+        const startInput = document.getElementById('planfactStartDate');
+        const endInput = document.getElementById('planfactEndDate');
+        if (!startInput || !endInput) return;
+
+        const s = String(startInput.value || '');
+        const e = String(endInput.value || '');
+        if (!s || !e) return;
+
+        const sd = new Date(s);
+        const ed = new Date(e);
+        if (Number.isNaN(sd.getTime()) || Number.isNaN(ed.getTime())) return;
+
+        if (sd.getTime() > ed.getTime()) {
+            endInput.value = s;
+        } else if (ed.getTime() < sd.getTime()) {
+            startInput.value = e;
+        }
+    }
+
+    createModal() {
+        let modal = document.getElementById('planfact-modal');
+        if (modal) {
+            this.modal = modal;
+            return;
+        }
+
+        modal = document.createElement('div');
+        modal.id = 'planfact-modal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modal.style.backdropFilter = 'blur(4px)';
+        modal.style.overflow = 'hidden';
+        modal.style.zIndex = '10150';
+
+        modal.innerHTML = `
+            <div class="modal-content statistics-modal-content">
+                <div class="statistics-header" style="display:flex; align-items:center; gap: 10px;">
+                    <div style="display:flex; align-items:center; gap: 10px; min-width: 0; flex: 1 1 auto;">
+                        <h2 style="margin: 0; white-space: nowrap;">План‑Факт</h2>
+                    </div>
+
+                    <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                        <button class="action-btn" id="refreshPlanFactBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                            <i data-lucide="rotate-cw"></i>
+                        </button>
+                        <button class="close-statistics-btn" id="closePlanFactBtn">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="statistics-controls">
+                    <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+                        <div style="display:flex; align-items:center; gap: 10px;">
+                            <div id="planfactUserPicker" style="position: relative; min-width: 220px;">
+                                <button id="planfactUserPickerBtn" type="button" class="group-select" style="width: 100%; display:flex; align-items:center; gap: 10px; justify-content: space-between; font-size: 16px; font-weight: 500;">
+                                    <span style="display:flex; align-items:center; gap: 10px; min-width: 0;">
+                                        <img id="planfactUserPickerAvatar" src="" alt="" style="width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #e9eef5; flex: 0 0 auto;">
+                                        <span id="planfactUserPickerLabel" style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                                    </span>
+                                    <i data-lucide="chevron-down" style="width: 18px; height: 18px; flex: 0 0 auto;"></i>
+                                </button>
+                                <div id="planfactUserPickerMenu" style="display:none; position:absolute; left:0; top: calc(100% + 6px); width: 100%; max-height: 300px; overflow:auto; background: #fff; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.12); z-index: 5; padding: 6px;"></div>
+                            </div>
+                            <select id="planfactUserSelect" class="group-select" style="display:none;"></select>
+                        </div>
+
+                        <div class="date-range-controls" style="margin-left: auto;">
+                            <input type="date" id="planfactStartDate" class="date-input" style="width: 128px; padding-right: 20px;">
+                            <span>—</span>
+                            <input type="date" id="planfactEndDate" class="date-input" style="width: 128px; padding-right: 20px;">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="statistics-chart" id="planfactRoot" style="overflow-y:auto;"></div>
+            </div>
+        `;
+
+        try {
+            const content = modal.querySelector('.modal-content');
+            if (content) {
+                content.style.zIndex = '10151';
+                content.style.maxHeight = '90vh';
+                content.style.height = '90vh';
+                content.style.display = 'flex';
+                content.style.flexDirection = 'column';
+                content.style.overflow = 'hidden';
+                content.style.boxSizing = 'border-box';
+            }
+
+            const root = modal.querySelector('#planfactRoot');
+            if (root) {
+                root.style.flex = '1 1 auto';
+                root.style.minHeight = '0';
+            }
+        } catch (e) {
+        }
+
+        document.body.appendChild(modal);
+        this.modal = modal;
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        const closeBtn = document.getElementById('closePlanFactBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.hide());
+        }
+
+        const refreshBtn = document.getElementById('refreshPlanFactBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.updateReport());
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.hide();
+            }
+        });
+
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 30);
+        try {
+            const startInput = document.getElementById('planfactStartDate');
+            const endInput = document.getElementById('planfactEndDate');
+            if (startInput) startInput.value = this.formatDateForInput(startDate);
+            if (endInput) endInput.value = this.formatDateForInput(endDate);
+        } catch (e) {
+        }
+
+        try {
+            const userSelect = document.getElementById('planfactUserSelect');
+            if (userSelect) {
+                userSelect.addEventListener('change', () => {
+                    const raw = userSelect.value;
+                    const parsed = parseInt(String(raw || ''), 10);
+                    this.selectedUserId = Number.isFinite(parsed) ? parsed : null;
+                    try {
+                        this.updateUserPickerUI();
+                    } catch (e) {
+                    }
+                    this.updateReport();
+                });
+            }
+        } catch (e) {
+        }
+
+        try {
+            const btn = document.getElementById('planfactUserPickerBtn');
+            const menu = document.getElementById('planfactUserPickerMenu');
+            if (btn && menu) {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.toggleUserDropdown();
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!this._userDropdownOpen) return;
+                    const root = document.getElementById('planfactUserPicker');
+                    if (root && !root.contains(e.target)) {
+                        this.closeUserDropdown();
+                    }
+                });
+            }
+        } catch (e) {
+        }
+
+        try {
+            const startInput = document.getElementById('planfactStartDate');
+            const endInput = document.getElementById('planfactEndDate');
+            const onDateChange = () => {
+                this.validateAndNormalizeCustomRange();
+                this.updateReport();
+            };
+            if (startInput) startInput.addEventListener('change', onDateChange);
+            if (endInput) endInput.addEventListener('change', onDateChange);
+        } catch (e) {
+        }
+    }
+
+    async show() {
+        if (!this.modal) {
+            this.createModal();
+        }
+        this.modal.style.display = 'flex';
+        try {
+            await this.ensureUsersLoaded();
+        } catch (e) {
+        }
+        await this.updateReport();
+    }
+
+    hide() {
+        if (this.modal) {
+            this.modal.style.display = 'none';
+        }
+    }
+
+    getPositionsLabel(positions) {
+        try {
+            if (positions == null) return 'все предложения';
+            const arr = Array.isArray(positions) ? positions : [];
+            if (!arr.length) return 'все предложения';
+            const uniq = [...new Set(arr.map(x => Number(x)).filter(n => Number.isFinite(n)))].sort((a, b) => a - b);
+            if (!uniq.length) return 'все предложения';
+            return `предл.: ${uniq.join(',')}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    renderReport(days) {
+        const root = document.getElementById('planfactRoot');
+        if (!root) return;
+
+        const list = Array.isArray(days) ? days : [];
+        if (!list.length) {
+            root.innerHTML = '<p class="no-data">Нет данных</p>';
+            return;
+        }
+
+        const htmlDays = list.map(d => {
+            const dateLabel = String(d && d.date ? d.date : '');
+            const items = Array.isArray(d && d.items) ? d.items : [];
+            const extra = Array.isArray(d && d.extra_activity) ? d.extra_activity : [];
+
+            const rows = items.map(it => {
+                const title = this.escapeHtml(String(it && it.dictation_title ? it.dictation_title : `Диктант #${it?.dictation_id || ''}`));
+                const group = this.escapeHtml(String(it && it.group_title ? it.group_title : ''));
+                const positionsLabel = this.escapeHtml(this.getPositionsLabel(it && it.selected_sentence_positions));
+                const req = Number(it && it.required_completions) || 0;
+                const done = Number(it && it.done) || 0;
+                const completed = !!(it && it.completed);
+                const badgeBg = completed ? 'rgba(16,185,129,0.14)' : 'rgba(244,63,94,0.12)';
+                const badgeColor = completed ? 'rgba(16,185,129,0.95)' : 'rgba(225,29,72,0.95)';
+                const activity = it && it.activity ? it.activity : {};
+                const perfect = Number(activity && activity.perfect) || 0;
+                const corrected = Number(activity && activity.corrected) || 0;
+                const audio = Number(activity && activity.audio) || 0;
+
+                return `
+                    <div style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04);">
+                        <div style="flex: 1 1 auto; min-width: 0;">
+                            <div style="display:flex; align-items:center; gap: 10px;">
+                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+                                <span style="margin-left: auto; flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 700; font-size: 13px;">${completed ? 'выполнено' : 'не выполнено'}</span>
+                            </div>
+                            <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
+                                <span>${group}</span>
+                                <span>${positionsLabel}</span>
+                                <span>план: ${req}</span>
+                                <span>факт: ${done}</span>
+                            </div>
+                        </div>
+
+                        <div style="flex: 0 0 auto; display:flex; align-items:center; gap: 10px; padding-top: 2px;">
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
+                                <i data-lucide="star" style="width: 16px; height: 16px;"></i>
+                                <span style="font-weight: 800;">${perfect}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
+                                <i data-lucide="star-half" style="width: 16px; height: 16px;"></i>
+                                <span style="font-weight: 800;">${corrected}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
+                                <i data-lucide="mic" style="width: 16px; height: 16px;"></i>
+                                <span style="font-weight: 800;">${audio}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const extrasHtml = extra.length
+                ? `
+                    <div style="margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(251, 191, 36, 0.10); border: 1px solid rgba(251, 191, 36, 0.25);">
+                        <div style="font-weight: 700; margin-bottom: 6px;">Другая активность (вне плана)</div>
+                        ${extra.map(x => {
+                            const did = Number(x && x.dictation_id) || 0;
+                            const act = x && x.activity ? x.activity : {};
+                            const perfect = Number(act && act.perfect) || 0;
+                            const corrected = Number(act && act.corrected) || 0;
+                            const audio = Number(act && act.audio) || 0;
+                            return `
+                                <div style="display:flex; align-items:center; gap: 10px; padding: 6px 0; color: rgba(31,41,51,0.8);">
+                                    <div style="flex: 1 1 auto; min-width: 0; font-weight: 600;">Диктант #${did}</div>
+                                    <div style="display:flex; align-items:center; gap: 10px;">
+                                        <span>Perfect: ${perfect}</span>
+                                        <span>Corrected: ${corrected}</span>
+                                        <span>Audio: ${audio}</span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `
+                : '';
+
+            return `
+                <div style="margin-bottom: 14px;">
+                    <div style="display:flex; align-items:center; gap: 10px; margin: 10px 2px;">
+                        <div style="font-weight: 800; font-size: 16px;">${this.escapeHtml(dateLabel)}</div>
+                        <div style="flex: 1 1 auto; height: 1px; background: rgba(31,41,51,0.12);"></div>
+                    </div>
+                    <div style="display:flex; flex-direction: column; gap: 10px;">${rows || '<p class="no-data">Нет заданий</p>'}</div>
+                    ${extrasHtml}
+                </div>
+            `;
+        }).join('');
+
+        root.innerHTML = `<div class="chart-container" style="display:flex; flex-direction: column;">${htmlDays}</div>`;
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    async updateReport() {
+        const root = document.getElementById('planfactRoot');
+        if (root) {
+            root.innerHTML = '<p class="no-data">Формируем отчет…</p>';
+        }
+
+        const token = this.getToken();
+        if (!token) {
+            if (root) root.innerHTML = '<p class="no-data">Не найден токен</p>';
+            return;
+        }
+
+        const startInput = document.getElementById('planfactStartDate');
+        const endInput = document.getElementById('planfactEndDate');
+        if (!startInput || !endInput) return;
+        this.validateAndNormalizeCustomRange();
+
+        const startDate = String(startInput.value || '');
+        const endDate = String(endInput.value || '');
+        if (!startDate || !endDate) {
+            if (root) root.innerHTML = '<p class="no-data">Выберите даты</p>';
+            return;
+        }
+
+        let days = [];
+        try {
+            const res = await fetch('/api/statistics/planfact', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: this.selectedUserId,
+                    start_date: startDate,
+                    end_date: endDate,
+                })
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success && Array.isArray(js.days))) {
+                days = [];
+            } else {
+                days = js.days;
+            }
+        } catch (e) {
+            days = [];
+        }
+
+        this.renderReport(days);
+    }
+
+    static async open(activityHistory) {
+        const rep = new PlanFactReport(activityHistory);
+        await rep.show();
+    }
+}

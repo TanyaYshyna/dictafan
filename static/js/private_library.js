@@ -281,7 +281,21 @@ function setupUserDropdownMenu() {
     planFactBtn.addEventListener('click', (e) => {
       try { e.preventDefault(); } catch (e2) {}
       close();
-      alert('Отчет План-факт скоро будет');
+      if (typeof PlanFactReport === 'undefined') {
+        alert('Отчет План‑Факт недоступен');
+        return;
+      }
+      if (typeof UserActivityHistory === 'undefined') {
+        alert('Отчет План‑Факт недоступен');
+        return;
+      }
+
+      try {
+        const history = new UserActivityHistory('/user/api');
+        PlanFactReport.open(history);
+      } catch (err) {
+        alert('Не удалось открыть отчет План‑Факт');
+      }
     });
   }
 }
@@ -346,7 +360,16 @@ function installUserMenuReportsClickFallback() {
       }
 
       if (planFactBtn) {
-        alert('Отчет План-факт скоро будет');
+        if (typeof PlanFactReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
+          alert('Отчет План‑Факт недоступен');
+          return;
+        }
+        try {
+          const history = new UserActivityHistory('/user/api');
+          await PlanFactReport.open(history);
+        } catch (err) {
+          alert('Не удалось открыть отчет План‑Факт');
+        }
         return;
       }
     } catch (err) {

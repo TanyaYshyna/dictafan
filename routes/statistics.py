@@ -1035,6 +1035,293 @@ def api_activity_report():
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@statistics_bp.route('/planfact', methods=['POST'])
+@jwt_required()
+def api_planfact_report():
+    """Отчет План‑Факт: план из assignments + факт из history_successes и history_activity."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        data = request.get_json(silent=True) or {}
+        start_date_raw = data.get('start_date')
+        end_date_raw = data.get('end_date')
+        requested_user_id = data.get('user_id')
+
+        if not start_date_raw or not end_date_raw:
+            return jsonify({"success": False, "error": "Missing start_date/end_date"}), 400
+
+        try:
+            start_date = datetime.fromisoformat(str(start_date_raw)).date()
+            end_date = datetime.fromisoformat(str(end_date_raw)).date()
+        except Exception:
+            return jsonify({"success": False, "error": "Invalid start_date/end_date"}), 400
+
+        if start_date > end_date:
+            end_date = start_date
+
+        current_user_id = int(user.get('id'))
+        target_user_id = current_user_id
+        if requested_user_id is not None and str(requested_user_id).strip() != "":
+            try:
+                target_user_id = int(requested_user_id)
+            except Exception:
+                target_user_id = current_user_id
+
+        # Разрешенные пользователи: self + активные ученики, давшие доступ.
+        allowed_ids = {current_user_id}
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT DISTINCT u.id AS user_id
+                    FROM group_students gs
+                    JOIN group_teachers gt ON gt.group_id = gs.group_id
+                    JOIN users u ON u.id = gs.student_user_id
+                    WHERE gt.teacher_user_id = %s
+                      AND gs.status = 'active'
+                      AND gs.removed_at IS NULL
+                      AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
+                    """,
+                    (current_user_id,),
+                )
+                for r in (cur.fetchall() or []):
+                    try:
+                        uid = int(r.get('user_id') if isinstance(r, dict) else r[0])
+                        allowed_ids.add(uid)
+                    except Exception:
+                        continue
+
+                if target_user_id not in allowed_ids:
+                    return jsonify({"success": False, "error": "Forbidden"}), 403
+
+                # 1) План: assignments_by_date в диапазоне.
+                cur.execute(
+                    """
+                    SELECT
+                        abd.day_date,
+                        abd.required_completions,
+                        a.id AS assignment_id,
+                        a.group_id,
+                        a.dictation_id,
+                        a.created_by_teacher_user_id,
+                        a.selected_sentence_positions,
+                        g.title AS group_title,
+                        d.title AS dictation_title,
+                        d.language_code AS dictation_language_code,
+                        d.level AS dictation_level,
+                        d.sentences_count AS dictation_sentences_count,
+                        u.username AS teacher_username
+                    FROM assignments_by_date abd
+                    JOIN assignments a ON a.id = abd.assignment_id
+                    JOIN groups g ON g.id = a.group_id
+                    JOIN dictations d ON d.id = a.dictation_id
+                    JOIN group_students gs ON gs.group_id = a.group_id
+                    LEFT JOIN users u ON u.id = a.created_by_teacher_user_id
+                    WHERE gs.student_user_id = %s
+                      AND gs.status = 'active'
+                      AND gs.removed_at IS NULL
+                      AND abd.day_date >= %s
+                      AND abd.day_date <= %s
+                    ORDER BY abd.day_date ASC, a.id ASC
+                    """,
+                    (target_user_id, start_date, end_date),
+                )
+                plan_rows = cur.fetchall() or []
+
+                # 2) Факт (successes): количество завершений по дню/диктанту/позициям.
+                successes = {}
+                cur.execute(
+                    """
+                    SELECT
+                        hs.dictation_id,
+                        hs.created_at::date AS d,
+                        hs.selected_sentence_positions,
+                        COUNT(*)::int AS cnt
+                    FROM history_successes hs
+                    WHERE hs.user_id = %s
+                      AND hs.created_at::date >= %s
+                      AND hs.created_at::date <= %s
+                    GROUP BY hs.dictation_id, hs.created_at::date, hs.selected_sentence_positions
+                    """,
+                    (target_user_id, start_date, end_date),
+                )
+                for rr in (cur.fetchall() or []):
+                    try:
+                        did = int(rr.get('dictation_id') if isinstance(rr, dict) else rr[0])
+                        day = rr.get('d') if isinstance(rr, dict) else rr[1]
+                        raw_pos = rr.get('selected_sentence_positions') if isinstance(rr, dict) else rr[2]
+                        cnt = int(rr.get('cnt') if isinstance(rr, dict) else rr[3])
+
+                        pos_key = ''
+                        if raw_pos is not None:
+                            try:
+                                pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                            except Exception:
+                                pos_key = ''
+                        k = (did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)
+                        successes[k] = cnt
+                    except Exception:
+                        continue
+
+                # 3) Факт (activity): счетчики по дню/диктанту/позициям.
+                activities = {}
+                cur.execute(
+                    """
+                    SELECT
+                        date,
+                        dictation_id,
+                        selected_sentence_positions,
+                        COALESCE(SUM(perfect_count), 0) AS perfect,
+                        COALESCE(SUM(corrected_count), 0) AS corrected,
+                        COALESCE(SUM(audio_count), 0) AS audio
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date >= %s
+                      AND date <= %s
+                    GROUP BY date, dictation_id, selected_sentence_positions
+                    ORDER BY date ASC, dictation_id ASC
+                    """,
+                    (target_user_id, start_date, end_date),
+                )
+                for ar in (cur.fetchall() or []):
+                    try:
+                        if isinstance(ar, dict):
+                            day = ar.get('date')
+                            did = int(ar.get('dictation_id') or 0)
+                            raw_pos = ar.get('selected_sentence_positions')
+                            pos_key = ''
+                            if raw_pos is not None:
+                                try:
+                                    pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                                except Exception:
+                                    pos_key = ''
+                            activities[(did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)] = {
+                                'perfect': int(ar.get('perfect') or 0),
+                                'corrected': int(ar.get('corrected') or 0),
+                                'audio': int(ar.get('audio') or 0),
+                            }
+                        else:
+                            day = ar[0]
+                            did = int(ar[1] or 0)
+                            raw_pos = ar[2]
+                            pos_key = ''
+                            if raw_pos is not None:
+                                try:
+                                    pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                                except Exception:
+                                    pos_key = ''
+                            activities[(did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)] = {
+                                'perfect': int(ar[3] or 0),
+                                'corrected': int(ar[4] or 0),
+                                'audio': int(ar[5] or 0),
+                            }
+                    except Exception:
+                        continue
+
+        finally:
+            conn.close()
+
+        # Собираем по дням
+        days = {}
+        for r in plan_rows:
+            try:
+                if isinstance(r, dict):
+                    day = r.get('day_date')
+                    day_iso = day.isoformat() if hasattr(day, 'isoformat') else str(day)
+                    did = int(r.get('dictation_id') or 0)
+                    raw_pos = r.get('selected_sentence_positions')
+                    pos_key = ''
+                    if raw_pos is not None:
+                        try:
+                            pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                        except Exception:
+                            pos_key = ''
+                    req = int(r.get('required_completions') or 1)
+                    done = int(successes.get((did, day_iso, pos_key), 0) or 0)
+                    act = activities.get((did, day_iso, pos_key)) or {'perfect': 0, 'corrected': 0, 'audio': 0}
+                    item = {
+                        'assignment_id': int(r.get('assignment_id') or 0),
+                        'group_id': int(r.get('group_id') or 0),
+                        'group_title': str(r.get('group_title') or ''),
+                        'dictation_id': did,
+                        'dictation_title': str(r.get('dictation_title') or ''),
+                        'dictation_language_code': str(r.get('dictation_language_code') or ''),
+                        'dictation_level': r.get('dictation_level'),
+                        'dictation_sentences_count': int(r.get('dictation_sentences_count') or 0),
+                        'selected_sentence_positions': list(raw_pos or []) if raw_pos is not None else None,
+                        'required_completions': req,
+                        'done': done,
+                        'completed': bool(done >= req and req > 0),
+                        'activity': {
+                            'perfect': int(act.get('perfect') or 0),
+                            'corrected': int(act.get('corrected') or 0),
+                            'audio': int(act.get('audio') or 0),
+                        },
+                        'teacher_username': str(r.get('teacher_username') or ''),
+                    }
+                else:
+                    continue
+
+                if day_iso not in days:
+                    days[day_iso] = {'date': day_iso, 'items': []}
+                days[day_iso]['items'].append(item)
+            except Exception:
+                continue
+
+        # Добавляем "прочую активность" (есть activity, но нет подходящего задания)
+        assignments_keys = set()
+        for day_iso, payload in days.items():
+            for it in payload.get('items') or []:
+                try:
+                    raw_pos = it.get('selected_sentence_positions')
+                    pos_key = ''
+                    if raw_pos is not None:
+                        pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                    assignments_keys.add((int(it.get('dictation_id') or 0), day_iso, pos_key))
+                except Exception:
+                    continue
+
+        extras_by_day = {}
+        for (did, day_iso, pos_key), act in activities.items():
+            if (did, day_iso, pos_key) in assignments_keys:
+                continue
+            if day_iso not in extras_by_day:
+                extras_by_day[day_iso] = []
+            extras_by_day[day_iso].append(
+                {
+                    'dictation_id': int(did),
+                    'selected_sentence_positions_key': str(pos_key or ''),
+                    'activity': {
+                        'perfect': int(act.get('perfect') or 0),
+                        'corrected': int(act.get('corrected') or 0),
+                        'audio': int(act.get('audio') or 0),
+                    },
+                }
+            )
+
+        out_days = []
+        for day_iso in sorted(set(list(days.keys()) + list(extras_by_day.keys()))):
+            payload = days.get(day_iso) or {'date': day_iso, 'items': []}
+            payload['extra_activity'] = extras_by_day.get(day_iso) or []
+            # completed first
+            payload['items'] = sorted(payload.get('items') or [], key=lambda x: (0 if x.get('completed') else 1, int(x.get('assignment_id') or 0)))
+            out_days.append(payload)
+
+        return jsonify({
+            'success': True,
+            'user_id': int(target_user_id),
+            'start_date': start_date.isoformat(),
+            'end_date': end_date.isoformat(),
+            'days': out_days,
+        })
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @statistics_bp.route('/rating', methods=['POST'])
 @jwt_required()
 def api_rating_report():
