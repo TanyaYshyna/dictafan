@@ -1181,6 +1181,23 @@ class PlanFactReport {
         this._userDropdownOpen = false;
         this.selectedLanguage = 'all';
         this._languageSelectorInited = false;
+        this._updateTimer = null;
+        this._updateSeq = 0;
+    }
+
+    scheduleUpdate(delayMs = 150) {
+        try {
+            if (this._updateTimer) {
+                clearTimeout(this._updateTimer);
+                this._updateTimer = null;
+            }
+            this._updateTimer = setTimeout(() => {
+                this._updateTimer = null;
+                this.updateReport();
+            }, Math.max(0, Number(delayMs) || 0));
+        } catch (e) {
+            this.updateReport();
+        }
     }
 
     initLanguageSelector() {
@@ -1203,7 +1220,7 @@ class PlanFactReport {
                 currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
                 onLanguageChange: ({ currentLearning }) => {
                     this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
-                    this.updateReport();
+                    this.scheduleUpdate(0);
                 }
             });
             this._languageSelectorInited = true;
@@ -1417,7 +1434,7 @@ class PlanFactReport {
                             try { userSelect.value = String(uid); } catch (e2) {}
                             this.updateUserPickerUI();
                             this.closeUserDropdown();
-                            this.updateReport();
+                            this.scheduleUpdate(0);
                         });
                     });
                 }
@@ -1587,7 +1604,7 @@ class PlanFactReport {
                         this.updateUserPickerUI();
                     } catch (e) {
                     }
-                    this.updateReport();
+                    this.scheduleUpdate(0);
                 });
             }
         } catch (e) {
@@ -1619,7 +1636,7 @@ class PlanFactReport {
             const endInput = document.getElementById('planfactEndDate');
             const onDateChange = () => {
                 this.validateAndNormalizeCustomRange();
-                this.updateReport();
+                this.scheduleUpdate(150);
             };
             if (startInput) startInput.addEventListener('change', onDateChange);
             if (endInput) endInput.addEventListener('change', onDateChange);
@@ -1838,6 +1855,7 @@ class PlanFactReport {
     }
 
     async updateReport() {
+        const seq = ++this._updateSeq;
         const root = document.getElementById('planfactRoot');
         if (root) {
             root.innerHTML = '<p class="no-data">Формируем отчет…</p>';
@@ -1892,6 +1910,7 @@ class PlanFactReport {
             days = [];
         }
 
+        if (seq !== this._updateSeq) return;
         this.renderReport(days);
     }
 

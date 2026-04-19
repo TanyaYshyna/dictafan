@@ -31,7 +31,8 @@ except Exception:
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
 
-def _can_teacher_view_student_activity(*, teacher_user_id: int, student_user_id: int) -> bool:
+def _can_teacher_view_student_activity(teacher_user_id: int, student_user_id: int) -> bool:
+    """Teacher может смотреть активность ученика если ученик активен в группе учителя и дал доступ."""
     try:
         conn = get_db_connection()
         try:
@@ -1071,6 +1072,17 @@ def api_planfact_report():
         except Exception:
             language_code_norm = None
 
+        def _positions_to_key(raw_pos):
+            try:
+                if raw_pos is None:
+                    return ''
+                arr = list(raw_pos or [])
+                if not arr:
+                    return ''
+                return json.dumps(sorted([int(x) for x in arr]), ensure_ascii=False, separators=(',', ':'))
+            except Exception:
+                return ''
+
         current_user_id = int(user.get('id'))
         target_user_id = current_user_id
         if requested_user_id is not None and str(requested_user_id).strip() != "":
@@ -1169,12 +1181,7 @@ def api_planfact_report():
                         raw_pos = rr.get('selected_sentence_positions') if isinstance(rr, dict) else rr[2]
                         cnt = int(rr.get('cnt') if isinstance(rr, dict) else rr[3])
 
-                        pos_key = ''
-                        if raw_pos is not None:
-                            try:
-                                pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
-                            except Exception:
-                                pos_key = ''
+                        pos_key = _positions_to_key(raw_pos)
                         k = (did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)
                         successes[k] = cnt
                     except Exception:
@@ -1208,12 +1215,7 @@ def api_planfact_report():
                             day = ar.get('date')
                             did = int(ar.get('dictation_id') or 0)
                             raw_pos = ar.get('selected_sentence_positions')
-                            pos_key = ''
-                            if raw_pos is not None:
-                                try:
-                                    pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
-                                except Exception:
-                                    pos_key = ''
+                            pos_key = _positions_to_key(raw_pos)
                             activities[(did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)] = {
                                 'perfect': int(ar.get('perfect') or 0),
                                 'corrected': int(ar.get('corrected') or 0),
@@ -1223,12 +1225,7 @@ def api_planfact_report():
                             day = ar[0]
                             did = int(ar[1] or 0)
                             raw_pos = ar[2]
-                            pos_key = ''
-                            if raw_pos is not None:
-                                try:
-                                    pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
-                                except Exception:
-                                    pos_key = ''
+                            pos_key = _positions_to_key(raw_pos)
                             activities[(did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)] = {
                                 'perfect': int(ar[3] or 0),
                                 'corrected': int(ar[4] or 0),
@@ -1249,12 +1246,7 @@ def api_planfact_report():
                     day_iso = day.isoformat() if hasattr(day, 'isoformat') else str(day)
                     did = int(r.get('dictation_id') or 0)
                     raw_pos = r.get('selected_sentence_positions')
-                    pos_key = ''
-                    if raw_pos is not None:
-                        try:
-                            pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
-                        except Exception:
-                            pos_key = ''
+                    pos_key = _positions_to_key(raw_pos)
                     req = int(r.get('required_completions') or 1)
                     done = int(successes.get((did, day_iso, pos_key), 0) or 0)
                     act = activities.get((did, day_iso, pos_key)) or {'perfect': 0, 'corrected': 0, 'audio': 0}
@@ -1284,12 +1276,7 @@ def api_planfact_report():
                     day_iso = day.isoformat() if hasattr(day, 'isoformat') else str(day)
                     did = int(r[4] or 0)
                     raw_pos = r[6]
-                    pos_key = ''
-                    if raw_pos is not None:
-                        try:
-                            pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
-                        except Exception:
-                            pos_key = ''
+                    pos_key = _positions_to_key(raw_pos)
                     req = int(r[1] or 1)
                     done = int(successes.get((did, day_iso, pos_key), 0) or 0)
                     act = activities.get((did, day_iso, pos_key)) or {'perfect': 0, 'corrected': 0, 'audio': 0}
@@ -1326,9 +1313,7 @@ def api_planfact_report():
             for it in payload.get('items') or []:
                 try:
                     raw_pos = it.get('selected_sentence_positions')
-                    pos_key = ''
-                    if raw_pos is not None:
-                        pos_key = json.dumps(sorted([int(x) for x in list(raw_pos or [])]), ensure_ascii=False, separators=(',', ':'))
+                    pos_key = _positions_to_key(raw_pos)
                     assignments_keys.add((int(it.get('dictation_id') or 0), day_iso, pos_key))
                 except Exception:
                     continue
