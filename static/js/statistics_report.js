@@ -1749,12 +1749,18 @@ class PlanFactReport {
                 const completed = !!(it && it.completed);
                 const level = this.escapeHtml(String(it && it.dictation_level ? it.dictation_level : ''));
                 const coverUrl = String(it && it.dictation_cover_url ? it.dictation_cover_url : '');
-                const badgeBg = completed ? 'rgba(16,185,129,0.14)' : 'rgba(244,63,94,0.12)';
-                const badgeColor = completed ? 'rgba(16,185,129,0.95)' : 'rgba(225,29,72,0.95)';
                 const activity = it && it.activity ? it.activity : {};
                 const perfect = Number(activity && activity.perfect) || 0;
                 const corrected = Number(activity && activity.corrected) || 0;
                 const audio = Number(activity && activity.audio) || 0;
+                const hasProgress = (!completed) && ((done > 0) || ((perfect + corrected + audio) > 0));
+                const badgeText = completed ? 'выполнено' : (hasProgress ? 'частично' : 'не выполнено');
+                const badgeBg = completed
+                    ? 'rgba(16,185,129,0.14)'
+                    : (hasProgress ? 'rgba(245, 158, 11, 0.16)' : 'rgba(244,63,94,0.12)');
+                const badgeColor = completed
+                    ? 'rgba(16,185,129,0.95)'
+                    : (hasProgress ? 'rgba(180, 83, 9, 0.95)' : 'rgba(225,29,72,0.95)');
 
                 return `
                     <div style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04);">
@@ -1762,7 +1768,7 @@ class PlanFactReport {
                         <div style="flex: 1 1 auto; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 10px;">
                                 <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${level ? ` · ${level}` : ''}</div>
-                                <span style="margin-left: auto; flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 700; font-size: 13px;">${completed ? 'выполнено' : 'не выполнено'}</span>
+                                <span style="margin-left: auto; flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 700; font-size: 13px;">${badgeText}</span>
                             </div>
                             <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
                                 <span>${group}</span>
