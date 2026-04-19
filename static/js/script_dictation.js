@@ -3400,34 +3400,49 @@ function setupCompletionModalHandlers() {
                 if (e.ctrlKey || e.metaKey || e.altKey) return;
                 if (!completionModal || completionModal.style.display === 'none') return;
 
-                const focusables = [exitBtn, resultsBtn]
-                    .filter(x => x && typeof x.focus === 'function')
-                    .filter(x => {
-                        try {
-                            if (x.disabled) return false;
-                            const st = window.getComputedStyle(x);
-                            return st && st.display !== 'none' && st.visibility !== 'hidden';
-                        } catch (e2) {
-                            return true;
-                        }
-                    });
-                if (!focusables.length) return;
+                const isFocusable = (x) => {
+                    try {
+                        if (!x || typeof x.focus !== 'function') return false;
+                        if (x.disabled) return false;
+                        const st = window.getComputedStyle(x);
+                        return st && st.display !== 'none' && st.visibility !== 'hidden';
+                    } catch (e2) {
+                        return Boolean(x && typeof x.focus === 'function');
+                    }
+                };
+
+                const a = exitBtn;
+                const b = resultsBtn;
+                const aOk = isFocusable(a);
+                const bOk = isFocusable(b);
+
+                if (!aOk && !bOk) return;
+
+                // Всегда ловим Tab, чтобы фокус не уходил на элементы страницы
+                e.preventDefault();
+
+                if (aOk && !bOk) {
+                    a.focus();
+                    return;
+                }
 
                 const active = document.activeElement;
-                const idx = focusables.indexOf(active);
-                const lastIdx = focusables.length - 1;
 
+                // Порядок намеренно такой: Exit -> Results -> Exit
+                // (и обратно при Shift+Tab)
                 if (e.shiftKey) {
-                    if (idx <= 0) {
-                        e.preventDefault();
-                        focusables[lastIdx].focus();
+                    if (active === a) {
+                        b.focus();
+                    } else {
+                        a.focus();
                     }
                     return;
                 }
 
-                if (idx === -1 || idx >= lastIdx) {
-                    e.preventDefault();
-                    focusables[0].focus();
+                if (active === a) {
+                    b.focus();
+                } else {
+                    a.focus();
                 }
             } catch (e2) {
             }

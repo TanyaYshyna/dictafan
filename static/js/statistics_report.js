@@ -1185,6 +1185,39 @@ class PlanFactReport {
         this._updateSeq = 0;
     }
 
+    getCurrentUserId() {
+        try {
+            if (window.UM && typeof window.UM.getCurrentUser === 'function') {
+                const id = Number(window.UM.getCurrentUser()?.id);
+                return Number.isFinite(id) ? id : null;
+            }
+        } catch (e) {
+        }
+        try {
+            if (window.UM && window.UM.userData && window.UM.userData.id != null) {
+                const id = Number(window.UM.userData.id);
+                return Number.isFinite(id) ? id : null;
+            }
+        } catch (e) {
+        }
+        return null;
+    }
+
+    getSelectedUserIdFromUI() {
+        let userId = this.selectedUserId;
+        try {
+            const userSelect = document.getElementById('planfactUserSelect');
+            if (userSelect && String(userSelect.value || '').trim() !== '') {
+                const parsed = parseInt(String(userSelect.value || ''), 10);
+                if (Number.isFinite(parsed)) {
+                    userId = parsed;
+                }
+            }
+        } catch (e) {
+        }
+        return userId;
+    }
+
     scheduleUpdate(delayMs = 150) {
         try {
             if (this._updateTimer) {
@@ -1763,18 +1796,22 @@ class PlanFactReport {
                 const dictTitleRaw = String(it && it.dictation_title ? it.dictation_title : '');
                 const titleFallback = it?.dictation_id ? `Диктант ${it.dictation_id}` : 'Диктант';
                 const title = this.escapeHtml(dictTitleRaw || titleFallback);
+                const did = Number(it && it.dictation_id) || 0;
+                const coverUrl = String(it && it.dictation_cover_url ? it.dictation_cover_url : '');
+                const level = this.escapeHtml(String(it && it.dictation_level ? it.dictation_level : ''));
+                const req = Number(
+                    (it && (it.required_completions ?? it.plan_required_completions ?? it.plan_count ?? it.required ?? it.plan))
+                ) || 0;
+                const done = Number(
+                    (it && (it.successes_done ?? it.done ?? it.successes_count ?? it.completions_done ?? it.completions ?? it.fact))
+                ) || 0;
+                const completed = (req > 0) ? (done >= req) : (done > 0);
+                const hasProgress = (done > 0 && !completed);
                 const group = this.escapeHtml(String(it && it.group_title ? it.group_title : ''));
                 const positionsLabel = this.escapeHtml(this.getPositionsLabel(it && it.selected_sentence_positions));
-                const req = Number(it && it.required_completions) || 0;
-                const done = Number(it && it.done) || 0;
-                const completed = !!(it && it.completed);
-                const level = this.escapeHtml(String(it && it.dictation_level ? it.dictation_level : ''));
-                const coverUrl = String(it && it.dictation_cover_url ? it.dictation_cover_url : '');
-                const activity = it && it.activity ? it.activity : {};
-                const perfect = Number(activity && activity.perfect) || 0;
-                const corrected = Number(activity && activity.corrected) || 0;
-                const audio = Number(activity && activity.audio) || 0;
-                const hasProgress = (!completed) && ((done > 0) || ((perfect + corrected + audio) > 0));
+                const langCode = String(it && (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) ? (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) : '');
+                const posArr = Array.isArray(it && it.selected_sentence_positions) ? it.selected_sentence_positions : null;
+                const posCsv = Array.isArray(posArr) ? posArr.map(x => Number(x)).filter(n => Number.isFinite(n)).join(',') : '';
                 const badgeText = completed ? 'выполнено' : (hasProgress ? 'частично' : 'не выполнено');
                 const badgeBg = completed
                     ? 'var(--color-button-lightgreen, #bbf1ca)'
@@ -1784,7 +1821,7 @@ class PlanFactReport {
                     : (hasProgress ? 'var(--color-button-text-yellow, rgb(255, 198, 9))' : 'var(--color-button-text-pink, #802c35)');
 
                 return `
-                    <div style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04);">
+                    <div data-action="planfact-launch" data-date="${this.escapeHtml(dateLabel)}" data-dictation-id="${this.escapeHtml(String(did || ''))}" data-dictation-lang="${this.escapeHtml(String(langCode || ''))}" data-dictation-title="${this.escapeHtml(String(dictTitleRaw || titleFallback))}" data-dictation-cover-url="${this.escapeHtml(String(coverUrl || ''))}" data-selected-positions="${this.escapeHtml(String(posCsv || ''))}" data-required-completions="${this.escapeHtml(String(req || 0))}" style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04); cursor: default;">
                         <img src="${this.escapeHtml(coverUrl || '/static/data/covers/cover_en.webp')}" alt="" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/data/covers/cover_en.webp';">
                         <div style="flex: 1 1 auto; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 10px;">
@@ -1878,6 +1915,96 @@ class PlanFactReport {
         root.innerHTML = `<div class="chart-container" style="display:flex; flex-direction: column;">${htmlDays}</div>`;
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
+        }
+
+        try {
+            const selectedUserId = this.getSelectedUserIdFromUI();
+            const currentUserId = this.getCurrentUserId();
+            const todayIso = this.formatIsoDate(new Date());
+
+            root.querySelectorAll('[data-action="planfact-launch"]').forEach(el => {
+                el.addEventListener('dblclick', (e) => {
+                    try {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    } catch (e2) {
+                    }
+
+                    try {
+                        if (currentUserId == null || selectedUserId == null || Number(selectedUserId) !== Number(currentUserId)) {
+                            alert('Нельзя запускать диктант за другого пользователя');
+                            return;
+                        }
+
+                        const dictationId = Number(el.getAttribute('data-dictation-id') || 0) || 0;
+                        if (!dictationId) return;
+                        const dateIso = String(el.getAttribute('data-date') || '').trim();
+                        const lang = String(el.getAttribute('data-dictation-lang') || '').trim();
+                        const title = String(el.getAttribute('data-dictation-title') || '').trim();
+                        const coverUrl = String(el.getAttribute('data-dictation-cover-url') || '').trim();
+                        const posCsv = String(el.getAttribute('data-selected-positions') || '').trim();
+                        const req = Number(el.getAttribute('data-required-completions') || 0) || 0;
+                        const positions = posCsv
+                            ? posCsv.split(',').map(x => Number(String(x || '').trim())).filter(n => Number.isFinite(n))
+                            : [];
+                        const isToday = Boolean(dateIso && todayIso && dateIso === todayIso);
+
+                        if (isToday) {
+                            try {
+                                if (typeof _setAssignmentLaunchContext === 'function') {
+                                    _setAssignmentLaunchContext({
+                                        assignment_id: null,
+                                        dictation_id: dictationId,
+                                        source_group_id: null,
+                                        source_group_title: null,
+                                        selected_sentence_positions: positions.length ? positions : null,
+                                        required_completions: req,
+                                    });
+                                }
+                            } catch (e3) {
+                            }
+                            try {
+                                if (typeof _studentPlanOpenDictation === 'function') {
+                                    _studentPlanOpenDictation(dictationId, lang);
+                                    return;
+                                }
+                            } catch (e3) {
+                            }
+                            try {
+                                const langNorm = String(lang || 'en').trim().toLowerCase() || 'en';
+                                const native = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+                                    ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+                                    : '';
+                                const openUrl = `/dictation/dict_${Number(dictationId)}/${langNorm}/${(native || langNorm || 'en')}`;
+                                window.location.href = openUrl;
+                            } catch (e3) {
+                            }
+                            return;
+                        }
+
+                        if (typeof openStudentPlanLaunchConfirmModal !== 'function') {
+                            alert('Запуск недоступен: модальное окно не загружено');
+                            return;
+                        }
+
+                        openStudentPlanLaunchConfirmModal({
+                            assignment_id: null,
+                            dictation_id: dictationId,
+                            dictation_language_code: lang,
+                            dictation_title: title,
+                            dictation_cover_url: coverUrl,
+                            plan_date: dateIso,
+                            source_group_id: null,
+                            source_group_title: null,
+                            selected_sentence_positions: positions.length ? positions : null,
+                            required_completions: req,
+                        });
+                    } catch (err) {
+                        try { console.log('[planfact] launch failed', err); } catch (e2) {}
+                    }
+                });
+            });
+        } catch (e) {
         }
     }
 
