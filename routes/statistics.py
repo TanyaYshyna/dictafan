@@ -1076,7 +1076,13 @@ def api_planfact_report():
             try:
                 if raw_pos is None:
                     return ''
-                arr = list(raw_pos or [])
+                arr_src = raw_pos
+                if isinstance(arr_src, str):
+                    try:
+                        arr_src = json.loads(arr_src)
+                    except Exception:
+                        arr_src = []
+                arr = list(arr_src or [])
                 if not arr:
                     return ''
                 return json.dumps(sorted([int(x) for x in arr]), ensure_ascii=False, separators=(',', ':'))

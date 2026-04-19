@@ -81,18 +81,28 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     print(f'   dictation_language_code: {dictation_language_code}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
 
-    # Нормализуем selected_sentence_positions к строке.
-    # Пустая строка означает: без задания/без выбора предложений.
+    # Нормализуем selected_sentence_positions к int[] для БД.
+    # Пустой массив означает: все предложения.
     try:
         if selected_sentence_positions is None:
-            selected_sentence_positions_str = ''
+            selected_sentence_positions_arr = []
         elif isinstance(selected_sentence_positions, str):
-            selected_sentence_positions_str = selected_sentence_positions.strip()
+            raw = selected_sentence_positions.strip()
+            if not raw or raw == '[]':
+                selected_sentence_positions_arr = []
+            else:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        selected_sentence_positions_arr = [int(x) for x in parsed]
+                    else:
+                        selected_sentence_positions_arr = []
+                except Exception:
+                    selected_sentence_positions_arr = []
         else:
-            # ожидаем list[int] (с фронта), но поддержим любой JSON-совместимый тип
-            selected_sentence_positions_str = json.dumps(selected_sentence_positions, ensure_ascii=False, separators=(',', ':'))
+            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
     except Exception:
-        selected_sentence_positions_str = ''
+        selected_sentence_positions_arr = []
     
     conn = get_db_connection()
     try:
@@ -117,7 +127,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
                 RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, created_at, updated_at
             """).format(field=sql.Identifier(update_field))
 
-            cur.execute(query, (user_id, dictation_id, target_date, selected_sentence_positions_str, dictation_language_code, number, number))
+            cur.execute(query, (user_id, dictation_id, target_date, selected_sentence_positions_arr, dictation_language_code, number, number))
 
             row = cur.fetchone()
             conn.commit()
