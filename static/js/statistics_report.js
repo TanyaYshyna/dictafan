@@ -1812,6 +1812,11 @@ class PlanFactReport {
                 const langCode = String(it && (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) ? (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) : '');
                 const posArr = Array.isArray(it && it.selected_sentence_positions) ? it.selected_sentence_positions : null;
                 const posCsv = Array.isArray(posArr) ? posArr.map(x => Number(x)).filter(n => Number.isFinite(n)).join(',') : '';
+
+                const activity = it && it.activity ? it.activity : null;
+                const perfect = Number(activity && activity.perfect != null ? activity.perfect : (it && it.perfect)) || 0;
+                const corrected = Number(activity && activity.corrected != null ? activity.corrected : (it && it.corrected)) || 0;
+                const audio = Number(activity && activity.audio != null ? activity.audio : (it && it.audio)) || 0;
                 const badgeText = completed ? 'выполнено' : (hasProgress ? 'частично' : 'не выполнено');
                 const badgeBg = completed
                     ? 'var(--color-button-lightgreen, #bbf1ca)'
