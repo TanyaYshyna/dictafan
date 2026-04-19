@@ -1406,12 +1406,30 @@ async function enqueueOfflineActivity(type_activity, number = 1) {
         const dateId = getLocalDateId();
         const dictationId = (currentDictation && currentDictation.id) ? currentDictation.id : null;
         if (!dictationId) return false;
-        const key = `${userId}:${dateId}:${dictationId}`;
+        let selectedSentencePositions = null;
+        try {
+            selectedSentencePositions = (window.assignmentSelectedSentencePositions != null)
+                ? window.assignmentSelectedSentencePositions
+                : null;
+        } catch (e) {
+            selectedSentencePositions = null;
+        }
+        let selectedSentencePositionsStr = '';
+        try {
+            if (selectedSentencePositions == null) selectedSentencePositionsStr = '';
+            else if (typeof selectedSentencePositions === 'string') selectedSentencePositionsStr = String(selectedSentencePositions);
+            else selectedSentencePositionsStr = JSON.stringify(selectedSentencePositions);
+        } catch (e) {
+            selectedSentencePositionsStr = '';
+        }
+
+        const key = `${userId}:${dateId}:${dictationId}:${selectedSentencePositionsStr}`;
         const existing = (await idbGet('activity_outbox', key)) || {
             key,
             userId,
             date: dateId,
             dictation_id: dictationId,
+            selected_sentence_positions: selectedSentencePositions,
             perfect_count: 0,
             corrected_count: 0,
             audio_count: 0,
@@ -1449,8 +1467,8 @@ async function syncOfflineActivityOutbox() {
             if (!dictationId) {
                 try {
                     const parts = String(row.key || '').split(':');
-                    // legacy: userId:dateId  OR new: userId:dateId:dictationId
-                    if (parts.length >= 3) dictationId = parts.slice(2).join(':');
+                    // legacy: userId:dateId  OR new: userId:dateId:dictationId[:selected_sentence_positions]
+                    if (parts.length >= 3) dictationId = parts[2];
                 } catch (e) {
                 }
             }
@@ -1458,6 +1476,10 @@ async function syncOfflineActivityOutbox() {
                 // нечего отправлять (невалидная запись)
                 continue;
             }
+
+            const selectedSentencePositions = (row && row.selected_sentence_positions != null)
+                ? row.selected_sentence_positions
+                : null;
 
             let sentAll = true;
             for (const item of toSend) {
@@ -1480,7 +1502,8 @@ async function syncOfflineActivityOutbox() {
                         date: row.date,
                         type_activity: item.type_activity,
                         number: item.number,
-                        dictation_language_code: dictLang
+                        dictation_language_code: dictLang,
+                        selected_sentence_positions: selectedSentencePositions
                     })
                 });
                 if (!response.ok) {
@@ -7950,6 +7973,13 @@ async function saveActivityToDB(type_activity) {
         // Всегда отправляем локальную дату в формате YYYYMMDD
         try {
             requestData.date = getLocalDateId();
+        } catch (e) {
+        }
+
+        try {
+            if (window.assignmentSelectedSentencePositions != null) {
+                requestData.selected_sentence_positions = window.assignmentSelectedSentencePositions;
+            }
         } catch (e) {
         }
 

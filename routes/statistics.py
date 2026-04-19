@@ -943,6 +943,7 @@ def save_activity():
         number = data.get('number', 1)  # опционально, по умолчанию 1
         activity_date = data.get('date')  # опционально: YYYY-MM-DD
         dictation_language_code = data.get('dictation_language_code')
+        selected_sentence_positions = data.get('selected_sentence_positions')
         
         if not dictation_id or not type_activity:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указаны dictation_id или type_activity')
@@ -961,8 +962,16 @@ def save_activity():
         user_id = user['id']
         print(f'✅ [SAVE_ACTIVITY] Найден user_id: {user_id} для email: {current_email}')
         
-        # Сохраняем активность в БД (агрегируется по дням)
-        activity = add_activity(user_id, dictation_id, type_activity, number, activity_date, dictation_language_code)
+        # Сохраняем активность в БД (агрегируется по дням; для "План‑Факт" ключ включает selected_sentence_positions)
+        activity = add_activity(
+            user_id,
+            dictation_id,
+            type_activity,
+            number,
+            activity_date,
+            dictation_language_code,
+            selected_sentence_positions,
+        )
         
         print(f'✅ [SAVE_ACTIVITY] Активность успешно сохранена в БД')
         
@@ -1126,11 +1135,12 @@ def api_rating_report():
                                 COALESCE(SUM(perfect_count), 0) AS perfect,
                                 COALESCE(SUM(corrected_count), 0) AS corrected,
                                 COALESCE(SUM(audio_count), 0) AS audio
-                            FROM history_activity
-                            WHERE user_id = ANY(%s)
-                              AND date >= %s
-                              AND date <= %s
-                              AND dictation_language_code = %s
+                            FROM history_activity ha
+                            LEFT JOIN dictations d ON d.id = ha.dictation_id
+                            WHERE ha.user_id = ANY(%s)
+                              AND ha.date >= %s
+                              AND ha.date <= %s
+                              AND COALESCE(ha.dictation_language_code, d.language_code) = %s
                             GROUP BY user_id
                             """,
                             (user_ids, start_date, end_date, str(language_code).strip().lower()),

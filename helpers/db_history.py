@@ -7,7 +7,7 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
-def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None):
+def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
     
@@ -79,6 +79,20 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     print(f'   number: {number}')
     print(f'   date: {target_date}')
     print(f'   dictation_language_code: {dictation_language_code}')
+    print(f'   selected_sentence_positions: {selected_sentence_positions}')
+
+    # Нормализуем selected_sentence_positions к строке.
+    # Пустая строка означает: без задания/без выбора предложений.
+    try:
+        if selected_sentence_positions is None:
+            selected_sentence_positions_str = ''
+        elif isinstance(selected_sentence_positions, str):
+            selected_sentence_positions_str = selected_sentence_positions.strip()
+        else:
+            # ожидаем list[int] (с фронта), но поддержим любой JSON-совместимый тип
+            selected_sentence_positions_str = json.dumps(selected_sentence_positions, ensure_ascii=False, separators=(',', ':'))
+    except Exception:
+        selected_sentence_positions_str = ''
     
     conn = get_db_connection()
     try:
@@ -93,17 +107,17 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
             query = sql.SQL("""
                 INSERT INTO history_activity 
-                (user_id, dictation_id, date, dictation_language_code, {field}, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                ON CONFLICT (user_id, dictation_id, date) 
+                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, {field}, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, dictation_id, date, selected_sentence_positions)
                 DO UPDATE SET 
                     {field} = history_activity.{field} + %s,
                     dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, date, dictation_language_code, perfect_count, corrected_count, audio_count, created_at, updated_at
+                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, created_at, updated_at
             """).format(field=sql.Identifier(update_field))
 
-            cur.execute(query, (user_id, dictation_id, target_date, dictation_language_code, number, number))
+            cur.execute(query, (user_id, dictation_id, target_date, selected_sentence_positions_str, dictation_language_code, number, number))
 
             row = cur.fetchone()
             conn.commit()
@@ -113,12 +127,13 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
                 'user_id': row[1],
                 'dictation_id': row[2],
                 'date': row[3].isoformat() if row[3] else None,
-                'dictation_language_code': row[4],
-                'perfect_count': row[5],
-                'corrected_count': row[6],
-                'audio_count': row[7],
-                'created_at': row[8].isoformat() if row[8] else None,
-                'updated_at': row[9].isoformat() if row[9] else None,
+                'selected_sentence_positions': row[4],
+                'dictation_language_code': row[5],
+                'perfect_count': row[6],
+                'corrected_count': row[7],
+                'audio_count': row[8],
+                'created_at': row[9].isoformat() if row[9] else None,
+                'updated_at': row[10].isoformat() if row[10] else None,
             }
 
             print(f'✅ [HISTORY_ACTIVITY] Активность сохранена: id={activity["id"]}, date={activity["date"]}, {update_field}={activity[update_field]}')
