@@ -1756,11 +1756,11 @@ class PlanFactReport {
                 const hasProgress = (!completed) && ((done > 0) || ((perfect + corrected + audio) > 0));
                 const badgeText = completed ? 'выполнено' : (hasProgress ? 'частично' : 'не выполнено');
                 const badgeBg = completed
-                    ? 'rgba(16,185,129,0.14)'
-                    : (hasProgress ? 'rgba(245, 158, 11, 0.16)' : 'rgba(244,63,94,0.12)');
+                    ? 'var(--color-button-lightgreen, #bbf1ca)'
+                    : (hasProgress ? 'var(--color-button-yellow, rgb(252, 235, 163))' : 'var(--color-button-pink, #f5c0ca)');
                 const badgeColor = completed
-                    ? 'rgba(16,185,129,0.95)'
-                    : (hasProgress ? 'rgba(180, 83, 9, 0.95)' : 'rgba(225,29,72,0.95)');
+                    ? 'var(--color-button-text-lightgreen, #366f40)'
+                    : (hasProgress ? 'var(--color-button-text-yellow, rgb(255, 198, 9))' : 'var(--color-button-text-pink, #802c35)');
 
                 return `
                     <div style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04);">
