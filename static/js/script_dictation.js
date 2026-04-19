@@ -3393,6 +3393,48 @@ function setupCompletionModalHandlers() {
         return;
     }
 
+    try {
+        completionModal.addEventListener('keydown', (e) => {
+            try {
+                if (e.key !== 'Tab') return;
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+                if (!completionModal || completionModal.style.display === 'none') return;
+
+                const focusables = [exitBtn, resultsBtn]
+                    .filter(x => x && typeof x.focus === 'function')
+                    .filter(x => {
+                        try {
+                            if (x.disabled) return false;
+                            const st = window.getComputedStyle(x);
+                            return st && st.display !== 'none' && st.visibility !== 'hidden';
+                        } catch (e2) {
+                            return true;
+                        }
+                    });
+                if (!focusables.length) return;
+
+                const active = document.activeElement;
+                const idx = focusables.indexOf(active);
+                const lastIdx = focusables.length - 1;
+
+                if (e.shiftKey) {
+                    if (idx <= 0) {
+                        e.preventDefault();
+                        focusables[lastIdx].focus();
+                    }
+                    return;
+                }
+
+                if (idx === -1 || idx >= lastIdx) {
+                    e.preventDefault();
+                    focusables[0].focus();
+                }
+            } catch (e2) {
+            }
+        }, true);
+    } catch (e) {
+    }
+
     if (resultsBtn) {
         resultsBtn.addEventListener('click', () => {
             try {

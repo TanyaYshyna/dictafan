@@ -930,6 +930,186 @@ function _setAssignmentLaunchContext(ctx) {
   }
 }
 
+function ensureStudentPlanLaunchConfirmModal() {
+  let modal = document.getElementById('student-plan-launch-confirm-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'student-plan-launch-confirm-modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.zIndex = '100050';
+  modal.style.background = 'rgba(0,0,0,0.35)';
+  modal.style.backdropFilter = 'blur(4px)';
+
+  modal.innerHTML = `
+    <div id="student-plan-launch-confirm-card" style="position:absolute; left:50%; top:50%; transform: translate(-50%, -50%); width:min(92vw, 720px); max-height: 86vh; overflow:hidden; background:#fff; color:#222; border-radius:18px; box-shadow: 0 30px 70px rgba(0,0,0,0.35); display:flex; flex-direction:column;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px 10px 16px; border-bottom:1px solid rgba(0,0,0,0.08);">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <div id="student-plan-launch-confirm-cover" style="width:54px; height:54px; border-radius:14px; background:#e9eef5; flex:0 0 auto; background-size: cover; background-position:center;"></div>
+          <div style="min-width:0;">
+            <div id="student-plan-launch-confirm-title" style="font-weight:900; font-size:16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
+            <div id="student-plan-launch-confirm-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
+          </div>
+        </div>
+        <button type="button" id="student-plan-launch-confirm-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div style="padding: 12px 16px; overflow:auto; flex: 1;">
+        <div id="student-plan-launch-confirm-warning" style="padding:10px 12px; border-radius:14px; background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.24); color: rgba(17,24,39,0.88); font-weight:650; line-height:1.35;"></div>
+
+        <div style="margin-top: 12px; font-weight:900; font-size:13px; color: rgba(0,0,0,0.70);">Предложения из задания</div>
+        <div id="student-plan-launch-confirm-positions" style="margin-top: 4px; font-size: 13px; color: rgba(0,0,0,0.65);"></div>
+        <div id="student-plan-launch-confirm-sentences" style="margin-top: 10px; display:flex; flex-direction:column; gap:8px;"></div>
+      </div>
+
+      <div style="padding: 12px 16px; border-top:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:flex-end; gap: 10px;">
+        <button type="button" id="student-plan-launch-confirm-start" class="button-color-yellow" style="height:40px; padding:0 16px; font-weight:900;">Запустить</button>
+      </div>
+    </div>
+  `;
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      try { modal.style.display = 'none'; } catch (e2) { }
+    }
+  });
+
+  document.body.appendChild(modal);
+  return modal;
+}
+
+async function openStudentPlanLaunchConfirmModal(ctx) {
+  const modal = ensureStudentPlanLaunchConfirmModal();
+  const closeBtn = document.getElementById('student-plan-launch-confirm-close');
+  const startBtn = document.getElementById('student-plan-launch-confirm-start');
+  const titleEl = document.getElementById('student-plan-launch-confirm-title');
+  const subtitleEl = document.getElementById('student-plan-launch-confirm-subtitle');
+  const coverEl = document.getElementById('student-plan-launch-confirm-cover');
+  const warningEl = document.getElementById('student-plan-launch-confirm-warning');
+  const posEl = document.getElementById('student-plan-launch-confirm-positions');
+  const sentsEl = document.getElementById('student-plan-launch-confirm-sentences');
+
+  if (titleEl) titleEl.textContent = String((ctx && ctx.dictation_title) || 'Диктант');
+  if (subtitleEl) subtitleEl.textContent = String((ctx && ctx.plan_date) ? `Задание на ${ctx.plan_date}` : '');
+  if (coverEl) {
+    const url = String((ctx && ctx.dictation_cover_url) || '');
+    coverEl.style.backgroundImage = url ? `url(${escapeHtml(url)})` : 'none';
+  }
+  if (warningEl) {
+    warningEl.textContent = 'Это задание из прошлого дня. Результаты выполнения диктанта попадут в текущий день как «другая активность (вне плана)». На результаты прошлых дней повлиять уже нельзя.';
+  }
+
+  const positions = Array.isArray(ctx && ctx.selected_sentence_positions)
+    ? ctx.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+    : [];
+  positions.sort((a, b) => a - b);
+
+  const formatPositionsLabel = () => {
+    try {
+      if (!positions.length) return 'Все предложения';
+      const uniq = Array.from(new Set(positions));
+      uniq.sort((a, b) => a - b);
+      const ranges = [];
+      let start = null;
+      let prev = null;
+      for (const n of uniq) {
+        if (start == null) {
+          start = n;
+          prev = n;
+          continue;
+        }
+        if (n === prev + 1) {
+          prev = n;
+          continue;
+        }
+        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+        start = n;
+        prev = n;
+      }
+      if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+      const compact = ranges.join(',');
+      return compact ? `(${compact})` : 'Все предложения';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  if (posEl) posEl.textContent = formatPositionsLabel();
+  if (sentsEl) sentsEl.innerHTML = '<div style="color: rgba(0,0,0,0.55);">Загрузка…</div>';
+
+  try {
+    const did = Number(ctx && ctx.dictation_id);
+    const all = await loadDictationSentencesForAssignmentModal(did);
+    const list = Array.isArray(all) ? all : [];
+
+    let pick = list;
+    if (positions.length) {
+      const set = new Set(positions);
+      pick = list.filter(s => {
+        try {
+          const p = Number(s && s.position);
+          return Number.isFinite(p) && set.has(p);
+        } catch (e) {
+          return false;
+        }
+      });
+    }
+
+    const rows = pick.slice(0, 60).map(s => {
+      const p = Number(s && s.position);
+      const txt = String((s && (s.text || s.sentence || s.value)) || '').trim();
+      const short = txt.length > 160 ? `${txt.slice(0, 160)}…` : txt;
+      return `
+        <div style="display:flex; gap:10px; padding:10px 12px; border-radius:14px; background: rgba(0,0,0,0.04);">
+          <div style="flex:0 0 auto; min-width:38px; height:26px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.06); font-weight:900; font-size:12px;">${escapeHtml(String(Number.isFinite(p) ? p : ''))}</div>
+          <div style="flex:1 1 auto; font-size:13px; line-height:1.35; color: rgba(0,0,0,0.78);">${escapeHtml(short || '')}</div>
+        </div>
+      `;
+    }).join('');
+    if (sentsEl) sentsEl.innerHTML = rows || '<div style="color: rgba(0,0,0,0.55);">Нет предложений</div>';
+  } catch (e) {
+    if (sentsEl) sentsEl.innerHTML = '<div style="color: rgba(0,0,0,0.55);">Не удалось загрузить предложения</div>';
+  }
+
+  const close = () => {
+    try { modal.style.display = 'none'; } catch (e) { }
+  };
+  if (closeBtn) closeBtn.onclick = () => close();
+
+  if (startBtn) {
+    startBtn.onclick = () => {
+      try {
+        _setAssignmentLaunchContext({
+          assignment_id: Number(ctx && ctx.assignment_id),
+          dictation_id: Number(ctx && ctx.dictation_id),
+          source_group_id: ctx && ctx.source_group_id != null ? Number(ctx.source_group_id) : null,
+          source_group_title: ctx && ctx.source_group_title != null ? String(ctx.source_group_title) : null,
+          selected_sentence_positions: positions.length ? positions : null,
+          required_completions: Number(ctx && ctx.required_completions || 0) || 0,
+        });
+      } catch (e) {
+      }
+      close();
+      _studentPlanOpenDictation(ctx && ctx.dictation_id, ctx && ctx.dictation_language_code);
+    };
+  }
+
+  modal.style.display = 'block';
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
+}
+
 const STUDENT_PLAN_CACHE_STORE = 'student_plan_cache';
 const STUDENT_PLAN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
@@ -1114,7 +1294,7 @@ function _studentPlanRender(panel, dateIso, items) {
             <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111827; font-weight:900; font-size:12px; line-height:1;">${escapeHtml(String(subsetLabel || ''))}</div>
           </td>
           <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
-            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" style="height:34px; padding:0 10px;">Запустить</button>
+            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" data-plan-date="${escapeHtml(String(range || ''))}" data-dictation-title="${escapeHtml(String(dictationTitle || ''))}" data-dictation-cover-url="${escapeHtml(String(coverUrl || ''))}" style="height:34px; padding:0 10px;">Запустить</button>
           </td>
         </tr>
       `;
@@ -1158,21 +1338,43 @@ function _studentPlanRender(panel, dateIso, items) {
       const sourceGroupTitle = btn.getAttribute('data-source-group-title');
       const selectedPositionsStr = btn.getAttribute('data-selected-positions');
       const requiredCompletions = btn.getAttribute('data-required-completions');
+      const planDate = btn.getAttribute('data-plan-date');
+      const dictTitle = btn.getAttribute('data-dictation-title');
+      const coverUrl = btn.getAttribute('data-dictation-cover-url');
       if (dictationId) {
         const positions = String(selectedPositionsStr || '')
           .split(',')
           .map(x => Number(String(x || '').trim()))
           .filter(x => Number.isFinite(x));
 
-        _setAssignmentLaunchContext({
+        const today = getTodayIsoDate();
+        const forDay = String(planDate || '').trim();
+        const isToday = Boolean(forDay && today && forDay === today);
+        if (isToday) {
+          _setAssignmentLaunchContext({
+            assignment_id: Number(assignmentId),
+            dictation_id: Number(dictationId),
+            source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
+            source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
+            selected_sentence_positions: positions.length ? positions : null,
+            required_completions: Number(requiredCompletions || 0) || 0,
+          });
+          _studentPlanOpenDictation(dictationId, lang);
+          return;
+        }
+
+        openStudentPlanLaunchConfirmModal({
           assignment_id: Number(assignmentId),
           dictation_id: Number(dictationId),
+          dictation_language_code: String(lang || ''),
+          dictation_title: String(dictTitle || ''),
+          dictation_cover_url: String(coverUrl || ''),
+          plan_date: forDay,
           source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
           source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
           selected_sentence_positions: positions.length ? positions : null,
           required_completions: Number(requiredCompletions || 0) || 0,
         });
-        _studentPlanOpenDictation(dictationId, lang);
       }
     });
   });
