@@ -1049,6 +1049,7 @@ def api_planfact_report():
         start_date_raw = data.get('start_date')
         end_date_raw = data.get('end_date')
         requested_user_id = data.get('user_id')
+        language_code = data.get('language_code')
 
         if not start_date_raw or not end_date_raw:
             return jsonify({"success": False, "error": "Missing start_date/end_date"}), 400
@@ -1061,6 +1062,14 @@ def api_planfact_report():
 
         if start_date > end_date:
             end_date = start_date
+
+        language_code_norm = None
+        try:
+            lc = str(language_code or '').strip().lower()
+            if lc and lc != 'all':
+                language_code_norm = lc
+        except Exception:
+            language_code_norm = None
 
         current_user_id = int(user.get('id'))
         target_user_id = current_user_id
@@ -1124,11 +1133,13 @@ def api_planfact_report():
                     WHERE gs.student_user_id = %s
                       AND gs.status = 'active'
                       AND gs.removed_at IS NULL
+                      AND g.archived_at IS NULL
                       AND abd.day_date >= %s
                       AND abd.day_date <= %s
+                      AND (%s IS NULL OR LOWER(COALESCE(d.language_code, '')) = %s)
                     ORDER BY abd.day_date ASC, a.id ASC
                     """,
-                    (target_user_id, start_date, end_date),
+                    (target_user_id, start_date, end_date, language_code_norm, language_code_norm),
                 )
                 plan_rows = cur.fetchall() or []
 
@@ -1142,12 +1153,14 @@ def api_planfact_report():
                         hs.selected_sentence_positions,
                         COUNT(*)::int AS cnt
                     FROM history_successes hs
+                    LEFT JOIN dictations d ON d.id = hs.dictation_id
                     WHERE hs.user_id = %s
                       AND hs.created_at::date >= %s
                       AND hs.created_at::date <= %s
+                      AND (%s IS NULL OR LOWER(COALESCE(d.language_code, '')) = %s)
                     GROUP BY hs.dictation_id, hs.created_at::date, hs.selected_sentence_positions
                     """,
-                    (target_user_id, start_date, end_date),
+                    (target_user_id, start_date, end_date, language_code_norm, language_code_norm),
                 )
                 for rr in (cur.fetchall() or []):
                     try:
@@ -1172,20 +1185,22 @@ def api_planfact_report():
                 cur.execute(
                     """
                     SELECT
-                        date,
-                        dictation_id,
-                        selected_sentence_positions,
+                        ha.date,
+                        ha.dictation_id,
+                        ha.selected_sentence_positions,
                         COALESCE(SUM(perfect_count), 0) AS perfect,
                         COALESCE(SUM(corrected_count), 0) AS corrected,
                         COALESCE(SUM(audio_count), 0) AS audio
-                    FROM history_activity
-                    WHERE user_id = %s
-                      AND date >= %s
-                      AND date <= %s
-                    GROUP BY date, dictation_id, selected_sentence_positions
-                    ORDER BY date ASC, dictation_id ASC
+                    FROM history_activity ha
+                    LEFT JOIN dictations d ON d.id = ha.dictation_id
+                    WHERE ha.user_id = %s
+                      AND ha.date >= %s
+                      AND ha.date <= %s
+                      AND (%s IS NULL OR LOWER(COALESCE(d.language_code, '')) = %s)
+                    GROUP BY ha.date, ha.dictation_id, ha.selected_sentence_positions
+                    ORDER BY ha.date ASC, ha.dictation_id ASC
                     """,
-                    (target_user_id, start_date, end_date),
+                    (target_user_id, start_date, end_date, language_code_norm, language_code_norm),
                 )
                 for ar in (cur.fetchall() or []):
                     try:
@@ -1303,8 +1318,99 @@ def api_planfact_report():
                 }
             )
 
+        # Обогащаем метаданными диктантов (title/level/cover) и для плана, и для extra.
+        try:
+            all_dict_ids = set()
+            for payload in (days or {}).values():
+                for it in payload.get('items') or []:
+                    try:
+                        all_dict_ids.add(int(it.get('dictation_id') or 0))
+                    except Exception:
+                        pass
+            for payload in (extras_by_day or {}).values():
+                for it in payload or []:
+                    try:
+                        all_dict_ids.add(int(it.get('dictation_id') or 0))
+                    except Exception:
+                        pass
+            all_dict_ids.discard(0)
+
+            dict_meta = {}
+            if all_dict_ids:
+                conn2 = get_db_connection()
+                try:
+                    with conn2.cursor() as cur2:
+                        cur2.execute(
+                            """
+                            SELECT id, title, language_code, level
+                            FROM dictations
+                            WHERE id = ANY(%s)
+                            """,
+                            (list(all_dict_ids),),
+                        )
+                        for rr in (cur2.fetchall() or []):
+                            try:
+                                if isinstance(rr, dict):
+                                    did = int(rr.get('id') or 0)
+                                    dict_meta[did] = {
+                                        'title': rr.get('title'),
+                                        'language_code': rr.get('language_code'),
+                                        'level': rr.get('level'),
+                                    }
+                                else:
+                                    did = int(rr[0] or 0)
+                                    dict_meta[did] = {
+                                        'title': rr[1],
+                                        'language_code': rr[2],
+                                        'level': rr[3],
+                                    }
+                            except Exception:
+                                continue
+                finally:
+                    conn2.close()
+
+            cover_fn = None
+            try:
+                from routes.index import get_cover_url_for_id as cover_fn
+            except Exception:
+                cover_fn = None
+
+            for payload in (days or {}).values():
+                for it in payload.get('items') or []:
+                    try:
+                        did = int(it.get('dictation_id') or 0)
+                        meta = dict_meta.get(did) or {}
+                        if not it.get('dictation_title'):
+                            it['dictation_title'] = str(meta.get('title') or '')
+                        if not it.get('dictation_level'):
+                            it['dictation_level'] = meta.get('level')
+                        if cover_fn:
+                            lang = it.get('dictation_language_code') or meta.get('language_code')
+                            it['dictation_cover_url'] = cover_fn(f"dict_{did}", lang)
+                        else:
+                            it['dictation_cover_url'] = f"/static/data/covers/cover_{(it.get('dictation_language_code') or meta.get('language_code') or 'en')}.webp"
+                    except Exception:
+                        continue
+
+            for payload in (extras_by_day or {}).values():
+                for it in payload or []:
+                    try:
+                        did = int(it.get('dictation_id') or 0)
+                        meta = dict_meta.get(did) or {}
+                        it['dictation_title'] = str(meta.get('title') or '')
+                        it['dictation_level'] = meta.get('level')
+                        it['dictation_language_code'] = str(meta.get('language_code') or '')
+                        if cover_fn:
+                            it['dictation_cover_url'] = cover_fn(f"dict_{did}", meta.get('language_code'))
+                        else:
+                            it['dictation_cover_url'] = f"/static/data/covers/cover_{(meta.get('language_code') or 'en')}.webp"
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+
         out_days = []
-        for day_iso in sorted(set(list(days.keys()) + list(extras_by_day.keys()))):
+        for day_iso in sorted(set(list(days.keys()) + list(extras_by_day.keys())), reverse=True):
             payload = days.get(day_iso) or {'date': day_iso, 'items': []}
             payload['extra_activity'] = extras_by_day.get(day_iso) or []
             # completed first

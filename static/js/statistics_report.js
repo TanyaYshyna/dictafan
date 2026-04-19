@@ -200,6 +200,28 @@ class StatisticsReport {
             lucide.createIcons();
         }
 
+        try {
+            const wrap = document.getElementById('planfactLanguagePicker');
+            if (wrap && typeof LanguageSelector !== 'undefined') {
+                const raw = this.getLanguageData() || {};
+                const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+                const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
+                new LanguageSelector({
+                    container: wrap,
+                    mode: 'report-selector',
+                    languageData: dataWithAll,
+                    nativeLanguage: 'all',
+                    learningLanguages: codes,
+                    currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
+                    onLanguageChange: ({ currentLearning }) => {
+                        this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
+                        this.updateReport();
+                    }
+                });
+            }
+        } catch (e) {
+        }
+
         // Обработчики событий
         document.getElementById('closeStatisticsBtn').addEventListener('click', () => {
             this.hide();
@@ -1157,6 +1179,66 @@ class PlanFactReport {
         this.selectedUserId = options.userId || null;
         this._activityUsers = [];
         this._userDropdownOpen = false;
+        this.selectedLanguage = 'all';
+    }
+
+    formatIsoDate(d) {
+        try {
+            const dt = (d instanceof Date) ? d : new Date(d);
+            if (Number.isNaN(dt.getTime())) return '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    getWeekdayShort(dateIso) {
+        try {
+            const s = String(dateIso || '');
+            if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return '';
+            const dt = new Date(s);
+            const jsDay = dt.getDay();
+            const map = { 1: 'пн', 2: 'вт', 3: 'ср', 4: 'чт', 5: 'пт', 6: 'сб', 0: 'вс' };
+            return map[jsDay] || '';
+        } catch (e) {
+            return '';
+        }
+    }
+
+    getWeekdayBadgeStyle(dateIso) {
+        try {
+            const s = String(dateIso || '');
+            if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s)) return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
+            const dt = new Date(s);
+            const jsDay = dt.getDay();
+            const isWeekend = (jsDay === 0 || jsDay === 6);
+            if (isWeekend) {
+                return 'background: rgba(255, 143, 171, 0.28); color: rgba(127, 29, 29, 0.85); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
+            }
+            const tone = (jsDay % 2 === 0)
+                ? 'background: rgba(31,41,51,0.16); color: rgba(31,41,51,0.85);'
+                : 'background: rgba(31,41,51,0.10); color: rgba(31,41,51,0.80);';
+            return `${tone} font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;`;
+        } catch (e) {
+            return 'background: rgba(31,41,51,0.08); color: rgba(31,41,51,0.75); font-weight: 400; font-size: 13px; line-height: 1; padding-top: 1px;';
+        }
+    }
+
+    getLanguageData() {
+        try {
+            if (window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function') {
+                return window.LanguageManager.getLanguageData() || {};
+            }
+        } catch (e) {
+        }
+        try {
+            return (window.LANGUAGE_DATA && typeof window.LANGUAGE_DATA === 'object') ? window.LANGUAGE_DATA : {};
+        } catch (e) {
+        }
+        return {};
     }
 
     getToken() {
@@ -1397,6 +1479,8 @@ class PlanFactReport {
                             <select id="planfactUserSelect" class="group-select" style="display:none;"></select>
                         </div>
 
+                        <div id="planfactLanguagePicker" style="position: relative; min-width: 210px;"></div>
+
                         <div class="date-range-controls" style="margin-left: auto;">
                             <input type="date" id="planfactStartDate" class="date-input" style="width: 128px; padding-right: 20px;">
                             <span>—</span>
@@ -1549,7 +1633,51 @@ class PlanFactReport {
         const root = document.getElementById('planfactRoot');
         if (!root) return;
 
-        const list = Array.isArray(days) ? days : [];
+        let list = Array.isArray(days) ? days : [];
+        try {
+            // if backend returns ASC for some reason, keep newest on top
+            if (list.length >= 2) {
+                const a = String(list[0]?.date || '');
+                const b = String(list[list.length - 1]?.date || '');
+                if (a && b && a < b) list = [...list].reverse();
+            }
+        } catch (e) {
+        }
+
+        try {
+            const startInput = document.getElementById('planfactStartDate');
+            const endInput = document.getElementById('planfactEndDate');
+            const startIso = String(startInput && startInput.value ? startInput.value : '').trim();
+            const endIso = String(endInput && endInput.value ? endInput.value : '').trim();
+            if (/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(startIso) && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(endIso)) {
+                const sd = new Date(startIso);
+                const ed = new Date(endIso);
+                if (!Number.isNaN(sd.getTime()) && !Number.isNaN(ed.getTime())) {
+                    const start = sd.getTime() <= ed.getTime() ? sd : ed;
+                    const end = sd.getTime() <= ed.getTime() ? ed : sd;
+
+                    const map = new Map();
+                    for (const d of list) {
+                        const k = String(d && d.date ? d.date : '').trim();
+                        if (k) map.set(k, d);
+                    }
+
+                    const out = [];
+                    const cur = new Date(end);
+                    cur.setHours(0, 0, 0, 0);
+                    const startDay = new Date(start);
+                    startDay.setHours(0, 0, 0, 0);
+                    while (cur.getTime() >= startDay.getTime()) {
+                        const k = this.formatIsoDate(cur);
+                        out.push(map.get(k) || { date: k, items: [], extra_activity: [] });
+                        cur.setDate(cur.getDate() - 1);
+                    }
+                    list = out;
+                }
+            }
+        } catch (e) {
+        }
+
         if (!list.length) {
             root.innerHTML = '<p class="no-data">Нет данных</p>';
             return;
@@ -1561,12 +1689,16 @@ class PlanFactReport {
             const extra = Array.isArray(d && d.extra_activity) ? d.extra_activity : [];
 
             const rows = items.map(it => {
-                const title = this.escapeHtml(String(it && it.dictation_title ? it.dictation_title : `Диктант #${it?.dictation_id || ''}`));
+                const dictTitleRaw = String(it && it.dictation_title ? it.dictation_title : '');
+                const titleFallback = it?.dictation_id ? `Диктант ${it.dictation_id}` : 'Диктант';
+                const title = this.escapeHtml(dictTitleRaw || titleFallback);
                 const group = this.escapeHtml(String(it && it.group_title ? it.group_title : ''));
                 const positionsLabel = this.escapeHtml(this.getPositionsLabel(it && it.selected_sentence_positions));
                 const req = Number(it && it.required_completions) || 0;
                 const done = Number(it && it.done) || 0;
                 const completed = !!(it && it.completed);
+                const level = this.escapeHtml(String(it && it.dictation_level ? it.dictation_level : ''));
+                const coverUrl = String(it && it.dictation_cover_url ? it.dictation_cover_url : '');
                 const badgeBg = completed ? 'rgba(16,185,129,0.14)' : 'rgba(244,63,94,0.12)';
                 const badgeColor = completed ? 'rgba(16,185,129,0.95)' : 'rgba(225,29,72,0.95)';
                 const activity = it && it.activity ? it.activity : {};
@@ -1576,9 +1708,10 @@ class PlanFactReport {
 
                 return `
                     <div style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04);">
+                        <img src="${this.escapeHtml(coverUrl || '/static/data/covers/cover_en.webp')}" alt="" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/data/covers/cover_en.webp';">
                         <div style="flex: 1 1 auto; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 10px;">
-                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}</div>
+                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${level ? ` · ${level}` : ''}</div>
                                 <span style="margin-left: auto; flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 700; font-size: 13px;">${completed ? 'выполнено' : 'не выполнено'}</span>
                             </div>
                             <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
@@ -1613,17 +1746,32 @@ class PlanFactReport {
                         <div style="font-weight: 700; margin-bottom: 6px;">Другая активность (вне плана)</div>
                         ${extra.map(x => {
                             const did = Number(x && x.dictation_id) || 0;
+                            const dictTitleRaw = String(x && x.dictation_title ? x.dictation_title : '');
+                            const titleFallback = did ? `Диктант ${did}` : 'Диктант';
+                            const title = this.escapeHtml(dictTitleRaw || titleFallback);
+                            const level = this.escapeHtml(String(x && x.dictation_level ? x.dictation_level : ''));
+                            const coverUrl = String(x && x.dictation_cover_url ? x.dictation_cover_url : '');
                             const act = x && x.activity ? x.activity : {};
                             const perfect = Number(act && act.perfect) || 0;
                             const corrected = Number(act && act.corrected) || 0;
                             const audio = Number(act && act.audio) || 0;
                             return `
                                 <div style="display:flex; align-items:center; gap: 10px; padding: 6px 0; color: rgba(31,41,51,0.8);">
-                                    <div style="flex: 1 1 auto; min-width: 0; font-weight: 600;">Диктант #${did}</div>
+                                    <img src="${this.escapeHtml(coverUrl || '/static/data/covers/cover_en.webp')}" alt="" style="width: 34px; height: 34px; border-radius: 9px; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/data/covers/cover_en.webp';">
+                                    <div style="flex: 1 1 auto; min-width: 0; font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${level ? ` · ${level}` : ''}</div>
                                     <div style="display:flex; align-items:center; gap: 10px;">
-                                        <span>Perfect: ${perfect}</span>
-                                        <span>Corrected: ${corrected}</span>
-                                        <span>Audio: ${audio}</span>
+                                        <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
+                                            <i data-lucide="star" style="width: 16px; height: 16px;"></i>
+                                            <span style="font-weight: 800;">${perfect}</span>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
+                                            <i data-lucide="star-half" style="width: 16px; height: 16px;"></i>
+                                            <span style="font-weight: 800;">${corrected}</span>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
+                                            <i data-lucide="mic" style="width: 16px; height: 16px;"></i>
+                                            <span style="font-weight: 800;">${audio}</span>
+                                        </div>
                                     </div>
                                 </div>
                             `;
@@ -1632,14 +1780,20 @@ class PlanFactReport {
                 `
                 : '';
 
+            const hasAny = Boolean((items && items.length) || (extra && extra.length));
+            const rowsHtml = rows || '';
+            const itemsBlock = (rowsHtml && String(rowsHtml).trim())
+                ? `<div style="display:flex; flex-direction: column; gap: 10px;">${rowsHtml}</div>`
+                : '';
+
             return `
                 <div style="margin-bottom: 14px;">
                     <div style="display:flex; align-items:center; gap: 10px; margin: 10px 2px;">
+                        <span style="display:inline-flex; align-items:center; justify-content:center; min-width: 34px; height: 22px; padding: 0 8px; border-radius: 999px; ${this.getWeekdayBadgeStyle(dateLabel)}">${this.escapeHtml(this.getWeekdayShort(dateLabel))}</span>
                         <div style="font-weight: 800; font-size: 16px;">${this.escapeHtml(dateLabel)}</div>
                         <div style="flex: 1 1 auto; height: 1px; background: rgba(31,41,51,0.12);"></div>
                     </div>
-                    <div style="display:flex; flex-direction: column; gap: 10px;">${rows || '<p class="no-data">Нет заданий</p>'}</div>
-                    ${extrasHtml}
+                    ${hasAny ? `${itemsBlock}${extrasHtml}` : ''}
                 </div>
             `;
         }).join('');
@@ -1676,6 +1830,12 @@ class PlanFactReport {
 
         let days = [];
         try {
+            let languageCode = null;
+            try {
+                languageCode = String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all';
+            } catch (e) {
+                languageCode = null;
+            }
             const res = await fetch('/api/statistics/planfact', {
                 method: 'POST',
                 headers: {
@@ -1686,6 +1846,7 @@ class PlanFactReport {
                     user_id: this.selectedUserId,
                     start_date: startDate,
                     end_date: endDate,
+                    ...(languageCode && languageCode !== 'all' ? { language_code: languageCode } : {}),
                 })
             });
             const js = await res.json().catch(() => null);
