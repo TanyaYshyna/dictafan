@@ -3471,6 +3471,14 @@ function setupCompletionModalHandlers() {
                 }
             } catch (e) {
             }
+
+            try {
+                const resetBtn = document.getElementById('resetProgressBtn');
+                if (resetBtn && typeof resetBtn.focus === 'function') {
+                    resetBtn.focus();
+                }
+            } catch (e) {
+            }
             try {
                 // Инициализируем иконки Lucide после открытия модального окна
                 if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -4347,6 +4355,13 @@ function initializeResetProgressButton() {
         try {
             applySentenceColumnPrefsToUi();
             _updateDraftSentenceColumnPrefs();
+        } catch (e) {
+        }
+
+        try {
+            if (confirmStartBtn && typeof confirmStartBtn.focus === 'function') {
+                confirmStartBtn.focus();
+            }
         } catch (e) {
         }
     });

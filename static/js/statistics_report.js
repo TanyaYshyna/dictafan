@@ -12,6 +12,130 @@ class StatisticsReport {
         this._activityUsers = [];
         this._userDropdownOpen = false;
         this.selectedLanguage = 'all';
+        this._telegramSendBusy = false;
+        this._lastStats = null;
+        this._lastRange = null;
+    }
+
+    getToken() {
+        try {
+            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
+                return window.UM.token;
+            }
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('jwt_token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
+    async sendTelegramSelfReportFromActivity() {
+        if (this._telegramSendBusy) return;
+        const token = this.getToken();
+        if (!token) {
+            alert('Не найден токен');
+            return;
+        }
+
+        const userId = Number(this.selectedUserId) || null;
+        const userLabel = (() => {
+            try {
+                const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(userId));
+                const label = String(u && u.label ? u.label : (u && u.username ? u.username : ''));
+                if (label) return label;
+            } catch (e) {
+            }
+            return (userId != null) ? `User #${userId}` : '';
+        })();
+
+        const stats = Array.isArray(this._lastStats) ? this._lastStats : [];
+        const range = this._lastRange || {};
+        const title = 'Отчет об активности';
+        const startLabel = range.start ? String(range.start) : '';
+        const endLabel = range.end ? String(range.end) : '';
+        const langLabel = String(this.selectedLanguage || 'all').trim().toLowerCase() === 'all'
+            ? 'все языки'
+            : String(this.selectedLanguage || '').trim().toLowerCase();
+
+        if (!stats.length) {
+            alert('Нет данных для отправки');
+            return;
+        }
+
+        let sumPerfect = 0;
+        let sumCorrected = 0;
+        let sumAudio = 0;
+        let sumTimeMs = 0;
+        for (const s of stats) {
+            sumPerfect += Number(s && s.perfect) || 0;
+            sumCorrected += Number(s && s.corrected) || 0;
+            sumAudio += Number(s && s.audio) || 0;
+            sumTimeMs += Number(s && s.time_ms) || 0;
+        }
+        const timeLabel = sumTimeMs > 0 ? this.formatDurationHhMmSs(sumTimeMs) : '00:00:00';
+
+        const text = [
+            `<b>${title}</b>`,
+            startLabel && endLabel ? `${startLabel} — ${endLabel}` : '',
+            userLabel ? `Пользователь: ${userLabel}` : '',
+            `Язык: ${langLabel}`,
+            '',
+            `⭐ Perfect: ${sumPerfect}`,
+            `⭐½ Corrected: ${sumCorrected}`,
+            `🎤 Audio: ${sumAudio}`,
+            `⏱ Время: ${timeLabel}`,
+        ].filter(Boolean).join('\n');
+
+        const btn = document.getElementById('sendActivityTelegramBtn');
+        this._telegramSendBusy = true;
+        try {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+            }
+        } catch (e) {}
+
+        try {
+            const res = await fetch('/api/statistics/telegram/send_self', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success)) {
+                const err = js && js.error ? String(js.error) : 'send_failed';
+                if (err === 'telegram_not_linked') {
+                    alert('Telegram не подключен (нужно привязать чат)');
+                } else {
+                    alert('Не удалось отправить отчет');
+                }
+                return;
+            }
+            alert('Отчет отправлен');
+        } catch (e) {
+            alert('Не удалось отправить отчет');
+        } finally {
+            this._telegramSendBusy = false;
+            try {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                    btn.style.cursor = '';
+                }
+            } catch (e) {}
+        }
     }
 
     getLanguageData() {
@@ -117,6 +241,9 @@ class StatisticsReport {
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0; padding-top: 2px;">
+                        <button id="sendActivityTelegramBtn" class="action-btn" title="Отправить в Telegram" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                            <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+                        </button>
                         <button id="updateStatisticsBtn" class="action-btn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
                             <i data-lucide="rotate-cw" style="width: 18px; height: 18px;"></i>
                         </button>
@@ -230,6 +357,16 @@ class StatisticsReport {
         document.getElementById('updateStatisticsBtn').addEventListener('click', () => {
             this.updateStatistics();
         });
+
+        try {
+            const sendBtn = document.getElementById('sendActivityTelegramBtn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', () => {
+                    this.sendTelegramSelfReportFromActivity();
+                });
+            }
+        } catch (e) {
+        }
 
         try {
             const wrap = document.getElementById('activityLanguagePicker');
@@ -584,6 +721,15 @@ class StatisticsReport {
 
         if (this.groupBy === 'days') {
             stats = this.fillMissingDays(stats, startDate, endDate);
+        }
+
+        try {
+            this._lastStats = Array.isArray(stats) ? stats : [];
+            this._lastRange = {
+                start: (startDateInput && startDateInput.value) ? String(startDateInput.value) : null,
+                end: (endDateInput && endDateInput.value) ? String(endDateInput.value) : null,
+            };
+        } catch (e) {
         }
 
         // Рисуем график
@@ -1183,6 +1329,139 @@ class PlanFactReport {
         this._languageSelectorInited = false;
         this._updateTimer = null;
         this._updateSeq = 0;
+        this._telegramSendBusy = false;
+        this._lastDays = null;
+        this._lastRange = null;
+    }
+
+    getToken() {
+        try {
+            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
+                return window.UM.token;
+            }
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('jwt_token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
+    async sendTelegramSelfReportFromPlanFact() {
+        if (this._telegramSendBusy) return;
+        const token = this.getToken();
+        if (!token) {
+            alert('Не найден токен');
+            return;
+        }
+
+        const selectedUserId = this.getSelectedUserIdFromUI();
+        const userLabel = (() => {
+            try {
+                const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(selectedUserId));
+                const label = String(u && u.label ? u.label : (u && u.username ? u.username : ''));
+                if (label) return label;
+            } catch (e) {
+            }
+            return (selectedUserId != null) ? `User #${selectedUserId}` : '';
+        })();
+
+        const days = Array.isArray(this._lastDays) ? this._lastDays : [];
+        if (!days.length) {
+            alert('Нет данных для отправки');
+            return;
+        }
+
+        const range = this._lastRange || {};
+        const startLabel = range.start ? String(range.start) : '';
+        const endLabel = range.end ? String(range.end) : '';
+        const langLabel = String(this.selectedLanguage || 'all').trim().toLowerCase() === 'all'
+            ? 'все языки'
+            : String(this.selectedLanguage || '').trim().toLowerCase();
+
+        let planTotal = 0;
+        let factTotal = 0;
+        let perfectTotal = 0;
+        let correctedTotal = 0;
+        let audioTotal = 0;
+
+        for (const d of days) {
+            const items = Array.isArray(d && d.items) ? d.items : [];
+            for (const it of items) {
+                const req = Number(it && (it.required_completions ?? it.plan_required_completions ?? it.plan_count ?? it.required ?? it.plan)) || 0;
+                const done = Number(it && (it.successes_done ?? it.done ?? it.successes_count ?? it.completions_done ?? it.completions ?? it.fact)) || 0;
+                planTotal += req;
+                factTotal += done;
+                const act = it && it.activity ? it.activity : null;
+                perfectTotal += Number(act && act.perfect != null ? act.perfect : (it && it.perfect)) || 0;
+                correctedTotal += Number(act && act.corrected != null ? act.corrected : (it && it.corrected)) || 0;
+                audioTotal += Number(act && act.audio != null ? act.audio : (it && it.audio)) || 0;
+            }
+        }
+
+        const text = [
+            `<b>Отчет План‑Факт</b>`,
+            startLabel && endLabel ? `${startLabel} — ${endLabel}` : '',
+            userLabel ? `Пользователь: ${userLabel}` : '',
+            `Язык: ${langLabel}`,
+            '',
+            `План (выполнений): ${planTotal}`,
+            `Факт (выполнений): ${factTotal}`,
+            '',
+            `⭐ Perfect: ${perfectTotal}`,
+            `⭐½ Corrected: ${correctedTotal}`,
+            `🎤 Audio: ${audioTotal}`,
+        ].filter(Boolean).join('\n');
+
+        const btn = document.getElementById('sendPlanFactTelegramBtn');
+        this._telegramSendBusy = true;
+        try {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'not-allowed';
+            }
+        } catch (e) {}
+
+        try {
+            const res = await fetch('/api/statistics/telegram/send_self', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ text })
+            });
+            const js = await res.json().catch(() => null);
+            if (!(res && res.ok && js && js.success)) {
+                const err = js && js.error ? String(js.error) : 'send_failed';
+                if (err === 'telegram_not_linked') {
+                    alert('Telegram не подключен (нужно привязать чат)');
+                } else {
+                    alert('Не удалось отправить отчет');
+                }
+                return;
+            }
+            alert('Отчет отправлен');
+        } catch (e) {
+            alert('Не удалось отправить отчет');
+        } finally {
+            this._telegramSendBusy = false;
+            try {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.style.opacity = '';
+                    btn.style.cursor = '';
+                }
+            } catch (e) {}
+        }
     }
 
     getCurrentUserId() {
@@ -1533,6 +1812,9 @@ class PlanFactReport {
                     </div>
 
                     <div style="display:flex; align-items:center; gap: 10px; flex-shrink: 0;">
+                        <button class="action-btn" id="sendPlanFactTelegramBtn" title="Отправить в Telegram" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                            <i data-lucide="send"></i>
+                        </button>
                         <button class="action-btn" id="refreshPlanFactBtn" title="Обновить" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
                             <i data-lucide="rotate-cw"></i>
                         </button>
@@ -1607,6 +1889,16 @@ class PlanFactReport {
         const refreshBtn = document.getElementById('refreshPlanFactBtn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', () => this.updateReport());
+        }
+
+        try {
+            const sendBtn = document.getElementById('sendPlanFactTelegramBtn');
+            if (sendBtn) {
+                sendBtn.addEventListener('click', () => {
+                    this.sendTelegramSelfReportFromPlanFact();
+                });
+            }
+        } catch (e) {
         }
 
         modal.addEventListener('click', (e) => {
@@ -1736,6 +2028,17 @@ class PlanFactReport {
     renderReport(days) {
         const root = document.getElementById('planfactRoot');
         if (!root) return;
+
+        try {
+            this._lastDays = Array.isArray(days) ? days : [];
+            const startInput = document.getElementById('planfactStartDate');
+            const endInput = document.getElementById('planfactEndDate');
+            this._lastRange = {
+                start: (startInput && startInput.value) ? String(startInput.value) : null,
+                end: (endInput && endInput.value) ? String(endInput.value) : null,
+            };
+        } catch (e) {
+        }
 
         let list = Array.isArray(days) ? days : [];
         try {

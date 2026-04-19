@@ -31,6 +31,42 @@ except Exception:
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
 
+@statistics_bp.route('/telegram/send_self', methods=['POST'])
+@jwt_required()
+def api_statistics_telegram_send_self():
+    """Send an arbitrary report text to current user's Telegram chat.
+
+    Used by web UI reports (activity/plan-fact) to send summary only to self.
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    if not is_telegram_enabled():
+        return jsonify({'success': False, 'error': 'Telegram disabled'}), 400
+
+    chat_id = user.get('telegram_chat_id')
+    if not chat_id or not bool(user.get('telegram_enabled')):
+        return jsonify({'success': False, 'error': 'telegram_not_linked'}), 400
+
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'success': False, 'error': 'empty_text'}), 400
+
+    # Telegram sendMessage hard limit is 4096 chars.
+    if len(text) > 4000:
+        text = text[:4000]
+
+    try:
+        send_telegram_message(int(chat_id), text)
+    except Exception as e:
+        return jsonify({'success': False, 'error': 'send_failed'}), 500
+
+    return jsonify({'success': True})
+
+
 def _can_teacher_view_student_activity(teacher_user_id: int, student_user_id: int) -> bool:
     """Teacher может смотреть активность ученика если ученик активен в группе учителя и дал доступ."""
     try:
