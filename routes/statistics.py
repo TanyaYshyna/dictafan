@@ -314,7 +314,14 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         sent_text = _safe_html(rr.get('text'))
         if sent_text and len(sent_text) > 120:
             sent_text = sent_text[:117] + '...'
-        lines.append(f"{i}) {compact}   {sent_text}")
+        line_num = i
+        try:
+            p = rr.get('position')
+            if p is not None:
+                line_num = int(p)
+        except Exception:
+            line_num = i
+        lines.append(f"{line_num}) {compact}   {sent_text}")
 
     # Error words (reuse short builder logic)
     short_part = _build_teacher_report_text(
