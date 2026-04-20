@@ -2148,8 +2148,8 @@ class PlanFactReport {
                             <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
                                 <span>${group}</span>
                                 <span>${positionsLabel}</span>
-                                <span style="display:inline-flex; align-items:center; gap: 8px;">
-                                    <span style="display:inline-block; width: 88px; height: 10px; border-radius: 999px; background: ${barBg}; overflow: hidden;">
+                                <span style="display:inline-flex; align-items:center; gap: 8px; margin-left: auto;">
+                                    <span style="display:inline-block; width: 176px; height: 10px; border-radius: 999px; background: ${barBg}; overflow: hidden;">
                                         <span style="display:block; height: 100%; width: ${ratioPct}%; background: ${barDone};"></span>
                                     </span>
                                     <span style="font-weight: 700;">${done}/${req}</span>
@@ -2185,6 +2185,7 @@ class PlanFactReport {
                             const titleFallback = did ? `Диктант ${did}` : 'Диктант';
                             const title = this.escapeHtml(dictTitleRaw || titleFallback);
                             const level = this.escapeHtml(String(x && x.dictation_level ? x.dictation_level : ''));
+                            const langCode = String(x && (x.dictation_language_code || x.dictation_language_code_norm || x.dictation_language) ? (x.dictation_language_code || x.dictation_language_code_norm || x.dictation_language) : '');
                             const coverUrl = String(x && x.dictation_cover_url ? x.dictation_cover_url : '');
                             const act = x && x.activity ? x.activity : {};
                             const perfect = Number(act && act.perfect) || 0;
@@ -2193,7 +2194,7 @@ class PlanFactReport {
                             return `
                                 <div style="display:flex; align-items:center; gap: 10px; padding: 6px 0; color: rgba(31,41,51,0.8);">
                                     <img src="${this.escapeHtml(coverUrl || '/static/data/covers/cover_en.webp')}" alt="" style="width: 34px; height: 34px; border-radius: 9px; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/data/covers/cover_en.webp';">
-                                    <div style="flex: 1 1 auto; min-width: 0; font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${level ? ` · ${level}` : ''}</div>
+                                    <div style="flex: 1 1 auto; min-width: 0; font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${langCode ? ` · ${this.escapeHtml(String(langCode).trim().toLowerCase())}` : ''}${level ? ` ${level}` : ''}</div>
                                     <div style="display:flex; align-items:center; gap: 10px;">
                                         <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
                                             <i data-lucide="star" style="width: 16px; height: 16px;"></i>
@@ -2249,7 +2250,6 @@ class PlanFactReport {
 
             const lines = [];
             lines.push('<b>Отчет План‑Факт</b>');
-            if (teacherLabel) lines.push(teacherLabel);
             if (selectedUserLabel) lines.push(selectedUserLabel);
             if (startLabel && endLabel) lines.push(`${startLabel} — ${endLabel}`);
             lines.push('');
@@ -2284,12 +2284,14 @@ class PlanFactReport {
                 lines.push(`(sentences/all) ${sentencesSelectedTotal}/${sentencesAllTotal}`);
             }
             lines.push(`fakt/plan ${factTotal}/${planTotal}`);
+            lines.push('(sentenses/all)  fakt/plan  ⭐ Perfect -  ⭐½ Corrected - 🎤 Audio');
             lines.push('');
 
             for (const d of list) {
                 const dateIso = String(d && d.date ? d.date : '').trim();
                 const items = Array.isArray(d && d.items) ? d.items : [];
-                if (!dateIso || !items.length) continue;
+                const extra = Array.isArray(d && d.extra_activity) ? d.extra_activity : [];
+                if (!dateIso || (!items.length && !extra.length)) continue;
 
                 const dow = this.getWeekdayShort(dateIso);
                 lines.push(`${dow ? dow + ' ' : ''}${dateIso} -------------------`);
@@ -2316,6 +2318,21 @@ class PlanFactReport {
                     const nameParts = [posLabel, title, langCode, level].filter(Boolean).join(' ');
                     const left = `${nameParts} ${sentencesLabel}`.trim();
                     lines.push(`${left}    ${done}/${req}   ${perfect} - ${corrected} - ${audio}`.trim());
+                }
+
+                for (const it of extra) {
+                    const dictTitleRaw = String(it && it.dictation_title ? it.dictation_title : '');
+                    const titleFallback = it?.dictation_id ? `Диктант ${it.dictation_id}` : 'Диктант';
+                    const title = (dictTitleRaw || titleFallback).trim();
+                    const level = String(it && it.dictation_level ? it.dictation_level : '').trim();
+                    const langCode = String(it && (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) ? (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) : '').trim().toLowerCase();
+                    const act = it && it.activity ? it.activity : null;
+                    const perfect = Number(act && act.perfect != null ? act.perfect : (it && it.perfect)) || 0;
+                    const corrected = Number(act && act.corrected != null ? act.corrected : (it && it.corrected)) || 0;
+                    const audio = Number(act && act.audio != null ? act.audio : (it && it.audio)) || 0;
+
+                    const nameParts = [title, langCode, level].filter(Boolean).join(' ');
+                    lines.push(`${nameParts}   ${perfect} - ${corrected} - ${audio}`.trim());
                 }
 
                 lines.push('---');
