@@ -1332,6 +1332,7 @@ class PlanFactReport {
         this._telegramSendBusy = false;
         this._lastDays = null;
         this._lastRange = null;
+        this._planfactTelegramText = null;
     }
 
     getToken() {
@@ -1379,46 +1380,13 @@ class PlanFactReport {
             return;
         }
 
-        const range = this._lastRange || {};
-        const startLabel = range.start ? String(range.start) : '';
-        const endLabel = range.end ? String(range.end) : '';
-        const langLabel = String(this.selectedLanguage || 'all').trim().toLowerCase() === 'all'
-            ? 'все языки'
-            : String(this.selectedLanguage || '').trim().toLowerCase();
-
-        let planTotal = 0;
-        let factTotal = 0;
-        let perfectTotal = 0;
-        let correctedTotal = 0;
-        let audioTotal = 0;
-
-        for (const d of days) {
-            const items = Array.isArray(d && d.items) ? d.items : [];
-            for (const it of items) {
-                const req = Number(it && (it.required_completions ?? it.plan_required_completions ?? it.plan_count ?? it.required ?? it.plan)) || 0;
-                const done = Number(it && (it.successes_done ?? it.done ?? it.successes_count ?? it.completions_done ?? it.completions ?? it.fact)) || 0;
-                planTotal += req;
-                factTotal += done;
-                const act = it && it.activity ? it.activity : null;
-                perfectTotal += Number(act && act.perfect != null ? act.perfect : (it && it.perfect)) || 0;
-                correctedTotal += Number(act && act.corrected != null ? act.corrected : (it && it.corrected)) || 0;
-                audioTotal += Number(act && act.audio != null ? act.audio : (it && it.audio)) || 0;
-            }
+        const telegramText = String(this._planfactTelegramText || '').trim();
+        if (!telegramText) {
+            alert('Нет данных для отправки');
+            return;
         }
 
-        const text = [
-            `<b>Отчет План‑Факт</b>`,
-            startLabel && endLabel ? `${startLabel} — ${endLabel}` : '',
-            userLabel ? `Пользователь: ${userLabel}` : '',
-            `Язык: ${langLabel}`,
-            '',
-            `План (выполнений): ${planTotal}`,
-            `Факт (выполнений): ${factTotal}`,
-            '',
-            `⭐ Perfect: ${perfectTotal}`,
-            `⭐½ Corrected: ${correctedTotal}`,
-            `🎤 Audio: ${audioTotal}`,
-        ].filter(Boolean).join('\n');
+        const text = telegramText;
 
         const btn = document.getElementById('sendPlanFactTelegramBtn');
         this._telegramSendBusy = true;
@@ -2090,6 +2058,38 @@ class PlanFactReport {
             return;
         }
 
+        const selectedUserId = this.getSelectedUserIdFromUI();
+        const selectedUserLabel = (() => {
+            try {
+                const u = (this._activityUsers || []).find(x => Number(x && x.id) === Number(selectedUserId));
+                const label = String(u && u.label ? u.label : (u && u.username ? u.username : ''));
+                if (label) return label;
+            } catch (e) {
+            }
+            return (selectedUserId != null) ? `User #${selectedUserId}` : '';
+        })();
+
+        const teacherLabel = (() => {
+            try {
+                if (window.UM && typeof window.UM.getCurrentUser === 'function') {
+                    const u = window.UM.getCurrentUser();
+                    const nm = String(u && (u.username || u.name || u.full_name) ? (u.username || u.name || u.full_name) : '').trim();
+                    if (nm) return nm;
+                }
+            } catch (e) {
+            }
+            try {
+                const nm = String(window.UM && window.UM.userData && (window.UM.userData.username || window.UM.userData.name) ? (window.UM.userData.username || window.UM.userData.name) : '').trim();
+                if (nm) return nm;
+            } catch (e) {
+            }
+            return '';
+        })();
+
+        const range = this._lastRange || {};
+        const startLabel = range.start ? String(range.start) : '';
+        const endLabel = range.end ? String(range.end) : '';
+
         const htmlDays = list.map(d => {
             const dateLabel = String(d && d.date ? d.date : '');
             const items = Array.isArray(d && d.items) ? d.items : [];
@@ -2116,6 +2116,10 @@ class PlanFactReport {
                 const posArr = Array.isArray(it && it.selected_sentence_positions) ? it.selected_sentence_positions : null;
                 const posCsv = Array.isArray(posArr) ? posArr.map(x => Number(x)).filter(n => Number.isFinite(n)).join(',') : '';
 
+                const totalSentences = Number(it && (it.dictation_sentences_count ?? it.sentences_count ?? it.sentences_total)) || 0;
+                const selCount = Array.isArray(posArr) ? posArr.length : 0;
+                const sentencesLabel = (selCount > 0 && totalSentences > 0) ? `(${selCount}/${totalSentences})` : '';
+
                 const activity = it && it.activity ? it.activity : null;
                 const perfect = Number(activity && activity.perfect != null ? activity.perfect : (it && it.perfect)) || 0;
                 const corrected = Number(activity && activity.corrected != null ? activity.corrected : (it && it.corrected)) || 0;
@@ -2123,24 +2127,33 @@ class PlanFactReport {
                 const badgeText = completed ? 'выполнено' : (hasProgress ? 'частично' : 'не выполнено');
                 const badgeBg = completed
                     ? 'var(--color-button-lightgreen, #bbf1ca)'
-                    : (hasProgress ? 'var(--color-button-yellow, rgb(252, 235, 163))' : 'var(--color-button-pink, #f5c0ca)');
+                    : (hasProgress ? 'var(--color-button-yellow, rgb(252, 235, 163))' : 'var(--color-button-gray, #eeede8)');
                 const badgeColor = completed
                     ? 'var(--color-button-text-lightgreen, #366f40)'
-                    : (hasProgress ? 'var(--color-button-text-yellow, rgb(255, 198, 9))' : 'var(--color-button-text-pink, #802c35)');
+                    : (hasProgress ? 'var(--color-button-text-yellow, rgb(255, 198, 9))' : 'var(--color-button-text-gray, rgb(162, 161, 153))');
+
+                const ratio = (req > 0) ? Math.max(0, Math.min(1, done / req)) : 0;
+                const ratioPct = Math.round(ratio * 100);
+                const barBg = 'var(--color-cesh-text, rgb(162, 161, 153))';
+                const barDone = 'var(--color-button-yellow, rgb(252, 235, 163))';
 
                 return `
                     <div data-action="planfact-launch" data-date="${this.escapeHtml(dateLabel)}" data-dictation-id="${this.escapeHtml(String(did || ''))}" data-dictation-lang="${this.escapeHtml(String(langCode || ''))}" data-dictation-title="${this.escapeHtml(String(dictTitleRaw || titleFallback))}" data-dictation-cover-url="${this.escapeHtml(String(coverUrl || ''))}" data-selected-positions="${this.escapeHtml(String(posCsv || ''))}" data-required-completions="${this.escapeHtml(String(req || 0))}" style="display:flex; align-items:flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(31,41,51,0.04); cursor: default;">
                         <img src="${this.escapeHtml(coverUrl || '/static/data/covers/cover_en.webp')}" alt="" style="width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/data/covers/cover_en.webp';">
                         <div style="flex: 1 1 auto; min-width: 0;">
                             <div style="display:flex; align-items:center; gap: 10px;">
-                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${level ? ` · ${level}` : ''}</div>
+                                <div style="font-weight: 700; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${title}${langCode ? ` · ${this.escapeHtml(String(langCode).trim().toLowerCase())}` : ''}${level ? ` ${level}` : ''}${sentencesLabel ? ` ${sentencesLabel}` : ''}</div>
                                 <span style="margin-left: auto; flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: ${badgeBg}; color: ${badgeColor}; font-weight: 700; font-size: 13px;">${badgeText}</span>
                             </div>
                             <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
                                 <span>${group}</span>
                                 <span>${positionsLabel}</span>
-                                <span>план: ${req}</span>
-                                <span>факт: ${done}</span>
+                                <span style="display:inline-flex; align-items:center; gap: 8px;">
+                                    <span style="display:inline-block; width: 88px; height: 10px; border-radius: 999px; background: ${barBg}; overflow: hidden;">
+                                        <span style="display:block; height: 100%; width: ${ratioPct}%; background: ${barDone};"></span>
+                                    </span>
+                                    <span style="font-weight: 700;">${done}/${req}</span>
+                                </span>
                             </div>
                         </div>
 
@@ -2226,7 +2239,95 @@ class PlanFactReport {
         }
 
         try {
-            const selectedUserId = this.getSelectedUserIdFromUI();
+            let planTotal = 0;
+            let factTotal = 0;
+            let perfectTotal = 0;
+            let correctedTotal = 0;
+            let audioTotal = 0;
+            let sentencesSelectedTotal = 0;
+            let sentencesAllTotal = 0;
+
+            const lines = [];
+            lines.push('<b>Отчет План‑Факт</b>');
+            if (teacherLabel) lines.push(teacherLabel);
+            if (selectedUserLabel) lines.push(selectedUserLabel);
+            if (startLabel && endLabel) lines.push(`${startLabel} — ${endLabel}`);
+            lines.push('');
+
+            // Итоги считаем по плановым строкам
+            for (const d of list) {
+                const items = Array.isArray(d && d.items) ? d.items : [];
+                for (const it of items) {
+                    const req = Number(it && (it.required_completions ?? it.plan_required_completions ?? it.plan_count ?? it.required ?? it.plan)) || 0;
+                    const done = Number(it && (it.successes_done ?? it.done ?? it.successes_count ?? it.completions_done ?? it.completions ?? it.fact)) || 0;
+                    planTotal += req;
+                    factTotal += done;
+
+                    try {
+                        const posArr = Array.isArray(it && it.selected_sentence_positions) ? it.selected_sentence_positions : null;
+                        const totalSentences = Number(it && (it.dictation_sentences_count ?? it.sentences_count ?? it.sentences_total)) || 0;
+                        const selCount = Array.isArray(posArr) ? posArr.length : 0;
+                        if (selCount > 0) sentencesSelectedTotal += selCount;
+                        if (totalSentences > 0) sentencesAllTotal += totalSentences;
+                    } catch (e) {
+                    }
+
+                    const act = it && it.activity ? it.activity : null;
+                    perfectTotal += Number(act && act.perfect != null ? act.perfect : (it && it.perfect)) || 0;
+                    correctedTotal += Number(act && act.corrected != null ? act.corrected : (it && it.corrected)) || 0;
+                    audioTotal += Number(act && act.audio != null ? act.audio : (it && it.audio)) || 0;
+                }
+            }
+
+            lines.push(`Итоги: ${perfectTotal} - ${correctedTotal} - ${audioTotal}`);
+            if (sentencesSelectedTotal > 0 && sentencesAllTotal > 0) {
+                lines.push(`(sentences/all) ${sentencesSelectedTotal}/${sentencesAllTotal}`);
+            }
+            lines.push(`fakt/plan ${factTotal}/${planTotal}`);
+            lines.push('');
+
+            for (const d of list) {
+                const dateIso = String(d && d.date ? d.date : '').trim();
+                const items = Array.isArray(d && d.items) ? d.items : [];
+                if (!dateIso || !items.length) continue;
+
+                const dow = this.getWeekdayShort(dateIso);
+                lines.push(`${dow ? dow + ' ' : ''}${dateIso} -------------------`);
+
+                for (const it of items) {
+                    const dictTitleRaw = String(it && it.dictation_title ? it.dictation_title : '');
+                    const titleFallback = it?.dictation_id ? `Диктант ${it.dictation_id}` : 'Диктант';
+                    const title = (dictTitleRaw || titleFallback).trim();
+                    const level = String(it && it.dictation_level ? it.dictation_level : '').trim();
+                    const langCode = String(it && (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) ? (it.dictation_language_code || it.dictation_language_code_norm || it.dictation_language) : '').trim().toLowerCase();
+                    const posArr = Array.isArray(it && it.selected_sentence_positions) ? it.selected_sentence_positions : null;
+                    const posLabel = this.getPositionsLabel(it && it.selected_sentence_positions);
+                    const totalSentences = Number(it && (it.dictation_sentences_count ?? it.sentences_count ?? it.sentences_total)) || 0;
+                    const selCount = Array.isArray(posArr) ? posArr.length : 0;
+                    const sentencesLabel = (selCount > 0 && totalSentences > 0) ? `(${selCount}/${totalSentences})` : '';
+
+                    const req = Number(it && (it.required_completions ?? it.plan_required_completions ?? it.plan_count ?? it.required ?? it.plan)) || 0;
+                    const done = Number(it && (it.successes_done ?? it.done ?? it.successes_count ?? it.completions_done ?? it.completions ?? it.fact)) || 0;
+                    const act = it && it.activity ? it.activity : null;
+                    const perfect = Number(act && act.perfect != null ? act.perfect : (it && it.perfect)) || 0;
+                    const corrected = Number(act && act.corrected != null ? act.corrected : (it && it.corrected)) || 0;
+                    const audio = Number(act && act.audio != null ? act.audio : (it && it.audio)) || 0;
+
+                    const nameParts = [posLabel, title, langCode, level].filter(Boolean).join(' ');
+                    const left = `${nameParts} ${sentencesLabel}`.trim();
+                    lines.push(`${left}    ${done}/${req}   ${perfect} - ${corrected} - ${audio}`.trim());
+                }
+
+                lines.push('---');
+                lines.push('');
+            }
+
+            this._planfactTelegramText = lines.join('\n').trim();
+        } catch (e) {
+            this._planfactTelegramText = null;
+        }
+
+        try {
             const currentUserId = this.getCurrentUserId();
             const todayIso = this.formatIsoDate(new Date());
 
