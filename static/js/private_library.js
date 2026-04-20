@@ -8284,6 +8284,66 @@ function initializeBooksLanguageSelector() {
 // Функция для загрузки данных после авторизации
 let __initialDeskLoadTriggered = false;
 let __initialBooksLoadTriggered = false;
+let __autoOpenTodayPlanChecked = false;
+
+function _hasUnfinishedTodayHomework(items) {
+  try {
+    const rows = Array.isArray(items) ? items : [];
+    for (const a of rows) {
+      try {
+        const req = Number(a && (a.required_completions ?? a.count ?? 1)) || 0;
+        const done = Number(a && (a.done ?? a.successes_done ?? 0)) || 0;
+        if ((req > 0 && done < req) || (req === 0 && done === 0)) {
+          return true;
+        }
+      } catch (e) {
+      }
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function _autoOpenTodayPlanIfNeeded() {
+  if (__autoOpenTodayPlanChecked) return;
+  __autoOpenTodayPlanChecked = true;
+
+  try {
+    if (!window.UM || typeof window.UM.isAuthenticated !== 'function') return;
+    if (!window.UM.isAuthenticated()) return;
+  } catch (e) {
+    return;
+  }
+
+  const today = (typeof getTodayIsoDate === 'function') ? getTodayIsoDate() : '';
+  if (!today) return;
+
+  const panel = document.getElementById('student-plan-panel');
+  if (panel && panel.style && panel.style.display && panel.style.display !== 'none') return;
+
+  // 1) Fast path: check cached assignments for today (if any)
+  try {
+    const cached = await _getStudentPlanCacheForDateIdb(today);
+    if (cached && Array.isArray(cached.assignments) && _hasUnfinishedTodayHomework(cached.assignments)) {
+      openStudentPlanPanel(today);
+      return;
+    }
+  } catch (e) {
+  }
+
+  // 2) Network verification: open if API says there is unfinished homework
+  try {
+    const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(today)}`, { method: 'GET' });
+    if (res && res.success) {
+      const items = Array.isArray(res.assignments) ? res.assignments : [];
+      if (_hasUnfinishedTodayHomework(items)) {
+        openStudentPlanPanel(today);
+      }
+    }
+  } catch (e) {
+  }
+}
 
 function triggerDeskLoadOnce() {
   if (__initialDeskLoadTriggered) return;
@@ -8408,6 +8468,12 @@ document.addEventListener("DOMContentLoaded", async () => {
           triggerDeskLoadOnce();
           triggerBooksLoadOnce();
           try {
+            setTimeout(() => {
+              _autoOpenTodayPlanIfNeeded().catch(() => { });
+            }, 250);
+          } catch (e) {
+          }
+          try {
             if (typeof syncOfflineOutboxes === 'function') {
               syncOfflineOutboxes().catch(() => { }); // Trigger offline outbox sync on page load after UserManager initialization
             }
@@ -8443,6 +8509,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         }, 100);
         // Загружаем данные
         loadLibraryData();
+
+        try {
+          setTimeout(() => {
+            _autoOpenTodayPlanIfNeeded().catch(() => { });
+          }, 250);
+        } catch (e) {
+        }
 
         // join-group flow: если пользователь только что залогинился/зарегистрировался
         // и в URL есть join_group, показываем подтверждение вступления.
