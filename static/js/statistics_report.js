@@ -2148,27 +2148,29 @@ class PlanFactReport {
                             <div style="margin-top: 4px; display:flex; gap: 10px; flex-wrap: wrap; color: rgba(31,41,51,0.75); font-size: 13px;">
                                 <span>${group}</span>
                                 <span>${positionsLabel}</span>
-                                <span style="display:inline-flex; align-items:center; gap: 8px; margin-left: auto;">
-                                    <span style="display:inline-block; width: 176px; height: 10px; border-radius: 999px; background: ${barBg}; overflow: hidden;">
-                                        <span style="display:block; height: 100%; width: ${ratioPct}%; background: ${barDone};"></span>
-                                    </span>
-                                    <span style="font-weight: 700;">${done}/${req}</span>
-                                </span>
                             </div>
                         </div>
 
-                        <div style="flex: 0 0 auto; display:flex; align-items:center; gap: 10px; padding-top: 2px;">
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
-                                <i data-lucide="star" style="width: 16px; height: 16px;"></i>
-                                <span style="font-weight: 800;">${perfect}</span>
+                        <div style="flex: 0 0 auto; display:flex; flex-direction: column; align-items: flex-end; gap: 6px; padding-top: 2px;">
+                            <div style="display:flex; align-items:center; gap: 10px;">
+                                <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
+                                    <i data-lucide="star" style="width: 16px; height: 16px;"></i>
+                                    <span style="font-weight: 800;">${perfect}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
+                                    <i data-lucide="star-half" style="width: 16px; height: 16px;"></i>
+                                    <span style="font-weight: 800;">${corrected}</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
+                                    <i data-lucide="mic" style="width: 16px; height: 16px;"></i>
+                                    <span style="font-weight: 800;">${audio}</span>
+                                </div>
                             </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
-                                <i data-lucide="star-half" style="width: 16px; height: 16px;"></i>
-                                <span style="font-weight: 800;">${corrected}</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
-                                <i data-lucide="mic" style="width: 16px; height: 16px;"></i>
-                                <span style="font-weight: 800;">${audio}</span>
+                            <div style="display:flex; align-items:center; gap: 8px; color: rgba(31,41,51,0.75); font-size: 13px;">
+                                <span style="display:inline-block; width: 176px; height: 10px; border-radius: 999px; background: ${barBg}; overflow: hidden;">
+                                    <span style="display:block; height: 100%; width: ${ratioPct}%; background: ${barDone};"></span>
+                                </span>
+                                <span style="font-weight: 700;">${done}/${req}</span>
                             </div>
                         </div>
                     </div>
@@ -2320,6 +2322,10 @@ class PlanFactReport {
                     lines.push(`${left}    ${done}/${req}   ${perfect} - ${corrected} - ${audio}`.trim());
                 }
 
+                if (items.length && extra.length) {
+                    lines.push('---');
+                }
+
                 for (const it of extra) {
                     const dictTitleRaw = String(it && it.dictation_title ? it.dictation_title : '');
                     const titleFallback = it?.dictation_id ? `Диктант ${it.dictation_id}` : 'Диктант';
@@ -2335,7 +2341,9 @@ class PlanFactReport {
                     lines.push(`${nameParts}   ${perfect} - ${corrected} - ${audio}`.trim());
                 }
 
-                lines.push('---');
+                if (!extra.length) {
+                    lines.push('---');
+                }
                 lines.push('');
             }
 

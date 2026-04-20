@@ -3338,6 +3338,17 @@ function showCompletionModal() {
         return;
     }
 
+    try {
+        const resultsBtn = document.getElementById('completionResultsBtn');
+        if (resultsBtn) {
+            resultsBtn.dataset.busy = '0';
+            resultsBtn.disabled = false;
+            resultsBtn.style.opacity = '';
+            resultsBtn.style.cursor = '';
+        }
+    } catch (e) {
+    }
+
     // Останавливаем таймер
     stopTimer();
 

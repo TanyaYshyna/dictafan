@@ -2538,6 +2538,12 @@ body.playing-audio::after {
   box-shadow: none !important;
 }
 
+#resetProgressBtn:focus,
+#resetProgressBtn:focus-visible {
+  outline: 2px solid var(--color-button-text-yellow, rgb(255, 198, 9));
+  outline-offset: 3px;
+}
+
 .sentence-progress-cell {
   text-align: center;
   font-size: 13px;
