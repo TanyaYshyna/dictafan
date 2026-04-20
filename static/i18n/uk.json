@@ -1,0 +1,13 @@
+{
+  "profile": {
+    "page_title": "Профіль користувача - DiktaFun",
+    "header": "Профіль користувача",
+    "ui_language": {
+      "label": "Мова інтерфейсу"
+    },
+    "topbar": {
+      "save": "Зберегти",
+      "back_to_dictations": "Повернутися до списку диктантів"
+    }
+  }
+}

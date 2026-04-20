@@ -23,17 +23,17 @@ from flask import render_template_string
 # Импортируем из helpers
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_user_folder, email_to_folder
-from helpers.db_users import (
-    create_user,
-    get_user_by_email,
-    verify_user_password,
-    create_password_reset_token,
-    reset_password_by_token,
-    update_user,
-)
+from helpers.db_users import get_user_by_email, create_user, update_user
 from helpers.email_sender import send_email
-from helpers.db_telegram import generate_and_store_telegram_link_code, set_user_telegram_enabled
-from helpers.telegram import is_telegram_enabled, send_telegram_message
+from helpers.db_telegram import (
+    ensure_telegram_columns,
+    get_user_telegram,
+    link_telegram_chat,
+    set_telegram_enabled,
+    set_telegram_teacher_enabled,
+    unlink_telegram_chat,
+)
+from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
 from helpers.db_groups import ensure_personal_group_for_user
 from helpers.b2_storage import b2_storage
 
@@ -476,6 +476,23 @@ def api_logout():
     response = jsonify({'message': 'Logout successful'})
     response.set_cookie('access_token_cookie', '', expires=0)
     return response
+
+
+@user_bp.route('/api/ui-lang', methods=['POST'])
+@jwt_required()
+def api_set_ui_lang():
+    """Persist selected UI language in cookie for SSR and JS."""
+    payload = request.get_json(silent=True) or {}
+    lang = str(payload.get('lang') or '').strip().lower()
+    if lang not in SUPPORTED_UI_LANGS:
+        lang = DEFAULT_UI_LANG
+
+    resp = jsonify({'success': True, 'lang': lang})
+    try:
+        resp.set_cookie('ui_lang', lang, max_age=60 * 60 * 24 * 365, samesite='Lax')
+    except Exception:
+        pass
+    return resp
 
 # ==================== СТРАНИЦЫ ====================
 

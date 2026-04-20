@@ -1,0 +1,13 @@
+{
+  "profile": {
+    "page_title": "الملف الشخصي - DiktaFun",
+    "header": "الملف الشخصي",
+    "ui_language": {
+      "label": "لغة الواجهة"
+    },
+    "topbar": {
+      "save": "حفظ",
+      "back_to_dictations": "العودة إلى قائمة الإملاءات"
+    }
+  }
+}

@@ -5,6 +5,8 @@ import sys
 import logging
 import hashlib
 
+from helpers.i18n import get_ui_dir, get_ui_lang, t as t_i18n
+
 # Уменьшаем уровень логирования werkzeug (убираем лишние HTTP запросы)
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.WARNING)
@@ -68,9 +70,20 @@ def get_app_cache_revision() -> str:
 @app.context_processor
 def inject_app_cache_revision():
     try:
-        return {'app_cache_revision': get_app_cache_revision()}
+        ui_lang = get_ui_lang()
+        return {
+            'app_cache_revision': get_app_cache_revision(),
+            't': t_i18n,
+            'ui_lang': ui_lang,
+            'ui_dir': get_ui_dir(ui_lang),
+        }
     except Exception:
-        return {'app_cache_revision': '1'}
+        return {
+            'app_cache_revision': '1',
+            't': t_i18n,
+            'ui_lang': 'en',
+            'ui_dir': 'ltr',
+        }
 
 # Нужен валидный app.static_folder для логики бэкенда, где используются пути
 # через current_app.static_folder (поиск обложек, экспорт/импорт и т.д.).

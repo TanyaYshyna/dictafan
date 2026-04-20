@@ -1,0 +1,13 @@
+{
+  "profile": {
+    "page_title": "Профиль пользователя - DiktaFun",
+    "header": "Профиль пользователя",
+    "ui_language": {
+      "label": "Язык интерфейса"
+    },
+    "topbar": {
+      "save": "Сохранить",
+      "back_to_dictations": "Вернуться к списку диктантов"
+    }
+  }
+}

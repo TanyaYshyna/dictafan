@@ -1,0 +1,13 @@
+{
+  "profile": {
+    "page_title": "User profile - DiktaFun",
+    "header": "User profile",
+    "ui_language": {
+      "label": "Interface language"
+    },
+    "topbar": {
+      "save": "Save",
+      "back_to_dictations": "Back to dictations"
+    }
+  }
+}

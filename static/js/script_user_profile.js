@@ -14,6 +14,81 @@ let profileTestAutoStopId = null;
 
 const PROFILE_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
 
+function initializeUiLangSelector() {
+    const select = document.getElementById('uiLangSelect');
+    if (!select) return;
+
+    const supported = ['en', 'uk', 'ru', 'ar'];
+    let current = '';
+    try {
+        current = (document.documentElement && document.documentElement.lang) ? String(document.documentElement.lang) : '';
+    } catch (e) {
+        current = '';
+    }
+    current = String(current || '').trim().toLowerCase();
+
+    if (!supported.includes(current)) {
+        try {
+            const stored = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
+            if (supported.includes(stored)) current = stored;
+        } catch (e) {
+        }
+    }
+
+    if (!supported.includes(current)) {
+        current = 'en';
+    }
+
+    try {
+        select.value = current;
+    } catch (e) {
+    }
+
+    select.addEventListener('change', async () => {
+        const next = String(select.value || '').trim().toLowerCase();
+        if (!supported.includes(next)) return;
+        if (next === current) return;
+
+        select.disabled = true;
+        try {
+            try {
+                localStorage.setItem('ui_lang', next);
+            } catch (e) {
+            }
+
+            if (window.I18n && typeof window.I18n.setLanguage === 'function') {
+                try {
+                    await window.I18n.setLanguage(next);
+                } catch (e) {
+                }
+            }
+
+            const headers = { 'Content-Type': 'application/json' };
+            try {
+                if (UM && UM.token) {
+                    headers['Authorization'] = `Bearer ${UM.token}`;
+                }
+            } catch (e) {
+            }
+
+            const res = await fetch('/user/api/ui-lang', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ lang: next }),
+            });
+
+            if (!res.ok) {
+                throw new Error('Не удалось сохранить язык');
+            }
+
+            location.reload();
+        } catch (e) {
+            select.disabled = false;
+            showError(e && e.message ? e.message : 'Ошибка');
+        }
+    });
+}
+
 function installProfileSaveHotkey() {
     try {
         if (document.body && document.body.dataset && document.body.dataset.profileSaveHotkeyBound) {
@@ -1596,6 +1671,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.querySelector('.profile-container').style.display = 'none';
             return;
         }
+        initializeUiLangSelector();
         loadUserData();
         initializeLanguageSelector();
         initializeLanguageModelsSelector();
