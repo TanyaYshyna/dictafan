@@ -26,12 +26,9 @@ from helpers.user_helpers import get_user_folder, email_to_folder
 from helpers.db_users import get_user_by_email, create_user, update_user
 from helpers.email_sender import send_email
 from helpers.db_telegram import (
-    ensure_telegram_columns,
-    get_user_telegram,
-    link_telegram_chat,
-    set_telegram_enabled,
-    set_telegram_teacher_enabled,
-    unlink_telegram_chat,
+    generate_and_store_telegram_link_code,
+    link_telegram_chat_by_code,
+    set_user_telegram_enabled,
 )
 from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
 from helpers.db_groups import ensure_personal_group_for_user
