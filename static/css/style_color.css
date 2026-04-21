@@ -54,6 +54,7 @@
   --color-border: #ccc;                      /* нейтральные рамки */
   --color-border-light: #ddd;                /* светлые рамки */
   --color-border-strong: #aaa;               /* ярко-серые рамки */
+  --color-flag-border: #d0d0d0;              /* тонкая обводка флагов */
   --color-muted: #999999;                    /* троеточия, неактивные элементы */
   --color-error: red;                        /* ошибки */
   --color-success: green;                    /* правильный ответ */

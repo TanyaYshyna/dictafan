@@ -9,11 +9,21 @@
       "copy": "Copy",
       "refresh": "Refresh",
       "yes": "Yes",
-      "toggle_section_aria": "Collapse/expand"
+      "toggle_section_aria": "Collapse/expand",
+      "error": "Error",
+      "saved": "Saved",
+      "updated": "Updated",
+      "copied": "Copied",
+      "link_copied": "Link copied",
+      "copy_manually": "Copy the link manually",
+      "saving_changes": "Saving changes...",
+      "profile_saved": "Profile saved!",
+      "service_worker_inactive": "Service Worker is not active"
     },
     "ui_language": {
       "label": "Interface language",
-      "label_inline": "Interface"
+      "label_inline": "Interface",
+      "save_error": "Failed to save language"
     },
     "native_language": {
       "label": "Native language:"
@@ -70,10 +80,18 @@
         "get_code": "Get code",
         "code_placeholder": "code",
         "copy_start_cmd_title": "Copy /start command to clipboard",
-        "refresh_status_title": "Refresh status without page reload"
+        "refresh_status_title": "Refresh status without page reload",
+        "code_received": "Code received",
+        "get_code_first": "Get a code first"
+      },
+      "errors": {
+        "profile_refresh_failed": "Failed to refresh profile"
       }
     },
     "groups": {
+      "details": {
+        "select_left": "Select a group on the left"
+      },
       "filter": {
         "title": "Filter",
         "active": "show only active",
@@ -81,16 +99,26 @@
       },
       "actions": {
         "create_group_title": "New group",
-        "delete_group_title": "Delete/archive group"
+        "delete_group_title": "Delete/archive group",
+        "created": "Group created",
+        "archived": "Group archived",
+        "restored": "Group restored"
       },
       "invite_link": {
-        "label": "Invite link"
+        "label": "Invite link",
+        "errors": {
+          "get_failed": "Failed to get link"
+        }
       },
       "students": {
         "title": "Students",
         "invite_email_title": "New student (email)",
         "invite_link_title": "Invite student (link)",
-        "delete_title": "Remove student"
+        "delete_title": "Remove student",
+        "empty": "No students yet",
+        "select_student": "Select a student",
+        "cannot_remove_pending_invite": "Cannot remove: student has not accepted the invitation yet",
+        "removed": "Student removed"
       },
       "memberships": {
         "title": "I am in groups",
@@ -109,6 +137,17 @@
         "email_label": "Student email",
         "send": "Invite"
       }
+    },
+    "auth": {
+      "please_login": "Please sign in"
+    },
+    "errors": {
+      "load_failed": "Failed to load profile: {message}",
+      "save_failed": "Save failed: {message}"
+    },
+    "password_toggle": {
+      "show": "Show password",
+      "hide": "Hide password"
     },
     "exit_modal": {
       "title": "Back to desktop?",

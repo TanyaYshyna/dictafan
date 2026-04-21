@@ -9,11 +9,21 @@
       "copy": "نسخ",
       "refresh": "تحديث",
       "yes": "نعم",
-      "toggle_section_aria": "طي/توسيع"
+      "toggle_section_aria": "طي/توسيع",
+      "error": "خطأ",
+      "saved": "تم الحفظ",
+      "updated": "تم التحديث",
+      "copied": "تم النسخ",
+      "link_copied": "تم نسخ الرابط",
+      "copy_manually": "انسخ الرابط يدويًا",
+      "saving_changes": "جارٍ حفظ التغييرات...",
+      "profile_saved": "تم حفظ الملف الشخصي!",
+      "service_worker_inactive": "Service Worker غير نشط"
     },
     "ui_language": {
       "label": "لغة الواجهة",
-      "label_inline": "الواجهة"
+      "label_inline": "الواجهة",
+      "save_error": "تعذر حفظ اللغة"
     },
     "native_language": {
       "label": "اللغة الأم:"
@@ -70,10 +80,18 @@
         "get_code": "الحصول على رمز",
         "code_placeholder": "رمز",
         "copy_start_cmd_title": "نسخ أمر /start إلى الحافظة",
-        "refresh_status_title": "تحديث الحالة بدون إعادة تحميل الصفحة"
+        "refresh_status_title": "تحديث الحالة بدون إعادة تحميل الصفحة",
+        "code_received": "تم الحصول على الرمز",
+        "get_code_first": "احصل على الرمز أولاً"
+      },
+      "errors": {
+        "profile_refresh_failed": "تعذر تحديث الملف الشخصي"
       }
     },
     "groups": {
+      "details": {
+        "select_left": "اختر مجموعة على اليسار"
+      },
       "filter": {
         "title": "تصفية",
         "active": "إظهار النشطة فقط",
@@ -81,16 +99,26 @@
       },
       "actions": {
         "create_group_title": "مجموعة جديدة",
-        "delete_group_title": "حذف/أرشفة المجموعة"
+        "delete_group_title": "حذف/أرشفة المجموعة",
+        "created": "تم إنشاء المجموعة",
+        "archived": "تمت أرشفة المجموعة",
+        "restored": "تمت استعادة المجموعة"
       },
       "invite_link": {
-        "label": "رابط الدعوة"
+        "label": "رابط الدعوة",
+        "errors": {
+          "get_failed": "تعذر الحصول على الرابط"
+        }
       },
       "students": {
         "title": "الطلاب",
         "invite_email_title": "طالب جديد (البريد)",
         "invite_link_title": "دعوة طالب (رابط)",
-        "delete_title": "إزالة الطالب"
+        "delete_title": "إزالة الطالب",
+        "empty": "لا يوجد طلاب بعد",
+        "select_student": "اختر طالبًا",
+        "cannot_remove_pending_invite": "لا يمكن الإزالة: لم يقبل الطالب الدعوة بعد",
+        "removed": "تمت إزالة الطالب"
       },
       "memberships": {
         "title": "أنا ضمن مجموعات",
@@ -109,6 +137,17 @@
         "email_label": "بريد الطالب",
         "send": "دعوة"
       }
+    },
+    "auth": {
+      "please_login": "يرجى تسجيل الدخول"
+    },
+    "errors": {
+      "load_failed": "فشل تحميل الملف الشخصي: {message}",
+      "save_failed": "فشل الحفظ: {message}"
+    },
+    "password_toggle": {
+      "show": "إظهار كلمة المرور",
+      "hide": "إخفاء كلمة المرور"
     },
     "exit_modal": {
       "title": "العودة إلى سطح المكتب؟",

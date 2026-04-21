@@ -334,7 +334,7 @@ button i[data-lucide] {
     height: 18px;
     border-radius: 1px;
     object-fit: cover;
-    border: 1px solid var(--color-button-gray);
+    border: 1px solid var(--color-flag-border);
 }
 
 #langPair .flag-separator {

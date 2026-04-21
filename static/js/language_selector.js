@@ -9,6 +9,9 @@
 // profile-panels - ДВЕ ПАНЕЛИ для профиля (родной + изучаемые)
 // registration - для регистрации (родной + изучаемый)
 class LanguageSelector {
+    static FLAG_SIZE_SMALL = { width: 20, height: 15 };
+    static FLAG_SIZE_LARGE = { width: 30, height: 20 };
+
     constructor(options = {}) {
         this.options = {
             container: null,
@@ -30,6 +33,18 @@ class LanguageSelector {
         this.languageData = this.options.languageData;
         this.flagPath = '/static/flags/';
         this.isInitialized = false;
+
+        this._t = (key, params, fallback) => {
+            try {
+                if (window.I18n && typeof window.I18n.t === 'function') {
+                    const v = window.I18n.t(key, params);
+                    if (v && v !== key) return v;
+                }
+            } catch (e) {
+            }
+            if (typeof fallback === 'string') return fallback;
+            return String(key || '');
+        };
 
         this._modelsCentricBound = false;
         this._modelsCentricDownloadsInFlight = new Map();
@@ -172,7 +187,7 @@ class LanguageSelector {
 
         const left = `
             <div class="downloaded-models-panel" style="margin:0;">
-                <label class="language-label">Все модели</label>
+                <label class="language-label">${this._t('profile.models.all_models', null, 'Все модели')}</label>
                 <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
                     ${models.map(m => {
                         const isDownloaded = downloadedKeys.has(m.modelKey);
@@ -207,13 +222,13 @@ class LanguageSelector {
                         `;
                     }).join('')}
                 </div>
-                <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 0 4px;">Загружено: ${downloadedKeys.size}</div>
+                <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 0 4px;">${this._t('profile.models.downloaded_prefix', null, 'Загружено:')} ${downloadedKeys.size}</div>
             </div>
         `;
 
         const right = `
             <div class="downloaded-models-panel" style="margin:0;">
-                <label class="language-label">Языки</label>
+                <label class="language-label">${this._t('profile.models.languages', null, 'Языки')}</label>
                 <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
                     ${languages.map(code => {
                         const applicable = getApplicableDownloaded(code);
@@ -228,7 +243,7 @@ class LanguageSelector {
                             <div class="language-item" data-lang="${code}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f0f0;">
                                 <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
                                     ${this.createFlagElement(code)}
-                                    <span style="font-weight:500;">${this.getLanguageName(code)}</span>
+                                    <span style="font-weight:500;">${this.getDisplayLanguageName(code)}</span>
                                 </div>
                                 <div style="flex-grow:1; min-width:0;"></div>
                                 <div style="flex-shrink:0; min-width: 260px;">
@@ -240,7 +255,7 @@ class LanguageSelector {
                                             }).join('')}
                                         </select>
                                     ` : `
-                                        <div style="font-size:12px; color:#999;">нет загруженных моделей</div>
+                                        <div style="font-size:12px; color:#999;">${this._t('profile.models.no_downloaded_models', null, 'нет загруженных моделей')}</div>
                                     `}
                                 </div>
                             </div>
@@ -258,14 +273,14 @@ class LanguageSelector {
                 </div>
                 <div class="storage-info-full" style="margin-top: 16px; padding: 12px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #555;">
-                        <span style="font-weight: bold;">Хранилище браузера:</span>
-                        <span style="color: #333;" id="storage-stats-text">Загрузка информации...</span>
+                        <span style="font-weight: bold;">${this._t('profile.models.browser_storage', null, 'Хранилище браузера:')}</span>
+                        <span style="color: #333;" id="storage-stats-text">${this._t('profile.models.loading_info', null, 'Загрузка информации...')}</span>
                     </div>
                     <div class="storage-progress-full" style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative;">
                         <div class="storage-progress-fill-full" id="storage-progress-fill" style="height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s;"></div>
                         <div class="storage-progress-text-full" id="storage-progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">0%</div>
                     </div>
-                    <div style="font-size: 11px; color: #888; margin-top: 4px; text-align: center;" id="storage-details">Рассчитываем использование памяти...</div>
+                    <div style="font-size: 11px; color: #888; margin-top: 4px; text-align: center;" id="storage-details">${this._t('profile.models.calculating_storage', null, 'Рассчитываем использование памяти...')}</div>
                 </div>
             </div>
         `;
@@ -276,12 +291,12 @@ class LanguageSelector {
         const availableLanguages = Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : [];
         const getLabel = (code) => {
             const c = String(code || '').trim().toLowerCase();
-            if (!c || c === 'all') return 'Все языки';
-            return this.getLanguageName(c);
+            if (!c || c === 'all') return this._t('profile.report.all_languages', null, 'Все языки');
+            return this.getDisplayLanguageName(c);
         };
 
         const currentCode = String(current || '').trim().toLowerCase();
-        const currentFlag = currentCode && currentCode !== 'all' ? this.createFlagElement(currentCode) : '';
+        const currentFlag = currentCode && currentCode !== 'all' ? this.createFlagElement(currentCode, 'small') : '';
 
         return `
             <div class="report-language-combo" style="display:flex; align-items:center; justify-content: space-between; gap: 10px; cursor:pointer; padding: 6px 12px; border-radius: 10px; border: 1px solid rgba(0,0,0,0.12); background: #fff; min-height: 36px;">
@@ -295,7 +310,7 @@ class LanguageSelector {
                 ${availableLanguages.map(code => {
                     const c = String(code || '').trim().toLowerCase();
                     const selected = c === String(current || '').trim().toLowerCase();
-                    const flagHtml = (c && c !== 'all') ? this.createFlagElement(c) : '';
+                    const flagHtml = (c && c !== 'all') ? this.createFlagElement(c, 'small') : '';
                     return `
                         <div class="report-language-option ${selected ? 'selected' : ''}" data-value="${c}" style="display:flex; align-items:center; gap: 10px; padding: 8px 10px; border-radius: 10px; cursor: pointer; ${selected ? 'background: rgba(0,0,0,0.06);' : ''}">
                             ${flagHtml ? `<div style="display:flex; align-items:center; flex: 0 0 auto;">${flagHtml}</div>` : ''}
@@ -318,7 +333,7 @@ class LanguageSelector {
         el.style.display = 'none';
         el.innerHTML = `
             <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:min(520px, calc(100vw - 40px)); background:#fff; border-radius:10px; padding:18px 18px 14px 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.25);">
-                <div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">Загрузка модели</div>
+                <div style="font-size:14px; font-weight:600; color:#333; margin-bottom:10px;">${this._t('profile.models.download_modal.title', null, 'Загрузка модели')}</div>
                 <div data-role="models-centric-modal-text" style="font-size:13px; color:#555; margin-bottom:10px;">...</div>
                 <div style="height:10px; background:#eee; border-radius:999px; overflow:hidden;">
                     <div data-role="models-centric-modal-bar" style="height:100%; width:0%; background:#8B4513; transition: width 0.15s;"></div>
@@ -394,7 +409,7 @@ class LanguageSelector {
                 } catch (e) {
                 }
 
-                this._openModelsCentricModal(`Подготовка загрузки…`, 0);
+                this._openModelsCentricModal(this._t('profile.models.download_modal.preparing', null, 'Подготовка загрузки…'), 0);
 
                 const p = (async () => {
                     try {
@@ -407,7 +422,9 @@ class LanguageSelector {
                                 const prog = info && typeof info.progress === 'number' ? info.progress : 0;
                                 const file = info && info.file ? String(info.file) : '';
                                 const status = info && info.status ? String(info.status) : '';
-                                const text = file ? `${status} ${file}`.trim() : (status || 'Загрузка…');
+                                const text = file
+                                    ? `${status} ${file}`.trim()
+                                    : (status || this._t('profile.models.download_modal.downloading', null, 'Загрузка…'));
                                 this._openModelsCentricModal(text, prog);
                             } catch (e) {
                             }
@@ -510,9 +527,23 @@ class LanguageSelector {
 
         if (statsText) {
             if (browserQuota && displayUsage != null) {
-                statsText.textContent = `${this.formatSize(displayUsage / (1024 * 1024))} из ${this.formatSize(browserQuota / (1024 * 1024))}`;
+                statsText.textContent = this._t(
+                    'profile.models.storage.stats',
+                    {
+                        used: this.formatSize(displayUsage / (1024 * 1024)),
+                        total: this.formatSize(browserQuota / (1024 * 1024))
+                    },
+                    `${this.formatSize(displayUsage / (1024 * 1024))} из ${this.formatSize(browserQuota / (1024 * 1024))}`
+                );
             } else {
-                statsText.textContent = `${storageInfo.downloadedCount} моделей (${this.formatSize(storageInfo.downloadedSizeMB)})`;
+                statsText.textContent = this._t(
+                    'profile.models.storage.models_short',
+                    {
+                        count: storageInfo.downloadedCount,
+                        size: this.formatSize(storageInfo.downloadedSizeMB)
+                    },
+                    `${storageInfo.downloadedCount} моделей (${this.formatSize(storageInfo.downloadedSizeMB)})`
+                );
             }
         }
 
@@ -521,17 +552,21 @@ class LanguageSelector {
                 const displayUsageMB = displayUsage / (1024 * 1024);
                 const displayAvailableMB = browserAvailable / (1024 * 1024);
                 const modelsInfo = storageInfo.downloadedCount > 0
-                    ? ` | <strong>Модели:</strong> ${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSizeMB)})`
+                    ? ` | <strong>${this._t('profile.models.storage.models', null, 'Модели:')}</strong> ${this._t(
+                        'profile.models.storage.models_count',
+                        { count: storageInfo.downloadedCount, size: this.formatSize(storageInfo.downloadedSizeMB) },
+                        `${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSizeMB)})`
+                    )}`
                     : '';
                 detailsText.innerHTML = `
-                    <strong>Использовано:</strong> ${this.formatSize(displayUsageMB)} |
-                    <strong>Доступно:</strong> ${this.formatSize(displayAvailableMB)} |
-                    <strong>Всего:</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
+                    <strong>${this._t('profile.models.storage.used', null, 'Использовано:')}</strong> ${this.formatSize(displayUsageMB)} |
+                    <strong>${this._t('profile.models.storage.available', null, 'Доступно:')}</strong> ${this.formatSize(displayAvailableMB)} |
+                    <strong>${this._t('profile.models.storage.total', null, 'Всего:')}</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
                 `;
             } else {
                 detailsText.innerHTML = `
-                    <strong>Загружено моделей:</strong> ${storageInfo.downloadedCount} |
-                    <strong>Размер моделей:</strong> ${this.formatSize(storageInfo.downloadedSizeMB)}
+                    <strong>${this._t('profile.models.storage.downloaded_models', null, 'Загружено моделей:')}</strong> ${storageInfo.downloadedCount} |
+                    <strong>${this._t('profile.models.storage.models_size', null, 'Размер моделей:')}</strong> ${this.formatSize(storageInfo.downloadedSizeMB)}
                 `;
             }
         }
@@ -549,19 +584,56 @@ class LanguageSelector {
         return window.LanguageManager.getNativeLanguageName(langCode);
     }
 
+    getDisplayLanguageName(langCode) {
+        try {
+            const native = this.getNativeLanguageName(langCode);
+            if (native && native !== langCode) return native;
+        } catch (e) {
+        }
+        try {
+            return this.getLanguageName(langCode);
+        } catch (e2) {
+            return langCode;
+        }
+    }
+
     getFlagFilename(langCode) {
         const countryCode = this.getCountryCode(langCode);
         return countryCode ? `${countryCode}.svg` : '';
     }
 
-    createFlagElement(langCode) {
+    _getFlagSize(size) {
+        if (size === 'small') return LanguageSelector.FLAG_SIZE_SMALL;
+        if (size === 'large') return LanguageSelector.FLAG_SIZE_LARGE;
+        return null;
+    }
+
+    _getDefaultFlagSize() {
+        const mode = String(this.options.mode || '').trim();
+        if (mode === 'header-selector') return 'small';
+        if (mode === 'flag-combo') return 'small';
+        if (mode === 'learning-selector-compact') return 'small';
+        if (mode === 'profile-panels') return 'small';
+        if (mode === 'learning-list') return 'small';
+        if (mode === 'registration') return 'small';
+        if (mode === 'models-centric') return 'small';
+        if (mode === 'report-selector') return 'small';
+        return 'large';
+    }
+
+    createFlagElement(langCode, size) {
         const flagFile = this.getFlagFilename(langCode);
         if (!flagFile) return '';
+
+        const resolvedSize = this._getFlagSize(size) || this._getFlagSize(this._getDefaultFlagSize()) || LanguageSelector.FLAG_SIZE_LARGE;
+        const w = resolvedSize && resolvedSize.width ? Number(resolvedSize.width) : 30;
+        const h = resolvedSize && resolvedSize.height ? Number(resolvedSize.height) : 20;
 
         return `
             <img src="${this.flagPath}${flagFile}" 
                  alt="${this.getLanguageName(langCode)}" 
                  class="language-flag"
+                 style="width:${w}px; height:${h}px; box-sizing:border-box;"
                  onerror="this.style.display='none'">
         `;
     }
@@ -612,7 +684,7 @@ class LanguageSelector {
         // Проверяем, нужен ли компактный режим (только флаг в trigger)
         const isCompact = this.options.mode === 'learning-selector-compact';
         const triggerContent = isCompact
-            ? `${this.createFlagElement(currentValue)}<i data-lucide="chevron-down"></i>`
+            ? `${this.createFlagElement(currentValue, 'small')}<i data-lucide="chevron-down"></i>`
             : `${this.createFlagElement(currentValue)} ${this.getLanguageName(currentValue)}<i data-lucide="chevron-down"></i>`;
 
         // <label class="language-label">Текущий изучаемый язык</label>

@@ -42,6 +42,18 @@ class AudioSettingsPanel {
 
         this.isInitialized = false;
         this._noLocalModelNotified = false;
+
+        this._t = (key, params, fallback) => {
+            try {
+                if (window.I18n && typeof window.I18n.t === 'function') {
+                    const v = window.I18n.t(key, params);
+                    if (v && v !== key) return v;
+                }
+            } catch (e) {
+            }
+            if (typeof fallback === 'string') return fallback;
+            return String(key || '');
+        };
     }
 
     _getSelectedModelKeyV2(langCode) {
@@ -383,12 +395,40 @@ class AudioSettingsPanel {
         
         // Для режима user-settings - две панели (слева настройки, справа обозначения)
         if (mode === 'user-settings') {
+            const explanationsLabel = this._t('profile.audio.explanations.label', null, 'Обозначения:');
+            const audioPlayedTitle = this._t('profile.audio.play_audio.title', null, 'Проигрываем аудио:');
+            const onStartLabel = this._t('profile.audio.play_audio.on_start', null, 'при старте:');
+            const onTypoLabel = this._t('profile.audio.play_audio.on_typo', null, 'при ошибке:');
+            const onSuccessLabel = this._t('profile.audio.play_audio.on_success', null, 'при успехе:');
+            const repeatsLabel = this._t('profile.audio.repeats.label', null, 'Повторы аудио:');
+            const onlyAudioLabel = this._t('profile.audio.only_audio.label', null, 'Только аудио (без ввода текста):');
+            const showHintLabel = this._t('profile.audio.show_hint.label', null, 'Показывать подсказку:');
+            const speechRecLabel = this._t('profile.audio.speech_recognition.label', null, 'Распознавание речи:');
+            const testRecLabel = this._t('profile.audio.test_recording.label', null, 'Тест записи:');
+            const recordBtnText = this._t('profile.audio.test_recording.record', null, 'Записать');
+            const testRecPlaceholder = this._t('profile.audio.test_recording.placeholder', null, 'Распознанный текст появится тут');
+
+            const explanationValues = {
+                'o': this._t('profile.audio.explanations.o', null, this.explanations['o']),
+                't': this._t('profile.audio.explanations.t', null, this.explanations['t']),
+            };
+
+            const seqTitle = this._t(
+                'profile.audio.play_audio.sequence_title',
+                null,
+                "Используйте только буквы 't' (translation) и 'o' (original)"
+            );
+            const repeatsTitle = this._t('profile.audio.repeats.title', null, 'Всего повторов аудио (от 0 до 5)');
+            const starHalfTitle = this._t('profile.audio.required_star_half.title', null, 'Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)');
+            const onlyAudioTitle = this._t('profile.audio.only_audio.title', null, 'Если включено, поле ввода текста будет недоступно');
+            const showHintTitle = this._t('profile.audio.show_hint.title', null, 'Если включено, будет показываться правильный текст предложения');
+
             // Генерируем список объяснений
             const explanationsHTML = `
                 <div class="audio-explanations">
-                    <label>Обозначения:</label>
+                    <label>${explanationsLabel}</label>
                     <ul class="explanations-list">
-                        ${Object.entries(this.explanations).map(([key, value]) => `
+                        ${Object.entries(explanationValues).map(([key, value]) => `
                             <li><strong>${key}</strong> - ${value}</li>
                         `).join('')}
                     </ul>
@@ -400,11 +440,11 @@ class AudioSettingsPanel {
                     <tr>
                         <td class="audio-settings-column">
                             <div class="audio-settings-frame">
-                                <label class="audio-settings-title">Проигрываем аудио:</label>
+                                <label class="audio-settings-title">${audioPlayedTitle}</label>
                                 <table class="audio-settings-table">
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>при старте:</label>
+                                            <label>${onStartLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <input type="text" 
@@ -418,12 +458,12 @@ class AudioSettingsPanel {
                                                    autocorrect="off"
                                                    spellcheck="false"
                                                    value="${this.settings.start}"
-                                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                                   title="${seqTitle}">
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>при ошибке:</label>
+                                            <label>${onTypoLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <input type="text" 
@@ -437,12 +477,12 @@ class AudioSettingsPanel {
                                                    autocorrect="off"
                                                    spellcheck="false"
                                                    value="${this.settings.typo}"
-                                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                                   title="${seqTitle}">
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>при успехе:</label>
+                                            <label>${onSuccessLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <input type="text" 
@@ -456,14 +496,14 @@ class AudioSettingsPanel {
                                                    autocorrect="off"
                                                    spellcheck="false"
                                                    value="${this.settings.success}"
-                                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                                   title="${seqTitle}">
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
                                             <label>
                                                 <i data-lucide="mic"></i>
-                                                Повторы аудио:
+                                                ${repeatsLabel}
                                             </label>
                                         </td>
                                         <td class="audio-settings-input">
@@ -473,7 +513,7 @@ class AudioSettingsPanel {
                                                    min="0" 
                                                    max="5" 
                                                    value="${this.settings.repeats}"
-                                                   title="Всего повторов аудио (от 0 до 5)">
+                                                   title="${repeatsTitle}">
                                         </td>
                                     </tr>
                                     <tr>
@@ -492,42 +532,42 @@ class AudioSettingsPanel {
                                                        max="9"
                                                        style="width: 56px;"
                                                        value="${this.settings.required_passed_star_half}"
-                                                       title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
+                                                       title="${starHalfTitle}">
                                                 <i data-lucide="star-half"></i>
                                             </div>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>Только аудио (без ввода текста):</label>
+                                            <label>${onlyAudioLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <button type="button" 
                                                     id="${prefix}withoutEnteringTextButton" 
                                                     class="audio-setting-checkbox-btn" 
                                                     data-checked="${this.settings.without_entering_text}"
-                                                    title="Если включено, поле ввода текста будет недоступно">
+                                                    title="${onlyAudioTitle}">
                                                 <i data-lucide="${this.settings.without_entering_text ? 'circle-check-big' : 'circle'}"></i>
                                             </button>
                                         </td>
                                     </tr>
                                     <tr id="${prefix}showTextRow" style="${this.settings.without_entering_text ? '' : 'display: none;'}">
                                         <td class="audio-settings-label">
-                                            <label>Показывать подсказку:</label>
+                                            <label>${showHintLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <button type="button" 
                                                     id="${prefix}showTextButton" 
                                                     class="audio-setting-checkbox-btn" 
                                                     data-checked="${this.settings.show_text}"
-                                                    title="Если включено, будет показываться правильный текст предложения">
+                                                    title="${showHintTitle}">
                                                 <i data-lucide="${this.settings.show_text ? 'circle-check-big' : 'circle'}"></i>
                                             </button>
                                         </td>
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>Распознавание речи:</label>
+                                            <label>${speechRecLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <div class="speech-recognition-toggle-button" 
@@ -540,15 +580,15 @@ class AudioSettingsPanel {
                                     </tr>
                                     <tr>
                                         <td class="audio-settings-label">
-                                            <label>Тест записи:</label>
+                                            <label>${testRecLabel}</label>
                                         </td>
                                         <td class="audio-settings-input">
                                             <div style="display:flex; flex-direction:column; gap:8px;">
                                                 <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                                    <button type="button" id="profileTestRecordingBtn" class="button-color-yellow" style="height: 34px; padding: 0 12px;">Записать</button>
+                                                    <button type="button" id="profileTestRecordingBtn" class="button-color-yellow" style="height: 34px; padding: 0 12px;">${recordBtnText}</button>
                                                     <span id="profileTestRecordingStatus" style="font-size: 12px; color: #666;"></span>
                                                 </div>
-                                                <textarea id="profileTestRecordingResult" rows="2" style="width: min(520px, 100%); resize: vertical;" placeholder="Распознанный текст появится тут" readonly></textarea>
+                                                <textarea id="profileTestRecordingResult" rows="2" style="width: min(520px, 100%); resize: vertical;" placeholder="${testRecPlaceholder}" readonly></textarea>
                                             </div>
                                         </td>
                                     </tr>
@@ -577,10 +617,10 @@ class AudioSettingsPanel {
         let modelInfoColor = '#666';
         if (isLocalMode) {
             if (!hasModel) {
-                modelInfoText = 'Локальная модель не загружена';
+                modelInfoText = this._t('profile.audio.speech_recognition.local_model_not_downloaded', null, 'Локальная модель не загружена');
                 modelInfoColor = '#b00020';
             } else if (!selectedSize) {
-                modelInfoText = 'Локальная модель не выбрана';
+                modelInfoText = this._t('profile.audio.speech_recognition.local_model_not_selected', null, 'Локальная модель не выбрана');
                 modelInfoColor = '#b00020';
             } else {
                 modelInfoText = `Whisper ${selectedSize}`;
@@ -588,12 +628,34 @@ class AudioSettingsPanel {
             }
         }
 
+        const explanationsLabel = this._t('profile.audio.explanations.label', null, 'Обозначения:');
+        const explanationValues = {
+            'o': this._t('profile.audio.explanations.o', null, this.explanations['o']),
+            't': this._t('profile.audio.explanations.t', null, this.explanations['t']),
+        };
+        const seqTitle = this._t(
+            'profile.audio.play_audio.sequence_title',
+            null,
+            "Используйте только буквы 't' (translation) и 'o' (original)"
+        );
+        const starHalfTitle = this._t('profile.audio.required_star_half.title', null, 'Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)');
+        const repeatsTitle = this._t('profile.audio.repeats.title', null, 'Всего повторов аудио (от 0 до 5)');
+        const onlyAudioTitle = this._t('profile.audio.only_audio.title', null, 'Если включено, поле ввода текста будет недоступно');
+        const onlyAudioLabel = this._t('profile.audio.only_audio.label', null, 'Только аудио (без ввода текста):');
+        const showHintLabel = this._t('profile.audio.show_hint.label', null, 'Показывать подсказку:');
+        const showHintTitle = this._t('profile.audio.show_hint.title', null, 'Если включено, будет показываться правильный текст предложения');
+        const speechRecLabel = this._t('profile.audio.speech_recognition.label', null, 'Распознавание речи:');
+        const playAudioTitle = this._t('profile.audio.play_audio.title', null, 'Проигрываем аудио:');
+        const onStartLabel = this._t('profile.audio.play_audio.on_start', null, 'при старте:');
+        const onTypoLabel = this._t('profile.audio.play_audio.on_typo', null, 'при ошибке:');
+        const onSuccessLabel = this._t('profile.audio.play_audio.on_success', null, 'при успехе:');
+
         // Для inline и modal режимов - обычная структура
         const explanationsHTML = showExplanations ? `
             <div class="audio-explanations">
-                <label>Обозначения:</label>
+                <label>${explanationsLabel}</label>
                 <ul class="explanations-list">
-                    ${Object.entries(this.explanations).map(([key, value]) => `
+                    ${Object.entries(explanationValues).map(([key, value]) => `
                         <li><strong>${key}</strong> - ${value}</li>
                     `).join('')}
                 </ul>
@@ -612,7 +674,7 @@ class AudioSettingsPanel {
                                min="3"
                                max="9"
                                value="${this.settings.required_passed_star_half}"
-                               title="Сколько полузвёзд нужно, чтобы засчитать 1 звезду (от 3 до 9)">
+                               title="${starHalfTitle}">
                         <i data-lucide="star-half" class="required-passed-star-half"></i>
                     </div>
                 </div>
@@ -626,7 +688,7 @@ class AudioSettingsPanel {
                                min="0"
                                max="5"
                                value="${this.settings.repeats}"
-                               title="Всего повторов аудио (от 0 до 5)">
+                               title="${repeatsTitle}">
                         <i data-lucide="mic-off" class="required-passed-mic"></i>
                     </div>
                 </div>
@@ -635,25 +697,25 @@ class AudioSettingsPanel {
                             id="${prefix}withoutEnteringTextButton" 
                             class="all-checkbox-btn audio-setting-checkbox-btn" 
                             data-checked="${this.settings.without_entering_text}"
-                            title="Если включено, поле ввода текста будет недоступно"
+                            title="${onlyAudioTitle}"
                             style="justify-content:flex-start; width:100%;">
                         <i data-lucide="${this.settings.without_entering_text ? 'circle-check-big' : 'circle'}"></i>
-                        <span>Только аудио (без ввода текста):</span>
+                        <span>${onlyAudioLabel}</span>
                     </button>
                 </div>
                 <div class="play-sequence-item" id="${prefix}showTextRow" style="${this.settings.without_entering_text ? '' : 'display: none;'}">
-                    <label>Показывать подсказку:</label>
+                    <label>${showHintLabel}</label>
                     <button type="button" 
                             id="${prefix}showTextButton" 
                             class="audio-setting-checkbox-btn" 
                             data-checked="${this.settings.show_text}"
-                            title="Если включено, будет показываться правильный текст предложения">
+                            title="${showHintTitle}">
                         <i data-lucide="${this.settings.show_text ? 'circle-check-big' : 'circle'}"></i>
                     </button>
                 </div>
                 <div class="play-sequence-item">
                     <div class="speech-recognition-row">
-                        <label>Распознавание речи:</label>
+                        <label>${speechRecLabel}</label>
                         <div class="speech-recognition-toggle-button" 
                              data-prefix="${prefix}"
                              data-mode="${this.settings.speech_recognition_mode}">
@@ -668,9 +730,9 @@ class AudioSettingsPanel {
             <div class="audio-settings-bottom-panel">
                 <div class="audio-settings-play-and-explanations">
                     <div class="play-sequence-container">
-                        <label>Проигрываем аудио:</label>
+                        <label>${playAudioTitle}</label>
                         <div class="play-sequence-item">
-                            <label>при старте:</label>
+                            <label>${onStartLabel}</label>
                             <input type="text" 
                                    id="${prefix}playSequenceStart" 
                                    class="play-sequence-input" 
@@ -682,10 +744,10 @@ class AudioSettingsPanel {
                                    autocorrect="off"
                                    spellcheck="false"
                                    value="${this.settings.start}"
-                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                   title="${seqTitle}">
                         </div>
                         <div class="play-sequence-item">
-                            <label>при ошибке:</label>
+                            <label>${onTypoLabel}</label>
                             <input type="text" 
                                    id="${prefix}playSequenceTypo" 
                                    class="play-sequence-input" 
@@ -697,10 +759,10 @@ class AudioSettingsPanel {
                                    autocorrect="off"
                                    spellcheck="false"
                                    value="${this.settings.typo}"
-                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                   title="${seqTitle}">
                         </div>
                         <div class="play-sequence-item">
-                            <label>при успехе:</label>
+                            <label>${onSuccessLabel}</label>
                             <input type="text" 
                                    id="${prefix}playSequenceSuccess" 
                                    class="play-sequence-input"
@@ -712,7 +774,7 @@ class AudioSettingsPanel {
                                    autocorrect="off"
                                    spellcheck="false"
                                    value="${this.settings.success}"
-                                   title="Используйте только буквы 't' (translation) и 'o' (original)">
+                                   title="${seqTitle}">
                         </div>
                         ${explanationsHTML}
                     </div>
@@ -1003,7 +1065,7 @@ class AudioSettingsPanel {
                         const icon = speechRecognitionButton.querySelector('.speech-recognition-icon');
                         const label = speechRecognitionButton.querySelector('.speech-recognition-label');
                         if (icon) icon.setAttribute('data-lucide', 'route-off');
-                        if (label) label.textContent = 'локально';
+                        if (label) label.textContent = this.getSpeechRecognitionLabel('route-off');
                         this._updateSetting('speech_recognition_mode', 'route-off');
                         if (window.lucide && window.lucide.createIcons) {
                             window.lucide.createIcons();
@@ -1011,7 +1073,7 @@ class AudioSettingsPanel {
                     }
                     speechRecognitionButton.style.opacity = '0.9';
                     speechRecognitionButton.style.cursor = 'not-allowed';
-                    speechRecognitionButton.title = 'Оффлайн: распознавание работает только локально';
+                    speechRecognitionButton.title = this._t('profile.audio.speech_recognition.offline_title', null, 'Оффлайн: распознавание работает только локально');
                     return;
                 }
                 
@@ -1023,7 +1085,7 @@ class AudioSettingsPanel {
                         const icon = speechRecognitionButton.querySelector('.speech-recognition-icon');
                         const label = speechRecognitionButton.querySelector('.speech-recognition-label');
                         if (icon) icon.setAttribute('data-lucide', 'route');
-                        if (label) label.textContent = 'интернет';
+                        if (label) label.textContent = this.getSpeechRecognitionLabel('route');
                         this._updateSetting('speech_recognition_mode', 'route');
                         if (window.lucide && window.lucide.createIcons) {
                             window.lucide.createIcons();
@@ -1032,7 +1094,7 @@ class AudioSettingsPanel {
                     // Делаем кнопку неактивной (визуально, но клик все равно обрабатываем)
                     speechRecognitionButton.style.opacity = '0.6';
                     speechRecognitionButton.style.cursor = 'not-allowed';
-                    speechRecognitionButton.title = 'Модель Whisper не загружена. Загрузите модель в профиле пользователя для локального распознавания.';
+                    speechRecognitionButton.title = this._t('profile.audio.speech_recognition.no_model_title', null, 'Модель Whisper не загружена. Загрузите модель в профиле пользователя для локального распознавания.');
                 } else {
                     // Модель загружена - кнопка активна
                     speechRecognitionButton.style.opacity = '1';
@@ -1192,11 +1254,9 @@ class AudioSettingsPanel {
      * Получить лейбл для режима распознавания речи
      */
     getSpeechRecognitionLabel(mode) {
-        const labels = {
-            'route': 'интернет',
-            'route-off': 'локально'
-        };
-        return labels[mode] || 'интернет';
+        const norm = String(mode || 'route');
+        if (norm === 'route-off') return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
+        return this._t('profile.audio.speech_recognition.mode_internet', null, 'интернет');
     }
 
     /**

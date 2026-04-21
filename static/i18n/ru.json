@@ -9,11 +9,21 @@
       "copy": "Скопировать",
       "refresh": "Обновить",
       "yes": "ДА",
-      "toggle_section_aria": "Свернуть/развернуть"
+      "toggle_section_aria": "Свернуть/развернуть",
+      "error": "Ошибка",
+      "saved": "Сохранено",
+      "updated": "Обновлено",
+      "copied": "Скопировано",
+      "link_copied": "Ссылка скопирована",
+      "copy_manually": "Скопируй ссылку вручную",
+      "saving_changes": "Сохраняем изменения...",
+      "profile_saved": "Профиль успешно сохранен!",
+      "service_worker_inactive": "Service Worker не активен"
     },
     "ui_language": {
       "label": "Язык интерфейса",
-      "label_inline": "Интерфейс"
+      "label_inline": "Интерфейс",
+      "save_error": "Не удалось сохранить язык"
     },
     "native_language": {
       "label": "Родной язык:"
@@ -70,10 +80,18 @@
         "get_code": "Получить код",
         "code_placeholder": "код",
         "copy_start_cmd_title": "Скопировать команду /start в буфер",
-        "refresh_status_title": "увидеть актуальный статус без перезагрузки страницы"
+        "refresh_status_title": "увидеть актуальный статус без перезагрузки страницы",
+        "code_received": "Код получен",
+        "get_code_first": "Сначала получи код"
+      },
+      "errors": {
+        "profile_refresh_failed": "Не удалось обновить профиль"
       }
     },
     "groups": {
+      "details": {
+        "select_left": "Выбери группу слева"
+      },
       "filter": {
         "title": "Фильтр",
         "active": "показать только активные",
@@ -81,16 +99,26 @@
       },
       "actions": {
         "create_group_title": "Новая группа",
-        "delete_group_title": "Удалить/архивировать группу"
+        "delete_group_title": "Удалить/архивировать группу",
+        "created": "Группа создана",
+        "archived": "Группа архивирована",
+        "restored": "Группа восстановлена"
       },
       "invite_link": {
-        "label": "Инвайт ссылка"
+        "label": "Инвайт ссылка",
+        "errors": {
+          "get_failed": "Не удалось получить ссылку"
+        }
       },
       "students": {
         "title": "Ученики",
         "invite_email_title": "Новый ученик (email)",
         "invite_link_title": "Пригласить ученика (ссылка)",
-        "delete_title": "Удалить ученика"
+        "delete_title": "Удалить ученика",
+        "empty": "Пока нет учеников",
+        "select_student": "Выбери ученика",
+        "cannot_remove_pending_invite": "Нельзя удалить: ученик ещё не подтвердил приглашение",
+        "removed": "Ученик удалён"
       },
       "memberships": {
         "title": "Я вхожу в группы",
@@ -109,6 +137,17 @@
         "email_label": "Email ученика",
         "send": "Пригласить"
       }
+    },
+    "auth": {
+      "please_login": "Пожалуйста, войдите в систему"
+    },
+    "errors": {
+      "load_failed": "Ошибка загрузки профиля: {message}",
+      "save_failed": "Ошибка сохранения: {message}"
+    },
+    "password_toggle": {
+      "show": "Показать пароль",
+      "hide": "Скрыть пароль"
     },
     "exit_modal": {
       "title": "Вернуться на рабочий стол?",

@@ -14,9 +14,21 @@ let profileTestAutoStopId = null;
 
 const PROFILE_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
 
+function profileT(key, params, fallback) {
+    try {
+        if (window.I18n && typeof window.I18n.t === 'function') {
+            const v = window.I18n.t(key, params);
+            if (v && v !== key) return v;
+        }
+    } catch (e) {
+    }
+    if (typeof fallback === 'string') return fallback;
+    return String(key || '');
+}
+
 function initializeUiLangSelector() {
-    const select = document.getElementById('uiLangSelect');
-    if (!select) return;
+    const container = document.getElementById('uiLangSelectorContainer');
+    if (!container) return;
 
     const supported = ['en', 'uk', 'ru', 'ar'];
     let current = '';
@@ -34,22 +46,36 @@ function initializeUiLangSelector() {
         } catch (e) {
         }
     }
+    if (!supported.includes(current)) current = 'en';
 
-    if (!supported.includes(current)) {
-        current = 'en';
-    }
-
+    let uiLangSelector = null;
     try {
-        select.value = current;
+        const languageData = window.LanguageManager.getLanguageData();
+        uiLangSelector = new LanguageSelector({
+            container,
+            mode: 'native-selector',
+            nativeLanguage: current,
+            learningLanguages: supported,
+            currentLearning: current,
+            languageData,
+            onLanguageChange: function (data) {
+                try {
+                    const next = String(data && data.nativeLanguage ? data.nativeLanguage : '').trim().toLowerCase();
+                    if (!supported.includes(next)) return;
+                    if (next === current) return;
+                    handleUiLangChange(next);
+                } catch (e) {
+                }
+            }
+        });
     } catch (e) {
+        container.innerHTML = '';
+        return;
     }
 
-    select.addEventListener('change', async () => {
-        const next = String(select.value || '').trim().toLowerCase();
-        if (!supported.includes(next)) return;
-        if (next === current) return;
-
-        select.disabled = true;
+    async function handleUiLangChange(next) {
+        container.style.pointerEvents = 'none';
+        container.style.opacity = '0.7';
         try {
             try {
                 localStorage.setItem('ui_lang', next);
@@ -78,15 +104,24 @@ function initializeUiLangSelector() {
             });
 
             if (!res.ok) {
-                throw new Error('Не удалось сохранить язык');
+                throw new Error(profileT('profile.ui_language.save_error', null, 'Не удалось сохранить язык'));
             }
 
             location.reload();
         } catch (e) {
-            select.disabled = false;
-            showError(e && e.message ? e.message : 'Ошибка');
+            container.style.pointerEvents = '';
+            container.style.opacity = '';
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+            try {
+                if (uiLangSelector && typeof uiLangSelector.render === 'function') {
+                    uiLangSelector.options.nativeLanguage = current;
+                    uiLangSelector.options.currentLearning = current;
+                    uiLangSelector.render();
+                }
+            } catch (e2) {
+            }
         }
-    });
+    }
 }
 
 function installProfileSaveHotkey() {
@@ -140,7 +175,7 @@ function createLucideToggleButton({ checked, title, disabled }) {
 
 async function swRequest(action, payload = {}) {
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
-        throw new Error('Service Worker не активен');
+        throw new Error(profileT('profile.common.service_worker_inactive', null, 'Service Worker не активен'));
     }
 
     const requestId = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -176,12 +211,12 @@ async function swRequest(action, payload = {}) {
 async function createEmailInviteForSelectedGroup(targetEmail) {
     const g = getSelectedGroup();
     if (!g) {
-        showInfo('Выбери группу');
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return null;
     }
     const email = String(targetEmail || '').trim().toLowerCase();
     if (!email) {
-        showInfo('Введи email ученика');
+        showInfo(profileT('profile.groups.invite_email.errors.enter_email', null, 'Введи email ученика'));
         return null;
     }
     try {
@@ -190,13 +225,13 @@ async function createEmailInviteForSelectedGroup(targetEmail) {
             body: JSON.stringify({ email }),
         });
         if (!data || !data.success) {
-            const msg = data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка';
+            const msg = data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка');
             throw new Error(msg);
         }
-        showSuccess('Инвайт создан');
+        showSuccess(profileT('profile.groups.invite_email.success', null, 'Инвайт создан'));
         return data.invite || null;
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         return null;
     }
 }
@@ -221,7 +256,7 @@ async function submitGroupEmailInviteFromModal() {
     const input = document.getElementById('groupEmailInviteInput');
     const email = input ? String(input.value || '').trim() : '';
     if (!email) {
-        showInfo('Введи email ученика');
+        showInfo(profileT('profile.groups.invite_email.errors.enter_email', null, 'Введи email ученика'));
         return;
     }
     const res = await createEmailInviteForSelectedGroup(email);
@@ -395,7 +430,7 @@ function renderMembershipsTable() {
         const startChecked = m.notify_teacher_on_success !== false;
         const notifyBtn = createLucideToggleButton({
             checked: startChecked,
-            title: 'Уведомлять учителя о моих выполнениях',
+            title: profileT('profile.groups.memberships.notify_teacher_title', null, 'Уведомлять учителя о моих выполнениях'),
             disabled: false,
         });
         notifyBtn.addEventListener('click', async (e) => {
@@ -427,9 +462,9 @@ function renderMembershipsTable() {
                     list[idx] = Object.assign({}, list[idx], { notify_teacher_on_success: next });
                     groupsUiState.memberships = list;
                 }
-                showSuccess('Сохранено');
+                showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
             } catch (e) {
-                showError(e && e.message ? e.message : 'Ошибка');
+                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
             } finally {
                 notifyBtn.disabled = false;
             }
@@ -479,21 +514,21 @@ async function refreshMemberships() {
 async function leaveSelectedMembershipGroup() {
     const groupId = groupsUiState.selectedMembershipGroupId;
     if (!groupId) {
-        showInfo('Выбери группу');
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return;
     }
     const membership = (groupsUiState.memberships || []).find((x) => String(x.group_id) === String(groupId)) || null;
     const name = membership ? String(membership.group_title || '') : '';
-    if (!confirm(`Выйти из группы${name ? ` «${name}»` : ''}?`)) return;
+    if (!confirm(profileT('profile.groups.memberships.confirm_leave', { name }, `Выйти из группы${name ? ` «${name}»` : ''}?`))) return;
 
     try {
         await groupsApiRequest(`/groups/api/memberships/${groupId}/leave`, { method: 'POST' });
-        showSuccess('Готово');
+        showSuccess(profileT('profile.groups.memberships.left', null, 'Готово'));
         groupsUiState.selectedMembershipGroupId = null;
         await refreshMemberships();
         await refreshGroups();
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     }
 }
 
@@ -505,9 +540,9 @@ function renderGroupsTable() {
     const header = document.createElement('div');
     header.className = 'groups-table-header';
     const h1 = document.createElement('div');
-    h1.textContent = 'ID';
+    h1.textContent = profileT('profile.groups.table.id', null, 'ID');
     const h2 = document.createElement('div');
-    h2.textContent = 'Название';
+    h2.textContent = profileT('profile.groups.table.name', null, 'Название');
     const h3 = document.createElement('div');
     h3.textContent = '';
     header.appendChild(h1);
@@ -520,7 +555,7 @@ function renderGroupsTable() {
         const empty = document.createElement('div');
         empty.style.padding = '12px';
         empty.style.color = '#666';
-        empty.textContent = 'Пока нет групп';
+        empty.textContent = profileT('profile.groups.table.empty', null, 'Пока нет групп');
         table.appendChild(empty);
         return;
     }
@@ -546,7 +581,7 @@ function renderGroupsTable() {
             const restoreBtn = document.createElement('button');
             restoreBtn.type = 'button';
             restoreBtn.className = 'groups-row-restore-btn button-color-yellow';
-            restoreBtn.title = 'Снять удаление группы';
+            restoreBtn.title = profileT('profile.groups.actions.restore_title', null, 'Снять удаление группы');
             restoreBtn.innerHTML = '<i data-lucide="trash-2"></i>';
             restoreBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -601,7 +636,9 @@ function updateInviteCopyButtonIcon() {
         const inviteEl = document.getElementById('groupsInviteLink');
         if (!btn || !inviteEl) return;
         const hasLink = Boolean(String(inviteEl.value || '').trim());
-        btn.title = hasLink ? 'Скопировать' : 'Создать инвайт';
+        btn.title = hasLink
+            ? profileT('profile.groups.invite_link.copy', null, 'Скопировать')
+            : profileT('profile.groups.invite_link.create', null, 'Создать инвайт');
         btn.innerHTML = `<i data-lucide="${hasLink ? 'copy' : 'plus'}"></i>`;
         if (window.lucide) {
             window.lucide.createIcons({ root: btn });
@@ -656,7 +693,21 @@ function renderTelegramSection() {
     const selfReportsEnabled = Boolean(user.telegram_self_reports_enabled);
     const linked = Boolean(chatId);
 
-    statusEl.textContent = linked ? `привязан (chat_id: ${chatId})` : 'не привязан';
+    const t = (key, params, fallback) => {
+        try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+                const v = window.I18n.t(key, params);
+                if (v && v !== key) return v;
+            }
+        } catch (e) {
+        }
+        if (typeof fallback === 'string') return fallback;
+        return String(key || '');
+    };
+
+    statusEl.textContent = linked
+        ? t('profile.telegram.status.linked', { chat_id: chatId }, `привязан (chat_id: ${chatId})`)
+        : t('profile.telegram.status.not_linked', null, 'не привязан');
 
     const _setLinkCollapsed = (collapsed) => {
         if (!collapseBtn || !linkBody) return;
@@ -705,12 +756,24 @@ function renderTelegramSection() {
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
 
-    const helpPrefix = linked ? 'Чтобы привязать другой аккаунт:' : 'Чтобы привязать Telegram:';
+    const helpPrefix = linked
+        ? t('profile.telegram.help.prefix_other', null, 'Чтобы привязать другой аккаунт:')
+        : t('profile.telegram.help.prefix', null, 'Чтобы привязать Telegram:');
+    const helpStep1 = t(
+        'profile.telegram.help.step1',
+        null,
+        '-  нажми «<span class="telegram-inline-icon"><i data-lucide="key"></i></span> Получить код»,'
+    );
+    const helpStep2 = t(
+        'profile.telegram.help.step2',
+        null,
+        '- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span>'
+    );
     helpEl.innerHTML = `
         <div>${helpPrefix}</div>
         <div class="telegram-help-bullets">
-            <div>-  нажми «<span class="telegram-inline-icon"><i data-lucide="key"></i></span> Получить код»,</div>
-            <div>- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span></div>
+            <div>${helpStep1}</div>
+            <div>${helpStep2}</div>
         </div>
     `;
 
@@ -725,16 +788,16 @@ function renderTelegramSection() {
             getCodeBtn.disabled = true;
             const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
             if (!data || !data.success || !data.code) {
-                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
             }
             codeInput.value = String(data.code);
             if (UM && UM.userData) {
                 UM.userData.telegram_link_code = String(data.code);
             }
             copyBtn.disabled = false;
-            showSuccess('Код получен');
+            showSuccess(profileT('profile.telegram.link.code_received', null, 'Код получен'));
         } catch (e) {
-            showError(e && e.message ? e.message : 'Ошибка');
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         } finally {
             getCodeBtn.disabled = false;
         }
@@ -746,7 +809,7 @@ function renderTelegramSection() {
             const data = await telegramApiRequest('/user/api/profile', { method: 'GET' });
             const nextUser = data && data.user ? data.user : null;
             if (!nextUser) {
-                throw new Error('Не удалось обновить профиль');
+                throw new Error(profileT('profile.telegram.errors.profile_refresh_failed', null, 'Не удалось обновить профиль'));
             }
             if (UM) {
                 UM.userData = Object.assign({}, UM.userData || {}, nextUser);
@@ -755,9 +818,9 @@ function renderTelegramSection() {
                 }
             }
             renderTelegramSection();
-            showSuccess('Обновлено');
+            showSuccess(profileT('profile.common.updated', null, 'Обновлено'));
         } catch (e) {
-            showError(e && e.message ? e.message : 'Ошибка');
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         } finally {
             refreshBtn.disabled = false;
         }
@@ -766,13 +829,13 @@ function renderTelegramSection() {
     copyBtn.onclick = async () => {
         const code = String(codeInput.value || '').trim();
         if (!code) {
-            showInfo('Сначала получи код');
+            showInfo(profileT('profile.telegram.link.get_code_first', null, 'Сначала получи код'));
             return;
         }
         const cmd = `/start ${code}`;
         try {
             await navigator.clipboard.writeText(cmd);
-            showSuccess('Скопировано');
+            showSuccess(profileT('profile.common.copied', null, 'Скопировано'));
         } catch (e) {
             showInfo(cmd);
         }
@@ -787,7 +850,7 @@ function renderTelegramSection() {
                 body: JSON.stringify({ enabled: next }),
             });
             if (!data || !data.success) {
-                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
             }
             if (UM && UM.userData) {
                 UM.userData.telegram_enabled = Boolean(data.enabled);
@@ -796,9 +859,9 @@ function renderTelegramSection() {
                 }
             }
             _setBtnState(enabledToggleBtn, Boolean(data.enabled));
-            showSuccess('Сохранено');
+            showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
         } catch (e) {
-            showError(e && e.message ? e.message : 'Ошибка');
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         } finally {
             enabledToggleBtn.disabled = false;
         }
@@ -813,7 +876,7 @@ function renderTelegramSection() {
                 body: JSON.stringify({ enabled: next }),
             });
             if (!data || !data.success) {
-                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : 'Ошибка');
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
             }
             if (UM && UM.userData) {
                 UM.userData.telegram_self_reports_enabled = Boolean(data.enabled);
@@ -822,9 +885,9 @@ function renderTelegramSection() {
                 }
             }
             _setBtnState(selfReportsToggleBtn, Boolean(data.enabled));
-            showSuccess('Сохранено');
+            showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
         } catch (e) {
-            showError(e && e.message ? e.message : 'Ошибка');
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         } finally {
             selfReportsToggleBtn.disabled = false;
         }
@@ -849,7 +912,7 @@ function renderStudentsTable(students) {
         const empty = document.createElement('div');
         empty.style.padding = '12px';
         empty.style.color = '#666';
-        empty.textContent = 'Выбери группу слева';
+        empty.textContent = profileT('profile.groups.details.select_left', null, 'Выбери группу слева');
         table.appendChild(empty);
         return;
     }
@@ -858,7 +921,7 @@ function renderStudentsTable(students) {
         const empty = document.createElement('div');
         empty.style.padding = '12px';
         empty.style.color = '#666';
-        empty.textContent = 'Пока нет учеников';
+        empty.textContent = profileT('profile.groups.students.empty', null, 'Пока нет учеников');
         table.appendChild(empty);
         return;
     }
@@ -912,7 +975,7 @@ function renderStudentsTable(students) {
             const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
             const notifyBtn = createLucideToggleButton({
                 checked: startChecked,
-                title: 'Уведомлять учителя о выполнении этим учеником',
+                title: profileT('profile.groups.students.notify_teacher_title', null, 'Уведомлять учителя о выполнении этим учеником'),
                 disabled: isEmailInviteRow,
             });
             notifyBtn.addEventListener('click', (e) => {
@@ -947,9 +1010,9 @@ function renderStudentsTable(students) {
                         cache[idx] = Object.assign({}, cache[idx], { notify_teacher_on_success: next });
                     }
                     groupsUiState._studentsCache = cache;
-                    showSuccess('Сохранено');
+                    showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
                 } catch (e) {
-                    showError(e && e.message ? e.message : 'Ошибка');
+                    showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
                 } finally {
                     notifyBtn.disabled = false;
                 }
@@ -999,7 +1062,7 @@ async function refreshGroups() {
             refreshStudents();
         }
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     }
 }
 
@@ -1074,12 +1137,12 @@ async function restoreGroupFromModal() {
             method: 'PUT',
             body: JSON.stringify({ archived_at: null }),
         });
-        showSuccess('Группа восстановлена');
+        showSuccess(profileT('profile.groups.actions.restored', null, 'Группа восстановлена'));
         toggleGroupRestoreModal(false);
         groupsUiState._restoreGroupId = null;
         await refreshGroups();
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     } finally {
         if (yesBtn) yesBtn.disabled = false;
     }
@@ -1092,12 +1155,12 @@ function openGroupModal(mode, group) {
     if (!title || !titleInput || !descInput) return;
 
     if (mode === 'edit' && group) {
-        title.textContent = 'Группа';
+        title.textContent = profileT('profile.groups.modal.title', null, 'Группа');
         titleInput.value = String(group.title || '');
         descInput.value = String(group.description || '');
         groupsUiState._modalGroupId = String(group.id);
     } else {
-        title.textContent = 'Группа';
+        title.textContent = profileT('profile.groups.modal.title', null, 'Группа');
         titleInput.value = '';
         descInput.value = '';
         groupsUiState._modalGroupId = null;
@@ -1120,7 +1183,7 @@ async function saveGroupFromModal() {
     const title = String(titleInput.value || '').trim();
     const description = String(descInput.value || '').trim();
     if (!title) {
-        showError('Название обязательно');
+        showError(profileT('profile.groups.errors.name_required', null, 'Название обязательно'));
         return;
     }
 
@@ -1132,19 +1195,19 @@ async function saveGroupFromModal() {
                 method: 'PUT',
                 body: JSON.stringify({ title, description: description || null }),
             });
-            showSuccess('Сохранено');
+            showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
         } else {
             await groupsApiRequest('/groups/api/group', {
                 method: 'POST',
                 body: JSON.stringify({ title, description: description || null }),
             });
-            showSuccess('Группа создана');
+            showSuccess(profileT('profile.groups.actions.created', null, 'Группа создана'));
         }
         toggleGroupModal(false);
         groupsUiState._modalGroupId = null;
         await refreshGroups();
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     } finally {
         saveBtn.disabled = false;
         try {
@@ -1158,7 +1221,7 @@ async function saveGroupFromModal() {
 async function createInviteForSelectedGroup() {
     const g = getSelectedGroup();
     if (!g) {
-        showInfo('Выбери группу');
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return;
     }
     const inviteEl = document.getElementById('groupsInviteLink');
@@ -1170,7 +1233,7 @@ async function createInviteForSelectedGroup() {
         const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
         const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
         const path = joinPath || (token ? `/join-group/${token}` : null);
-        if (!path) throw new Error('Не удалось получить ссылку');
+        if (!path) throw new Error(profileT('profile.groups.invite_link.errors.get_failed', null, 'Не удалось получить ссылку'));
         const fullUrl = `${location.origin}${path}`;
         if (inviteEl) inviteEl.value = fullUrl;
         if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
@@ -1178,7 +1241,7 @@ async function createInviteForSelectedGroup() {
         updateInviteCopyButtonIcon();
         return fullUrl;
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
         return null;
     }
 }
@@ -1199,16 +1262,16 @@ async function copyInviteLink() {
     if (!link) return;
     try {
         await navigator.clipboard.writeText(link);
-        showSuccess('Ссылка скопирована');
+        showSuccess(profileT('profile.common.link_copied', null, 'Ссылка скопирована'));
     } catch (e) {
-        showInfo('Скопируй ссылку вручную');
+        showInfo(profileT('profile.common.copy_manually', null, 'Скопируй ссылку вручную'));
     }
 }
 
 async function archiveSelectedGroup() {
     const g = getSelectedGroup();
     if (!g) {
-        showInfo('Выбери группу');
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return;
     }
     try {
@@ -1216,11 +1279,11 @@ async function archiveSelectedGroup() {
             method: 'PUT',
             body: JSON.stringify({ archived_at: new Date().toISOString() }),
         });
-        showSuccess('Группа архивирована');
+        showSuccess(profileT('profile.groups.actions.archived', null, 'Группа архивирована'));
         groupsUiState.selectedGroupId = null;
         await refreshGroups();
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     }
 }
 
@@ -1228,25 +1291,25 @@ async function removeSelectedStudent() {
     const g = getSelectedGroup();
     const studentId = groupsUiState.selectedStudentId;
     if (!g) {
-        showInfo('Выбери группу');
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return;
     }
     if (!studentId) {
-        showInfo('Выбери ученика');
+        showInfo(profileT('profile.groups.students.select_student', null, 'Выбери ученика'));
         return;
     }
     if (String(studentId).startsWith('email_invite:')) {
-        showInfo('Нельзя удалить: ученик ещё не подтвердил приглашение');
+        showInfo(profileT('profile.groups.students.cannot_remove_pending_invite', null, 'Нельзя удалить: ученик ещё не подтвердил приглашение'));
         return;
     }
     try {
         await groupsApiRequest(`/groups/api/group/${g.id}/students/${studentId}/remove`, { method: 'POST' });
-        showSuccess('Ученик удалён');
+        showSuccess(profileT('profile.groups.students.removed', null, 'Ученик удалён'));
         groupsUiState.selectedStudentId = null;
         await refreshGroups();
         await refreshStudents();
     } catch (e) {
-        showError(e && e.message ? e.message : 'Ошибка');
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     }
 }
 
@@ -1311,7 +1374,7 @@ function initializeGroupsSection() {
     studentsInviteEmailBtn && studentsInviteEmailBtn.addEventListener('click', async () => {
         const g = getSelectedGroup();
         if (!g) {
-            showInfo('Выбери группу');
+            showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
             return;
         }
         toggleGroupEmailInviteModal(true);
@@ -1666,7 +1729,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         await UM.init();
         if (!UM.isAuthenticated()) {
             // Показываем сообщение вместо редиректа
-            showError('Пожалуйста, войдите в систему');
+            showError(profileT('profile.auth.please_login', null, 'Пожалуйста, войдите в систему'));
             // Скрываем форму профиля
             document.querySelector('.profile-container').style.display = 'none';
             return;
@@ -1689,7 +1752,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     } catch (error) {
         console.error('Ошибка инициализации:', error);
-        showError('Ошибка загрузки профиля: ' + error.message);
+        showError(profileT('profile.errors.load_failed', { message: String(error && error.message ? error.message : '') }, `Ошибка загрузки профиля: ${error && error.message ? error.message : ''}`));
     }
 });
 
@@ -1706,7 +1769,9 @@ function setupPasswordToggles() {
 
         const willShow = input.type === 'password';
         input.type = willShow ? 'text' : 'password';
-        toggleBtn.setAttribute('aria-label', willShow ? 'Скрыть пароль' : 'Показать пароль');
+        toggleBtn.setAttribute('aria-label', willShow
+            ? profileT('profile.password_toggle.hide', null, 'Скрыть пароль')
+            : profileT('profile.password_toggle.show', null, 'Показать пароль'));
 
         const iconName = willShow ? 'eye-off' : 'eye';
         toggleBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
@@ -2358,7 +2423,7 @@ async function saveProfile(options = {}) {
             updateData.speech_recognition_mode = settings.speech_recognition_mode || 'route';
         }
 
-        showInfo('Сохраняем изменения...');
+        showInfo(profileT('profile.common.saving_changes', null, 'Сохраняем изменения...'));
 
         const updatedUser = await UM.updateProfile(updateData);
 
@@ -2580,7 +2645,7 @@ async function saveProfile(options = {}) {
         // Убеждаемся, что обработчик beforeunload удален
         setUnsavedState(false);
         pendingAvatarBlob = null;
-        showSuccess('Профиль успешно сохранен!');
+        showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
 
         if (typeof afterSave === 'function') {
             afterSave();
@@ -2588,7 +2653,7 @@ async function saveProfile(options = {}) {
 
     } catch (error) {
         console.error('Ошибка сохранения:', error);
-        showError('Ошибка сохранения: ' + error.message);
+        showError(profileT('profile.errors.save_failed', { message: String(error && error.message ? error.message : '') }, `Ошибка сохранения: ${error && error.message ? error.message : ''}`));
     } finally {
         isSavingProfile = false;
         // После сохранения проверяем изменения еще раз, чтобы обновить hasUnsavedChanges
@@ -2666,7 +2731,7 @@ async function handleSave() {
 /**
  * Обработчик сохранения и выхода
  */
-async function handleSaveAndExit() {
+async function handleInviteEmailSendClick() {
     await saveProfile({ afterSave: proceedToExit });
 }
 

@@ -9,11 +9,21 @@
       "copy": "Копіювати",
       "refresh": "Оновити",
       "yes": "ТАК",
-      "toggle_section_aria": "Згорнути/розгорнути"
+      "toggle_section_aria": "Згорнути/розгорнути",
+      "error": "Помилка",
+      "saved": "Збережено",
+      "updated": "Оновлено",
+      "copied": "Скопійовано",
+      "link_copied": "Посилання скопійовано",
+      "copy_manually": "Скопіюй посилання вручну",
+      "saving_changes": "Зберігаємо зміни...",
+      "profile_saved": "Профіль успішно збережено!",
+      "service_worker_inactive": "Service Worker не активний"
     },
     "ui_language": {
       "label": "Мова інтерфейсу",
-      "label_inline": "Інтерфейс"
+      "label_inline": "Інтерфейс",
+      "save_error": "Не вдалося зберегти мову"
     },
     "native_language": {
       "label": "Рідна мова:"
@@ -70,10 +80,18 @@
         "get_code": "Отримати код",
         "code_placeholder": "код",
         "copy_start_cmd_title": "Скопіювати команду /start у буфер",
-        "refresh_status_title": "побачити актуальний статус без перезавантаження сторінки"
+        "refresh_status_title": "побачити актуальний статус без перезавантаження сторінки",
+        "code_received": "Код отримано",
+        "get_code_first": "Спочатку отримай код"
+      },
+      "errors": {
+        "profile_refresh_failed": "Не вдалося оновити профіль"
       }
     },
     "groups": {
+      "details": {
+        "select_left": "Вибери групу зліва"
+      },
       "filter": {
         "title": "Фільтр",
         "active": "показати лише активні",
@@ -81,16 +99,26 @@
       },
       "actions": {
         "create_group_title": "Нова група",
-        "delete_group_title": "Видалити/архівувати групу"
+        "delete_group_title": "Видалити/архівувати групу",
+        "created": "Групу створено",
+        "archived": "Групу заархівовано",
+        "restored": "Групу відновлено"
       },
       "invite_link": {
-        "label": "Інвайт посилання"
+        "label": "Інвайт посилання",
+        "errors": {
+          "get_failed": "Не вдалося отримати посилання"
+        }
       },
       "students": {
         "title": "Учні",
         "invite_email_title": "Новий учень (email)",
         "invite_link_title": "Запросити учня (посилання)",
-        "delete_title": "Видалити учня"
+        "delete_title": "Видалити учня",
+        "empty": "Поки немає учнів",
+        "select_student": "Вибери учня",
+        "cannot_remove_pending_invite": "Неможливо видалити: учень ще не підтвердив запрошення",
+        "removed": "Учня видалено"
       },
       "memberships": {
         "title": "Я входжу до груп",
@@ -109,6 +137,17 @@
         "email_label": "Email учня",
         "send": "Запросити"
       }
+    },
+    "auth": {
+      "please_login": "Будь ласка, увійдіть у систему"
+    },
+    "errors": {
+      "load_failed": "Помилка завантаження профілю: {message}",
+      "save_failed": "Помилка збереження: {message}"
+    },
+    "password_toggle": {
+      "show": "Показати пароль",
+      "hide": "Сховати пароль"
     },
     "exit_modal": {
       "title": "Повернутися на робочий стіл?",

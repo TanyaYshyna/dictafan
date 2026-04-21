@@ -685,6 +685,7 @@ select {
     margin-left: 5px;
     border-radius: 2px;
     object-fit: cover;
+    border: 1px solid var(--color-flag-border);
 }
 
 .language-name {
@@ -1196,6 +1197,7 @@ select {
     height: 15px;
     object-fit: cover;
     border-radius: 2px;
+    border: 1px solid var(--color-flag-border);
 }
 
 /* Стили для списка изучаемых языков */
