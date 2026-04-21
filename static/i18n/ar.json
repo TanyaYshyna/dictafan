@@ -56,6 +56,47 @@
       "assignment_history": "سجل المهام",
       "groups": "المجموعات"
     },
+    "audio": {
+      "explanations": {
+        "label": "الرموز:",
+        "o": "صوت النص الأصلي",
+        "t": "صوت الترجمة"
+      },
+      "play_audio": {
+        "title": "تشغيل الصوت:",
+        "on_start": "عند البدء:",
+        "on_typo": "عند الخطأ:",
+        "on_success": "عند النجاح:",
+        "sequence_title": "استخدم فقط الحرفين 't' (translation) و 'o' (original)"
+      },
+      "repeats": {
+        "label": "تكرار الصوت:",
+        "title": "إجمالي مرات تكرار الصوت (من 0 إلى 5)"
+      },
+      "required_star_half": {
+        "title": "كم عدد أنصاف النجوم المطلوبة لاحتساب نجمة واحدة (من 3 إلى 9)"
+      },
+      "only_audio": {
+        "label": "صوت فقط (بدون إدخال نص):",
+        "title": "إذا تم التفعيل، سيتم تعطيل حقل إدخال النص"
+      },
+      "show_hint": {
+        "label": "إظهار تلميح:",
+        "title": "إذا تم التفعيل، سيظهر النص الصحيح للجملة"
+      },
+      "speech_recognition": {
+        "label": "التعرّف على الكلام:",
+        "mode_local": "محلي",
+        "mode_internet": "عبر الإنترنت",
+        "local_model_not_downloaded": "لم يتم تنزيل النموذج المحلي",
+        "local_model_not_selected": "لم يتم اختيار النموذج المحلي"
+      },
+      "test_recording": {
+        "label": "اختبار التسجيل:",
+        "record": "تسجيل",
+        "placeholder": "سيظهر النص المُتعرَّف عليه هنا"
+      }
+    },
     "assignment_history": {
       "retention": {
         "label": "الاحتفاظ بسجل المهام",

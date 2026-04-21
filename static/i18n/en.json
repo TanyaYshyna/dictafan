@@ -56,6 +56,47 @@
       "assignment_history": "Assignment history",
       "groups": "Groups"
     },
+    "audio": {
+      "explanations": {
+        "label": "Legend:",
+        "o": "original audio",
+        "t": "translation audio"
+      },
+      "play_audio": {
+        "title": "Play audio:",
+        "on_start": "on start:",
+        "on_typo": "on mistake:",
+        "on_success": "on success:",
+        "sequence_title": "Use only letters 't' (translation) and 'o' (original)"
+      },
+      "repeats": {
+        "label": "Audio repeats:",
+        "title": "Total audio repeats (from 0 to 5)"
+      },
+      "required_star_half": {
+        "title": "How many half-stars are needed to count 1 star (from 3 to 9)"
+      },
+      "only_audio": {
+        "label": "Audio only (no text input):",
+        "title": "If enabled, the text input field will be disabled"
+      },
+      "show_hint": {
+        "label": "Show hint:",
+        "title": "If enabled, the correct sentence text will be shown"
+      },
+      "speech_recognition": {
+        "label": "Speech recognition:",
+        "mode_local": "local",
+        "mode_internet": "internet",
+        "local_model_not_downloaded": "Local model is not downloaded",
+        "local_model_not_selected": "Local model is not selected"
+      },
+      "test_recording": {
+        "label": "Recording test:",
+        "record": "Record",
+        "placeholder": "Recognized text will appear here"
+      }
+    },
     "assignment_history": {
       "retention": {
         "label": "Keep assignment history",

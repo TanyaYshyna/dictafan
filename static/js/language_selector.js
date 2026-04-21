@@ -681,8 +681,8 @@ class LanguageSelector {
     createLearningSelector() {
         const currentValue = this.options.currentLearning;
         // В режиме profile-panels используем только изучаемые языки, в registration - все языки
-        const availableLanguages = (Array.isArray(this.options.learningLanguages) && this.options.learningLanguages.length > 0)
-            ? this.options.learningLanguages
+        const availableLanguages = (Array.isArray(this.options.learningAvailableLanguages) && this.options.learningAvailableLanguages.length > 0)
+            ? this.options.learningAvailableLanguages
             : Object.keys(this.languageData);
 
         // Проверяем, нужен ли компактный режим (только флаг в trigger)

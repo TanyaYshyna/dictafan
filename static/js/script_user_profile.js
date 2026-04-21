@@ -1943,7 +1943,7 @@ function initializeAudioSettings() {
     const container = document.getElementById('userAudioSettingsContainer');
     
     if (!container) {
-        console.error('❌ Контейнер для AudioSettingsPanel не найден');
+        console.error(profileT('profile.audio.errors.container_not_found', null, '❌ Контейнер для AudioSettingsPanel не найден'));
         return;
     }
 
@@ -2018,10 +2018,10 @@ function initializeAudioSettings() {
         }, 0);
 
     } catch (error) {
-        console.error('❌ Ошибка инициализации AudioSettingsPanel:', error);
+        console.error(profileT('profile.audio.errors.init_failed', null, '❌ Ошибка инициализации AudioSettingsPanel:'), error);
         container.innerHTML = `
             <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; text-align: center;">
-                <p style="color: #dc3545;">Ошибка загрузки настроек аудио</p>
+                <p style="color: #dc3545;">${profileT('profile.audio.errors.load_failed', null, 'Ошибка загрузки настроек аудио')}</p>
             </div>
         `;
     }
