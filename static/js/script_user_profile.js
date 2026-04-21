@@ -55,6 +55,7 @@ function initializeUiLangSelector() {
             container,
             mode: 'native-selector',
             nativeLanguage: current,
+            nativeLanguages: supported,
             learningLanguages: supported,
             currentLearning: current,
             languageData,

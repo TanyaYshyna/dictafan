@@ -640,7 +640,9 @@ class LanguageSelector {
 
     createNativeSelector() {
         const currentValue = this.options.nativeLanguage;
-        const availableLanguages = Object.keys(this.languageData);
+        const availableLanguages = (Array.isArray(this.options.nativeLanguages) && this.options.nativeLanguages.length > 0)
+            ? this.options.nativeLanguages
+            : Object.keys(this.languageData);
 
         return `
             <div class="language-selector-group" data-selector-type="native">
@@ -679,7 +681,9 @@ class LanguageSelector {
     createLearningSelector() {
         const currentValue = this.options.currentLearning;
         // В режиме profile-panels используем только изучаемые языки, в registration - все языки
-        const availableLanguages = Object.keys(this.languageData);
+        const availableLanguages = (Array.isArray(this.options.learningLanguages) && this.options.learningLanguages.length > 0)
+            ? this.options.learningLanguages
+            : Object.keys(this.languageData);
 
         // Проверяем, нужен ли компактный режим (только флаг в trigger)
         const isCompact = this.options.mode === 'learning-selector-compact';
