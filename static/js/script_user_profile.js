@@ -1739,7 +1739,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         loadUserData();
         initializeLanguageSelector();
         initializeLanguageModelsSelector();
-        initializeAudioSettings();
+        await initializeAudioSettings();
         initializeGroupsSection();
         initializeProfileSectionToggles();
         setupFormListeners();
@@ -1939,7 +1939,7 @@ function initializeLanguageModelsSelector() {
 // Инициализация панели настроек аудио
 let audioSettingsPanel = null;
 
-function initializeAudioSettings() {
+async function initializeAudioSettings() {
     const container = document.getElementById('userAudioSettingsContainer');
     
     if (!container) {
@@ -1948,6 +1948,13 @@ function initializeAudioSettings() {
     }
 
     try {
+        try {
+            if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+                await window.I18n.ensureLoaded();
+            }
+        } catch (e) {
+        }
+
         // Загружаем настройки пользователя из settings_json (приоритет) или из отдельных полей
         let userSettings = {};
         
