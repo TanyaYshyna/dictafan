@@ -2,12 +2,122 @@
   "profile": {
     "page_title": "User profile - DiktaFun",
     "header": "User profile",
+    "common": {
+      "save": "Save",
+      "cancel": "Cancel",
+      "close": "Close",
+      "copy": "Copy",
+      "refresh": "Refresh",
+      "yes": "Yes",
+      "toggle_section_aria": "Collapse/expand"
+    },
     "ui_language": {
-      "label": "Interface language"
+      "label": "Interface language",
+      "label_inline": "Interface"
+    },
+    "native_language": {
+      "label": "Native language:"
+    },
+    "learning_language": {
+      "label": "Learning language:"
+    },
+    "name": {
+      "label": "Name"
+    },
+    "email": {
+      "label": "Email"
+    },
+    "password": {
+      "label": "Password",
+      "placeholder": "Enter new password",
+      "show_aria": "Show password"
+    },
+    "avatar": {
+      "alt": "Avatar",
+      "upload": "Upload"
     },
     "topbar": {
-      "save": "Save",
-      "back_to_dictations": "Back to dictations"
+      "back_to_dictations": "Back to dictations",
+      "save": "Save"
+    },
+    "sections": {
+      "local_models": "Offline language models settings",
+      "dictation_settings": "Dictation settings",
+      "assignment_history": "Assignment history",
+      "groups": "Groups"
+    },
+    "assignment_history": {
+      "retention": {
+        "label": "Keep assignment history",
+        "days_0": "0 days",
+        "days_7": "7 days",
+        "days_30": "30 days",
+        "help": "Assignment history is kept for up to 30 days. Older items may be deleted."
+      }
+    },
+    "telegram": {
+      "teacher_notifications": {
+        "title": "Receive student notifications in Telegram",
+        "label": "Receive student notifications in Telegram"
+      },
+      "self_reports": {
+        "title": "Send me my dictation results in Telegram",
+        "label_html": "Send me my dictation results<br>in Telegram"
+      },
+      "link": {
+        "title": "Link Telegram",
+        "toggle_aria": "Collapse/expand Telegram link section",
+        "get_code": "Get code",
+        "code_placeholder": "code",
+        "copy_start_cmd_title": "Copy /start command to clipboard",
+        "refresh_status_title": "Refresh status without page reload"
+      }
+    },
+    "groups": {
+      "filter": {
+        "title": "Filter",
+        "active": "show only active",
+        "all": "show all"
+      },
+      "actions": {
+        "create_group_title": "New group",
+        "delete_group_title": "Delete/archive group"
+      },
+      "invite_link": {
+        "label": "Invite link"
+      },
+      "students": {
+        "title": "Students",
+        "invite_email_title": "New student (email)",
+        "invite_link_title": "Invite student (link)",
+        "delete_title": "Remove student"
+      },
+      "memberships": {
+        "title": "I am in groups",
+        "leave_title": "Leave group"
+      },
+      "modal": {
+        "title": "Group",
+        "name": "Name",
+        "description": "Description"
+      },
+      "restore": {
+        "confirm": "Restore group?"
+      },
+      "invite_email": {
+        "modal_title": "New student (email)",
+        "email_label": "Student email",
+        "send": "Invite"
+      }
+    },
+    "exit_modal": {
+      "title": "Back to desktop?",
+      "message": "What should we do with your current changes?",
+      "stay": "Stay",
+      "exit": "Exit"
+    },
+    "crop_modal": {
+      "title": "Crop avatar"
     }
   }
 }

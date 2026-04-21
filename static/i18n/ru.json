@@ -2,12 +2,122 @@
   "profile": {
     "page_title": "Профиль пользователя - DiktaFun",
     "header": "Профиль пользователя",
+    "common": {
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "close": "Закрыть",
+      "copy": "Скопировать",
+      "refresh": "Обновить",
+      "yes": "ДА",
+      "toggle_section_aria": "Свернуть/развернуть"
+    },
     "ui_language": {
-      "label": "Язык интерфейса"
+      "label": "Язык интерфейса",
+      "label_inline": "Интерфейс"
+    },
+    "native_language": {
+      "label": "Родной язык:"
+    },
+    "learning_language": {
+      "label": "Изучаю язык:"
+    },
+    "name": {
+      "label": "Имя"
+    },
+    "email": {
+      "label": "Почта"
+    },
+    "password": {
+      "label": "Пароль",
+      "placeholder": "Введите новый пароль",
+      "show_aria": "Показать пароль"
+    },
+    "avatar": {
+      "alt": "Аватар",
+      "upload": "Загрузить"
     },
     "topbar": {
       "save": "Сохранить",
       "back_to_dictations": "Вернуться к списку диктантов"
+    },
+    "sections": {
+      "local_models": "Настройки автономных языковых моделей",
+      "dictation_settings": "Настройки для диктантов",
+      "assignment_history": "История заданий",
+      "groups": "Группы"
+    },
+    "assignment_history": {
+      "retention": {
+        "label": "Хранить историю заданий",
+        "days_0": "0 дней",
+        "days_7": "7 дней",
+        "days_30": "30 дней",
+        "help": "История заданий хранится максимум 30 дней. Всё, что старше — может быть удалено."
+      }
+    },
+    "telegram": {
+      "teacher_notifications": {
+        "title": "получать уведомленя от учеников в Телеграм",
+        "label": "получать уведомленя от учеников в Телеграм"
+      },
+      "self_reports": {
+        "title": "отправлять мне в Телеграм итоги моих выполненных диктантов",
+        "label_html": "отправлять мне в Телеграм итоги<br>моих выполненных диктантов"
+      },
+      "link": {
+        "title": "Привязать Telegram",
+        "toggle_aria": "Свернуть/развернуть привязку Telegram",
+        "get_code": "Получить код",
+        "code_placeholder": "код",
+        "copy_start_cmd_title": "Скопировать команду /start в буфер",
+        "refresh_status_title": "увидеть актуальный статус без перезагрузки страницы"
+      }
+    },
+    "groups": {
+      "filter": {
+        "title": "Фильтр",
+        "active": "показать только активные",
+        "all": "показать все"
+      },
+      "actions": {
+        "create_group_title": "Новая группа",
+        "delete_group_title": "Удалить/архивировать группу"
+      },
+      "invite_link": {
+        "label": "Инвайт ссылка"
+      },
+      "students": {
+        "title": "Ученики",
+        "invite_email_title": "Новый ученик (email)",
+        "invite_link_title": "Пригласить ученика (ссылка)",
+        "delete_title": "Удалить ученика"
+      },
+      "memberships": {
+        "title": "Я вхожу в группы",
+        "leave_title": "Выйти из группы"
+      },
+      "modal": {
+        "title": "Группа",
+        "name": "Название",
+        "description": "Описание"
+      },
+      "restore": {
+        "confirm": "Снять удаление группы?"
+      },
+      "invite_email": {
+        "modal_title": "Новый ученик (email)",
+        "email_label": "Email ученика",
+        "send": "Пригласить"
+      }
+    },
+    "exit_modal": {
+      "title": "Вернуться на рабочий стол?",
+      "message": "Что сделать с текущими изменениями?",
+      "stay": "Остаться",
+      "exit": "Выйти"
+    },
+    "crop_modal": {
+      "title": "Обрезка аватара"
     }
   }
 }

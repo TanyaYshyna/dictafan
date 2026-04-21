@@ -1771,38 +1771,63 @@ function loadUserData() {
 
 // Инициализация языкового селектора (только выбор родного и изучаемого языка)
 function initializeLanguageSelector() {
-    const container = document.getElementById('languageSelectorContainer');
-    
-    if (!container) {
-        console.error('❌ Контейнер для LanguageSelector не найден');
+    const nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
+    const learningContainer = document.getElementById('learningLanguageSelectorContainer');
+
+    if (!nativeContainer || !learningContainer) {
+        console.error('❌ Контейнеры для LanguageSelector не найдены');
         return;
     }
 
     try {
         const languageData = window.LanguageManager.getLanguageData();
 
-        languageSelector = new LanguageSelector({
-            container: container,
-            mode: 'registration', // Режим как при регистрации - только родной и изучаемый язык
+        const nativeSelector = new LanguageSelector({
+            container: nativeContainer,
+            mode: 'native-selector',
             nativeLanguage: originalData.native_language,
             learningLanguages: originalData.learning_languages,
             currentLearning: originalData.current_learning,
             languageData: languageData,
-            onLanguageChange: function (data) {
+            onLanguageChange: function () {
                 checkForChanges();
             }
         });
-        
-        // Делаем глобальной для доступа из других селекторов
+
+        const learningSelector = new LanguageSelector({
+            container: learningContainer,
+            mode: 'learning-selector',
+            nativeLanguage: originalData.native_language,
+            learningLanguages: originalData.learning_languages,
+            currentLearning: originalData.current_learning,
+            languageData: languageData,
+            onLanguageChange: function () {
+                checkForChanges();
+            }
+        });
+
+        languageSelector = {
+            getValues: function () {
+                const a = nativeSelector && typeof nativeSelector.getValues === 'function' ? nativeSelector.getValues() : null;
+                const b = learningSelector && typeof learningSelector.getValues === 'function' ? learningSelector.getValues() : null;
+                return {
+                    nativeLanguage: (a && a.nativeLanguage) ? a.nativeLanguage : originalData.native_language,
+                    learningLanguages: (b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages,
+                    currentLearning: (b && b.currentLearning) ? b.currentLearning : originalData.current_learning,
+                };
+            }
+        };
+
         window.languageSelector = languageSelector;
 
     } catch (error) {
         console.error('❌ Ошибка инициализации LanguageSelector:', error);
-        container.innerHTML = `
-            <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; text-align: center;">
+        nativeContainer.innerHTML = `
+            <div style="padding: 10px; background: #f8f9fa; border-radius: 5px; text-align: center;">
                 <p style="color: #dc3545;">Ошибка загрузки языковых настроек</p>
             </div>
         `;
+        learningContainer.innerHTML = nativeContainer.innerHTML;
     }
 }
 

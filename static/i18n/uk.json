@@ -2,12 +2,122 @@
   "profile": {
     "page_title": "Профіль користувача - DiktaFun",
     "header": "Профіль користувача",
+    "common": {
+      "save": "Зберегти",
+      "cancel": "Скасувати",
+      "close": "Закрити",
+      "copy": "Копіювати",
+      "refresh": "Оновити",
+      "yes": "ТАК",
+      "toggle_section_aria": "Згорнути/розгорнути"
+    },
     "ui_language": {
-      "label": "Мова інтерфейсу"
+      "label": "Мова інтерфейсу",
+      "label_inline": "Інтерфейс"
+    },
+    "native_language": {
+      "label": "Рідна мова:"
+    },
+    "learning_language": {
+      "label": "Вивчаю мову:"
+    },
+    "name": {
+      "label": "Ім'я"
+    },
+    "email": {
+      "label": "Пошта"
+    },
+    "password": {
+      "label": "Пароль",
+      "placeholder": "Введіть новий пароль",
+      "show_aria": "Показати пароль"
+    },
+    "avatar": {
+      "alt": "Аватар",
+      "upload": "Завантажити"
     },
     "topbar": {
       "save": "Зберегти",
       "back_to_dictations": "Повернутися до списку диктантів"
+    },
+    "sections": {
+      "local_models": "Налаштування автономних мовних моделей",
+      "dictation_settings": "Налаштування для диктантів",
+      "assignment_history": "Історія завдань",
+      "groups": "Групи"
+    },
+    "assignment_history": {
+      "retention": {
+        "label": "Зберігати історію завдань",
+        "days_0": "0 днів",
+        "days_7": "7 днів",
+        "days_30": "30 днів",
+        "help": "Історія завдань зберігається максимум 30 днів. Усе, що старіше — може бути видалено."
+      }
+    },
+    "telegram": {
+      "teacher_notifications": {
+        "title": "отримувати сповіщення від учнів у Telegram",
+        "label": "отримувати сповіщення від учнів у Telegram"
+      },
+      "self_reports": {
+        "title": "надсилати мені в Telegram підсумки моїх виконаних диктантів",
+        "label_html": "надсилати мені в Telegram підсумки<br>моїх виконаних диктантів"
+      },
+      "link": {
+        "title": "Прив'язати Telegram",
+        "toggle_aria": "Згорнути/розгорнути прив'язку Telegram",
+        "get_code": "Отримати код",
+        "code_placeholder": "код",
+        "copy_start_cmd_title": "Скопіювати команду /start у буфер",
+        "refresh_status_title": "побачити актуальний статус без перезавантаження сторінки"
+      }
+    },
+    "groups": {
+      "filter": {
+        "title": "Фільтр",
+        "active": "показати лише активні",
+        "all": "показати всі"
+      },
+      "actions": {
+        "create_group_title": "Нова група",
+        "delete_group_title": "Видалити/архівувати групу"
+      },
+      "invite_link": {
+        "label": "Інвайт посилання"
+      },
+      "students": {
+        "title": "Учні",
+        "invite_email_title": "Новий учень (email)",
+        "invite_link_title": "Запросити учня (посилання)",
+        "delete_title": "Видалити учня"
+      },
+      "memberships": {
+        "title": "Я входжу до груп",
+        "leave_title": "Вийти з групи"
+      },
+      "modal": {
+        "title": "Група",
+        "name": "Назва",
+        "description": "Опис"
+      },
+      "restore": {
+        "confirm": "Відновити групу?"
+      },
+      "invite_email": {
+        "modal_title": "Новий учень (email)",
+        "email_label": "Email учня",
+        "send": "Запросити"
+      }
+    },
+    "exit_modal": {
+      "title": "Повернутися на робочий стіл?",
+      "message": "Що зробити з поточними змінами?",
+      "stay": "Залишитися",
+      "exit": "Вийти"
+    },
+    "crop_modal": {
+      "title": "Обрізка аватара"
     }
   }
 }

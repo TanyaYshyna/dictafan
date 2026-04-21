@@ -2,12 +2,122 @@
   "profile": {
     "page_title": "الملف الشخصي - DiktaFun",
     "header": "الملف الشخصي",
+    "common": {
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "close": "إغلاق",
+      "copy": "نسخ",
+      "refresh": "تحديث",
+      "yes": "نعم",
+      "toggle_section_aria": "طي/توسيع"
+    },
     "ui_language": {
-      "label": "لغة الواجهة"
+      "label": "لغة الواجهة",
+      "label_inline": "الواجهة"
+    },
+    "native_language": {
+      "label": "اللغة الأم:"
+    },
+    "learning_language": {
+      "label": "أتعلم اللغة:"
+    },
+    "name": {
+      "label": "الاسم"
+    },
+    "email": {
+      "label": "البريد"
+    },
+    "password": {
+      "label": "كلمة المرور",
+      "placeholder": "أدخل كلمة مرور جديدة",
+      "show_aria": "إظهار كلمة المرور"
+    },
+    "avatar": {
+      "alt": "الصورة الشخصية",
+      "upload": "رفع"
     },
     "topbar": {
       "save": "حفظ",
       "back_to_dictations": "العودة إلى قائمة الإملاءات"
+    },
+    "sections": {
+      "local_models": "إعدادات نماذج اللغة دون اتصال",
+      "dictation_settings": "إعدادات الإملاء",
+      "assignment_history": "سجل المهام",
+      "groups": "المجموعات"
+    },
+    "assignment_history": {
+      "retention": {
+        "label": "الاحتفاظ بسجل المهام",
+        "days_0": "0 يوم",
+        "days_7": "7 أيام",
+        "days_30": "30 يومًا",
+        "help": "يتم الاحتفاظ بسجل المهام لمدة تصل إلى 30 يومًا. قد يتم حذف ما هو أقدم من ذلك."
+      }
+    },
+    "telegram": {
+      "teacher_notifications": {
+        "title": "تلقي إشعارات الطلاب عبر Telegram",
+        "label": "تلقي إشعارات الطلاب عبر Telegram"
+      },
+      "self_reports": {
+        "title": "إرسال نتائج الإملاء الخاصة بي إلى Telegram",
+        "label_html": "إرسال نتائج الإملاء الخاصة بي<br>إلى Telegram"
+      },
+      "link": {
+        "title": "ربط Telegram",
+        "toggle_aria": "طي/توسيع ربط Telegram",
+        "get_code": "الحصول على رمز",
+        "code_placeholder": "رمز",
+        "copy_start_cmd_title": "نسخ أمر /start إلى الحافظة",
+        "refresh_status_title": "تحديث الحالة بدون إعادة تحميل الصفحة"
+      }
+    },
+    "groups": {
+      "filter": {
+        "title": "تصفية",
+        "active": "إظهار النشطة فقط",
+        "all": "إظهار الكل"
+      },
+      "actions": {
+        "create_group_title": "مجموعة جديدة",
+        "delete_group_title": "حذف/أرشفة المجموعة"
+      },
+      "invite_link": {
+        "label": "رابط الدعوة"
+      },
+      "students": {
+        "title": "الطلاب",
+        "invite_email_title": "طالب جديد (البريد)",
+        "invite_link_title": "دعوة طالب (رابط)",
+        "delete_title": "إزالة الطالب"
+      },
+      "memberships": {
+        "title": "أنا ضمن مجموعات",
+        "leave_title": "مغادرة المجموعة"
+      },
+      "modal": {
+        "title": "مجموعة",
+        "name": "الاسم",
+        "description": "الوصف"
+      },
+      "restore": {
+        "confirm": "استعادة المجموعة؟"
+      },
+      "invite_email": {
+        "modal_title": "طالب جديد (البريد)",
+        "email_label": "بريد الطالب",
+        "send": "دعوة"
+      }
+    },
+    "exit_modal": {
+      "title": "العودة إلى سطح المكتب؟",
+      "message": "ماذا نفعل بالتغييرات الحالية؟",
+      "stay": "البقاء",
+      "exit": "خروج"
+    },
+    "crop_modal": {
+      "title": "قص الصورة الشخصية"
     }
   }
 }
