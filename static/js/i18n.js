@@ -29,9 +29,20 @@
         loading: null,
     };
 
+    function getCacheBustingSuffix() {
+        try {
+            const v = (window && (window.__APP_BUILD || window.__APP_CACHE_REVISION)) ? String(window.__APP_BUILD || window.__APP_CACHE_REVISION) : '';
+            if (!v) return '';
+            return `?v=${encodeURIComponent(v)}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
     async function loadDict(lang) {
         const l = (lang || '').trim().toLowerCase() || DEFAULT_LANG;
-        const res = await fetch(`/static/i18n/${encodeURIComponent(l)}.json`, { cache: 'force-cache' });
+        const suffix = getCacheBustingSuffix();
+        const res = await fetch(`/static/i18n/${encodeURIComponent(l)}.json${suffix}`, { cache: 'force-cache' });
         if (!res.ok) throw new Error('i18n_load_failed');
         const data = await res.json();
         return (data && typeof data === 'object') ? data : {};
