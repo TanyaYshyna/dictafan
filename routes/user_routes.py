@@ -23,8 +23,16 @@ from flask import render_template_string
 # Импортируем из helpers
 from helpers.language_data import load_language_data
 from helpers.user_helpers import get_user_folder, email_to_folder
-from helpers.db_users import get_user_by_email, create_user, update_user
+from helpers.db_users import (
+    get_user_by_email,
+    create_user,
+    update_user,
+    verify_user_password,
+    create_password_reset_token,
+    reset_password_by_token,
+)
 from helpers.email_sender import send_email
+from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_telegram import (
     generate_and_store_telegram_link_code,
     link_telegram_chat_by_code,
