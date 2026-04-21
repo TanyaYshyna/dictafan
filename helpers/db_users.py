@@ -159,11 +159,11 @@ def _ensure_users_password_reset_columns(cur) -> None:
     rows = cur.fetchall() or []
     cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
     if 'password_reset_token' not in cols:
-        cur.execute("ALTER TABLE users ADD COLUMN password_reset_token TEXT")
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT")
     if 'password_reset_expires_at' not in cols:
-        cur.execute("ALTER TABLE users ADD COLUMN password_reset_expires_at TIMESTAMP")
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ")
     if 'password_reset_last_request_at' not in cols:
-        cur.execute("ALTER TABLE users ADD COLUMN password_reset_last_request_at TIMESTAMP")
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_last_request_at TIMESTAMPTZ")
 
 
 def create_password_reset_token(email: str, ttl_minutes: int = 30, cooldown_seconds: int = 120) -> Optional[str]:
