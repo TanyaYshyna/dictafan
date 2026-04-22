@@ -2305,15 +2305,24 @@ function updateStartModalProgressUi() {
         if (!confirmStartBtn) return;
         const labelEl = document.getElementById('startProgressLabel');
 
-        // Determine which sentences participate in the dictation (checked + completed).
-        const activeSentences = (allSentences || []).filter((s) => {
-            try {
-                const state = String(s && s.selection_state ? s.selection_state : '').toLowerCase();
-                return state === 'checked' || state === 'completed';
-            } catch (e) {
-                return false;
+        // Determine which sentences participate in the dictation.
+        // Relying on selection_state here is unsafe (it can be undefined/out-of-sync),
+        // so we use the authoritative list rendered in the start modal table when possible.
+        let activeSentences = [];
+        try {
+            const table = document.getElementById('sentences-table');
+            const keyButtons = table ? Array.from(table.querySelectorAll('tr button[data-key]')) : [];
+            const keys = keyButtons.map((b) => String(b.dataset.key || '')).filter(Boolean);
+            if (keys.length) {
+                const byKey = makeByKeyMap(allSentences || []);
+                activeSentences = keys.map((k) => byKey.get(k)).filter(Boolean);
             }
-        });
+        } catch (e) {
+        }
+
+        if (!activeSentences.length) {
+            activeSentences = (allSentences || []).slice();
+        }
 
         const n = activeSentences.length;
         const repeats = Math.max(0, Number(REQUIRED_PASSED_COUNT) || 0);
