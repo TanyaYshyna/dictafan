@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ ui_lang }}" dir="{{ ui_dir }}">
 
 <head>
     <meta charset="UTF-8">
@@ -46,10 +46,21 @@
 <body>
     <script>
         try {
-            const uiLang = (localStorage.getItem('ui_lang') || 'ru').toString();
-            document.documentElement.lang = uiLang;
-            const isRtl = uiLang.toLowerCase().startsWith('ar');
-            document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+            const supported = ['en', 'uk', 'ru', 'ar'];
+            const storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
+            const stored = supported.includes(storedRaw) ? storedRaw : '';
+
+            // Prefer a valid stored language; otherwise keep SSR-provided lang/dir.
+            const ssrLang = (document.documentElement.lang || '').toString().trim().toLowerCase();
+            const finalLang = stored || (supported.includes(ssrLang) ? ssrLang : 'en');
+
+            document.documentElement.lang = finalLang;
+            document.documentElement.dir = finalLang.startsWith('ar') ? 'rtl' : 'ltr';
+
+            // Normalize localStorage to prevent future invalid loads
+            if (stored && stored !== storedRaw) {
+                localStorage.setItem('ui_lang', stored);
+            }
         } catch (e) {
         }
     </script>
