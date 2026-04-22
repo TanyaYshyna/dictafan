@@ -1735,6 +1735,14 @@ document.addEventListener('DOMContentLoaded', async function () {
             document.querySelector('.profile-container').style.display = 'none';
             return;
         }
+
+        try {
+            if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+                await window.I18n.ensureLoaded();
+            }
+        } catch (e) {
+        }
+
         initializeUiLangSelector();
         loadUserData();
         initializeLanguageSelector();
