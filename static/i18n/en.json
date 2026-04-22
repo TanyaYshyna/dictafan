@@ -115,6 +115,10 @@
         "title": "Send me my dictation results in Telegram",
         "label_html": "Send me my dictation results<br>in Telegram"
       },
+      "status": {
+        "linked": "Linked (chat_id: {chat_id})",
+        "not_linked": "Not linked"
+      },
       "link": {
         "title": "Link Telegram",
         "toggle_aria": "Collapse/expand Telegram link section",

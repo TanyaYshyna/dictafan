@@ -115,6 +115,10 @@
         "title": "إرسال نتائج الإملاء الخاصة بي إلى Telegram",
         "label_html": "إرسال نتائج الإملاء الخاصة بي<br>إلى Telegram"
       },
+      "status": {
+        "linked": "تم الربط (chat_id: {chat_id})",
+        "not_linked": "غير مرتبط"
+      },
       "link": {
         "title": "ربط Telegram",
         "toggle_aria": "طي/توسيع ربط Telegram",

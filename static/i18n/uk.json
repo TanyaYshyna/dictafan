@@ -115,6 +115,10 @@
         "title": "надсилати мені в Telegram підсумки моїх виконаних диктантів",
         "label_html": "надсилати мені в Telegram підсумки<br>моїх виконаних диктантів"
       },
+      "status": {
+        "linked": "прив’язано (chat_id: {chat_id})",
+        "not_linked": "не прив’язано"
+      },
       "link": {
         "title": "Прив'язати Telegram",
         "toggle_aria": "Згорнути/розгорнути прив'язку Telegram",

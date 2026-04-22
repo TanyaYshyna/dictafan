@@ -279,6 +279,8 @@ function initializeProfileSectionToggles() {
             const btn = e.target && e.target.closest ? e.target.closest('.profile-section-toggle') : null;
             if (!btn) return;
 
+            const wasUnsaved = !!hasUnsavedChanges;
+
             const targetSelector = btn.dataset ? btn.dataset.target : null;
             if (!targetSelector) return;
 
@@ -297,6 +299,16 @@ function initializeProfileSectionToggles() {
 
             if (window.lucide) {
                 window.lucide.createIcons({ root: btn });
+            }
+
+            if (!wasUnsaved) {
+                setTimeout(() => {
+                    try {
+                        checkForChanges();
+                        if (hasUnsavedChanges) setUnsavedState(false);
+                    } catch (e) {
+                    }
+                }, 0);
             }
         });
     } catch (e) {
