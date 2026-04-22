@@ -929,7 +929,19 @@ function dictationT(key, fallback, params) {
     try {
         if (!window.I18n || typeof window.I18n.t !== 'function') return fallback;
         const fullKey = key.startsWith('dictation.') ? key : `dictation.${key}`;
-        return window.I18n.t(fullKey, fallback, params);
+        const translated = window.I18n.t(fullKey, params);
+        if (typeof translated === 'string' && translated !== fullKey) return translated;
+
+        // Fallback formatting (keep parity with i18n.js format())
+        if (fallback == null) return fullKey;
+        const text = String(fallback);
+        if (!params) return text;
+        return text.replace(/\{(\w+)\}/g, (m, name) => {
+            if (Object.prototype.hasOwnProperty.call(params, name)) {
+                return String(params[name]);
+            }
+            return m;
+        });
     } catch (e) {
         return fallback;
     }
@@ -2520,8 +2532,8 @@ function applySentenceColumnPrefsToUi() {
         } catch (e) {
         }
 
-        renderLucideToggleFlagButton(toggleOriginalColumnBtn, showO, 'Оригинал');
-        renderLucideToggleFlagButton(toggleTranslationColumnBtn, showT, 'Перевод');
+        renderLucideToggleFlagButton(toggleOriginalColumnBtn, showO, dictationT('start_modal.original', 'Оригинал'));
+        renderLucideToggleFlagButton(toggleTranslationColumnBtn, showT, dictationT('start_modal.translation', 'Перевод'));
     } catch (e) {
     }
 }
@@ -3932,7 +3944,7 @@ function showNoSelectionModal(customMessage = null) {
 
     const messageNode = noSelectionModal.querySelector('.warning-message');
     if (messageNode) {
-        messageNode.textContent = customMessage || 'Пожалуйста, отметьте предложения для работы в таблице выше.';
+        messageNode.textContent = customMessage || dictationT('no_selection.message', 'Пожалуйста, отметьте предложения для работы в таблице выше.');
     }
 
     // Показываем модальное окно
@@ -4673,7 +4685,8 @@ function updateAllCheckboxState() {
         iconName = 'circle-alert'; // иконка с восклицательным знаком для неопределенного состояния
     }
 
-    allCheckbox.innerHTML = `<i data-lucide="${iconName}"></i>Отметить все`;
+    const label = dictationT('start_modal.select_all', 'Отметить все');
+    allCheckbox.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(label)}</span>`;
 
     // Обновляем иконки Lucide
     lucide.createIcons();
@@ -4740,8 +4753,10 @@ function initializeMixControl() {
             this.dataset.checked = newState;
 
             const iconName = newState === 'true' ? 'shuffle' : 'move-right';
-            const textName = newState === 'true' ? 'Перемешать предложения' : 'Прямой порядок предложений';
-            this.innerHTML = `<i data-lucide="${iconName}"></i>${textName}`;
+            const textName = newState === 'true'
+                ? dictationT('start_modal.shuffle_order', 'Перемешать предложения')
+                : dictationT('start_modal.direct_order', 'Прямой порядок');
+            this.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(textName)}</span>`;
 
             if (window.lucide?.createIcons) {
                 lucide.createIcons();
@@ -4751,8 +4766,10 @@ function initializeMixControl() {
     }
 
     const iconName = mixControl.dataset.checked === 'true' ? 'shuffle' : 'move-right';
-    const textName = mixControl.dataset.checked === 'true' ? 'Перемешать предложения' : 'Прямой порядок предложений';
-    mixControl.innerHTML = `<i data-lucide="${iconName}"></i>${textName}`;
+    const textName = mixControl.dataset.checked === 'true'
+        ? dictationT('start_modal.shuffle_order', 'Перемешать предложения')
+        : dictationT('start_modal.direct_order', 'Прямой порядок');
+    mixControl.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(textName)}</span>`;
 
     if (window.lucide?.createIcons) {
         lucide.createIcons();
@@ -5216,7 +5233,11 @@ async function startGame(isResume = false) {
         console.log('[startGame] Определено продолжение черновика по флагу hasDraftLoaded');
     }
 
-    // ...
+    // Re-compute selection from the UI right before starting.
+    try {
+        getSelectedSentences();
+    } catch (e) {
+    }
 
     // Валидируем настройки нагрузки: нельзя выключить и текст, и аудио одновременно
     // (если repeats=0 и without_entering_text=true, пользователь вообще ничего не сможет делать)
@@ -5262,8 +5283,71 @@ async function startGame(isResume = false) {
         }
     }
 
-    // ...
 
+    // Prepare sentence order (shuffle if enabled)
+    try {
+        prepareGameFromTable();
+    } catch (e) {
+    }
+
+    // If still nothing selected - abort.
+    if (!Array.isArray(selectedSentences) || !selectedSentences.length) {
+        showNoSelectionModal(dictationT('no_selection.nothing_to_do', 'Ничего не выбрано для диктанта'));
+        return;
+    }
+
+    // Close start modal and actually start the session
+    try {
+        if (startModal) startModal.style.display = 'none';
+    } catch (e) {
+    }
+
+    try {
+        // Mark game started for inactivity timer logic
+        gameHasAlreadyBegun = true;
+    } catch (e) {
+    }
+
+    try {
+        // Start / resume timer
+        if (typeof startTimer === 'function') {
+            startTimer();
+        }
+    } catch (e) {
+    }
+
+    try {
+        initTabloSentenceCounter();
+    } catch (e) {
+    }
+
+    try {
+        // When starting from scratch, always begin from the first selected sentence.
+        // Resume flow can set currentSentenceIndex elsewhere via draft restore.
+        if (!isResume) {
+            currentSentenceIndex = 0;
+        }
+    } catch (e) {
+        currentSentenceIndex = 0;
+    }
+
+    try {
+        // Ensure totalSelectedSentences is stable for navigation
+        totalSelectedSentences = selectedSentences.length;
+    } catch (e) {
+    }
+
+    try {
+        showCurrentSentence(0, currentSentenceIndex || 0);
+    } catch (e) {
+        console.warn('[startGame] failed to show first sentence', e);
+    }
+
+    try {
+        currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
+        resetInactivityTimer();
+    } catch (e) {
+    }
 }
 
 // ...

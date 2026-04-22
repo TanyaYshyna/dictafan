@@ -261,6 +261,7 @@
       "original": "original",
       "translation": "translation",
       "direct_order": "direct order",
+      "shuffle_order": "shuffle",
       "reset": "Start over",
       "send_interim_report": "Send interim report",
       "settings": "Settings",
@@ -353,6 +354,7 @@
       "no_layout": "Keyboard layout is not available for the current language"
     },
     "no_selection": {
+      "message": "Please select sentences to work on in the table above.",
       "load_failed_check_internet": "Failed to load dictation. Check your internet and refresh the page.",
       "cache_save_failed": "Failed to save dictation to cache. Refresh the page.",
       "settings_disable_text_and_audio": "Both text and audio are disabled in settings. Enable at least one exercise.",
