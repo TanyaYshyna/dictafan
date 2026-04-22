@@ -662,10 +662,14 @@ function renderAssignmentSourceGroupIfAny() {
     try {
         const el = document.getElementById('assignment-source-group');
         if (!el) return;
-        const title = (window.assignmentSourceGroupTitle != null) ? String(window.assignmentSourceGroupTitle) : '';
-        // По UX не выводим "Группа" в шапку (если нужно — пользователь увидит в настройках/профиле).
-        el.textContent = '';
-        el.style.display = 'none';
+        const assignmentId = (window.assignmentId != null) ? String(window.assignmentId) : '';
+        if (!assignmentId) {
+            el.textContent = '';
+            el.style.display = 'none';
+            return;
+        }
+        el.textContent = `Задание ${assignmentId}`;
+        el.style.display = 'inline-flex';
     } catch (e) {
     }
 }
@@ -1916,6 +1920,33 @@ async function loadAudioSettingsFromUser() {
 // let allSentences = JSON.parse(rawJson); // все предложения всего диктанта (самый широкий)
 let allSentences = [];
 
+function getAssignmentActiveContext() {
+    try {
+        const raw = sessionStorage.getItem('dictafan_assignment_active_ctx');
+        if (!raw) return null;
+        const ctx = JSON.parse(raw);
+        if (!ctx || typeof ctx !== 'object') return null;
+        return ctx;
+    } catch (e) {
+        return null;
+    }
+}
+
+function setAssignmentActiveContext(ctx) {
+    try {
+        if (!ctx || typeof ctx !== 'object') return;
+        sessionStorage.setItem('dictafan_assignment_active_ctx', JSON.stringify(ctx));
+    } catch (e) {
+    }
+}
+
+function clearAssignmentActiveContext() {
+    try {
+        sessionStorage.removeItem('dictafan_assignment_active_ctx');
+    } catch (e) {
+    }
+}
+
 function getAssignmentLaunchContext() {
     try {
         const raw = localStorage.getItem('dictafan_assignment_launch_ctx');
@@ -1943,7 +1974,7 @@ function clearAssignmentLaunchContext() {
 }
 
 function applyAssignmentSentenceSubsetIfNeeded() {
-    const ctx = getAssignmentLaunchContext();
+    const ctx = getAssignmentActiveContext() || getAssignmentLaunchContext();
     if (!ctx) return false;
 
     try {
@@ -1963,6 +1994,13 @@ function applyAssignmentSentenceSubsetIfNeeded() {
         : null;
     if (!positions || !positions.length) {
         return false;
+    }
+
+    // Keep assignment context within the current tab (survives reload) but do not leak it across tabs.
+    // Launch context comes from another page via localStorage; once applied we move it to sessionStorage.
+    try {
+        setAssignmentActiveContext(ctx);
+    } catch (e) {
     }
 
     const allowed = new Set(positions);

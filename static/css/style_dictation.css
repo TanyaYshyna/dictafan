@@ -408,7 +408,7 @@ body.playing-audio::after {
 .start-progress-label {
   position: absolute;
   right: 10px;
-  bottom: 8px;
+  bottom: 14px;
   font-size: 13px;
   font-weight: 700;
   color: rgba(0, 0, 0, 0.55);
@@ -428,8 +428,8 @@ body.playing-audio::after {
 #confirmStartBtn {
   /* padding: 12px 24px; */
   font-size: 30px;
-  background: var(--color-button-lightgreen);
-  color: var(--color-button-text-lightgreen);
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
   border: none;
   border-radius: 6px;
   /* box-shadow: var(--color-button-shadow-lightgreen); */
