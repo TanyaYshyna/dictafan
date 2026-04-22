@@ -2300,6 +2300,71 @@ let isAudioLoaded = false;
 const startModal = document.getElementById('start-modal');
 const confirmStartBtn = document.getElementById('confirmStartBtn');
 
+function updateStartModalProgressUi() {
+    try {
+        if (!confirmStartBtn) return;
+        const labelEl = document.getElementById('startProgressLabel');
+
+        // Determine which sentences participate in the dictation (checked + completed).
+        const activeSentences = (allSentences || []).filter((s) => {
+            try {
+                const state = String(s && s.selection_state ? s.selection_state : '').toLowerCase();
+                return state === 'checked' || state === 'completed';
+            } catch (e) {
+                return false;
+            }
+        });
+
+        const n = activeSentences.length;
+        const repeats = Math.max(0, Number(REQUIRED_PASSED_COUNT) || 0);
+
+        let doneStars = 0;
+        let doneMics = 0;
+        for (const s of activeSentences) {
+            const perfect = Number(s && s.number_of_perfect ? s.number_of_perfect : 0) || 0;
+            if (perfect > 0) doneStars += 1;
+            const audio = Number(s && s.number_of_audio ? s.number_of_audio : 0) || 0;
+            doneMics += Math.min(audio, repeats);
+        }
+
+        const total = n + (n * repeats);
+        const done = doneStars + doneMics;
+
+        // Text + colors
+        const yellow = 'var(--color-button-yellow)';
+        const yellowText = 'var(--color-button-text-yellow)';
+        const green = 'var(--color-button-lightgreen)';
+        const greenText = 'var(--color-button-text-lightgreen)';
+
+        if (!total || done <= 0) {
+            confirmStartBtn.textContent = 'СТАРТ';
+            confirmStartBtn.style.background = yellow;
+            confirmStartBtn.style.color = yellowText;
+            if (labelEl) labelEl.textContent = '';
+            return;
+        }
+
+        // Progress label is shown for any non-zero progress.
+        if (labelEl) {
+            labelEl.textContent = `${done}/${total}`;
+        }
+
+        if (done >= total) {
+            confirmStartBtn.textContent = 'Победа! Ты красавчик!!!';
+            confirmStartBtn.style.background = green;
+            confirmStartBtn.style.color = greenText;
+            return;
+        }
+
+        confirmStartBtn.textContent = 'Продолжаем!!!';
+        confirmStartBtn.style.color = greenText;
+        const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+        // Completed (green) + remaining (yellow)
+        confirmStartBtn.style.background = `linear-gradient(90deg, ${green} 0%, ${green} ${pct}%, ${yellow} ${pct}%, ${yellow} 100%)`;
+    } catch (e) {
+    }
+}
+
 // ===== Элементы DOM =====
 const count_perfect = document.getElementById('count_perfect');
 const count_corrected = document.getElementById('count_corrected');
@@ -5384,6 +5449,11 @@ function updateStats(circle = null) {
     // Обновляем статистику в старой системе (для совместимости)
     if (dictationStatistics) {
         dictationStatistics.updateStats(totalPerfect, totalCorrected, totalAudio, totalTotal);
+    }
+
+    try {
+        updateStartModalProgressUi();
+    } catch (e) {
     }
 };
 

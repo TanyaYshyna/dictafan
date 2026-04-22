@@ -6,14 +6,6 @@ let isSavingProfile = false;
 let pendingAvatarBlob = null;
 let passwordTouched = false;
 
-function isUnsavedStarDebugEnabled() {
-    try {
-        return String(localStorage.getItem('debug_unsaved_star') || '') === '1';
-    } catch (e) {
-        return false;
-    }
-}
-
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
 let profileTestChunks = [];
@@ -2244,31 +2236,11 @@ function checkForChanges() {
 
     const hasChanges = Object.values(diffs).some(Boolean);
 
-    if (isUnsavedStarDebugEnabled() && !hasUnsavedChanges && hasChanges) {
-        try {
-            console.group('[profile] unsaved_star_on');
-            console.log('diffs:', diffs);
-            console.log('currentValues:', currentValues);
-            console.log('originalData:', originalData);
-            console.trace('checkForChanges stack');
-            console.groupEnd();
-        } catch (e) {
-        }
-    }
-
     setUnsavedState(hasChanges);
 }
 
 function setUnsavedState(state) {
-    const prev = hasUnsavedChanges;
     hasUnsavedChanges = state;
-
-    if (isUnsavedStarDebugEnabled() && !prev && state) {
-        try {
-            console.trace('[profile] setUnsavedState(true) stack');
-        } catch (e) {
-        }
-    }
 
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {

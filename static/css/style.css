@@ -404,11 +404,16 @@ body.dictation-vk-enabled #userInput.text-input {
      position: relative;
      width: 100%;
  }
-
+ 
  .password-input-wrapper input {
      padding-right: 44px;
  }
 
+ html[dir="rtl"] .password-input-wrapper input {
+     padding-right: 12px;
+     padding-left: 44px;
+ }
+ 
  .password-toggle-btn {
      position: absolute;
      right: 10px;
@@ -423,6 +428,11 @@ body.dictation-vk-enabled #userInput.text-input {
      border-radius: 8px;
  }
 
+ html[dir="rtl"] .password-toggle-btn {
+     right: auto;
+     left: 10px;
+ }
+ 
  .password-toggle-btn i {
      width: 20px;
      height: 20px;

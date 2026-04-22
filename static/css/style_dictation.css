@@ -395,6 +395,27 @@ body.playing-audio::after {
   z-index: 1000;
 }
 
+/* Progress wrapper for the big START button */
+.start-progress-wrap {
+  width: 100%;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 8px auto;
+}
+
+.start-progress-label {
+  position: absolute;
+  right: 6%;
+  bottom: -14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.55);
+  user-select: none;
+  pointer-events: none;
+}
+
 #exitModal {
   z-index: 1300;
 }
@@ -417,7 +438,7 @@ body.playing-audio::after {
   align-items: center;
   width: 90%;
   height: 100%;
-  margin: 8px auto;
+  margin: 0;
 
 }
 #confirmStartBtn:focus {
