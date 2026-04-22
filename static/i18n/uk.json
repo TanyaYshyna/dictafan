@@ -127,9 +127,22 @@
       },
       "errors": {
         "profile_refresh_failed": "Не вдалося оновити профіль"
+      },
+      "help": {
+        "prefix": "Щоб прив’язати Telegram:",
+        "prefix_other": "Щоб прив’язати інший акаунт:",
+        "step1": "-  натисни «<span class=\"telegram-inline-icon\"><i data-lucide=\"key\"></i></span> Отримати код»,",
+        "step2": "- потім надішли в Telegram команду з кнопки <span class=\"telegram-inline-icon\"><i data-lucide=\"copy\"></i></span>"
       }
     },
     "groups": {
+      "table": {
+        "id": "ID",
+        "name": "Назва"
+      },
+      "errors": {
+        "name_required": "Назва обов’язкова"
+      },
       "details": {
         "select_left": "Вибери групу зліва"
       },
@@ -177,6 +190,31 @@
         "modal_title": "Новий учень (email)",
         "email_label": "Email учня",
         "send": "Запросити"
+      }
+    },
+    "models": {
+      "all_models": "Усі моделі",
+      "languages": "Мови",
+      "browser_storage": "Сховище браузера:",
+      "loading_info": "Завантажуємо інформацію...",
+      "calculating_storage": "Розраховуємо використання пам’яті...",
+      "downloaded_prefix": "Завантажено:",
+      "no_downloaded_models": "немає завантажених моделей",
+      "download_modal": {
+        "title": "Завантаження моделі",
+        "preparing": "Підготовка завантаження…",
+        "downloading": "Завантаження…"
+      },
+      "storage": {
+        "stats": "Використано: {used} | Всього: {total}",
+        "models_short": "Моделі: {count} ({size})",
+        "used": "Використано:",
+        "available": "Доступно:",
+        "total": "Всього:",
+        "models": "Моделі:",
+        "models_count": "{count} ({size})",
+        "downloaded_models": "Завантажено моделей:",
+        "models_size": "Розмір моделей:"
       }
     },
     "auth": {

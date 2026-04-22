@@ -127,9 +127,22 @@
       },
       "errors": {
         "profile_refresh_failed": "Не удалось обновить профиль"
+      },
+      "help": {
+        "prefix": "Чтобы привязать Telegram:",
+        "prefix_other": "Чтобы привязать другой аккаунт:",
+        "step1": "-  нажми «<span class=\"telegram-inline-icon\"><i data-lucide=\"key\"></i></span> Получить код»,",
+        "step2": "- затем отправь в Telegram команду из кнопки <span class=\"telegram-inline-icon\"><i data-lucide=\"copy\"></i></span>"
       }
     },
     "groups": {
+      "table": {
+        "id": "ID",
+        "name": "Название"
+      },
+      "errors": {
+        "name_required": "Название обязательно"
+      },
       "details": {
         "select_left": "Выбери группу слева"
       },
@@ -177,6 +190,31 @@
         "modal_title": "Новый ученик (email)",
         "email_label": "Email ученика",
         "send": "Пригласить"
+      }
+    },
+    "models": {
+      "all_models": "Все модели",
+      "languages": "Языки",
+      "browser_storage": "Хранилище браузера:",
+      "loading_info": "Загрузка информации...",
+      "calculating_storage": "Рассчитываем использование памяти...",
+      "downloaded_prefix": "Загружено:",
+      "no_downloaded_models": "нет загруженных моделей",
+      "download_modal": {
+        "title": "Загрузка модели",
+        "preparing": "Подготовка загрузки…",
+        "downloading": "Загрузка…"
+      },
+      "storage": {
+        "stats": "Использовано: {used} | Всего: {total}",
+        "models_short": "Модели: {count} ({size})",
+        "used": "Использовано:",
+        "available": "Доступно:",
+        "total": "Всего:",
+        "models": "Модели:",
+        "models_count": "{count} ({size})",
+        "downloaded_models": "Загружено моделей:",
+        "models_size": "Размер моделей:"
       }
     },
     "auth": {

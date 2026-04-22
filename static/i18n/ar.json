@@ -127,9 +127,22 @@
       },
       "errors": {
         "profile_refresh_failed": "تعذر تحديث الملف الشخصي"
+      },
+      "help": {
+        "prefix": "لربط Telegram:",
+        "prefix_other": "لربط حساب آخر:",
+        "step1": "- اضغط «<span class=\"telegram-inline-icon\"><i data-lucide=\"key\"></i></span> الحصول على رمز»،",
+        "step2": "- ثم أرسل إلى Telegram الأمر من زر <span class=\"telegram-inline-icon\"><i data-lucide=\"copy\"></i></span>"
       }
     },
     "groups": {
+      "table": {
+        "id": "ID",
+        "name": "الاسم"
+      },
+      "errors": {
+        "name_required": "الاسم مطلوب"
+      },
       "details": {
         "select_left": "اختر مجموعة على اليسار"
       },
@@ -177,6 +190,31 @@
         "modal_title": "طالب جديد (البريد)",
         "email_label": "بريد الطالب",
         "send": "دعوة"
+      }
+    },
+    "models": {
+      "all_models": "جميع النماذج",
+      "languages": "اللغات",
+      "browser_storage": "تخزين المتصفح:",
+      "loading_info": "جارٍ تحميل المعلومات...",
+      "calculating_storage": "جارٍ حساب استخدام التخزين...",
+      "downloaded_prefix": "تم التنزيل:",
+      "no_downloaded_models": "لا توجد نماذج مُنزَّلة",
+      "download_modal": {
+        "title": "تنزيل النموذج",
+        "preparing": "جارٍ التحضير للتنزيل…",
+        "downloading": "جارٍ التنزيل…"
+      },
+      "storage": {
+        "stats": "المستخدم: {used} | الإجمالي: {total}",
+        "models_short": "النماذج: {count} ({size})",
+        "used": "المستخدم:",
+        "available": "المتاح:",
+        "total": "الإجمالي:",
+        "models": "النماذج:",
+        "models_count": "{count} ({size})",
+        "downloaded_models": "النماذج المُنزَّلة:",
+        "models_size": "حجم النماذج:"
       }
     },
     "auth": {

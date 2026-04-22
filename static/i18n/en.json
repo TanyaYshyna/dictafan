@@ -127,9 +127,22 @@
       },
       "errors": {
         "profile_refresh_failed": "Failed to refresh profile"
+      },
+      "help": {
+        "prefix": "To link Telegram:",
+        "prefix_other": "To link another account:",
+        "step1": "- click «<span class=\"telegram-inline-icon\"><i data-lucide=\"key\"></i></span> Get code»,",
+        "step2": "- then send the Telegram command using the <span class=\"telegram-inline-icon\"><i data-lucide=\"copy\"></i></span> button"
       }
     },
     "groups": {
+      "table": {
+        "id": "ID",
+        "name": "Name"
+      },
+      "errors": {
+        "name_required": "Name is required"
+      },
       "details": {
         "select_left": "Select a group on the left"
       },
@@ -177,6 +190,31 @@
         "modal_title": "New student (email)",
         "email_label": "Student email",
         "send": "Invite"
+      }
+    },
+    "models": {
+      "all_models": "All models",
+      "languages": "Languages",
+      "browser_storage": "Browser storage:",
+      "loading_info": "Loading info...",
+      "calculating_storage": "Calculating storage usage...",
+      "downloaded_prefix": "Downloaded:",
+      "no_downloaded_models": "no downloaded models",
+      "download_modal": {
+        "title": "Model download",
+        "preparing": "Preparing download…",
+        "downloading": "Downloading…"
+      },
+      "storage": {
+        "stats": "Used: {used} | Total: {total}",
+        "models_short": "Models: {count} ({size})",
+        "used": "Used:",
+        "available": "Available:",
+        "total": "Total:",
+        "models": "Models:",
+        "models_count": "{count} ({size})",
+        "downloaded_models": "Downloaded models:",
+        "models_size": "Models size:"
       }
     },
     "auth": {
