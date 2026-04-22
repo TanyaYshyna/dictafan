@@ -2349,7 +2349,9 @@ function updateStartModalProgressUi() {
             confirmStartBtn.textContent = 'СТАРТ';
             confirmStartBtn.style.background = yellow;
             confirmStartBtn.style.color = yellowText;
-            if (labelEl) labelEl.textContent = '';
+            if (labelEl) {
+                labelEl.textContent = total ? `0/${total}` : '';
+            }
             return;
         }
 
