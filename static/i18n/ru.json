@@ -241,5 +241,129 @@
     "crop_modal": {
       "title": "Обрезка аватара"
     }
+  },
+  "dictation": {
+    "topbar": {
+      "show_statistics": "Показать статистику",
+      "settings": "Настройки",
+      "save": "Сохранить",
+      "back_to_list": "Вернуться к списку диктантов",
+      "streak_title": "Несгораемая сумма дней",
+      "cover_alt": "Обложка диктанта"
+    },
+    "start_button": {
+      "start": "СТАРТ",
+      "continue": "Продолжаем!!!",
+      "victory": "Победа! Ты красавчик!!!"
+    },
+    "start_modal": {
+      "select_all": "отметить все",
+      "original": "оригинал",
+      "translation": "перевод",
+      "direct_order": "прямой порядок",
+      "reset": "Давай по новой",
+      "send_interim_report": "Отправить промежуточный отчет",
+      "settings": "Настройки",
+      "exit": "Выйти из диктанта",
+      "close": "Закрыть",
+      "table": {
+        "choice": "Выбор",
+        "row_number": "Номер строки",
+        "sentence": "Предложение",
+        "translation": "Перевод"
+      }
+    },
+    "exit_modal": {
+      "title": "Вернуться на рабочий стол?",
+      "message": "Что сделать с текущим прогрессом?",
+      "stay": "Остаться",
+      "exit": "Выйти"
+    },
+    "pause_modal": {
+      "title": "Пауза (control + esc)",
+      "resume": "Продолжить"
+    },
+    "settings_modal": {
+      "title": "Настройки",
+      "close": "Закрыть",
+      "teacher_report": {
+        "title": "Отчет в Telegram",
+        "desc": "Кому отправлять отчет после завершения диктанта"
+      }
+    },
+    "completion_modal": {
+      "title": "Поздравляем!",
+      "message": "Вы успешно завершили диктант!",
+      "results_title": "Посмотреть результаты",
+      "results": "Посмотреть результаты",
+      "exit": "Выйти"
+    },
+    "no_selection": {
+      "title": "Внимание! У нас проблема!",
+      "message": "Пожалуйста, отметьте предложения для работы в таблице выше.",
+      "ok": "Понятно"
+    },
+    "main": {
+      "check_title": "Нажмите Enter/Return когда закончили ввод текста",
+      "check": "Проверить",
+      "virtual_keyboard": "Показать клавиатуру",
+      "unsaved_progress": "Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)",
+      "recording_indicator": "Индикатор записи",
+      "recognition_mode": "Режим распознавания речи",
+      "paste_disabled": "Вставка текста отключена для этого поля"
+    },
+    "teacher_report": {
+      "no_dictation_data": "Нет данных о диктанте",
+      "loading": "Загрузка…",
+      "no_recipients": "Нет доступных получателей",
+      "self_label": "Я",
+      "teacher_fallback": "Учитель #{id}"
+    },
+    "assignment": {
+      "badge": "Задание {id}"
+    },
+    "cache": {
+      "loading": "Загрузка в кеш…",
+      "fetching_dictation": "Загрузка диктанта в кеш…"
+    },
+    "toasts": {
+      "progress_cleared": "Прогресс по предложениям очищен.",
+      "cache_missing_fetching": "Данных нет в кеше. Загружаю из интернета…",
+      "progress_saved": "Прогресс сохранён",
+      "progress_save_failed": "Не удалось сохранить прогресс",
+      "progress_save_error": "Ошибка при сохранении",
+      "progress_saved_continue_later": "Прогресс сохранён. Можно продолжить позже."
+    },
+    "alerts": {
+      "load_dictation_data_failed": "Ошибка загрузки данных диктанта",
+      "interim_report_sent": "Промежуточный отчет отправлен",
+      "interim_report_failed": "Не удалось отправить отчет"
+    },
+    "speech": {
+      "processing": "Распознаю...",
+      "speak": "Говорите...",
+      "speak_offline": "Говорите... (локально)",
+      "motivation_50": "Ты молодец, ты очень упорный!\nЗачитываю аудио за 5 попыток больше 50٪!!!\nНо попробуй уточнить с носителем или учителем что ты произносишь неправильно!",
+      "unavailable_browser": "Распознавание речи недоступно. Используйте Chrome, Edge или Safari.",
+      "no_internet": "Нет подключения к интернету. Web Speech API требует интернет для работы.",
+      "recognition_error_prefix": "Ошибка распознавания:",
+      "error_prefix": "Ошибка:"
+    },
+    "vk": {
+      "no_layout": "Раскладка для текущего языка отсутствует"
+    },
+    "no_selection": {
+      "load_failed_check_internet": "Не удалось загрузить диктант. Проверь интернет и обнови страницу.",
+      "cache_save_failed": "Не удалось сохранить диктант в кеш. Обнови страницу.",
+      "settings_disable_text_and_audio": "В настройках выключены и текст, и аудио. Включите хотя бы одно упражнение.",
+      "none_selected": "Ни одно предложение не выбрано для диктанта",
+      "audio_not_cached_reload": "Аудио не загружено в кеш. Перезагрузите диктант и дождитесь загрузки."
+    },
+    "main": {
+      "checking": "Проверка",
+      "excellent": "Прекрасно",
+      "good": "Хорошо",
+      "check_title": "Нажмите Enter/Return когда закончили ввод текста"
+    }
   }
 }

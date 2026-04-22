@@ -241,5 +241,129 @@
     "crop_modal": {
       "title": "قص الصورة الشخصية"
     }
+  },
+  "dictation": {
+    "topbar": {
+      "show_statistics": "عرض الإحصائيات",
+      "settings": "الإعدادات",
+      "save": "حفظ",
+      "back_to_list": "العودة إلى قائمة الإملاءات",
+      "streak_title": "سلسلة الأيام",
+      "cover_alt": "غلاف الإملاء"
+    },
+    "start_button": {
+      "start": "ابدأ",
+      "continue": "تابع!!!",
+      "victory": "النصر! أحسنت!!!"
+    },
+    "start_modal": {
+      "select_all": "تحديد الكل",
+      "original": "الأصل",
+      "translation": "الترجمة",
+      "direct_order": "ترتيب مباشر",
+      "reset": "ابدأ من جديد",
+      "send_interim_report": "إرسال تقرير مؤقت",
+      "settings": "الإعدادات",
+      "exit": "الخروج من الإملاء",
+      "close": "إغلاق",
+      "table": {
+        "choice": "اختيار",
+        "row_number": "رقم السطر",
+        "sentence": "الجملة",
+        "translation": "الترجمة"
+      }
+    },
+    "exit_modal": {
+      "title": "العودة إلى سطح المكتب؟",
+      "message": "ماذا نفعل بالتقدم الحالي؟",
+      "stay": "البقاء",
+      "exit": "خروج"
+    },
+    "pause_modal": {
+      "title": "إيقاف مؤقت (control + esc)",
+      "resume": "متابعة"
+    },
+    "settings_modal": {
+      "title": "الإعدادات",
+      "close": "إغلاق",
+      "teacher_report": {
+        "title": "تقرير Telegram",
+        "desc": "من الذي يجب أن يستلم التقرير بعد إكمال الإملاء"
+      }
+    },
+    "completion_modal": {
+      "title": "تهانينا!",
+      "message": "لقد أكملت الإملاء بنجاح!",
+      "results_title": "عرض النتائج",
+      "results": "عرض النتائج",
+      "exit": "خروج"
+    },
+    "no_selection": {
+      "title": "تنبيه! لدينا مشكلة!",
+      "message": "يرجى تحديد الجمل للعمل عليها في الجدول أعلاه.",
+      "ok": "حسنًا"
+    },
+    "main": {
+      "check_title": "اضغط Enter/Return عند الانتهاء من كتابة النص",
+      "check": "تحقق",
+      "virtual_keyboard": "إظهار لوحة المفاتيح",
+      "unsaved_progress": "هناك تقدم غير محفوظ (Ctrl/⌘ + S — حفظ)",
+      "recording_indicator": "مؤشر التسجيل",
+      "recognition_mode": "وضع التعرف على الكلام",
+      "paste_disabled": "تم تعطيل لصق النص لهذا الحقل"
+    },
+    "teacher_report": {
+      "no_dictation_data": "لا توجد بيانات للإملاء",
+      "loading": "جارٍ التحميل…",
+      "no_recipients": "لا توجد جهات مستلمة متاحة",
+      "self_label": "أنا",
+      "teacher_fallback": "المعلم #{id}"
+    },
+    "assignment": {
+      "badge": "المهمة {id}"
+    },
+    "cache": {
+      "loading": "جارٍ التحميل إلى ذاكرة التخزين المؤقت…",
+      "fetching_dictation": "جارٍ تحميل الإملاء إلى ذاكرة التخزين المؤقت…"
+    },
+    "toasts": {
+      "progress_cleared": "تم مسح تقدم الجمل.",
+      "cache_missing_fetching": "لا توجد بيانات في ذاكرة التخزين المؤقت. جارٍ التحميل من الإنترنت…",
+      "progress_saved": "تم حفظ التقدم",
+      "progress_save_failed": "تعذر حفظ التقدم",
+      "progress_save_error": "حدث خطأ أثناء الحفظ",
+      "progress_saved_continue_later": "تم حفظ التقدم. يمكنك المتابعة لاحقًا."
+    },
+    "alerts": {
+      "load_dictation_data_failed": "فشل تحميل بيانات الإملاء",
+      "interim_report_sent": "تم إرسال التقرير المؤقت",
+      "interim_report_failed": "تعذر إرسال التقرير"
+    },
+    "speech": {
+      "processing": "جارٍ التعرف…",
+      "speak": "تحدث…",
+      "speak_offline": "تحدث… (محليًا)",
+      "motivation_50": "أحسنت — أنت مثابر جدًا!\nسأحتسب الصوت مع 5 محاولات فوق 50٪!!!\nلكن حاول أن تسأل متحدثًا أصليًا أو معلمًا عمّا تنطقه بشكل غير صحيح!",
+      "unavailable_browser": "التعرف على الكلام غير متاح. استخدم Chrome أو Edge أو Safari.",
+      "no_internet": "لا يوجد اتصال بالإنترنت. يتطلب Web Speech API الإنترنت ليعمل.",
+      "recognition_error_prefix": "خطأ في التعرف:",
+      "error_prefix": "خطأ:"
+    },
+    "vk": {
+      "no_layout": "تخطيط لوحة المفاتيح غير متاح للغة الحالية"
+    },
+    "no_selection": {
+      "load_failed_check_internet": "تعذر تحميل الإملاء. تحقق من الإنترنت وأعد تحميل الصفحة.",
+      "cache_save_failed": "تعذر حفظ الإملاء في ذاكرة التخزين المؤقت. أعد تحميل الصفحة.",
+      "settings_disable_text_and_audio": "تم تعطيل النص والصوت في الإعدادات. فعّل تمرينًا واحدًا على الأقل.",
+      "none_selected": "لم يتم اختيار أي جملة للإملاء",
+      "audio_not_cached_reload": "الصوت غير محفوظ في ذاكرة التخزين المؤقت. أعد تحميل الإملاء وانتظر التنزيل."
+    },
+    "main": {
+      "checking": "جارٍ التحقق",
+      "excellent": "ممتاز",
+      "good": "جيد",
+      "check_title": "اضغط Enter/Return عند الانتهاء من كتابة النص"
+    }
   }
 }

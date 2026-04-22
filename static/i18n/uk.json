@@ -241,5 +241,129 @@
     "crop_modal": {
       "title": "Обрізка аватара"
     }
+  },
+  "dictation": {
+    "topbar": {
+      "show_statistics": "Показати статистику",
+      "settings": "Налаштування",
+      "save": "Зберегти",
+      "back_to_list": "Повернутися до списку диктантів",
+      "streak_title": "Незгораюча сума днів",
+      "cover_alt": "Обкладинка диктанту"
+    },
+    "start_button": {
+      "start": "СТАРТ",
+      "continue": "Продовжуємо!!!",
+      "victory": "Перемога! Ти молодець!!!"
+    },
+    "start_modal": {
+      "select_all": "позначити все",
+      "original": "оригінал",
+      "translation": "переклад",
+      "direct_order": "прямий порядок",
+      "reset": "Давай спочатку",
+      "send_interim_report": "Надіслати проміжний звіт",
+      "settings": "Налаштування",
+      "exit": "Вийти з диктанту",
+      "close": "Закрити",
+      "table": {
+        "choice": "Вибір",
+        "row_number": "Номер рядка",
+        "sentence": "Речення",
+        "translation": "Переклад"
+      }
+    },
+    "exit_modal": {
+      "title": "Повернутися на робочий стіл?",
+      "message": "Що зробити з поточним прогресом?",
+      "stay": "Залишитись",
+      "exit": "Вийти"
+    },
+    "pause_modal": {
+      "title": "Пауза (control + esc)",
+      "resume": "Продовжити"
+    },
+    "settings_modal": {
+      "title": "Налаштування",
+      "close": "Закрити",
+      "teacher_report": {
+        "title": "Звіт у Telegram",
+        "desc": "Кому надсилати звіт після завершення диктанту"
+      }
+    },
+    "completion_modal": {
+      "title": "Вітаємо!",
+      "message": "Ви успішно завершили диктант!",
+      "results_title": "Переглянути результати",
+      "results": "Переглянути результати",
+      "exit": "Вийти"
+    },
+    "no_selection": {
+      "title": "Увага! У нас проблема!",
+      "message": "Будь ласка, позначте речення для роботи в таблиці вище.",
+      "ok": "Зрозуміло"
+    },
+    "main": {
+      "check_title": "Натисніть Enter/Return, коли завершили введення тексту",
+      "check": "Перевірити",
+      "virtual_keyboard": "Показати клавіатуру",
+      "unsaved_progress": "Є незбережений прогрес (Ctrl/⌘ + S — зберегти)",
+      "recording_indicator": "Індикатор запису",
+      "recognition_mode": "Режим розпізнавання мовлення",
+      "paste_disabled": "Вставлення тексту вимкнено для цього поля"
+    },
+    "teacher_report": {
+      "no_dictation_data": "Немає даних про диктант",
+      "loading": "Завантаження…",
+      "no_recipients": "Немає доступних одержувачів",
+      "self_label": "Я",
+      "teacher_fallback": "Вчитель #{id}"
+    },
+    "assignment": {
+      "badge": "Завдання {id}"
+    },
+    "cache": {
+      "loading": "Завантаження в кеш…",
+      "fetching_dictation": "Завантаження диктанту в кеш…"
+    },
+    "toasts": {
+      "progress_cleared": "Прогрес за реченнями очищено.",
+      "cache_missing_fetching": "Немає даних у кеші. Завантажую з інтернету…",
+      "progress_saved": "Прогрес збережено",
+      "progress_save_failed": "Не вдалося зберегти прогрес",
+      "progress_save_error": "Помилка під час збереження",
+      "progress_saved_continue_later": "Прогрес збережено. Можна продовжити пізніше."
+    },
+    "alerts": {
+      "load_dictation_data_failed": "Помилка завантаження даних диктанту",
+      "interim_report_sent": "Проміжний звіт надіслано",
+      "interim_report_failed": "Не вдалося надіслати звіт"
+    },
+    "speech": {
+      "processing": "Розпізнаю...",
+      "speak": "Говоріть...",
+      "speak_offline": "Говоріть... (локально)",
+      "motivation_50": "Ти молодець, ти дуже наполегливий!\nЗараховую аудіо за 5 спроб понад 50٪!!!\nАле спробуй уточнити у носія або вчителя, що ти вимовляєш неправильно!",
+      "unavailable_browser": "Розпізнавання мовлення недоступне. Використовуйте Chrome, Edge або Safari.",
+      "no_internet": "Немає підключення до інтернету. Web Speech API потребує інтернет для роботи.",
+      "recognition_error_prefix": "Помилка розпізнавання:",
+      "error_prefix": "Помилка:"
+    },
+    "vk": {
+      "no_layout": "Розкладка для поточної мови відсутня"
+    },
+    "no_selection": {
+      "load_failed_check_internet": "Не вдалося завантажити диктант. Перевір інтернет і онови сторінку.",
+      "cache_save_failed": "Не вдалося зберегти диктант у кеш. Онови сторінку.",
+      "settings_disable_text_and_audio": "У налаштуваннях вимкнені і текст, і аудіо. Увімкніть хоча б одну вправу.",
+      "none_selected": "Жодне речення не вибрано для диктанту",
+      "audio_not_cached_reload": "Аудіо не завантажено в кеш. Перезавантаж диктант і дочекайся завантаження."
+    },
+    "main": {
+      "checking": "Перевірка",
+      "excellent": "Чудово",
+      "good": "Добре",
+      "check_title": "Натисніть Enter/Return коли закінчили вводити текст"
+    }
   }
 }

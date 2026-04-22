@@ -409,11 +409,20 @@ body.playing-audio::after {
   position: absolute;
   right: 10px;
   bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 13px;
   font-weight: 700;
   color: rgba(0, 0, 0, 0.55);
   user-select: none;
   pointer-events: none;
+}
+
+.start-progress-label i {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
 }
 
 #exitModal {

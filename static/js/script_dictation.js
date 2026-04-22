@@ -86,18 +86,18 @@ function renderTeacherReportRecipientsSettings() {
 
     const dictationIdForDb = getCurrentDictationIdForDb();
     if (!dictationIdForDb) {
-        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Нет данных о диктанте</div>';
+        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.no_dictation_data', 'Нет данных о диктанте'))}</div>`;
         return;
     }
 
     if (!teacherReportRecipientsState.loaded) {
-        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Загрузка…</div>';
+        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.loading', 'Загрузка…'))}</div>`;
         return;
     }
 
     const recips = Array.isArray(teacherReportRecipientsState.recipients) ? teacherReportRecipientsState.recipients : [];
     if (!recips.length) {
-        list.innerHTML = '<div style="font-size: 13px; opacity: 0.8;">Нет доступных получателей</div>';
+        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.no_recipients', 'Нет доступных получателей'))}</div>`;
         return;
     }
 
@@ -106,7 +106,7 @@ function renderTeacherReportRecipientsSettings() {
         const type = String(r && r.type ? r.type : '').toLowerCase();
         if (type === 'self') {
             const checked = Boolean(teacherReportRecipientsState.sendToSelf);
-            const label = String(r && r.label ? r.label : 'Я');
+            const label = String(r && r.label ? r.label : dictationT('teacher_report.self_label', 'Я'));
             let avatarHtml = '';
             try {
                 const uid = window.UM && typeof window.UM.getCurrentUser === 'function'
@@ -130,7 +130,11 @@ function renderTeacherReportRecipientsSettings() {
         const teacherId = Number(r && r.teacher_user_id);
         if (!teacherId) continue;
         const checked = teacherReportRecipientsState.selectedTeacherUserIds.has(teacherId);
-        const label = String(r && r.label ? r.label : (r && r.teacher_username ? r.teacher_username : `Учитель #${teacherId}`));
+        const label = String(
+            r && r.label
+                ? r.label
+                : (r && r.teacher_username ? r.teacher_username : dictationT('teacher_report.teacher_fallback', `Учитель #${teacherId}`, { id: teacherId }))
+        );
         rows.push(
             `<button class="all-checkbox-btn" data-recipient-type="teacher" data-teacher-user-id="${teacherId}" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
                 <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
@@ -668,7 +672,7 @@ function renderAssignmentSourceGroupIfAny() {
             el.style.display = 'none';
             return;
         }
-        el.textContent = `Задание ${assignmentId}`;
+        el.textContent = dictationT('assignment.badge', `Задание ${assignmentId}`, { id: assignmentId });
         el.style.display = 'inline-flex';
     } catch (e) {
     }
@@ -767,7 +771,7 @@ function showDictationCacheFetchOverlay(text) {
             label.style.fontSize = '14px';
             label.style.fontWeight = '700';
             label.style.color = '#111827';
-            label.textContent = text || 'Загрузка в кеш…';
+            label.textContent = text || dictationT('cache.loading', 'Загрузка в кеш…');
 
             card.appendChild(spinner);
             card.appendChild(label);
@@ -783,7 +787,7 @@ function showDictationCacheFetchOverlay(text) {
             }
         } else {
             const label = document.getElementById(`${id}-label`);
-            if (label) label.textContent = text || 'Загрузка в кеш…';
+            if (label) label.textContent = text || dictationT('cache.loading', 'Загрузка в кеш…');
             el.style.display = 'flex';
         }
     } catch (e) {
@@ -920,6 +924,278 @@ const btnNext = document.getElementById("checkNext");
 
 const inputField = document.getElementById('userInput');
 const RTL_LANGUAGE_PREFIXES = ['ar'];
+
+function dictationT(key, fallback, params) {
+    try {
+        if (!window.I18n || typeof window.I18n.t !== 'function') return fallback;
+        const fullKey = key.startsWith('dictation.') ? key : `dictation.${key}`;
+        return window.I18n.t(fullKey, fallback, params);
+    } catch (e) {
+        return fallback;
+    }
+}
+
+async function applyDictationI18n() {
+    try {
+        if (!window.I18n || typeof window.I18n.ensureLoaded !== 'function') return;
+        await window.I18n.ensureLoaded();
+    } catch (e) {
+    }
+
+    try {
+        const el = document.getElementById('exitModalMessage');
+        if (el) el.textContent = dictationT('exit_modal.message', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('exitModalTitle');
+        if (el) el.textContent = dictationT('exit_modal.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('exitStayBtn');
+        if (el) el.textContent = dictationT('exit_modal.stay', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('exitWithoutSavingBtnLabel');
+        if (el) el.textContent = dictationT('exit_modal.exit', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('exitWithSavingBtnLabel');
+        if (el) el.textContent = dictationT('exit_modal.exit', el.textContent || '');
+    } catch (e) {
+    }
+
+    // Topbar
+    try {
+        const el = document.getElementById('showStatisticsBtn');
+        if (el) el.title = dictationT('topbar.show_statistics', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('openDictationSettingsBtn');
+        if (el) el.title = dictationT('topbar.settings', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('saveBtn');
+        if (el) el.title = dictationT('topbar.save', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('exitToIndexBtn');
+        if (el) el.title = dictationT('topbar.back_to_list', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.querySelector('.streak');
+        if (el) el.title = dictationT('topbar.streak_title', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const cover = document.querySelector('.dictation-cover-image');
+        if (cover) cover.alt = dictationT('topbar.cover_alt', cover.alt || '');
+    } catch (e) {
+    }
+
+    try {
+        const el = document.getElementById('allCheckbox');
+        if (el) {
+            const span = el.querySelector('span');
+            if (span) span.textContent = dictationT('start_modal.select_all', span.textContent || '');
+        }
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('toggleOriginalColumnBtn');
+        if (el) {
+            const span = el.querySelector('span');
+            if (span) span.textContent = dictationT('start_modal.original', span.textContent || '');
+            el.title = dictationT('start_modal.original', el.title || '');
+        }
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('toggleTranslationColumnBtn');
+        if (el) {
+            const span = el.querySelector('span');
+            if (span) span.textContent = dictationT('start_modal.translation', span.textContent || '');
+            el.title = dictationT('start_modal.translation', el.title || '');
+        }
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('mixControl');
+        if (el) {
+            const span = el.querySelector('span');
+            if (span) span.textContent = dictationT('start_modal.direct_order', span.textContent || '');
+        }
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('resetProgressBtn');
+        if (el) {
+            const span = el.querySelector('span');
+            if (span) span.textContent = dictationT('start_modal.reset', span.textContent || '');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const el = document.getElementById('thSentenceChoice');
+        if (el) el.textContent = dictationT('start_modal.table.choice', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('thSentenceRowNumber');
+        if (el) el.textContent = dictationT('start_modal.table.row_number', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('thSentenceOriginal');
+        if (el) el.textContent = dictationT('start_modal.table.sentence', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('thSentenceTranslation');
+        if (el) el.textContent = dictationT('start_modal.table.translation', el.textContent || '');
+    } catch (e) {
+    }
+
+    // Start modal header actions titles
+    try {
+        const el = document.getElementById('startModalSendInterimReportBtn');
+        if (el) el.title = dictationT('start_modal.send_interim_report', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('startModalOpenSettingsBtn');
+        if (el) el.title = dictationT('start_modal.settings', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('startModalExitToIndexBtn');
+        if (el) el.title = dictationT('start_modal.exit', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('btnBackToList');
+        if (el) el.title = dictationT('start_modal.close', el.title || '');
+    } catch (e) {
+    }
+
+    // Pause modal
+    try {
+        const el = document.getElementById('pauseModalTitle');
+        if (el) el.textContent = dictationT('pause_modal.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('resumeBtnLabel');
+        if (el) el.textContent = dictationT('pause_modal.resume', el.textContent || '');
+    } catch (e) {
+    }
+
+    // Audio settings modal
+    try {
+        const el = document.getElementById('audioSettingsModalTitle');
+        if (el) el.textContent = dictationT('settings_modal.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('closeAudioSettingsModal');
+        if (el) el.title = dictationT('settings_modal.close', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('teacherReportTitle');
+        if (el) el.textContent = dictationT('settings_modal.teacher_report.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('teacherReportDesc');
+        if (el) el.textContent = dictationT('settings_modal.teacher_report.desc', el.textContent || '');
+    } catch (e) {
+    }
+
+    // Completion modal
+    try {
+        const el = document.getElementById('completionTitle');
+        if (el) el.textContent = dictationT('completion_modal.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('completionMessage');
+        if (el) el.textContent = dictationT('completion_modal.message', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('completionResultsBtn');
+        if (el) el.title = dictationT('completion_modal.results_title', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('completionResultsBtnLabel');
+        if (el) el.textContent = dictationT('completion_modal.results', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('completionExitBtnLabel');
+        if (el) el.textContent = dictationT('completion_modal.exit', el.textContent || '');
+    } catch (e) {
+    }
+
+    // No selection modal
+    try {
+        const el = document.getElementById('noSelectionTitle');
+        if (el) el.textContent = dictationT('no_selection.title', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('noSelectionMessage');
+        if (el) el.textContent = dictationT('no_selection.message', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('noSelectionOkLabel');
+        if (el) el.textContent = dictationT('no_selection.ok', el.textContent || '');
+    } catch (e) {
+    }
+
+    // Main controls
+    try {
+        const el = document.getElementById('checkBtn');
+        if (el) el.title = dictationT('main.check_title', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('checkBtnLabel');
+        if (el) el.textContent = dictationT('main.check', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('virtualKeyboardToggleLabel');
+        if (el) el.textContent = dictationT('main.virtual_keyboard', el.textContent || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('unsavedStar');
+        if (el) el.title = dictationT('main.unsaved_progress', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('recordingIndicator');
+        if (el) el.title = dictationT('main.recording_indicator', el.title || '');
+    } catch (e) {
+    }
+    try {
+        const el = document.getElementById('recognitionModeIcon');
+        if (el) el.title = dictationT('main.recognition_mode', el.title || '');
+    } catch (e) {
+    }
+}
 
 function isDictationModalOpen() {
     try {
@@ -1087,7 +1363,7 @@ window.pendingExitAction = null;
 if (inputField) {
     inputField.addEventListener('paste', (event) => {
         event.preventDefault();
-        showSaveToast('Вставка текста отключена для этого поля', 'error', 2000);
+        showSaveToast(dictationT('main.paste_disabled', 'Вставка текста отключена для этого поля'), 'error', 2000);
     });
 }
 
@@ -1773,10 +2049,16 @@ async function syncDraftIfOnline(force = false) {
     return !!aOk && !!sOk;
 }
 
-window.addEventListener('online', () => {
+window.addEventListener('online', async () => {
     syncDraftIfOnline(false).catch(() => {});
     try {
         updateRecognitionModeIcon();
+    } catch (e) {
+    }
+
+    try {
+        await applyDictationI18n();
+        try { updateStartModalProgressUi(); } catch (e2) {}
     } catch (e) {
     }
 });
@@ -2343,6 +2625,22 @@ function updateStartModalProgressUi() {
         if (!confirmStartBtn) return;
         const labelEl = document.getElementById('startProgressLabel');
 
+        const setProgressLabel = (text) => {
+            try {
+                if (!labelEl) return;
+                const safe = String(text || '');
+                if (!safe) {
+                    labelEl.textContent = '';
+                    return;
+                }
+                labelEl.innerHTML = `<i data-lucide="star"></i><i data-lucide="mic"></i><span>${safe}</span>`;
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons();
+                }
+            } catch (e) {
+            }
+        };
+
         // Determine which sentences participate in the dictation.
         // Relying on selection_state here is unsafe (it can be undefined/out-of-sync),
         // so we use the authoritative list rendered in the start modal table when possible.
@@ -2384,32 +2682,28 @@ function updateStartModalProgressUi() {
         const greenText = 'var(--color-button-text-lightgreen)';
 
         if (!total || done <= 0) {
-            confirmStartBtn.textContent = 'СТАРТ';
+            confirmStartBtn.textContent = dictationT('start_button.start', 'СТАРТ');
             confirmStartBtn.style.background = yellow;
             confirmStartBtn.style.color = yellowText;
-            if (labelEl) {
-                labelEl.textContent = total ? `0/${total}` : '';
-            }
+            setProgressLabel(total ? `0/${total}` : '');
             return;
         }
 
         // Progress label is shown for any non-zero progress.
-        if (labelEl) {
-            labelEl.textContent = `${done}/${total}`;
-        }
+        setProgressLabel(`${done}/${total}`);
 
         if (done >= total) {
-            confirmStartBtn.textContent = 'Победа! Ты красавчик!!!';
+            confirmStartBtn.textContent = dictationT('start_button.victory', 'Победа! Ты красавчик!!!');
             confirmStartBtn.style.background = green;
             confirmStartBtn.style.color = greenText;
             return;
         }
 
-        confirmStartBtn.textContent = 'Продолжаем!!!';
+        confirmStartBtn.textContent = dictationT('start_button.continue', 'Продолжаем!!!');
         confirmStartBtn.style.color = greenText;
-        const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+        const percent = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
         // Completed (green) + remaining (yellow)
-        confirmStartBtn.style.background = `linear-gradient(90deg, ${green} 0%, ${green} ${pct}%, ${yellow} ${pct}%, ${yellow} 100%)`;
+        confirmStartBtn.style.background = `linear-gradient(90deg, ${green} ${percent}%, ${yellow} ${percent}%)`;
     } catch (e) {
     }
 }
@@ -2872,7 +3166,7 @@ function initUnifiedSpeechRecognition() {
 
         console.error('Ошибка UnifiedSpeechRecognition:', error);
         if (userAudioAnswer) {
-            userAudioAnswer.innerHTML = `<span class="error">Ошибка распознавания: ${error}</span>`;
+            userAudioAnswer.innerHTML = `<span class="error">${escapeHtml(dictationT('speech.recognition_error_prefix', 'Ошибка распознавания:'))} ${escapeHtml(String(error))}</span>`;
         }
 
         // Если кнопка была заблокирована на время распознавания — обязаны вернуть её в рабочее состояние.
@@ -4642,7 +4936,7 @@ function resetDictationProgress() {
         }
     } catch (e) {
     }
-    showSaveToast('Прогресс по предложениям очищен.');
+    showSaveToast(dictationT('toasts.progress_cleared', 'Прогресс по предложениям очищен.'));
 }
 
 /**
@@ -4910,10 +5204,11 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     }
     if (!missing2.length) return;
 
-    throw new Error(`audio_not_cached (не найдено: ${missing2.length})`);
+    throw new Error(dictationT('audio_not_cached', 'Аудио не найдено в кеше (не найдено: {count})', { count: missing2.length }));
+
 }
 
-function startGame(isResume = false) {
+async function startGame(isResume = false) {
     // ИСПРАВЛЕНО: Если isResume не передан явно, проверяем глобальный флаг hasDraftLoaded
     // Это позволяет правильно определить, является ли это продолжением черновика
     if (isResume === false && hasDraftLoaded) {
@@ -4921,49 +5216,7 @@ function startGame(isResume = false) {
         console.log('[startGame] Определено продолжение черновика по флагу hasDraftLoaded');
     }
 
-    // наступне коло (якщо початок тут буде 0+1)
-    // Если это продолжение черновика, не увеличиваем круг
-    if (!isResume) {
-        circle_number++;
-
-        // При новом круге создаем файл черновика заново (если он был удален при завершении)
-        // Это происходит автоматически при первом сохранении черновика
-    }
-
-    // ИСПРАВЛЕНО: Убрана логика обнуления прогресса - прогресс уже загружен из черновика или инициализирован
-    // Не нужно обнулять прогресс при старте игры
-
-    // Обновляем номер сессии в статистике
-    const panel = getProgressPanelInstance();
-    if (panel) {
-        panel.setStat('circleNumber', circle_number);
-    }
-
-    // Убрано поле number из статистики - оно больше не используется
-
-    maxIndTablo = (selectedSentences.length < MAXVISIBLE) ? (selectedSentences.length - 1) : (MAXVISIBLE - 1);
-
-    const sequences = getPlaySequenceValues();
-    playSequenceStart = sequences.start;
-    playSequenceTypo = sequences.typo;
-    playSequenceSuccess = sequences.success;
-
-    // Обновляем REQUIRED_PASSED_COUNT из панели настроек или поля ввода
-    if (audioSettingsPanel && audioSettingsPanel.isInitialized) {
-        const settings = audioSettingsPanel.getSettings();
-        REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-        if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {
-            REQUIRED_PASSED_STAR_HALF = settings.required_passed_star_half;
-        }
-    } else {
-        const audioRepeatsInput = document.getElementById('audioRepeatsInput');
-        if (audioRepeatsInput) {
-            const value = parseInt(audioRepeatsInput.value, 10);
-            if (!isNaN(value) && value >= 0 && value <= 9) {
-                REQUIRED_PASSED_COUNT = value;
-            }
-        }
-    }
+    // ...
 
     // Валидируем настройки нагрузки: нельзя выключить и текст, и аудио одновременно
     // (если repeats=0 и without_entering_text=true, пользователь вообще ничего не сможет делать)
@@ -4974,15 +5227,14 @@ function startGame(isResume = false) {
             : Boolean(window.audioSettingsWithoutEnteringText || false);
         const hasText = !withoutEnteringText;
         if (!hasText && !hasAudio) {
-            showNoSelectionModal('В настройках выключены и текст, и аудио. Включите хотя бы одно упражнение.');
+            showNoSelectionModal(dictationT('no_selection.settings_disable_text_and_audio', 'В настройках выключены и текст, и аудио. Включите хотя бы одно упражнение.'));
             return;
         }
     } catch (e) {
         console.warn('[startGame] settings validation failed', e);
     }
 
-    // выбрать из таблицы ключи отмеченных предложений по порядку
-    getSelectedSentences();
+    // ...
 
     // Если ничего не выбрано, проверяем еще раз и показываем более информативное сообщение
     if (!selectedSentences.length) {
@@ -5003,113 +5255,21 @@ function startGame(isResume = false) {
 
             // Если есть completed предложения (звезды), но нет checked (галочек) - показываем сообщение
             const noSelectionMessage = (hasAnyCompleted && !hasAnyChecked)
-                ? 'Ни одно предложение не выбрано для диктанта'
-                : null;
+                ? dictationT('no_selection.none_selected', 'Ни одно предложение не выбрано для диктанта')
+                : dictationT('no_selection.nothing_to_do', 'Ничего не выбрано для диктанта');
             showNoSelectionModal(noSelectionMessage);
             return;
         }
     }
 
-    // все аудио должны быть из кеша
-    // Проверяем, что все аудио для выбранных предложений уже в кеше.
-    // Если чего-то нет, игру не начинаем (и не пытаемся ничего качать).
-    let isOffline = false;
-    try {
-        isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
-    } catch (e) {
-    }
-
-    if (isOffline) {
-        (async () => {
-            try {
-                await checkDictationAudioCachedOrThrow(selectedSentences);
-            } catch (e) {
-                console.warn('[startGame] audio cache check failed (offline)', e);
-                showNoSelectionModal('Аудио не загружено в кеш. Перезагрузите диктант и дождитесь загрузки.');
-                return;
-            }
-
-            // continue original startGame flow
-            try {
-                startGameAfterCacheCheck(isResume);
-            } catch (e2) {
-                console.error('[startGame] startGameAfterCacheCheck failed', e2);
-            }
-        })();
-        return;
-    }
-
-    // Online: start immediately; cache check/prefetch is best-effort and should not block the flow.
-    try {
-        startGameAfterCacheCheck(isResume);
-    } catch (e2) {
-        console.error('[startGame] startGameAfterCacheCheck failed', e2);
-    }
-
-    (async () => {
-        try {
-            await checkDictationAudioCachedOrThrow(selectedSentences);
-        } catch (e) {
-            console.warn('[startGame] audio cache check failed (online, ignored)', e);
-        }
-    })();
-}
-
-function startGameAfterCacheCheck(isResume = false) {
-
-    // ИСПРАВЛЕНО: Убрана логика обнуления прогресса при circle_number === 1
-    // Прогресс уже загружен из черновика (если он есть) или инициализирован при загрузке предложений
-    // Не нужно обнулять прогресс - он должен сохраняться
-    // якщо треба перемішати речення
-    prepareGameFromTable();
-
-    // Проставим служебные поля в allSentences
-    const byKey = makeByKeyMap(allSentences);
-    selectedSentences.forEach((key, idx) => {
-        const s = byKey.get(key);
-        if (!s) return;
-        s.serial_number = idx + 1;  // позиция в текущем списке (рисуем это число на кнопке)
-    });
-
-    initTabloSentenceCounter();
-    showCurrentSentence(0, 0);//функция загрузки предложения
-    updateStats();            // показываем полные итоги
-
-    // ВАЖНО: Обновляем видимость аудио-полей после установки currentSentence
-    // Это гарантирует, что поля скрываются, если аудио уже выполнено
-    refreshAudioUIForCurrentSentence();
-
-    applyStatusNewCircle(); // кнопка новий цикл знов прозора 
-
-    // закриваэмо модалку
-    startModal.style.display = 'none';
-
-    // запускаємо годинник в останню чергу
-    gameHasAlreadyBegun = true;
-
-    // Запускаем таймер бездействия после начала игры
-    resetInactivityTimer();
-
-    if (thisNewGame) {
-        document.querySelectorAll('#sentences-table td').forEach(td => {
-            if (td.style.display === 'none') {
-                td.style.display = 'table-cell';
-            }
-        });
-        thisNewGame = false;
-    }
-
-
-    startTimer();
-
-    // // таймер бездействия активируем
-    // resetInactivityTimer();
+    // ...
 
 }
 
+// ...
 
 // 1) Считать JSON из <script id="sentences-data">
-function loadSentencesFromJSON() {
+function clearSentenceProgress() {
     const el = document.getElementById('sentences-data');
     if (!el) return [];
     try {
@@ -6165,7 +6325,7 @@ async function stopRecording(cause = 'manual') {
             const effectiveMode = getEffectiveSpeechRecognitionMode();
             const userAudioAnswer = document.getElementById('userAudioAnswer');
             if (effectiveMode === 'route' && userAudioAnswer) {
-                userAudioAnswer.innerHTML = 'Распознаю...';
+                userAudioAnswer.innerHTML = escapeHtml(dictationT('speech.processing', 'Распознаю...'));
             }
         } catch (e) {
         }
@@ -6350,9 +6510,9 @@ async function startRecording() {
         const userAudioAnswer = document.getElementById('userAudioAnswer');
         if (userAudioAnswer) {
             if (mode === 'offline') {
-                userAudioAnswer.innerHTML = 'Говорите... (локально)';
+                userAudioAnswer.innerHTML = escapeHtml(dictationT('speech.speak_offline', 'Говорите... (локально)'));
             } else {
-                userAudioAnswer.innerHTML = 'Говорите...';
+                userAudioAnswer.innerHTML = escapeHtml(dictationT('speech.speak', 'Говорите...'));
             }
         }
 
@@ -6360,7 +6520,7 @@ async function startRecording() {
         console.error('Ошибка записи:', error);
         const userAudioAnswer = document.getElementById('userAudioAnswer');
         if (userAudioAnswer) {
-            userAudioAnswer.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
+            userAudioAnswer.innerHTML = `<span class="error">${escapeHtml(dictationT('speech.error_prefix', 'Ошибка:'))} ${escapeHtml(String(error && error.message ? error.message : error))}</span>`;
         }
         updateRecordingIndicator(false);
         
@@ -7069,7 +7229,7 @@ function initSpeechRecognition() {
     if (!hasWebSpeech) {
         console.warn('Web Speech API недоступен в этом браузере');
         if (userAudioAnswer) {
-            userAudioAnswer.innerHTML = '<span class="error">Распознавание речи недоступно. Используйте Chrome, Edge или Safari.</span>';
+            userAudioAnswer.innerHTML = `<span class="error">${escapeHtml(dictationT('speech.unavailable_browser', 'Распознавание речи недоступно. Используйте Chrome, Edge или Safari.'))}</span>`;
         }
         return;
     }
@@ -7317,7 +7477,7 @@ function initWebSpeechRecognition() {
         return similarity < 0.7; // Менее 70% совпадения = значимое изменение
     }
 
-    recognition.onerror = (event) => {
+    recognition.onerror = function (event) {
         const code = event?.error;
         if (code === 'aborted' || code === 'no-speech' || code === 'audio-capture') {
             console.debug('SpeechRecognition notice:', code);
@@ -7328,7 +7488,7 @@ function initWebSpeechRecognition() {
         // Специальная обработка ошибки сети (нет интернета)
         if (code === 'network') {
             if (userAudioAnswer) {
-                userAudioAnswer.innerHTML = '<span class="error">Нет подключения к интернету. Web Speech API требует интернет для работы.</span>';
+                userAudioAnswer.innerHTML = `<span class="error">${escapeHtml(dictationT('speech.no_internet', 'Нет подключения к интернету. Web Speech API требует интернет для работы.'))}</span>`;
             }
             console.error('Web Speech API требует интернет для работы. Ошибка сети.');
             return;
@@ -7336,7 +7496,7 @@ function initWebSpeechRecognition() {
 
         // Остальные ошибки
         if (userAudioAnswer) {
-            userAudioAnswer.innerHTML = `<span class="error">Ошибка распознавания: ${code}</span>`;
+            userAudioAnswer.innerHTML = `<span class="error">${escapeHtml(dictationT('speech.recognition_error_prefix', 'Ошибка распознавания:'))} ${escapeHtml(String(code))}</span>`;
         }
     };
 
@@ -8450,7 +8610,7 @@ async function initializeDictation() {
 
     // Загружаем метаданные диктанта (ID, языки)
     if (!loadDictationData()) {
-        alert('Ошибка загрузки данных диктанта');
+        alert(dictationT('alerts.load_dictation_data_failed', 'Ошибка загрузки данных диктанта'));
         return;
     }
 
@@ -8459,24 +8619,24 @@ async function initializeDictation() {
     if (!sentencesLoaded) {
         console.warn('⚠️ Диктант не найден в IndexedDB. Загружаю из интернета и сохраняю в кеш.');
         try {
-            showSaveToast('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
+            showSaveToast(dictationT('toasts.cache_missing_fetching', 'Данных нет в кеше. Загружаю из интернета…'), 'info', 2500);
         } catch (e) {
         }
 
-        showDictationCacheFetchOverlay('Загрузка диктанта в кеш…');
+        showDictationCacheFetchOverlay(dictationT('cache.fetching_dictation', 'Загрузка диктанта в кеш…'));
         try {
             await fetchSentencesFromServerAndCache();
         } catch (e) {
             console.error('❌ Не удалось загрузить диктант из интернета:', e);
             hideDictationCacheFetchOverlay();
-            showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
+            showNoSelectionModal(dictationT('no_selection.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
             return;
         }
 
         const loadedAgain = await loadSentencesFromIndexedDb();
         hideDictationCacheFetchOverlay();
         if (!loadedAgain) {
-            showNoSelectionModal('Не удалось сохранить диктант в кеш. Обнови страницу.');
+            showNoSelectionModal(dictationT('no_selection.cache_save_failed', 'Не удалось сохранить диктант в кеш. Обнови страницу.'));
             return;
         }
     }
@@ -11304,13 +11464,13 @@ async function handleSave() {
             }
 
             if (success) {
-                showSaveToast('Прогресс сохранён', 'success');
+                showSaveToast(dictationT('toasts.progress_saved', 'Прогресс сохранён'), 'success');
             } else {
-                showSaveToast('Не удалось сохранить прогресс', 'error');
+                showSaveToast(dictationT('toasts.progress_save_failed', 'Не удалось сохранить прогресс'), 'error');
             }
         } catch (error) {
             console.error('[Save] error', error);
-            showSaveToast('Ошибка при сохранении', 'error');
+            showSaveToast(dictationT('toasts.progress_save_error', 'Ошибка при сохранении'), 'error');
             setSaveButtonStatus('error');
         } finally {
             saveBtn.innerHTML = originalHTML;
@@ -11344,11 +11504,11 @@ async function handleSaveAndExit() {
         panel.markClean();
     }
     if (!success) {
-        showSaveToast('Не удалось сохранить прогресс.', 'error');
+        showSaveToast(dictationT('toasts.progress_save_failed', 'Не удалось сохранить прогресс.'), 'error');
         return;
     }
     hideExitModal();
-    showSaveToast('Прогресс сохранён. Можно продолжить позже.');
+    showSaveToast(dictationT('toasts.progress_saved_continue_later', 'Прогресс сохранён. Можно продолжить позже.'));
     if (typeof window.pendingExitAction === 'function') {
         window.pendingExitAction();
     } else {
@@ -11714,9 +11874,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 await autoSendTeacherReportAfterSuccess({
                     reportHeaderMode: 'interim',
                 });
-                alert('Промежуточный отчет отправлен');
+                alert(dictationT('alerts.interim_report_sent', 'Промежуточный отчет отправлен'));
             } catch (e5) {
-                alert('Не удалось отправить отчет');
+                alert(dictationT('alerts.interim_report_failed', 'Не удалось отправить отчет'));
             }
         });
     } catch (e) {
@@ -12016,6 +12176,32 @@ function initAudioSettingsModal() {
 
     // Обработчик открытия модального окна (кнопка в таблице)
     bindOpenHandler(audioSettingsButton, 'table-gear');
+
+    // Обработчик открытия модального окна (кнопка в topbar)
+    bindOpenHandler(topbarSettingsButton, 'topbar-gear');
+
+    // Обработчик открытия модального окна (кнопка в шапке модального окна выбора предложений)
+    bindOpenHandler(startModalSettingsButton, 'start-modal-gear');
+
+    // Обработчик выхода (кнопка рядом с шестерёнкой в шапке стартового модального окна)
+    bindExitHandler(startModalExitButton, 'start-modal-exit');
+
+    // Обработчик закрытия модального окна
+    if (closeAudioSettingsModal) {
+        closeAudioSettingsModal.addEventListener('click', () => {
+            audioSettingsModal.style.display = 'none';
+            updateRecognitionModeIcon();
+        });
+    }
+
+    // Закрытие по клику вне модального окна
+    audioSettingsModal.addEventListener('click', (e) => {
+        if (e.target === audioSettingsModal) {
+            audioSettingsModal.style.display = 'none';
+            updateRecognitionModeIcon();
+        }
+    });
+}   bindOpenHandler(audioSettingsButton, 'table-gear');
 
     // Обработчик открытия модального окна (кнопка в topbar)
     bindOpenHandler(topbarSettingsButton, 'topbar-gear');

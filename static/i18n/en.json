@@ -241,5 +241,129 @@
     "crop_modal": {
       "title": "Crop avatar"
     }
+  },
+  "dictation": {
+    "topbar": {
+      "show_statistics": "Show statistics",
+      "settings": "Settings",
+      "save": "Save",
+      "back_to_list": "Back to dictations list",
+      "streak_title": "Streak days",
+      "cover_alt": "Dictation cover"
+    },
+    "start_button": {
+      "start": "START",
+      "continue": "Continue!!!",
+      "victory": "Victory! Great job!!!"
+    },
+    "start_modal": {
+      "select_all": "Select all",
+      "original": "original",
+      "translation": "translation",
+      "direct_order": "direct order",
+      "reset": "Start over",
+      "send_interim_report": "Send interim report",
+      "settings": "Settings",
+      "exit": "Exit dictation",
+      "close": "Close",
+      "table": {
+        "choice": "Choice",
+        "row_number": "Row number",
+        "sentence": "Sentence",
+        "translation": "Translation"
+      }
+    },
+    "exit_modal": {
+      "title": "Back to desktop?",
+      "message": "What should we do with the current progress?",
+      "stay": "Stay",
+      "exit": "Exit"
+    },
+    "pause_modal": {
+      "title": "Pause (control + esc)",
+      "resume": "Resume"
+    },
+    "settings_modal": {
+      "title": "Settings",
+      "close": "Close",
+      "teacher_report": {
+        "title": "Telegram report",
+        "desc": "Who should receive the report after completing the dictation"
+      }
+    },
+    "completion_modal": {
+      "title": "Congratulations!",
+      "message": "You have successfully completed the dictation!",
+      "results_title": "View results",
+      "results": "View results",
+      "exit": "Exit"
+    },
+    "no_selection": {
+      "title": "Attention! We have a problem!",
+      "message": "Please select sentences to work on in the table above.",
+      "ok": "Got it"
+    },
+    "main": {
+      "check_title": "Press Enter/Return when you finish typing",
+      "check": "Check",
+      "virtual_keyboard": "Show keyboard",
+      "unsaved_progress": "There is unsaved progress (Ctrl/⌘ + S — save)",
+      "recording_indicator": "Recording indicator",
+      "recognition_mode": "Speech recognition mode",
+      "paste_disabled": "Pasting text is disabled for this field"
+    },
+    "teacher_report": {
+      "no_dictation_data": "No dictation data",
+      "loading": "Loading…",
+      "no_recipients": "No available recipients",
+      "self_label": "Me",
+      "teacher_fallback": "Teacher #{id}"
+    },
+    "assignment": {
+      "badge": "Assignment {id}"
+    },
+    "cache": {
+      "loading": "Loading into cache…",
+      "fetching_dictation": "Loading dictation into cache…"
+    },
+    "toasts": {
+      "progress_cleared": "Sentence progress has been cleared.",
+      "cache_missing_fetching": "No cached data. Fetching from the internet…",
+      "progress_saved": "Progress saved",
+      "progress_save_failed": "Failed to save progress",
+      "progress_save_error": "Error while saving",
+      "progress_saved_continue_later": "Progress saved. You can continue later."
+    },
+    "alerts": {
+      "load_dictation_data_failed": "Failed to load dictation data",
+      "interim_report_sent": "Interim report sent",
+      "interim_report_failed": "Failed to send report"
+    },
+    "speech": {
+      "processing": "Recognizing…",
+      "speak": "Speak…",
+      "speak_offline": "Speak… (offline)",
+      "motivation_50": "Great job — you are very persistent!\nI will count the audio with 5 attempts over 50٪!!!\nBut try to ask a native speaker or teacher what is pronounced incorrectly!",
+      "unavailable_browser": "Speech recognition is unavailable. Use Chrome, Edge, or Safari.",
+      "no_internet": "No internet connection. Web Speech API requires internet to work.",
+      "recognition_error_prefix": "Recognition error:",
+      "error_prefix": "Error:"
+    },
+    "vk": {
+      "no_layout": "Keyboard layout is not available for the current language"
+    },
+    "no_selection": {
+      "load_failed_check_internet": "Failed to load dictation. Check your internet and refresh the page.",
+      "cache_save_failed": "Failed to save dictation to cache. Refresh the page.",
+      "settings_disable_text_and_audio": "Both text and audio are disabled in settings. Enable at least one exercise.",
+      "none_selected": "No sentences selected for dictation",
+      "audio_not_cached_reload": "Audio is not cached. Reload the dictation and wait for it to download."
+    },
+    "main": {
+      "checking": "Checking",
+      "excellent": "Excellent",
+      "good": "Good",
+      "check_title": "Press Enter/Return when you finish typing"
+    }
   }
 }

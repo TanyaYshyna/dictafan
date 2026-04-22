@@ -45,10 +45,20 @@
 
 <body>
     <script>
+        try {
+            const uiLang = (localStorage.getItem('ui_lang') || 'ru').toString();
+            document.documentElement.lang = uiLang;
+            const isRtl = uiLang.toLowerCase().startsWith('ar');
+            document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+        } catch (e) {
+        }
+    </script>
+    <script>
         if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
     </script>
     <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
     <script>
         var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
 
@@ -102,17 +112,17 @@
     <!-- Модальное окно выхода -->
     <div id="exitModal" class="modal" style="display: none;">
         <div class="modal-content exit-modal-content">
-            <h2>Вернуться на рабочий стол?</h2>
+            <h2 id="exitModalTitle">Вернуться на рабочий стол?</h2>
             <p id="exitModalMessage">Что сделать с текущим прогрессом?</p>
             <div class="exit-modal-buttons">
                 <button id="exitStayBtn" class="button-secondary">Остаться</button>
                 <button id="exitWithoutSavingBtn" class="button-color-lightgreen">
                     <i data-lucide="save-off"></i>
-                    Выйти
+                    <span id="exitWithoutSavingBtnLabel">Выйти</span>
                 </button>
                 <button id="exitWithSavingBtn" class="button-color-yellow" style="display: none;">
                     <i data-lucide="save"></i>
-                    Выйти
+                    <span id="exitWithSavingBtnLabel">Выйти</span>
                 </button>
             </div>
         </div>
@@ -199,8 +209,8 @@
                                     <i data-lucide="settings"></i>
                                 </button>
                             </th>
-                            <th>Выбор</th>
-                            <th>Номер строки</th>
+                            <th id="thSentenceChoice">Выбор</th>
+                            <th id="thSentenceRowNumber">Номер строки</th>
                             <th class="hidden-column">Код</th>
                             <th><i data-lucide="star"></i></th>
                             <th><i data-lucide="star-half"></i></th>
@@ -221,7 +231,7 @@
     <!-- Модальное окно паузы -->
     <div id="pauseModal" class="modal" style="display: none;">
         <div class="modal-content">
-            <h2>Пауза (control + esk)</h2>
+            <h2 id="pauseModalTitle">Пауза (control + esk)</h2>
             <div class="pause-timer">
                 <i data-lucide="clock"></i>
                 <span id="pauseTimer">00:00:00</span>
@@ -229,7 +239,7 @@
             <!-- <p>Игра приостановлена. Таймер простоя:</p> -->
             <button id="resumeBtn" class="button-color-green" onclick="resumeGame()">
                 <i data-lucide="play"></i>
-                Продолжить
+                <span id="resumeBtnLabel">Продолжить</span>
             </button>
         </div>
     </div>
@@ -238,7 +248,7 @@
     <div id="audioSettingsModal" class="modal" style="display: none;">
         <div class="modal-content audio-settings-modal-content">
             <div class="modal-header">
-                <h2>Настройки</h2>
+                <h2 id="audioSettingsModalTitle">Настройки</h2>
                 <button class="modal-close" id="closeAudioSettingsModal" title="Закрыть">
                     <i data-lucide="x"></i>
                 </button>
@@ -254,10 +264,10 @@
                         <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
                             <div style="display:flex; align-items:center; gap: 8px; font-weight: 700;">
                                 <i data-lucide="send"></i>
-                                <span>Отчет в Telegram</span>
+                                <span id="teacherReportTitle">Отчет в Telegram</span>
                             </div>
                         </div>
-                        <div style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">Кому отправлять отчет после завершения диктанта</div>
+                        <div id="teacherReportDesc" style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">Кому отправлять отчет после завершения диктанта</div>
                         <div id="teacherReportRecipientsList" style="display:flex; flex-direction: column; gap: 8px;"></div>
                     </div>
                 </div>
@@ -273,17 +283,17 @@
                     <i data-lucide="award" class="completion-icon"></i>
                     <span id="completionMedalCount" class="completion-medal-count" style="display:none;">0</span>
                 </div>
-                <h2>Поздравляем!</h2>
+                <h2 id="completionTitle">Поздравляем!</h2>
             </div>
-            <p class="completion-message">Вы успешно завершили диктант!</p>
+            <p id="completionMessage" class="completion-message">Вы успешно завершили диктант!</p>
             <div class="completion-buttons">
                 <button id="completionResultsBtn" class="completion-transparent-btn" title="Посмотреть результаты">
                     <i data-lucide="list-check"></i>
-                    Посмотреть результаты
+                    <span id="completionResultsBtnLabel">Посмотреть результаты</span>
                 </button>
                 <button id="completionExitBtn" class="button-color-yellow">
                     <i data-lucide="log-out"></i>
-                    Выйти
+                    <span id="completionExitBtnLabel">Выйти</span>
                 </button>
             </div>
         </div>
@@ -294,13 +304,13 @@
         <div class="modal-content warning-modal-content">
             <div class="warning-header">
                 <i data-lucide="alert-circle" class="warning-icon"></i>
-                <h2>Внимание! У нас проблема!</h2>
+                <h2 id="noSelectionTitle">Внимание! У нас проблема!</h2>
             </div>
-            <p class="warning-message">Пожалуйста, отметьте предложения для работы в таблице выше.</p>
+            <p id="noSelectionMessage" class="warning-message">Пожалуйста, отметьте предложения для работы в таблице выше.</p>
             <div class="warning-buttons">
                 <button id="noSelectionOkBtn" class="button-color-green">
                     <i data-lucide="check"></i>
-                    Понятно
+                    <span id="noSelectionOkLabel">Понятно</span>
                 </button>
             </div>
         </div>
@@ -397,7 +407,7 @@
                 <button id="checkBtn" class="button-color-yellow" onclick="checkText()"
                     title="Нажмите Enter/Return когда закончили ввод текста">
                     <i data-lucide="corner-down-left"></i>
-                    <span>Проверить</span>
+                    <span id="checkBtnLabel">Проверить</span>
                 </button>
             </div>
         </div>
@@ -409,7 +419,7 @@
                     <i class="vk-toggle-icon-off" data-lucide="circle"></i>
                     <i class="vk-toggle-icon-on" data-lucide="check-circle"></i>
                 </span>
-                <span>Показать клавиатуру</span>
+                <span id="virtualKeyboardToggleLabel">Показать клавиатуру</span>
             </label>
             <div id="virtualKeyboard" hidden></div>
         </div>
