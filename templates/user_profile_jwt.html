@@ -452,6 +452,13 @@
     
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
 
+    <script>
+        try {
+            if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+        } catch (e) {
+        }
+    </script>
+
     <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
 
     <script id="language-data" type="application/json">
