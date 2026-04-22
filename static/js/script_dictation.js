@@ -12201,30 +12201,4 @@ function initAudioSettingsModal() {
             updateRecognitionModeIcon();
         }
     });
-}   bindOpenHandler(audioSettingsButton, 'table-gear');
-
-    // Обработчик открытия модального окна (кнопка в topbar)
-    bindOpenHandler(topbarSettingsButton, 'topbar-gear');
-
-    // Обработчик открытия модального окна (кнопка в шапке модального окна выбора предложений)
-    bindOpenHandler(startModalSettingsButton, 'start-modal-gear');
-
-    // Обработчик выхода (кнопка рядом с шестерёнкой в шапке стартового модального окна)
-    bindExitHandler(startModalExitButton, 'start-modal-exit');
-
-    // Обработчик закрытия модального окна
-    if (closeAudioSettingsModal) {
-        closeAudioSettingsModal.addEventListener('click', () => {
-            audioSettingsModal.style.display = 'none';
-            updateRecognitionModeIcon();
-        });
-    }
-
-    // Закрытие по клику вне модального окна
-    audioSettingsModal.addEventListener('click', (e) => {
-        if (e.target === audioSettingsModal) {
-            audioSettingsModal.style.display = 'none';
-            updateRecognitionModeIcon();
-        }
-    });
 }
