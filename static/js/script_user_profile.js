@@ -5,6 +5,14 @@ let hasUnsavedChanges = false;
 let isSavingProfile = false;
 let pendingAvatarBlob = null;
 
+function isUnsavedStarDebugEnabled() {
+    try {
+        return String(localStorage.getItem('debug_unsaved_star') || '') === '1';
+    } catch (e) {
+        return false;
+    }
+}
+
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
 let profileTestChunks = [];
@@ -2204,26 +2212,49 @@ function checkForChanges() {
         }
     })();
 
-    const hasChanges =
-        currentValues.username !== originalData.username ||
-        currentValues.password !== '' ||
-        currentValues.native_language !== originalData.native_language ||
-        JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages) ||
-        currentValues.current_learning !== originalData.current_learning ||
-        avatarChanged ||
-        currentValues.audio_start !== (originalData.audio_start || '') ||
-        currentValues.audio_typo !== (originalData.audio_typo || '') ||
-        currentValues.audio_success !== (originalData.audio_success || '') ||
-        currentValues.audio_repeats !== (originalData.audio_repeats || 3) ||
-        currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3) ||
-        currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route') ||
-        currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7);
+    const diffs = {
+        username: currentValues.username !== originalData.username,
+        password: currentValues.password !== '',
+        native_language: currentValues.native_language !== originalData.native_language,
+        learning_languages: JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages),
+        current_learning: currentValues.current_learning !== originalData.current_learning,
+        avatar: avatarChanged,
+        audio_start: currentValues.audio_start !== (originalData.audio_start || ''),
+        audio_typo: currentValues.audio_typo !== (originalData.audio_typo || ''),
+        audio_success: currentValues.audio_success !== (originalData.audio_success || ''),
+        audio_repeats: currentValues.audio_repeats !== (originalData.audio_repeats || 3),
+        audio_required_passed_star_half: currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3),
+        speech_recognition_mode: currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route'),
+        assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
+    };
+
+    const hasChanges = Object.values(diffs).some(Boolean);
+
+    if (isUnsavedStarDebugEnabled() && !hasUnsavedChanges && hasChanges) {
+        try {
+            console.group('[profile] unsaved_star_on');
+            console.log('diffs:', diffs);
+            console.log('currentValues:', currentValues);
+            console.log('originalData:', originalData);
+            console.trace('checkForChanges stack');
+            console.groupEnd();
+        } catch (e) {
+        }
+    }
 
     setUnsavedState(hasChanges);
 }
 
 function setUnsavedState(state) {
+    const prev = hasUnsavedChanges;
     hasUnsavedChanges = state;
+
+    if (isUnsavedStarDebugEnabled() && !prev && state) {
+        try {
+            console.trace('[profile] setUnsavedState(true) stack');
+        } catch (e) {
+        }
+    }
 
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {
