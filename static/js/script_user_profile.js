@@ -4,6 +4,7 @@ let originalData = {};
 let hasUnsavedChanges = false;
 let isSavingProfile = false;
 let pendingAvatarBlob = null;
+let passwordTouched = false;
 
 function isUnsavedStarDebugEnabled() {
     try {
@@ -1845,6 +1846,12 @@ function loadUserData() {
 
     document.getElementById('username').value = originalData.username;
     document.getElementById('email').value = originalData.email;
+    try {
+        const pwd = document.getElementById('password');
+        if (pwd) pwd.value = '';
+        passwordTouched = false;
+    } catch (e) {
+    }
     updateAvatarDisplay(originalData.avatar);
 
     try {
@@ -2067,7 +2074,14 @@ async function initializeAudioSettings() {
 function setupFormListeners() {
     const inputs = ['username', 'password'];
     inputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', checkForChanges);
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => {
+            if (id === 'password') {
+                passwordTouched = true;
+            }
+            checkForChanges();
+        });
     });
 }
 
@@ -2214,7 +2228,7 @@ function checkForChanges() {
 
     const diffs = {
         username: currentValues.username !== originalData.username,
-        password: currentValues.password !== '',
+        password: passwordTouched && currentValues.password !== '',
         native_language: currentValues.native_language !== originalData.native_language,
         learning_languages: JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages),
         current_learning: currentValues.current_learning !== originalData.current_learning,
@@ -2698,6 +2712,8 @@ async function saveProfile(options = {}) {
         if (formValues.password) {
             document.getElementById('password').value = '';
         }
+
+        passwordTouched = false;
 
         // Проверяем изменения после сохранения (должно быть false)
         checkForChanges();
