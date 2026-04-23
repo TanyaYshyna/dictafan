@@ -190,6 +190,10 @@
   height: 18px;
 }
 
+html[dir="rtl"] #dictationLangPair {
+  direction: ltr;
+}
+
 
 
 /* проверка + правильный ответ + кнопрока проверки */
@@ -199,6 +203,14 @@
   align-items: flex-start;
   gap: 15px;
   margin-top: 10px;
+}
+
+html[dir="rtl"] .result-panel {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] body.exercise-ltr .result-panel {
+  flex-direction: row;
 }
 
 .check-group {
@@ -1251,6 +1263,11 @@ body.playing-audio::after {
   color: var(--color-hover);
 }
 
+html[dir="rtl"] .title-meta {
+  right: auto;
+  left: 0;
+}
+
 .title-meta .unsaved-star {
   display: none;
   background: none;
@@ -1275,6 +1292,29 @@ body.playing-audio::after {
   align-items: flex-start;
   width: 100%;
   gap: 10px;
+}
+
+html[dir="rtl"] .panels-row {
+  direction: ltr;
+}
+
+html[dir="rtl"] .button-group {
+  direction: ltr;
+}
+
+html[dir="rtl"] .sentence-counter,
+html[dir="rtl"] .sentence-counter-simple {
+  direction: ltr;
+}
+
+html[dir="rtl"] #tablo_result {
+  direction: ltr;
+}
+
+html[dir="rtl"] #progressPanelContainer,
+html[dir="rtl"] .progress-panel-modal-r {
+  direction: ltr;
+  text-align: left;
 }
 
 /* Оставляем кнопки в столбик */

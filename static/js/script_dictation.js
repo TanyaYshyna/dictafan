@@ -925,6 +925,16 @@ const btnNext = document.getElementById("checkNext");
 const inputField = document.getElementById('userInput');
 const RTL_LANGUAGE_PREFIXES = ['ar'];
 
+function applyExerciseLayoutDirection(languageCode) {
+    try {
+        const normalized = (languageCode || '').toLowerCase();
+        const isRtl = RTL_LANGUAGE_PREFIXES.some(prefix => normalized.startsWith(prefix));
+        document.body.classList.remove('exercise-rtl', 'exercise-ltr');
+        document.body.classList.add(isRtl ? 'exercise-rtl' : 'exercise-ltr');
+    } catch (e) {
+    }
+}
+
 function dictationT(key, fallback, params) {
     try {
         if (!window.I18n || typeof window.I18n.t !== 'function') return fallback;
@@ -8507,6 +8517,10 @@ function loadDictationData() {
         } catch (e) {
         }
 
+        try {
+            applyExerciseLayoutDirection(currentDictation.language_original);
+        } catch (e) {
+        }
         applyInputDirection(currentDictation.language_original);
         // Используем LanguageManager для получения country_cod_url
         if (window.LanguageManager && typeof window.LanguageManager.getCountryCodeUrl === 'function') {
@@ -10353,15 +10367,15 @@ function disableCheckButton(active) {
     switch (active) {
         case 2:
             checkBtn.disabled = false;
-            checkBtn.innerHTML = '<i data-lucide="corner-down-left"></i><span class="check-btn-label">Проверка</span>';
-            checkBtn.title = 'Нажмите Enter/Return когда закончили ввод текста';
+            checkBtn.innerHTML = `<i data-lucide="corner-down-left"></i><span class="check-btn-label">${dictationT('main_status.checking', 'Проверка')}</span>`;
+            checkBtn.title = dictationT('main.check_title', 'Нажмите Enter/Return когда закончили ввод текста');
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-yellow');
             break;
 
         case 0:
             checkBtn.disabled = true;
-            checkBtn.innerHTML = '<i data-lucide="star" class="check-btn-icon"></i><span class="check-btn-label">Прекрасно</span>';
+            checkBtn.innerHTML = `<i data-lucide="star" class="check-btn-icon"></i><span class="check-btn-label">${dictationT('main_status.excellent', 'Прекрасно')}</span>`;
             checkBtn.title = '';
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-mint');
@@ -10370,7 +10384,7 @@ function disableCheckButton(active) {
 
         case 1:
             checkBtn.disabled = true;
-            checkBtn.innerHTML = '<i data-lucide="star-half" class="check-btn-icon"></i><span class="check-btn-label">Хорошо</span>';
+            checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i><span class="check-btn-label">${dictationT('main_status.good', 'Хорошо')}</span>`;
             checkBtn.title = '';
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-lightgreen');
