@@ -5986,6 +5986,18 @@ function showSentenceCounter() {
 
 window.showSentenceCounter = showSentenceCounter;
 
+function updateErrorCountLabel(count) {
+    try {
+        const el = document.getElementById('errorCountLabel');
+        if (!el) return;
+        const n = Number(count) || 0;
+        el.textContent = n > 0 ? String(n) : '';
+    } catch (e) {
+    }
+}
+
+window.updateErrorCountLabel = updateErrorCountLabel;
+
 
 
 // ===== пройшли коло =========
