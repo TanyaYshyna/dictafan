@@ -4298,7 +4298,9 @@ function ensureField(obj, field, fallback) {
 // Быстрый индекс по ключу:
 function makeByKeyMap(arr) {
     const m = new Map();
-    arr.forEach(s => m.set(s.key, s));
+    // IMPORTANT: dataset.key is always a string. Sentence keys can be numbers.
+    // Normalize to String everywhere to avoid Map misses like get('7') vs key 7.
+    arr.forEach(s => m.set(String(s.key), s));
     return m;
 }
 
@@ -4325,7 +4327,7 @@ function calculateSentenceSelectionState(s) {
     }
 
     // Если не completed, проверяем выбрано ли оно
-    return selectedSentences.includes(s.key) ? 'checked' : 'unchecked';
+    return selectedSentences.includes(String(s.key)) ? 'checked' : 'unchecked';
 }
 
 /**
@@ -4343,11 +4345,14 @@ function updateSentenceSelectionState(s, forceUpdate = false) {
     // Синхронизируем selectedSentences с состоянием
     // НЕ удаляем предложения из selectedSentences - они должны оставаться в списке для навигации
     // Только добавляем новые checked предложения, если их еще нет
-    if ((s.selection_state === 'checked' || s.selection_state === 'completed') && !selectedSentences.includes(s.key)) {
-        selectedSentences.push(s.key);
+    const sKey = String(s.key);
+    if ((s.selection_state === 'checked' || s.selection_state === 'completed') && !selectedSentences.includes(sKey)) {
+        selectedSentences.push(sKey);
     }
     // Предложения НЕ удаляются из selectedSentences - они остаются в списке с разными состояниями
 }
+
+// ...
 
 /**
  * Рендерит кнопку состояния для строки таблицы
@@ -4365,7 +4370,7 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
 
     // Очищаем предыдущие классы и атрибуты
     statusBtn.className = 'sentence-check';
-    statusBtn.dataset.key = s.key;
+    statusBtn.dataset.key = String(s.key);
 
     if (state === 'completed') {
         statusBtn.dataset.checked = 'star';
@@ -4396,18 +4401,8 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
     }
 }
 
-function updateErrorCountLabel(count) {
-    const el = document.getElementById('errorCountLabel');
-    if (!el) return;
-    const n = Number(count);
-    if (!Number.isFinite(n) || n <= 0) {
-        el.textContent = '';
-        return;
-    }
-    el.textContent = String(n);
-}
+// ...
 
-const tableSentences = document.querySelector(`#sentences-table tbody`);
 function renderSelectionTable() {
     if (!tableSentences) return;
 
@@ -4422,8 +4417,9 @@ function renderSelectionTable() {
         // Инициализируем состояние выбора если его нет
         if (s.selection_state === undefined) {
             // При первой загрузке: если есть предвыбор, используем его, иначе все выбрано
+            const sKey = String(s.key);
             if (hasPreselection) {
-                s.selection_state = selectedSentences.includes(s.key) ? 'checked' : 'unchecked';
+                s.selection_state = selectedSentences.includes(sKey) ? 'checked' : 'unchecked';
             } else {
                 // Если нет предвыбора - по умолчанию выбираем только первое предложение (кроме completed)
                 const isCompleted = calculateSentenceSelectionState(s) === 'completed';
@@ -4452,7 +4448,7 @@ function renderSelectionTable() {
         // Добавляем в обновленный список все предложения (checked и completed)
         // unchecked тоже остаются в списке для навигации
         if (s.selection_state === 'checked' || s.selection_state === 'completed' || s.selection_state === 'unchecked') {
-            updatedSelection.push(s.key);
+            updatedSelection.push(String(s.key));
         }
 
         // ИСПРАВЛЕНО: Убрано суммирование с circle_number_of_* - эти поля больше не используются
@@ -4554,8 +4550,9 @@ function renderSelectionTable() {
 
     // Убеждаемся, что все предложения из allSentences есть в selectedSentences
     allSentences.forEach(s => {
-        if (!selectedSentences.includes(s.key)) {
-            selectedSentences.push(s.key);
+        const sKey = String(s.key);
+        if (!selectedSentences.includes(sKey)) {
+            selectedSentences.push(sKey);
         }
     });
 
@@ -4563,7 +4560,7 @@ function renderSelectionTable() {
     if (selectedSentences.length === 0) {
         allSentences.forEach(s => {
             if (s.selection_state === 'checked') {
-                selectedSentences.push(s.key);
+                selectedSentences.push(String(s.key));
             }
         });
     }
@@ -4574,7 +4571,7 @@ function renderSelectionTable() {
         allSentences.forEach(s => {
             if (s.selection_state !== 'completed') {
                 s.selection_state = 'checked';
-                selectedSentences.push(s.key);
+                selectedSentences.push(String(s.key));
             }
         });
     }
@@ -4625,7 +4622,7 @@ function handleSentenceTableClick(e) {
     const statusBtn = e.target.closest('.sentence-check');
     if (!statusBtn) return;
 
-    const key = statusBtn.dataset.key;
+    const key = String(statusBtn.dataset.key || '');
     const s = makeByKeyMap(allSentences).get(key);
     if (!s) return;
 
@@ -4703,7 +4700,7 @@ function initializeAllCheckbox() {
             this.dataset.checked = newState;
 
             document.querySelectorAll('#sentences-table .sentence-check').forEach(checkbox => {
-                const key = checkbox.dataset.key;
+                const key = String(checkbox.dataset.key || '');
                 const s = makeByKeyMap(allSentences).get(key);
                 if (!s) return;
 
@@ -4974,6 +4971,7 @@ function getUnavailable(s = currentSentence) {
 }
 
 function getRemainingAudio(s) {
+    if (!s) return Math.max(0, Number(REQUIRED_PASSED_COUNT) || 0);
     const remaining = (REQUIRED_PASSED_COUNT - (Number(s.number_of_audio) || 0));
     return remaining > 0 ? remaining : 0;
 }
@@ -5105,7 +5103,7 @@ function getSelectedSentences() {
     // Собираем выбранные предложения из таблицы (проверяем DOM)
     const checkboxes = document.querySelectorAll('#sentences-table .sentence-check');
     checkboxes.forEach(checkbox => {
-        const key = checkbox.dataset.key;
+        const key = String(checkbox.dataset.key || '');
         const state = checkbox.dataset.checked;
 
         // Добавляем если checked (но не star/completed)
@@ -5126,7 +5124,7 @@ function getSelectedSentences() {
         allSentences.forEach(s => {
             updateSentenceSelectionState(s, true);
             if (s.selection_state === 'checked') {
-                selectedSentences.push(s.key);
+                selectedSentences.push(String(s.key));
             }
         });
     }
@@ -11433,8 +11431,9 @@ async function loadAndApplyDraft(forceClear = false) {
             // 2. completed - полностью завершенные (должны оставаться в списке)
             // 3. Предложения с прогрессом (perfect, corrected, audio)
             if (s.selection_state === 'checked' || s.selection_state === 'completed') {
-                if (!selectedSentences.includes(s.key)) {
-                    selectedSentences.push(s.key);
+                const sKey = String(s.key);
+                if (!selectedSentences.includes(sKey)) {
+                    selectedSentences.push(sKey);
                 }
             }
         });
@@ -11454,7 +11453,8 @@ async function loadAndApplyDraft(forceClear = false) {
         allSentences.forEach(s => {
             // Обновляем состояние только если оно не было явно восстановлено из черновика
             // Для этого проверяем, было ли предложение в черновике
-            const draftSentence = draft.per_sentence && draft.per_sentence[s.key];
+            const draftSentenceKey = String(s.key);
+            const draftSentence = draft.per_sentence && (draft.per_sentence[draftSentenceKey] || draft.per_sentence[s.key]);
             if (!draftSentence || draftSentence.selection_state === undefined) {
                 // Предложения не было в черновике или состояние не было сохранено - пересчитываем
                 updateSentenceSelectionState(s, true);
@@ -11464,9 +11464,10 @@ async function loadAndApplyDraft(forceClear = false) {
             }
 
             // Добавляем в selectedSentences если checked или completed
+            const sKey = String(s.key);
             if ((s.selection_state === 'checked' || s.selection_state === 'completed') &&
-                !selectedSentences.includes(s.key)) {
-                selectedSentences.push(s.key);
+                !selectedSentences.includes(sKey)) {
+                selectedSentences.push(sKey);
             }
         });
 
@@ -11886,6 +11887,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
     // Инициализируем модальное окно настроек аудио
     initAudioSettingsModal();
+
+    try {
+        await applyDictationI18n();
+        try { updateStartModalProgressUi(); } catch (e2) {}
+    } catch (e) {
+    }
 });
 
 // обработчики событий для отслеживания активности:-----------------------------------------------
