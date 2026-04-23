@@ -5977,6 +5977,15 @@ function updateSimpleSentenceCounter() {
     }
 }
 
+function showSentenceCounter() {
+    try {
+        updateSimpleSentenceCounter();
+    } catch (e) {
+    }
+}
+
+window.showSentenceCounter = showSentenceCounter;
+
 
 
 // ===== пройшли коло =========
