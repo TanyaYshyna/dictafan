@@ -8544,14 +8544,14 @@ async function initializeDictation() {
         } catch (e) {
             console.error('❌ Не удалось загрузить диктант из интернета:', e);
             hideDictationCacheFetchOverlay();
-            showNoSelectionModal(dictationT('no_selection.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
+            showNoSelectionModal(dictationT('no_selection_errors.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
             return;
         }
 
         const loadedAgain = await loadSentencesFromIndexedDb();
         hideDictationCacheFetchOverlay();
         if (!loadedAgain) {
-            showNoSelectionModal(dictationT('no_selection.cache_save_failed', 'Не удалось сохранить диктант в кеш. Обнови страницу.'));
+            showNoSelectionModal(dictationT('no_selection_errors.cache_save_failed', 'Не удалось сохранить диктант в кеш. Обнови страницу.'));
             return;
         }
     }

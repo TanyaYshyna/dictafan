@@ -353,7 +353,7 @@
     "vk": {
       "no_layout": "Keyboard layout is not available for the current language"
     },
-    "no_selection": {
+    "no_selection_errors": {
       "message": "Please select sentences to work on in the table above.",
       "load_failed_check_internet": "Failed to load dictation. Check your internet and refresh the page.",
       "cache_save_failed": "Failed to save dictation to cache. Refresh the page.",
@@ -361,7 +361,7 @@
       "none_selected": "No sentences selected for dictation",
       "audio_not_cached_reload": "Audio is not cached. Reload the dictation and wait for it to download."
     },
-    "main": {
+    "main_status": {
       "checking": "Checking",
       "excellent": "Excellent",
       "good": "Good",
