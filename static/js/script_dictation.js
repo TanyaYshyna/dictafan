@@ -2720,6 +2720,100 @@ function updateStartModalProgressUi() {
     }
 }
 
+function refreshAudioUIForCurrentSentence() {
+    try {
+        const userAudio = document.querySelector('.custom-audio-player[data-audio-id="audio_user"] audio');
+        if (userAudio) {
+            try {
+                userAudio.pause();
+            } catch (e) {
+            }
+            try {
+                userAudio.src = '';
+                userAudio.load();
+            } catch (e) {
+            }
+        }
+
+        if (translationPlayButton) {
+            const icon = translationPlayButton.querySelector('[data-lucide]');
+            if (icon) {
+                icon.setAttribute('data-lucide', 'play');
+            }
+        }
+
+        try {
+            if (originalAudioVisual && typeof originalAudioVisual.reset === 'function') {
+                originalAudioVisual.reset();
+            }
+        } catch (e) {
+        }
+
+        if (typeof applyAudioSettingsToUI === 'function') {
+            applyAudioSettingsToUI();
+        }
+
+        if (window.lucide?.createIcons) {
+            window.lucide.createIcons();
+        }
+    } catch (e) {
+    }
+}
+
+async function startGame(isResume = false) {
+    try {
+        if (isResume === false && hasDraftLoaded) {
+            isResume = true;
+        }
+    } catch (e) {
+    }
+
+    try {
+        getSelectedSentences();
+    } catch (e) {
+    }
+
+    if (!Array.isArray(selectedSentences) || selectedSentences.length === 0) {
+        showNoSelectionModal(dictationT('no_selection.message', 'Пожалуйста, отметьте предложения для работы в таблице выше.'));
+        return;
+    }
+
+    try {
+        totalSelectedSentences = selectedSentences.length;
+        currentSentenceIndex = 0;
+        initTabloSentenceCounter();
+    } catch (e) {
+    }
+
+    try {
+        if (startModal) startModal.style.display = 'none';
+    } catch (e) {
+    }
+
+    try {
+        showCurrentSentence(0, currentSentenceIndex);
+    } catch (e) {
+        console.error('[startGame] showCurrentSentence failed', e);
+    }
+
+    try {
+        startTimer();
+    } catch (e) {
+    }
+    try {
+        resetInactivityTimer();
+    } catch (e) {
+    }
+
+    try {
+        updateStartModalProgressUi();
+    } catch (e) {
+    }
+}
+
+window.startGame = startGame;
+window.refreshAudioUIForCurrentSentence = refreshAudioUIForCurrentSentence;
+
 // ===== Элементы DOM =====
 const count_perfect = document.getElementById('count_perfect');
 const count_corrected = document.getElementById('count_corrected');
