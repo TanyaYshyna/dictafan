@@ -4404,6 +4404,7 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
 // ...
 
 function renderSelectionTable() {
+    const tableSentences = document.querySelector('#sentences-table tbody');
     if (!tableSentences) return;
 
     const hasPreselection = Array.isArray(selectedSentences) && selectedSentences.length > 0;
@@ -4988,6 +4989,8 @@ function getRemainingAllResult(s) {
 }
 
 function updateTableRowStatus(s) {
+    const tableSentences = document.querySelector('#sentences-table tbody');
+    if (!tableSentences) return;
     // Находим строку с нужным ключом
     const row = tableSentences.querySelector(`tr button[data-key="${s.key}"]`)?.closest('tr');
     if (!row) return;
@@ -5219,238 +5222,66 @@ async function checkDictationAudioCachedOrThrow(sentenceKeys) {
     }
     if (!missing2.length) return;
 
-    throw new Error(dictationT('audio_not_cached', 'Аудио не найдено в кеше (не найдено: {count})', { count: missing2.length }));
-
+    const err = new Error('audio_cache_missing');
+    err.missing_urls = missing2;
+    throw err;
 }
 
-async function startGame(isResume = false) {
-    // ИСПРАВЛЕНО: Если isResume не передан явно, проверяем глобальный флаг hasDraftLoaded
-    // Это позволяет правильно определить, является ли это продолжением черновика
-    if (isResume === false && hasDraftLoaded) {
-        isResume = true;
-        console.log('[startGame] Определено продолжение черновика по флагу hasDraftLoaded');
-    }
+// ...
 
-    // Re-compute selection from the UI right before starting.
+function updateSelectionButtonsOnly() {
+    const tableSentences = document.querySelector('#sentences-table tbody');
+    if (!tableSentences) return;
     try {
-        getSelectedSentences();
+        allSentences.forEach(s => {
+            // Обновляем ТОЛЬКО кнопку состояния (чекбокс), не трогая звезды, полузвезды и микрофон
+            // НЕ меняем состояние выбора, если оно было явно установлено пользователем
+            const row = tableSentences.querySelector(`tr button[data-key="${s.key}"]`)?.closest('tr');
+            if (row) {
+                // Сохраняем текущее состояние перед пересчетом
+                const previousState = s.selection_state;
+
+                // Обновляем состояние только если:
+                // 1. Предложение стало completed (нужно показать звезду)
+                // 2. Предложение перестало быть completed (нужно убрать звезду)
+                // НЕ меняем состояние, если оно было unchecked или checked (явно установлено пользователем)
+                // и не произошло перехода в/из completed
+                if (s.selection_state === 'completed' && previousState !== 'completed') {
+                    // Предложение стало completed - обновляем состояние
+                    updateSentenceSelectionState(s, false); // false - не пересчитывать, использовать установленное
+                } else if (s.selection_state !== 'completed' && previousState === 'completed') {
+                    // Предложение перестало быть completed - обновляем состояние
+                    if (s.number_of_perfect > 0 || s.number_of_audio > 0 || s.number_of_corrected > 0) {
+                        s.selection_state = 'checked';
+                    } else {
+                        s.selection_state = 'unchecked';
+                    }
+                    updateSentenceSelectionState(s, false); // false - не пересчитывать, использовать установленное
+                }
+                // Если состояние не менялось (не было перехода в/из completed), НЕ трогаем его
+
+                // Обновляем отображение кнопки состояния
+                const statusIcon = row.querySelector('.sentence-check');
+                if (statusIcon) {
+                    renderSelectionStateButton(statusIcon, s, row);
+                }
+
+                // Обновляем класс completed строки, но НЕ трогаем ячейки со звездами и микрофоном
+                const completedSentence = getUnavailable(s) || (s.number_of_perfect > 0 && s.number_of_audio >= REQUIRED_PASSED_COUNT);
+                if (completedSentence) {
+                    row.classList.add('sentence-row-completed');
+                } else {
+                    row.classList.remove('sentence-row-completed');
+                }
+            }
+        });
     } catch (e) {
-    }
-
-    // Валидируем настройки нагрузки: нельзя выключить и текст, и аудио одновременно
-    // (если repeats=0 и without_entering_text=true, пользователь вообще ничего не сможет делать)
-    try {
-        const hasAudio = Number(REQUIRED_PASSED_COUNT) > 0;
-        const withoutEnteringText = audioSettingsPanel && audioSettingsPanel.isInitialized
-            ? Boolean(audioSettingsPanel.getSettings().without_entering_text)
-            : Boolean(window.audioSettingsWithoutEnteringText || false);
-        const hasText = !withoutEnteringText;
-        if (!hasText && !hasAudio) {
-            showNoSelectionModal(dictationT('no_selection.settings_disable_text_and_audio', 'В настройках выключены и текст, и аудио. Включите хотя бы одно упражнение.'));
-            return;
-        }
-    } catch (e) {
-        console.warn('[startGame] settings validation failed', e);
-    }
-
-    // ...
-
-    // Если ничего не выбрано, проверяем еще раз и показываем более информативное сообщение
-    if (!selectedSentences.length) {
-        // Попробуем собрать из DOM еще раз
-        const checkboxes = document.querySelectorAll('#sentences-table .sentence-check[data-checked="true"]');
-        if (checkboxes.length > 0) {
-            selectedSentences = Array.from(checkboxes).map(cb => cb.dataset.key).filter(Boolean);
-            console.log('[startGame] Найдено выбранных предложений в DOM:', selectedSentences.length);
-        }
-
-        if (!selectedSentences.length) {
-            // Проверяем DOM напрямую для более надежной проверки
-            const completedCheckboxes = document.querySelectorAll('#sentences-table .sentence-check[data-checked="star"]');
-            const checkedCheckboxes = document.querySelectorAll('#sentences-table .sentence-check[data-checked="true"]');
-
-            const hasAnyCompleted = completedCheckboxes.length > 0;
-            const hasAnyChecked = checkedCheckboxes.length > 0;
-
-            // Если есть completed предложения (звезды), но нет checked (галочек) - показываем сообщение
-            const noSelectionMessage = (hasAnyCompleted && !hasAnyChecked)
-                ? dictationT('no_selection.none_selected', 'Ни одно предложение не выбрано для диктанта')
-                : dictationT('no_selection.nothing_to_do', 'Ничего не выбрано для диктанта');
-            showNoSelectionModal(noSelectionMessage);
-            return;
-        }
-    }
-
-
-    // Prepare sentence order (shuffle if enabled)
-    try {
-        prepareGameFromTable();
-    } catch (e) {
-    }
-
-    // If still nothing selected - abort.
-    if (!Array.isArray(selectedSentences) || !selectedSentences.length) {
-        showNoSelectionModal(dictationT('no_selection.nothing_to_do', 'Ничего не выбрано для диктанта'));
-        return;
-    }
-
-    // Close start modal and actually start the session
-    try {
-        if (startModal) startModal.style.display = 'none';
-    } catch (e) {
-    }
-
-    try {
-        // Mark game started for inactivity timer logic
-        gameHasAlreadyBegun = true;
-    } catch (e) {
-    }
-
-    try {
-        // Start / resume timer
-        if (typeof startTimer === 'function') {
-            startTimer();
-        }
-    } catch (e) {
-    }
-
-    try {
-        initTabloSentenceCounter();
-    } catch (e) {
-    }
-
-    try {
-        // When starting from scratch, always begin from the first selected sentence.
-        // Resume flow can set currentSentenceIndex elsewhere via draft restore.
-        if (!isResume) {
-            currentSentenceIndex = 0;
-        }
-    } catch (e) {
-        currentSentenceIndex = 0;
-    }
-
-    try {
-        // Ensure totalSelectedSentences is stable for navigation
-        totalSelectedSentences = selectedSentences.length;
-    } catch (e) {
-    }
-
-    try {
-        showCurrentSentence(0, currentSentenceIndex || 0);
-    } catch (e) {
-        console.warn('[startGame] failed to show first sentence', e);
-    }
-
-    try {
-        currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
-        resetInactivityTimer();
-    } catch (e) {
+        console.error('[updateSelectionButtonsOnly] failed', e);
     }
 }
 
 // ...
 
-// 1) Считать JSON из <script id="sentences-data">
-function clearSentenceProgress() {
-    const el = document.getElementById('sentences-data');
-    if (!el) return [];
-    try {
-        const raw = (el.textContent || '').trim();
-        const data = JSON.parse(raw || '[]');
-        // поддержим оба варианта: массив или объект с полем sentences
-        return Array.isArray(data) ? data : (Array.isArray(data.sentences) ? data.sentences : []);
-    } catch (e) {
-        console.error('Не удалось распарсить sentences-data:', e);
-        return [];
-    }
-}
-
-// Показ/скрытие UI по remainingAudio текущего предложения
-function refreshAudioUIForCurrentSentence() {
-    const R = Number(REQUIRED_PASSED_COUNT ?? 0);
-
-    const recordBtn = document.getElementById('recordButton');
-    const percentWrap = document.getElementById('count_percent')?.parentElement; // stat-btn c процентом
-    const visual = document.getElementById('audioVisualizer');
-
-    // Если аудиоконтроль вообще не нужен
-    if (R === 0) {
-        if (recordBtn) { recordBtn.disabled = true; recordBtn.classList.add('disabled'); }
-        if (percentWrap) percentWrap.style.display = 'none';
-
-        if (visual) {
-            try { if (typeof stopVisualization === 'function') stopVisualization(); } catch { }
-            const ctx = visual.getContext && visual.getContext('2d');
-            if (ctx) ctx.clearRect(0, 0, visual.width, visual.height);
-            visual.hidden = true; // ← прячем жёстко
-        }
-        return;
-    } else {
-        // Остаток попыток
-        const remainingAudio = getRemainingAudio(currentSentence);
-        const hasAttempts = remainingAudio > 0;
-
-        // ИСПРАВЛЕНО: Скрываем все элементы аудио, если аудио уже выполнено
-        const recordingIndicator = document.getElementById('recordingIndicator');
-        const countPercent = document.getElementById('count_percent');
-
-        // Кнопка записи: скрываем полностью, если нет попыток
-        if (recordBtn) {
-            if (hasAttempts) {
-                recordBtn.style.display = '';
-                recordBtn.disabled = false;
-                recordBtn.classList.remove('disabled');
-            } else {
-                recordBtn.style.display = 'none';
-                recordBtn.disabled = true;
-                recordBtn.classList.add('disabled');
-            }
-        }
-
-        // Проценты: скрываем полностью
-        if (percentWrap) percentWrap.style.display = hasAttempts ? '' : 'none';
-        if (countPercent) countPercent.style.display = hasAttempts ? 'block' : 'none';
-
-        // Индикатор записи (кружок):
-        // - если попыток нет: полностью скрываем
-        // - если попытки есть: место резервируем, но сам кружок скрываем (visibility)
-        if (recordingIndicator) {
-            if (!hasAttempts) {
-                recordingIndicator.style.display = '';
-                recordingIndicator.style.visibility = 'hidden';
-                recordingIndicator.style.opacity = '0';
-            } else {
-                recordingIndicator.style.display = '';
-                recordingIndicator.style.visibility = isRecording ? 'visible' : 'hidden';
-                recordingIndicator.style.opacity = isRecording ? '1' : '0';
-            }
-        }
-
-        // Эквалайзер: скрываем
-        if (visual) {
-            if (remainingAudio > 0) {
-                visual.hidden = false;
-                visual.style.display = '';
-            } else {
-                try { if (typeof stopVisualization === 'function') stopVisualization(); } catch { }
-                const ctx = visual.getContext && visual.getContext('2d');
-                if (ctx) ctx.clearRect(0, 0, visual.width, visual.height);
-                visual.hidden = true;
-                visual.style.display = 'none';
-            }
-        }
-
-        // Обновить «микрофоны/галочки»
-        renderUserAudioTablo();
-
-    }
-
-}
-
-/**
- * Пересчитывает доступность кнопок записи для всех предложений при изменении REQUIRED_PASSED_COUNT
- * Обновляет статусы completed и перерисовывает таблицу предложений
- */
 function recalculateAudioAvailabilityForAllSentences() {
     if (!allSentences || allSentences.length === 0) return;
 
@@ -5483,6 +5314,8 @@ function recalculateAudioAvailabilityForAllSentences() {
 
         // Обновляем ТОЛЬКО кнопку состояния (чекбокс), не трогая звезды, полузвезды и микрофон
         // НЕ меняем состояние выбора, если оно было явно установлено пользователем
+        const tableSentences = document.querySelector('#sentences-table tbody');
+        if (!tableSentences) return;
         const row = tableSentences.querySelector(`tr button[data-key="${s.key}"]`)?.closest('tr');
         if (row) {
             // Сохраняем текущее состояние перед пересчетом
@@ -6239,7 +6072,7 @@ function checkIfAllCompleted() {
                 updateSentenceSelectionState(nextSentence);
 
                 // Обновляем отображение в таблице
-                const nextRow = tableSentences.querySelector(`tr button[data-key="${nextSentence.key}"]`)?.closest('tr');
+                const nextRow = document.querySelector(`#sentences-table tbody tr button[data-key="${nextSentence.key}"]`)?.closest('tr');
                 if (nextRow) {
                     const statusBtn = nextRow.querySelector('.sentence-check');
                     if (statusBtn) {
