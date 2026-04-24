@@ -1715,12 +1715,12 @@ html[dir="rtl"] .progress-panel-modal-r {
   display: flex;
   flex-wrap: nowrap;
   align-items: flex-start;
-  justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  max-width: 100%;
-  margin-top: 10px;
-  align-self: flex-start;
+}
+
+html[dir="rtl"] .audio-players-wrapper {
+  direction: ltr;
 }
 
 /* Плеер оригинального аудио растягивается на всю ширину */

@@ -277,6 +277,8 @@
     "exit_modal": {
       "title": "Back to desktop?",
       "message": "What should we do with the current progress?",
+      "unsaved_progress_confirm": "There is unsaved progress. Save before exiting?",
+      "saved_progress_next": "All changes are already saved. What would you like to do next?",
       "stay": "Stay",
       "exit": "Exit"
     },

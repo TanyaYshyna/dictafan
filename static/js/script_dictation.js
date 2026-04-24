@@ -3819,13 +3819,24 @@ async function showExitModal(action) {
     const messageEl = document.getElementById('exitModalMessage');
     if (messageEl) {
         messageEl.textContent = hasPending
-            ? 'Есть несохранённый прогресс. Сохранить перед выходом?'
-            : 'Все изменения уже сохранены. Что сделать дальше?';
+            ? dictationT('exit_modal.unsaved_progress_confirm', messageEl.textContent || '')
+            : dictationT('exit_modal.saved_progress_next', messageEl.textContent || '');
     }
 
-    const exitWithoutBtn = document.getElementById('exitWithoutSavingBtn');
-    if (exitWithoutBtn) {
-        exitWithoutBtn.textContent = hasPending ? 'Выйти' : 'Выйти';
+    try {
+        const exitWithoutLabel = document.getElementById('exitWithoutSavingBtnLabel');
+        if (exitWithoutLabel) {
+            exitWithoutLabel.textContent = dictationT('exit_modal.exit', exitWithoutLabel.textContent || '');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitWithLabel = document.getElementById('exitWithSavingBtnLabel');
+        if (exitWithLabel) {
+            exitWithLabel.textContent = dictationT('exit_modal.exit', exitWithLabel.textContent || '');
+        }
+    } catch (e) {
     }
 
     const exitWithBtn = document.getElementById('exitWithSavingBtn');
@@ -9549,8 +9560,8 @@ const DASHES = /[\u2010\u2011\u2012\u2013\u2014\u2015\u2212-]/g;
 // «умные» апострофы → для унификации
 const CURLY_APOS = /[\u2019\u2018\u02BC]/g;
 // Расширенный regex для удаления всех знаков препинания, включая все варианты кавычек
-const PUNCTUATION_REGEX = /[.,!?:;"«»„"'"'"'"'"'"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
-const ARABIC_DIACRITICS_REGEX = /[\u064B-\u0655\u0670\u0671]/g;
+const PUNCTUATION_REGEX = /[.,!?:;"«»„"'"'"'"'"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
+const ARABIC_DIACRITICS_REGEX = /[\u064B-\u065F\u0670\u0671\u06D6-\u06ED]/g;
 
 // === ЧИСЛА ДЛЯ ASR: маскируем и цифры, и словесные числа в <num> ===
 // === ЧИСЛА И НОРМАЛИЗАЦИЯ ДЛЯ ASR ===
@@ -10743,8 +10754,8 @@ inputField.addEventListener('keydown', function (event) {
 document.addEventListener('keydown', function (event) {
     if (event.ctrlKey) {
         // Проверяем, что Ctrl нажат
-        switch (event.key) {
-            case '1':
+        switch (event.code) {
+            case 'Digit1':
                 // Проигрываем оригинал - просто вызываем клик на кнопке
                 if (originalAudioVisual && originalAudioVisual.playButton) {
                     originalAudioVisual.playButton.click();
@@ -10752,7 +10763,7 @@ document.addEventListener('keydown', function (event) {
                 event.preventDefault();
                 break;
 
-            case '2':
+            case 'Digit2':
                 // Проигрываем перевод - просто вызываем клик на кнопке
                 if (translationPlayButton) {
                     translationPlayButton.click();
@@ -10760,25 +10771,25 @@ document.addEventListener('keydown', function (event) {
                 event.preventDefault();
                 break;
 
-            case '4':
+            case 'Digit4':
                 // Следующее предложение
                 nextSentence();
                 event.preventDefault();
                 break;
 
-            case '3':
+            case 'Digit3':
                 // Предыдущее предложение
                 previousSentence();
                 event.preventDefault();
                 break;
 
-            case '0':
+            case 'Digit0':
                 // Закончить круг раньше времени
                 checkIfAllCompleted();
                 event.preventDefault();
                 break;
 
-            case '5':
+            case 'Digit5':
                 // Показать/скрыть виртуальную клавиатуру
                 try {
                     const toggle = document.getElementById('virtualKeyboardToggle');
