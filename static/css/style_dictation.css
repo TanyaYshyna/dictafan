@@ -102,12 +102,12 @@
 }
 
 html[dir="rtl"] .topbar {
-    flex-direction: row-reverse;
+    flex-direction: row;
 }
 
 html[dir="rtl"] .user-section {
-    margin-left: 0;
-    margin-right: auto;
+    margin-left: auto;
+    margin-right: 0;
 }
 
 /* По умолчанию мини-логотип скрыт */
@@ -212,14 +212,6 @@ html[dir="rtl"] #dictationLangPair {
   align-items: flex-start;
   gap: 15px;
   margin-top: 10px;
-}
-
-html[dir="rtl"] .result-panel {
-  flex-direction: row-reverse;
-}
-
-html[dir="rtl"] body.exercise-ltr .result-panel {
-  flex-direction: row;
 }
 
 body.exercise-rtl .result-panel {
