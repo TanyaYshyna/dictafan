@@ -355,6 +355,7 @@ class UserManager {
     // Build a compact activity badge (daily progress + streak) to avoid tall header rows
     let activityBadge = null;
     try {
+      const activityContainer = userInfo || userSection;
       if (hideActivity) {
         const existing = userSection.querySelector('.user-activity-badge');
         if (existing) {
@@ -362,16 +363,20 @@ class UserManager {
         }
         activityBadge = null;
       } else {
-      activityBadge = userSection.querySelector('.user-activity-badge');
+      activityBadge = activityContainer.querySelector('.user-activity-badge');
       if (!activityBadge) {
         activityBadge = document.createElement('div');
         activityBadge.className = 'user-activity-badge';
-        // Insert after username link if possible
-        const usernameLink = userSection.querySelector('a.username');
-        if (usernameLink && usernameLink.parentElement) {
-          usernameLink.insertAdjacentElement('afterend', activityBadge);
+        const usernameEl = activityContainer.querySelector('.username');
+        if (usernameEl && usernameEl.parentElement) {
+          usernameEl.insertAdjacentElement('afterend', activityBadge);
         } else {
-          userSection.appendChild(activityBadge);
+          const logoutBtn = activityContainer.querySelector('#logoutBtn');
+          if (logoutBtn && logoutBtn.parentElement) {
+            logoutBtn.insertAdjacentElement('beforebegin', activityBadge);
+          } else {
+            activityContainer.appendChild(activityBadge);
+          }
         }
       }
 
