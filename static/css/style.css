@@ -1027,7 +1027,7 @@ select {
 /* Адаптивность для шапки */
 @media (max-width: 768px) {
     .user-section {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 5px;
     }
     

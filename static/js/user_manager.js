@@ -13,11 +13,39 @@ class UserManager {
     this._requireAuthDeferred = false;
     this._requireAuthInFlight = false;
     this._requireAuthLastAt = 0;
+    this._todayDateKey = 'dictafan_today_date_v1';
 
     // ✅ АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ
     this.init().then(() => {
       // console.log('✅ UserManager авто-инициализирован');
     });
+  }
+
+  _getLocalTodayDateStr() {
+    try {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
+  _syncTodayRollover(userData) {
+    try {
+      const todayStr = this._getLocalTodayDateStr();
+      if (!todayStr) return;
+      const prev = String(localStorage.getItem(this._todayDateKey) || '');
+      if (prev !== todayStr) {
+        localStorage.setItem(this._todayDateKey, todayStr);
+        if (userData && typeof userData === 'object') {
+          userData.today_activity_total = 0;
+        }
+      }
+    } catch (e) {
+    }
   }
 
   getSafeEmail() {
@@ -276,6 +304,11 @@ class UserManager {
       // Это нормально на страницах, где нет элемента user-section (например, страница профиля)
       console.log('ℹ️ user-section не найден в DOM - это нормально');
       return;
+    }
+
+    try {
+      this._syncTodayRollover(userData);
+    } catch (e) {
     }
 
     // console.log('🔄 Настройка интерфейса для авторизованного пользователя');
