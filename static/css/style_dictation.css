@@ -106,8 +106,8 @@ html[dir="rtl"] .topbar {
 }
 
 html[dir="rtl"] .user-section {
-    margin-left: auto;
-    margin-right: 0;
+    margin-left: 0;
+    margin-right: auto;
 }
 
 /* По умолчанию мини-логотип скрыт */
@@ -214,8 +214,14 @@ html[dir="rtl"] #dictationLangPair {
   margin-top: 10px;
 }
 
+body.exercise-ltr .result-panel {
+  direction: ltr !important;
+  flex-direction: row !important;
+}
+
 body.exercise-rtl .result-panel {
-  flex-direction: row-reverse;
+  direction: rtl !important;
+  flex-direction: row-reverse !important;
 }
 
 .check-group {
