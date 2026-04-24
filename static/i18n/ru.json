@@ -51,10 +51,16 @@
       "back_to_dictations": "Вернуться к списку диктантов"
     },
     "sections": {
-      "local_models": "Настройки автономных языковых моделей",
-      "dictation_settings": "Настройки для диктантов",
+      "languages": "Языки",
+      "activity_goal": "План активности",
+      "local_models": "Локальные модели",
+      "dictation_settings": "Настройки диктантов",
       "assignment_history": "История заданий",
       "groups": "Группы"
+    },
+    "activity_goal": {
+      "label": "План активности в день:",
+      "help": "Это число нужно для отображения в шапке прогресса за сегодня (например 78/100)."
     },
     "audio": {
       "explanations": {

@@ -51,10 +51,16 @@
       "save": "Save"
     },
     "sections": {
+      "languages": "Languages",
+      "activity_goal": "Daily Activity Goal",
       "local_models": "Offline language models settings",
       "dictation_settings": "Dictation settings",
       "assignment_history": "Assignment history",
       "groups": "Groups"
+    },
+    "activity_goal": {
+      "label": "Daily activity goal:",
+      "help": "Used to display today's progress in the header (e.g. 78/100)."
     },
     "audio": {
       "explanations": {

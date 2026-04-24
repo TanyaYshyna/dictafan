@@ -2,7 +2,7 @@
 Функции для работы с историей активности пользователей в PostgreSQL
 """
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from psycopg2 import sql
 from helpers.db import get_db_connection
 
@@ -151,6 +151,93 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     except Exception as e:
         conn.rollback()
         raise Exception(f"Failed to add activity: {e}")
+    finally:
+        conn.close()
+
+
+def get_activity_total_for_date(user_id, date_value, language_code=None):
+    """Return total activity points for a specific date.
+
+    Total = perfect + corrected + audio.
+    """
+    conn = get_db_connection()
+    try:
+        if isinstance(date_value, str):
+            date_value = datetime.fromisoformat(date_value).date()
+        with conn.cursor() as cur:
+            if language_code and str(language_code).strip().lower() not in ('all', '*'):
+                cur.execute(
+                    """
+                    SELECT
+                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS total
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date = %s
+                      AND dictation_language_code = %s
+                    """,
+                    (int(user_id), date_value, str(language_code).strip().lower()),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT
+                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS total
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date = %s
+                    """,
+                    (int(user_id), date_value),
+                )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return int(row.get('total') or 0)
+            return int(row[0] if row and row[0] is not None else 0)
+    finally:
+        conn.close()
+
+
+def calculate_streak_days(user_id, today=None):
+    """Calculate consecutive active days based on history_activity.
+
+    A day counts as active if total(perfect+corrected+audio) > 0.
+    """
+    if today is None:
+        today = datetime.now().date()
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Pull recent active dates (descending). Limit protects from scanning huge history.
+            cur.execute(
+                """
+                SELECT date
+                FROM history_activity
+                WHERE user_id = %s
+                GROUP BY date
+                HAVING COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) > 0
+                ORDER BY date DESC
+                LIMIT 400
+                """,
+                (int(user_id),),
+            )
+            rows = cur.fetchall() or []
+
+        active = set()
+        for r in rows:
+            d = r.get('date') if isinstance(r, dict) else (r[0] if r else None)
+            if d is not None:
+                active.add(d)
+
+        if not active:
+            return 0
+
+        # If today not active, start from yesterday.
+        current = today if today in active else (today - timedelta(days=1))
+        streak = 0
+        while current in active:
+            streak += 1
+            current = current - timedelta(days=1)
+        return streak
     finally:
         conn.close()
 

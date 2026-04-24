@@ -289,6 +289,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
                 'settings_json',
                 'audio_settings_json',
                 'assignment_history_retention_days',
+                'daily_activity_goal',
                 'telegram_chat_id',
                 'telegram_enabled',
                 'telegram_link_code',
@@ -301,6 +302,7 @@ def get_user_by_email(email: str) -> Optional[dict]:
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
         has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
+        has_daily_activity_goal = 'daily_activity_goal' in columns
         has_telegram_chat_id = 'telegram_chat_id' in columns
         has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
@@ -318,6 +320,8 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.audio_settings_json")
         if has_assignment_history_retention_days:
             select_fields.append("u.assignment_history_retention_days")
+        if has_daily_activity_goal:
+            select_fields.append("u.daily_activity_goal")
         if has_telegram_chat_id:
             select_fields.append("u.telegram_chat_id")
         if has_telegram_enabled:
@@ -373,6 +377,9 @@ def get_user_by_email(email: str) -> Optional[dict]:
 
         if has_assignment_history_retention_days and "assignment_history_retention_days" in row:
             result["assignment_history_retention_days"] = row.get("assignment_history_retention_days")
+
+        if has_daily_activity_goal and "daily_activity_goal" in row:
+            result["daily_activity_goal"] = row.get("daily_activity_goal")
 
         if has_telegram_chat_id and "telegram_chat_id" in row:
             result["telegram_chat_id"] = row.get("telegram_chat_id")
@@ -476,6 +483,7 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
                 'settings_json',
                 'audio_settings_json',
                 'assignment_history_retention_days',
+                'daily_activity_goal',
                 'telegram_self_reports_enabled'
             )
         """)
@@ -485,6 +493,7 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         has_settings_json = 'settings_json' in columns
         has_audio_settings_json = 'audio_settings_json' in columns
         has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
+        has_daily_activity_goal = 'daily_activity_goal' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
 
         if 'assignment_history_retention_days' in updates:
@@ -502,6 +511,25 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
                 raise RuntimeError(
                     "DB schema mismatch: column users.assignment_history_retention_days is missing. "
                     "Apply migrations/add_assignment_history_retention_days_to_users.sql"
+                )
+
+        if 'daily_activity_goal' in updates:
+            if has_daily_activity_goal:
+                v = updates.get('daily_activity_goal')
+                try:
+                    v_int = int(v)
+                except Exception:
+                    v_int = 100
+                if v_int < 0:
+                    v_int = 0
+                if v_int > 100000:
+                    v_int = 100000
+                update_fields.append("daily_activity_goal = %s")
+                update_values.append(v_int)
+            else:
+                raise RuntimeError(
+                    "DB schema mismatch: column users.daily_activity_goal is missing. "
+                    "Apply migrations/add_daily_activity_goal_to_users.sql"
                 )
         
         # Обновляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)

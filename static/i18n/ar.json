@@ -51,10 +51,15 @@
       "back_to_dictations": "العودة إلى قائمة الإملاءات"
     },
     "sections": {
-      "local_models": "إعدادات نماذج اللغة دون اتصال",
+      "languages": "اللغات",
+      "activity_goal": "هدف النشاط اليومي",
+      "local_models": "نماذج محلية",
       "dictation_settings": "إعدادات الإملاء",
-      "assignment_history": "سجل المهام",
-      "groups": "المجموعات"
+      "assignment_history": "سجل الواجبات"
+    },
+    "activity_goal": {
+      "label": "هدف النشاط اليومي:",
+      "help": "يُستخدم لعرض تقدم اليوم في الشريط العلوي (مثال 78/100)."
     },
     "audio": {
       "explanations": {

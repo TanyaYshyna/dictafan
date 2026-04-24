@@ -31,6 +31,7 @@ from helpers.db_users import (
     create_password_reset_token,
     reset_password_by_token,
 )
+from helpers.db_history import calculate_streak_days, get_activity_total_for_date
 from helpers.email_sender import send_email
 from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_telegram import (
@@ -437,6 +438,13 @@ def api_get_current_user():
     # В БД мы пароль не возвращаем, password_hash наружу не отдаём
     user_copy = dict(user_data)
     user_copy.pop('password_hash', None)
+
+    try:
+        user_id_int = int(user_data.get('id'))
+        user_copy['streak_days'] = calculate_streak_days(user_id_int)
+        user_copy['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
+    except Exception:
+        user_copy['today_activity_total'] = int(user_copy.get('today_activity_total') or 0)
     
     # audio_settings_json уже включен в user_data из get_user_by_email
     # и будет возвращен автоматически
@@ -559,6 +567,9 @@ def api_update_profile():
 
         if 'assignment_history_retention_days' in updates:
             db_updates['assignment_history_retention_days'] = updates['assignment_history_retention_days']
+
+        if 'daily_activity_goal' in updates:
+            db_updates['daily_activity_goal'] = updates['daily_activity_goal']
         
         # Обновляем данные в БД
         if db_updates:
@@ -579,6 +590,16 @@ def api_update_profile():
             'streak_days': updated_user['streak_days'],
             'role': updated_user['role'],
         }
+
+        try:
+            user_id_int = int(updated_user.get('id'))
+            user_response['streak_days'] = calculate_streak_days(user_id_int)
+            user_response['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
+        except Exception:
+            user_response['today_activity_total'] = int(user_response.get('today_activity_total') or 0)
+
+        if 'daily_activity_goal' in updated_user:
+            user_response['daily_activity_goal'] = updated_user.get('daily_activity_goal')
 
         if 'telegram_chat_id' in updated_user:
             user_response['telegram_chat_id'] = updated_user.get('telegram_chat_id')
@@ -628,6 +649,16 @@ def api_get_profile():
         'streak_days': user_db['streak_days'],
         'role': user_db['role'],
     }
+
+    try:
+        user_id_int = int(user_db.get('id'))
+        user_response['streak_days'] = calculate_streak_days(user_id_int)
+        user_response['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
+    except Exception:
+        user_response['today_activity_total'] = int(user_response.get('today_activity_total') or 0)
+
+    if 'daily_activity_goal' in user_db:
+        user_response['daily_activity_goal'] = user_db.get('daily_activity_goal')
 
     if 'telegram_chat_id' in user_db:
         user_response['telegram_chat_id'] = user_db.get('telegram_chat_id')

@@ -344,6 +344,38 @@ class UserManager {
       usernameElement.textContent = userData.username || 'Пользователь';
     }
 
+    // Daily activity plan: show as today/goal near username
+    try {
+      const todayTotal = Number(userData?.today_activity_total);
+      const goal = Number(userData?.daily_activity_goal);
+      const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;
+      const goalOk = Number.isFinite(goal) && goal > 0;
+
+      let el = userSection.querySelector('.daily-activity-progress');
+      if (!el) {
+        el = document.createElement('span');
+        el.className = 'daily-activity-progress';
+        el.style.marginLeft = '8px';
+        el.style.fontSize = '12px';
+        el.style.fontWeight = '800';
+        el.style.color = 'rgba(0,0,0,0.55)';
+        if (usernameElement && usernameElement.parentElement) {
+          usernameElement.parentElement.appendChild(el);
+        }
+      }
+
+      if (el) {
+        if (todayOk && goalOk) {
+          el.textContent = `${todayTotal}/${goal}`;
+          el.style.display = 'inline';
+        } else {
+          el.textContent = '';
+          el.style.display = 'none';
+        }
+      }
+    } catch (e) {
+    }
+
     // Аватар
     if (avatarElement && userData.avatar) {
       const avatarUrl = this.getAvatarUrl('small');

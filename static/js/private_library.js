@@ -2098,7 +2098,15 @@ async function openCreateAssignmentModal(dictationId) {
 
   try {
     const sentences = await loadDictationSentencesForAssignmentModal(dictationId);
-    setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: null });
+    const firstPos = (() => {
+      try {
+        const p = sentences && sentences.length ? Number(sentences[0] && sentences[0].position) : NaN;
+        return Number.isFinite(p) ? p : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+    setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: firstPos != null ? [firstPos] : null });
     renderCreateAssignmentSentencesTable(modal);
   } catch (e) {
     setCreateAssignmentSentencesState(modal, { sentences: [], selectedPositions: null });

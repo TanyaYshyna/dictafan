@@ -1834,6 +1834,14 @@ function loadUserData() {
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
         speech_recognition_mode: userData.speech_recognition_mode || 'route',
         assignment_history_retention_days: assignmentHistoryRetentionDays,
+        daily_activity_goal: (() => {
+            try {
+                const n = Number(userData.daily_activity_goal);
+                return (Number.isFinite(n) && n >= 0) ? n : 100;
+            } catch (e) {
+                return 100;
+            }
+        })(),
     };
 
     document.getElementById('username').value = originalData.username;
@@ -1851,6 +1859,17 @@ function loadUserData() {
         if (sel) {
             sel.value = String(originalData.assignment_history_retention_days ?? 7);
             sel.onchange = () => {
+                checkForChanges();
+            };
+        }
+    } catch (e) {
+    }
+
+    try {
+        const goalEl = document.getElementById('dailyActivityGoal');
+        if (goalEl) {
+            goalEl.value = String(originalData.daily_activity_goal ?? 100);
+            goalEl.oninput = () => {
                 checkForChanges();
             };
         }
@@ -2232,6 +2251,7 @@ function checkForChanges() {
         audio_required_passed_star_half: currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3),
         speech_recognition_mode: currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route'),
         assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
+        daily_activity_goal: currentValues.daily_activity_goal !== (originalData.daily_activity_goal ?? 100),
     };
 
     const hasChanges = Object.values(diffs).some(Boolean);
@@ -2315,6 +2335,16 @@ function getCurrentFormValues() {
                 return (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) ? n : 7;
             } catch (e) {
                 return 7;
+            }
+        })(),
+        daily_activity_goal: (() => {
+            try {
+                const el = document.getElementById('dailyActivityGoal');
+                const n = Number(el ? el.value : 100);
+                if (!Number.isFinite(n) || n < 0) return 100;
+                return Math.floor(n);
+            } catch (e) {
+                return 100;
             }
         })(),
     };
@@ -2423,6 +2453,7 @@ async function saveProfile(options = {}) {
         }
 
         updateData.assignment_history_retention_days = formValues.assignment_history_retention_days;
+        updateData.daily_activity_goal = formValues.daily_activity_goal;
 
         // audio остаётся в settings_json
         if (audioSettingsPanel) {
@@ -2577,6 +2608,14 @@ async function saveProfile(options = {}) {
             audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
             speech_recognition_mode: audioSettings.speech_recognition_mode,
             assignment_history_retention_days: assignmentHistoryRetentionDaysAfterSave,
+            daily_activity_goal: (() => {
+                try {
+                    const n = Number(updatedUser && updatedUser.daily_activity_goal);
+                    return (Number.isFinite(n) && n >= 0) ? n : (originalData.daily_activity_goal ?? 100);
+                } catch (e) {
+                    return (originalData.daily_activity_goal ?? 100);
+                }
+            })(),
         };
         
         // Обновляем UM.userData, чтобы при следующей загрузке страницы данные были актуальными
@@ -2620,6 +2659,16 @@ async function saveProfile(options = {}) {
 
             if (updatedUser.assignment_history_retention_days !== undefined && updatedUser.assignment_history_retention_days !== null) {
                 UM.userData.assignment_history_retention_days = updatedUser.assignment_history_retention_days;
+            }
+
+            if (updatedUser.daily_activity_goal !== undefined && updatedUser.daily_activity_goal !== null) {
+                UM.userData.daily_activity_goal = updatedUser.daily_activity_goal;
+            }
+
+            try {
+                const goalEl = document.getElementById('dailyActivityGoal');
+                if (goalEl) goalEl.value = String(originalData.daily_activity_goal ?? 100);
+            } catch (e) {
             }
 
             try {
