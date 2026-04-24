@@ -1091,7 +1091,7 @@ select {
 .streak-days {
     font-size: 14px;
     font-weight: 700;
-    color: var(--color-button-text-yellow, #1f2933);
+    color: var(--color-text, #1f2933);
     line-height: 1;
     position: relative;
     top: 3px; /* Опустить число на 3px вниз */

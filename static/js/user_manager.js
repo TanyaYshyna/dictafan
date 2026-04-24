@@ -344,9 +344,24 @@ class UserManager {
       usernameElement.textContent = userData.username || 'Пользователь';
     }
 
+    let hideActivity = false;
+    try {
+      const p = String(window.location && window.location.pathname ? window.location.pathname : '');
+      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor');
+    } catch (e) {
+      hideActivity = false;
+    }
+
     // Build a compact activity badge (daily progress + streak) to avoid tall header rows
     let activityBadge = null;
     try {
+      if (hideActivity) {
+        const existing = userSection.querySelector('.user-activity-badge');
+        if (existing) {
+          try { existing.remove(); } catch (e2) {}
+        }
+        activityBadge = null;
+      } else {
       activityBadge = userSection.querySelector('.user-activity-badge');
       if (!activityBadge) {
         activityBadge = document.createElement('div');
@@ -361,9 +376,10 @@ class UserManager {
       }
 
       // Move streak button inside the badge for consistent layout
-      const streakBtn = userSection.querySelector('button.streak');
-      if (streakBtn && streakBtn.parentElement !== activityBadge) {
-        activityBadge.appendChild(streakBtn);
+      const streakEl = userSection.querySelector('.streak');
+      if (streakEl && streakEl.parentElement !== activityBadge) {
+        activityBadge.appendChild(streakEl);
+      }
       }
     } catch (e) {
     }
@@ -379,7 +395,7 @@ class UserManager {
       if (!el) {
         el = document.createElement('span');
         el.className = 'daily-activity-progress';
-        if (activityBadge) {
+        if (activityBadge && !hideActivity) {
           activityBadge.appendChild(el);
         } else if (usernameElement && usernameElement.parentElement) {
           usernameElement.parentElement.appendChild(el);
