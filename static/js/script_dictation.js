@@ -9883,14 +9883,20 @@ function compressNumRuns(t) {
 }
 
 // Нормализация ТОЛЬКО для ASR-процентов/авто-стопа
-function normalizeForASR(text) {
-    let s = (text || "")
+function normalizeForASR(raw) {
+    let s = normalizeDictationInvisibleChars(String(raw || ''))
         .normalize('NFKC')
         .replace(/[\u00A0\u202F\u2007\u2009\u200A]/g, ' ')
         .replace(/[\u200B\u200C\u200D\u2060\uFEFF]/g, '')
         .replace(/\u00AD/g, '')
         .replace(DASHES, ' ')   // КЛЮЧ: «more—that's» → "more that's"
         .toLowerCase();
+
+    // Arabic: strip diacritics/harakat and extended Quranic marks to avoid false mismatches.
+    try {
+        s = s.replace(ARABIC_DIACRITICS_REGEX, '');
+    } catch (e) {
+    }
 
     s = maskNumbersToNumToken(s);
     s = compressNumRuns(s);

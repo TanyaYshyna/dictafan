@@ -230,6 +230,7 @@ body.exercise-rtl .result-panel {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .text-column {
@@ -237,7 +238,31 @@ body.exercise-rtl .result-panel {
   flex-direction: column;
   gap: 5px;
   flex: 1;
+  min-width: 0;
   /* занимает всё свободное пространство */
+}
+
+body.exercise-rtl .text-column {
+  align-items: flex-end;
+  text-align: right;
+}
+
+body.exercise-rtl #correctAnswer,
+body.exercise-rtl #translation {
+  margin-left: auto;
+}
+
+body.exercise-rtl .check-group {
+  flex-direction: row-reverse;
+}
+
+body.exercise-ltr .text-column {
+  align-items: flex-start;
+  text-align: left;
+}
+
+body.exercise-ltr .check-group {
+  margin-left: auto;
 }
 
 #correctAnswer {
