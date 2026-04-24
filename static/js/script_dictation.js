@@ -484,7 +484,27 @@ function refreshMedalBadgesFromCache() {
     try {
         const id = getCurrentDictationIdForDb();
         const n = getCompletionCountFromCache(id);
-        updateTopbarMedalBadge(n);
+        // If assignment subset is active, show candy instead of medal.
+        try {
+            const hasSubset = Array.isArray(window.assignmentSelectedSentencePositions) && window.assignmentSelectedSentencePositions.length > 0;
+            if (hasSubset) {
+                try {
+                    const medalWrap = document.getElementById('dictation-topbar-medal');
+                    if (medalWrap) medalWrap.style.display = 'none';
+                } catch (e2) {
+                }
+                refreshTopbarCandyBadgeFromServer().catch(() => {});
+            } else {
+                try {
+                    const candyWrap = document.getElementById('dictation-topbar-candy');
+                    if (candyWrap) candyWrap.style.display = 'none';
+                } catch (e2) {
+                }
+                updateTopbarMedalBadge(n);
+            }
+        } catch (e2) {
+            updateTopbarMedalBadge(n);
+        }
         updateCompletionModalMedalCount(n);
     } catch (e) {
     }
@@ -530,6 +550,86 @@ function updateTopbarMedalBadge(count) {
         } catch (e) {
         }
     } catch (e) {
+    }
+}
+
+function updateTopbarCandyBadge(count) {
+    try {
+        const wrap = document.getElementById('dictation-topbar-candy');
+        const label = document.getElementById('dictation-topbar-candy-count');
+        if (!wrap || !label) return;
+        const n = Number(count);
+        if (!Number.isFinite(n) || n <= 0) {
+            wrap.style.display = 'none';
+            label.textContent = '0';
+            return;
+        }
+        label.textContent = String(n);
+        wrap.style.display = 'inline-flex';
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: wrap });
+            }
+        } catch (e) {
+        }
+    } catch (e) {
+    }
+}
+
+async function refreshTopbarCandyBadgeFromServer() {
+    try {
+        const wrap = document.getElementById('dictation-topbar-candy');
+        const label = document.getElementById('dictation-topbar-candy-count');
+        if (!wrap || !label) return;
+
+        const positions = (() => {
+            try {
+                return (window.assignmentSelectedSentencePositions != null)
+                    ? window.assignmentSelectedSentencePositions
+                    : null;
+            } catch (e) {
+                return null;
+            }
+        })();
+        if (!Array.isArray(positions) || positions.length === 0) {
+            updateTopbarCandyBadge(0);
+            return;
+        }
+
+        const um = window.UM || userManager;
+        const token = um?.token || localStorage.getItem('jwt_token');
+        if (!token) {
+            updateTopbarCandyBadge(0);
+            return;
+        }
+
+        const dictationIdForDb = getCurrentDictationIdForDb();
+        if (!dictationIdForDb) {
+            updateTopbarCandyBadge(0);
+            return;
+        }
+
+        const payload = {
+            dictation_id: dictationIdForDb,
+            selected_sentence_positions: Array.from(new Set(positions.map(x => Number(x)).filter(x => Number.isFinite(x)))).sort((a, b) => a - b),
+        };
+
+        const resp = await fetch('/api/statistics/success/count_subset', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        if (!resp.ok) {
+            updateTopbarCandyBadge(0);
+            return;
+        }
+        const data = await resp.json();
+        updateTopbarCandyBadge(Number(data && data.count ? data.count : 0) || 0);
+    } catch (e) {
+        try { updateTopbarCandyBadge(0); } catch (e2) {}
     }
 }
 
@@ -664,16 +764,67 @@ function applyAudioSettingsFromUserData(userData) {
 
 function renderAssignmentSourceGroupIfAny() {
     try {
-        const el = document.getElementById('assignment-source-group');
-        if (!el) return;
-        const assignmentId = (window.assignmentId != null) ? String(window.assignmentId) : '';
-        if (!assignmentId) {
-            el.textContent = '';
-            el.style.display = 'none';
+        const idEl = document.getElementById('dictationIdDisplay');
+        if (!idEl) return;
+
+        const baseId = String(idEl.getAttribute('data-base-id') || idEl.textContent || '').trim();
+        if (!idEl.getAttribute('data-base-id')) {
+            idEl.setAttribute('data-base-id', baseId);
+        }
+
+        const positions = (() => {
+            try {
+                return (window.assignmentSelectedSentencePositions != null)
+                    ? window.assignmentSelectedSentencePositions
+                    : null;
+            } catch (e) {
+                return null;
+            }
+        })();
+
+        if (!Array.isArray(positions) || positions.length === 0) {
+            idEl.textContent = baseId;
             return;
         }
-        el.textContent = dictationT('assignment.badge', `Задание ${assignmentId}`, { id: assignmentId });
-        el.style.display = 'inline-flex';
+
+        const uniq = Array.from(new Set(positions.map(x => Number(x)).filter(x => Number.isFinite(x))));
+        uniq.sort((a, b) => a - b);
+        if (!uniq.length) {
+            idEl.textContent = baseId;
+            return;
+        }
+
+        // If assignment covers ALL sentences, show nothing (same as full dictation).
+        try {
+            const total = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
+            if (total > 0 && uniq.length >= total) {
+                idEl.textContent = baseId;
+                return;
+            }
+        } catch (e) {
+        }
+
+        const ranges = [];
+        let start = null;
+        let prev = null;
+        for (const n of uniq) {
+            if (start == null) {
+                start = n;
+                prev = n;
+                continue;
+            }
+            if (n === prev + 1) {
+                prev = n;
+                continue;
+            }
+            ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+            start = n;
+            prev = n;
+        }
+        if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+
+        const compact = ranges.join(',');
+        idEl.textContent = compact ? `${baseId} (${compact})` : baseId;
     } catch (e) {
     }
 }

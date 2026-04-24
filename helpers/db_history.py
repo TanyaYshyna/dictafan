@@ -407,13 +407,74 @@ def get_success_count(user_id, dictation_id):
             cur.execute("""
                 SELECT COUNT(*) 
                 FROM history_successes
-                WHERE user_id = %s AND dictation_id = %s
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND selected_sentence_positions IS NULL
             """, (user_id, dictation_id))
             
             row = cur.fetchone()
             return row[0] if row else 0
     except Exception as e:
         raise Exception(f"Failed to get success count: {e}")
+    finally:
+        conn.close()
+
+
+def get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions):
+    """Count successful completions for an exact assignment subset.
+
+    Args:
+        user_id: ID пользователя
+        dictation_id: ID диктанта (integer или строка dict_<id>)
+        selected_sentence_positions: list[int] | None
+
+    Returns:
+        int
+    """
+    if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
+        try:
+            dictation_id = int(dictation_id.replace('dict_', ''))
+        except ValueError:
+            raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
+
+    positions = None
+    try:
+        if selected_sentence_positions is not None:
+            positions = [int(x) for x in list(selected_sentence_positions or [])]
+            positions.sort()
+    except Exception:
+        positions = None
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if positions is None:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM history_successes
+                    WHERE user_id = %s
+                      AND dictation_id = %s
+                      AND selected_sentence_positions IS NULL
+                    """,
+                    (user_id, dictation_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)
+                    FROM history_successes
+                    WHERE user_id = %s
+                      AND dictation_id = %s
+                      AND selected_sentence_positions = %s
+                    """,
+                    (user_id, dictation_id, positions),
+                )
+
+            row = cur.fetchone()
+            return row[0] if row else 0
+    except Exception as e:
+        raise Exception(f"Failed to get subset success count: {e}")
     finally:
         conn.close()
 
@@ -461,7 +522,9 @@ def get_success_counts_for_dictations(user_id, dictation_ids):
             cur.execute("""
                 SELECT dictation_id, COUNT(*) as count
                 FROM history_successes
-                WHERE user_id = %s AND dictation_id = ANY(%s)
+                WHERE user_id = %s
+                  AND dictation_id = ANY(%s)
+                  AND selected_sentence_positions IS NULL
                 GROUP BY dictation_id
             """, (user_id, numeric_ids))
             

@@ -12,6 +12,7 @@ from helpers.db_users import get_user_by_email, update_user
 from helpers.db_history import (
     add_activity, add_success, get_success_count, get_success_counts_for_dictations,
     get_activity_totals_by_period,
+    get_success_count_for_subset,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -2109,4 +2110,37 @@ def get_success_counts():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Ошибка получения количества завершений'}), 500
+
+
+@statistics_bp.route('/success/count_subset', methods=['POST'])
+@jwt_required()
+def get_success_count_subset():
+    """Return completion count for a specific assignment subset (selected_sentence_positions).
+
+    Medals count only full dictations (selected_sentence_positions IS NULL).
+    This endpoint is for candies: it counts exact subset matches.
+    """
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json() or {}
+
+        dictation_id = data.get('dictation_id')
+        selected_sentence_positions = data.get('selected_sentence_positions')
+
+        if not dictation_id:
+            return jsonify({'error': 'Не указан dictation_id'}), 400
+
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+
+        user_id = int(user['id'])
+
+        cnt = int(get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions) or 0)
+        return jsonify({'success': True, 'count': cnt})
+    except Exception as e:
+        print(f'❌ [GET_SUCCESS_COUNT_SUBSET] Ошибка: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Ошибка получения количества завершений для поднабора'}), 500
 

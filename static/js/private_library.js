@@ -8019,8 +8019,8 @@ async function updateCompletionBadges(container = null) {
           }
         });
       }
-      badge.title = `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`;
-      badge.setAttribute('aria-label', `Выполнено полностью: ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`);
+      badge.title = `Выполнено полностью (весь диктант): ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`;
+      badge.setAttribute('aria-label', `Выполнено полностью (весь диктант): ${completionCount} раз. Кликните, чтобы открыть отчет по этому диктанту`);
       badge.innerHTML = `<i data-lucide="award"></i><span class="completion-count">${completionCount}</span>`;
     } else if (badge) {
       // Удаляем медальку, если выполнений нет
