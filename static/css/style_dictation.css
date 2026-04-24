@@ -110,6 +110,10 @@ html[dir="rtl"] .user-section {
     margin-right: auto;
 }
 
+html[dir="rtl"] .topbar-save-group {
+    flex-direction: row-reverse;
+}
+
 /* По умолчанию мини-логотип скрыт */
 .logo-min {
     display: none;
