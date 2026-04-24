@@ -402,7 +402,19 @@ class UserManager {
         activityBadge.className = 'user-activity-badge';
         const usernameEl = activityContainer.querySelector('.username');
         if (usernameEl && usernameEl.parentElement) {
-          usernameEl.insertAdjacentElement('afterend', activityBadge);
+          let wrap = null;
+          try {
+            if (typeof usernameEl.closest === 'function') {
+              wrap = usernameEl.closest('.dropdown-menu-wrapper');
+            }
+          } catch (e) {
+            wrap = null;
+          }
+          if (wrap && wrap.parentElement === activityContainer) {
+            wrap.insertAdjacentElement('afterend', activityBadge);
+          } else {
+            usernameEl.insertAdjacentElement('afterend', activityBadge);
+          }
         } else {
           const logoutBtn = activityContainer.querySelector('#logoutBtn');
           if (logoutBtn && logoutBtn.parentElement) {
