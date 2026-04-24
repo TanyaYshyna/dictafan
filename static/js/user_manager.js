@@ -380,7 +380,7 @@ class UserManager {
         el = document.createElement('span');
         el.className = 'daily-activity-progress';
         if (activityBadge) {
-          activityBadge.insertBefore(el, activityBadge.firstChild);
+          activityBadge.appendChild(el);
         } else if (usernameElement && usernameElement.parentElement) {
           usernameElement.parentElement.appendChild(el);
         }
