@@ -2429,7 +2429,11 @@ function clearAssignmentLaunchContext() {
 }
 
 function applyAssignmentSentenceSubsetIfNeeded() {
-    const ctx = getAssignmentActiveContext() || getAssignmentLaunchContext();
+    // Important: launch context (from Plan / another page) must override stale active context
+    // from a previous unfinished assignment in the same tab.
+    const launchCtx = getAssignmentLaunchContext();
+    const activeCtx = getAssignmentActiveContext();
+    const ctx = launchCtx || activeCtx;
     if (!ctx) return false;
 
     try {
@@ -2452,9 +2456,16 @@ function applyAssignmentSentenceSubsetIfNeeded() {
     }
 
     // Keep assignment context within the current tab (survives reload) but do not leak it across tabs.
-    // Launch context comes from another page via localStorage; once applied we move it to sessionStorage.
+    // Launch context comes from another page via localStorage; once applied it must replace any stale active ctx.
     try {
-        setAssignmentActiveContext(ctx);
+        if (launchCtx) {
+            try {
+                setAssignmentActiveContext(launchCtx);
+            } catch (e2) {
+            }
+        } else {
+            setAssignmentActiveContext(ctx);
+        }
     } catch (e) {
     }
 
