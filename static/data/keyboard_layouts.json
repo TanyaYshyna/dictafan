@@ -803,7 +803,7 @@
         { "code": "KeyP", "label": "ح", "shiftLabel": "؛", "finger": "right-pinky" },
         { "code": "BracketLeft", "label": "ج", "shiftLabel": "<", "finger": "right-pinky" },
         { "code": "BracketRight", "label": "د", "shiftLabel": ">", "finger": "right-pinky" },
-        { "code": "Backslash", "label": "ذ", "shiftLabel": "؟", "finger": "right-pinky", "size": 1.5 }
+        { "code": "Backslash", "label": "ة", "shiftLabel": "؟", "finger": "right-pinky", "size": 1.5 }
       ],
       [
         { "code": "CapsLock", "label": "Caps", "finger": "left-pinky", "size": 1.8 },
@@ -822,16 +822,16 @@
       ],
       [
         { "code": "ShiftLeft", "label": "Shift", "finger": "left-pinky", "size": 2.2 },
-        { "code": "KeyZ", "label": "ئ", "shiftLabel": "~", "finger": "left-pinky" },
-        { "code": "KeyX", "label": "ء", "shiftLabel": "`", "finger": "left-ring" },
-        { "code": "KeyC", "label": "ؤ", "shiftLabel": "{", "finger": "left-middle" },
-        { "code": "KeyV", "label": "ر", "shiftLabel": "}", "finger": "left-index" },
-        { "code": "KeyB", "label": "لا", "shiftLabel": "لآ", "finger": "left-index" },
-        { "code": "KeyN", "label": "ى", "shiftLabel": "آ", "finger": "right-index" },
-        { "code": "KeyM", "label": "ة", "shiftLabel": "’", "finger": "right-index" },
-        { "code": "Comma", "label": "و", "shiftLabel": ",", "finger": "right-middle" },
-        { "code": "Period", "label": "ز", "shiftLabel": ".", "finger": "right-ring" },
-        { "code": "Slash", "label": "ظ", "shiftLabel": "؟", "finger": "right-pinky" },
+        { "code": "KeyZ", "label": "ظ", "shiftLabel": "~", "finger": "left-pinky" },
+        { "code": "KeyX", "label": "ط", "shiftLabel": "`", "finger": "left-ring" },
+        { "code": "KeyC", "label": "ذ", "shiftLabel": "{", "finger": "left-middle" },
+        { "code": "KeyV", "label": "د", "shiftLabel": "}", "finger": "left-index" },
+        { "code": "KeyB", "label": "ز", "shiftLabel": "لآ", "finger": "left-index" },
+        { "code": "KeyN", "label": "ر", "shiftLabel": "آ", "finger": "right-index" },
+        { "code": "KeyM", "label": "و", "shiftLabel": "’", "finger": "right-index" },
+        { "code": "Comma", "label": ".", "shiftLabel": ",", "finger": "right-middle" },
+        { "code": "Period", "label": "/", "shiftLabel": ".", "finger": "right-ring" },
+        { "code": "Slash", "label": "?", "shiftLabel": "؟", "finger": "right-pinky" },
         { "code": "ShiftRight", "label": "Shift", "finger": "right-pinky", "size": 2.6 }
       ],
       [

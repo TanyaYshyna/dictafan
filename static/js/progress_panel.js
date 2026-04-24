@@ -9,6 +9,9 @@ class ProgressPanel {
         this.taskCount = 0;
         this._dirty = false; // есть несохраненный прогресс
         this._lastSaveOk = true; // последний save прошел успешно
+        this._saveDebounceTimer = null;
+        this._periodicRetryTimer = null;
+        this._periodicRetryMs = Number(options.periodicRetryMs) > 0 ? Number(options.periodicRetryMs) : 30000;
         
         // Элементы DOM для статистики
         this.elements = {
@@ -65,6 +68,18 @@ class ProgressPanel {
         this.timerPreferenceKey = 'progressPanelTimerPreference';
         this._lucideRetryScheduled = false;
         this._suppressDirty = false;
+        try {
+            this._periodicRetryTimer = window.setInterval(() => {
+                try {
+                    if (!this.history?.currentSession) return;
+                    if (!this.hasPending()) return;
+                    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return;
+                    this.save().catch(() => {});
+                } catch (e) {
+                }
+            }, this._periodicRetryMs);
+        } catch (e) {
+        }
     }
 
     /**
@@ -649,6 +664,25 @@ class ProgressPanel {
         if (this.taskCount >= this.saveInterval) {
             this.save();
             this.taskCount = 0;
+        } else {
+            this._scheduleDebouncedSave();
+        }
+    }
+
+    _scheduleDebouncedSave() {
+        try {
+            if (this._saveDebounceTimer) return;
+            this._saveDebounceTimer = window.setTimeout(async () => {
+                this._saveDebounceTimer = null;
+                try {
+                    if (!this.history?.currentSession) return;
+                    if (!this.hasPending()) return;
+                    if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) return;
+                    await this.save();
+                } catch (e) {
+                }
+            }, 3000);
+        } catch (e) {
         }
     }
 
@@ -662,6 +696,7 @@ class ProgressPanel {
         this._lastSaveOk = !!ok;
         if (ok) {
             this._dirty = false;
+            this.taskCount = 0;
         }
         this.updateUnsavedIndicators();
         
@@ -698,7 +733,10 @@ class ProgressPanel {
                 });
                 const ok = await this.history.finishSession();
                 this._lastSaveOk = !!ok;
-                if (ok) this._dirty = false;
+                if (ok) {
+                    this._dirty = false;
+                    this.taskCount = 0;
+                }
                 this.updateUnsavedIndicators();
                 return !!ok;
             }

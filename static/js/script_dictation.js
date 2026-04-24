@@ -8529,6 +8529,12 @@ async function saveActivityToDB(type_activity) {
         if (!token) {
             console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет токена (кладу в outbox)');
             await enqueueOfflineActivity(type_activity, 1);
+            try {
+                if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
+                    window.UM.incrementTodayActivityTotal(1);
+                }
+            } catch (e) {
+            }
             return;
         }
 
@@ -8574,6 +8580,12 @@ async function saveActivityToDB(type_activity) {
             const errorText = await response.text();
             console.warn(`⚠️ [CLIENT] Текст ошибки:`, errorText);
             await enqueueOfflineActivity(type_activity, 1);
+            try {
+                if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
+                    window.UM.incrementTodayActivityTotal(1);
+                }
+            } catch (e) {
+            }
             // Если интернет есть, но запрос не прошёл (например, временная ошибка/401),
             // попробуем отправить outbox сразу, чтобы активность не "застряла" до следующего события online.
             try {
@@ -8587,9 +8599,22 @@ async function saveActivityToDB(type_activity) {
 
         const result = await response.json();
         console.log(`✅ [CLIENT] Активность ${type_activity} успешно сохранена в БД:`, result);
+
+        try {
+            if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
+                window.UM.incrementTodayActivityTotal(1);
+            }
+        } catch (e) {
+        }
     } catch (error) {
         console.error(`❌ [CLIENT] Ошибка при сохранении активности ${type_activity}:`, error);
         await enqueueOfflineActivity(type_activity, 1);
+        try {
+            if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
+                window.UM.incrementTodayActivityTotal(1);
+            }
+        } catch (e) {
+        }
         try {
             if (navigator.onLine) {
                 syncOfflineActivityOutbox().catch(() => {});

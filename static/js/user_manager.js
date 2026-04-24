@@ -344,6 +344,30 @@ class UserManager {
       usernameElement.textContent = userData.username || 'Пользователь';
     }
 
+    // Build a compact activity badge (daily progress + streak) to avoid tall header rows
+    let activityBadge = null;
+    try {
+      activityBadge = userSection.querySelector('.user-activity-badge');
+      if (!activityBadge) {
+        activityBadge = document.createElement('div');
+        activityBadge.className = 'user-activity-badge';
+        // Insert after username link if possible
+        const usernameLink = userSection.querySelector('a.username');
+        if (usernameLink && usernameLink.parentElement) {
+          usernameLink.insertAdjacentElement('afterend', activityBadge);
+        } else {
+          userSection.appendChild(activityBadge);
+        }
+      }
+
+      // Move streak button inside the badge for consistent layout
+      const streakBtn = userSection.querySelector('button.streak');
+      if (streakBtn && streakBtn.parentElement !== activityBadge) {
+        activityBadge.appendChild(streakBtn);
+      }
+    } catch (e) {
+    }
+
     // Daily activity plan: show as today/goal near username
     try {
       const todayTotal = Number(userData?.today_activity_total);
@@ -355,11 +379,9 @@ class UserManager {
       if (!el) {
         el = document.createElement('span');
         el.className = 'daily-activity-progress';
-        el.style.marginLeft = '8px';
-        el.style.fontSize = '12px';
-        el.style.fontWeight = '800';
-        el.style.color = 'rgba(0,0,0,0.55)';
-        if (usernameElement && usernameElement.parentElement) {
+        if (activityBadge) {
+          activityBadge.insertBefore(el, activityBadge.firstChild);
+        } else if (usernameElement && usernameElement.parentElement) {
           usernameElement.parentElement.appendChild(el);
         }
       }
@@ -371,6 +393,15 @@ class UserManager {
         } else {
           el.textContent = '';
           el.style.display = 'none';
+        }
+      }
+
+      if (activityBadge) {
+        // unified hint for the whole badge
+        if (todayOk && goalOk) {
+          activityBadge.title = `План на день: ${todayTotal}/${goal}`;
+        } else {
+          activityBadge.title = 'План на день';
         }
       }
     } catch (e) {
@@ -405,6 +436,25 @@ class UserManager {
     if (userInfo) userInfo.style.display = 'flex';
 
     // console.log('✅ Интерфейс настроен для авторизованного пользователя');
+  }
+
+  refreshHeaderActivityBadge() {
+    try {
+      this.setupAuthenticatedUser(this.userData || {});
+    } catch (e) {
+    }
+  }
+
+  incrementTodayActivityTotal(delta = 1) {
+    try {
+      const d = Number(delta);
+      if (!Number.isFinite(d) || d === 0) return;
+      if (!this.userData) this.userData = {};
+      const curr = Number(this.userData.today_activity_total);
+      this.userData.today_activity_total = (Number.isFinite(curr) ? curr : 0) + d;
+      this.refreshHeaderActivityBadge();
+    } catch (e) {
+    }
   }
 
   // Гостевой режим
