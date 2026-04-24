@@ -309,6 +309,8 @@
     "main": {
       "check_title": "اضغط Enter/Return عند الانتهاء من كتابة النص",
       "check": "تحقق",
+      "input_empty": "لم تكتب أي حرف بعد — ماذا تريد أن تتحقق؟",
+      "input_min_half": "اكتب على الأقل نصف الجملة قبل التحقق.",
       "virtual_keyboard": "إظهار لوحة المفاتيح",
       "unsaved_progress": "هناك تقدم غير محفوظ (Ctrl/⌘ + S — حفظ)",
       "recording_indicator": "مؤشر التسجيل",

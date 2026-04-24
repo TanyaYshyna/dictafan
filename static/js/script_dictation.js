@@ -10609,12 +10609,14 @@ function checkText() {
             return normalizeDictationInvisibleChars(String(raw || ''))
                 .toLowerCase()
                 .replace(PUNCTUATION_REGEX, '')
+                .replace(ARABIC_DIACRITICS_REGEX, '')
                 .replace(/\s+/g, '')
                 .trim();
         } catch (e) {
             return String(raw || '')
                 .toLowerCase()
                 .replace(/[.,!?:;"«»()\[\]{}—–\-]/g, '')
+                .replace(ARABIC_DIACRITICS_REGEX, '')
                 .replace(/\s+/g, '')
                 .trim();
         }
@@ -10631,7 +10633,7 @@ function checkText() {
     }
     if (userNorm.length === 0) {
         try {
-            showUserInputNotice('Ты ещё ни одной буквы не набрал — что ты хочешь проверять?', 'error', 6000);
+            showUserInputNotice(dictationT('main.input_empty', 'Ты ещё ни одной буквы не набрал — что ты хочешь проверять?'), 'error', 6000);
         } catch (e) {
         }
         return;
@@ -10641,7 +10643,7 @@ function checkText() {
     const minNeed = Math.ceil(origNorm.length / 2);
     if (userNorm.length < minNeed) {
         try {
-            showUserInputNotice('Введи хотя бы половину предложения, а потом проверяй.', 'error', 6000);
+            showUserInputNotice(dictationT('main.input_min_half', 'Введи хотя бы половину предложения, а потом проверяй.'), 'error', 6000);
         } catch (e) {
         }
         return;

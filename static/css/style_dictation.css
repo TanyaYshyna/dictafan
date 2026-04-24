@@ -101,6 +101,15 @@
     z-index: 21;
 }
 
+html[dir="rtl"] .topbar {
+    flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .user-section {
+    margin-left: 0;
+    margin-right: auto;
+}
+
 /* По умолчанию мини-логотип скрыт */
 .logo-min {
     display: none;
@@ -211,6 +220,10 @@ html[dir="rtl"] .result-panel {
 
 html[dir="rtl"] body.exercise-ltr .result-panel {
   flex-direction: row;
+}
+
+body.exercise-rtl .result-panel {
+  flex-direction: row-reverse;
 }
 
 .check-group {
