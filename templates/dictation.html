@@ -100,14 +100,10 @@
             </a>
             <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span
                     class="streak-days">0</span></button>
-            <button id="showStatisticsBtn" class="statistics-btn topbar-icon-btn" title="Показать статистику">
-                <i data-lucide="bar-chart-3"></i>
-                <!-- <span>Статистика</span> -->
-            </button>
-            <button id="openDictationSettingsBtn" class="statistics-btn topbar-icon-btn" title="Настройки">
-                <i data-lucide="settings"></i>
-            </button>
             <div class="button-group topbar-save-group">
+                <button id="openDictationSettingsBtn" class="statistics-btn topbar-icon-btn" title="Настройки">
+                    <i data-lucide="settings"></i>
+                </button>
                 <button id="saveBtn" class="topbar-icon-btn save-status-clean" title="Сохранить">
                     <i data-lucide="save"></i>
                 </button>
@@ -525,7 +521,6 @@
     <script src="{{ url_for('static', filename='js/dictation_statistics.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/progress_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
     <!-- Unified Speech Recognition -->
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
@@ -562,42 +557,6 @@
             const modalContainer = document.getElementById('progressPanelModalContainer');
             if (inlineContainer) { window.progressPanel.render(internal = inlineContainer, 'inline'); }
             if (modalContainer) { window.progressPanel.render(modalContainer, 'modal'); }
-
-            // Кнопка для открытия статистики
-            const showStatisticsBtn = document.getElementById('showStatisticsBtn');
-            if (showStatisticsBtn) {
-                const ensureStatisticsButton = async () => {
-                    const um = window.UM;
-                    showStatisticsBtn.style.display = 'none';
-
-                    if (!um) {
-                        return;
-                    }
-
-                    const start = Date.now();
-                    while (!um.isInitialized && Date.now() - start < 5000) {
-                        await new Promise(resolve => setTimeout(resolve, 100));
-                    }
-
-                    if (!um.getCurrentUser || !um.getCurrentUser()) {
-                        return;
-                    }
-
-                    showStatisticsBtn.style.display = '';
-
-                    if (typeof StatisticsReport !== 'undefined') {
-                        showStatisticsBtn.addEventListener('click', async () => {
-                            if (window.activityHistory) {
-                                await StatisticsReport.open(window.activityHistory);
-                            } else {
-                                alert('История активности еще не загружена');
-                            }
-                        });
-                    }
-                };
-
-                ensureStatisticsButton();
-            }
 
             // Индикатор несохраненного прогресса (звездочка)
             const unsavedStar = document.getElementById('unsavedStar');
