@@ -2969,6 +2969,11 @@ async function startGame(isResume = false) {
     }
 
     try {
+        gameHasAlreadyBegun = true;
+    } catch (e) {
+    }
+
+    try {
         startTimer();
     } catch (e) {
     }
