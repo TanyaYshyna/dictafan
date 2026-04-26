@@ -303,8 +303,8 @@
     "completion_modal": {
       "title": "Вітаємо!",
       "message": "Ви успішно завершили диктант!",
-      "results_title": "Переглянути результати",
-      "results": "Переглянути результати",
+      "results_title": "Підсумки й нова гра",
+      "results": "Підсумки й нова гра",
       "exit": "Вийти"
     },
     "no_selection": {
@@ -489,6 +489,18 @@
     "translation_pick": {
       "only_available": "Перекладу «{lang}» немає — відкрито єдиний доступний переклад.",
       "other_available": "Перекладу «{lang}» немає — відкрито інший доступний переклад."
+    },
+    "dictation_card_actions": {
+      "title": "Дії",
+      "create_assignment_new": "Нове завдання",
+      "cache": "Зберегти в кеш",
+      "edit": "Редагувати",
+      "show_in_book": "Показати в книзі",
+      "remove_from_desk": "Прибрати зі столу",
+      "add_to_desk": "Додати на стіл",
+      "create_assignment": "Завдання",
+      "move": "Перемістити",
+      "delete": "Видалити"
     },
     "teacher_students": {
       "title": "Учні",

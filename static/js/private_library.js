@@ -2382,15 +2382,7 @@ async function openCreateAssignmentModal(dictationId) {
 
   try {
     const sentences = await loadDictationSentencesForAssignmentModal(dictationId);
-    const firstPos = (() => {
-      try {
-        const p = sentences && sentences.length ? Number(sentences[0] && sentences[0].position) : NaN;
-        return Number.isFinite(p) ? p : null;
-      } catch (e) {
-        return null;
-      }
-    })();
-    setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: firstPos != null ? [firstPos] : null });
+    setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: null });
     renderCreateAssignmentSentencesTable(modal);
   } catch (e) {
     setCreateAssignmentSentencesState(modal, { sentences: [], selectedPositions: null });
@@ -4658,8 +4650,12 @@ function updateInWorkIndicators() {
 
     const btn = card.querySelector('[data-action="toggle-desk-explicit"]');
     if (btn) {
-      btn.setAttribute('title', isOnDesk ? 'Убрать со стола' : 'Добавить на стол');
-      btn.setAttribute('aria-label', isOnDesk ? 'Убрать со стола' : 'Добавить на стол');
+      btn.setAttribute('title', isOnDesk
+        ? libT('private_library.dictation_card_actions.remove_from_desk')
+        : libT('private_library.dictation_card_actions.add_to_desk'));
+      btn.setAttribute('aria-label', isOnDesk
+        ? libT('private_library.dictation_card_actions.remove_from_desk')
+        : libT('private_library.dictation_card_actions.add_to_desk'));
       const icon = btn.querySelector('i[data-lucide]');
       if (icon) {
         icon.setAttribute('data-lucide', isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash');
@@ -5107,29 +5103,29 @@ function createDictationCard(item, isDeskCard = false) {
           <div class="short-footer">
             <div class="short-dikt-number">${dictationIdFormatted}</div>
             <div class="dropdown-menu-wrapper short-actions-menu-wrapper">
-              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="Действия" aria-label="Действия">
+              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="${escapeHtml(libT('private_library.dictation_card_actions.title'))}" aria-label="${escapeHtml(libT('private_library.dictation_card_actions.title'))}">
                 <i data-lucide="more-vertical"></i>
               </button>
               <div class="dropdown-menu short-card-actions-menu" style="display: none;">
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
                   <i data-lucide="clipboard-list"></i>
-                  <span>Новое задание</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}</span>
                 </button>
                 <button class="dropdown-menu-item" type="button" data-action="prefetch-dictation-cache" data-dictation-id="${dictationId}" data-lang-original="${escapeHtml(langOriginal)}" data-cover-url="${escapeHtml(coverUrl || '')}" data-translation-langs="${escapeHtml(availableTranslations.join(','))}">
                   <i data-lucide="download"></i>
-                  <span>Получить в кеш</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.cache'))}</span>
                 </button>
                 <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
                   <i data-lucide="pencil-ruler"></i>
-                  <span>Редактировать</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.edit'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="show-in-book" data-dictation-id="${dictationId}">
                   <i data-lucide="book-marked"></i>
-                  <span>Показать в книге</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.show_in_book'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="remove-from-desk" data-desk-item-id="${item.id}" data-dictation-id="${dictationId}">
                   <i data-lucide="arrow-big-down-dash"></i>
-                  <span>Убрать со стола</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.remove_from_desk'))}</span>
                 </button>
               </div>
             </div>
@@ -5195,30 +5191,30 @@ function createDictationCard(item, isDeskCard = false) {
           </div>
 
           <div class="short-footer">
-            <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}" aria-label="${isOnDesk ? 'Убрать со стола' : 'Добавить на стол'}">
+            <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="${dbId}" title="${escapeHtml(isOnDesk ? libT('private_library.dictation_card_actions.remove_from_desk') : libT('private_library.dictation_card_actions.add_to_desk'))}" aria-label="${escapeHtml(isOnDesk ? libT('private_library.dictation_card_actions.remove_from_desk') : libT('private_library.dictation_card_actions.add_to_desk'))}">
               <i data-lucide="${isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash'}"></i>
             </button>
             <div class="short-dikt-number">${dictationId}</div>
             <div class="dropdown-menu-wrapper short-actions-menu-wrapper">
-              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="Действия" aria-label="Действия">
+              <button class="short-action-btn short-action-btn--kebab" data-action="toggle-card-actions" title="${escapeHtml(libT('private_library.dictation_card_actions.title'))}" aria-label="${escapeHtml(libT('private_library.dictation_card_actions.title'))}">
                 <i data-lucide="more-vertical"></i>
               </button>
               <div class="dropdown-menu short-card-actions-menu" style="display: none;">
                 <button class="dropdown-menu-item" type="button" data-action="edit-dictation" data-edit-url="${editUrl}">
                   <i data-lucide="pencil-ruler"></i>
-                  <span>Редактировать</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.edit'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dbId}">
                   <i data-lucide="clipboard-list"></i>
-                  <span>Задание</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="folder-symlink"></i>
-                  <span>Переместить</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.move'))}</span>
                 </button>
                 <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="trash-2"></i>
-                  <span>Удалить</span>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.delete'))}</span>
                 </button>
               </div>
             </div>

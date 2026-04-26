@@ -302,8 +302,8 @@
     "completion_modal": {
       "title": "تهانينا!",
       "message": "لقد أكملت الإملاء بنجاح!",
-      "results_title": "عرض النتائج",
-      "results": "عرض النتائج",
+      "results_title": "الملخص ولعبة جديدة",
+      "results": "الملخص ولعبة جديدة",
       "exit": "خروج"
     },
     "no_selection": {
@@ -488,6 +488,18 @@
     "translation_pick": {
       "only_available": "لا توجد ترجمة لـ «{lang}» — تم فتح الترجمة الوحيدة المتاحة.",
       "other_available": "لا توجد ترجمة لـ «{lang}» — تم فتح ترجمة أخرى متاحة."
+    },
+    "dictation_card_actions": {
+      "title": "إجراءات",
+      "create_assignment_new": "مهمة جديدة",
+      "cache": "حفظ في التخزين المؤقت",
+      "edit": "تعديل",
+      "show_in_book": "إظهار في الكتاب",
+      "remove_from_desk": "إزالة من المكتب",
+      "add_to_desk": "إضافة إلى المكتب",
+      "create_assignment": "مهمة",
+      "move": "نقل",
+      "delete": "حذف"
     },
     "teacher_students": {
       "title": "الطلاب",

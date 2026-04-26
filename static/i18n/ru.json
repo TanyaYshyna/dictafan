@@ -303,8 +303,8 @@
     "completion_modal": {
       "title": "Поздравляем!",
       "message": "Вы успешно завершили диктант!",
-      "results_title": "Посмотреть результаты",
-      "results": "Посмотреть результаты",
+      "results_title": "Итоги и новая игра",
+      "results": "Итоги и новая игра",
       "exit": "Выйти"
     },
     "no_selection": {
@@ -489,6 +489,18 @@
     "translation_pick": {
       "only_available": "Перевода на «{lang}» нет — открыт единственный доступный перевод.",
       "other_available": "Перевода на «{lang}» нет — открыт другой доступный перевод."
+    },
+    "dictation_card_actions": {
+      "title": "Действия",
+      "create_assignment_new": "Новое задание",
+      "cache": "Получить в кеш",
+      "edit": "Редактировать",
+      "show_in_book": "Показать в книге",
+      "remove_from_desk": "Убрать со стола",
+      "add_to_desk": "Добавить на стол",
+      "create_assignment": "Задание",
+      "move": "Переместить",
+      "delete": "Удалить"
     },
     "teacher_students": {
       "title": "Ученики",

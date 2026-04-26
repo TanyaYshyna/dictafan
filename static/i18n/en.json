@@ -303,8 +303,8 @@
     "completion_modal": {
       "title": "Congratulations!",
       "message": "You have successfully completed the dictation!",
-      "results_title": "View results",
-      "results": "View results",
+      "results_title": "Summary and new game",
+      "results": "Summary and new game",
       "exit": "Exit"
     },
     "no_selection": {
@@ -489,6 +489,18 @@
     "translation_pick": {
       "only_available": "No translation for ‘{lang}’ — opened the only available translation.",
       "other_available": "No translation for ‘{lang}’ — opened another available translation."
+    },
+    "dictation_card_actions": {
+      "title": "Actions",
+      "create_assignment_new": "New assignment",
+      "cache": "Cache",
+      "edit": "Edit",
+      "show_in_book": "Show in book",
+      "remove_from_desk": "Remove from desk",
+      "add_to_desk": "Add to desk",
+      "create_assignment": "Assignment",
+      "move": "Move",
+      "delete": "Delete"
     },
     "teacher_students": {
       "title": "Students",

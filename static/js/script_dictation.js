@@ -6,6 +6,9 @@ let translationPlayButton = null;
 let completionCountsCacheLoaded = false;
 let completionCountsCacheCounts = {};
 
+let completionSubsetCountsCacheLoaded = false;
+let completionSubsetCountsCacheCounts = {};
+
 function getCurrentDictationIdForDb() {
     try {
         const raw = String(currentDictation && currentDictation.id != null ? currentDictation.id : '').trim();
@@ -450,6 +453,85 @@ async function loadCompletionCountsCacheFromIdb() {
     }
 }
 
+async function loadCompletionSubsetCountsCacheFromIdb() {
+    try {
+        if (completionSubsetCountsCacheLoaded) return;
+        completionSubsetCountsCacheLoaded = true;
+        completionSubsetCountsCacheCounts = {};
+        if (typeof idbGet !== 'function') return;
+        const cached = await idbGet('desk_items', 'completion_counts_subset');
+        const counts = cached && cached.counts && typeof cached.counts === 'object' ? cached.counts : {};
+        completionSubsetCountsCacheCounts = counts;
+    } catch (e) {
+    }
+}
+
+function _getAssignmentPositionsSorted() {
+    try {
+        const positions = (window.assignmentSelectedSentencePositions != null)
+            ? window.assignmentSelectedSentencePositions
+            : null;
+        if (!Array.isArray(positions) || positions.length === 0) return null;
+        const uniq = Array.from(new Set(positions.map(x => Number(x)).filter(x => Number.isFinite(x))));
+        uniq.sort((a, b) => a - b);
+        return uniq.length ? uniq : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _isSubsetAssignmentActive() {
+    try {
+        const positions = _getAssignmentPositionsSorted();
+        if (!positions) return false;
+        const total = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
+        if (total > 0 && positions.length >= total) return false;
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function _formatPositionsCompact(positionsSorted) {
+    try {
+        const uniq = Array.isArray(positionsSorted) ? positionsSorted : null;
+        if (!uniq || !uniq.length) return '';
+        const ranges = [];
+        let start = null;
+        let prev = null;
+        for (const n of uniq) {
+            if (start == null) {
+                start = n;
+                prev = n;
+                continue;
+            }
+            if (n === prev + 1) {
+                prev = n;
+                continue;
+            }
+            ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+            start = n;
+            prev = n;
+        }
+        if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+        return ranges.join(',');
+    } catch (e) {
+        return '';
+    }
+}
+
+function _getSubsetCacheKey(dictationIdForDb, positionsSorted) {
+    try {
+        if (!dictationIdForDb) return '';
+        const id = String(dictationIdForDb);
+        const pos = Array.isArray(positionsSorted) ? positionsSorted : [];
+        const posKey = pos.length ? pos.join(',') : '';
+        return `${id}|${posKey}`;
+    } catch (e) {
+        return '';
+    }
+}
+
 function getCompletionCountFromCache(dictationIdForDb) {
     try {
         if (!dictationIdForDb) return 0;
@@ -459,6 +541,19 @@ function getCompletionCountFromCache(dictationIdForDb) {
         const key = String(dictationIdForDb);
         const dictKey = `dict_${key}`;
         return Number(counts[key] ?? counts[dictKey] ?? 0) || 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+function getCompletionSubsetCountFromCache(dictationIdForDb, positionsSorted) {
+    try {
+        const key = _getSubsetCacheKey(dictationIdForDb, positionsSorted);
+        if (!key) return 0;
+        const counts = completionSubsetCountsCacheCounts && typeof completionSubsetCountsCacheCounts === 'object'
+            ? completionSubsetCountsCacheCounts
+            : {};
+        return Number(counts[key] ?? 0) || 0;
     } catch (e) {
         return 0;
     }
@@ -480,32 +575,85 @@ function updateCompletionModalMedalCount(count) {
     }
 }
 
+function updateCompletionModalRewardIcon(iconName) {
+    try {
+        const icon = document.getElementById('completionRewardIcon');
+        if (!icon) return;
+        icon.setAttribute('data-lucide', iconName || 'award');
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: icon.parentElement || icon });
+            }
+        } catch (e2) {
+        }
+    } catch (e) {
+    }
+}
+
+function updateCompletionModalAssignmentPositionsLabel(text) {
+    try {
+        const el = document.getElementById('completionAssignmentPositions');
+        if (!el) return;
+        const s = String(text || '').trim();
+        if (!s) {
+            el.textContent = '';
+            el.style.display = 'none';
+            return;
+        }
+        el.textContent = s;
+        el.style.display = '';
+    } catch (e) {
+    }
+}
+
+function refreshCompletionModalRewardFromCache() {
+    try {
+        const dictId = getCurrentDictationIdForDb();
+        const subsetActive = _isSubsetAssignmentActive();
+        if (!subsetActive) {
+            const n = getCompletionCountFromCache(dictId);
+            updateCompletionModalRewardIcon('award');
+            updateCompletionModalAssignmentPositionsLabel('');
+            updateCompletionModalMedalCount(n);
+            return;
+        }
+
+        const positions = _getAssignmentPositionsSorted();
+        const cnt = getCompletionSubsetCountFromCache(dictId, positions);
+        updateCompletionModalRewardIcon('candy');
+        const compact = _formatPositionsCompact(positions);
+        updateCompletionModalAssignmentPositionsLabel(compact ? `${compact}` : '');
+        updateCompletionModalMedalCount(cnt);
+    } catch (e) {
+    }
+}
+
 function refreshMedalBadgesFromCache() {
     try {
         const id = getCurrentDictationIdForDb();
-        const n = getCompletionCountFromCache(id);
-        // If assignment subset is active, show candy instead of medal.
-        try {
-            const hasSubset = Array.isArray(window.assignmentSelectedSentencePositions) && window.assignmentSelectedSentencePositions.length > 0;
-            if (hasSubset) {
-                try {
-                    const medalWrap = document.getElementById('dictation-topbar-medal');
-                    if (medalWrap) medalWrap.style.display = 'none';
-                } catch (e2) {
-                }
-                refreshTopbarCandyBadgeFromServer().catch(() => {});
-            } else {
-                try {
-                    const candyWrap = document.getElementById('dictation-topbar-candy');
-                    if (candyWrap) candyWrap.style.display = 'none';
-                } catch (e2) {
-                }
-                updateTopbarMedalBadge(n);
+        const subsetActive = _isSubsetAssignmentActive();
+
+        if (subsetActive) {
+            try {
+                const medalWrap = document.getElementById('dictation-topbar-medal');
+                if (medalWrap) medalWrap.style.display = 'none';
+            } catch (e2) {
             }
-        } catch (e2) {
+
+            const positions = _getAssignmentPositionsSorted();
+            const cnt = getCompletionSubsetCountFromCache(id, positions);
+            updateTopbarCandyBadge(cnt);
+        } else {
+            try {
+                const candyWrap = document.getElementById('dictation-topbar-candy');
+                if (candyWrap) candyWrap.style.display = 'none';
+            } catch (e2) {
+            }
+            const n = getCompletionCountFromCache(id);
             updateTopbarMedalBadge(n);
         }
-        updateCompletionModalMedalCount(n);
+
+        refreshCompletionModalRewardFromCache();
     } catch (e) {
     }
 }
@@ -513,6 +661,21 @@ function refreshMedalBadgesFromCache() {
 async function bumpCompletionCountsCache(dictationIdForDb) {
     try {
         if (!dictationIdForDb) return 0;
+        const subsetActive = _isSubsetAssignmentActive();
+        if (subsetActive) {
+            await loadCompletionSubsetCountsCacheFromIdb();
+            const positions = _getAssignmentPositionsSorted();
+            const cacheKey = _getSubsetCacheKey(dictationIdForDb, positions);
+            const current = Number(completionSubsetCountsCacheCounts[cacheKey] ?? 0) || 0;
+            const next = current + 1;
+            completionSubsetCountsCacheCounts[cacheKey] = next;
+            if (typeof idbPut === 'function') {
+                await idbPut('desk_items', { key: 'completion_counts_subset', updatedAt: Date.now(), counts: completionSubsetCountsCacheCounts });
+            }
+            refreshMedalBadgesFromCache();
+            return next;
+        }
+
         await loadCompletionCountsCacheFromIdb();
         const key = String(dictationIdForDb);
         const dictKey = `dict_${key}`;
@@ -636,6 +799,7 @@ async function refreshTopbarCandyBadgeFromServer() {
 async function refreshTopbarMedalBadgeFromIdb() {
     try {
         await loadCompletionCountsCacheFromIdb();
+        await loadCompletionSubsetCountsCacheFromIdb();
         refreshMedalBadgesFromCache();
     } catch (e) {
     }
@@ -644,6 +808,7 @@ async function refreshTopbarMedalBadgeFromIdb() {
 async function refreshCompletionModalMedalCountFromIdb() {
     try {
         await loadCompletionCountsCacheFromIdb();
+        await loadCompletionSubsetCountsCacheFromIdb();
         refreshMedalBadgesFromCache();
     } catch (e) {
     }
@@ -4076,10 +4241,10 @@ function showCompletionModal() {
         window.lucide.createIcons();
     }
 
-    // Устанавливаем фокус на кнопку "Пройти еще раз"
-    const exitBtn = document.getElementById('completionExitBtn');
-    if (exitBtn) {
-        exitBtn.focus();
+    // Устанавливаем фокус на кнопку "Посмотреть результат"
+    const resultsBtn = document.getElementById('completionResultsBtn');
+    if (resultsBtn) {
+        resultsBtn.focus();
     }
 }
 
