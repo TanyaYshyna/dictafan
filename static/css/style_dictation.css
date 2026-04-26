@@ -1040,6 +1040,10 @@ body.playing-audio::after {
   color: var(--color-text-secondary) !important;
 }
 
+#completionResultsBtnLabel {
+  white-space: pre-line;
+}
+
 .completion-buttons button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
