@@ -376,5 +376,139 @@
       "good": "جيد",
       "check_title": "اضغط Enter/Return عند الانتهاء من كتابة النص"
     }
+  },
+  "private_library": {
+    "page_title": "المكتبة الخاصة — DictaFan",
+    "common": {
+      "close": "إغلاق",
+      "cancel": "إلغاء",
+      "save": "حفظ"
+    },
+    "topbar": {
+      "logout_title": "خروج",
+      "streak_title": "سلسلة الأيام"
+    },
+    "user_menu": {
+      "profile": "الملف الشخصي",
+      "activity_report": "تقرير النشاط",
+      "rating": "التصنيف",
+      "plan_fact": "تقرير الخطة مقابل الواقع"
+    },
+    "delete_modal": {
+      "title": "حذف الإملاء",
+      "question_prefix": "هل تريد حقًا حذف الإملاء",
+      "confirm": "حذف"
+    },
+    "home_library": {
+      "title": "مكتبتي",
+      "my_books": "كتبي",
+      "new_book": "كتاب جديد"
+    },
+    "toolbar": {
+      "create_dictation": "إنشاء إملاء",
+      "my_library": "مكتبتي",
+      "public_library": "المكتبة العامة",
+      "plan": "الخطة",
+      "assignments": "المهام",
+      "zoom_in": "تكبير",
+      "zoom_out": "تصغير"
+    },
+    "book_edit": {
+      "title_new": "كتاب جديد",
+      "cover_label": "غلاف الكتاب",
+      "cover_alt": "غلاف",
+      "cover_upload": "رفع الغلاف",
+      "book_title": "العنوان",
+      "author_optional": "مؤلف النص (اختياري)",
+      "author_materials_url": "رابط مواد المؤلف",
+      "url_placeholder": "https://...",
+      "original_language": "لغة الأصل",
+      "theme": "الموضوع",
+      "theme_placeholder": "قصائد، إملاءات مدرسية، إلخ.",
+      "visibility": "إمكانية العرض",
+      "visibility_private": "مرئي لي فقط",
+      "visibility_public": "مرئي للجميع (كتاب عام)",
+      "description": "الوصف"
+    },
+    "section_edit": {
+      "title_new": "قسم جديد",
+      "number": "رقم القسم",
+      "number_placeholder": "أدخل رقم القسم",
+      "name": "عنوان القسم",
+      "placeholder": "أدخل عنوان القسم"
+    },
+    "book_view": {
+      "title": "كتاب"
+    },
+    "public_library": {
+      "title": "المكتبة العامة"
+    },
+    "move_dictation": {
+      "title": "نقل الإملاء إلى كتاب",
+      "choose_book": "اختر كتابًا:",
+      "choose_book_placeholder": "-- اختر كتابًا --",
+      "choose_section": "اختر قسمًا:",
+      "select": "اختيار"
+    },
+    "crop": {
+      "title": "اقتصاص الغلاف",
+      "apply": "تطبيق"
+    },
+    "assignments": {
+      "max_7_days": "الحد الأقصى 7 أيام",
+      "modal_title": "مهمة",
+      "add_day": "إضافة يوم",
+      "text_column": "النص",
+      "no_sentences": "لا توجد جمل",
+      "toggle_all_select": "تحديد الكل",
+      "toggle_all_deselect": "إلغاء تحديد الكل",
+      "select_sentence": "تحديد الجملة"
+    },
+    "reports": {
+      "rating_unavailable": "التصنيف غير متاح",
+      "rating_open_failed": "تعذر فتح التصنيف",
+      "activity_unavailable": "تقرير النشاط غير متاح",
+      "activity_open_failed": "تعذر فتح تقرير النشاط",
+      "plan_fact_unavailable": "تقرير الخطة مقابل الواقع غير متاح",
+      "plan_fact_open_failed": "تعذر فتح تقرير الخطة مقابل الواقع"
+    },
+    "student_plan": {
+      "title": "الخطة",
+      "prev_day": "اليوم السابق",
+      "next_day": "اليوم التالي",
+      "today": "اليوم",
+      "refresh": "تحديث البيانات",
+      "no_assignments": "لا توجد مهام لهذا التاريخ",
+      "dictation_fallback_title": "إملاء {id}",
+      "cached_title": "مخزن مؤقتًا",
+      "cached_badge": "مخزن مؤقتًا",
+      "group_fallback_title": "مجموعة {id}",
+      "group_generic_title": "مجموعة"
+    },
+    "translation_pick": {
+      "only_available": "لا توجد ترجمة لـ «{lang}» — تم فتح الترجمة الوحيدة المتاحة.",
+      "other_available": "لا توجد ترجمة لـ «{lang}» — تم فتح ترجمة أخرى متاحة."
+    },
+    "teacher_students": {
+      "title": "الطلاب",
+      "subtitle": "{pct}% مكتمل · {done}/{total}",
+      "none": "لا يوجد طلاب بعد",
+      "status_done": "أكمل",
+      "status_overdue": "متأخر",
+      "status_not_done": "لم يُكمل",
+      "loading": "جارٍ التحميل…",
+      "load_failed": "تعذر التحميل"
+    },
+    "student_plan_launch": {
+      "sentences_from_assignment": "جمل من المهمة",
+      "start": "بدء",
+      "dictation_fallback_title": "إملاء",
+      "assignment_for_date": "مهمة بتاريخ {date}",
+      "past_day_warning": "هذه المهمة من يوم سابق. سيتم احتساب النتيجة لليوم الحالي كـ «نشاط آخر (خارج الخطة)». لا يمكن تغيير نتائج الأيام السابقة.",
+      "all_sentences": "كل الجمل",
+      "loading": "جارٍ التحميل…",
+      "no_sentences": "لا توجد جمل",
+      "load_sentences_failed": "تعذر تحميل الجمل"
+    }
   }
 }

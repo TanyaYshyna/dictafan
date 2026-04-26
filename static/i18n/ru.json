@@ -377,5 +377,139 @@
       "good": "Хорошо",
       "check_title": "Нажмите Enter/Return когда закончили ввод текста"
     }
+  },
+  "private_library": {
+    "page_title": "Приватная библиотека — DictaFan",
+    "common": {
+      "close": "Закрыть",
+      "cancel": "Отмена",
+      "save": "Сохранить"
+    },
+    "topbar": {
+      "logout_title": "Выйти",
+      "streak_title": "Несгораемая сумма дней"
+    },
+    "user_menu": {
+      "profile": "Профиль пользователя",
+      "activity_report": "Отчет об активности",
+      "rating": "Рейтинг",
+      "plan_fact": "Отчет План-факт"
+    },
+    "delete_modal": {
+      "title": "Удалить диктант",
+      "question_prefix": "Вы действительно хотите удалить диктант",
+      "confirm": "Удалить"
+    },
+    "home_library": {
+      "title": "Моя библиотека",
+      "my_books": "Мои книги",
+      "new_book": "Новая книга"
+    },
+    "toolbar": {
+      "create_dictation": "Создать диктант",
+      "my_library": "Моя библиотека",
+      "public_library": "Публичная библиотека",
+      "plan": "План",
+      "assignments": "Задания",
+      "zoom_in": "Приблизить",
+      "zoom_out": "Отдалить"
+    },
+    "book_edit": {
+      "title_new": "Новая книга",
+      "cover_label": "Обложка книги",
+      "cover_alt": "Обложка",
+      "cover_upload": "Загрузить обложку",
+      "book_title": "Название",
+      "author_optional": "Автор текста (необязательно)",
+      "author_materials_url": "Ссылка на материалы автора",
+      "url_placeholder": "https://...",
+      "original_language": "Язык оригинала",
+      "theme": "Тема",
+      "theme_placeholder": "стихи, школьные диктанты и т.п.",
+      "visibility": "Видимость",
+      "visibility_private": "Вижу только я",
+      "visibility_public": "Видна всем (публичная книга)",
+      "description": "Описание"
+    },
+    "section_edit": {
+      "title_new": "Новый раздел",
+      "number": "Номер раздела",
+      "number_placeholder": "Введите номер раздела",
+      "name": "Название раздела",
+      "placeholder": "Введите название раздела"
+    },
+    "book_view": {
+      "title": "Книга"
+    },
+    "public_library": {
+      "title": "Публичная библиотека"
+    },
+    "move_dictation": {
+      "title": "Переместить диктант в книгу",
+      "choose_book": "Выберите книгу:",
+      "choose_book_placeholder": "-- Выберите книгу --",
+      "choose_section": "Выберите раздел:",
+      "select": "Выбрать"
+    },
+    "crop": {
+      "title": "Обрезка обложки",
+      "apply": "Применить"
+    },
+    "assignments": {
+      "max_7_days": "Максимум 7 дней",
+      "modal_title": "Задание",
+      "add_day": "Добавить день",
+      "text_column": "Текст",
+      "no_sentences": "Нет предложений",
+      "toggle_all_select": "Выбрать все",
+      "toggle_all_deselect": "Снять выделение",
+      "select_sentence": "Выбрать предложение"
+    },
+    "reports": {
+      "rating_unavailable": "Рейтинг недоступен",
+      "rating_open_failed": "Не удалось открыть рейтинг",
+      "activity_unavailable": "Отчет об активности недоступен",
+      "activity_open_failed": "Не удалось открыть отчет об активности",
+      "plan_fact_unavailable": "Отчет План‑Факт недоступен",
+      "plan_fact_open_failed": "Не удалось открыть отчет План‑Факт"
+    },
+    "student_plan": {
+      "title": "План",
+      "prev_day": "Предыдущий день",
+      "next_day": "Следующий день",
+      "today": "Сегодня",
+      "refresh": "Получить свежие данные",
+      "no_assignments": "На эту дату заданий нет",
+      "dictation_fallback_title": "Диктант {id}",
+      "cached_title": "В кеше",
+      "cached_badge": "в кеше",
+      "group_fallback_title": "Группа {id}",
+      "group_generic_title": "Группа"
+    },
+    "translation_pick": {
+      "only_available": "Перевода на «{lang}» нет — открыт единственный доступный перевод.",
+      "other_available": "Перевода на «{lang}» нет — открыт другой доступный перевод."
+    },
+    "teacher_students": {
+      "title": "Ученики",
+      "subtitle": "{pct}% выполнено · {done}/{total}",
+      "none": "Пока нет учеников",
+      "status_done": "выполнил",
+      "status_overdue": "просрочил",
+      "status_not_done": "не выполнил",
+      "loading": "Загрузка…",
+      "load_failed": "Не удалось загрузить"
+    },
+    "student_plan_launch": {
+      "sentences_from_assignment": "Предложения из задания",
+      "start": "Запустить",
+      "dictation_fallback_title": "Диктант",
+      "assignment_for_date": "Задание на {date}",
+      "past_day_warning": "Это задание из прошлого дня. Результаты выполнения диктанта попадут в текущий день как «другая активность (вне плана)». На результаты прошлых дней повлиять уже нельзя.",
+      "all_sentences": "Все предложения",
+      "loading": "Загрузка…",
+      "no_sentences": "Нет предложений",
+      "load_sentences_failed": "Не удалось загрузить предложения"
+    }
   }
 }

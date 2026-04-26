@@ -4,6 +4,281 @@ var __APP_BUILD_LOCAL = (window && window.__APP_BUILD) ? String(window.__APP_BUI
 
 let bookEditDirty = false;
 
+function libT(key, params, fallback) {
+  try {
+    if (window.I18n && typeof window.I18n.t === 'function') {
+      const v = window.I18n.t(key, params);
+      if (v && v !== key) return v;
+    }
+  } catch (e) {
+  }
+  if (typeof fallback === 'string') return fallback;
+  return String(key || '');
+}
+
+function applyPrivateLibraryTranslations() {
+  try {
+    document.title = libT('private_library.page_title');
+  } catch (e) {
+  }
+
+  const setText = (id, key, fallback) => {
+    try {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = libT(key, null, fallback);
+    } catch (e) {
+    }
+  };
+
+  const setAttr = (id, attr, key, fallback) => {
+    try {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.setAttribute(attr, libT(key, null, fallback));
+    } catch (e) {
+    }
+  };
+
+  try {
+    const profileLabel = document.querySelector('#userMenuProfileBtn span');
+    if (profileLabel) profileLabel.textContent = libT('private_library.user_menu.profile');
+  } catch (e) {
+  }
+  try {
+    const activityLabel = document.querySelector('#userMenuActivityReportBtn span');
+    if (activityLabel) activityLabel.textContent = libT('private_library.user_menu.activity_report');
+  } catch (e) {
+  }
+  try {
+    const ratingLabel = document.querySelector('#userMenuRatingReportBtn span');
+    if (ratingLabel) ratingLabel.textContent = libT('private_library.user_menu.rating');
+  } catch (e) {
+  }
+  try {
+    const planFactLabel = document.querySelector('#userMenuPlanFactBtn span');
+    if (planFactLabel) planFactLabel.textContent = libT('private_library.user_menu.plan_fact');
+  } catch (e) {
+  }
+
+  try {
+    const streak = document.querySelector('.streak');
+    if (streak) streak.setAttribute('title', libT('private_library.topbar.streak_title'));
+  } catch (e) {
+  }
+
+  setAttr('logoutBtn', 'title', 'private_library.topbar.logout_title');
+  try {
+    const logoutText = document.querySelector('#logoutBtn .logout-text');
+    if (logoutText) logoutText.textContent = libT('private_library.topbar.logout_title');
+  } catch (e) {
+  }
+
+  setAttr('logoutBtn', 'aria-label', 'private_library.topbar.logout_title');
+
+  try {
+    const h = document.querySelector('#delete-dictation-modal h3');
+    if (h) h.textContent = libT('private_library.delete_modal.title');
+  } catch (e) {
+  }
+  setAttr('delete-dictation-close', 'aria-label', 'private_library.common.close');
+  setAttr('delete-dictation-close', 'title', 'private_library.common.close');
+  setText('delete-dictation-confirm', 'private_library.delete_modal.confirm');
+  try {
+    const q = document.getElementById('delete-dictation-question');
+    const name = document.getElementById('delete-dictation-name');
+    if (q && name) {
+      q.innerHTML = `${libT('private_library.delete_modal.question_prefix')} <span id="delete-dictation-name"></span>?`;
+      const name2 = document.getElementById('delete-dictation-name');
+      if (name2) name2.textContent = name.textContent;
+    }
+  } catch (e) {
+  }
+
+  try {
+    const h = document.querySelector('#home-library-modal h3');
+    if (h) h.textContent = libT('private_library.home_library.title');
+  } catch (e) {
+  }
+  setAttr('home-library-close', 'aria-label', 'private_library.common.close');
+  setAttr('home-library-close', 'title', 'private_library.common.close');
+  try {
+    const h = document.querySelector('#booksZone .books-zone-header h3');
+    if (h) h.textContent = libT('private_library.home_library.my_books');
+  } catch (e) {
+  }
+  setAttr('btnNewBookInZone', 'title', 'private_library.home_library.new_book');
+
+  setAttr('btnNewDictationQuick', 'title', 'private_library.toolbar.create_dictation');
+  setAttr('btnHomeLibrary', 'title', 'private_library.toolbar.my_library');
+  setAttr('btnPublicLibrary', 'title', 'private_library.toolbar.public_library');
+  setAttr('btnStudentPlan', 'title', 'private_library.toolbar.plan');
+  setAttr('btnTeacherAssignments', 'title', 'private_library.toolbar.assignments');
+  setAttr('btnDeskZoomIn', 'title', 'private_library.toolbar.zoom_in');
+  setAttr('btnDeskZoomOut', 'title', 'private_library.toolbar.zoom_out');
+
+  try {
+    const h = document.getElementById('book-edit-title');
+    if (h) {
+      const star = document.getElementById('book-edit-unsaved-star');
+      const starHtml = star ? star.outerHTML : '';
+      h.innerHTML = `${libT('private_library.book_edit.title_new')}${starHtml}`;
+    }
+  } catch (e) {
+  }
+  try {
+    const btn = document.querySelector('.book-edit-save-header');
+    if (btn) btn.textContent = libT('private_library.common.save');
+  } catch (e) {
+  }
+  setAttr('book-edit-close', 'title', 'private_library.common.close');
+  setAttr('book-edit-close', 'aria-label', 'private_library.common.close');
+
+  try {
+    const label = document.querySelector('.book-cover-label');
+    if (label) label.textContent = libT('private_library.book_edit.cover_label');
+  } catch (e) {
+  }
+  try {
+    const prev = document.getElementById('book-cover-preview');
+    if (prev) prev.setAttribute('alt', libT('private_library.book_edit.cover_alt'));
+  } catch (e) {
+  }
+  setText('book-cover-upload-btn', 'private_library.book_edit.cover_upload');
+
+  try {
+    const label = document.querySelector('label[for="book-title-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.book_title');
+  } catch (e) {
+  }
+  try {
+    const label = document.querySelector('label[for="book-author-text-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.author_optional');
+  } catch (e) {
+  }
+
+  try {
+    const label = document.querySelector('label[for="book-author-materials-url-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.author_materials_url');
+  } catch (e) {
+  }
+  setAttr('book-author-materials-url-input', 'placeholder', 'private_library.book_edit.url_placeholder');
+
+  try {
+    const label = document.querySelector('#book-language-selector')?.closest('.form-row')?.querySelector('label');
+    if (label) label.textContent = libT('private_library.book_edit.original_language');
+  } catch (e) {
+  }
+
+  try {
+    const label = document.querySelector('label[for="book-theme-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.theme');
+  } catch (e) {
+  }
+  setAttr('book-theme-input', 'placeholder', 'private_library.book_edit.theme_placeholder');
+
+  try {
+    const label = document.querySelector('label[for="book-visibility-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.visibility');
+  } catch (e) {
+  }
+  try {
+    const sel = document.getElementById('book-visibility-input');
+    if (sel) {
+      const optPrivate = sel.querySelector('option[value="private"]');
+      const optPublic = sel.querySelector('option[value="public"]');
+      if (optPrivate) optPrivate.textContent = libT('private_library.book_edit.visibility_private');
+      if (optPublic) optPublic.textContent = libT('private_library.book_edit.visibility_public');
+    }
+  } catch (e) {
+  }
+
+  try {
+    const label = document.querySelector('label[for="book-description-input"]');
+    if (label) label.textContent = libT('private_library.book_edit.description');
+  } catch (e) {
+  }
+
+  try {
+    const h = document.getElementById('section-edit-title');
+    if (h && !h.textContent) h.textContent = libT('private_library.section_edit.title_new');
+  } catch (e) {
+  }
+  setAttr('section-edit-close', 'aria-label', 'private_library.common.close');
+  setAttr('section-edit-close', 'title', 'private_library.common.close');
+  try {
+    const label = document.querySelector('label[for="section-number-input"]');
+    if (label) label.textContent = libT('private_library.section_edit.number');
+  } catch (e) {
+  }
+  setAttr('section-number-input', 'placeholder', 'private_library.section_edit.number_placeholder');
+  try {
+    const label = document.querySelector('label[for="section-title-input"]');
+    if (label) label.textContent = libT('private_library.section_edit.name');
+  } catch (e) {
+  }
+  setAttr('section-title-input', 'placeholder', 'private_library.section_edit.placeholder');
+  try {
+    const btn = document.querySelector('.section-edit-submit');
+    if (btn) btn.textContent = libT('private_library.common.save');
+  } catch (e) {
+  }
+
+  try {
+    const h = document.getElementById('book-view-title');
+    if (h && !h.textContent) h.textContent = libT('private_library.book_view.title');
+  } catch (e) {
+  }
+  setAttr('book-view-close', 'aria-label', 'private_library.common.close');
+  setAttr('book-view-close', 'title', 'private_library.common.close');
+
+  try {
+    const h = document.querySelector('#public-library-modal .modal-header h3');
+    if (h) h.textContent = libT('private_library.public_library.title');
+  } catch (e) {
+  }
+  setAttr('public-library-close', 'aria-label', 'private_library.common.close');
+  setAttr('public-library-close', 'title', 'private_library.common.close');
+
+  try {
+    const h = document.querySelector('#move-dictation-modal .modal-header h3');
+    if (h) h.textContent = libT('private_library.move_dictation.title');
+  } catch (e) {
+  }
+  setAttr('move-dictation-close', 'aria-label', 'private_library.common.close');
+  setAttr('move-dictation-close', 'title', 'private_library.common.close');
+  try {
+    const label = document.querySelector('label[for="move-target-book"]');
+    if (label) label.textContent = libT('private_library.move_dictation.choose_book');
+  } catch (e) {
+  }
+  try {
+    const opt = document.querySelector('#move-target-book option[value=""]');
+    if (opt) opt.textContent = libT('private_library.move_dictation.choose_book_placeholder');
+  } catch (e) {
+  }
+  try {
+    const label = document.querySelector('#move-dictation-sections-container > label');
+    if (label) label.textContent = libT('private_library.move_dictation.choose_section');
+  } catch (e) {
+  }
+  try {
+    const btn = document.querySelector('.move-dictation-submit');
+    if (btn) btn.textContent = libT('private_library.move_dictation.select');
+  } catch (e) {
+  }
+
+  try {
+    const h = document.querySelector('#crop-modal h3');
+    if (h) h.textContent = libT('private_library.crop.title');
+  } catch (e) {
+  }
+  setAttr('crop-close', 'aria-label', 'private_library.common.close');
+  setAttr('crop-close', 'title', 'private_library.common.close');
+  setText('crop-cancel', 'private_library.common.cancel');
+  setText('crop-confirm', 'private_library.crop.apply');
+}
+
 function setBookEditDirty(nextDirty) {
   bookEditDirty = !!nextDirty;
   const star = document.getElementById('book-edit-unsaved-star');
@@ -149,9 +424,9 @@ function validateAssignmentDaysWeekLimit(modal) {
   const dates = cur.map(x => String(x && x.date ? x.date : '').trim()).filter(Boolean);
   if (!dates.length) return { ok: true, reason: '' };
   const uniq = Array.from(new Set(dates)).sort();
-  if (uniq.length > 7) return { ok: false, reason: 'Максимум 7 дней' };
+  if (uniq.length > 7) return { ok: false, reason: libT('private_library.assignments.max_7_days') };
   const span = diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]);
-  if (span != null && span > 6) return { ok: false, reason: 'Максимум 7 дней' };
+  if (span != null && span > 6) return { ok: false, reason: libT('private_library.assignments.max_7_days') };
   return { ok: true, reason: '' };
 }
 
@@ -246,14 +521,14 @@ function setupUserDropdownMenu() {
       close();
 
       if (typeof RatingReport === 'undefined') {
-        alert('Рейтинг недоступен');
+        alert(libT('private_library.reports.rating_unavailable'));
         return;
       }
 
       try {
         await RatingReport.open();
       } catch (err) {
-        alert('Не удалось открыть рейтинг');
+        alert(libT('private_library.reports.rating_open_failed'));
       }
     });
   }
@@ -264,7 +539,7 @@ function setupUserDropdownMenu() {
       close();
 
       if (typeof StatisticsReport === 'undefined') {
-        alert('Отчет об активности недоступен');
+        alert(libT('private_library.reports.activity_unavailable'));
         return;
       }
 
@@ -272,7 +547,7 @@ function setupUserDropdownMenu() {
         const history = new UserActivityHistory('/user/api');
         await StatisticsReport.open(history);
       } catch (err) {
-        alert('Не удалось открыть отчет об активности');
+        alert(libT('private_library.reports.activity_open_failed'));
       }
     });
   }
@@ -282,11 +557,11 @@ function setupUserDropdownMenu() {
       try { e.preventDefault(); } catch (e2) {}
       close();
       if (typeof PlanFactReport === 'undefined') {
-        alert('Отчет План‑Факт недоступен');
+        alert(libT('private_library.reports.plan_fact_unavailable'));
         return;
       }
       if (typeof UserActivityHistory === 'undefined') {
-        alert('Отчет План‑Факт недоступен');
+        alert(libT('private_library.reports.plan_fact_unavailable'));
         return;
       }
 
@@ -294,10 +569,11 @@ function setupUserDropdownMenu() {
         const history = new UserActivityHistory('/user/api');
         PlanFactReport.open(history);
       } catch (err) {
-        alert('Не удалось открыть отчет План‑Факт');
+        alert(libT('private_library.reports.plan_fact_open_failed'));
       }
     });
   }
+
 }
 
 let __userMenuReportsFallbackInstalled = false;
@@ -343,7 +619,7 @@ function installUserMenuReportsClickFallback() {
             });
           } catch (e0) {
           }
-          alert('Отчет об активности недоступен');
+          alert(libT('private_library.reports.activity_unavailable'));
           return;
         }
         try {
@@ -354,21 +630,21 @@ function installUserMenuReportsClickFallback() {
             console.log('[user_menu_reports] open activity report failed', err);
           } catch (e0) {
           }
-          alert('Не удалось открыть отчет об активности');
+          alert(libT('private_library.reports.activity_open_failed'));
         }
         return;
       }
 
       if (planFactBtn) {
         if (typeof PlanFactReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
-          alert('Отчет План‑Факт недоступен');
+          alert(libT('private_library.reports.plan_fact_unavailable'));
           return;
         }
         try {
           const history = new UserActivityHistory('/user/api');
           await PlanFactReport.open(history);
         } catch (err) {
-          alert('Не удалось открыть отчет План‑Факт');
+          alert(libT('private_library.reports.plan_fact_open_failed'));
         }
         return;
       }
@@ -443,7 +719,7 @@ function renderCreateAssignmentSentencesTable(modal) {
 
   if (!sentences.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="3" style="padding:10px; color: rgba(0,0,0,0.55);">Нет предложений</td>`;
+    tr.innerHTML = `<td colspan="3" style="padding:10px; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.assignments.no_sentences'))}</td>`;
     tbody.appendChild(tr);
     return;
   }
@@ -454,7 +730,9 @@ function renderCreateAssignmentSentencesTable(modal) {
   const headerToggleBtn = document.getElementById('create-assignment-sentences-toggle-all');
   if (headerToggleBtn) {
     renderLucideCheckboxButton(headerToggleBtn, allSelected, !allPositions.length);
-    headerToggleBtn.title = allSelected ? 'Снять выделение' : 'Выбрать все';
+    headerToggleBtn.title = allSelected
+      ? libT('private_library.assignments.toggle_all_deselect')
+      : libT('private_library.assignments.toggle_all_select');
   }
 
   sentences.forEach((s, idx) => {
@@ -469,7 +747,7 @@ function renderCreateAssignmentSentencesTable(modal) {
     tr.innerHTML = `
       <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums; white-space:nowrap;">${escapeHtml(labelNum)}</td>
       <td style="padding:8px 10px; width:46px;">
-        <button type="button" class="topbar-icon-btn create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" aria-label="Выбрать предложение" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
+        <button type="button" class="topbar-icon-btn create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" aria-label="${escapeHtml(libT('private_library.assignments.select_sentence'))}" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
       </td>
       <td style="padding:8px 10px;">${escapeHtml(text)}</td>
     `;
@@ -539,15 +817,15 @@ function ensureCreateAssignmentModal() {
       <div class="modal-header create-assignment-modal-header">
         <div class="create-assignment-modal-title">
           <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="create-assignment-modal-title-text">Задание</div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.assignments.modal_title'))}</div>
         </div>
 
         <div class="create-assignment-modal-header-actions">
           <button type="button" id="create-assignment-save" class="btn-primary create-assignment-save-btn">
             <i data-lucide="save"></i>
-            <span>Сохранить</span>
+            <span>${escapeHtml(libT('private_library.common.save'))}</span>
           </button>
-          <button type="button" id="create-assignment-close" class="modal-close create-assignment-close-btn" title="Закрыть">
+          <button type="button" id="create-assignment-close" class="modal-close create-assignment-close-btn" title="${escapeHtml(libT('private_library.common.close'))}">
             <i data-lucide="x"></i>
           </button>
         </div>
@@ -582,7 +860,7 @@ function ensureCreateAssignmentModal() {
           <div id="create-assignment-days-panel" class="create-assignment-panel create-assignment-panel--days">
             <div class="create-assignment-panel-body">
               <div class="create-assignment-panel-actions">
-                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn create-assignment-icon-btn" title="Добавить день">
+                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn create-assignment-icon-btn" title="${escapeHtml(libT('private_library.assignments.add_day'))}">
                   <i data-lucide="plus"></i>
                 </button>
               </div>
@@ -597,11 +875,11 @@ function ensureCreateAssignmentModal() {
                   <tr>
                     <th class="create-assignment-th-num">№</th>
                     <th class="create-assignment-th-check">
-                      <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn create-assignment-icon-btn" title="Выбрать все">
+                      <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn create-assignment-icon-btn" title="${escapeHtml(libT('private_library.assignments.toggle_all_select'))}">
                         <i data-lucide="circle"></i>
                       </button>
                     </th>
-                    <th class="create-assignment-th-text">Текст</th>
+                    <th class="create-assignment-th-text">${escapeHtml(libT('private_library.assignments.text_column'))}</th>
                   </tr>
                 </thead>
                 <tbody id="create-assignment-sentences-body"></tbody>
@@ -714,28 +992,28 @@ function ensureStudentPlanPanel() {
             <i data-lucide="calendar-check"></i>
           </div>
           <div>
-            <div style="font-weight:700; font-size:16px; line-height:1.1;">План</div>
+            <div style="font-weight:700; font-size:16px; line-height:1.1;">${escapeHtml(libT('private_library.student_plan.title'))}</div>
             <div id="student-plan-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
           </div>
         </div>
-        <button type="button" id="student-plan-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+        <button type="button" id="student-plan-close" class="modal-close" title="${escapeHtml(libT('private_library.common.close'))}" style="background:transparent; border:0; cursor:pointer; padding:6px;">
           <i data-lucide="x"></i>
         </button>
       </div>
 
       <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
         <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="Предыдущий день" style="width:40px; height:40px;">
+          <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.prev_day'))}" style="width:40px; height:40px;">
             <i data-lucide="chevron-left"></i>
           </button>
           <input type="date" id="student-plan-date" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);">
-          <button type="button" id="student-plan-next" class="topbar-icon-btn" title="Следующий день" style="width:40px; height:40px;">
+          <button type="button" id="student-plan-next" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.next_day'))}" style="width:40px; height:40px;">
             <i data-lucide="chevron-right"></i>
           </button>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">Сегодня</button>
-          <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="Получить свежие данные" style="width:40px; height:40px;">
+          <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">${escapeHtml(libT('private_library.student_plan.today'))}</button>
+          <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.refresh'))}" style="width:40px; height:40px;">
             <i data-lucide="refresh-cw"></i>
           </button>
         </div>
@@ -769,10 +1047,10 @@ function ensureTeacherAssignmentStudentsModal() {
     <div style="position:absolute; right:0; top:0; height:100%; width:min(62vw, 760px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
         <div>
-          <div id="teacher-assignment-students-title" style="font-weight:700; font-size:16px; line-height:1.1;">Ученики</div>
+          <div id="teacher-assignment-students-title" style="font-weight:700; font-size:16px; line-height:1.1;">${escapeHtml(libT('private_library.teacher_students.title'))}</div>
           <div id="teacher-assignment-students-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
         </div>
-        <button type="button" id="teacher-assignment-students-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+        <button type="button" id="teacher-assignment-students-close" class="modal-close" title="${escapeHtml(libT('private_library.common.close'))}" style="background:transparent; border:0; cursor:pointer; padding:6px;">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -825,17 +1103,17 @@ function _teacherStudentsRender(data) {
   } catch (e) {
   }
 
-  if (titleEl) titleEl.textContent = assignment && assignment.dictation_title ? String(assignment.dictation_title) : 'Ученики';
+  if (titleEl) titleEl.textContent = assignment && assignment.dictation_title ? String(assignment.dictation_title) : libT('private_library.teacher_students.title');
   if (subtitleEl) {
     const pct = typeof summary.percent_completed === 'number' ? summary.percent_completed : 0;
     const done = typeof summary.students_completed === 'number' ? summary.students_completed : 0;
     const total = typeof summary.students_total === 'number' ? summary.students_total : students.length;
-    subtitleEl.textContent = `${pct}% выполнено · ${done}/${total}`;
+    subtitleEl.textContent = libT('private_library.teacher_students.subtitle', { pct, done, total });
   }
   if (!list) return;
 
   if (!students.length) {
-    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Пока нет учеников</div>';
+    list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.teacher_students.none'))}</div>`;
     return;
   }
 
@@ -847,7 +1125,9 @@ function _teacherStudentsRender(data) {
     const avatarUrl = String(s && s.avatar_small_url ? s.avatar_small_url : '');
     const isOverdue = Boolean(!isDone && deadlineDate && todayDate && todayDate.getTime() > deadlineDate.getTime());
 
-    const statusText = isDone ? 'выполнил' : (isOverdue ? 'просрочил' : 'не выполнил');
+    const statusText = isDone
+      ? libT('private_library.teacher_students.status_done')
+      : (isOverdue ? libT('private_library.teacher_students.status_overdue') : libT('private_library.teacher_students.status_not_done'));
     const statusBg = isDone ? 'rgba(34,197,94,0.14)' : (isOverdue ? 'rgba(239,68,68,0.14)' : 'rgba(0,0,0,0.06)');
     const statusColor = isDone ? '#166534' : (isOverdue ? '#991b1b' : 'rgba(0,0,0,0.65)');
 
@@ -880,7 +1160,7 @@ async function openTeacherAssignmentStudentsModal(assignmentId) {
   const list = document.getElementById('teacher-assignment-students-list');
 
   if (closeBtn) closeBtn.onclick = () => { try { modal.style.display = 'none'; } catch (e) { } };
-  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
+  if (list) list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.teacher_students.loading'))}</div>`;
 
   modal.style.display = 'block';
   try {
@@ -893,12 +1173,12 @@ async function openTeacherAssignmentStudentsModal(assignmentId) {
   try {
     const res = await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(assignmentId))}/students`, { method: 'GET' });
     if (!res || !res.success) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+      if (list) list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.teacher_students.load_failed'))}</div>`;
       return;
     }
     _teacherStudentsRender(res);
   } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить</div>';
+    if (list) list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.teacher_students.load_failed'))}</div>`;
   }
 }
 
@@ -956,7 +1236,7 @@ function ensureStudentPlanLaunchConfirmModal() {
             <div id="student-plan-launch-confirm-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
           </div>
         </div>
-        <button type="button" id="student-plan-launch-confirm-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
+        <button type="button" id="student-plan-launch-confirm-close" class="modal-close" title="${escapeHtml(libT('private_library.common.close'))}" style="background:transparent; border:0; cursor:pointer; padding:6px;">
           <i data-lucide="x"></i>
         </button>
       </div>
@@ -964,13 +1244,13 @@ function ensureStudentPlanLaunchConfirmModal() {
       <div style="padding: 12px 16px; overflow:auto; flex: 1;">
         <div id="student-plan-launch-confirm-warning" style="padding:10px 12px; border-radius:14px; background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.24); color: rgba(17,24,39,0.88); font-weight:650; line-height:1.35;"></div>
 
-        <div style="margin-top: 12px; font-weight:900; font-size:13px; color: rgba(0,0,0,0.70);">Предложения из задания</div>
+        <div style="margin-top: 12px; font-weight:900; font-size:13px; color: rgba(0,0,0,0.70);">${escapeHtml(libT('private_library.student_plan_launch.sentences_from_assignment'))}</div>
         <div id="student-plan-launch-confirm-positions" style="margin-top: 4px; font-size: 13px; color: rgba(0,0,0,0.65);"></div>
         <div id="student-plan-launch-confirm-sentences" style="margin-top: 10px; display:flex; flex-direction:column; gap:8px;"></div>
       </div>
 
       <div style="padding: 12px 16px; border-top:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:flex-end; gap: 10px;">
-        <button type="button" id="student-plan-launch-confirm-start" class="button-color-yellow" style="height:40px; padding:0 16px; font-weight:900;">Запустить</button>
+        <button type="button" id="student-plan-launch-confirm-start" class="button-color-yellow" style="height:40px; padding:0 16px; font-weight:900;">${escapeHtml(libT('private_library.student_plan_launch.start'))}</button>
       </div>
     </div>
   `;
@@ -996,14 +1276,14 @@ async function openStudentPlanLaunchConfirmModal(ctx) {
   const posEl = document.getElementById('student-plan-launch-confirm-positions');
   const sentsEl = document.getElementById('student-plan-launch-confirm-sentences');
 
-  if (titleEl) titleEl.textContent = String((ctx && ctx.dictation_title) || 'Диктант');
-  if (subtitleEl) subtitleEl.textContent = String((ctx && ctx.plan_date) ? `Задание на ${ctx.plan_date}` : '');
+  if (titleEl) titleEl.textContent = String((ctx && ctx.dictation_title) || libT('private_library.student_plan_launch.dictation_fallback_title'));
+  if (subtitleEl) subtitleEl.textContent = String((ctx && ctx.plan_date) ? libT('private_library.student_plan_launch.assignment_for_date', { date: ctx.plan_date }) : '');
   if (coverEl) {
     const url = String((ctx && ctx.dictation_cover_url) || '');
     coverEl.style.backgroundImage = url ? `url(${escapeHtml(url)})` : 'none';
   }
   if (warningEl) {
-    warningEl.textContent = 'Это задание из прошлого дня. Результаты выполнения диктанта попадут в текущий день как «другая активность (вне плана)». На результаты прошлых дней повлиять уже нельзя.';
+    warningEl.textContent = libT('private_library.student_plan_launch.past_day_warning');
   }
 
   const positions = Array.isArray(ctx && ctx.selected_sentence_positions)
@@ -1013,7 +1293,7 @@ async function openStudentPlanLaunchConfirmModal(ctx) {
 
   const formatPositionsLabel = () => {
     try {
-      if (!positions.length) return 'Все предложения';
+      if (!positions.length) return libT('private_library.student_plan_launch.all_sentences');
       const uniq = Array.from(new Set(positions));
       uniq.sort((a, b) => a - b);
       const ranges = [];
@@ -1035,14 +1315,14 @@ async function openStudentPlanLaunchConfirmModal(ctx) {
       }
       if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
       const compact = ranges.join(',');
-      return compact ? `(${compact})` : 'Все предложения';
+      return compact ? `(${compact})` : libT('private_library.student_plan_launch.all_sentences');
     } catch (e) {
       return '';
     }
   };
 
   if (posEl) posEl.textContent = formatPositionsLabel();
-  if (sentsEl) sentsEl.innerHTML = '<div style="color: rgba(0,0,0,0.55);">Загрузка…</div>';
+  if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.loading'))}</div>`;
 
   try {
     const did = Number(ctx && ctx.dictation_id);
@@ -1073,9 +1353,9 @@ async function openStudentPlanLaunchConfirmModal(ctx) {
         </div>
       `;
     }).join('');
-    if (sentsEl) sentsEl.innerHTML = rows || '<div style="color: rgba(0,0,0,0.55);">Нет предложений</div>';
+    if (sentsEl) sentsEl.innerHTML = rows || `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.no_sentences'))}</div>`;
   } catch (e) {
-    if (sentsEl) sentsEl.innerHTML = '<div style="color: rgba(0,0,0,0.55);">Не удалось загрузить предложения</div>';
+    if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.load_sentences_failed'))}</div>`;
   }
 
   const close = () => {
@@ -1186,7 +1466,7 @@ function _pickTranslationLanguageForOpen({ preferredNative, availableTranslation
     return {
       lang: available[0],
       usedFallback: !!preferred && available[0] !== preferred,
-      reason: preferred ? `Перевода на «${preferred}» нет — открыт единственный доступный перевод.` : ''
+      reason: preferred ? libT('private_library.translation_pick.only_available', { lang: preferred }) : ''
     };
   }
 
@@ -1195,7 +1475,7 @@ function _pickTranslationLanguageForOpen({ preferredNative, availableTranslation
   }
 
   if (available.length > 1) {
-    return { lang: available[0], usedFallback: !!preferred, reason: preferred ? `Перевода на «${preferred}» нет — открыт другой доступный перевод.` : '' };
+    return { lang: available[0], usedFallback: !!preferred, reason: preferred ? libT('private_library.translation_pick.other_available', { lang: preferred }) : '' };
   }
 
   return { lang: fallback || 'en', usedFallback: false, reason: '' };
@@ -1233,7 +1513,7 @@ function _studentPlanRender(panel, dateIso, items) {
 
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) {
-    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">На эту дату заданий нет</div>';
+    list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan.no_assignments'))}</div>`;
     return;
   }
 
@@ -1249,12 +1529,14 @@ function _studentPlanRender(panel, dateIso, items) {
   const blocks = [];
   for (const [dictKey, dictItems] of byDictation.entries()) {
     const first = dictItems[0] || {};
-    const dictationTitle = String(first && first.dictation_title ? first.dictation_title : `Диктант ${first.dictation_id}`);
+    const dictationTitle = String(first && first.dictation_title
+      ? first.dictation_title
+      : libT('private_library.student_plan.dictation_fallback_title', { id: first.dictation_id }));
     const level = first && first.dictation_level ? String(first.dictation_level) : '—';
     const coverUrl = String(first && first.dictation_cover_url ? first.dictation_cover_url : '');
     const isCached = !!(first && first.__cached);
     const cacheBadge = isCached
-      ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
+      ? `<div title="${escapeHtml(libT('private_library.student_plan.cached_title'))}" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>${escapeHtml(libT('private_library.student_plan.cached_badge'))}</span></div>`
       : '';
     const range = dateIso ? String(dateIso) : '—';
 
@@ -1265,7 +1547,9 @@ function _studentPlanRender(panel, dateIso, items) {
     const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
 
     const rowsHtml = dictItems.map(a => {
-      const groupTitle = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : 'Группа');
+      const groupTitle = String(a && (a.group_title || a.group_id)
+        ? (a.group_title || libT('private_library.student_plan.group_fallback_title', { id: a.group_id }))
+        : libT('private_library.student_plan.group_generic_title'));
       const groupId = a && a.group_id ? Number(a.group_id) : null;
       const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
       const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
@@ -1294,7 +1578,7 @@ function _studentPlanRender(panel, dateIso, items) {
             <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111827; font-weight:900; font-size:12px; line-height:1;">${escapeHtml(String(subsetLabel || ''))}</div>
           </td>
           <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
-            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" data-plan-date="${escapeHtml(String(range || ''))}" data-dictation-title="${escapeHtml(String(dictationTitle || ''))}" data-dictation-cover-url="${escapeHtml(String(coverUrl || ''))}" style="height:34px; padding:0 10px;">Запустить</button>
+            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" data-plan-date="${escapeHtml(String(range || ''))}" data-dictation-title="${escapeHtml(String(dictationTitle || ''))}" data-dictation-cover-url="${escapeHtml(String(coverUrl || ''))}" style="height:34px; padding:0 10px;">${escapeHtml(libT('private_library.student_plan_launch.start'))}</button>
           </td>
         </tr>
       `;
@@ -8387,6 +8671,18 @@ function loadLibraryData() {
 
 // Инициализация при загрузке страницы
 document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+      await window.I18n.ensureLoaded();
+    }
+  } catch (e) {
+  }
+
+  try {
+    applyPrivateLibraryTranslations();
+  } catch (e) {
+  }
+
   installEventHandlers();
 
   try {

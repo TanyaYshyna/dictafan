@@ -377,5 +377,139 @@
       "good": "Добре",
       "check_title": "Натисніть Enter/Return коли закінчили вводити текст"
     }
+  },
+  "private_library": {
+    "page_title": "Приватна бібліотека — DictaFan",
+    "common": {
+      "close": "Закрити",
+      "cancel": "Скасувати",
+      "save": "Зберегти"
+    },
+    "topbar": {
+      "logout_title": "Вийти",
+      "streak_title": "Незгораюча сума днів"
+    },
+    "user_menu": {
+      "profile": "Профіль користувача",
+      "activity_report": "Звіт про активність",
+      "rating": "Рейтинг",
+      "plan_fact": "Звіт План-факт"
+    },
+    "delete_modal": {
+      "title": "Видалити диктант",
+      "question_prefix": "Ви дійсно хочете видалити диктант",
+      "confirm": "Видалити"
+    },
+    "home_library": {
+      "title": "Моя бібліотека",
+      "my_books": "Мої книги",
+      "new_book": "Нова книга"
+    },
+    "toolbar": {
+      "create_dictation": "Створити диктант",
+      "my_library": "Моя бібліотека",
+      "public_library": "Публічна бібліотека",
+      "plan": "План",
+      "assignments": "Завдання",
+      "zoom_in": "Збільшити",
+      "zoom_out": "Зменшити"
+    },
+    "book_edit": {
+      "title_new": "Нова книга",
+      "cover_label": "Обкладинка книги",
+      "cover_alt": "Обкладинка",
+      "cover_upload": "Завантажити обкладинку",
+      "book_title": "Назва",
+      "author_optional": "Автор тексту (необов'язково)",
+      "author_materials_url": "Посилання на матеріали автора",
+      "url_placeholder": "https://...",
+      "original_language": "Мова оригіналу",
+      "theme": "Тема",
+      "theme_placeholder": "вірші, шкільні диктанти тощо",
+      "visibility": "Видимість",
+      "visibility_private": "Бачу лише я",
+      "visibility_public": "Видима всім (публічна книга)",
+      "description": "Опис"
+    },
+    "section_edit": {
+      "title_new": "Новий розділ",
+      "number": "Номер розділу",
+      "number_placeholder": "Введіть номер розділу",
+      "name": "Назва розділу",
+      "placeholder": "Введіть назву розділу"
+    },
+    "book_view": {
+      "title": "Книга"
+    },
+    "public_library": {
+      "title": "Публічна бібліотека"
+    },
+    "move_dictation": {
+      "title": "Перемістити диктант до книги",
+      "choose_book": "Оберіть книгу:",
+      "choose_book_placeholder": "-- Оберіть книгу --",
+      "choose_section": "Оберіть розділ:",
+      "select": "Обрати"
+    },
+    "crop": {
+      "title": "Обрізка обкладинки",
+      "apply": "Застосувати"
+    },
+    "assignments": {
+      "max_7_days": "Максимум 7 днів",
+      "modal_title": "Завдання",
+      "add_day": "Додати день",
+      "text_column": "Текст",
+      "no_sentences": "Немає речень",
+      "toggle_all_select": "Вибрати все",
+      "toggle_all_deselect": "Зняти виділення",
+      "select_sentence": "Вибрати речення"
+    },
+    "reports": {
+      "rating_unavailable": "Рейтинг недоступний",
+      "rating_open_failed": "Не вдалося відкрити рейтинг",
+      "activity_unavailable": "Звіт про активність недоступний",
+      "activity_open_failed": "Не вдалося відкрити звіт про активність",
+      "plan_fact_unavailable": "Звіт План‑Факт недоступний",
+      "plan_fact_open_failed": "Не вдалося відкрити звіт План‑Факт"
+    },
+    "student_plan": {
+      "title": "План",
+      "prev_day": "Попередній день",
+      "next_day": "Наступний день",
+      "today": "Сьогодні",
+      "refresh": "Отримати свіжі дані",
+      "no_assignments": "На цю дату завдань немає",
+      "dictation_fallback_title": "Диктант {id}",
+      "cached_title": "У кеші",
+      "cached_badge": "у кеші",
+      "group_fallback_title": "Група {id}",
+      "group_generic_title": "Група"
+    },
+    "translation_pick": {
+      "only_available": "Перекладу «{lang}» немає — відкрито єдиний доступний переклад.",
+      "other_available": "Перекладу «{lang}» немає — відкрито інший доступний переклад."
+    },
+    "teacher_students": {
+      "title": "Учні",
+      "subtitle": "{pct}% виконано · {done}/{total}",
+      "none": "Поки що немає учнів",
+      "status_done": "виконав",
+      "status_overdue": "прострочив",
+      "status_not_done": "не виконав",
+      "loading": "Завантаження…",
+      "load_failed": "Не вдалося завантажити"
+    },
+    "student_plan_launch": {
+      "sentences_from_assignment": "Речення із завдання",
+      "start": "Запустити",
+      "dictation_fallback_title": "Диктант",
+      "assignment_for_date": "Завдання на {date}",
+      "past_day_warning": "Це завдання з минулого дня. Результат виконання диктанту буде зараховано до поточного дня як «інша активність (поза планом)». На результати минулих днів уже не можна вплинути.",
+      "all_sentences": "Усі речення",
+      "loading": "Завантаження…",
+      "no_sentences": "Немає речень",
+      "load_sentences_failed": "Не вдалося завантажити речення"
+    }
   }
 }

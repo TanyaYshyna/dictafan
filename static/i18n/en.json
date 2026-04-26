@@ -377,5 +377,139 @@
       "good": "Good",
       "check_title": "Press Enter/Return when you finish typing"
     }
+  },
+  "private_library": {
+    "page_title": "Private library — DictaFan",
+    "common": {
+      "close": "Close",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "topbar": {
+      "logout_title": "Log out",
+      "streak_title": "Streak days"
+    },
+    "user_menu": {
+      "profile": "User profile",
+      "activity_report": "Activity report",
+      "rating": "Rating",
+      "plan_fact": "Plan vs fact report"
+    },
+    "delete_modal": {
+      "title": "Delete dictation",
+      "question_prefix": "Do you really want to delete dictation",
+      "confirm": "Delete"
+    },
+    "home_library": {
+      "title": "My library",
+      "my_books": "My books",
+      "new_book": "New book"
+    },
+    "toolbar": {
+      "create_dictation": "Create dictation",
+      "my_library": "My library",
+      "public_library": "Public library",
+      "plan": "Plan",
+      "assignments": "Assignments",
+      "zoom_in": "Zoom in",
+      "zoom_out": "Zoom out"
+    },
+    "book_edit": {
+      "title_new": "New book",
+      "cover_label": "Book cover",
+      "cover_alt": "Cover",
+      "cover_upload": "Upload cover",
+      "book_title": "Title",
+      "author_optional": "Text author (optional)",
+      "author_materials_url": "Author materials link",
+      "url_placeholder": "https://...",
+      "original_language": "Original language",
+      "theme": "Topic",
+      "theme_placeholder": "poems, school dictations, etc.",
+      "visibility": "Visibility",
+      "visibility_private": "Visible only to me",
+      "visibility_public": "Visible to everyone (public book)",
+      "description": "Description"
+    },
+    "section_edit": {
+      "title_new": "New section",
+      "number": "Section number",
+      "number_placeholder": "Enter section number",
+      "name": "Section title",
+      "placeholder": "Enter section title"
+    },
+    "book_view": {
+      "title": "Book"
+    },
+    "public_library": {
+      "title": "Public library"
+    },
+    "move_dictation": {
+      "title": "Move dictation to a book",
+      "choose_book": "Choose a book:",
+      "choose_book_placeholder": "-- Choose a book --",
+      "choose_section": "Choose a section:",
+      "select": "Select"
+    },
+    "crop": {
+      "title": "Crop cover",
+      "apply": "Apply"
+    },
+    "assignments": {
+      "max_7_days": "Maximum 7 days",
+      "modal_title": "Assignment",
+      "add_day": "Add day",
+      "text_column": "Text",
+      "no_sentences": "No sentences",
+      "toggle_all_select": "Select all",
+      "toggle_all_deselect": "Deselect all",
+      "select_sentence": "Select sentence"
+    },
+    "reports": {
+      "rating_unavailable": "Rating is unavailable",
+      "rating_open_failed": "Failed to open rating",
+      "activity_unavailable": "Activity report is unavailable",
+      "activity_open_failed": "Failed to open activity report",
+      "plan_fact_unavailable": "Plan vs fact report is unavailable",
+      "plan_fact_open_failed": "Failed to open plan vs fact report"
+    },
+    "student_plan": {
+      "title": "Plan",
+      "prev_day": "Previous day",
+      "next_day": "Next day",
+      "today": "Today",
+      "refresh": "Refresh data",
+      "no_assignments": "No assignments for this date",
+      "dictation_fallback_title": "Dictation {id}",
+      "cached_title": "Cached",
+      "cached_badge": "cached",
+      "group_fallback_title": "Group {id}",
+      "group_generic_title": "Group"
+    },
+    "translation_pick": {
+      "only_available": "No translation for ‘{lang}’ — opened the only available translation.",
+      "other_available": "No translation for ‘{lang}’ — opened another available translation."
+    },
+    "teacher_students": {
+      "title": "Students",
+      "subtitle": "{pct}% done · {done}/{total}",
+      "none": "No students yet",
+      "status_done": "done",
+      "status_overdue": "overdue",
+      "status_not_done": "not done",
+      "loading": "Loading…",
+      "load_failed": "Failed to load"
+    },
+    "student_plan_launch": {
+      "sentences_from_assignment": "Sentences from the assignment",
+      "start": "Start",
+      "dictation_fallback_title": "Dictation",
+      "assignment_for_date": "Assignment for {date}",
+      "past_day_warning": "This assignment is from a previous day. The result will be counted for today as ‘other activity (outside the plan)’. Past days cannot be changed.",
+      "all_sentences": "All sentences",
+      "loading": "Loading…",
+      "no_sentences": "No sentences",
+      "load_sentences_failed": "Failed to load sentences"
+    }
   }
 }

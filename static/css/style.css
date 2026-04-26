@@ -495,10 +495,14 @@ select {
 }
 
 .user-section {
-    margin-left: auto;
+    margin-inline-start: auto;
     display: flex;
     gap: 10px;
     align-items: center;
+}
+
+html[dir="rtl"] .topbar-save-group {
+    flex-direction: row-reverse;
 }
 
 /* Compact activity badge in header: daily progress + streak */
