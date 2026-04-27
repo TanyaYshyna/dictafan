@@ -99,19 +99,19 @@
         <div id="settingsTabsPanel" class="settings-tabs-panel">
             <div class="tabs-header">
                 <button class="tab-btn active" data-tab="general">
-                    <span>1. Общие данные</span>
+                    <span>{{ t('ui.dictation_editor.tabs.general') }}</span>
                 </button>
                 <button class="tab-btn" data-tab="audio">
-                    <span>2. Настройка аудио</span>
+                    <span>{{ t('ui.dictation_editor.tabs.audio') }}</span>
                 </button>
                 <button class="tab-btn" data-tab="dialog">
-                    <span>3. Диалог</span>
+                    <span>{{ t('ui.dictation_editor.tabs.dialog') }}</span>
                 </button>
                 <button class="tab-btn" data-tab="create-audio">
-                    <span>4. Создание аудио</span>
+                    <span>{{ t('ui.dictation_editor.tabs.create_audio') }}</span>
                 </button>
                 <button class="tab-btn" data-tab="translations">
-                    <span>5. Переводы</span>
+                    <span>{{ t('ui.dictation_editor.tabs.translations') }}</span>
                 </button>
             </div>
 
@@ -131,7 +131,7 @@
                                         <input type="file" id="coverFile" accept="image/*" style="display: none;">
                                         <button id="coverUploadBtn" class="button-color-yellow">
                                             <i data-lucide="download"></i>
-                                            Загрузить
+                                            {{ t('ui.dictation_editor.general.cover_upload') }}
                                         </button>
                                     </div>
                                 </div>
@@ -283,7 +283,7 @@
                             <label class="checkbox-label" id="tabDialogCheckboxLabel">
                                 <input type="checkbox" id="tabIsDialogCheckbox" style="display: none;">
                                 <i data-lucide="circle" class="checkbox-icon"></i>
-                                Это диалог
+                                {{ t('ui.dictation_editor.dialog.is_dialog') }}
                             </label>
                         </div>
                         <div id="tabSpeakersTable" class="speakers-table" style="display: none;">
@@ -436,7 +436,7 @@
                 <!-- Кнопка перезаполнения таблицы (слева) -->
                 <button id="refillTableBtn" class="table-control-btn refill-btn">
                     <i data-lucide="refresh-cw"></i>
-                    Перезаполнить таблицу
+                    {{ t('ui.dictation_editor.table.refill') }}
                 </button>
 
                 <!-- Кнопка показать explanation -->
@@ -450,12 +450,12 @@
                     </button>
 
                     <button id="toggleExplanationBtn" class="table-control-btn refill-btn"
-                        title="Показать/скрыть пояснение">
+                        title="{{ t('ui.dictation_editor.table.toggle_explanation_title') }}">
                         <i data-lucide="circle" class="toggle-explanation-icon"></i>
-                        Пояснение
+                        {{ t('ui.dictation_editor.table.explanation') }}
                     </button>
 
-                    <button id="prevRowBtn" class="table-control-btn nav-btn" title="Предыдущая строка">
+                    <button id="prevRowBtn" class="table-control-btn nav-btn" title="{{ t('ui.dictation_editor.table.prev_row') }}">
                         <i data-lucide="chevron-left"></i>
                     </button>
 
@@ -463,7 +463,7 @@
                         <span id="currentRowNumber">1</span>
                     </div>
 
-                    <button id="nextRowBtn" class="table-control-btn nav-btn" title="Следующая строка">
+                    <button id="nextRowBtn" class="table-control-btn nav-btn" title="{{ t('ui.dictation_editor.table.next_row') }}">
                         <i data-lucide="chevron-right"></i>
                     </button>
                 </div>
@@ -484,17 +484,17 @@
                                 <i data-lucide="user"></i>
                             </th>
 
-                            <th class="col-original panel-original">Оригинал</th>
+                            <th class="col-original panel-original">{{ t('ui.dictation_editor.table.original') }}</th>
                             <th class="col-play-original panel-original panel-create-audio">o</th>
 
 
-                            <th class="col-translation panel-translation">Перевод</th>
+                            <th class="col-translation panel-translation">{{ t('ui.dictation_editor.table.translation') }}</th>
                             <th class="col-play-translation panel-translation panel-create-audio">t</th>
-                            <th class="col-explanation" style="display: none;">Пояснение</th>
+                            <th class="col-explanation" style="display: none;">{{ t('ui.dictation_editor.table.explanation') }}</th>
 
                             <th class="col-generate-tts panel-editing-avto panel-create-audio">a</th>
-                            <th class="col-apply-avto panel-editing-avto" title="Применить">
-                                <i data-lucide="arrow-big-left-dash"></i>
+                            <th class="col-apply-avto panel-editing-avto" title="{{ t('ui.dictation_editor.table.apply') }}">
+                                <i data-lucide="corner-down-left"></i>
                             </th>
 
                             <!-- <th class="col-checkbox panel-editing"><i data-lucide="check"></i></th> -->
@@ -558,11 +558,11 @@
                     <label class="checkbox-label" id="dialogCheckboxLabel">
                         <input type="checkbox" id="isDialogCheckbox" style="display: none;">
                         <i data-lucide="circle" class="checkbox-icon"></i>
-                        Это диалог
+                        {{ t('ui.dictation_editor.dialog.is_dialog') }}
                     </label>
                 </div>
                 <div class="form-group">
-                    <label for="translationDelimiter">Символ начала строки перевода:</label>
+                    <label for="translationDelimiter">{{ t('ui.dictation_editor.start_modal.translation_delimiter') }}</label>
                     <!-- Старое значение: value="/*" -->
                     <input type="text" id="translationDelimiter" value="//" placeholder="//">
                 </div>
