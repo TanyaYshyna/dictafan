@@ -522,6 +522,113 @@
       "loading": "Загрузка…",
       "no_sentences": "Нет предложений",
       "load_sentences_failed": "Не удалось загрузить предложения"
+    },
+    "dictation_editor": {
+      "title": "Генератор диктантов",
+      "header": {
+        "streak_title": "Несгораемая сумма дней",
+        "save": "Сохранить",
+        "back_to_list": "Вернуться к списку диктантов",
+        "dictation_name": "Название диктанта:"
+      },
+      "tabs": {
+        "general": "1. Общие данные",
+        "audio": "2. Настройка аудио",
+        "dialog": "3. Диалог",
+        "create_audio": "4. Создание аудио",
+        "translations": "5. Переводы"
+      },
+      "general": {
+        "cover_upload": "Загрузить",
+        "level": "Уровень:",
+        "author_materials_url": "Ссылка на материалы автора",
+        "url_placeholder": "https://..."
+      },
+      "audio": {
+        "mode_full": "Отображать весь файл",
+        "mode_sentence": "Текущее предложение",
+        "mode_mic": "Запись с микрофона",
+        "mode_auto": "Автозаполнение",
+        "current_audio_none": "Аудио для волны: не выбрано",
+        "current_row_none": "Строка таблицы: не выбрана",
+        "select_file": "Выбрать файл",
+        "start": "Start:",
+        "end": "End:",
+        "cut_many_title": "Разрезать аудио на 1000 кусков",
+        "cut_many": "на 1000 кусков"
+      },
+      "dialog": {
+        "is_dialog": "Это диалог",
+        "speakers": "Спикеры",
+        "speaker_name": "Имя спикера",
+        "remove_speaker": "Удалить спикера",
+        "add_speaker": "Добавить спикера"
+      },
+      "table": {
+        "refill": "Перезаполнить таблицу",
+        "delete_row": "Удалить строку",
+        "add_row": "Добавить строку",
+        "toggle_explanation_title": "Показать/скрыть пояснение",
+        "explanation": "Пояснение",
+        "prev_row": "Предыдущая строка",
+        "next_row": "Следующая строка",
+        "original": "Оригинал",
+        "translation": "Перевод",
+        "apply": "Применить",
+        "edit_all_marked": "Отредактировать все отмеченные"
+      },
+      "start_modal": {
+        "title": "Создание диктанта",
+        "create": "Сформировать диктант",
+        "translation_delimiter": "Символ начала строки перевода:",
+        "name": "Название:",
+        "name_placeholder": "Введите название...",
+        "text": "Текст диктанта:",
+        "text_placeholder": "Введите текст диктанта..."
+      },
+      "create_audio_file": {
+        "title": "Создать аудио файл",
+        "file_name": "Имя файла:",
+        "file_name_placeholder": "audio_op.mp3",
+        "hint": "Файл будет сохранен в temp папке диктанта"
+      },
+      "add_row": {
+        "title": "Добавить новую строку",
+        "message_html": "Выберите, где добавить новую строку относительно строки <span id=\"addRowCurrentNumber\">{n}</span>:"
+      },
+      "delete_row": {
+        "title": "Удалить строку",
+        "message_html": "Вы действительно хотите удалить строку <span id=\"deleteRowNumber\">{n}</span>?",
+        "irreversible": "Это действие нельзя отменить!",
+        "key": "Ключ:"
+      },
+      "mic": {
+        "title": "Запись с микрофона",
+        "text_for_record": "Текст для записи:",
+        "ready": "Готов к записи",
+        "start": "Начать запись",
+        "stop": "Остановить",
+        "listen": "Прослушать",
+        "rerecord": "Перезаписать",
+        "duration": "Длительность: --:--",
+        "save": "Сохранить запись"
+      },
+      "exit": {
+        "title": "Вернуться на рабочий стол?",
+        "message": "Что сделать с текущими изменениями?",
+        "stay": "Остаться",
+        "exit": "Выйти"
+      },
+      "crop": {
+        "title": "Обрезка обложки"
+      },
+      "common": {
+        "close": "Закрыть",
+        "create": "Создать",
+        "cancel": "Отмена",
+        "delete": "Удалить",
+        "apply": "Применить"
+      }
     }
   }
 }

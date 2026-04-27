@@ -521,6 +521,113 @@
       "loading": "جارٍ التحميل…",
       "no_sentences": "لا توجد جمل",
       "load_sentences_failed": "تعذر تحميل الجمل"
+    },
+    "dictation_editor": {
+      "title": "محرر الإملاء",
+      "header": {
+        "streak_title": "مجموع الأيام غير القابل للفقد",
+        "save": "حفظ",
+        "back_to_list": "العودة إلى قائمة الإملاءات",
+        "dictation_name": "اسم الإملاء:"
+      },
+      "tabs": {
+        "general": "1. بيانات عامة",
+        "audio": "2. إعداد الصوت",
+        "dialog": "3. حوار",
+        "create_audio": "4. إنشاء صوت",
+        "translations": "5. الترجمات"
+      },
+      "general": {
+        "cover_upload": "تحميل",
+        "level": "المستوى:",
+        "author_materials_url": "رابط مواد المؤلف",
+        "url_placeholder": "https://..."
+      },
+      "audio": {
+        "mode_full": "عرض الملف بالكامل",
+        "mode_sentence": "الجملة الحالية",
+        "mode_mic": "تسجيل من الميكروفون",
+        "mode_auto": "تعبئة تلقائية",
+        "current_audio_none": "صوت الموجة: غير محدد",
+        "current_row_none": "صف الجدول: غير محدد",
+        "select_file": "اختيار ملف",
+        "start": "Start:",
+        "end": "End:",
+        "cut_many_title": "تقسيم الصوت إلى 1000 جزء",
+        "cut_many": "إلى 1000 جزء"
+      },
+      "dialog": {
+        "is_dialog": "هذا حوار",
+        "speakers": "المتحدثون",
+        "speaker_name": "اسم المتحدث",
+        "remove_speaker": "إزالة المتحدث",
+        "add_speaker": "إضافة متحدث"
+      },
+      "table": {
+        "refill": "إعادة تعبئة الجدول",
+        "delete_row": "حذف الصف",
+        "add_row": "إضافة صف",
+        "toggle_explanation_title": "إظهار/إخفاء الشرح",
+        "explanation": "شرح",
+        "prev_row": "الصف السابق",
+        "next_row": "الصف التالي",
+        "original": "الأصل",
+        "translation": "الترجمة",
+        "apply": "تطبيق",
+        "edit_all_marked": "تعديل جميع المحددة"
+      },
+      "start_modal": {
+        "title": "إنشاء إملاء",
+        "create": "توليد الإملاء",
+        "translation_delimiter": "بادئة سطر الترجمة:",
+        "name": "العنوان:",
+        "name_placeholder": "أدخل عنوانًا...",
+        "text": "نص الإملاء:",
+        "text_placeholder": "أدخل نص الإملاء..."
+      },
+      "create_audio_file": {
+        "title": "إنشاء ملف صوت",
+        "file_name": "اسم الملف:",
+        "file_name_placeholder": "audio_op.mp3",
+        "hint": "سيتم حفظ الملف في مجلد temp للإملاء"
+      },
+      "add_row": {
+        "title": "إضافة صف جديد",
+        "message_html": "اختر مكان إضافة صف جديد بالنسبة للصف <span id=\"addRowCurrentNumber\">{n}</span>:"
+      },
+      "delete_row": {
+        "title": "حذف صف",
+        "message_html": "هل تريد حقًا حذف الصف <span id=\"deleteRowNumber\">{n}</span>؟",
+        "irreversible": "لا يمكن التراجع عن هذا الإجراء!",
+        "key": "المفتاح:"
+      },
+      "mic": {
+        "title": "تسجيل من الميكروفون",
+        "text_for_record": "نص للتسجيل:",
+        "ready": "جاهز للتسجيل",
+        "start": "بدء التسجيل",
+        "stop": "إيقاف",
+        "listen": "استماع",
+        "rerecord": "إعادة التسجيل",
+        "duration": "المدة: --:--",
+        "save": "حفظ التسجيل"
+      },
+      "exit": {
+        "title": "العودة إلى سطح المكتب؟",
+        "message": "ماذا نفعل بالتغييرات الحالية؟",
+        "stay": "البقاء",
+        "exit": "خروج"
+      },
+      "crop": {
+        "title": "اقتصاص الغلاف"
+      },
+      "common": {
+        "close": "إغلاق",
+        "create": "إنشاء",
+        "cancel": "إلغاء",
+        "delete": "حذف",
+        "apply": "تطبيق"
+      }
     }
   }
 }

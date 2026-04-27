@@ -522,6 +522,113 @@
       "loading": "Завантаження…",
       "no_sentences": "Немає речень",
       "load_sentences_failed": "Не вдалося завантажити речення"
+    },
+    "dictation_editor": {
+      "title": "Редактор диктантів",
+      "header": {
+        "streak_title": "Незгораюча сума днів",
+        "save": "Зберегти",
+        "back_to_list": "Повернутися до списку диктантів",
+        "dictation_name": "Назва диктанту:"
+      },
+      "tabs": {
+        "general": "1. Загальні дані",
+        "audio": "2. Налаштування аудіо",
+        "dialog": "3. Діалог",
+        "create_audio": "4. Створення аудіо",
+        "translations": "5. Переклади"
+      },
+      "general": {
+        "cover_upload": "Завантажити",
+        "level": "Рівень:",
+        "author_materials_url": "Посилання на матеріали автора",
+        "url_placeholder": "https://..."
+      },
+      "audio": {
+        "mode_full": "Показувати весь файл",
+        "mode_sentence": "Поточне речення",
+        "mode_mic": "Запис із мікрофона",
+        "mode_auto": "Автозаповнення",
+        "current_audio_none": "Аудіо для хвилі: не вибрано",
+        "current_row_none": "Рядок таблиці: не вибрано",
+        "select_file": "Вибрати файл",
+        "start": "Start:",
+        "end": "End:",
+        "cut_many_title": "Розрізати аудіо на 1000 шматків",
+        "cut_many": "на 1000 шматків"
+      },
+      "dialog": {
+        "is_dialog": "Це діалог",
+        "speakers": "Спікери",
+        "speaker_name": "Ім’я спікера",
+        "remove_speaker": "Видалити спікера",
+        "add_speaker": "Додати спікера"
+      },
+      "table": {
+        "refill": "Перезаповнити таблицю",
+        "delete_row": "Видалити рядок",
+        "add_row": "Додати рядок",
+        "toggle_explanation_title": "Показати/сховати пояснення",
+        "explanation": "Пояснення",
+        "prev_row": "Попередній рядок",
+        "next_row": "Наступний рядок",
+        "original": "Оригінал",
+        "translation": "Переклад",
+        "apply": "Застосувати",
+        "edit_all_marked": "Відредагувати всі позначені"
+      },
+      "start_modal": {
+        "title": "Створення диктанту",
+        "create": "Сформувати диктант",
+        "translation_delimiter": "Символ початку рядка перекладу:",
+        "name": "Назва:",
+        "name_placeholder": "Введіть назву...",
+        "text": "Текст диктанту:",
+        "text_placeholder": "Введіть текст диктанту..."
+      },
+      "create_audio_file": {
+        "title": "Створити аудіофайл",
+        "file_name": "Ім’я файлу:",
+        "file_name_placeholder": "audio_op.mp3",
+        "hint": "Файл буде збережено в temp папці диктанту"
+      },
+      "add_row": {
+        "title": "Додати новий рядок",
+        "message_html": "Виберіть, де додати новий рядок відносно рядка <span id=\"addRowCurrentNumber\">{n}</span>:"
+      },
+      "delete_row": {
+        "title": "Видалити рядок",
+        "message_html": "Ви справді хочете видалити рядок <span id=\"deleteRowNumber\">{n}</span>?",
+        "irreversible": "Цю дію не можна скасувати!",
+        "key": "Ключ:"
+      },
+      "mic": {
+        "title": "Запис із мікрофона",
+        "text_for_record": "Текст для запису:",
+        "ready": "Готовий до запису",
+        "start": "Почати запис",
+        "stop": "Зупинити",
+        "listen": "Прослухати",
+        "rerecord": "Перезаписати",
+        "duration": "Тривалість: --:--",
+        "save": "Зберегти запис"
+      },
+      "exit": {
+        "title": "Повернутися на робочий стіл?",
+        "message": "Що зробити з поточними змінами?",
+        "stay": "Залишитися",
+        "exit": "Вийти"
+      },
+      "crop": {
+        "title": "Обрізка обкладинки"
+      },
+      "common": {
+        "close": "Закрити",
+        "create": "Створити",
+        "cancel": "Скасувати",
+        "delete": "Видалити",
+        "apply": "Застосувати"
+      }
     }
   }
 }

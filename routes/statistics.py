@@ -471,6 +471,14 @@ def teacher_report_send():
     if not dictation_lang:
         return jsonify({'success': False, 'error': 'Не удалось определить язык диктанта'}), 400
 
+    try:
+        print(
+            f"📨 [TELEGRAM][SEND_MANUAL] student_user_id={user.get('id')} dictation_id={dictation_int} "
+            f"dictation_lang={dictation_lang!r} teacher_user_ids={teacher_user_ids}"
+        )
+    except Exception:
+        pass
+
     today_iso = _today_iso_local()
     try:
         auto_chat_ids = list_teacher_chat_ids_for_student_success(
@@ -493,6 +501,11 @@ def teacher_report_send():
         )
     except Exception:
         chat_ids = []
+
+    try:
+        print(f"📨 [TELEGRAM][SEND_AUTO] filtered_teacher_chat_ids={chat_ids}")
+    except Exception:
+        pass
 
     if not chat_ids:
         return jsonify({'success': False, 'error': 'no_recipients'}), 400
@@ -558,7 +571,11 @@ def teacher_report_send():
         try:
             send_telegram_message(int(cid), text)
             sent += 1
-        except Exception:
+        except Exception as e:
+            try:
+                print(f"📨 [TELEGRAM][SEND_AUTO] send failed chat_id={cid}: {e}")
+            except Exception:
+                pass
             continue
 
     return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids)})
@@ -599,6 +616,14 @@ def teacher_report_recipients_auto():
 
     recipients = []
 
+    try:
+        print(
+            f"📨 [TELEGRAM][RECIPIENTS_AUTO] student_user_id={user.get('id')} "
+            f"dictation_id={dictation_int} dictation_lang={dictation_lang!r}"
+        )
+    except Exception:
+        pass
+
     # self
     try:
         if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')):
@@ -613,6 +638,14 @@ def teacher_report_recipients_auto():
                 int(user.get('id')),
                 dictation_language_code=dictation_lang,
             )
+
+            try:
+                print(
+                    f"📨 [TELEGRAM][RECIPIENTS_AUTO] eligible_teachers={len(teachers) if teachers else 0}"
+                )
+            except Exception:
+                pass
+
             for t in teachers:
                 try:
                     recipients.append(
@@ -625,6 +658,11 @@ def teacher_report_recipients_auto():
                     )
                 except Exception:
                     continue
+    except Exception:
+        pass
+
+    try:
+        print(f"📨 [TELEGRAM][RECIPIENTS_AUTO] recipients_total={len(recipients)}")
     except Exception:
         pass
 
@@ -670,6 +708,14 @@ def teacher_report_send_auto():
     if not dictation_lang:
         return jsonify({'success': False, 'error': 'Не удалось определить язык диктанта'}), 400
 
+    try:
+        print(
+            f"📨 [TELEGRAM][SEND_AUTO] student_user_id={user.get('id')} dictation_id={dictation_int} "
+            f"dictation_lang={dictation_lang!r} teacher_user_ids={teacher_user_ids} send_to_self={send_to_self}"
+        )
+    except Exception:
+        pass
+
     # teachers: filter for this student + language + teacher telegram
     chat_ids = []
     try:
@@ -681,6 +727,11 @@ def teacher_report_send_auto():
     except Exception:
         chat_ids = []
 
+    try:
+        print(f"📨 [TELEGRAM][SEND_AUTO] filtered_teacher_chat_ids={chat_ids}")
+    except Exception:
+        pass
+
     # self chat
     self_chat_id = None
     try:
@@ -690,6 +741,10 @@ def teacher_report_send_auto():
         self_chat_id = None
 
     if not chat_ids and self_chat_id is None:
+        try:
+            print("📨 [TELEGRAM][SEND_AUTO] no recipients -> skip")
+        except Exception:
+            pass
         return jsonify({'success': True, 'sent': 0, 'recipients': 0})
 
     try:
@@ -759,7 +814,11 @@ def teacher_report_send_auto():
         try:
             send_telegram_message(int(self_chat_id), text)
             sent += 1
-        except Exception:
+        except Exception as e:
+            try:
+                print(f"📨 [TELEGRAM][SEND_AUTO] self send failed chat_id={self_chat_id}: {e}")
+            except Exception:
+                pass
             pass
 
     return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids) + (1 if self_chat_id is not None else 0)})

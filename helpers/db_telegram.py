@@ -187,12 +187,8 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
     - student is active in group_students
     - COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE (student agrees)
     - teacher is in group_teachers, teacher has telegram_chat_id and telegram_enabled
-    - teacher language filter: teacher.current_learning == dictation_language_code OR teacher learning_languages contains it
+    - teacher language preferences must not block student->teacher reports
     """
-    lang = (dictation_language_code or '').strip().lower()
-    if not lang:
-        return []
-
     conn, cur = get_db_cursor()
     try:
         cur.execute(
@@ -204,20 +200,15 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
             FROM group_students gs
             JOIN group_teachers gt ON gt.group_id = gs.group_id
             JOIN users u ON u.id = gt.teacher_user_id
-            LEFT JOIN user_learning_languages ull ON ull.user_id = u.id
             WHERE gs.student_user_id = %s
               AND gs.status = 'active'
               AND gs.removed_at IS NULL
               AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
               AND u.telegram_chat_id IS NOT NULL
               AND u.telegram_enabled = TRUE
-              AND (
-                LOWER(COALESCE(u.current_learning, '')) = %s
-                OR LOWER(COALESCE(ull.language_code, '')) = %s
-              )
             ORDER BY u.username ASC, u.id ASC
             """,
-            (int(student_user_id), lang, lang),
+            (int(student_user_id),),
         )
         rows = cur.fetchall() or []
         result: list[dict] = []
@@ -252,10 +243,6 @@ def filter_manual_teacher_chat_ids(
     if not isinstance(teacher_user_ids, list) or not teacher_user_ids:
         return []
 
-    lang = (dictation_language_code or '').strip().lower()
-    if not lang:
-        return []
-
     ids: list[int] = []
     for x in teacher_user_ids:
         try:
@@ -273,7 +260,6 @@ def filter_manual_teacher_chat_ids(
             FROM group_students gs
             JOIN group_teachers gt ON gt.group_id = gs.group_id
             JOIN users u ON u.id = gt.teacher_user_id
-            LEFT JOIN user_learning_languages ull ON ull.user_id = u.id
             WHERE gs.student_user_id = %s
               AND gs.status = 'active'
               AND gs.removed_at IS NULL
@@ -281,12 +267,8 @@ def filter_manual_teacher_chat_ids(
               AND gt.teacher_user_id = ANY(%s)
               AND u.telegram_chat_id IS NOT NULL
               AND u.telegram_enabled = TRUE
-              AND (
-                LOWER(COALESCE(u.current_learning, '')) = %s
-                OR LOWER(COALESCE(ull.language_code, '')) = %s
-              )
             """,
-            (int(student_user_id), ids, lang, lang),
+            (int(student_user_id), ids),
         )
         rows = cur.fetchall() or []
         chat_ids: list[int] = []

@@ -522,6 +522,113 @@
       "loading": "Loading…",
       "no_sentences": "No sentences",
       "load_sentences_failed": "Failed to load sentences"
+    },
+    "dictation_editor": {
+      "title": "Dictation editor",
+      "header": {
+        "streak_title": "Unburnable streak sum",
+        "save": "Save",
+        "back_to_list": "Back to dictations list",
+        "dictation_name": "Dictation name:"
+      },
+      "tabs": {
+        "general": "1. General",
+        "audio": "2. Audio",
+        "dialog": "3. Dialog",
+        "create_audio": "4. Create audio",
+        "translations": "5. Translations"
+      },
+      "general": {
+        "cover_upload": "Upload",
+        "level": "Level:",
+        "author_materials_url": "Author materials URL",
+        "url_placeholder": "https://..."
+      },
+      "audio": {
+        "mode_full": "Show full file",
+        "mode_sentence": "Current sentence",
+        "mode_mic": "Microphone recording",
+        "mode_auto": "Auto-fill",
+        "current_audio_none": "Audio for waveform: not selected",
+        "current_row_none": "Table row: not selected",
+        "select_file": "Select file",
+        "start": "Start:",
+        "end": "End:",
+        "cut_many_title": "Split audio into 1000 chunks",
+        "cut_many": "into 1000 chunks"
+      },
+      "dialog": {
+        "is_dialog": "This is a dialog",
+        "speakers": "Speakers",
+        "speaker_name": "Speaker name",
+        "remove_speaker": "Remove speaker",
+        "add_speaker": "Add speaker"
+      },
+      "table": {
+        "refill": "Refill table",
+        "delete_row": "Delete row",
+        "add_row": "Add row",
+        "toggle_explanation_title": "Show/hide explanation",
+        "explanation": "Explanation",
+        "prev_row": "Previous row",
+        "next_row": "Next row",
+        "original": "Original",
+        "translation": "Translation",
+        "apply": "Apply",
+        "edit_all_marked": "Edit all marked"
+      },
+      "start_modal": {
+        "title": "Create dictation",
+        "create": "Generate dictation",
+        "translation_delimiter": "Translation line prefix:",
+        "name": "Title:",
+        "name_placeholder": "Enter a title...",
+        "text": "Dictation text:",
+        "text_placeholder": "Enter dictation text..."
+      },
+      "create_audio_file": {
+        "title": "Create audio file",
+        "file_name": "File name:",
+        "file_name_placeholder": "audio_op.mp3",
+        "hint": "The file will be saved to the dictation temp folder"
+      },
+      "add_row": {
+        "title": "Add a new row",
+        "message_html": "Choose where to add a new row relative to row <span id=\"addRowCurrentNumber\">{n}</span>:"
+      },
+      "delete_row": {
+        "title": "Delete row",
+        "message_html": "Do you really want to delete row <span id=\"deleteRowNumber\">{n}</span>?",
+        "irreversible": "This action cannot be undone!",
+        "key": "Key:"
+      },
+      "mic": {
+        "title": "Microphone recording",
+        "text_for_record": "Text to record:",
+        "ready": "Ready to record",
+        "start": "Start recording",
+        "stop": "Stop",
+        "listen": "Listen",
+        "rerecord": "Re-record",
+        "duration": "Duration: --:--",
+        "save": "Save recording"
+      },
+      "exit": {
+        "title": "Back to desktop?",
+        "message": "What should we do with the current changes?",
+        "stay": "Stay",
+        "exit": "Exit"
+      },
+      "crop": {
+        "title": "Crop cover"
+      },
+      "common": {
+        "close": "Close",
+        "create": "Create",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "apply": "Apply"
+      }
     }
   }
 }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ ui_lang|default('en') }}" dir="{{ ui_dir|default('ltr') }}">
 
 <head>
     <meta charset="UTF-8">
@@ -24,6 +24,18 @@
     <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
     <script>
         if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
+    </script>
+    <script>
+        (function () {
+            try {
+                var l = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
+                if (l) {
+                    document.documentElement.lang = l;
+                    document.documentElement.dir = (l === 'ar') ? 'rtl' : 'ltr';
+                }
+            } catch (e) {
+            }
+        })();
     </script>
     <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
     <script>
@@ -73,7 +85,7 @@
             <div id="langPair" data-original="{{ original_language }}" data-translation="{{ translation_language }}">
                 <!-- Флаги будут добавлены через language_selector.js -->
             </div>
-            <h2 id="dictation-name">Назва диктанту:
+            <h2 id="dictation-name">Название диктанта:
                 <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span>
                 <span id="unsavedStarDb" class="unsaved-star" style="display: none;">*</span>
                 <span id="unsavedStarAudio" class="unsaved-star" style="display: none;">*</span>
@@ -766,6 +778,8 @@
 
     <!--------- СКРИПТЫ и ИНИЦИАЛИЗАЦИЯ ---------------------------------------->
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
 
     <!-- Добавляем скрипты LanguageManager и LanguageSelector -->
     <script src="{{ url_for('static', filename='js/audio_manager.js') }}?v={{ app_cache_revision }}"></script>

@@ -11,6 +11,381 @@ const endInput = document.getElementById('audioEndTime');
 
 const EDITOR_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
 
+function editorT(key, fallback, params) {
+    try {
+        if (window.I18n && typeof window.I18n.t === 'function') {
+            const v = window.I18n.t(key, params);
+            if (v && v !== key) return v;
+        }
+    } catch (e) {
+    }
+    return (fallback !== undefined && fallback !== null) ? String(fallback) : String(key || '');
+}
+
+function applyDictationEditorTranslations() {
+    try {
+        document.title = editorT('dictation_editor.title', 'Генератор диктантов');
+    } catch (e) {
+    }
+
+    try {
+        const streak = document.querySelector('.streak');
+        if (streak) streak.setAttribute('title', editorT('dictation_editor.header.streak_title', 'Несгораемая сумма дней'));
+    } catch (e) {
+    }
+
+    try {
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) saveBtn.setAttribute('title', editorT('dictation_editor.header.save', 'Сохранить'));
+    } catch (e) {
+    }
+
+    try {
+        const exitBtn = document.getElementById('exitToIndexBtn');
+        if (exitBtn) exitBtn.setAttribute('title', editorT('dictation_editor.header.back_to_list', 'Вернуться к списку диктантов'));
+    } catch (e) {
+    }
+
+    try {
+        const h = document.getElementById('dictation-name');
+        if (h && h.childNodes && h.childNodes.length) {
+            h.childNodes[0].textContent = editorT('dictation_editor.header.dictation_name', 'Название диктанта:');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const general = document.querySelector('.tabs-header [data-tab="general"] span');
+        const audio = document.querySelector('.tabs-header [data-tab="audio"] span');
+        const dialog = document.querySelector('.tabs-header [data-tab="dialog"] span');
+        const createAudio = document.querySelector('.tabs-header [data-tab="create-audio"] span');
+        const translations = document.querySelector('.tabs-header [data-tab="translations"] span');
+        if (general) general.textContent = editorT('dictation_editor.tabs.general', '1. Общие данные');
+        if (audio) audio.textContent = editorT('dictation_editor.tabs.audio', '2. Настройка аудио');
+        if (dialog) dialog.textContent = editorT('dictation_editor.tabs.dialog', '3. Диалог');
+        if (createAudio) createAudio.textContent = editorT('dictation_editor.tabs.create_audio', '4. Создание аудио');
+        if (translations) translations.textContent = editorT('dictation_editor.tabs.translations', '5. Переводы');
+    } catch (e) {
+    }
+
+    try {
+        const coverUpload = document.getElementById('coverUploadBtn');
+        if (coverUpload) {
+            const span = coverUpload.querySelector('span') || coverUpload.childNodes[coverUpload.childNodes.length - 1];
+            if (span && span.nodeType === Node.TEXT_NODE) {
+                span.textContent = ' ' + editorT('dictation_editor.general.cover_upload', 'Загрузить');
+            } else if (span) {
+                span.textContent = editorT('dictation_editor.general.cover_upload', 'Загрузить');
+            }
+        }
+    } catch (e) {
+    }
+
+    try {
+        const levelLabel = document.querySelector('label.level-label');
+        if (levelLabel) levelLabel.textContent = editorT('dictation_editor.general.level', 'Уровень:');
+    } catch (e) {
+    }
+
+    try {
+        const authorLabel = document.querySelector('label[for="dictation-author-materials-url-input"]');
+        if (authorLabel) authorLabel.textContent = editorT('dictation_editor.general.author_materials_url', 'Ссылка на материалы автора');
+        const authorInput = document.getElementById('dictation-author-materials-url-input');
+        if (authorInput) authorInput.setAttribute('placeholder', editorT('dictation_editor.general.url_placeholder', 'https://...'));
+    } catch (e) {
+    }
+
+    try {
+        const modeLabels = document.querySelectorAll('.audio-mode-controls .radio-label span');
+        if (modeLabels && modeLabels.length >= 4) {
+            modeLabels[0].textContent = editorT('dictation_editor.audio.mode_full', 'Отображать весь файл');
+            modeLabels[1].textContent = editorT('dictation_editor.audio.mode_sentence', 'Текущее предложение');
+            modeLabels[2].textContent = editorT('dictation_editor.audio.mode_mic', 'Запись с микрофона');
+            modeLabels[3].textContent = editorT('dictation_editor.audio.mode_auto', 'Автозаполнение');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const audioInfo = document.getElementById('currentAudioInfo');
+        if (audioInfo && (audioInfo.textContent || '').trim() === 'Аудио для волны: не выбрано') {
+            audioInfo.textContent = editorT('dictation_editor.audio.current_audio_none', 'Аудио для волны: не выбрано');
+        }
+        const sentenceInfo = document.getElementById('currentSentenceInfo');
+        if (sentenceInfo && (sentenceInfo.textContent || '').trim() === 'Строка таблицы: не выбрана') {
+            sentenceInfo.textContent = editorT('dictation_editor.audio.current_row_none', 'Строка таблицы: не выбрана');
+        }
+        const selectFileBtn = document.getElementById('selectFileBtn');
+        if (selectFileBtn) selectFileBtn.setAttribute('title', editorT('dictation_editor.audio.select_file', 'Выбрать файл'));
+    } catch (e) {
+    }
+
+    try {
+        const timeLabels = document.querySelectorAll('#timeControls label');
+        if (timeLabels && timeLabels.length >= 2) {
+            timeLabels[0].textContent = editorT('dictation_editor.audio.start', 'Start:');
+            timeLabels[1].textContent = editorT('dictation_editor.audio.end', 'End:');
+        }
+        const actionBtn = document.getElementById('audioTableActionBtn');
+        if (actionBtn) {
+            actionBtn.setAttribute('title', editorT('dictation_editor.audio.cut_many_title', 'Разрезать аудио на 1000 кусков'));
+            const span = actionBtn.querySelector('span');
+            if (span) span.textContent = editorT('dictation_editor.audio.cut_many', 'на 1000 кусков');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const tabDialogLabel = document.getElementById('tabDialogCheckboxLabel');
+        if (tabDialogLabel) {
+            const nodes = Array.from(tabDialogLabel.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.dialog.is_dialog', 'Это диалог');
+        }
+        const tabSpeakersTitle = document.querySelector('#tabSpeakersTable h3');
+        if (tabSpeakersTitle) tabSpeakersTitle.textContent = editorT('dictation_editor.dialog.speakers', 'Спикеры');
+        document.querySelectorAll('#tabSpeakersTable .speaker-name').forEach(inp => {
+            inp.setAttribute('placeholder', editorT('dictation_editor.dialog.speaker_name', 'Имя спикера'));
+        });
+        document.querySelectorAll('#tabSpeakersTable .remove-speaker').forEach(btn => {
+            btn.setAttribute('title', editorT('dictation_editor.dialog.remove_speaker', 'Удалить спикера'));
+        });
+        const addSpeaker = document.getElementById('tabAddSpeakerBtn');
+        if (addSpeaker) addSpeaker.setAttribute('title', editorT('dictation_editor.dialog.add_speaker', 'Добавить спикера'));
+    } catch (e) {
+    }
+
+    try {
+        const refill = document.getElementById('refillTableBtn');
+        if (refill) {
+            const label = refill.querySelector('span') || refill.childNodes[refill.childNodes.length - 1];
+            if (label && label.nodeType === Node.TEXT_NODE) {
+                label.textContent = ' ' + editorT('dictation_editor.table.refill', 'Перезаполнить таблицу');
+            } else if (label) {
+                label.textContent = editorT('dictation_editor.table.refill', 'Перезаполнить таблицу');
+            }
+        }
+        const delBtn = document.getElementById('deleteRowBtn');
+        if (delBtn) delBtn.setAttribute('title', editorT('dictation_editor.table.delete_row', 'Удалить строку'));
+        const addBtn = document.getElementById('addRowBtn');
+        if (addBtn) addBtn.setAttribute('title', editorT('dictation_editor.table.add_row', 'Добавить строку'));
+        const explBtn = document.getElementById('toggleExplanationBtn');
+        if (explBtn) {
+            explBtn.setAttribute('title', editorT('dictation_editor.table.toggle_explanation_title', 'Показать/скрыть пояснение'));
+            const nodes = Array.from(explBtn.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.table.explanation', 'Пояснение');
+        }
+        const prev = document.getElementById('prevRowBtn');
+        if (prev) prev.setAttribute('title', editorT('dictation_editor.table.prev_row', 'Предыдущая строка'));
+        const next = document.getElementById('nextRowBtn');
+        if (next) next.setAttribute('title', editorT('dictation_editor.table.next_row', 'Следующая строка'));
+    } catch (e) {
+    }
+
+    try {
+        const thOrig = document.querySelector('th.col-original');
+        if (thOrig) thOrig.textContent = editorT('dictation_editor.table.original', 'Оригинал');
+        const thTr = document.querySelector('th.col-translation');
+        if (thTr) thTr.textContent = editorT('dictation_editor.table.translation', 'Перевод');
+        const thExpl = document.querySelector('th.col-explanation');
+        if (thExpl) thExpl.textContent = editorT('dictation_editor.table.explanation', 'Пояснение');
+        const applyBtns = document.querySelectorAll('th[title="Применить"]');
+        applyBtns.forEach(x => x.setAttribute('title', editorT('dictation_editor.table.apply', 'Применить')));
+        const editAll = document.getElementById('editAllCreatingBtn');
+        if (editAll) editAll.setAttribute('title', editorT('dictation_editor.table.edit_all_marked', 'Отредактировать все отмеченные'));
+    } catch (e) {
+    }
+
+    try {
+        const startModalTitle = document.querySelector('#startModal .start-modal-header-center h2');
+        if (startModalTitle) startModalTitle.textContent = editorT('dictation_editor.start_modal.title', 'Создание диктанта');
+        const createDictBtn = document.getElementById('createDictationBtn');
+        if (createDictBtn) createDictBtn.textContent = editorT('dictation_editor.start_modal.create', 'Сформировать диктант');
+        const cancelStart = document.getElementById('cancelStartBtn');
+        if (cancelStart) cancelStart.setAttribute('title', editorT('dictation_editor.common.close', 'Закрыть'));
+        const dialogLbl = document.getElementById('dialogCheckboxLabel');
+        if (dialogLbl) {
+            const nodes = Array.from(dialogLbl.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.dialog.is_dialog', 'Это диалог');
+        }
+        const delimLabel = document.querySelector('label[for="translationDelimiter"]');
+        if (delimLabel) delimLabel.textContent = editorT('dictation_editor.start_modal.translation_delimiter', 'Символ начала строки перевода:');
+        const startTitleLabel = document.querySelector('label[for="startTitleInput"]');
+        if (startTitleLabel) startTitleLabel.textContent = editorT('dictation_editor.start_modal.name', 'Название:');
+        const startTitleInput = document.getElementById('startTitleInput');
+        if (startTitleInput) startTitleInput.setAttribute('placeholder', editorT('dictation_editor.start_modal.name_placeholder', 'Введите название...'));
+        const spTitle = document.querySelector('#speakersTable h3');
+        if (spTitle) spTitle.textContent = editorT('dictation_editor.dialog.speakers', 'Спикеры');
+        document.querySelectorAll('#speakersTable .speaker-name').forEach(inp => {
+            inp.setAttribute('placeholder', editorT('dictation_editor.dialog.speaker_name', 'Имя спикера'));
+        });
+        document.querySelectorAll('#speakersTable .remove-speaker').forEach(btn => {
+            btn.setAttribute('title', editorT('dictation_editor.dialog.remove_speaker', 'Удалить спикера'));
+        });
+        const addSp = document.getElementById('addSpeakerBtn');
+        if (addSp) addSp.setAttribute('title', editorT('dictation_editor.dialog.add_speaker', 'Добавить спикера'));
+        const startTextLabel = document.querySelector('#startModal .form-group > label:not([for])');
+        if (startTextLabel) startTextLabel.textContent = editorT('dictation_editor.start_modal.text', 'Текст диктанта:');
+        const startText = document.getElementById('startTextInput');
+        if (startText) startText.setAttribute('placeholder', editorT('dictation_editor.start_modal.text_placeholder', 'Введите текст диктанта...'));
+    } catch (e) {
+    }
+
+    try {
+        const createAudioTitle = document.querySelector('#createAudioFileModal h2');
+        if (createAudioTitle) createAudioTitle.textContent = editorT('dictation_editor.create_audio_file.title', 'Создать аудио файл');
+        const newAudioLabel = document.querySelector('label[for="newAudioFileName"]');
+        if (newAudioLabel) newAudioLabel.textContent = editorT('dictation_editor.create_audio_file.file_name', 'Имя файла:');
+        const newAudioInput = document.getElementById('newAudioFileName');
+        if (newAudioInput) newAudioInput.setAttribute('placeholder', editorT('dictation_editor.create_audio_file.file_name_placeholder', 'audio_op.mp3'));
+        const hint = document.querySelector('#createAudioFileModal small');
+        if (hint) hint.textContent = editorT('dictation_editor.create_audio_file.hint', 'Файл будет сохранен в temp папке диктанта');
+        const confirmBtn = document.getElementById('createAudioFileModalConfirm');
+        if (confirmBtn) {
+            const nodes = Array.from(confirmBtn.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.common.create', 'Создать');
+        }
+        const cancelBtn = document.getElementById('createAudioFileModalCancel');
+        if (cancelBtn) cancelBtn.textContent = editorT('dictation_editor.common.cancel', 'Отмена');
+    } catch (e) {
+    }
+
+    try {
+        const addRowTitle = document.querySelector('#addRowModal .modal-header h3');
+        if (addRowTitle) addRowTitle.textContent = editorT('dictation_editor.add_row.title', 'Добавить новую строку');
+        const addRowP = document.querySelector('#addRowModal .modal-body p');
+        if (addRowP) {
+            const cur = document.getElementById('addRowCurrentNumber');
+            const n = cur ? cur.textContent : '';
+            addRowP.innerHTML = editorT('dictation_editor.add_row.message_html', 'Выберите, где добавить новую строку относительно строки <span id="addRowCurrentNumber">{n}</span>:', { n });
+        }
+        const addRowCancel = document.querySelector('#addRowModal .modal-footer .transparent');
+        if (addRowCancel) {
+            const nodes = Array.from(addRowCancel.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.common.cancel', 'Отмена');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const delRowTitle = document.querySelector('#deleteRowModal .modal-header h3');
+        if (delRowTitle) delRowTitle.textContent = editorT('dictation_editor.delete_row.title', 'Удалить строку');
+        const delPs = document.querySelectorAll('#deleteRowModal .modal-body p');
+        if (delPs && delPs.length >= 3) {
+            const n = (document.getElementById('deleteRowNumber') || {}).textContent || '';
+            delPs[0].innerHTML = editorT('dictation_editor.delete_row.message_html', 'Вы действительно хотите удалить строку <span id="deleteRowNumber">{n}</span>?', { n });
+            delPs[2].textContent = editorT('dictation_editor.delete_row.irreversible', 'Это действие нельзя отменить!');
+        }
+        const delCancel = document.querySelector('#deleteRowModal .modal-footer .modal-btn-secondary');
+        if (delCancel) {
+            const nodes = Array.from(delCancel.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.common.cancel', 'Отмена');
+        }
+        const delConfirm = document.querySelector('#deleteRowModal .modal-footer .modal-btn-danger');
+        if (delConfirm) {
+            const nodes = Array.from(delConfirm.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.common.delete', 'Удалить');
+        }
+        const keyLabel = document.querySelector('#deleteRowModal .modal-body .modal-warning');
+        if (keyLabel && (keyLabel.textContent || '').trim().startsWith('Ключ:')) {
+            keyLabel.childNodes[0].textContent = editorT('dictation_editor.delete_row.key', 'Ключ:');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const micTitle = document.querySelector('#micRecordModal .modal-header h3');
+        if (micTitle) micTitle.textContent = editorT('dictation_editor.mic.title', 'Запись с микрофона');
+        const micTextLabel = document.querySelector('#micRecordModal .sentence-text-display label');
+        if (micTextLabel) micTextLabel.textContent = editorT('dictation_editor.mic.text_for_record', 'Текст для записи:');
+        const status = document.getElementById('recordingStatusText');
+        if (status && (status.textContent || '').trim() === 'Готов к записи') {
+            status.textContent = editorT('dictation_editor.mic.ready', 'Готов к записи');
+        }
+        const startRec = document.getElementById('startRecordBtn');
+        if (startRec) {
+            const nodes = Array.from(startRec.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.mic.start', 'Начать запись');
+        }
+        const stopRec = document.getElementById('stopRecordBtn');
+        if (stopRec) {
+            const nodes = Array.from(stopRec.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.mic.stop', 'Остановить');
+        }
+        const playRec = document.getElementById('playRecordBtn');
+        if (playRec) {
+            const nodes = Array.from(playRec.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.mic.listen', 'Прослушать');
+        }
+        const rerecord = document.getElementById('rerecordBtn');
+        if (rerecord) {
+            const nodes = Array.from(rerecord.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.mic.rerecord', 'Перезаписать');
+        }
+        const dur = document.getElementById('playbackDuration');
+        if (dur && (dur.textContent || '').trim().startsWith('Длительность:')) {
+            dur.textContent = editorT('dictation_editor.mic.duration', 'Длительность: --:--');
+        }
+        const micCancel = document.querySelector('#micRecordModal .modal-footer .transparent');
+        if (micCancel) {
+            const nodes = Array.from(micCancel.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.common.cancel', 'Отмена');
+        }
+        const saveRec = document.getElementById('saveRecordBtn');
+        if (saveRec) {
+            const nodes = Array.from(saveRec.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.mic.save', 'Сохранить запись');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const exitTitle = document.querySelector('#exitModal h2');
+        if (exitTitle) exitTitle.textContent = editorT('dictation_editor.exit.title', 'Вернуться на рабочий стол?');
+        const exitMsg = document.getElementById('exitModalMessage');
+        if (exitMsg && (exitMsg.textContent || '').trim() === 'Что сделать с текущими изменениями?') {
+            exitMsg.textContent = editorT('dictation_editor.exit.message', 'Что сделать с текущими изменениями?');
+        }
+        const stay = document.getElementById('exitStayBtn');
+        if (stay) stay.textContent = editorT('dictation_editor.exit.stay', 'Остаться');
+        const without = document.getElementById('exitWithoutSavingBtn');
+        if (without) {
+            const nodes = Array.from(without.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.exit.exit', 'Выйти');
+        }
+        const withSave = document.getElementById('exitWithSavingBtn');
+        if (withSave) {
+            const nodes = Array.from(withSave.childNodes || []);
+            const textNode = nodes.find(n => n.nodeType === Node.TEXT_NODE && (n.textContent || '').trim());
+            if (textNode) textNode.textContent = ' ' + editorT('dictation_editor.exit.exit', 'Выйти');
+        }
+    } catch (e) {
+    }
+
+    try {
+        const cropTitle = document.querySelector('#crop-modal .modal-header h3');
+        if (cropTitle) cropTitle.textContent = editorT('dictation_editor.crop.title', 'Обрезка обложки');
+        const cropClose = document.getElementById('crop-close');
+        if (cropClose) cropClose.setAttribute('title', editorT('dictation_editor.common.close', 'Закрыть'));
+        const cropConfirm = document.getElementById('crop-confirm');
+        if (cropConfirm) cropConfirm.textContent = editorT('dictation_editor.common.apply', 'Применить');
+    } catch (e) {
+    }
+}
+
 function ensureSwStatusBar() {
     try {
         const id = 'swStatusBar';
@@ -2654,6 +3029,18 @@ async function loadExistingDictation(initData) {
 async function initDictationGenerator() {
     // const path = window.location.pathname;
 
+
+    try {
+        if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+            await window.I18n.ensureLoaded();
+        }
+    } catch (e) {
+    }
+
+    try {
+        applyDictationEditorTranslations();
+    } catch (e) {
+    }
 
     // 1. Получаем JSON как строку
     const initRaw = document.getElementById("init-data")?.textContent;
