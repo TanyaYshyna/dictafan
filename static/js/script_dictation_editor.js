@@ -14,7 +14,15 @@ const EDITOR_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
 function editorT(key, fallback, params) {
     try {
         if (window.I18n && typeof window.I18n.t === 'function') {
-            const v = window.I18n.t(key, params);
+            let v = null;
+            try {
+                if (key && typeof key === 'string' && !key.startsWith('ui.')) {
+                    v = window.I18n.t(`ui.${key}`, params);
+                    if (v && v !== `ui.${key}`) return v;
+                }
+            } catch (e) {
+            }
+            v = window.I18n.t(key, params);
             if (v && v !== key) return v;
         }
     } catch (e) {
