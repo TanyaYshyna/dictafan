@@ -143,7 +143,8 @@ function normalizeCacheKey(requestOrUrl) {
     if (path.startsWith('/static/')) {
       const isJs = path.endsWith('.js');
       const isCss = path.endsWith('.css');
-      if (isJs || isCss) {
+      const isI18nJson = path.startsWith('/static/i18n/') && path.endsWith('.json');
+      if (isJs || isCss || isI18nJson) {
         return `${url.origin}${path}${url.search}`;
       }
       // Остальные static-ассеты могут игнорировать query-параметры.
@@ -220,7 +221,17 @@ function shouldIgnoreSearchFallbackForRequest(request) {
   try {
     const url = new URL(request.url);
     const path = url.pathname;
-    return path === '/' || path.startsWith('/dictation/') || path.startsWith('/static/');
+    if (path === '/' || path.startsWith('/dictation/')) return true;
+
+    // Never ignore search for versioned assets.
+    if (path.startsWith('/static/')) {
+      const isJs = path.endsWith('.js');
+      const isCss = path.endsWith('.css');
+      const isI18nJson = path.startsWith('/static/i18n/') && path.endsWith('.json');
+      if (isJs || isCss || isI18nJson) return false;
+      return true;
+    }
+    return false;
   } catch (e) {
     return false;
   }
