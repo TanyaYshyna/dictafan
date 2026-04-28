@@ -3090,6 +3090,25 @@ async function initDictationGenerator() {
     }
 
     try {
+        if (window.I18n && typeof window.I18n.t === 'function') {
+            const probeKey = 'ui.dictation_editor.tabs.general';
+            const probeVal = window.I18n.t(probeKey);
+            const looksMissing = !probeVal || probeVal === probeKey;
+            console.log('🌐 [dictation_editor] i18n probe', { probeKey, probeVal, looksMissing });
+            if (looksMissing && typeof window.I18n.setLanguage === 'function' && typeof window.I18n.getLang === 'function') {
+                try {
+                    const l = window.I18n.getLang();
+                    await window.I18n.setLanguage(l);
+                    const probeVal2 = window.I18n.t(probeKey);
+                    console.log('🌐 [dictation_editor] i18n probe after reload', { lang: l, probeVal2 });
+                } catch (e2) {
+                }
+            }
+        }
+    } catch (e) {
+    }
+
+    try {
         console.log('🌐 [dictation_editor] initDictationGenerator: after ensureLoaded', {
             i18n_lang_after: (window.I18n && typeof window.I18n.getLang === 'function') ? window.I18n.getLang() : null,
             has_i18n_dict: (window.I18n && window.I18n.dict && typeof window.I18n.dict === 'object') ? Object.keys(window.I18n.dict).length : null,
