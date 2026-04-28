@@ -1545,6 +1545,38 @@ async function updateDictationSentencesIndexedDbCache(dictationId) {
     }
 }
 
+async function updateDeskItemsIndexedDbCache(dictationDbId, meta) {
+    try {
+        const dbId = Number(dictationDbId);
+        if (!Number.isFinite(dbId) || dbId <= 0) return false;
+
+        const cached = await idbGet('desk_items', 'latest');
+        const items = cached && Array.isArray(cached.items) ? cached.items : [];
+        if (!items.length) return false;
+
+        const nextItems = items.map((it) => {
+            try {
+                if (!it || typeof it !== 'object') return it;
+                const did = Number(it.dictation_id);
+                if (!Number.isFinite(did) || did !== dbId) return it;
+
+                const out = { ...it };
+                if (meta && typeof meta.title === 'string') out.title = meta.title;
+                if (meta && typeof meta.level === 'string') out.level = meta.level;
+                if (meta && Number.isFinite(Number(meta.sentences_count))) out.sentences_count = Number(meta.sentences_count);
+                return out;
+            } catch (e) {
+                return it;
+            }
+        });
+
+        await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: nextItems });
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function getDirtyFlags() {
     try {
         return window.__DICTATION_EDITOR_DIRTY || { db: false, audio: false, cover: false };
@@ -10244,6 +10276,24 @@ async function saveDictationOnly() {
 
             try {
                 await updateDictationSentencesIndexedDbCache(currentDictation.id);
+            } catch (e) {
+            }
+
+            try {
+                const deskDbId = (result && result.db_id) ? Number(result.db_id) : (currentDictation && currentDictation.db_id ? Number(currentDictation.db_id) : null);
+                const sentencesCount = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+                    ? workingData.original.sentences.length
+                    : null;
+                const titleForDesk = (workingData && workingData.original && typeof workingData.original.title === 'string')
+                    ? workingData.original.title
+                    : (currentDictation && currentDictation.title ? String(currentDictation.title) : '');
+                if (deskDbId && isFinite(deskDbId)) {
+                    await updateDeskItemsIndexedDbCache(deskDbId, {
+                        title: titleForDesk,
+                        level: currentDictation.level || 'A1',
+                        sentences_count: sentencesCount
+                    });
+                }
             } catch (e) {
             }
 

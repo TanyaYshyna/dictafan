@@ -28,6 +28,47 @@
     <script>
         (function () {
             try {
+                var supported = ['en', 'uk', 'ru', 'ar'];
+                var storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
+                var stored = supported.includes(storedRaw) ? storedRaw : '';
+                var ssrLang = "{{ ui_lang|default('en') }}".toString().trim().toLowerCase();
+
+                if (!stored || stored === ssrLang) {
+                    return;
+                }
+
+                var key = 'ui_lang_cookie_sync_done';
+                try {
+                    if (sessionStorage.getItem(key) === stored) {
+                        return;
+                    }
+                } catch (e) {
+                }
+
+                fetch('/user/api/ui-lang', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ lang: stored })
+                }).then(function (res) {
+                    if (!res || !res.ok) return;
+                    try {
+                        sessionStorage.setItem(key, stored);
+                    } catch (e) {
+                    }
+                    try {
+                        location.reload();
+                    } catch (e) {
+                    }
+                }).catch(function () {
+                });
+            } catch (e) {
+            }
+        })();
+    </script>
+    <script>
+        (function () {
+            try {
                 var l = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
                 if (l) {
                     document.documentElement.lang = l;

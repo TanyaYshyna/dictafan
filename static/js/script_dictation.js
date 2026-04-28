@@ -2969,6 +2969,23 @@ let isAudioLoaded = false;
 const startModal = document.getElementById('start-modal');
 const confirmStartBtn = document.getElementById('confirmStartBtn');
 
+try {
+    if (startModal && !startModal.dataset.backdropNoCloseBound) {
+        startModal.dataset.backdropNoCloseBound = '1';
+        startModal.addEventListener('click', (e) => {
+            try {
+                if (e && e.target === startModal) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return;
+                }
+            } catch (err) {
+            }
+        }, true);
+    }
+} catch (e) {
+}
+
 function updateStartModalProgressUi() {
     try {
         if (!confirmStartBtn) return;
@@ -4622,16 +4639,6 @@ function pauseGame(isInactivityPause = false) {
     // Показываем модальное окно паузы
     pauseModal.style.display = 'flex';
     resumeBtn.focus();
-
-    // Закрытие по клику вне контента
-    if (!pauseModalClickHandler) {
-        pauseModalClickHandler = (event) => {
-            if (event.target === pauseModal) {
-                resumeGame();
-            }
-        };
-    }
-    pauseModal.addEventListener('click', pauseModalClickHandler);
 
     // Закрытие по клавише Escape
     if (!pauseModalEscHandler) {

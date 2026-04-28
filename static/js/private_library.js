@@ -287,6 +287,72 @@ function setBookEditDirty(nextDirty) {
   }
 }
 
+async function refreshDeskCardMetaFromServer(dictationId) {
+  try {
+    const raw = String(dictationId || '').trim();
+    const numericId = parseInt(raw.replace(/^dict_/, ''), 10);
+    if (!Number.isFinite(numericId)) return false;
+
+    const data = await apiRequest('/desk/api/items');
+    if (!data || !data.success || !Array.isArray(data.items)) return false;
+
+    const fresh = data.items.find(it => {
+      try {
+        return Number(it && it.dictation_id) === numericId;
+      } catch (e) {
+        return false;
+      }
+    });
+    if (!fresh) return false;
+
+    try {
+      const cached = await idbGet('desk_items', 'latest');
+      const items = cached && Array.isArray(cached.items) ? cached.items : [];
+      if (items.length) {
+        const nextItems = items.map(it => {
+          try {
+            if (!it || typeof it !== 'object') return it;
+            if (Number(it.dictation_id) !== numericId) return it;
+            return { ...it, ...fresh };
+          } catch (e) {
+            return it;
+          }
+        });
+        await idbPut('desk_items', { key: 'latest', updatedAt: Date.now(), items: nextItems });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const container = document.getElementById('deskCardsContainer') || document.getElementById('deskContainer') || document;
+      const card = container && container.querySelector ? container.querySelector(`.desk-card[data-dictation-id="${numericId}"]`) : null;
+      if (card) {
+        try {
+          const titleEl = card.querySelector('.short-title');
+          if (titleEl && fresh.title != null) titleEl.textContent = String(fresh.title || '');
+        } catch (e) {
+        }
+        try {
+          const levelEl = card.querySelector('.short-level');
+          if (levelEl && fresh.level != null) levelEl.textContent = String(fresh.level || '—');
+        } catch (e) {
+        }
+        try {
+          const countEl = card.querySelector('.short-sentences-count span');
+          const v = (fresh && fresh.sentences_count != null) ? Number(fresh.sentences_count) : null;
+          if (countEl && Number.isFinite(v)) countEl.textContent = String(v);
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function _nowTs() {
   try {
     return (typeof performance !== 'undefined' && performance && typeof performance.now === 'function')
@@ -7310,6 +7376,11 @@ function installEventHandlers() {
           translationLanguages,
           coverUrl,
         });
+
+        try {
+          await refreshDeskCardMetaFromServer(dictationId);
+        } catch (e2) {
+        }
       } catch (e) {
         const msg = e && e.message ? e.message : String(e);
         try {
