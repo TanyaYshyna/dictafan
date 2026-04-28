@@ -42,7 +42,7 @@
     async function loadDict(lang) {
         const l = (lang || '').trim().toLowerCase() || DEFAULT_LANG;
         const suffix = getCacheBustingSuffix();
-        const res = await fetch(`/static/i18n/${encodeURIComponent(l)}.json${suffix}`, { cache: 'force-cache' });
+        const res = await fetch(`/static/i18n/${encodeURIComponent(l)}.json${suffix}`);
         if (!res.ok) throw new Error('i18n_load_failed');
         const data = await res.json();
         return (data && typeof data === 'object') ? data : {};
