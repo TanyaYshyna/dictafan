@@ -3071,6 +3071,18 @@ async function initDictationGenerator() {
 
 
     try {
+        console.log('🌐 [dictation_editor] initDictationGenerator: pre-i18n', {
+            ls_ui_lang: (() => { try { return localStorage.getItem('ui_lang'); } catch (e) { return null; } })(),
+            html_lang: document && document.documentElement ? document.documentElement.lang : null,
+            html_dir: document && document.documentElement ? document.documentElement.dir : null,
+            i18n_lang_before: (window.I18n && typeof window.I18n.getLang === 'function') ? window.I18n.getLang() : null,
+            has_i18n: !!window.I18n,
+        });
+    } catch (e) {
+    }
+
+
+    try {
         if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
             await window.I18n.ensureLoaded();
         }
@@ -3078,7 +3090,23 @@ async function initDictationGenerator() {
     }
 
     try {
+        console.log('🌐 [dictation_editor] initDictationGenerator: after ensureLoaded', {
+            i18n_lang_after: (window.I18n && typeof window.I18n.getLang === 'function') ? window.I18n.getLang() : null,
+            has_i18n_dict: (window.I18n && window.I18n.dict && typeof window.I18n.dict === 'object') ? Object.keys(window.I18n.dict).length : null,
+        });
+    } catch (e) {
+    }
+
+    try {
         applyDictationEditorTranslations();
+    } catch (e) {
+    }
+
+    try {
+        console.log('🌐 [dictation_editor] initDictationGenerator: after apply translations', {
+            doc_title: document ? document.title : null,
+            sample_t: (window.I18n && typeof window.I18n.t === 'function') ? window.I18n.t('ui.dictation_editor.title') : null,
+        });
     } catch (e) {
     }
 

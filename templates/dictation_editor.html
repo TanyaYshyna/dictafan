@@ -28,12 +28,27 @@
     <script>
         (function () {
             try {
+                try {
+                    console.log('🌐 [dictation_editor] lang bootstrap (before cookie sync)', {
+                        ssr_ui_lang: "{{ ui_lang|default('en') }}",
+                        ssr_ui_dir: "{{ ui_dir|default('ltr') }}",
+                        html_lang_initial: document && document.documentElement ? document.documentElement.lang : null,
+                        html_dir_initial: document && document.documentElement ? document.documentElement.dir : null,
+                        ls_ui_lang: (localStorage.getItem('ui_lang') || null),
+                    });
+                } catch (e) {
+                }
+
                 var supported = ['en', 'uk', 'ru', 'ar'];
                 var storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
                 var stored = supported.includes(storedRaw) ? storedRaw : '';
                 var ssrLang = "{{ ui_lang|default('en') }}".toString().trim().toLowerCase();
 
                 if (!stored || stored === ssrLang) {
+                    try {
+                        console.log('🌐 [dictation_editor] cookie sync skipped', { stored: stored || null, ssrLang: ssrLang || null });
+                    } catch (e) {
+                    }
                     return;
                 }
 
@@ -57,6 +72,10 @@
                     } catch (e) {
                     }
                     try {
+                        console.log('🌐 [dictation_editor] cookie sync ok -> reload', { stored: stored });
+                    } catch (e) {
+                    }
+                    try {
                         location.reload();
                     } catch (e) {
                     }
@@ -73,6 +92,14 @@
                 if (l) {
                     document.documentElement.lang = l;
                     document.documentElement.dir = (l === 'ar') ? 'rtl' : 'ltr';
+                }
+                try {
+                    console.log('🌐 [dictation_editor] html lang normalized from localStorage', {
+                        html_lang_after: document && document.documentElement ? document.documentElement.lang : null,
+                        html_dir_after: document && document.documentElement ? document.documentElement.dir : null,
+                        applied: l || null,
+                    });
+                } catch (e) {
                 }
             } catch (e) {
             }
