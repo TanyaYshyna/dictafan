@@ -522,8 +522,9 @@
       "loading": "Завантаження…",
       "no_sentences": "Немає речень",
       "load_sentences_failed": "Не вдалося завантажити речення"
-    },
-    "dictation_editor": {
+    }
+  },
+  "dictation_editor": {
       "title": "Редактор диктантів",
       "header": {
         "streak_title": "Незгораюча сума днів",
@@ -630,5 +631,5 @@
         "apply": "Застосувати"
       }
     }
-  }
+  
 }

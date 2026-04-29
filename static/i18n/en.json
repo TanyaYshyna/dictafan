@@ -522,7 +522,8 @@
       "loading": "Loading…",
       "no_sentences": "No sentences",
       "load_sentences_failed": "Failed to load sentences"
-    },
+    }
+  },
     "dictation_editor": {
       "title": "Dictation editor",
       "header": {
@@ -629,6 +630,5 @@
         "delete": "Delete",
         "apply": "Apply"
       }
-    }
   }
 }

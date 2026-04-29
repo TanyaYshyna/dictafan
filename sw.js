@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const RUNTIME_CACHE_BOUNDED = `dictafan-runtime-bounded-${CACHE_VERSION}`;
 const RUNTIME_CACHE_UNBOUNDED = `dictafan-runtime-unbounded-${CACHE_VERSION}`;
 
@@ -458,6 +458,20 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      for (const k of keys || []) {
+        try {
+          const isRuntime = (k || '').startsWith('dictafan-runtime-');
+          if (!isRuntime) continue;
+          if (k === RUNTIME_CACHE_BOUNDED || k === RUNTIME_CACHE_UNBOUNDED) continue;
+          await caches.delete(k);
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+
     // ВАЖНО: не удаляем старые runtime-кеши автоматически.
     // Иначе после деплоя новый SW может удалить app shell (HTML/JS/CSS), и приложение перестанет
     // открываться офлайн до следующего успешного онлайн-прогрева.
@@ -532,6 +546,51 @@ self.addEventListener('fetch', (event) => {
           }
 
           if (netRes) return netRes;
+        } catch (e) {
+        }
+
+        return new Response('Offline', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+      })().finally(() => {
+        swTimeEnd(label);
+      }));
+      return;
+    }
+  } catch (e) {
+  }
+
+  // i18n словари: строго network-first по точному URL (с ?v=), без ignoreSearch fallback.
+  // Иначе можно получить устаревший словарь (без новых ключей) даже после смены build.
+  try {
+    const url = new URL(request.url);
+    if (url.pathname && url.pathname.startsWith('/static/i18n/') && url.pathname.endsWith('.json')) {
+      const label = `sw#${reqId} i18n ${reqPath}`;
+      swTimeStart(label);
+      event.respondWith((async () => {
+        try {
+          const cache = await caches.open(RUNTIME_CACHE_BOUNDED);
+          const cacheKey = normalizeCacheKey(request);
+
+          try {
+            const netRes = await fetch(request);
+            if (netRes && netRes.ok) {
+              try {
+                await cache.put(cacheKey, netRes.clone());
+              } catch (e) {
+              }
+              return netRes;
+            }
+            if (netRes) return netRes;
+          } catch (e) {
+          }
+
+          try {
+            const cached = await cache.match(cacheKey);
+            if (cached) return cached;
+          } catch (e) {
+          }
         } catch (e) {
         }
 

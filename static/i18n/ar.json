@@ -521,7 +521,8 @@
       "loading": "جارٍ التحميل…",
       "no_sentences": "لا توجد جمل",
       "load_sentences_failed": "تعذر تحميل الجمل"
-    },
+    }
+  },
     "dictation_editor": {
       "title": "محرر الإملاء",
       "header": {
@@ -628,6 +629,5 @@
         "delete": "حذف",
         "apply": "تطبيق"
       }
-    }
   }
 }
