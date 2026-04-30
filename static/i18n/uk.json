@@ -630,6 +630,75 @@
         "delete": "Видалити",
         "apply": "Застосувати"
       }
+    },
+  "login_modal": {
+    "titles": {
+      "login_required": "Потрібна авторизація",
+      "register": "Реєстрація",
+      "forgot": "Відновлення пароля",
+      "reset": "Новий пароль"
+    },
+    "messages": {
+      "login_required": "Щоб користуватися застосунком, потрібно увійти",
+      "login_required_alert": "Щоб користуватися застосунком, потрібно увійти",
+      "register": "Створіть доступ до диктантів і особистого кабінету",
+      "forgot": "Введи пошту — ми надішлемо посилання для скидання пароля на пошту або в Telegram",
+      "reset": "Встав код і задай новий пароль",
+      "reset_sent_email": "Якщо акаунт існує — посилання для скидання пароля надіслано на пошту.",
+      "reset_sent_telegram": "Якщо акаунт існує і Telegram прив’язаний — посилання для скидання пароля надіслано в Telegram.",
+      "password_updated": "Пароль оновлено. Тепер можна увійти."
+    },
+    "fields": {
+      "username": "Ім’я користувача",
+      "email": "Пошта",
+      "password": "Пароль",
+      "code": "Код",
+      "new_password": "Новий пароль"
+    },
+    "placeholders": {
+      "username": "Як вас називати?",
+      "password": "Ваш пароль",
+      "password_min": "Мінімум 6 символів",
+      "code": "встав код із посилання"
+    },
+    "actions": {
+      "login": "Увійти",
+      "register": "Зареєструватися",
+      "forgot": "Забув пароль?",
+      "switch_to_register": "Зареєструватися",
+      "switch_to_login": "Увійти",
+      "send": "Надіслати",
+      "send_telegram": "Надіслати в Telegram",
+      "back_to_login": "Назад до входу",
+      "save": "Зберегти",
+      "show_password": "Показати пароль",
+      "hide_password": "Сховати пароль"
+    },
+    "hints": {
+      "no_account_prefix": "Немає акаунта?",
+      "already_registered_prefix": "Вже зареєстровані?"
+    },
+    "language_selector": {
+      "native": "Рідна мова",
+      "learning": "Вивчаю"
+    },
+    "errors": {
+      "enter_email": "Введи пошту",
+      "fill_all_fields": "Заповни всі поля",
+      "fill_all_fields_formal": "Будь ласка, заповніть усі поля",
+      "password_min_len": "Пароль має містити щонайменше 6 символів",
+      "native_learning_must_differ": "Рідна та мова, яку вивчаєте, мають відрізнятися",
+      "login_failed": "Помилка входу",
+      "login_network": "Сталася помилка під час входу. Спробуйте ще раз.",
+      "register_failed": "Помилка реєстрації",
+      "register_network": "Сталася помилка під час реєстрації. Спробуйте ще раз.",
+      "generic": "Помилка"
+    },
+    "states": {
+      "sending": "Надсилаємо...",
+      "saving": "Зберігаємо...",
+      "logging_in": "Вхід...",
+      "creating_account": "Створюємо акаунт..."
     }
-  
+  }
 }

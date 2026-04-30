@@ -630,5 +630,75 @@
         "delete": "Удалить",
         "apply": "Применить"
       }
+  },
+  "login_modal": {
+    "titles": {
+      "login_required": "Требуется авторизация",
+      "register": "Регистрация",
+      "forgot": "Восстановление пароля",
+      "reset": "Новый пароль"
+    },
+    "messages": {
+      "login_required": "Для работы с приложением необходимо войти в систему",
+      "login_required_alert": "Для работы с приложением необходимо войти в систему",
+      "register": "Создайте доступ к диктантам и личному кабинету",
+      "forgot": "Введи почту — мы отправим ссылку для сброса пароля на почту или в Telegram",
+      "reset": "Вставь код и задай новый пароль",
+      "reset_sent_email": "Если аккаунт существует — ссылка для сброса пароля отправлена на почту.",
+      "reset_sent_telegram": "Если аккаунт существует и Telegram привязан — ссылка для сброса пароля отправлена в Telegram.",
+      "password_updated": "Пароль обновлён. Теперь можно войти."
+    },
+    "fields": {
+      "username": "Имя пользователя",
+      "email": "Почта",
+      "password": "Пароль",
+      "code": "Код",
+      "new_password": "Новый пароль"
+    },
+    "placeholders": {
+      "username": "Как вас называть?",
+      "password": "Ваш пароль",
+      "password_min": "Минимум 6 символов",
+      "code": "вставь код из ссылки"
+    },
+    "actions": {
+      "login": "Войти",
+      "register": "Зарегистрироваться",
+      "forgot": "Забыл пароль?",
+      "switch_to_register": "Зарегистрироваться",
+      "switch_to_login": "Войти",
+      "send": "Отправить",
+      "send_telegram": "Отправить в Telegram",
+      "back_to_login": "Назад ко входу",
+      "save": "Сохранить",
+      "show_password": "Показать пароль",
+      "hide_password": "Скрыть пароль"
+    },
+    "hints": {
+      "no_account_prefix": "Нет аккаунта?",
+      "already_registered_prefix": "Уже зарегистрированы?"
+    },
+    "language_selector": {
+      "native": "Родной язык",
+      "learning": "Изучаю"
+    },
+    "errors": {
+      "enter_email": "Введи почту",
+      "fill_all_fields": "Заполни все поля",
+      "fill_all_fields_formal": "Пожалуйста, заполните все поля",
+      "password_min_len": "Пароль должен содержать не менее 6 символов",
+      "native_learning_must_differ": "Родной и изучаемый языки должны различаться",
+      "login_failed": "Ошибка входа",
+      "login_network": "Произошла ошибка при входе. Попробуйте еще раз.",
+      "register_failed": "Ошибка регистрации",
+      "register_network": "Произошла ошибка при регистрации. Попробуйте еще раз.",
+      "generic": "Ошибка"
+    },
+    "states": {
+      "sending": "Отправляем...",
+      "saving": "Сохраняем...",
+      "logging_in": "Вход...",
+      "creating_account": "Создаём аккаунт..."
+    }
   }
 }

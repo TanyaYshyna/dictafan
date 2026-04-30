@@ -630,5 +630,75 @@
         "delete": "Delete",
         "apply": "Apply"
       }
+  },
+  "login_modal": {
+      "titles": {
+        "login_required": "Authorization required",
+        "register": "Sign up",
+        "forgot": "Password recovery",
+        "reset": "New password"
+      },
+      "messages": {
+        "login_required": "To use the app, you need to sign in",
+        "login_required_alert": "To use the app, you need to sign in",
+        "register": "Create access to dictations and your personal account",
+        "forgot": "Enter your email — we will send a password reset link by email or Telegram",
+        "reset": "Paste the code and set a new password",
+        "reset_sent_email": "If the account exists — a password reset link has been sent to your email.",
+        "reset_sent_telegram": "If the account exists and Telegram is linked — a password reset link has been sent to Telegram.",
+        "password_updated": "Password updated. You can sign in now."
+      },
+      "fields": {
+        "username": "Username",
+        "email": "Email",
+        "password": "Password",
+        "code": "Code",
+        "new_password": "New password"
+      },
+      "placeholders": {
+        "username": "How should we call you?",
+        "password": "Your password",
+        "password_min": "At least 6 characters",
+        "code": "paste the code from the link"
+      },
+      "actions": {
+        "login": "Sign in",
+        "register": "Sign up",
+        "forgot": "Forgot password?",
+        "switch_to_register": "Sign up",
+        "switch_to_login": "Sign in",
+        "send": "Send",
+        "send_telegram": "Send to Telegram",
+        "back_to_login": "Back to sign in",
+        "save": "Save",
+        "show_password": "Show password",
+        "hide_password": "Hide password"
+      },
+      "hints": {
+        "no_account_prefix": "No account?",
+        "already_registered_prefix": "Already registered?"
+      },
+      "language_selector": {
+        "native": "Native language",
+        "learning": "Learning"
+      },
+      "errors": {
+        "enter_email": "Enter your email",
+        "fill_all_fields": "Fill in all fields",
+        "fill_all_fields_formal": "Please fill in all fields",
+        "password_min_len": "Password must be at least 6 characters",
+        "native_learning_must_differ": "Native and learning languages must be different",
+        "login_failed": "Login error",
+        "login_network": "An error occurred while signing in. Please try again.",
+        "register_failed": "Registration error",
+        "register_network": "An error occurred while signing up. Please try again.",
+        "generic": "Error"
+      },
+      "states": {
+        "sending": "Sending…",
+        "saving": "Saving…",
+        "logging_in": "Signing in…",
+        "creating_account": "Creating account…"
+      }
+    }
   }
-}

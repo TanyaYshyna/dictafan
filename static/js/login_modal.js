@@ -10,6 +10,42 @@ class LoginModal {
         this.pendingResolve = null;
         this.mode = 'login'; // 'login' или 'register' или 'forgot' или 'reset'
         this.languageSelector = null;
+        this.uiLanguageSelector = null;
+    }
+
+    _t(key, fallback, params) {
+        try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+                const v = window.I18n.t(key, params);
+                if (v && v !== key) return v;
+            }
+        } catch (e) {
+        }
+        return (fallback !== undefined && fallback !== null) ? String(fallback) : String(key || '');
+    }
+
+    _getUiLang() {
+        try {
+            const v = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
+            if (v) return v;
+        } catch (e) {
+        }
+        try {
+            if (window.I18n && typeof window.I18n.getLang === 'function') {
+                return window.I18n.getLang();
+            }
+        } catch (e) {
+        }
+        return 'en';
+    }
+
+    async _ensureI18n() {
+        try {
+            if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+                await window.I18n.ensureLoaded();
+            }
+        } catch (e) {
+        }
     }
 
     _consumeResetTokenFromUrl() {
@@ -50,19 +86,20 @@ class LoginModal {
         modal.innerHTML = `
             <div class="modal-content login-modal-content">
                 <div class="login-header">
-                    <h2 id="loginModalTitle">Требуется авторизация</h2>
+                    <h2 id="loginModalTitle">${this._t('login_modal.titles.login_required', 'Требуется авторизация')}</h2>
+                    <div class="login-ui-lang" id="loginModalUiLangWrap" style="margin-left: 10px;"></div>
                     <button class="close-login-btn" id="closeLoginBtn" style="display: none;">
                         <i data-lucide="x"></i>
                     </button>
                 </div>
                 
                 <div class="login-body">
-                    <p class="login-message" id="loginModalMessage">Для работы с приложением необходимо войти в систему</p>
+                    <p class="login-message" id="loginModalMessage">${this._t('login_modal.messages.login_required', 'Для работы с приложением необходимо войти в систему')}</p>
                     
                     <!-- Режим логина -->
                     <form id="loginModalForm" class="login-form" style="display: none;" autocomplete="off">
                         <div class="form-row">
-                            <label for="loginModalEmail">Почта</label>
+                            <label for="loginModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
                             <input 
                                 id="loginModalEmail" 
                                 class="text-input auth-input" 
@@ -75,18 +112,18 @@ class LoginModal {
                         </div>
 
                         <div class="form-row">
-                            <label for="loginModalPassword">Пароль</label>
+                            <label for="loginModalPassword">${this._t('login_modal.fields.password', 'Пароль')}</label>
                             <div class="password-input-wrapper">
                                 <input 
                                     id="loginModalPassword" 
                                     class="text-input auth-input" 
                                     type="password" 
                                     name="password" 
-                                    placeholder="Ваш пароль" 
+                                    placeholder="${this._t('login_modal.placeholders.password', 'Ваш пароль')}" 
                                     required
                                     autocomplete="current-password"
                                 >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="loginModalPassword">
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="loginModalPassword">
                                     <i data-lucide="eye"></i>
                                 </button>
                             </div>
@@ -96,7 +133,7 @@ class LoginModal {
 
                         <div class="login-form-actions">
                             <button type="submit" class="button-color-yellow auth-submit" id="loginModalSubmitBtn">
-                                Войти
+                                ${this._t('login_modal.actions.login', 'Войти')}
                             </button>
                         </div>
 
@@ -109,17 +146,17 @@ class LoginModal {
                         </div>
 
                         <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchToForgotLink">Забыл пароль?</a>
+                            <a href="#" id="switchToForgotLink">${this._t('login_modal.actions.forgot', 'Забыл пароль?')}</a>
                         </p>
 
                         <p class="form-note">
-                            Нет аккаунта? <a href="#" id="switchToRegisterLink">Зарегистрироваться</a>
+                            ${this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?')} <a href="#" id="switchToRegisterLink">${this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться')}</a>
                         </p>
                     </form>
 
                     <form id="forgotModalForm" class="login-form" style="display: none;" autocomplete="off">
                         <div class="form-row">
-                            <label for="forgotModalEmail">Почта</label>
+                            <label for="forgotModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
                             <input
                                 id="forgotModalEmail"
                                 class="text-input auth-input"
@@ -136,49 +173,49 @@ class LoginModal {
 
                         <div class="login-form-actions">
                             <button type="submit" class="button-color-yellow auth-submit" id="forgotModalSubmitBtn">
-                                Отправить
+                                ${this._t('login_modal.actions.send', 'Отправить')}
                             </button>
                         </div>
 
                         <div class="login-form-actions" style="margin-top: 10px;">
                             <button type="button" class="button-color-gray auth-submit" id="forgotModalTelegramBtn">
-                                Отправить в Telegram
+                                ${this._t('login_modal.actions.send_telegram', 'Отправить в Telegram')}
                             </button>
                         </div>
 
                         <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchBackToLoginFromForgotLink">Назад ко входу</a>
+                            <a href="#" id="switchBackToLoginFromForgotLink">${this._t('login_modal.actions.back_to_login', 'Назад ко входу')}</a>
                         </p>
                     </form>
 
                     <form id="resetModalForm" class="login-form" style="display: none;" autocomplete="off">
                         <div class="form-row">
-                            <label for="resetModalToken">Код</label>
+                            <label for="resetModalToken">${this._t('login_modal.fields.code', 'Код')}</label>
                             <input
                                 id="resetModalToken"
                                 class="text-input auth-input"
                                 type="text"
                                 name="token"
-                                placeholder="вставь код из ссылки"
+                                placeholder="${this._t('login_modal.placeholders.code', 'вставь код из ссылки')}"
                                 required
                                 autocomplete="off"
                             >
                         </div>
 
                         <div class="form-row">
-                            <label for="resetModalPassword">Новый пароль</label>
+                            <label for="resetModalPassword">${this._t('login_modal.fields.new_password', 'Новый пароль')}</label>
                             <div class="password-input-wrapper">
                                 <input
                                     id="resetModalPassword"
                                     class="text-input auth-input"
                                     type="password"
                                     name="password"
-                                    placeholder="Минимум 6 символов"
+                                    placeholder="${this._t('login_modal.placeholders.password_min', 'Минимум 6 символов')}"
                                     required
                                     minlength="6"
                                     autocomplete="new-password"
                                 >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="resetModalPassword">
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="resetModalPassword">
                                     <i data-lucide="eye"></i>
                                 </button>
                             </div>
@@ -189,25 +226,25 @@ class LoginModal {
 
                         <div class="login-form-actions">
                             <button type="submit" class="button-color-yellow auth-submit" id="resetModalSubmitBtn">
-                                Сохранить
+                                ${this._t('login_modal.actions.save', 'Сохранить')}
                             </button>
                         </div>
 
                         <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchBackToLoginFromResetLink">Назад ко входу</a>
+                            <a href="#" id="switchBackToLoginFromResetLink">${this._t('login_modal.actions.back_to_login', 'Назад ко входу')}</a>
                         </p>
                     </form>
 
                     <!-- Режим регистрации -->
                     <form id="registerModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="register">
                         <div class="form-row">
-                            <label for="registerModalUsername">Имя пользователя</label>
+                            <label for="registerModalUsername">${this._t('login_modal.fields.username', 'Имя пользователя')}</label>
                             <input 
                                 id="registerModalUsername" 
                                 class="text-input auth-input" 
                                 type="text" 
                                 name="username" 
-                                placeholder="Как вас называть?" 
+                                placeholder="${this._t('login_modal.placeholders.username', 'Как вас называть?')}" 
                                 required
                                 autocomplete="off"
                                 data-1p-ignore="true"
@@ -216,7 +253,7 @@ class LoginModal {
                         </div>
 
                         <div class="form-row">
-                            <label for="registerModalEmail">Почта</label>
+                            <label for="registerModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
                             <input 
                                 id="registerModalEmail" 
                                 class="text-input auth-input" 
@@ -231,21 +268,21 @@ class LoginModal {
                         </div>
 
                         <div class="form-row">
-                            <label for="registerModalPassword">Пароль</label>
+                            <label for="registerModalPassword">${this._t('login_modal.fields.password', 'Пароль')}</label>
                             <div class="password-input-wrapper">
                                 <input 
                                     id="registerModalPassword" 
                                     class="text-input auth-input" 
                                     type="password" 
                                     name="password" 
-                                    placeholder="Минимум 6 символов" 
+                                    placeholder="${this._t('login_modal.placeholders.password_min', 'Минимум 6 символов')}" 
                                     required
                                     minlength="6"
                                     autocomplete="new-password"
                                     data-1p-ignore="true"
                                     data-lpignore="true"
                                 >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="Показать пароль" data-password-toggle="1" data-target-input="registerModalPassword">
+                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="registerModalPassword">
                                     <i data-lucide="eye"></i>
                                 </button>
                             </div>
@@ -257,7 +294,7 @@ class LoginModal {
 
                         <div class="login-form-actions">
                             <button type="submit" class="button-color-yellow auth-submit" id="registerModalSubmitBtn">
-                                Зарегистрироваться
+                                ${this._t('login_modal.actions.register', 'Зарегистрироваться')}
                             </button>
                         </div>
 
@@ -270,7 +307,7 @@ class LoginModal {
                         </div>
 
                         <p class="form-note">
-                            Уже зарегистрированы? <a href="#" id="switchToLoginLink">Войти</a>
+                            ${this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?')} <a href="#" id="switchToLoginLink">${this._t('login_modal.actions.switch_to_login', 'Войти')}</a>
                         </p>
                     </form>
                 </div>
@@ -287,6 +324,178 @@ class LoginModal {
 
         // Обработчики событий
         this.setupEventHandlers();
+
+        try {
+            this.initUiLanguageSelector();
+        } catch (e) {
+        }
+
+        try {
+            this.applyTranslations();
+        } catch (e) {
+        }
+    }
+
+    initUiLanguageSelector() {
+        const wrap = document.getElementById('loginModalUiLangWrap');
+        if (!wrap) return;
+
+        wrap.innerHTML = '';
+        const sel = document.createElement('select');
+        sel.id = 'loginModalUiLangSelect';
+        sel.className = 'text-input';
+        sel.style.maxWidth = '180px';
+        sel.style.padding = '6px 10px';
+
+        const options = [
+            { v: 'en', label: 'English' },
+            { v: 'uk', label: 'Українська' },
+            { v: 'ru', label: 'Русский' },
+            { v: 'ar', label: 'العربية' },
+        ];
+        for (const o of options) {
+            const opt = document.createElement('option');
+            opt.value = o.v;
+            opt.textContent = o.label;
+            sel.appendChild(opt);
+        }
+
+        let cur = this._getUiLang();
+        try {
+            const stored = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
+            if (!stored && this.mode === 'register') {
+                cur = 'en';
+                localStorage.setItem('ui_lang', 'en');
+                try {
+                    if (window.I18n && typeof window.I18n.setLanguage === 'function') {
+                        Promise.resolve(window.I18n.setLanguage('en')).catch(() => {});
+                    }
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+        try {
+            sel.value = cur;
+        } catch (e) {
+        }
+
+        sel.addEventListener('change', async () => {
+            const v = (sel.value || '').trim().toLowerCase();
+            try {
+                localStorage.setItem('ui_lang', v);
+            } catch (e) {
+            }
+            try {
+                if (window.I18n && typeof window.I18n.setLanguage === 'function') {
+                    await window.I18n.setLanguage(v);
+                }
+            } catch (e) {
+            }
+            try {
+                await this._ensureI18n();
+            } catch (e) {
+            }
+            try {
+                this.applyTranslations();
+            } catch (e) {
+            }
+        });
+
+        wrap.appendChild(sel);
+        this.uiLanguageSelector = sel;
+    }
+
+    async applyTranslations() {
+        await this._ensureI18n();
+
+        try {
+            const title = document.getElementById('loginModalTitle');
+            const message = document.getElementById('loginModalMessage');
+            if (title || message) {
+                this.updateModalView();
+            }
+        } catch (e) {
+        }
+
+        try {
+            const l1 = document.querySelector('label[for="loginModalEmail"]');
+            if (l1) l1.textContent = this._t('login_modal.fields.email', 'Почта');
+            const l2 = document.querySelector('label[for="loginModalPassword"]');
+            if (l2) l2.textContent = this._t('login_modal.fields.password', 'Пароль');
+            const pass = document.getElementById('loginModalPassword');
+            if (pass) pass.setAttribute('placeholder', this._t('login_modal.placeholders.password', 'Ваш пароль'));
+            const btn = document.getElementById('loginModalSubmitBtn');
+            if (btn) btn.textContent = this._t('login_modal.actions.login', 'Войти');
+            const forgot = document.getElementById('switchToForgotLink');
+            if (forgot) forgot.textContent = this._t('login_modal.actions.forgot', 'Забыл пароль?');
+            const swReg = document.getElementById('switchToRegisterLink');
+            if (swReg) swReg.textContent = this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться');
+            const loginNote = swReg ? swReg.closest('p') : null;
+            if (loginNote) {
+                const prefix = this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?');
+                const linkHtml = swReg.outerHTML;
+                loginNote.innerHTML = `${prefix} ${linkHtml}`;
+            }
+        } catch (e) {
+        }
+
+        try {
+            const l3 = document.querySelector('label[for="registerModalUsername"]');
+            if (l3) l3.textContent = this._t('login_modal.fields.username', 'Имя пользователя');
+            const u = document.getElementById('registerModalUsername');
+            if (u) u.setAttribute('placeholder', this._t('login_modal.placeholders.username', 'Как вас называть?'));
+            const l4 = document.querySelector('label[for="registerModalEmail"]');
+            if (l4) l4.textContent = this._t('login_modal.fields.email', 'Почта');
+            const l5 = document.querySelector('label[for="registerModalPassword"]');
+            if (l5) l5.textContent = this._t('login_modal.fields.password', 'Пароль');
+            const rp = document.getElementById('registerModalPassword');
+            if (rp) rp.setAttribute('placeholder', this._t('login_modal.placeholders.password_min', 'Минимум 6 символов'));
+            const rb = document.getElementById('registerModalSubmitBtn');
+            if (rb) rb.textContent = this._t('login_modal.actions.register', 'Зарегистрироваться');
+            const swLogin = document.getElementById('switchToLoginLink');
+            if (swLogin) swLogin.textContent = this._t('login_modal.actions.switch_to_login', 'Войти');
+            const regNote = swLogin ? swLogin.closest('p') : null;
+            if (regNote) {
+                const prefix = this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?');
+                const linkHtml = swLogin.outerHTML;
+                regNote.innerHTML = `${prefix} ${linkHtml}`;
+            }
+        } catch (e) {
+        }
+
+        try {
+            const lf = document.querySelector('label[for="forgotModalEmail"]');
+            if (lf) lf.textContent = this._t('login_modal.fields.email', 'Почта');
+            const fb = document.getElementById('forgotModalSubmitBtn');
+            if (fb) fb.textContent = this._t('login_modal.actions.send', 'Отправить');
+            const ft = document.getElementById('forgotModalTelegramBtn');
+            if (ft) ft.textContent = this._t('login_modal.actions.send_telegram', 'Отправить в Telegram');
+            const back = document.getElementById('switchBackToLoginFromForgotLink');
+            if (back) back.textContent = this._t('login_modal.actions.back_to_login', 'Назад ко входу');
+        } catch (e) {
+        }
+
+        try {
+            const lt = document.querySelector('label[for="resetModalToken"]');
+            if (lt) lt.textContent = this._t('login_modal.fields.code', 'Код');
+            const tok = document.getElementById('resetModalToken');
+            if (tok) tok.setAttribute('placeholder', this._t('login_modal.placeholders.code', 'вставь код из ссылки'));
+            const lp = document.querySelector('label[for="resetModalPassword"]');
+            if (lp) lp.textContent = this._t('login_modal.fields.new_password', 'Новый пароль');
+            const rpp = document.getElementById('resetModalPassword');
+            if (rpp) rpp.setAttribute('placeholder', this._t('login_modal.placeholders.password_min', 'Минимум 6 символов'));
+            const sb = document.getElementById('resetModalSubmitBtn');
+            if (sb) sb.textContent = this._t('login_modal.actions.save', 'Сохранить');
+            const back2 = document.getElementById('switchBackToLoginFromResetLink');
+            if (back2) back2.textContent = this._t('login_modal.actions.back_to_login', 'Назад ко входу');
+        } catch (e) {
+        }
+
+        try {
+            this.decorateLanguageSelector();
+        } catch (e) {
+        }
     }
 
     /**
@@ -408,7 +617,7 @@ class LoginModal {
                 if (window.UM && window.UM.isAuthenticated && window.UM.isAuthenticated()) {
                     this.hide();
                 } else {
-                    alert('Для работы с приложением необходимо войти в систему');
+                    alert(this._t('login_modal.messages.login_required_alert', 'Для работы с приложением необходимо войти в систему'));
                 }
             });
         }
@@ -420,7 +629,7 @@ class LoginModal {
                     if (window.UM && window.UM.isAuthenticated && window.UM.isAuthenticated()) {
                         this.hide();
                     } else {
-                        alert('Для работы с приложением необходимо войти в систему');
+                        alert(this._t('login_modal.messages.login_required_alert', 'Для работы с приложением необходимо войти в систему'));
                     }
                 }
             });
@@ -450,7 +659,9 @@ class LoginModal {
 
             const willShow = input.type === 'password';
             input.type = willShow ? 'text' : 'password';
-            toggleBtn.setAttribute('aria-label', willShow ? 'Скрыть пароль' : 'Показать пароль');
+            toggleBtn.setAttribute('aria-label', willShow
+                ? this._t('login_modal.actions.hide_password', 'Скрыть пароль')
+                : this._t('login_modal.actions.show_password', 'Показать пароль'));
 
             const iconName = willShow ? 'eye-off' : 'eye';
             toggleBtn.innerHTML = `<i data-lucide="${iconName}"></i>`;
@@ -471,6 +682,7 @@ class LoginModal {
         this.mode = 'register';
         this.updateModalView();
         this.initLanguageSelector();
+        try { this.applyTranslations(); } catch (e) {}
     }
 
     /**
@@ -479,16 +691,19 @@ class LoginModal {
     switchToLogin() {
         this.mode = 'login';
         this.updateModalView();
+        try { this.applyTranslations(); } catch (e) {}
     }
 
     switchToForgot() {
         this.mode = 'forgot';
         this.updateModalView();
+        try { this.applyTranslations(); } catch (e) {}
     }
 
     switchToReset() {
         this.mode = 'reset';
         this.updateModalView();
+        try { this.applyTranslations(); } catch (e) {}
     }
 
     /**
@@ -507,29 +722,29 @@ class LoginModal {
             if (registerForm) registerForm.style.display = 'none';
             if (forgotForm) forgotForm.style.display = 'none';
             if (resetForm) resetForm.style.display = 'none';
-            if (title) title.textContent = 'Требуется авторизация';
-            if (message) message.textContent = 'Для работы с приложением необходимо войти в систему';
+            if (title) title.textContent = this._t('login_modal.titles.login_required', 'Требуется авторизация');
+            if (message) message.textContent = this._t('login_modal.messages.login_required', 'Для работы с приложением необходимо войти в систему');
         } else if (this.mode === 'register') {
             if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'block';
             if (forgotForm) forgotForm.style.display = 'none';
             if (resetForm) resetForm.style.display = 'none';
-            if (title) title.textContent = 'Регистрация';
-            if (message) message.textContent = 'Создайте доступ к диктантам и личному кабинету';
+            if (title) title.textContent = this._t('login_modal.titles.register', 'Регистрация');
+            if (message) message.textContent = this._t('login_modal.messages.register', 'Создайте доступ к диктантам и личному кабинету');
         } else if (this.mode === 'forgot') {
             if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'none';
             if (forgotForm) forgotForm.style.display = 'block';
             if (resetForm) resetForm.style.display = 'none';
-            if (title) title.textContent = 'Восстановление пароля';
-            if (message) message.textContent = 'Введи почту — мы отправим ссылку для сброса пароля на почту или в Telegram';
+            if (title) title.textContent = this._t('login_modal.titles.forgot', 'Восстановление пароля');
+            if (message) message.textContent = this._t('login_modal.messages.forgot', 'Введи почту — мы отправим ссылку для сброса пароля на почту или в Telegram');
         } else {
             if (loginForm) loginForm.style.display = 'none';
             if (registerForm) registerForm.style.display = 'none';
             if (forgotForm) forgotForm.style.display = 'none';
             if (resetForm) resetForm.style.display = 'block';
-            if (title) title.textContent = 'Новый пароль';
-            if (message) message.textContent = 'Вставь код и задай новый пароль';
+            if (title) title.textContent = this._t('login_modal.titles.reset', 'Новый пароль');
+            if (message) message.textContent = this._t('login_modal.messages.reset', 'Вставь код и задай новый пароль');
         }
 
         // Очищаем ошибки
@@ -544,13 +759,13 @@ class LoginModal {
 
         const email = emailInput?.value?.trim();
         if (!email) {
-            this.showError('Введи почту', 'forgot');
+            this.showError(this._t('login_modal.errors.enter_email', 'Введи почту'), 'forgot');
             return;
         }
 
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Отправляем...';
+            submitBtn.textContent = this._t('login_modal.states.sending', 'Отправляем...');
         }
         if (telegramBtn) {
             telegramBtn.disabled = true;
@@ -580,14 +795,14 @@ class LoginModal {
                 infoMessage.style.border = '1px solid #a7f3d0';
                 infoMessage.style.padding = '10px';
                 infoMessage.style.borderRadius = '6px';
-                infoMessage.textContent = 'Если аккаунт существует — ссылка для сброса пароля отправлена на почту.';
+                infoMessage.textContent = this._t('login_modal.messages.reset_sent_email', 'Если аккаунт существует — ссылка для сброса пароля отправлена на почту.');
             }
         } catch (e) {
-            this.showError(e && e.message ? e.message : 'Ошибка', 'forgot');
+            this.showError(e && e.message ? e.message : this._t('login_modal.errors.generic', 'Ошибка'), 'forgot');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Отправить';
+                submitBtn.textContent = this._t('login_modal.actions.send', 'Отправить');
             }
             if (telegramBtn) {
                 telegramBtn.disabled = false;
@@ -603,13 +818,13 @@ class LoginModal {
 
         const email = emailInput?.value?.trim();
         if (!email) {
-            this.showError('Введи почту', 'forgot');
+            this.showError(this._t('login_modal.errors.enter_email', 'Введи почту'), 'forgot');
             return;
         }
 
         if (telegramBtn) {
             telegramBtn.disabled = true;
-            telegramBtn.textContent = 'Отправляем...';
+            telegramBtn.textContent = this._t('login_modal.states.sending', 'Отправляем...');
         }
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -639,14 +854,14 @@ class LoginModal {
                 infoMessage.style.border = '1px solid #a7f3d0';
                 infoMessage.style.padding = '10px';
                 infoMessage.style.borderRadius = '6px';
-                infoMessage.textContent = 'Если аккаунт существует и Telegram привязан — ссылка для сброса пароля отправлена в Telegram.';
+                infoMessage.textContent = this._t('login_modal.messages.reset_sent_telegram', 'Если аккаунт существует и Telegram привязан — ссылка для сброса пароля отправлена в Telegram.');
             }
         } catch (e) {
-            this.showError(e && e.message ? e.message : 'Ошибка', 'forgot');
+            this.showError(e && e.message ? e.message : this._t('login_modal.errors.generic', 'Ошибка'), 'forgot');
         } finally {
             if (telegramBtn) {
                 telegramBtn.disabled = false;
-                telegramBtn.textContent = 'Отправить в Telegram';
+                telegramBtn.textContent = this._t('login_modal.actions.send_telegram', 'Отправить в Telegram');
             }
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -663,17 +878,17 @@ class LoginModal {
         const token = tokenInput?.value?.trim();
         const password = passwordInput?.value;
         if (!token || !password) {
-            this.showError('Заполни все поля', 'reset');
+            this.showError(this._t('login_modal.errors.fill_all_fields', 'Заполни все поля'), 'reset');
             return;
         }
         if (String(password).length < 6) {
-            this.showError('Пароль должен содержать не менее 6 символов', 'reset');
+            this.showError(this._t('login_modal.errors.password_min_len', 'Пароль должен содержать не менее 6 символов'), 'reset');
             return;
         }
 
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Сохраняем...';
+            submitBtn.textContent = this._t('login_modal.states.saving', 'Сохраняем...');
         }
         this.clearErrors();
         if (infoMessage) {
@@ -699,15 +914,15 @@ class LoginModal {
                 infoMessage.style.border = '1px solid #a7f3d0';
                 infoMessage.style.padding = '10px';
                 infoMessage.style.borderRadius = '6px';
-                infoMessage.textContent = 'Пароль обновлён. Теперь можно войти.';
+                infoMessage.textContent = this._t('login_modal.messages.password_updated', 'Пароль обновлён. Теперь можно войти.');
             }
             this.switchToLogin();
         } catch (e) {
-            this.showError(e && e.message ? e.message : 'Ошибка', 'reset');
+            this.showError(e && e.message ? e.message : this._t('login_modal.errors.generic', 'Ошибка'), 'reset');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Сохранить';
+                submitBtn.textContent = this._t('login_modal.actions.save', 'Сохранить');
             }
         }
     }
@@ -787,10 +1002,10 @@ class LoginModal {
 
         const groups = container.querySelectorAll('.language-selector-group');
         if (groups[0]) {
-            groups[0].setAttribute('data-label', 'Родной язык');
+            groups[0].setAttribute('data-label', this._t('login_modal.language_selector.native', 'Родной язык'));
         }
         if (groups[1]) {
-            groups[1].setAttribute('data-label', 'Изучаю');
+            groups[1].setAttribute('data-label', this._t('login_modal.language_selector.learning', 'Изучаю'));
         }
     }
 
@@ -826,14 +1041,14 @@ class LoginModal {
         const password = passwordInput?.value;
 
         if (!email || !password) {
-            this.showError('Пожалуйста, заполните все поля', 'login');
+            this.showError(this._t('login_modal.errors.fill_all_fields_formal', 'Пожалуйста, заполните все поля'), 'login');
             return;
         }
 
         // Показываем состояние загрузки
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Вход...';
+            submitBtn.textContent = this._t('login_modal.states.logging_in', 'Вход...');
         }
 
         this.clearErrors();
@@ -855,15 +1070,15 @@ class LoginModal {
                     this.pendingResolve = null;
                 }
             } else {
-                this.showError(result?.error || 'Ошибка входа', 'login');
+                this.showError(result?.error || this._t('login_modal.errors.login_failed', 'Ошибка входа'), 'login');
             }
         } catch (error) {
             console.error('Ошибка при входе:', error);
-            this.showError('Произошла ошибка при входе. Попробуйте еще раз.', 'login');
+            this.showError(this._t('login_modal.errors.login_network', 'Произошла ошибка при входе. Попробуйте еще раз.'), 'login');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Войти';
+                submitBtn.textContent = this._t('login_modal.actions.login', 'Войти');
             }
         }
     }
@@ -883,12 +1098,12 @@ class LoginModal {
         const password = passwordInput?.value;
 
         if (!username || !email || !password) {
-            this.showError('Пожалуйста, заполните все поля', 'register');
+            this.showError(this._t('login_modal.errors.fill_all_fields_formal', 'Пожалуйста, заполните все поля'), 'register');
             return;
         }
 
         if (password.length < 6) {
-            this.showError('Пароль должен содержать не менее 6 символов', 'register');
+            this.showError(this._t('login_modal.errors.password_min_len', 'Пароль должен содержать не менее 6 символов'), 'register');
             return;
         }
 
@@ -898,14 +1113,14 @@ class LoginModal {
         const learningLanguage = selectorValues?.currentLearning || 'en';
 
         if (nativeLanguage === learningLanguage) {
-            this.showError('Родной и изучаемый языки должны различаться', 'register');
+            this.showError(this._t('login_modal.errors.native_learning_must_differ', 'Родной и изучаемый языки должны различаться'), 'register');
             return;
         }
 
         // Показываем состояние загрузки
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Создаём аккаунт...';
+            submitBtn.textContent = this._t('login_modal.states.creating_account', 'Создаём аккаунт...');
         }
 
         this.clearErrors();
@@ -933,15 +1148,15 @@ class LoginModal {
                     this.pendingResolve = null;
                 }
             } else {
-                this.showError(result?.error || 'Ошибка регистрации', 'register');
+                this.showError(result?.error || this._t('login_modal.errors.register_failed', 'Ошибка регистрации'), 'register');
             }
         } catch (error) {
             console.error('Ошибка при регистрации:', error);
-            this.showError('Произошла ошибка при регистрации. Попробуйте еще раз.', 'register');
+            this.showError(this._t('login_modal.errors.register_network', 'Произошла ошибка при регистрации. Попробуйте еще раз.'), 'register');
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Зарегистрироваться';
+                submitBtn.textContent = this._t('login_modal.actions.register', 'Зарегистрироваться');
             }
         }
     }
