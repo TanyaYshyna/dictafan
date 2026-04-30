@@ -1836,6 +1836,11 @@ html[dir="rtl"] .topbar-save-group {
     gap: 16px;
 }
 
+/* Registration language selector should not add extra vertical spacing vs other rows */
+.login-modal-content .language-selector-wrapper {
+    gap: 16px;
+}
+
 .login-form .form-row {
     display: flex;
     flex-direction: column;
@@ -1978,7 +1983,48 @@ html[dir="rtl"] .topbar-save-group {
     min-width: auto;
 }
 
+/* Registration: language selector rows should align with the other form rows (label left, control right) */
+.login-modal-content .language-selector-wrapper {
+    margin: 0;
+}
+
+.login-modal-content .language-selector-wrapper .language-selector-group {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 0;
+}
+
+.login-modal-content .language-selector-wrapper .language-selector-inline-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-text, #1f2933);
+    white-space: nowrap;
+    margin: 0;
+}
+
+/* Disable pseudo label when we render a real inline label */
+.login-modal-content .language-selector-wrapper .language-selector-group::before {
+    content: none;
+    display: none;
+}
+
 .login-modal-content .language-selector-wrapper .custom-select-wrapper {
-    width: 100%;
-    flex: 1;
+    width: auto;
+    max-width: 280px;
+}
+
+@media (max-width: 520px) {
+    .login-modal-content .language-selector-wrapper .language-selector-group {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+
+    .login-modal-content .language-selector-wrapper .custom-select-wrapper {
+        max-width: 100%;
+        width: 100%;
+    }
 }

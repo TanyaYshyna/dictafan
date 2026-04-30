@@ -991,12 +991,25 @@ class LoginModal {
         }
 
         const groups = container.querySelectorAll('.language-selector-group');
-        if (groups[0]) {
-            groups[0].setAttribute('data-label', this._t('login_modal.language_selector.native', 'Родной язык'));
-        }
-        if (groups[1]) {
-            groups[1].setAttribute('data-label', this._t('login_modal.language_selector.learning', 'Изучаю'));
-        }
+
+        const ensureInlineLabel = (groupEl, text) => {
+            if (!groupEl) return;
+            let labelEl = groupEl.querySelector(':scope > .language-selector-inline-label');
+            if (!labelEl) {
+                labelEl = document.createElement('label');
+                labelEl.className = 'language-selector-inline-label';
+                groupEl.prepend(labelEl);
+            }
+            labelEl.textContent = text;
+
+            try {
+                groupEl.removeAttribute('data-label');
+            } catch (e) {
+            }
+        };
+
+        ensureInlineLabel(groups[0], this._t('login_modal.language_selector.native', 'Родной язык'));
+        ensureInlineLabel(groups[1], this._t('login_modal.language_selector.learning', 'Изучаю'));
     }
 
     /**
