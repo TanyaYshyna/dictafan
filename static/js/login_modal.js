@@ -139,7 +139,7 @@ class LoginModal {
 
 
                         <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-gray auth-submit" id="loginWithGoogleBtn">
+                            <button type="button" class="button-color-purple auth-submit" id="loginWithGoogleBtn">
                                 <i data-lucide="chrome"></i>
                                 Google
                             </button>
@@ -150,7 +150,7 @@ class LoginModal {
                         </p>
 
                         <p class="form-note">
-                            ${this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?')} <a href="#" id="switchToRegisterLink">${this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться')}</a>
+                            <span id="loginNoAccountPrefix">${this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?')}</span> <a href="#" id="switchToRegisterLink">${this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться')}</a>
                         </p>
                     </form>
 
@@ -178,7 +178,7 @@ class LoginModal {
                         </div>
 
                         <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-gray auth-submit" id="forgotModalTelegramBtn">
+                            <button type="button" class="button-color-purple auth-submit" id="forgotModalTelegramBtn">
                                 ${this._t('login_modal.actions.send_telegram', 'Отправить в Telegram')}
                             </button>
                         </div>
@@ -300,14 +300,14 @@ class LoginModal {
 
 
                         <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-gray auth-submit" id="registerWithGoogleBtn">
+                            <button type="button" class="button-color-purple auth-submit" id="registerWithGoogleBtn">
                                 <i data-lucide="chrome"></i>
                                 Google
                             </button>
                         </div>
 
                         <p class="form-note">
-                            ${this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?')} <a href="#" id="switchToLoginLink">${this._t('login_modal.actions.switch_to_login', 'Войти')}</a>
+                            <span id="registerAlreadyPrefix">${this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?')}</span> <a href="#" id="switchToLoginLink">${this._t('login_modal.actions.switch_to_login', 'Войти')}</a>
                         </p>
                     </form>
                 </div>
@@ -341,69 +341,67 @@ class LoginModal {
         if (!wrap) return;
 
         wrap.innerHTML = '';
-        const sel = document.createElement('select');
-        sel.id = 'loginModalUiLangSelect';
-        sel.className = 'text-input';
-        sel.style.maxWidth = '180px';
-        sel.style.padding = '6px 10px';
-
-        const options = [
-            { v: 'en', label: 'English' },
-            { v: 'uk', label: 'Українська' },
-            { v: 'ru', label: 'Русский' },
-            { v: 'ar', label: 'العربية' },
-        ];
-        for (const o of options) {
-            const opt = document.createElement('option');
-            opt.value = o.v;
-            opt.textContent = o.label;
-            sel.appendChild(opt);
+        const supported = ['en', 'uk', 'ru', 'ar'];
+        let current = this._getUiLang();
+        try {
+            const stored = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
+            if (stored && supported.includes(stored)) {
+                current = stored;
+            }
+        } catch (e) {
         }
+        if (!supported.includes(current)) current = 'en';
 
-        let cur = this._getUiLang();
+        // Если открыли регистрацию впервые и ui_lang не задан — по умолчанию ставим English
         try {
             const stored = (localStorage.getItem('ui_lang') || '').trim().toLowerCase();
             if (!stored && this.mode === 'register') {
-                cur = 'en';
+                current = 'en';
                 localStorage.setItem('ui_lang', 'en');
-                try {
-                    if (window.I18n && typeof window.I18n.setLanguage === 'function') {
-                        Promise.resolve(window.I18n.setLanguage('en')).catch(() => {});
-                    }
-                } catch (e) {
-                }
             }
         } catch (e) {
         }
+
         try {
-            sel.value = cur;
-        } catch (e) {
-        }
-
-        sel.addEventListener('change', async () => {
-            const v = (sel.value || '').trim().toLowerCase();
-            try {
-                localStorage.setItem('ui_lang', v);
-            } catch (e) {
+            const languageData = window.LanguageManager?.getLanguageData?.() || window.LANGUAGE_DATA || {};
+            if (!languageData || Object.keys(languageData).length === 0) {
+                return;
             }
-            try {
-                if (window.I18n && typeof window.I18n.setLanguage === 'function') {
-                    await window.I18n.setLanguage(v);
+
+            const uiLangSelector = new LanguageSelector({
+                container: wrap,
+                mode: 'native-selector',
+                nativeLanguage: current,
+                nativeLanguages: supported,
+                learningLanguages: supported,
+                currentLearning: current,
+                languageData,
+                onLanguageChange: async (data) => {
+                    try {
+                        const next = String(data && data.nativeLanguage ? data.nativeLanguage : '').trim().toLowerCase();
+                        if (!supported.includes(next)) return;
+                        if (next === current) return;
+                        current = next;
+                    } catch (e) {
+                        return;
+                    }
+
+                    try { localStorage.setItem('ui_lang', current); } catch (e) {}
+                    try {
+                        if (window.I18n && typeof window.I18n.setLanguage === 'function') {
+                            await window.I18n.setLanguage(current);
+                        }
+                    } catch (e) {
+                    }
+                    try { await this._ensureI18n(); } catch (e) {}
+                    try { await this.applyTranslations(); } catch (e) {}
                 }
-            } catch (e) {
-            }
-            try {
-                await this._ensureI18n();
-            } catch (e) {
-            }
-            try {
-                this.applyTranslations();
-            } catch (e) {
-            }
-        });
+            });
 
-        wrap.appendChild(sel);
-        this.uiLanguageSelector = sel;
+            this.uiLanguageSelector = uiLangSelector;
+        } catch (e) {
+            return;
+        }
     }
 
     async applyTranslations() {
@@ -431,12 +429,8 @@ class LoginModal {
             if (forgot) forgot.textContent = this._t('login_modal.actions.forgot', 'Забыл пароль?');
             const swReg = document.getElementById('switchToRegisterLink');
             if (swReg) swReg.textContent = this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться');
-            const loginNote = swReg ? swReg.closest('p') : null;
-            if (loginNote) {
-                const prefix = this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?');
-                const linkHtml = swReg.outerHTML;
-                loginNote.innerHTML = `${prefix} ${linkHtml}`;
-            }
+            const loginPrefix = document.getElementById('loginNoAccountPrefix');
+            if (loginPrefix) loginPrefix.textContent = this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?');
         } catch (e) {
         }
 
@@ -455,12 +449,8 @@ class LoginModal {
             if (rb) rb.textContent = this._t('login_modal.actions.register', 'Зарегистрироваться');
             const swLogin = document.getElementById('switchToLoginLink');
             if (swLogin) swLogin.textContent = this._t('login_modal.actions.switch_to_login', 'Войти');
-            const regNote = swLogin ? swLogin.closest('p') : null;
-            if (regNote) {
-                const prefix = this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?');
-                const linkHtml = swLogin.outerHTML;
-                regNote.innerHTML = `${prefix} ${linkHtml}`;
-            }
+            const regPrefix = document.getElementById('registerAlreadyPrefix');
+            if (regPrefix) regPrefix.textContent = this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?');
         } catch (e) {
         }
 

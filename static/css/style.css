@@ -1842,6 +1842,28 @@ html[dir="rtl"] .topbar-save-group {
     gap: 6px;
 }
 
+/* В модальном окне логина/регистрации — label + input в одну строку */
+.login-modal-content .login-form .form-row {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+}
+
+.login-modal-content .login-form .form-row label {
+    margin: 0;
+    white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+    .login-modal-content .login-form .form-row {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+    }
+}
+
 .login-form .form-row label {
     font-size: 14px;
     font-weight: 500;
@@ -1874,6 +1896,11 @@ html[dir="rtl"] .topbar-save-group {
 }
 
 .login-form-actions .button-color-gray {
+    flex: 1;
+    justify-content: center;
+}
+
+.login-form-actions .button-color-purple {
     flex: 1;
     justify-content: center;
 }
