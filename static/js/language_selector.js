@@ -650,7 +650,7 @@ class LanguageSelector {
                 <div class="custom-select-wrapper">
                     <div class="custom-select-trigger">
                         ${this.createFlagElement(currentValue)} 
-                        ${this.getLanguageName(currentValue)}
+                        <span class="custom-select-text">${this.getLanguageName(currentValue)}</span>
                         <i data-lucide="chevron-down"></i>
                         
                     </div>
@@ -689,7 +689,7 @@ class LanguageSelector {
         const isCompact = this.options.mode === 'learning-selector-compact';
         const triggerContent = isCompact
             ? `${this.createFlagElement(currentValue, 'small')}<i data-lucide="chevron-down"></i>`
-            : `${this.createFlagElement(currentValue)} ${this.getLanguageName(currentValue)}<i data-lucide="chevron-down"></i>`;
+            : `${this.createFlagElement(currentValue)}<span class="custom-select-text">${this.getLanguageName(currentValue)}</span><i data-lucide="chevron-down"></i>`;
 
         // <label class="language-label">Текущий изучаемый язык</label>
         return `

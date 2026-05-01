@@ -1995,6 +1995,7 @@ html[dir="rtl"] .topbar-save-group {
     align-items: center;
     gap: 12px;
     margin-bottom: 0;
+    padding: 0;
 }
 
 .login-modal-content .language-selector-wrapper .language-selector-inline-label {
@@ -2022,6 +2023,15 @@ html[dir="rtl"] .topbar-save-group {
     align-items: center;
     width: 100%;
     box-sizing: border-box;
+    gap: 10px;
+}
+
+.login-modal-content .language-selector-wrapper .custom-select-trigger .custom-select-text {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .login-modal-content .language-selector-wrapper .custom-select-trigger i[data-lucide] {
