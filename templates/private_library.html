@@ -1,58 +1,19 @@
-<!DOCTYPE html>
-<html lang="{{ ui_lang|default('ru') }}" dir="{{ ui_dir|default('ltr') }}">
+{% extends "base.html" %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DictaFan</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
-    <link rel="stylesheet" href="/static/css/style_color.css">
-    <link rel="stylesheet" href="/static/css/style.css">
+{% block title %}DictaFan{% endblock %}
+
+{% block page_head %}
     <link rel="stylesheet" href="/static/css/style_private_library.css?v=42">
-    <!-- Cropper.js для обрезки изображений -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script defer src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
-</head>
+{% endblock %}
 
-<body class="page-index">
-    <script>
-        try {
-            const supported = ['en', 'uk', 'ru', 'ar'];
-            const storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
-            const stored = supported.includes(storedRaw) ? storedRaw : '';
+{% block body_attrs %}class="page-index"{% endblock %}
 
-            const ssrLang = (document.documentElement.lang || '').toString().trim().toLowerCase();
-            const finalLang = stored || (supported.includes(ssrLang) ? ssrLang : 'en');
+{% block build_channel %}dictafan:build:private_library{% endblock %}
 
-            document.documentElement.lang = finalLang;
-            document.documentElement.dir = finalLang.startsWith('ar') ? 'rtl' : 'ltr';
-
-            if (stored && stored !== storedRaw) {
-                localStorage.setItem('ui_lang', stored);
-            }
-        } catch (e) {
-        }
-    </script>
-    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
-    <script>
-        var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
-
-        if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
-            window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:private_library');
-        }
-
-        try {
-            if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
-                window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
-            }
-        } catch (e) {
-        }
-    </script>
+{% block topbar %}
     <div class="topbar">
         <a href="/" class="logo-link">
             <img src="/static/icons/logo.svg" class="logo">
@@ -95,7 +56,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block modals %}
     <div id="delete-dictation-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
@@ -137,41 +100,6 @@
                         </div>
                         <div class="books-list" id="booksList"></div>
                     </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="panel">
-        <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
-        <div class="desk-zone">
-            <div class="tool-palette tool-palette--desk" id="toolPalette">
-                <button id="btnNewDictationQuick" class="tool-palette-btn" title="">
-                    <i data-lucide="plus"></i>
-                </button>
-                <button id="btnHomeLibrary" class="tool-palette-btn" title="">
-                    <i data-lucide="home"></i>
-                </button>
-                <button id="btnPublicLibrary" class="tool-palette-btn" title="">
-                    <i data-lucide="globe"></i>
-                </button>
-                <button id="btnStudentPlan" class="tool-palette-btn" title="">
-                    <i data-lucide="calendar-check"></i>
-                </button>
-                <button id="btnTeacherAssignments" class="tool-palette-btn" title="">
-                    <i data-lucide="hat-glasses"></i>
-                </button>
-                <div class="tool-palette-separator"></div>
-                <button id="btnDeskZoomIn" class="tool-palette-btn" title="">
-                    <i data-lucide="plus"></i>
-                </button>
-                <button id="btnDeskZoomOut" class="tool-palette-btn" title="">
-                    <i data-lucide="minus"></i>
-                </button>
-            </div>
-            <div class="desk-scroll-container">
-                <div class="desk-cards-container" id="deskCardsContainer">
-                    <!-- Карточки диктантов будут загружаться через JS -->
                 </div>
             </div>
         </div>
@@ -363,25 +291,47 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
-    <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
-    <script> lucide.createIcons(); </script>
-    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_register.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/idb_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/cover_manager.js') }}"></script>
+{% block content %}
+    <div class="panel">
+        <!-- ЗОНА 1: Рабочий стол (горизонтальная прокрутка с диктантами) -->
+        <div class="desk-zone">
+            <div class="tool-palette tool-palette--desk" id="toolPalette">
+                <button id="btnNewDictationQuick" class="tool-palette-btn" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button id="btnHomeLibrary" class="tool-palette-btn" title="">
+                    <i data-lucide="home"></i>
+                </button>
+                <button id="btnPublicLibrary" class="tool-palette-btn" title="">
+                    <i data-lucide="globe"></i>
+                </button>
+                <button id="btnStudentPlan" class="tool-palette-btn" title="">
+                    <i data-lucide="calendar-check"></i>
+                </button>
+                <button id="btnTeacherAssignments" class="tool-palette-btn" title="">
+                    <i data-lucide="hat-glasses"></i>
+                </button>
+                <div class="tool-palette-separator"></div>
+                <button id="btnDeskZoomIn" class="tool-palette-btn" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button id="btnDeskZoomOut" class="tool-palette-btn" title="">
+                    <i data-lucide="minus"></i>
+                </button>
+            </div>
+            <div class="desk-scroll-container">
+                <div class="desk-cards-container" id="deskCardsContainer">
+                    <!-- Карточки диктантов будут загружаться через JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block page_scripts %}
     <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/private_library.js') }}?v={{ app_cache_revision }}"></script>
-</body>
-
-</html>
-
+{% endblock %}

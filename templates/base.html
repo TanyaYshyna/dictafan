@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="{{ ui_lang|default('en') }}" dir="{{ ui_dir|default('ltr') }}">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>{% block title %}DictaFan{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
+
+    <link rel="stylesheet" href="/static/css/style_color.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+
+    {% block page_head %}{% endblock %}
+</head>
+
+<body {% block body_attrs %}{% endblock %}>
+    {% block bootstrap_scripts %}
+    <script>
+        try {
+            const supported = ['en', 'uk', 'ru', 'ar'];
+            const storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
+            const stored = supported.includes(storedRaw) ? storedRaw : '';
+
+            const ssrLang = (document.documentElement.lang || '').toString().trim().toLowerCase();
+            const finalLang = stored || (supported.includes(ssrLang) ? ssrLang : 'en');
+
+            document.documentElement.lang = finalLang;
+            document.documentElement.dir = finalLang.startsWith('ar') ? 'rtl' : 'ltr';
+
+            if (stored && stored !== storedRaw) {
+                localStorage.setItem('ui_lang', stored);
+            }
+        } catch (e) {
+        }
+    </script>
+
+    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
+    <script>
+        var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
+
+        if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
+            window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, '{% block build_channel %}dictafan:build{% endblock %}');
+        }
+
+        try {
+            if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
+                window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
+            }
+        } catch (e) {
+        }
+    </script>
+    {% endblock %}
+
+    {% block topbar %}{% endblock %}
+
+    {% block modals %}{% endblock %}
+
+    {% block content %}{% endblock %}
+
+    {% block scripts %}
+    <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
+    <script> lucide.createIcons(); </script>
+    <script src="{{ url_for('static', filename='js/utils.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/audio_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/login_modal.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sw_register.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/idb_manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cover_manager.js') }}"></script>
+
+    {% block page_scripts %}{% endblock %}
+    {% endblock %}
+</body>
+
+</html>
