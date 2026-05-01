@@ -109,6 +109,19 @@
             localStorage.setItem('ui_lang', l);
         } catch (e) {
         }
+
+        try {
+            if (document && document.documentElement) {
+                document.documentElement.lang = l;
+                document.documentElement.dir = (l === 'ar') ? 'rtl' : 'ltr';
+            }
+        } catch (e) {
+        }
+
+        try {
+            window.dispatchEvent(new CustomEvent('ui-language-changed', { detail: { lang: l } }));
+        } catch (e) {
+        }
         await ensureLoaded();
     }
 

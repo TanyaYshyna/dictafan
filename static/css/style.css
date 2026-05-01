@@ -1839,6 +1839,7 @@ html[dir="rtl"] .topbar-save-group {
 /* Registration language selector should not add extra vertical spacing vs other rows */
 .login-modal-content .language-selector-wrapper {
     gap: 16px;
+    margin: 0;
 }
 
 .login-form .form-row {
@@ -1945,11 +1946,11 @@ html[dir="rtl"] .topbar-save-group {
 
 /* Стили для селектора языков в модальном окне регистрации */
 .login-modal-content .language-selector-wrapper {
-    margin: 16px 0;
+    margin: 0;
 }
 
 .login-modal-content .language-selector-wrapper .language-selector-group {
-    margin-bottom: 12px;
+    margin-bottom: 0;
 }
 
 /* Лейблы для селектора языков - такой же стиль, как у обычных лейблов формы */
@@ -2011,8 +2012,21 @@ html[dir="rtl"] .topbar-save-group {
 }
 
 .login-modal-content .language-selector-wrapper .custom-select-wrapper {
-    width: auto;
-    max-width: 280px;
+    width: 220px;
+    max-width: 220px;
+}
+
+/* Chevron must stick to the right edge regardless of the language label length */
+.login-modal-content .language-selector-wrapper .custom-select-trigger {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.login-modal-content .language-selector-wrapper .custom-select-trigger i[data-lucide] {
+    margin-left: auto;
+    flex: 0 0 auto;
 }
 
 @media (max-width: 520px) {
