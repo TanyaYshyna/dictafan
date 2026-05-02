@@ -9048,7 +9048,20 @@ async function initializeDictation() {
         } catch (e) {
             console.error('❌ Не удалось загрузить диктант из интернета:', e);
             hideDictationCacheFetchOverlay();
-            showNoSelectionModal(dictationT('no_selection_errors.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
+            try {
+                const raw = e && e.message ? String(e.message) : String(e);
+                const isStorage = raw.includes('fetch_sentences_failed_503')
+                    || raw.includes('fetch_sentences_failed_502')
+                    || raw.includes('_503_')
+                    || raw.includes('_502_');
+                if (isStorage) {
+                    showNoSelectionModal(dictationT('no_selection_errors.storage_unavailable', 'Хранилище временно недоступно. Попробуй ещё раз позже.'));
+                } else {
+                    showNoSelectionModal(dictationT('no_selection_errors.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
+                }
+            } catch (e2) {
+                showNoSelectionModal(dictationT('no_selection_errors.load_failed_check_internet', 'Не удалось загрузить диктант. Проверь интернет и обнови страницу.'));
+            }
             return;
         }
 

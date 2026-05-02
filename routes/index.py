@@ -907,6 +907,11 @@ def get_cover_url_for_id(dictation_id, language=None):
                 return f"/api/dictations_covers/{numeric_id}.webp"
         except Exception:
             logger.error("B2 cover check failed for %s", remote_path_new, exc_info=True)
+            # Важно: при временной недоступности B2 не «залипаем» на дефолтной обложке.
+            # Возвращаем канонический URL, чтобы фронт:
+            # - во время outage показал дефолт через onerror
+            # - после восстановления хранилища загрузил реальную обложку без ручной очистки кеша.
+            return f"/api/dictations_covers/{numeric_id}.webp"
 
     # --- 2) языковая обложка в /static/data/covers/ ---
     if language:

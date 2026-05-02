@@ -179,12 +179,16 @@ async function staleWhileRevalidateImage(request, event) {
           const netRes = await fetch(request);
           if (netRes && netRes.ok) {
             try {
-              await cache.put(cacheKey, netRes.clone());
+              const cc = (netRes.headers.get('cache-control') || '').toLowerCase();
+              const pragma = (netRes.headers.get('pragma') || '').toLowerCase();
+              const isNoStore = cc.includes('no-store') || cc.includes('no-cache') || pragma.includes('no-cache');
+              if (!isNoStore) {
+                await cache.put(cacheKey, netRes.clone());
+              }
             } catch (e) {
             }
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       })());
     }
     return cached;
@@ -210,7 +214,12 @@ async function staleWhileRevalidateImage(request, event) {
   const response = await fetch(request);
   if (response && response.ok) {
     try {
-      await cache.put(cacheKey, response.clone());
+      const cc = (response.headers.get('cache-control') || '').toLowerCase();
+      const pragma = (response.headers.get('pragma') || '').toLowerCase();
+      const isNoStore = cc.includes('no-store') || cc.includes('no-cache') || pragma.includes('no-cache');
+      if (!isNoStore) {
+        await cache.put(cacheKey, response.clone());
+      }
     } catch (e) {
     }
   }

@@ -3348,6 +3348,9 @@ async function _fetchSentencesFromServer(dictKey, langOrig, langTr) {
   if (!url) throw new Error('bad_sentences_url');
   const res = await fetch(url, { method: 'GET', cache: 'no-store' });
   if (!res.ok) {
+    if (res.status === 502 || res.status === 503) {
+      throw new Error(`storage_unavailable_${res.status}`);
+    }
     let t = '';
     try { t = await res.text(); } catch (e) {}
     throw new Error(`fetch_sentences_failed_${res.status}_${t}`);
@@ -7369,6 +7372,7 @@ function installEventHandlers() {
         if (card) card.classList.remove('short-card--menu-open');
       }
 
+      let prefetchOk = false;
       try {
         await prefetchDictationToCache({
           dictationId,
@@ -7377,6 +7381,8 @@ function installEventHandlers() {
           coverUrl,
         });
 
+        prefetchOk = true;
+
         try {
           await refreshDeskCardMetaFromServer(dictationId);
         } catch (e2) {
@@ -7384,14 +7390,22 @@ function installEventHandlers() {
       } catch (e) {
         const msg = e && e.message ? e.message : String(e);
         try {
-          showToast(`Не удалось получить в кеш: ${msg}`);
+          const isStorage = String(msg).includes('storage_unavailable_502')
+            || String(msg).includes('storage_unavailable_503')
+            || String(msg).includes('fetch_sentences_failed_502')
+            || String(msg).includes('fetch_sentences_failed_503');
+          if (isStorage) {
+            showToast('Хранилище временно недоступно. Попробуйте ещё раз позже.');
+          } else {
+            showToast(`Не удалось получить в кеш: ${msg}`);
+          }
         } catch (e2) {
         }
       }
 
       try {
         const card = btn && btn.closest ? btn.closest('.short-card') : null;
-        if (card) {
+        if (card && prefetchOk) {
           card.classList.add('short-card--cached');
 
           try {
@@ -7408,7 +7422,9 @@ function installEventHandlers() {
           }
         }
         const container = document.getElementById('deskCardsContainer') || document.getElementById('deskContainer') || document;
-        await applyCachedDictationCardStyles(container);
+        if (prefetchOk) {
+          await applyCachedDictationCardStyles(container);
+        }
       } catch (e) {
       }
 

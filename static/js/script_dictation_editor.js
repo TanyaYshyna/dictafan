@@ -30,6 +30,35 @@ function editorT(key, fallback, params) {
     return (fallback !== undefined && fallback !== null) ? String(fallback) : String(key || '');
 }
 
+function _notifyStorageUnavailableEditorOnce() {
+    try {
+        const now = Date.now();
+        const last = Number(window.__DICTAFAN_EDITOR_STORAGE_OUTAGE_LAST_SHOWN_AT || 0);
+        if (last && (now - last) < 15000) return;
+        window.__DICTAFAN_EDITOR_STORAGE_OUTAGE_LAST_SHOWN_AT = now;
+    } catch (e) {
+    }
+    const msg = 'Хранилище временно недоступно. Попробуй ещё раз позже.';
+    try {
+        if (typeof window.showToast === 'function') {
+            window.showToast(msg, { durationMs: 7000 });
+            return;
+        }
+    } catch (e) {
+    }
+    try {
+        if (typeof window.showSaveToast === 'function') {
+            window.showSaveToast(msg, 'error', 7000);
+            return;
+        }
+    } catch (e) {
+    }
+    try {
+        alert(msg);
+    } catch (e) {
+    }
+}
+
 function applyDictationEditorTranslations() {
     try {
         document.title = editorT('dictation_editor.title', 'Генератор диктантов');
@@ -10146,6 +10175,8 @@ async function saveDictationOnly() {
                         const resAudio = await uploadAudioThenCleanupB2({ dictationId: toId, token });
                         if (resAudio && resAudio.ok === true) {
                             setDirtyFlags({ audio: false });
+                        } else if (resAudio && (resAudio.status === 502 || resAudio.status === 503)) {
+                            _notifyStorageUnavailableEditorOnce();
                         }
                     } catch (e) {
                     }
@@ -10155,6 +10186,8 @@ async function saveDictationOnly() {
                         const resCover = await uploadDictationCoverFromCacheToB2({ dictationId: toId, token });
                         if (resCover && resCover.ok === true) {
                             setDirtyFlags({ cover: false });
+                        } else if (resCover && (resCover.status === 502 || resCover.status === 503)) {
+                            _notifyStorageUnavailableEditorOnce();
                         }
                     } catch (e) {
                     }
@@ -10263,6 +10296,8 @@ async function saveDictationOnly() {
                         if (resAudio && resAudio.ok === true) {
                             audioUploadOk = true;
                             setDirtyFlags({ audio: false });
+                        } else if (resAudio && (resAudio.status === 502 || resAudio.status === 503)) {
+                            _notifyStorageUnavailableEditorOnce();
                         }
                     } catch (e) {
                     }
@@ -10272,6 +10307,8 @@ async function saveDictationOnly() {
                         const resCover = await uploadDictationCoverFromCacheToB2({ dictationId: toId, token });
                         if (resCover && resCover.ok === true) {
                             setDirtyFlags({ cover: false });
+                        } else if (resCover && (resCover.status === 502 || resCover.status === 503)) {
+                            _notifyStorageUnavailableEditorOnce();
                         }
                     } catch (e) {
                     }
