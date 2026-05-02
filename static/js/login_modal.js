@@ -362,9 +362,39 @@ class LoginModal {
         } catch (e) {
         }
 
+        const applyUiLang = async (nextLang) => {
+            try {
+                const next = String(nextLang || '').trim().toLowerCase();
+                if (!supported.includes(next)) return;
+                if (next === current) return;
+                current = next;
+            } catch (e) {
+                return;
+            }
+
+            try { localStorage.setItem('ui_lang', current); } catch (e) {}
+            try {
+                if (window.I18n && typeof window.I18n.setLanguage === 'function') {
+                    await window.I18n.setLanguage(current);
+                }
+            } catch (e) {
+            }
+            try { await this._ensureI18n(); } catch (e) {}
+            try { await this.applyTranslations(); } catch (e) {}
+        };
+
         try {
             const languageData = window.LanguageManager?.getLanguageData?.() || window.LANGUAGE_DATA || {};
             if (!languageData || Object.keys(languageData).length === 0) {
+                if (!this._uiLangWaiterInstalled) {
+                    this._uiLangWaiterInstalled = true;
+                    const onData = () => {
+                        try { window.removeEventListener('language-data-updated', onData); } catch (e) {}
+                        try { this._uiLangWaiterInstalled = false; } catch (e) {}
+                        try { this.initUiLanguageSelector(); } catch (e) {}
+                    };
+                    try { window.addEventListener('language-data-updated', onData, { once: true }); } catch (e) {}
+                }
                 return;
             }
 
@@ -377,24 +407,8 @@ class LoginModal {
                 currentLearning: current,
                 languageData,
                 onLanguageChange: async (data) => {
-                    try {
-                        const next = String(data && data.nativeLanguage ? data.nativeLanguage : '').trim().toLowerCase();
-                        if (!supported.includes(next)) return;
-                        if (next === current) return;
-                        current = next;
-                    } catch (e) {
-                        return;
-                    }
-
-                    try { localStorage.setItem('ui_lang', current); } catch (e) {}
-                    try {
-                        if (window.I18n && typeof window.I18n.setLanguage === 'function') {
-                            await window.I18n.setLanguage(current);
-                        }
-                    } catch (e) {
-                    }
-                    try { await this._ensureI18n(); } catch (e) {}
-                    try { await this.applyTranslations(); } catch (e) {}
+                    const next = String(data && data.nativeLanguage ? data.nativeLanguage : '').trim().toLowerCase();
+                    await applyUiLang(next);
                 }
             });
 
