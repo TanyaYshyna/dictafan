@@ -1,0 +1,207 @@
+<div id="login-modal" class="modal" style="display: none;">
+    <div class="modal-content login-modal-content">
+        <div class="login-header">
+            <h2 id="loginModalTitle"></h2>
+            <div class="login-ui-lang" id="loginModalUiLangWrap" style="margin-left: 10px;"></div>
+            <button class="close-login-btn" id="closeLoginBtn" style="display: none;">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="login-body">
+            <p class="login-message" id="loginModalMessage"></p>
+
+            <form id="loginModalForm" class="login-form" style="display: none;" autocomplete="off">
+                <div class="form-row">
+                    <label for="loginModalEmail"></label>
+                    <input
+                        id="loginModalEmail"
+                        class="text-input auth-input"
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        required
+                        autocomplete="username"
+                    >
+                </div>
+
+                <div class="form-row">
+                    <label for="loginModalPassword"></label>
+                    <div class="password-input-wrapper">
+                        <input
+                            id="loginModalPassword"
+                            class="text-input auth-input"
+                            type="password"
+                            name="password"
+                            required
+                            autocomplete="current-password"
+                        >
+                        <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="loginModalPassword">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="loginModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                <div class="login-form-actions">
+                    <button type="submit" class="button-color-yellow auth-submit" id="loginModalSubmitBtn"></button>
+                </div>
+
+                <div class="login-form-actions" style="margin-top: 10px;">
+                    <button type="button" class="button-color-purple auth-submit" id="loginWithGoogleBtn">
+                        <i data-lucide="chrome"></i>
+                        Google
+                    </button>
+                </div>
+
+                <p class="form-note" style="margin-top: 10px;">
+                    <a href="#" id="switchToForgotLink"></a>
+                </p>
+
+                <p class="form-note">
+                    <span id="loginNoAccountPrefix"></span> <a href="#" id="switchToRegisterLink"></a>
+                </p>
+            </form>
+
+            <form id="forgotModalForm" class="login-form" style="display: none;" autocomplete="off">
+                <div class="form-row">
+                    <label for="forgotModalEmail"></label>
+                    <input
+                        id="forgotModalEmail"
+                        class="text-input auth-input"
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        required
+                        autocomplete="username"
+                    >
+                </div>
+
+                <div id="forgotModalInfoMessage" class="form-message" style="display: none;"></div>
+                <div id="forgotModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                <div class="login-form-actions">
+                    <button type="submit" class="button-color-yellow auth-submit" id="forgotModalSubmitBtn"></button>
+                </div>
+
+                <div class="login-form-actions" style="margin-top: 10px;">
+                    <button type="button" class="button-color-purple auth-submit" id="forgotModalTelegramBtn"></button>
+                </div>
+
+                <p class="form-note" style="margin-top: 10px;">
+                    <a href="#" id="switchBackToLoginFromForgotLink"></a>
+                </p>
+            </form>
+
+            <form id="resetModalForm" class="login-form" style="display: none;" autocomplete="off">
+                <div class="form-row">
+                    <label for="resetModalToken"></label>
+                    <input
+                        id="resetModalToken"
+                        class="text-input auth-input"
+                        type="text"
+                        name="token"
+                        required
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-row">
+                    <label for="resetModalPassword"></label>
+                    <div class="password-input-wrapper">
+                        <input
+                            id="resetModalPassword"
+                            class="text-input auth-input"
+                            type="password"
+                            name="password"
+                            required
+                            minlength="6"
+                            autocomplete="new-password"
+                        >
+                        <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="resetModalPassword">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="resetModalInfoMessage" class="form-message" style="display: none;"></div>
+                <div id="resetModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                <div class="login-form-actions">
+                    <button type="submit" class="button-color-yellow auth-submit" id="resetModalSubmitBtn"></button>
+                </div>
+
+                <p class="form-note" style="margin-top: 10px;">
+                    <a href="#" id="switchBackToLoginFromResetLink"></a>
+                </p>
+            </form>
+
+            <form id="registerModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="register">
+                <div class="form-row">
+                    <label for="registerModalUsername"></label>
+                    <input
+                        id="registerModalUsername"
+                        class="text-input auth-input"
+                        type="text"
+                        name="username"
+                        required
+                        autocomplete="off"
+                    >
+                </div>
+
+                <div class="form-row">
+                    <label for="registerModalEmail"></label>
+                    <input
+                        id="registerModalEmail"
+                        class="text-input auth-input"
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        required
+                        autocomplete="username"
+                    >
+                </div>
+
+                <div class="form-row">
+                    <label for="registerModalPassword"></label>
+                    <div class="password-input-wrapper">
+                        <input
+                            id="registerModalPassword"
+                            class="text-input auth-input"
+                            type="password"
+                            name="password"
+                            required
+                            minlength="6"
+                            autocomplete="new-password"
+                            data-1p-ignore="true"
+                            data-lpignore="true"
+                        >
+                        <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="registerModalPassword">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="registerModalLanguageSelector" class="language-selector-wrapper"></div>
+
+                <div id="registerModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+                <div class="login-form-actions">
+                    <button type="submit" class="button-color-yellow auth-submit" id="registerModalSubmitBtn"></button>
+                </div>
+
+                <div class="login-form-actions" style="margin-top: 10px;">
+                    <button type="button" class="button-color-purple auth-submit" id="registerWithGoogleBtn">
+                        <i data-lucide="chrome"></i>
+                        Google
+                    </button>
+                </div>
+
+                <p class="form-note">
+                    <span id="registerAlreadyPrefix"></span> <a href="#" id="switchToLoginLink"></a>
+                </p>
+            </form>
+        </div>
+    </div>
+</div>

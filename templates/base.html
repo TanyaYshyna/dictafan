@@ -57,7 +57,9 @@
 
     {% block topbar %}{% endblock %}
 
-    {% block modals %}{% endblock %}
+    {% block modals %}
+    {% include 'partials/login_modal.html' %}
+    {% endblock %}
 
     {% block content %}{% endblock %}
 

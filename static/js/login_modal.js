@@ -3,6 +3,214 @@
  * Показывает модальное окно поверх страницы, не теряя данные пользователя
  * Поддерживает переключение между режимами логина и регистрации
  */
+const __DICTAFAN_LOGIN_MODAL_HTML = `
+<div class="modal-content login-modal-content">
+    <div class="login-header">
+        <h2 id="loginModalTitle"></h2>
+        <div class="login-ui-lang" id="loginModalUiLangWrap" style="margin-left: 10px;"></div>
+        <button class="close-login-btn" id="closeLoginBtn" style="display: none;">
+            <i data-lucide="x"></i>
+        </button>
+    </div>
+
+    <div class="login-body">
+        <p class="login-message" id="loginModalMessage"></p>
+
+        <form id="loginModalForm" class="login-form" style="display: none;" autocomplete="off">
+            <div class="form-row">
+                <label for="loginModalEmail"></label>
+                <input
+                    id="loginModalEmail"
+                    class="text-input auth-input"
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <div class="form-row">
+                <label for="loginModalPassword"></label>
+                <div class="password-input-wrapper">
+                    <input
+                        id="loginModalPassword"
+                        class="text-input auth-input"
+                        type="password"
+                        name="password"
+                        required
+                        autocomplete="current-password"
+                    >
+                    <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="loginModalPassword">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="loginModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+            <div class="login-form-actions">
+                <button type="submit" class="button-color-yellow auth-submit" id="loginModalSubmitBtn"></button>
+            </div>
+
+            <div class="login-form-actions" style="margin-top: 10px;">
+                <button type="button" class="button-color-purple auth-submit" id="loginWithGoogleBtn">
+                    <i data-lucide="chrome"></i>
+                    Google
+                </button>
+            </div>
+
+            <p class="form-note" style="margin-top: 10px;">
+                <a href="#" id="switchToForgotLink"></a>
+            </p>
+
+            <p class="form-note">
+                <span id="loginNoAccountPrefix"></span> <a href="#" id="switchToRegisterLink"></a>
+            </p>
+        </form>
+
+        <form id="forgotModalForm" class="login-form" style="display: none;" autocomplete="off">
+            <div class="form-row">
+                <label for="forgotModalEmail"></label>
+                <input
+                    id="forgotModalEmail"
+                    class="text-input auth-input"
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <div id="forgotModalInfoMessage" class="form-message" style="display: none;"></div>
+            <div id="forgotModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+            <div class="login-form-actions">
+                <button type="submit" class="button-color-yellow auth-submit" id="forgotModalSubmitBtn"></button>
+            </div>
+
+            <div class="login-form-actions" style="margin-top: 10px;">
+                <button type="button" class="button-color-purple auth-submit" id="forgotModalTelegramBtn"></button>
+            </div>
+
+            <p class="form-note" style="margin-top: 10px;">
+                <a href="#" id="switchBackToLoginFromForgotLink"></a>
+            </p>
+        </form>
+
+        <form id="resetModalForm" class="login-form" style="display: none;" autocomplete="off">
+            <div class="form-row">
+                <label for="resetModalToken"></label>
+                <input
+                    id="resetModalToken"
+                    class="text-input auth-input"
+                    type="text"
+                    name="token"
+                    required
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="form-row">
+                <label for="resetModalPassword"></label>
+                <div class="password-input-wrapper">
+                    <input
+                        id="resetModalPassword"
+                        class="text-input auth-input"
+                        type="password"
+                        name="password"
+                        required
+                        minlength="6"
+                        autocomplete="new-password"
+                    >
+                    <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="resetModalPassword">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="resetModalInfoMessage" class="form-message" style="display: none;"></div>
+            <div id="resetModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+            <div class="login-form-actions">
+                <button type="submit" class="button-color-yellow auth-submit" id="resetModalSubmitBtn"></button>
+            </div>
+
+            <p class="form-note" style="margin-top: 10px;">
+                <a href="#" id="switchBackToLoginFromResetLink"></a>
+            </p>
+        </form>
+
+        <form id="registerModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="register">
+            <div class="form-row">
+                <label for="registerModalUsername"></label>
+                <input
+                    id="registerModalUsername"
+                    class="text-input auth-input"
+                    type="text"
+                    name="username"
+                    required
+                    autocomplete="off"
+                >
+            </div>
+
+            <div class="form-row">
+                <label for="registerModalEmail"></label>
+                <input
+                    id="registerModalEmail"
+                    class="text-input auth-input"
+                    type="email"
+                    name="email"
+                    placeholder="you@example.com"
+                    required
+                    autocomplete="username"
+                >
+            </div>
+
+            <div class="form-row">
+                <label for="registerModalPassword"></label>
+                <div class="password-input-wrapper">
+                    <input
+                        id="registerModalPassword"
+                        class="text-input auth-input"
+                        type="password"
+                        name="password"
+                        required
+                        minlength="6"
+                        autocomplete="new-password"
+                        data-1p-ignore="true"
+                        data-lpignore="true"
+                    >
+                    <button type="button" class="button-color-transparent password-toggle-btn" data-password-toggle="1" data-target-input="registerModalPassword">
+                        <i data-lucide="eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="registerModalLanguageSelector" class="language-selector-wrapper"></div>
+
+            <div id="registerModalErrorMessage" class="form-message error-message" style="display: none;"></div>
+
+            <div class="login-form-actions">
+                <button type="submit" class="button-color-yellow auth-submit" id="registerModalSubmitBtn"></button>
+            </div>
+
+            <div class="login-form-actions" style="margin-top: 10px;">
+                <button type="button" class="button-color-purple auth-submit" id="registerWithGoogleBtn">
+                    <i data-lucide="chrome"></i>
+                    Google
+                </button>
+            </div>
+
+            <p class="form-note">
+                <span id="registerAlreadyPrefix"></span> <a href="#" id="switchToLoginLink"></a>
+            </p>
+        </form>
+    </div>
+</div>
+`;
+
 class LoginModal {
     constructor() {
         this.modal = null;
@@ -74,248 +282,44 @@ class LoginModal {
         let modal = document.getElementById('login-modal');
         if (modal) {
             this.modal = modal;
+            if (!this._initialized) {
+                this._initialized = true;
+                try {
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                } catch (e) {
+                }
+
+                try {
+                    this.setupEventHandlers();
+                } catch (e) {
+                }
+
+                try {
+                    this.initUiLanguageSelector();
+                } catch (e) {
+                }
+
+                try {
+                    this.applyTranslations();
+                } catch (e) {
+                }
+            }
             return;
         }
 
-        // Создаем модальное окно
+        // Если шаблон не вставлен в HTML (страницы, которые еще не переведены на base.html)
+        // — создаем полную разметку на клиенте.
         modal = document.createElement('div');
         modal.id = 'login-modal';
         modal.className = 'modal';
         modal.style.display = 'none';
-
-        modal.innerHTML = `
-            <div class="modal-content login-modal-content">
-                <div class="login-header">
-                    <h2 id="loginModalTitle">${this._t('login_modal.titles.login_required', 'Требуется авторизация')}</h2>
-                    <div class="login-ui-lang" id="loginModalUiLangWrap" style="margin-left: 10px;"></div>
-                    <button class="close-login-btn" id="closeLoginBtn" style="display: none;">
-                        <i data-lucide="x"></i>
-                    </button>
-                </div>
-                
-                <div class="login-body">
-                    <p class="login-message" id="loginModalMessage">${this._t('login_modal.messages.login_required', 'Для работы с приложением необходимо войти в систему')}</p>
-                    
-                    <!-- Режим логина -->
-                    <form id="loginModalForm" class="login-form" style="display: none;" autocomplete="off">
-                        <div class="form-row">
-                            <label for="loginModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
-                            <input 
-                                id="loginModalEmail" 
-                                class="text-input auth-input" 
-                                type="email" 
-                                name="email" 
-                                placeholder="you@example.com" 
-                                required
-                                autocomplete="username"
-                            >
-                        </div>
-
-                        <div class="form-row">
-                            <label for="loginModalPassword">${this._t('login_modal.fields.password', 'Пароль')}</label>
-                            <div class="password-input-wrapper">
-                                <input 
-                                    id="loginModalPassword" 
-                                    class="text-input auth-input" 
-                                    type="password" 
-                                    name="password" 
-                                    placeholder="${this._t('login_modal.placeholders.password', 'Ваш пароль')}" 
-                                    required
-                                    autocomplete="current-password"
-                                >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="loginModalPassword">
-                                    <i data-lucide="eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div id="loginModalErrorMessage" class="form-message error-message" style="display: none;"></div>
-
-                        <div class="login-form-actions">
-                            <button type="submit" class="button-color-yellow auth-submit" id="loginModalSubmitBtn">
-                                ${this._t('login_modal.actions.login', 'Войти')}
-                            </button>
-                        </div>
-
-
-                        <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-purple auth-submit" id="loginWithGoogleBtn">
-                                <i data-lucide="chrome"></i>
-                                Google
-                            </button>
-                        </div>
-
-                        <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchToForgotLink">${this._t('login_modal.actions.forgot', 'Забыл пароль?')}</a>
-                        </p>
-
-                        <p class="form-note">
-                            <span id="loginNoAccountPrefix">${this._t('login_modal.hints.no_account_prefix', 'Нет аккаунта?')}</span> <a href="#" id="switchToRegisterLink">${this._t('login_modal.actions.switch_to_register', 'Зарегистрироваться')}</a>
-                        </p>
-                    </form>
-
-                    <form id="forgotModalForm" class="login-form" style="display: none;" autocomplete="off">
-                        <div class="form-row">
-                            <label for="forgotModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
-                            <input
-                                id="forgotModalEmail"
-                                class="text-input auth-input"
-                                type="email"
-                                name="email"
-                                placeholder="you@example.com"
-                                required
-                                autocomplete="username"
-                            >
-                        </div>
-
-                        <div id="forgotModalInfoMessage" class="form-message" style="display: none;"></div>
-                        <div id="forgotModalErrorMessage" class="form-message error-message" style="display: none;"></div>
-
-                        <div class="login-form-actions">
-                            <button type="submit" class="button-color-yellow auth-submit" id="forgotModalSubmitBtn">
-                                ${this._t('login_modal.actions.send', 'Отправить')}
-                            </button>
-                        </div>
-
-                        <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-purple auth-submit" id="forgotModalTelegramBtn">
-                                ${this._t('login_modal.actions.send_telegram', 'Отправить в Telegram')}
-                            </button>
-                        </div>
-
-                        <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchBackToLoginFromForgotLink">${this._t('login_modal.actions.back_to_login', 'Назад ко входу')}</a>
-                        </p>
-                    </form>
-
-                    <form id="resetModalForm" class="login-form" style="display: none;" autocomplete="off">
-                        <div class="form-row">
-                            <label for="resetModalToken">${this._t('login_modal.fields.code', 'Код')}</label>
-                            <input
-                                id="resetModalToken"
-                                class="text-input auth-input"
-                                type="text"
-                                name="token"
-                                placeholder="${this._t('login_modal.placeholders.code', 'вставь код из ссылки')}"
-                                required
-                                autocomplete="off"
-                            >
-                        </div>
-
-                        <div class="form-row">
-                            <label for="resetModalPassword">${this._t('login_modal.fields.new_password', 'Новый пароль')}</label>
-                            <div class="password-input-wrapper">
-                                <input
-                                    id="resetModalPassword"
-                                    class="text-input auth-input"
-                                    type="password"
-                                    name="password"
-                                    placeholder="${this._t('login_modal.placeholders.password_min', 'Минимум 6 символов')}"
-                                    required
-                                    minlength="6"
-                                    autocomplete="new-password"
-                                >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="resetModalPassword">
-                                    <i data-lucide="eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div id="resetModalInfoMessage" class="form-message" style="display: none;"></div>
-                        <div id="resetModalErrorMessage" class="form-message error-message" style="display: none;"></div>
-
-                        <div class="login-form-actions">
-                            <button type="submit" class="button-color-yellow auth-submit" id="resetModalSubmitBtn">
-                                ${this._t('login_modal.actions.save', 'Сохранить')}
-                            </button>
-                        </div>
-
-                        <p class="form-note" style="margin-top: 10px;">
-                            <a href="#" id="switchBackToLoginFromResetLink">${this._t('login_modal.actions.back_to_login', 'Назад ко входу')}</a>
-                        </p>
-                    </form>
-
-                    <!-- Режим регистрации -->
-                    <form id="registerModalForm" class="login-form" style="display: none;" autocomplete="off" data-form-type="register">
-                        <div class="form-row">
-                            <label for="registerModalUsername">${this._t('login_modal.fields.username', 'Имя пользователя')}</label>
-                            <input 
-                                id="registerModalUsername" 
-                                class="text-input auth-input" 
-                                type="text" 
-                                name="username" 
-                                placeholder="${this._t('login_modal.placeholders.username', 'Как вас называть?')}" 
-                                required
-                                autocomplete="off"
-                                data-1p-ignore="true"
-                                data-lpignore="true"
-                            >
-                        </div>
-
-                        <div class="form-row">
-                            <label for="registerModalEmail">${this._t('login_modal.fields.email', 'Почта')}</label>
-                            <input 
-                                id="registerModalEmail" 
-                                class="text-input auth-input" 
-                                type="email" 
-                                name="email" 
-                                placeholder="you@example.com" 
-                                required
-                                autocomplete="off"
-                                data-1p-ignore="true"
-                                data-lpignore="true"
-                            >
-                        </div>
-
-                        <div class="form-row">
-                            <label for="registerModalPassword">${this._t('login_modal.fields.password', 'Пароль')}</label>
-                            <div class="password-input-wrapper">
-                                <input 
-                                    id="registerModalPassword" 
-                                    class="text-input auth-input" 
-                                    type="password" 
-                                    name="password" 
-                                    placeholder="${this._t('login_modal.placeholders.password_min', 'Минимум 6 символов')}" 
-                                    required
-                                    minlength="6"
-                                    autocomplete="new-password"
-                                    data-1p-ignore="true"
-                                    data-lpignore="true"
-                                >
-                                <button type="button" class="button-color-transparent password-toggle-btn" aria-label="${this._t('login_modal.actions.show_password', 'Показать пароль')}" data-password-toggle="1" data-target-input="registerModalPassword">
-                                    <i data-lucide="eye"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div id="registerModalLanguageSelector" class="language-selector-wrapper"></div>
-
-                        <div id="registerModalErrorMessage" class="form-message error-message" style="display: none;"></div>
-
-                        <div class="login-form-actions">
-                            <button type="submit" class="button-color-yellow auth-submit" id="registerModalSubmitBtn">
-                                ${this._t('login_modal.actions.register', 'Зарегистрироваться')}
-                            </button>
-                        </div>
-
-
-                        <div class="login-form-actions" style="margin-top: 10px;">
-                            <button type="button" class="button-color-purple auth-submit" id="registerWithGoogleBtn">
-                                <i data-lucide="chrome"></i>
-                                Google
-                            </button>
-                        </div>
-
-                        <p class="form-note">
-                            <span id="registerAlreadyPrefix">${this._t('login_modal.hints.already_registered_prefix', 'Уже зарегистрированы?')}</span> <a href="#" id="switchToLoginLink">${this._t('login_modal.actions.switch_to_login', 'Войти')}</a>
-                        </p>
-                    </form>
-                </div>
-            </div>
-        `;
-
+        modal.innerHTML = __DICTAFAN_LOGIN_MODAL_HTML;
         document.body.appendChild(modal);
         this.modal = modal;
+
+        this._initialized = true;
 
         // Инициализируем иконки
         if (typeof lucide !== 'undefined') {
@@ -498,6 +502,25 @@ class LoginModal {
 
         try {
             this.decorateLanguageSelector();
+        } catch (e) {
+        }
+
+        try {
+            const toggles = document.querySelectorAll('.password-toggle-btn[data-password-toggle="1"]');
+            for (const toggleBtn of toggles) {
+                try {
+                    if (!toggleBtn) continue;
+                    const targetId = toggleBtn.getAttribute('data-target-input');
+                    if (!targetId) continue;
+                    const input = document.getElementById(targetId);
+                    if (!input) continue;
+                    const willShow = input.type === 'password';
+                    toggleBtn.setAttribute('aria-label', willShow
+                        ? this._t('login_modal.actions.show_password', 'Показать пароль')
+                        : this._t('login_modal.actions.hide_password', 'Скрыть пароль'));
+                } catch (e) {
+                }
+            }
         } catch (e) {
         }
     }
