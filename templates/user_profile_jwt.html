@@ -1,22 +1,14 @@
-<!DOCTYPE html>
-<html lang="{{ ui_lang }}" dir="{{ ui_dir }}">
+{% extends 'base.html' %}
 
-<head>
-    <meta charset="UTF-8">
-    <title>{{ t('profile.page_title') }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
-    <link rel="stylesheet" href="/static/css/style_color.css">
-    <link rel="stylesheet" href="/static/css/style.css">
+{% block title %}{{ t('profile.page_title') }}{% endblock %}
+
+{% block page_head %}
     <link rel="stylesheet" href="/static/css/style_user_profile.css">
     <link rel="stylesheet" href="/static/css/model_selector.css">
     <link rel="stylesheet" href="/static/css/language_selector.css">
-    <!-- Cropper.js для обрезки изображений -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
-    <!-- Transformers.js от Hugging Face для локального распознавания речи -->
-    <!-- Используем модульный подход -->
+
     <script type="module" id="transformers-loader">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
         
@@ -53,9 +45,16 @@
         } catch (e) {
         }
     </script>
-</head>
+{% endblock %}
 
-<body>
+{% block bootstrap_scripts %}
+    {{ super() }}
+    <script id="language-data" type="application/json">
+    {{ language_data | tojson | safe }}
+    </script>
+{% endblock %}
+
+{% block topbar %}
     <div class="topbar">
         <img src="/static/icons/logo.svg" class="logo" onclick="window.location.href='/'">
         <div class="user-section" id="user-section">
@@ -74,6 +73,10 @@
             </div>
         </div>
     </div>
+
+{% endblock %}
+
+{% block content %}
 
     <div class="profile-container">
         <div class="profile-header">
@@ -363,6 +366,12 @@
             </div>
         </div>
 
+    </div>
+{% endblock %}
+
+{% block modals %}
+    {{ super() }}
+
         <div id="groupModal" class="modal" style="display: none;">
             <div class="modal-content" style="max-width: 640px;">
                 <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
@@ -428,7 +437,6 @@
             </div>
         </div>
 
-        <!-- Модальное окно подтверждения выхода -->
         <div id="exitModal" class="modal" style="display: none;">
             <div class="modal-content exit-modal-content">
                 <h2>{{ t('profile.exit_modal.title') }}</h2>
@@ -447,7 +455,6 @@
             </div>
         </div>
 
-        <!-- Модальное окно обрезки изображения для аватара -->
         <div id="crop-modal" class="modal" style="display: none;">
             <div class="modal-content crop-modal-content">
                 <div class="modal-header">
@@ -468,32 +475,11 @@
                 </div>
             </div>
         </div>
-    </div>
-    
-    <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
+{% endblock %}
 
-    <script>
-        try {
-            if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
-        } catch (e) {
-        }
-    </script>
-
-    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
-
-    <script id="language-data" type="application/json">
-    {{ language_data | tojson | safe }}
-    </script>
-    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/language_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/model_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/user_manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_register.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}"></script>
+{% block page_scripts %}
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/language_selector.js') }}"></script>
     <script src="{{ url_for('static', filename='js/audio_settings_panel.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/script_user_profile.js') }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -533,6 +519,4 @@
             setTimeout(checkLibraries, 3000);
         });
     </script>
-</body>
-
-</html>
+{% endblock %}
