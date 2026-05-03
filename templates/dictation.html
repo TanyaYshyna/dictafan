@@ -1,20 +1,11 @@
-<!DOCTYPE html>
-<html lang="{{ ui_lang }}" dir="{{ ui_dir }}">
+{% extends 'base.html' %}
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <title>DictaFan</title>
-    <!-- <link rel="icon" href="/static/icons/logo_min.svg" type="image/svg+xml"> -->
-    <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
-    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
+{% block title %}DictaFan{% endblock %}
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style_color.css">
-    <link rel="stylesheet" href="/static/css/style.css">
+{% block build_channel %}dictafan:build:dictation{% endblock %}
+
+{% block page_head %}
     <link rel="stylesheet" href="/static/css/style_dictation.css">
-    <!-- Transformers.js от Hugging Face для локального распознавания речи -->
-    <!-- Используем модульный подход -->
     <script type="module" id="transformers-loader">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
 
@@ -41,49 +32,19 @@
         // Уведомляем о готовности
         window.dispatchEvent(new CustomEvent('transformers-ready'));
     </script>
-</head>
+{% endblock %}
 
-<body>
-    <script>
-        try {
-            const supported = ['en', 'uk', 'ru', 'ar'];
-            const storedRaw = (localStorage.getItem('ui_lang') || '').toString().trim().toLowerCase();
-            const stored = supported.includes(storedRaw) ? storedRaw : '';
-
-            // Prefer a valid stored language; otherwise keep SSR-provided lang/dir.
-            const ssrLang = (document.documentElement.lang || '').toString().trim().toLowerCase();
-            const finalLang = stored || (supported.includes(ssrLang) ? ssrLang : 'en');
-
-            document.documentElement.lang = finalLang;
-            document.documentElement.dir = finalLang.startsWith('ar') ? 'rtl' : 'ltr';
-
-            // Normalize localStorage to prevent future invalid loads
-            if (stored && stored !== storedRaw) {
-                localStorage.setItem('ui_lang', stored);
-            }
-        } catch (e) {
-        }
-    </script>
+{% block bootstrap_scripts %}
+    {{ super() }}
     <script>
         if (!window.__APP_CACHE_REVISION) window.__APP_CACHE_REVISION = "{{ app_cache_revision }}";
     </script>
-    <script src="{{ url_for('static', filename='js/app_build.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
-    <script>
-        var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
-
-        if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
-            window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, 'dictafan:build:dictation');
-        }
-
-        try {
-            if (window && window.BuildHelpers && typeof window.BuildHelpers.reportBuildToStatusBar === 'function') {
-                window.BuildHelpers.reportBuildToStatusBar(__APP_BUILD_LOCAL);
-            }
-        } catch (e) {
-        }
+    <script id="language-data" type="application/json">
+    {{ language_data | tojson | safe }}
     </script>
+{% endblock %}
+
+{% block topbar %}
     <div class="topbar">
         <img src="/static/icons/logo.svg" class="logo logo-full" onclick="window.location.href='/'">
         <img src="/static/icons/logo_min.svg" class="logo logo-min" onclick="window.location.href='/'">
@@ -115,6 +76,11 @@
             <a href="/user/register">Регистрация</a> -->
         </div>
     </div>
+
+{% endblock %}
+
+{% block modals %}
+    {{ super() }}
 
     <!-- Модальное окно выхода -->
     <div id="exitModal" class="modal" style="display: none;">
@@ -326,6 +292,10 @@
 
 
 
+{% endblock %}
+
+{% block content %}
+
     <div class="panel">
         <!-- Счетчик предложений -->
         <div class="panel-tablo">
@@ -496,15 +466,22 @@
         <source src="/static/sounds/success.ogg" type="audio/ogg">
     </audio>
 
+    <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
+    <div id="dictation-data" data-language-original="{{ language_original }}"
+        data-language-translation="{{ language_translation }}" data-lang-notice="{{ lang_notice|default('') }}" data-title-orig="{{ title_orig }}"
+        data-dictation-id="{{ dictation_id }}" data-is-dialog="{{ 'true' if is_dialog else 'false' }}"
+        data-speakers='{{ speakers | tojson | safe }}' {% if author_materials_url
+        %}data-author-materials-url="{{ author_materials_url }}" {% endif %} style="display: none;">
+    </div>
+
+{% endblock %}
+
+{% block scripts %}
     <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
     <script>
         lucide.createIcons();
     </script>
 
-    <!-- Сначала загружаем менеджеры -->
-    <script id="language-data" type="application/json">
-    {{ language_data | tojson | safe }}
-    </script>
     <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/language_selector.js') }}?v={{ app_cache_revision }}"></script>
@@ -527,14 +504,6 @@
     <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
 
     <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>
-
-    <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
-    <div id="dictation-data" data-language-original="{{ language_original }}"
-        data-language-translation="{{ language_translation }}" data-lang-notice="{{ lang_notice|default('') }}" data-title-orig="{{ title_orig }}"
-        data-dictation-id="{{ dictation_id }}" data-is-dialog="{{ 'true' if is_dialog else 'false' }}"
-        data-speakers='{{ speakers | tojson | safe }}' {% if author_materials_url
-        %}data-author-materials-url="{{ author_materials_url }}" {% endif %} style="display: none;">
-    </div>
 
     <!-- Загружаем основной скрипт СИНХРОННО -->
     <script src="{{ url_for('static', filename='js/script_dictation.js') }}?v={{ app_cache_revision }}"></script>
@@ -601,7 +570,4 @@
             }
         });
     </script>
-
-</body>
-
-</html>
+{% endblock %}
