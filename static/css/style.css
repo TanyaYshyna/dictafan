@@ -1836,6 +1836,10 @@ html[dir="rtl"] .topbar-save-group {
     gap: 16px;
 }
 
+.login-modal-content .login-form {
+    gap: 10px;
+}
+
 /* Registration language selector should not add extra vertical spacing vs other rows */
 .login-modal-content .language-selector-wrapper {
     gap: 16px;
