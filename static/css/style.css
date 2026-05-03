@@ -1,5 +1,9 @@
 /* Общие стили для всех страниц */
 
+:root {
+    color-scheme: light;
+}
+
 .container {
     max-width: 800px;
     margin: 0 auto;

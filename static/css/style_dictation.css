@@ -121,18 +121,12 @@ html[dir="rtl"] .topbar-save-group {
 
 /* Адаптивность для узких экранов на странице диктанта */
 @media (max-width: 768px) {
-    /* Показываем мини-логотип, скрываем полный */
     .logo-full {
         display: none;
     }
-    
+
     .logo-min {
-        display: block;
-    }
-    
-    /* Скрываем обложку диктанта */
-    .dictation-cover-wrapper {
-        display: none !important;
+        display: none;
     }
     
     /* Скрываем имя пользователя, оставляем только аватар */
@@ -143,6 +137,10 @@ html[dir="rtl"] .topbar-save-group {
     /* Убираем margin-right у аватара, так как имя скрыто */
     .user-avatar-small {
         margin-right: 0;
+    }
+
+    #saveBtn {
+        display: none !important;
     }
     
     /* При сужении кнопка btn-new-circle переходит на новую строку */
@@ -155,6 +153,12 @@ html[dir="rtl"] .topbar-save-group {
         width: 100%;
         margin-top: 8px;
         order: 10; /* Перемещаем в конец */
+    }
+}
+
+@media (max-width: 900px) {
+    .virtual-keyboard-container {
+        display: none !important;
     }
 }
 
