@@ -476,23 +476,8 @@
 
 {% endblock %}
 
-{% block scripts %}
-    <script src="{{ url_for('static', filename='js/lucide.js') }}"></script>
-    <script>
-        lucide.createIcons();
-    </script>
-
-    <script src="{{ url_for('static', filename='js/utils.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/language_manager.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/language_selector.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/model_manager.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/user_manager.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/login_modal.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_register.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}?v={{ app_cache_revision }}"></script>
-    <!-- Audio runtime must be loaded before UI wrapper -->
-    <script src="{{ url_for('static', filename='js/audio_manager.js') }}?v={{ app_cache_revision }}"></script>
+{% block page_scripts %}
+    <!-- Audio UI wrapper (depends on audio_manager.js from base.html) -->
     <script src="{{ url_for('static', filename='js/audio_player_visual.js') }}?v={{ app_cache_revision }}"></script>
     <!-- Статистика и отчеты -->
     <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
@@ -503,9 +488,7 @@
     <script src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
 
-    <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>
-
-    <!-- Загружаем основной скрипт СИНХРОННО -->
+    <!-- Основной скрипт диктанта -->
     <script src="{{ url_for('static', filename='js/script_dictation.js') }}?v={{ app_cache_revision }}"></script>
 
     <script>
