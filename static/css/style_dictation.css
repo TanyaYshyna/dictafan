@@ -161,10 +161,8 @@ html[dir="rtl"] .topbar-save-group {
         align-items: center;
     }
 
-    .panels-row .button-group {
+    .panels-row .sentence-nav-table {
         width: 100%;
-        flex-wrap: nowrap;
-        justify-content: space-between;
     }
 
     #progressPanelContainer {
@@ -1398,6 +1396,33 @@ html[dir="rtl"] .title-meta {
   align-items: flex-start;
   width: 100%;
   gap: 10px;
+}
+
+.sentence-nav-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.sentence-nav-table,
+.sentence-nav-table tr,
+.sentence-nav-table td {
+  border: none;
+}
+
+.sentence-nav-cell {
+  padding: 0;
+  vertical-align: middle;
+}
+
+.sentence-nav-prev,
+.sentence-nav-next,
+.sentence-nav-list {
+  width: 44px;
+}
+
+.sentence-nav-counter {
+  width: auto;
 }
 
 html[dir="rtl"] .panels-row {

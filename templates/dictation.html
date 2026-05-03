@@ -317,23 +317,33 @@
             </div>
             <!-- Строка с панелями навигации и результатов -->
             <div class="panels-row">
-                <div class="button-group">
-                    <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()" title="Ctrl+3">
-                        <i data-lucide="arrow-left"></i>
-                    </button>
-                    <div class="sentence-counter" id="sentenceCounter">
-                        <div class="sentence-counter-simple">
-                            <button id="sentenceCurrentNumber" class="sentence-current-number">1</button>
-                            <span id="sentenceTotalNumber" class="sentence-total-number">/ 0</span>
-                        </div>
-                    </div>
-                    <button id="checkNext" class="button-color-transparent" onclick="nextSentence()" title="Ctrl+4">
-                        <i data-lucide="arrow-right"></i>
-                    </button>
-                    <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()" title="Ctrl+0">
-                        <i data-lucide="file-text"></i>
-                    </button>
-                </div>
+                <table class="sentence-nav-table" role="presentation">
+                    <tr>
+                        <td class="sentence-nav-cell sentence-nav-prev">
+                            <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()" title="Ctrl+3">
+                                <i data-lucide="arrow-left"></i>
+                            </button>
+                        </td>
+                        <td class="sentence-nav-cell sentence-nav-counter">
+                            <div class="sentence-counter" id="sentenceCounter">
+                                <div class="sentence-counter-simple">
+                                    <button id="sentenceCurrentNumber" class="sentence-current-number">1</button>
+                                    <span id="sentenceTotalNumber" class="sentence-total-number">/ 0</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="sentence-nav-cell sentence-nav-next">
+                            <button id="checkNext" class="button-color-transparent" onclick="nextSentence()" title="Ctrl+4">
+                                <i data-lucide="arrow-right"></i>
+                            </button>
+                        </td>
+                        <td class="sentence-nav-cell sentence-nav-list">
+                            <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()" title="Ctrl+0">
+                                <i data-lucide="file-text"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </table>
                 <!-- Контейнер для рендера прогресс-панели (страница) -->
                 <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
             </div>
