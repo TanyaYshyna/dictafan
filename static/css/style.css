@@ -1849,7 +1849,6 @@ html[dir="rtl"] .topbar-save-group {
 .login-form .form-row {
     display: flex;
     flex-direction: column;
-    gap: 6px;
 }
 
 /* В модальном окне логина/регистрации — label + input в одну строку */
@@ -1857,7 +1856,7 @@ html[dir="rtl"] .topbar-save-group {
     display: grid;
     grid-template-columns: 110px minmax(0, 1fr);
     align-items: center;
-    gap: 12px;
+    gap: 0px 12px;
 }
 
 .login-modal-content .login-form .form-row label {
