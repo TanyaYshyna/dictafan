@@ -9932,13 +9932,13 @@ inputField.addEventListener('beforeinput', function (event) {
 
 // Требовать набор КАЖДОГО слова (без «сквозного» совпадения через одно)
 const REQUIRE_EVERY_WORD = true;
-// все варианты дефисов/тире/минуса (-, ‒, – , — , ―, −, а также обычный '-')
 const DASHES = /[\u2010\u2011\u2012\u2013\u2014\u2015\u2212-]/g;
 // «умные» апострофы → для унификации
 const CURLY_APOS = /[\u2019\u2018\u02BC]/g;
 // Расширенный regex для удаления всех знаков препинания, включая все варианты кавычек
-const PUNCTUATION_REGEX = /[.,!?:;"«»„"'"'"'"'"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
+const PUNCTUATION_REGEX = /[.,!?:;"«»„"'"'"'"'()\[\]{}،؛؟\u201C\u201D\u201E\u201F\u2033\u2036]/g;
 const ARABIC_DIACRITICS_REGEX = /[\u064B-\u065F\u0670\u0671\u06D6-\u06ED]/g;
+const ARABIC_ALIF_VARIANTS_REGEX = /[\u0622\u0623\u0625\u0671]/g;
 
 // === ЧИСЛА ДЛЯ ASR: маскируем и цифры, и словесные числа в <num> ===
 // === ЧИСЛА И НОРМАЛИЗАЦИЯ ДЛЯ ASR ===
@@ -10135,6 +10135,10 @@ function simplifyText(text) {
         .normalize('NFKC')          // унификация Юникода
         .toLowerCase();
     result = normalizeTurkishDottedI(result);
+    try {
+        result = result.replace(ARABIC_ALIF_VARIANTS_REGEX, 'ا');
+    } catch (e) {
+    }
 
     // Make '=' comparable with TTS/ASR that yields "equals".
     // User often types '=' in text input, but audio may say the word.
@@ -10268,6 +10272,11 @@ function normalizeForASR(raw) {
         .replace(/\u00AD/g, '')
         .replace(DASHES, ' ')   // КЛЮЧ: «more—that's» → "more that's"
         .toLowerCase();
+
+    try {
+        s = s.replace(ARABIC_ALIF_VARIANTS_REGEX, 'ا');
+    } catch (e) {
+    }
 
     // Arabic: strip diacritics/harakat and extended Quranic marks to avoid false mismatches.
     try {
@@ -10991,6 +11000,7 @@ function checkText() {
         try {
             return normalizeDictationInvisibleChars(String(raw || ''))
                 .toLowerCase()
+                .replace(ARABIC_ALIF_VARIANTS_REGEX, 'ا')
                 .replace(PUNCTUATION_REGEX, '')
                 .replace(ARABIC_DIACRITICS_REGEX, '')
                 .replace(/\s+/g, '')
