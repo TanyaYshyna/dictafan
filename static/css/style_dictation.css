@@ -210,6 +210,10 @@ html[dir="rtl"] .topbar-save-group {
         width: 100%;
         justify-content: center;
     }
+
+    .page-dictation .panel {
+        padding-bottom: calc(320px + var(--sw-status-bar-height, 0px) + env(safe-area-inset-bottom));
+    }
 }
 
 @media (max-width: 900px) {
@@ -1418,11 +1422,23 @@ html[dir="rtl"] .title-meta {
 .sentence-nav-prev,
 .sentence-nav-next,
 .sentence-nav-list {
-  width: 44px;
+  width: 36px;
 }
 
 .sentence-nav-counter {
   width: auto;
+}
+
+.sentence-nav-table button {
+  min-height: 32px;
+  height: 32px;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+}
+
+.sentence-nav-table .sentence-counter-simple {
+  gap: 6px;
 }
 
 html[dir="rtl"] .panels-row {
@@ -3108,6 +3124,30 @@ html[dir="rtl"] .audio-players-wrapper {
   gap: 8px;
   flex-wrap: nowrap;
   /* всё в одну строку */
+}
+
+@media (max-width: 500px) {
+  #panel-audio-visualizer {
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .audio-visualizer {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    flex: 1 1 100%;
+    height: 42px;
+  }
+
+  #word_percent {
+    height: 36px;
+  }
+
+  #btn-count-percent {
+    height: 36px;
+  }
 }
 
 /* Кнопка Play — тоже фиксируем, чтобы не ужималась */
