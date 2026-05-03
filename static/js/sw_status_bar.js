@@ -185,6 +185,38 @@
         el.appendChild(inner);
         document.body.appendChild(el);
 
+        try {
+          var applyLayoutOffsets = function () {
+            try {
+              var barEl = document.getElementById(BAR_ID);
+              if (!barEl) return;
+              var h = Math.ceil(barEl.getBoundingClientRect().height || 0);
+              if (!h) return;
+              try {
+                document.documentElement.style.setProperty('--sw-status-bar-height', h + 'px');
+              } catch (e0) {
+              }
+              try {
+                if (document.body) {
+                  document.body.style.paddingBottom = 'calc(' + h + 'px + env(safe-area-inset-bottom))';
+                }
+              } catch (e1) {
+              }
+            } catch (e2) {
+            }
+          };
+
+          applyLayoutOffsets();
+
+          if (!window.__dictafanSwStatusBarResizeHandlerAttached) {
+            window.__dictafanSwStatusBarResizeHandlerAttached = true;
+            window.addEventListener('resize', function () {
+              try { applyLayoutOffsets(); } catch (e3) { }
+            });
+          }
+        } catch (e) {
+        }
+
         // reflect any pending progress state
         try {
           if (progressState && progressState.active) {

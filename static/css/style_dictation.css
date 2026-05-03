@@ -170,6 +170,48 @@ html[dir="rtl"] .topbar-save-group {
     #progressPanelContainer {
         width: 100%;
     }
+
+    .button-group {
+        flex-wrap: nowrap !important;
+    }
+
+    .sentence-counter {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .sentence-counter-simple {
+        width: 100%;
+        justify-content: center;
+    }
+
+    #btn-new-circle {
+        flex: 0 0 auto;
+    }
+}
+
+@media (max-width: 500px) {
+    #panel-audio-visualizer {
+        flex-wrap: wrap;
+        justify-content: space-between;
+    }
+
+    .audio-visualizer {
+        flex: 1 1 100px;
+        width: 100%;
+        max-width: 100%;
+        margin-left: 0;
+    }
+
+    #word_percent,
+    #btn-count-percent {
+        flex: 0 0 auto;
+    }
+
+    #recordButton {
+        width: 100%;
+        justify-content: center;
+    }
 }
 
 @media (max-width: 900px) {
