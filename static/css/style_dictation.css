@@ -119,6 +119,19 @@ html[dir="rtl"] .topbar-save-group {
     display: none;
 }
 
+.page-dictation {
+  height: auto;
+  min-height: 100dvh;
+  overflow: auto;
+}
+
+.page-dictation .panel {
+  height: auto;
+  min-height: calc(100dvh - 80px);
+  max-height: none;
+  padding-bottom: calc(35px + env(safe-area-inset-bottom));
+}
+
 /* Адаптивность для узких экранов на странице диктанта */
 @media (max-width: 768px) {
     .logo-full {
@@ -142,17 +155,20 @@ html[dir="rtl"] .topbar-save-group {
     #saveBtn {
         display: none !important;
     }
-    
-    /* При сужении кнопка btn-new-circle переходит на новую строку */
-    .button-group {
+
+    .panels-row {
         flex-wrap: wrap;
+        align-items: center;
     }
-    
-    /* Кнопка btn-new-circle на новой строке при узком экране */
-    #btn-new-circle {
+
+    .panels-row .button-group {
         width: 100%;
-        margin-top: 8px;
-        order: 10; /* Перемещаем в конец */
+        flex-wrap: nowrap;
+        justify-content: space-between;
+    }
+
+    #progressPanelContainer {
+        width: 100%;
     }
 }
 
