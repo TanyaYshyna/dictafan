@@ -555,16 +555,82 @@ def api_get_dictation_sentences_simple(dictation_id):
 
 
 # ==============================================================
-# API endpoint для офлайн распознавания речи (заглушка)
+# API endpoint для server-side распознавания речи (Whisper)
 @dictation_bp.route('/api/speech-recognition/transcribe', methods=['POST'])
 def transcribe_audio():
-    """
-    Заглушка для локального распознавания речи.
-    В будущем здесь будет реализация с использованием локальных библиотек распознавания.
-    """
-    return jsonify({
-        'success': False,
-        'error': 'Локальное распознавание речи пока не реализовано',
-        'fallback': True
-    }), 501
+    try:
+        audio_file = request.files.get('audio')
+        if not audio_file:
+            return jsonify({'success': False, 'error': 'missing_audio'}), 400
+
+        lang = (request.form.get('lang') or request.args.get('lang') or '').strip()
+        # faster-whisper expects ISO-639-1 like "en". Accept "en-US".
+        language = (lang.split('-')[0].lower() if lang else None) or None
+
+        import tempfile
+        import os
+
+        suffix = None
+        try:
+            fn = (audio_file.filename or '').lower()
+            if '.' in fn:
+                suffix = '.' + fn.split('.')[-1]
+        except Exception:
+            suffix = None
+        if not suffix:
+            # default for MediaRecorder is usually webm
+            suffix = '.webm'
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp_path = tmp.name
+            audio_file.save(tmp)
+
+        try:
+            from faster_whisper import WhisperModel
+
+            # Cache model on app to avoid re-loading per request.
+            model = getattr(current_app, '_whisper_model_tiny', None)
+            if model is None:
+                # tiny model; CPU; int8 for speed.
+                model = WhisperModel('tiny', device='cpu', compute_type='int8')
+                setattr(current_app, '_whisper_model_tiny', model)
+
+            segments, info = model.transcribe(
+                tmp_path,
+                language=language,
+                vad_filter=True,
+            )
+
+            segs = []
+            texts = []
+            for s in segments:
+                try:
+                    t = (s.text or '').strip()
+                    if t:
+                        texts.append(t)
+                    segs.append({
+                        'start': float(getattr(s, 'start', 0.0) or 0.0),
+                        'end': float(getattr(s, 'end', 0.0) or 0.0),
+                        'text': t,
+                    })
+                except Exception:
+                    continue
+
+            text = ' '.join(texts).strip()
+
+            return jsonify({
+                'success': True,
+                'text': text,
+                'language': getattr(info, 'language', None),
+                'duration': float(getattr(info, 'duration', 0.0) or 0.0),
+                'segments': segs,
+            })
+        finally:
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+    except Exception as e:
+        current_app.logger.error(f"speech transcribe error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'transcribe_failed'}), 500
 

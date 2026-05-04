@@ -19,7 +19,7 @@ class AudioSettingsPanel {
             success: 'ot',
             repeats: 3,
             required_passed_star_half: 3,
-            speech_recognition_mode: 'route' // 'route' (интернет), 'route-off' (локально, только если модель загружена)
+            speech_recognition_mode: 'route' // 'route' (браузер/WebSpeech), 'route-server' (сервер), 'route-off' (локально, только если модель загружена)
         };
 
         // Текущие значения
@@ -1123,44 +1123,37 @@ class AudioSettingsPanel {
                     return;
                 }
                 
-                // Если модель не загружена, не позволяем переключаться на route-off
-                if (!hasModel) {
-                    const repeatsInput = document.getElementById(`${prefix}audioRepeatsInput`);
-                    if (repeatsInput) {
-                        repeatsInput.value = 0;
-                        repeatsInput.disabled = true;
-                        repeatsInput.max = '0';
-                    }
-                    this._updateSetting('repeats', 0);
-                    this.triggerChange();
+                // Переключаем между route -> route-server -> route-off
+                const nextMode = currentMode === 'route'
+                    ? 'route-server'
+                    : (currentMode === 'route-server' ? 'route-off' : 'route');
+
+                // Если модели нет — не позволяем включать локальный режим.
+                if (nextMode === 'route-off' && !hasModel) {
+                    this._showAutoCloseModal(
+                        this._t('profile.audio.speech_recognition.no_model_to_local', null, 'Модель Whisper не загружена. Локальный режим недоступен.'),
+                        3500
+                    );
                     return;
                 }
-                
-                // Переключаем только между route и route-off (убрали avto)
-                const nextMode = currentMode === 'route' ? 'route-off' : 'route';
-                
-                // Обновляем data-mode
+
                 speechRecognitionButton.dataset.mode = nextMode;
-                
-                // Обновляем иконку и лейбл
                 const icon = speechRecognitionButton.querySelector('.speech-recognition-icon');
                 const label = speechRecognitionButton.querySelector('.speech-recognition-label');
-                
-                if (icon) {
-                    icon.setAttribute('data-lucide', this.getSpeechRecognitionIcon(nextMode));
-                }
-                if (label) {
-                    label.textContent = this.getSpeechRecognitionLabel(nextMode);
-                }
-                
-                // Обновляем иконки Lucide
+                if (icon) icon.setAttribute('data-lucide', this.getSpeechRecognitionIcon(nextMode));
+                if (label) label.textContent = this.getSpeechRecognitionLabel(nextMode);
                 if (window.lucide && window.lucide.createIcons) {
-                    window.lucide.createIcons();
+                    try {
+                        window.lucide.createIcons({ root: speechRecognitionButton });
+                    } catch (e) {
+                        window.lucide.createIcons();
+                    }
                 }
-                
-                // Обновляем настройку
+
                 this._updateSetting('speech_recognition_mode', nextMode);
                 this.triggerChange();
+
+                updateButtonState();
             });
         }
         
@@ -1245,6 +1238,7 @@ class AudioSettingsPanel {
     getSpeechRecognitionIcon(mode) {
         const icons = {
             'route': 'route',
+            'route-server': 'server',
             'route-off': 'route-off'
         };
         return icons[mode] || 'route';
@@ -1255,6 +1249,7 @@ class AudioSettingsPanel {
      */
     getSpeechRecognitionLabel(mode) {
         const norm = String(mode || 'route');
+        if (norm === 'route-server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
         if (norm === 'route-off') return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
         return this._t('profile.audio.speech_recognition.mode_internet', null, 'интернет');
     }

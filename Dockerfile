@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     liblapack-dev \      
     libjpeg-dev \
     zlib1g-dev \
+    ffmpeg \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 

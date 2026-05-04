@@ -3430,7 +3430,7 @@ function stripDisallowedChars(text) {
     return result;
 }
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
-let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (только интернет), 'route-off' (только локально, только если модель загружена)
+let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (браузер/WebSpeech), 'route-server' (сервер), 'route-off' (локально, только если модель загружена)
 
 let whisperPreloadInFlight = null;
 let whisperPreloadAfterTableDone = false;
@@ -3563,6 +3563,31 @@ function getEffectiveSpeechRecognitionMode() {
     }
     return speechRecognitionMode;
 }
+
+async function transcribeOnServer(audioBlob, langCode) {
+    const blob = audioBlob;
+    if (!blob) throw new Error('missing_audio_blob');
+
+    const fd = new FormData();
+    const safeLang = (langCode || '').toString().trim() || (langCodeUrl || 'en-US');
+    fd.append('lang', safeLang);
+    fd.append('audio', blob, 'recording.webm');
+
+    const resp = await fetch('/api/speech-recognition/transcribe', {
+        method: 'POST',
+        body: fd,
+    });
+    if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(`server_transcribe_failed_${resp.status}_${text}`);
+    }
+    const data = await resp.json();
+    if (!data || data.success !== true) {
+        throw new Error(`server_transcribe_bad_response_${JSON.stringify(data)}`);
+    }
+    const t = (data.text != null) ? String(data.text) : '';
+    return t.trim();
+}
 let audioSettingsPanel = null;
 let audioSettingsModalPanel = null;  // Панель настроек в модальном окне
 
@@ -3586,11 +3611,13 @@ function initUnifiedSpeechRecognition() {
     const userAudioAnswer = document.getElementById('userAudioAnswer');
     const audioVisualizer = document.getElementById('audioVisualizer');
     
-    // Определяем режим распознавания (только 'online' или 'offline')
+    // Определяем режим распознавания ('online' | 'offline' | 'server')
     const effectiveMode = getEffectiveSpeechRecognitionMode();
-    let mode = 'online'; // по умолчанию онлайн
+    let mode = 'online'; // по умолчанию online (WebSpeech)
     if (effectiveMode === 'route-off') {
         mode = 'offline';
+    } else if (effectiveMode === 'route-server') {
+        mode = 'server';
     } else if (effectiveMode === 'route') {
         mode = 'online';
     }
@@ -3604,7 +3631,8 @@ function initUnifiedSpeechRecognition() {
         autoStopThreshold: AUTO_STOP_THRESHOLD,
         autoStopStableMs: AUTO_STOP_STABLE_MS,
         visualizerCanvas: audioVisualizer,
-        transcriptContainer: userAudioAnswer
+        transcriptContainer: userAudioAnswer,
+        onServerTranscribe: transcribeOnServer
     });
     
     // Настраиваем колбэки
@@ -6714,7 +6742,7 @@ async function stopRecording(cause = 'manual') {
         try {
             const effectiveMode = getEffectiveSpeechRecognitionMode();
             const userAudioAnswer = document.getElementById('userAudioAnswer');
-            if (effectiveMode === 'route' && userAudioAnswer) {
+            if ((effectiveMode === 'route' || effectiveMode === 'route-server') && userAudioAnswer) {
                 userAudioAnswer.innerHTML = escapeHtml(dictationT('speech.processing', 'Распознаю...'));
             }
         } catch (e) {
@@ -6884,9 +6912,11 @@ async function startRecording() {
         
         // Определяем режим для отображения сообщения пользователю
         const effectiveMode = getEffectiveSpeechRecognitionMode();
-        let mode = 'online'; // по умолчанию онлайн
+        let mode = 'online';
         if (effectiveMode === 'route-off') {
             mode = 'offline';
+        } else if (effectiveMode === 'route-server') {
+            mode = 'server';
         } else if (effectiveMode === 'route') {
             mode = 'online';
         }
@@ -7038,6 +7068,16 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
             // Получаем распознанный текст
             let spokenText = result.text || '';
+
+            // Server mode: transcribe using backend endpoint.
+            if (result.mode === 'server' && (!spokenText || !String(spokenText).trim())) {
+                try {
+                    const serverText = await transcribeOnServer(audioBlob, langCodeUrl || 'en-US');
+                    if (serverText) spokenText = serverText;
+                } catch (e) {
+                    console.error('❌ [saveRecording] Ошибка server transcribe:', e);
+                }
+            }
 
         // Если Whisper-режим (offline) — UnifiedSpeechRecognition не заполняет text.
         // На некоторых устройствах (особенно Android) WebSpeech (online) может вернуть пустой текст.
@@ -7593,6 +7633,9 @@ function updateRecognitionModeIcon() {
     if (effectiveMode === 'route') {
         iconName = 'route';
         title = 'Распознавание через интернет';
+    } else if (effectiveMode === 'route-server') {
+        iconName = 'server';
+        title = 'Распознавание на сервере (Whisper)';
     } else if (effectiveMode === 'route-off') {
         const currentLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
         const selectedSize = getSelectedWhisperModelSize(currentLang);
@@ -7633,6 +7676,12 @@ function initSpeechRecognition() {
         console.log('✅ [initSpeechRecognition] Режим: только через интернет (Web Speech API)');
         initWebSpeechRecognition();
         updateRecognitionModeIcon(); // Обновляем иконку
+        return;
+    } else if (effectiveMode === 'route-server') {
+        console.log('✅ [initSpeechRecognition] Режим: сервер (Whisper)');
+        // Ничего не инициализируем заранее: запись идёт на клиенте,
+        // транскрипция будет выполняться после stop (через /api/speech-recognition/transcribe)
+        updateRecognitionModeIcon();
         return;
     } else if (effectiveMode === 'route-off') {
         // "Только локально" - используем Whisper если модель загружена, иначе Web Speech API
