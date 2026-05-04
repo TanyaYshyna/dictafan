@@ -134,6 +134,28 @@ html[dir="rtl"] .topbar-save-group {
 
 /* Адаптивность для узких экранов на странице диктанта */
 @media (max-width: 768px) {
+    body.page-dictation {
+        overflow-x: hidden;
+        width: 100%;
+    }
+
+    body.page-dictation * {
+        max-width: 100%;
+    }
+
+    body.page-dictation .panel {
+        overflow-x: clip;
+    }
+
+    body.page-dictation .topbar,
+    body.page-dictation .panel,
+    body.page-dictation .panel-tablo,
+    body.page-dictation .panels-row,
+    body.page-dictation #progressPanelContainer {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
     .logo-full {
         display: none;
     }
