@@ -156,6 +156,14 @@ html[dir="rtl"] .topbar-save-group {
         box-sizing: border-box;
     }
 
+    body.page-dictation .panel-tablo {
+        gap: 0;
+    }
+
+    body.page-dictation .panels-row {
+        gap: 0;
+    }
+
     .logo-full {
         display: none;
     }
@@ -207,6 +215,16 @@ html[dir="rtl"] .topbar-save-group {
 
     #btn-new-circle {
         flex: 0 0 auto;
+    }
+
+    .sentence-nav-list {
+        width: 44px;
+    }
+
+    #btn-new-circle.button-32-32 {
+        width: 44px;
+        height: 44px;
+        min-height: 44px;
     }
 }
 
@@ -2541,6 +2559,13 @@ html[dir="rtl"] .audio-players-wrapper {
   justify-content: center;
   gap: 10px;
   color: var(--color-button-text-purple);
+}
+
+#pauseModal #resumeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 
