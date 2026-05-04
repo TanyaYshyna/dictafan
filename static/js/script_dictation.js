@@ -7039,16 +7039,17 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
             // Получаем распознанный текст
             let spokenText = result.text || '';
 
-        // Если офлайн-режим (Whisper) — UnifiedSpeechRecognition не заполняет text.
-        // Тогда распознаем здесь по audioBlob.
-            if (result.mode === 'offline' && (!spokenText || !String(spokenText).trim())) {
+        // Если Whisper-режим (offline) — UnifiedSpeechRecognition не заполняет text.
+        // На некоторых устройствах (особенно Android) WebSpeech (online) может вернуть пустой текст.
+        // В обоих случаях пробуем локальный Whisper как fallback (если модель есть).
+            if ((result.mode === 'offline' || result.mode === 'online') && (!spokenText || !String(spokenText).trim())) {
                 try {
                 const audioBlobForWhisper = audioBlob;
                 if (audioBlobForWhisper) {
                     const currentLang = langCodeUrl?.split('-')[0] || 'en';
                     const selectedSize = getSelectedWhisperModelSize(currentLang);
                     const hasModel = hasWhisperModel(currentLang, selectedSize);
-                    console.log(`🔍 [saveRecording] (unified) offline: модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
+                    console.log(`🔍 [saveRecording] (unified) whisper fallback: mode=${result.mode} модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
 
                     if (hasModel) {
                         let whisperModel = getWhisperModel(currentLang, selectedSize);

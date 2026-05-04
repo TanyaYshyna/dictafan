@@ -37,6 +37,15 @@
       this._finalizeReject = null;
     }
 
+    _isAndroidChrome() {
+      try {
+        const ua = (navigator && navigator.userAgent) ? String(navigator.userAgent) : '';
+        return /Android/i.test(ua) && /Chrome\//i.test(ua);
+      } catch (e) {
+        return false;
+      }
+    }
+
     async startRecording() {
       try {
         this._audioChunks = [];
@@ -66,6 +75,23 @@
           if (typeof this.callbacks.onRecordingStart === 'function') {
             this.callbacks.onRecordingStart();
           }
+
+          // WebSpeech on Android Chrome is sensitive to the start timing.
+          // Start it after MediaRecorder has actually started.
+          if (this.state.mode === 'online') {
+            try {
+              const delayMs = this._isAndroidChrome() ? 180 : 0;
+              setTimeout(() => {
+                try {
+                  if (this.state.mode === 'online' && this.state.isRecording) {
+                    this._initWebSpeech();
+                  }
+                } catch (e) {
+                }
+              }, delayMs);
+            } catch (e) {
+            }
+          }
         };
 
         mr.onstop = () => {
@@ -76,10 +102,6 @@
             this.callbacks.onRecordingStop();
           }
         };
-
-        if (this.state.mode === 'online') {
-          this._initWebSpeech();
-        }
 
         mr.start();
       } catch (e) {
@@ -221,12 +243,19 @@
         return;
       }
 
+      // Do not start multiple recognition instances for the same session.
+      if (this._recognition) return;
+
+      const isAndroidChrome = this._isAndroidChrome();
+
       const rec = new SpeechRecognition();
       this._recognition = rec;
       const mySessionId = this._sessionId;
       rec.lang = this.state.language;
-      rec.interimResults = true;
-      rec.continuous = true;
+      // Android Chrome often returns empty transcripts in continuous+interim mode.
+      // Prefer single-utterance recognition with final results.
+      rec.interimResults = !isAndroidChrome;
+      rec.continuous = !isAndroidChrome;
 
       rec.onresult = (event) => {
         if (this._ignoreResults) return;
@@ -279,6 +308,18 @@
           if (this._isFinalizing && typeof this._finalizeResolve === 'function') {
             this._finalizeResolve();
           }
+        } catch (e) {
+        }
+
+        // While recording, WebSpeech on mobile may end unexpectedly.
+        // Restart recognition to keep getting results.
+        try {
+          if (mySessionId !== this._sessionId) return;
+          if (this._ignoreResults) return;
+          if (this._isFinalizing) return;
+          if (!this.state.isRecording) return;
+          // rec may throw if started too fast; ignore.
+          rec.start();
         } catch (e) {
         }
       };
