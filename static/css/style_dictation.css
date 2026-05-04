@@ -1462,7 +1462,7 @@ html[dir="rtl"] .title-meta {
 .sentence-nav-prev,
 .sentence-nav-next,
 .sentence-nav-list {
-  width: 36px;
+  width: 44px;
 }
 
 .sentence-nav-counter {
@@ -1475,6 +1475,19 @@ html[dir="rtl"] .title-meta {
   padding-top: 0;
   padding-bottom: 0;
   line-height: 1;
+}
+
+.sentence-nav-prev > button,
+.sentence-nav-next > button,
+.sentence-nav-list > button {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 .sentence-nav-table .sentence-counter-simple {
