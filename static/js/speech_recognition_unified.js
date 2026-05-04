@@ -233,7 +233,11 @@
         if (mySessionId !== this._sessionId) return;
 
         // Accept results both while recording and while finalizing after manual Stop.
-        if (!this.state.isRecording && !this._isFinalizing) return;
+        // On some devices SpeechRecognition may emit results before MediaRecorder.onstart
+        // flips state.isRecording=true. In that case, still accept results if the
+        // underlying MediaRecorder is already in 'recording' state.
+        const mrState = (this._mediaRecorder && this._mediaRecorder.state) ? String(this._mediaRecorder.state) : '';
+        if (!this.state.isRecording && !this._isFinalizing && mrState !== 'recording') return;
         let interim = '';
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
