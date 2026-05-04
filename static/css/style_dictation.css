@@ -226,6 +226,10 @@ html[dir="rtl"] .topbar-save-group {
         height: 44px;
         min-height: 44px;
     }
+
+    #checkBtn .check-btn-label {
+        display: none;
+    }
 }
 
 @media (max-width: 500px) {
@@ -1470,11 +1474,13 @@ html[dir="rtl"] .title-meta {
 }
 
 .sentence-nav-table button {
-  min-height: 32px;
-  height: 32px;
-  padding-top: 0;
-  padding-bottom: 0;
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sentence-nav-prev > button,
@@ -1492,6 +1498,24 @@ html[dir="rtl"] .title-meta {
 
 .sentence-nav-table .sentence-counter-simple {
   gap: 6px;
+}
+
+.sentence-nav-table .sentence-counter,
+.sentence-nav-table .sentence-counter-simple,
+.sentence-nav-table .sentence-current-number,
+.sentence-nav-table .sentence-total-number {
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+}
+
+body.page-dictation #checkPrevios:focus,
+body.page-dictation #checkPrevios:focus-visible,
+body.page-dictation #checkNext:focus,
+body.page-dictation #checkNext:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.55);
+  outline-offset: 3px;
 }
 
 html[dir="rtl"] .panels-row {
