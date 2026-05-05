@@ -304,11 +304,18 @@
             <!-- Строка с панелями навигации и результатов -->
             <div class="panels-row">
                 <table class="sentence-nav-table" role="presentation">
+                    <colgroup>
+                        <col class="sentence-nav-col sentence-nav-col-1">
+                        <col class="sentence-nav-col sentence-nav-col-2">
+                        <col class="sentence-nav-col sentence-nav-col-3">
+                        <col class="sentence-nav-col sentence-nav-col-4">
+                        <col class="sentence-nav-col sentence-nav-col-5">
+                    </colgroup>
                     <tr class="sentence-nav-top-row">
-                        <td class="sentence-nav-cell sentence-nav-flags" colspan="3">
+                        <td class="sentence-nav-cell sentence-nav-flags" colspan="2">
                             <div id="dictationLangPair" class="dictation-langpair"></div>
                         </td>
-                        <td class="sentence-nav-cell sentence-nav-title">
+                        <td class="sentence-nav-cell sentence-nav-title" colspan="3">
                             <h2 class="dictation-title">{{ title_orig }}</h2>
                         </td>
                     </tr>
@@ -318,6 +325,7 @@
                                 <i data-lucide="arrow-left"></i>
                             </button>
                         </td>
+                        <td class="sentence-nav-cell sentence-nav-flags-spacer"></td>
                         <td class="sentence-nav-cell sentence-nav-counter">
                             <div class="sentence-counter" id="sentenceCounter">
                                 <div class="sentence-counter-simple">

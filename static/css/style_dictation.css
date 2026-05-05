@@ -1402,6 +1402,9 @@ body.playing-audio::after {
 
 .dictation-title {
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: center;
 }
 
@@ -1453,6 +1456,26 @@ html[dir="rtl"] .title-meta {
   width: 100%;
 }
 
+.sentence-nav-col-1 {
+  width: 40px;
+}
+
+.sentence-nav-col-2 {
+  width: 70px;
+}
+
+.sentence-nav-col-3 {
+  width: auto;
+}
+
+.sentence-nav-col-4 {
+  width: 40px;
+}
+
+.sentence-nav-col-5 {
+  width: auto;
+}
+
 .sentence-nav-table,
 .sentence-nav-table tr,
 .sentence-nav-table td {
@@ -1477,7 +1500,27 @@ html[dir="rtl"] .title-meta {
 }
 
 .sentence-nav-counter {
-  width: 100px;
+  width: 70px;
+}
+
+.sentence-nav-flags-spacer {
+  width: 70px;
+}
+
+.sentence-nav-bottom-row .sentence-nav-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.sentence-nav-bottom-row .sentence-nav-counter .sentence-counter {
+  width: 100%;
+  min-width: 0;
+}
+
+.sentence-nav-bottom-row .sentence-nav-counter #checkNext {
+  flex: 0 0 auto;
 }
 
 .sentence-nav-bottom-row .sentence-nav-list {
@@ -1987,6 +2030,17 @@ html[dir="rtl"] .audio-players-wrapper {
   gap: 4px;
   flex-shrink: 0;
   white-space: nowrap;
+  min-height: 44px;
+}
+
+@media (max-width: 520px) {
+  #whisperModelReadyBadge {
+    display: none !important;
+  }
+
+  #recognitionModeIcon {
+    display: none !important;
+  }
 }
 
 /* Язык перевода (ru) - зеленый, 20px, жирный, выровнен с en */
