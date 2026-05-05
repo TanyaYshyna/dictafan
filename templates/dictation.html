@@ -301,24 +301,18 @@
     <div class="panel">
         <!-- Счетчик предложений -->
         <div class="panel-tablo">
-            <!-- Строка с заголовком и ID диктанта -->
-            <div class="title-row">
-                <div class="dictation-title-group">
-                    <div class="dictation-title-row">
-                        <div id="dictationLangPair" class="dictation-langpair"></div>
-                        <h2 class="dictation-title">{{ title_orig }}</h2>
-                    </div>
-                </div>
-                <div class="title-meta">
-                    <span id="dictationIdDisplay" class="dictation-id">{{ dictation_id }}</span>
-                    <span id="unsavedStar" class="unsaved-star"
-                        title="Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)" style="display:none">*</span>
-                </div>
-            </div>
             <!-- Строка с панелями навигации и результатов -->
             <div class="panels-row">
                 <table class="sentence-nav-table" role="presentation">
-                    <tr>
+                    <tr class="sentence-nav-top-row">
+                        <td class="sentence-nav-cell sentence-nav-flags" colspan="3">
+                            <div id="dictationLangPair" class="dictation-langpair"></div>
+                        </td>
+                        <td class="sentence-nav-cell sentence-nav-title">
+                            <h2 class="dictation-title">{{ title_orig }}</h2>
+                        </td>
+                    </tr>
+                    <tr class="sentence-nav-bottom-row">
                         <td class="sentence-nav-cell sentence-nav-prev">
                             <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()" title="Ctrl+3">
                                 <i data-lucide="arrow-left"></i>
@@ -344,6 +338,11 @@
                         </td>
                     </tr>
                 </table>
+                <div class="dictation-meta-hidden" style="display:none;">
+                    <span id="dictationIdDisplay" class="dictation-id">{{ dictation_id }}</span>
+                    <span id="unsavedStar" class="unsaved-star"
+                        title="Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)" style="display:none">*</span>
+                </div>
                 <!-- Контейнер для рендера прогресс-панели (страница) -->
                 <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
             </div>

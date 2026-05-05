@@ -17,6 +17,10 @@
       updatedAt: 0,
     };
 
+    var leftInfo = {
+      text: '',
+    };
+
     // Public page-published info shown on the right.
     // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
     var pageInfo = {
@@ -141,6 +145,11 @@
         msg.id = BAR_ID + '__msg';
         msg.textContent = 'SW: idle';
 
+        var leftExtra = document.createElement('div');
+        leftExtra.className = 'swbar-msg';
+        leftExtra.id = BAR_ID + '__leftExtra';
+        leftExtra.textContent = '';
+
         var prog = document.createElement('div');
         prog.className = 'swbar-progress';
         prog.id = BAR_ID + '__progress';
@@ -162,6 +171,7 @@
         pct.textContent = '';
 
         leftWrap.appendChild(msg);
+        leftWrap.appendChild(leftExtra);
         left.appendChild(leftWrap);
 
         var right = document.createElement('div');
@@ -388,6 +398,23 @@
         } catch (e) {
         }
         updateProgressUi(progressState.label, progressState.percent, progressState.kind);
+      };
+
+      window.setSwBarLeftInfo = function (text) {
+        try {
+          leftInfo.text = String(text || '').trim();
+        } catch (e) {
+          leftInfo.text = '';
+        }
+        try {
+          ensureBar();
+        } catch (e2) {
+        }
+        try {
+          var el = document.getElementById(BAR_ID + '__leftExtra');
+          if (el) el.textContent = leftInfo.text ? (' ' + leftInfo.text) : '';
+        } catch (e3) {
+        }
       };
     } catch (e) {
     }

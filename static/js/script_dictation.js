@@ -949,6 +949,12 @@ function renderAssignmentSourceGroupIfAny() {
 
         if (!Array.isArray(positions) || positions.length === 0) {
             idEl.textContent = baseId;
+            try {
+                if (typeof window.setSwBarLeftInfo === 'function') {
+                    window.setSwBarLeftInfo(`dict: ${baseId}`);
+                }
+            } catch (e) {
+            }
             return;
         }
 
@@ -956,6 +962,12 @@ function renderAssignmentSourceGroupIfAny() {
         uniq.sort((a, b) => a - b);
         if (!uniq.length) {
             idEl.textContent = baseId;
+            try {
+                if (typeof window.setSwBarLeftInfo === 'function') {
+                    window.setSwBarLeftInfo(`dict: ${baseId}`);
+                }
+            } catch (e) {
+            }
             return;
         }
 
@@ -964,6 +976,12 @@ function renderAssignmentSourceGroupIfAny() {
             const total = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
             if (total > 0 && uniq.length >= total) {
                 idEl.textContent = baseId;
+                try {
+                    if (typeof window.setSwBarLeftInfo === 'function') {
+                        window.setSwBarLeftInfo(`dict: ${baseId}`);
+                    }
+                } catch (e) {
+                }
                 return;
             }
         } catch (e) {
@@ -990,6 +1008,12 @@ function renderAssignmentSourceGroupIfAny() {
 
         const compact = ranges.join(',');
         idEl.textContent = compact ? `${baseId} (${compact})` : baseId;
+        try {
+            if (typeof window.setSwBarLeftInfo === 'function') {
+                window.setSwBarLeftInfo(compact ? `dict: ${baseId} | task: ${compact}` : `dict: ${baseId}`);
+            }
+        } catch (e) {
+        }
     } catch (e) {
     }
 }
@@ -10820,7 +10844,7 @@ function disableCheckButton(active) {
     switch (active) {
         case 2:
             checkBtn.disabled = false;
-            checkBtn.innerHTML = `<i data-lucide="corner-down-left"></i><span class="check-btn-label">${dictationT('main_status.checking', 'Проверка')}</span>`;
+            checkBtn.innerHTML = `<i data-lucide="corner-down-left"></i>`;
             checkBtn.title = dictationT('main.check_title', 'Нажмите Enter/Return когда закончили ввод текста');
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-yellow');
@@ -10828,8 +10852,8 @@ function disableCheckButton(active) {
 
         case 0:
             checkBtn.disabled = true;
-            checkBtn.innerHTML = `<i data-lucide="star" class="check-btn-icon"></i><span class="check-btn-label">${dictationT('main_status.excellent', 'Прекрасно')}</span>`;
-            checkBtn.title = '';
+            checkBtn.innerHTML = `<i data-lucide="star" class="check-btn-icon"></i>`;
+            checkBtn.title = dictationT('main_status.excellent', 'Прекрасно');
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-mint');
             hideVirtualKeyboardIfActive();
@@ -10837,8 +10861,8 @@ function disableCheckButton(active) {
 
         case 1:
             checkBtn.disabled = true;
-            checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i><span class="check-btn-label">${dictationT('main_status.good', 'Хорошо')}</span>`;
-            checkBtn.title = '';
+            checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i>`;
+            checkBtn.title = dictationT('main_status.good', 'Хорошо');
             if (userInput) userInput.contentEditable = "true";
             checkBtn.classList.add('button-color-lightgreen');
             hideVirtualKeyboardIfActive();

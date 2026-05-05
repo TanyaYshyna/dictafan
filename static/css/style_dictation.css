@@ -1469,8 +1469,34 @@ html[dir="rtl"] .title-meta {
   width: 44px;
 }
 
+.sentence-nav-bottom-row .sentence-nav-list {
+  width: auto;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.sentence-nav-bottom-row .sentence-nav-list > button {
+  margin-right: auto;
+}
+
 .sentence-nav-counter {
   width: auto;
+}
+
+.sentence-nav-flags {
+  width: auto;
+}
+
+.sentence-nav-title {
+  width: auto;
+}
+
+.sentence-nav-title .dictation-title {
+  margin: 0;
+}
+
+.sentence-nav-list {
+  text-align: left;
 }
 
 .sentence-nav-table button {
