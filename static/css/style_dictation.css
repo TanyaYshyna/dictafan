@@ -269,7 +269,9 @@ html[dir="rtl"] .topbar-save-group {
 /* Спикер в диктанте */
 .speaker-tablo-overlay {
     position: relative;
-    min-height: 36px;
+    height: 30px;
+    min-height: 0;
+    overflow: visible;
 }
 
 .speaker-tablo-overlay #speaker {
@@ -286,6 +288,22 @@ html[dir="rtl"] .topbar-save-group {
     position: absolute;
     right: 0;
     top: 0;
+    margin-left: 0 !important;
+}
+
+@media (max-width: 900px) {
+    #whisperModelReadyBadge {
+        display: none !important;
+    }
+
+    #recognitionModeIcon {
+        display: none !important;
+    }
+}
+
+#recordButton svg {
+    width: 24px;
+    height: 24px;
 }
 
 #title-diktation {
