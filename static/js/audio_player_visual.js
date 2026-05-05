@@ -67,32 +67,32 @@ class AudioPlayerVisual {
     render() {
         this.container.innerHTML = `
             <div class="controls">
-                <span id="language" style="color: var(--color-button-text-yellow, #fbbf24); font-size: 20px; font-weight: 800; margin-right: 0; min-width: 40px;"></span>
+                <span id="language" class="audio-player-language"></span>
                 <button class="play-btn">
                     <i data-lucide="play"></i>
                 </button>
-                <input type="range" class="progress-bar" min="0" max="100" value="0" style="position: relative; min-width: ${this.options.progressBarMinWidth}px; max-width: ${this.options.progressBarMaxWidth}px; width: ${this.options.progressBarWidth}px;">
+                <input type="range" class="progress-bar" min="0" max="100" value="0">
                 <span class="total-time">0:00</span>
-                <div class="audio-type-select-wrapper" style="position: relative; display: inline-block; vertical-align: middle;">
-                    <button class="audio-type-select-button" style="border: 1px solid #ddd; padding: 3px 12px; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 20px; font-weight: 800; vertical-align: middle;">
-                        <span class="audio-type-display" style="color: var(--color-button-text-yellow, #fbbf24); font-weight: 500;">o</span>
-                        <i data-lucide="chevron-down" class="audio-type-arrow" style="width: 14px; height: 14px;"></i>
+                <div class="audio-type-select-wrapper">
+                    <button class="audio-type-select-button" type="button">
+                        <span class="audio-type-display">o</span>
+                        <i data-lucide="chevron-down" class="audio-type-arrow"></i>
                     </button>
-                    <ul class="audio-type-options" style="display: none; list-style: none; padding: 0; margin: 0; position: absolute; bottom: 100%; background: white; border: 1px solid #ddd; border-radius: 4px; width: max-content; min-width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; margin-bottom: 4px; max-height: 200px; overflow-y: auto; white-space: nowrap;">
-                        <li data-value="o" class="selected" style="padding: 8px 12px; cursor: pointer; font-size: 16px; border-bottom: 1px solid #eee; transition: background 0.2s; white-space: nowrap;">o - по умолчанию</li>
-                        <li data-value="a" style="padding: 8px 12px; cursor: pointer; font-size: 16px; border-bottom: 1px solid #eee; transition: background 0.2s; white-space: nowrap;">a - автоозвучка</li>
-                        <li data-value="f" style="padding: 8px 12px; cursor: pointer; font-size: 16px; border-bottom: 1px solid #eee; transition: background 0.2s; white-space: nowrap;">f - из файла</li>
-                        <li data-value="m" style="padding: 8px 12px; cursor: pointer; font-size: 16px; transition: background 0.2s; white-space: nowrap;">m - запись</li>
+                    <ul class="audio-type-options">
+                        <li data-value="o" class="selected">o - по умолчанию</li>
+                        <li data-value="a">a - автоозвучка</li>
+                        <li data-value="f">f - из файла</li>
+                        <li data-value="m">m - запись</li>
                     </ul>
                 </div>
-                <div class="custom-speed-select" style="position: relative; display: inline-block; vertical-align: middle;">
-                    <button class="speed-select-button">
+                <div class="custom-speed-select">
+                    <button class="speed-select-button" type="button">
                         <span class="speed-selected">1×</span>
-                        <i data-lucide="chevron-down" class="speed-arrow" style="width: 14px; height: 14px;"></i>
+                        <i data-lucide="chevron-down" class="speed-arrow"></i>
                     </button>
-                    <ul class="speed-options" style="display: none; list-style: none; padding: 0; margin: 0; position: absolute; bottom: 100%; background: white; border: 1px solid #ddd; border-radius: 4px; min-width: 80px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); z-index: 1000; margin-bottom: 4px; max-height: 200px; overflow-y: auto;">
+                    <ul class="speed-options">
                         ${this.options.speedOptions.map((rate, index) => 
-                            `<li data-value="${rate}" ${rate === 1 ? 'class="selected"' : ''} style="padding: 8px 12px; cursor: pointer; font-size: 16px; ${index < this.options.speedOptions.length - 1 ? 'border-bottom: 1px solid #eee;' : ''} transition: background 0.2s;">${rate}×</li>`
+                            `<li data-value="${rate}" ${rate === 1 ? 'class="selected"' : ''}>${rate}×</li>`
                         ).join('')}
                     </ul>
                 </div>
@@ -148,35 +148,27 @@ class AudioPlayerVisual {
         if (audioTypeButton && audioTypeOptions) {
             audioTypeButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isVisible = audioTypeOptions.style.display !== 'none';
-                audioTypeOptions.style.display = isVisible ? 'none' : 'block';
-                // Закрываем другой выпадающий список при открытии этого
-                if (!isVisible && speedOptions) {
-                    speedOptions.style.display = 'none';
+                const isOpen = this.audioTypeSelect.classList.contains('is-open');
+                this.audioTypeSelect.classList.toggle('is-open', !isOpen);
+                if (speedOptions && this.speedSelect) {
+                    this.speedSelect.classList.remove('is-open');
                 }
             });
 
             // Закрытие при клике вне
             document.addEventListener('click', (e) => {
                 if (!this.audioTypeSelect.contains(e.target)) {
-                    audioTypeOptions.style.display = 'none';
+                    this.audioTypeSelect.classList.remove('is-open');
                 }
             });
 
-            // Выбор опции с hover-эффектом
             audioTypeOptions.querySelectorAll('li').forEach(li => {
-                li.addEventListener('mouseenter', () => {
-                    li.style.background = '#f5f5f5';
-                });
-                li.addEventListener('mouseleave', () => {
-                    li.style.background = 'white';
-                });
                 li.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const value = li.dataset.value;
                     if (value && this.audioPaths[value]) {
                         this.setAudioType(value);
-                        audioTypeOptions.style.display = 'none';
+                        this.audioTypeSelect.classList.remove('is-open');
                         if (this.onAudioTypeChange) {
                             this.onAudioTypeChange(value, this.audioPaths[value]);
                         }
@@ -189,36 +181,28 @@ class AudioPlayerVisual {
         if (speedButton && speedOptions) {
             speedButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isVisible = speedOptions.style.display !== 'none';
-                speedOptions.style.display = isVisible ? 'none' : 'block';
-                // Закрываем другой выпадающий список при открытии этого
-                if (!isVisible && audioTypeOptions) {
-                    audioTypeOptions.style.display = 'none';
+                const isOpen = this.speedSelect.classList.contains('is-open');
+                this.speedSelect.classList.toggle('is-open', !isOpen);
+                if (audioTypeOptions && this.audioTypeSelect) {
+                    this.audioTypeSelect.classList.remove('is-open');
                 }
             });
 
             // Закрытие при клике вне
             document.addEventListener('click', (e) => {
                 if (!this.speedSelect.contains(e.target)) {
-                    speedOptions.style.display = 'none';
+                    this.speedSelect.classList.remove('is-open');
                 }
             });
 
-            // Выбор скорости с hover-эффектом
             speedOptions.querySelectorAll('li').forEach(li => {
-                li.addEventListener('mouseenter', () => {
-                    li.style.background = '#f5f5f5';
-                });
-                li.addEventListener('mouseleave', () => {
-                    li.style.background = 'white';
-                });
                 li.addEventListener('click', (e) => {
                     e.stopPropagation();
                     const value = parseFloat(li.dataset.value);
                     this.setPlaybackRate(value);
                     speedOptions.querySelectorAll('li').forEach(l => l.classList.remove('selected'));
                     li.classList.add('selected');
-                    speedOptions.style.display = 'none';
+                    this.speedSelect.classList.remove('is-open');
                     if (this.onSpeedChange) {
                         this.onSpeedChange(value);
                     }
@@ -259,9 +243,9 @@ class AudioPlayerVisual {
         options.querySelectorAll('li').forEach(li => {
             const value = li.dataset.value;
             if (!this.audioPaths[value]) {
-                li.style.display = 'none';
+                li.classList.add('is-hidden');
             } else {
-                li.style.display = 'list-item';
+                li.classList.remove('is-hidden');
                 if (value === this.currentAudioType) {
                     li.classList.add('selected');
                 } else {
