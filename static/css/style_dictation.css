@@ -1603,10 +1603,7 @@ html[dir="rtl"] .title-meta {
 }
 
 .sentence-nav-title {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-width: 0;
+  display: table-cell;
 }
 
 .sentence-nav-table,
@@ -1617,6 +1614,7 @@ html[dir="rtl"] .title-meta {
 
 .dictation-title {
   width: 100%;
+  min-width: 0;
 }
 
 .sentence-nav-cell {
