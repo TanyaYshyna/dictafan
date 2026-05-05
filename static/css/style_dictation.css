@@ -1450,6 +1450,7 @@ html[dir="rtl"] .title-meta {
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
+  width: 100%;
 }
 
 .sentence-nav-table,
@@ -1469,34 +1470,20 @@ html[dir="rtl"] .title-meta {
   width: 44px;
 }
 
+/* Fixed 1/2/3 columns, 4th is flexible */
+.sentence-nav-prev,
+.sentence-nav-next {
+  width: 40px;
+}
+
+.sentence-nav-counter {
+  width: 100px;
+}
+
 .sentence-nav-bottom-row .sentence-nav-list {
   width: auto;
   display: flex;
   justify-content: flex-start;
-}
-
-.sentence-nav-bottom-row .sentence-nav-list > button {
-  margin-right: auto;
-}
-
-.sentence-nav-counter {
-  width: auto;
-}
-
-.sentence-nav-flags {
-  width: auto;
-}
-
-.sentence-nav-title {
-  width: auto;
-}
-
-.sentence-nav-title .dictation-title {
-  margin: 0;
-}
-
-.sentence-nav-list {
-  text-align: left;
 }
 
 .sentence-nav-table button {
@@ -1512,7 +1499,7 @@ html[dir="rtl"] .title-meta {
 .sentence-nav-prev > button,
 .sentence-nav-next > button,
 .sentence-nav-list > button {
-  width: 44px;
+  width: 40px;
   height: 44px;
   min-height: 44px;
   display: inline-flex;
@@ -1586,7 +1573,7 @@ html[dir="rtl"] .progress-panel-modal-r {
   padding: 0 10px;
   margin-bottom: 0;
   width: auto;
-  flex-shrink: 0;
+  flex-shrink: 1;
   font-family: sans-serif;
 }
 
@@ -1624,6 +1611,12 @@ html[dir="rtl"] .progress-panel-modal-r {
   height: 6px;
   background: var(--color-muted);
   border-radius: 4px;
+}
+
+@media (max-width: 420px) {
+  .custom-audio-player .progress-bar {
+    min-width: 50px;
+  }
 }
 
 .custom-audio-player .progress-bar::-webkit-slider-thumb {
@@ -1969,6 +1962,10 @@ html[dir="rtl"] .progress-panel-modal-r {
   width: 100%;
 }
 
+.audio-players-wrapper > * {
+  min-width: 0;
+}
+
 html[dir="rtl"] .audio-players-wrapper {
   direction: ltr;
 }
@@ -2042,8 +2039,7 @@ html[dir="rtl"] .audio-players-wrapper {
 
 @media (max-width: 700px) {
   .audio-players-wrapper {
-    flex-wrap: wrap;
-    /* Разрешаем перенос на узких экранах */
+    flex-wrap: nowrap !important;
   }
   
   .custom-audio-player {
@@ -2055,12 +2051,12 @@ html[dir="rtl"] .audio-players-wrapper {
     /* Разрешаем сжатие на очень узких экранах */
   }
   
-  .custom-audio-player .progress-bar {
+  /* Уменьшаем размер на мобильных */
+  /* .custom-audio-player .progress-bar {
     min-width: 100px;
     max-width: 150px;
-    width: 120px;
-    /* Уменьшаем размер на мобильных */
-  }
+    width: 120px;  
+  }*/
 
   /* Для кнопки записи */
   .audio-user-panel {
@@ -2075,16 +2071,16 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Гарантируем, что элементы управления (кроме прогресс-бара) не сжимаются */
-.custom-audio-player .controls>* {
+/* .custom-audio-player .controls>* {
   flex-shrink: 0;
-}
+} */
 
 /* Прогресс-бар должен растягиваться - переопределяем правило выше */
 .custom-audio-player .controls .progress-bar {
   flex: 1 1 0 !important;
   flex-shrink: 1 !important;
   flex-grow: 1 !important;
-  min-width: 100px !important;
+  min-width: 70px !important;
   max-width: none !important;
   width: 0 !important;
 }
@@ -2127,15 +2123,13 @@ html[dir="rtl"] .audio-players-wrapper {
 /* кнопки чек и запись аудио полоьзователем ------------------------- */
 /* Кнопка проверки - фиксированная ширина и подписи */
 #checkBtn {
-  min-width: 160px;
-  width: 160px;
+  min-width: 48px;
+  width: 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 500;
-  padding: 12px 16px;
+  gap: 6px;
+  padding: 10px 8px;
 }
 
 #checkBtn .check-btn-label {
@@ -2327,7 +2321,7 @@ html[dir="rtl"] .audio-players-wrapper {
   overflow: visible !important;
 }
 
-/* Колонка 7: Текст (последняя, занимает весь остальной размер) */
+/* Колонка 7: Текст (последняя, занимает весь остальный размер) */
 #sentences-table td:last-child,
 #final-sentences-table td:last-child {
   width: auto !important;
@@ -2356,6 +2350,7 @@ html[dir="rtl"] .audio-players-wrapper {
 
 .progress-panel-modal-r {
   display: flex;
+  /* margin-bottom: 15px; */
   flex-direction: column;
   gap: 2px !important;
   margin-left: auto;
@@ -3214,11 +3209,12 @@ html[dir="rtl"] .audio-players-wrapper {
 /* Канвас — фикс. ширина и запрет сжатия в flex */
 .audio-visualizer {
   width: 200px;
+  min-width: 140px;
   height: 50px;
   background: var(--color-button-purple);
   border-radius: 8px;
   margin-left: 5px;
-  flex: 0 0 200px;
+  margin-top: 2px;
   pointer-events: none;
 }
 
@@ -3238,16 +3234,17 @@ html[dir="rtl"] .audio-players-wrapper {
 
 @media (max-width: 500px) {
   #panel-audio-visualizer {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     gap: 6px;
   }
 
   .audio-visualizer {
-    width: 100%;
+    width: auto;
     max-width: 100%;
     margin-left: 0;
-    flex: 1 1 100%;
+    flex: 1 1 90px;
+    min-width: 90px;
     height: 42px;
   }
 

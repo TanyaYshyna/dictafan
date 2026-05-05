@@ -86,7 +86,7 @@ class AudioPlayerVisual {
                     </ul>
                 </div>
                 <div class="custom-speed-select" style="position: relative; display: inline-block; vertical-align: middle;">
-                    <button class="speed-select-button" style="border: 1px solid #ddd; padding: 3px 12px; border-radius: 4px; background: white; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 20px; vertical-align: middle;">
+                    <button class="speed-select-button">
                         <span class="speed-selected">1×</span>
                         <i data-lucide="chevron-down" class="speed-arrow" style="width: 14px; height: 14px;"></i>
                     </button>
