@@ -295,10 +295,6 @@ html[dir="rtl"] .topbar-save-group {
     #whisperModelReadyBadge {
         display: none !important;
     }
-
-    #recognitionModeIcon {
-        display: none !important;
-    }
 }
 
 #recordButton svg {
@@ -2200,20 +2196,69 @@ html[dir="rtl"] .audio-players-wrapper {
   #whisperModelReadyBadge {
     display: none !important;
   }
-
-  #recognitionModeIcon {
-    display: none !important;
-  }
 }
 
 @media (max-width: 768px) {
   #whisperModelReadyBadge {
     display: none !important;
   }
+}
 
-  #recognitionModeIcon {
-    display: none !important;
-  }
+.audio-user-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.audio-user-col-1,
+.audio-user-col-2,
+.audio-user-col-3 {
+  width: 44px;
+}
+
+.audio-user-col-4 {
+  width: auto;
+}
+
+.audio-user-col-5 {
+  width: 120px;
+}
+
+.audio-user-cell {
+  padding: 0;
+  vertical-align: middle;
+}
+
+.audio-user-tablo {
+  text-align: left;
+}
+
+.audio-user-mode {
+  text-align: right;
+}
+
+.audio-user-visualizer .audio-visualizer {
+  width: 100%;
+  min-width: 70px;
+}
+
+.audio-user-next-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+#audioNextBtn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#audioNextBtn.is-last {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
 }
 
 /* Язык перевода (ru) - зеленый, 20px, жирный, выровнен с en */

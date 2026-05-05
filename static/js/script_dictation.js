@@ -1720,7 +1720,54 @@ const checkPreviosDiv = document.getElementById('checkPrevios');
 const correctAnswerDiv = document.getElementById('correctAnswer'); 
 // const translationDiv = document.getElementById('translation');
 const btnNewCircle = document.getElementById('btn-new-circle');
+const audioNextBtn = document.getElementById('audioNextBtn');
+const audioNextBtnLabel = document.getElementById('audioNextBtnLabel');
 window.pendingExitAction = null;
+
+function updateAudioNextBtnUI() {
+    try {
+        if (audioNextBtnLabel) {
+            audioNextBtnLabel.textContent = dictationT('main.next', audioNextBtnLabel.textContent || 'Далее');
+        }
+    } catch (e) {
+    }
+
+    try {
+        if (!audioNextBtn) return;
+        const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
+        audioNextBtn.classList.toggle('is-last', !!isLastSentenceInRun);
+    } catch (e) {
+    }
+}
+
+function goNextFromAudioButton() {
+    try {
+        const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
+        if (isLastSentenceInRun) {
+            checkIfAllCompleted();
+        } else {
+            nextSentence();
+        }
+    } catch (e) {
+        try { nextSentence(); } catch (e2) {}
+    }
+}
+
+try {
+    if (audioNextBtn && !audioNextBtn.dataset.listenerAttached) {
+        audioNextBtn.addEventListener('click', () => {
+            goNextFromAudioButton();
+        });
+        audioNextBtn.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                goNextFromAudioButton();
+            }
+        });
+        audioNextBtn.dataset.listenerAttached = 'true';
+    }
+} catch (e) {
+}
 
 if (inputField) {
     inputField.addEventListener('paste', (event) => {
@@ -6717,11 +6764,10 @@ function decreaseAudioCounter() {
             }
         });
 
-        const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
-        if (isLastSentenceInRun) {
-            btnNewCircle.focus();
-        } else {
-            checkNextDiv.focus();
+        updateAudioNextBtnUI();
+        try {
+            if (audioNextBtn) audioNextBtn.focus();
+        } catch (e) {
         }
     } else {
 
@@ -9455,6 +9501,7 @@ function nextSentence() {
         console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex); // функция загрузки предложения
+        updateAudioNextBtnUI();
     } else {
         // открыть модалку
     }
@@ -9469,6 +9516,7 @@ function previousSentence() {
         currentSentenceIndex = newSentenceIndex;
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex);
+        updateAudioNextBtnUI();
     }
 }
 
