@@ -1564,11 +1564,18 @@ html[dir="rtl"] .title-meta {
   gap: 10px;
 }
 
+.panels-row .sentence-nav-table {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .sentence-nav-table {
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
   width: 100%;
+  border: 1px solid var(--color-border-gray, rgba(0, 0, 0, 0.14));
+  border-radius: 10px;
 }
 
 .sentence-nav-col-1 {
@@ -1599,12 +1606,17 @@ html[dir="rtl"] .title-meta {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-width: 0;
 }
 
 .sentence-nav-table,
 .sentence-nav-table tr,
 .sentence-nav-table td {
   border: none;
+}
+
+.dictation-title {
+  width: 100%;
 }
 
 .sentence-nav-cell {
@@ -2192,18 +2204,6 @@ html[dir="rtl"] .audio-players-wrapper {
   min-height: 43px;
 }
 
-@media (max-width: 520px) {
-  #whisperModelReadyBadge {
-    display: none !important;
-  }
-}
-
-@media (max-width: 768px) {
-  #whisperModelReadyBadge {
-    display: none !important;
-  }
-}
-
 .audio-user-table {
   border-collapse: collapse;
   border-spacing: 0;
@@ -2238,27 +2238,35 @@ html[dir="rtl"] .audio-players-wrapper {
   text-align: right;
 }
 
-.audio-user-visualizer .audio-visualizer {
-  width: 100%;
-  min-width: 70px;
-}
-
 .audio-user-next-row {
   display: flex;
   justify-content: flex-end;
   margin-top: 10px;
 }
 
-#audioNextBtn {
+.dictation-next-row {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 10px;
+}
+
+#resultNextBtn {
   min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
-#audioNextBtn.is-last {
+#resultNextBtn.is-last {
   background: var(--color-button-lightgreen);
   color: var(--color-button-text-lightgreen);
+}
+
+@media (max-width: 500px) {
+  .audio-user-col-5 {
+    width: 44px;
+  }
 }
 
 /* Язык перевода (ru) - зеленый, 20px, жирный, выровнен с en */

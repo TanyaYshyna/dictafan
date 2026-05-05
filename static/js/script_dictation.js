@@ -1720,27 +1720,27 @@ const checkPreviosDiv = document.getElementById('checkPrevios');
 const correctAnswerDiv = document.getElementById('correctAnswer'); 
 // const translationDiv = document.getElementById('translation');
 const btnNewCircle = document.getElementById('btn-new-circle');
-const audioNextBtn = document.getElementById('audioNextBtn');
-const audioNextBtnLabel = document.getElementById('audioNextBtnLabel');
+const resultNextBtn = document.getElementById('resultNextBtn');
+const resultNextBtnLabel = document.getElementById('resultNextBtnLabel');
 window.pendingExitAction = null;
 
-function updateAudioNextBtnUI() {
+function updateResultNextBtnUI() {
     try {
-        if (audioNextBtnLabel) {
-            audioNextBtnLabel.textContent = dictationT('main.next', audioNextBtnLabel.textContent || 'Далее');
+        if (resultNextBtnLabel) {
+            resultNextBtnLabel.textContent = dictationT('main.next', resultNextBtnLabel.textContent || 'Далее');
         }
     } catch (e) {
     }
 
     try {
-        if (!audioNextBtn) return;
+        if (!resultNextBtn) return;
         const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
-        audioNextBtn.classList.toggle('is-last', !!isLastSentenceInRun);
+        resultNextBtn.classList.toggle('is-last', !!isLastSentenceInRun);
     } catch (e) {
     }
 }
 
-function goNextFromAudioButton() {
+function goNextFromResultButton() {
     try {
         const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
         if (isLastSentenceInRun) {
@@ -1754,17 +1754,17 @@ function goNextFromAudioButton() {
 }
 
 try {
-    if (audioNextBtn && !audioNextBtn.dataset.listenerAttached) {
-        audioNextBtn.addEventListener('click', () => {
-            goNextFromAudioButton();
+    if (resultNextBtn && !resultNextBtn.dataset.listenerAttached) {
+        resultNextBtn.addEventListener('click', () => {
+            goNextFromResultButton();
         });
-        audioNextBtn.addEventListener('keydown', (e) => {
+        resultNextBtn.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                goNextFromAudioButton();
+                goNextFromResultButton();
             }
         });
-        audioNextBtn.dataset.listenerAttached = 'true';
+        resultNextBtn.dataset.listenerAttached = 'true';
     }
 } catch (e) {
 }
@@ -6764,9 +6764,9 @@ function decreaseAudioCounter() {
             }
         });
 
-        updateAudioNextBtnUI();
+        updateResultNextBtnUI();
         try {
-            if (audioNextBtn) audioNextBtn.focus();
+            if (resultNextBtn) resultNextBtn.focus();
         } catch (e) {
         }
     } else {
@@ -9501,7 +9501,7 @@ function nextSentence() {
         console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex); // функция загрузки предложения
-        updateAudioNextBtnUI();
+        updateResultNextBtnUI();
     } else {
         // открыть модалку
     }
@@ -9516,7 +9516,7 @@ function previousSentence() {
         currentSentenceIndex = newSentenceIndex;
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex);
-        updateAudioNextBtnUI();
+        updateResultNextBtnUI();
     }
 }
 
