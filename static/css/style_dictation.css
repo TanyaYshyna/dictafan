@@ -1574,11 +1574,11 @@ html[dir="rtl"] .title-meta {
 }
 
 .sentence-nav-top-inner {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: flex-start;
-  flex-direction: row;
-  flex-wrap: nowrap;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 8px;
   padding: 6px 10px;
   min-width: 0;
@@ -1589,14 +1589,19 @@ html[dir="rtl"] .title-meta {
 }
 
 .sentence-nav-bottom-inner {
-  display: flex;
+  display: flex !important;
   align-items: center;
   justify-content: flex-start;
-  flex-direction: row;
-  flex-wrap: nowrap;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
   gap: 6px;
   padding: 6px 10px;
   min-width: 0;
+}
+
+.sentence-nav-top-inner > *,
+.sentence-nav-bottom-inner > * {
+  flex: 0 0 auto;
 }
 
 .sentence-nav-bottom-inner .sentence-counter {
