@@ -506,19 +506,46 @@ body.exercise-ltr .check-group {
 
 /* аудио пользователя прослушать + текст от аудио пользователя + кнопрока записи аудио */
 .audio-user-panel {
-  flex-wrap: wrap;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 15px;
+  display: block;
   margin-top: 10px;
+}
+
+.audio-user-content-buttons {
+  display: block;
+  width: 520px;
+  max-width: 100%;
+}
+
+.audio-user-table {
+  width: 100%;
+}
+
+.audio-user-visualizer,
+.audio-user-record {
+  padding: 4px;
+}
+
+.audio-user-visualizer .audio-visualizer {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.audio-user-record #recordButton {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 500px) {
   #recordButton {
     width: 100%;
     justify-content: center;
-    margin-top: 10px;
   }
 }
 
@@ -1607,7 +1634,7 @@ html[dir="rtl"] .title-meta {
 .sentence-nav-bottom-inner .sentence-counter {
   display: flex;
   align-items: center;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
