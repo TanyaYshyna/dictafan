@@ -1577,15 +1577,23 @@ html[dir="rtl"] .title-meta {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 8px;
   padding: 6px 10px;
   min-width: 0;
+}
+
+.sentence-nav-top-inner #dictationLangPair {
+  flex: 0 0 auto;
 }
 
 .sentence-nav-bottom-inner {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 6px;
   padding: 6px 10px;
   min-width: 0;
@@ -1594,6 +1602,7 @@ html[dir="rtl"] .title-meta {
 .sentence-nav-bottom-inner .sentence-counter {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
