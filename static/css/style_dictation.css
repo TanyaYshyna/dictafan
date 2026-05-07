@@ -2470,6 +2470,33 @@ html[dir="rtl"] .audio-players-wrapper {
   table-layout: fixed;
 }
 
+#sentences-table col.col-rownum,
+#final-sentences-table col.col-rownum {
+  width: 26px;
+}
+
+#sentences-table col.col-choice,
+#final-sentences-table col.col-choice {
+  width: 26px;
+}
+
+#sentences-table col.col-code,
+#final-sentences-table col.col-code {
+  width: 0;
+}
+
+#sentences-table col.col-progress,
+#final-sentences-table col.col-progress {
+  width: 26px;
+}
+
+#sentences-table col.col-text-original,
+#final-sentences-table col.col-text-original,
+#sentences-table col.col-text-translation,
+#final-sentences-table col.col-text-translation {
+  width: auto;
+}
+
 #sentences-table th,
 #final-sentences-table th,
 #sentences-table td,
@@ -2535,19 +2562,7 @@ html[dir="rtl"] .audio-players-wrapper {
   text-align: center !important;
   padding: 2px !important;
   overflow: visible !important;
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
   position: relative !important;
-}
-
-/* Дополнительная гарантия видимости для всех ячеек прогресса */
-#sentences-table tbody tr td.sentence-progress-cell {
-  display: table-cell !important;
-  visibility: visible !important;
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
 }
 
 /* Колонка 5: Звезда 2 (corrected) */
@@ -2565,9 +2580,9 @@ html[dir="rtl"] .audio-players-wrapper {
 /* Колонка 6: Микрофон */
 #sentences-table td:nth-child(6),
 #final-sentences-table td:nth-child(6) {
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
   text-align: center;
   padding: 4px !important;
   overflow: visible !important;
@@ -3171,33 +3186,30 @@ html[dir="rtl"] .audio-players-wrapper {
   text-align: center;
   font-size: 13px;
   color: var(--color-text);
-  min-width: 50px !important;
-  width: 50px !important;
-  max-width: 50px !important;
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+  min-width: 26px;
+  width: 26px;
+  max-width: 26px;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* Убеждаемся, что колонка с полной звездой всегда видна - максимальная специфичность */
 #sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect,
 #sentences-table tbody tr td.sentence-star-perfect,
 #sentences-table tbody tr td:nth-child(4) {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  visibility: visible;
+  opacity: 1;
+  width: 26px;
+  min-width: 26px;
+  max-width: 26px;
   padding: 4px !important;
   text-align: center !important;
 }
 
 /* Убеждаемся, что колонка с полной звездой всегда видна */
 .sentence-progress-cell.sentence-star-perfect {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+  visibility: visible;
+  opacity: 1;
 }
 
 .sentence-progress-cell i {
@@ -3246,12 +3258,11 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table td:nth-child(4) {
   padding: 4px !important;
   text-align: center !important;
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  visibility: visible;
+  opacity: 1;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
 }
 
 /* Убеждаемся, что иконка внутри видна */
@@ -3599,21 +3610,16 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column),
 #sentences-table tbody tr td.sentence-star-perfect:not(.hidden-column),
 #sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column) {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* КРИТИЧНО: Убеждаемся, что колонка с полной звездой НЕ скрыта правилом для hidden-column */
 #sentences-table td.sentence-star-perfect:not(.hidden-column),
 #sentences-table td.sentence-progress-cell.sentence-star-perfect:not(.hidden-column),
 #sentences-table tbody tr td.sentence-star-perfect:not(.hidden-column) {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+  visibility: visible;
+  opacity: 1;
 }
 
 /* Поля ввода для аудио сначала ошибка и вкрнце ---------------------------------------------------*/
@@ -5051,36 +5057,6 @@ html[dir="rtl"] .audio-players-wrapper {
    Порядок колонок: 1=settingsCell, 2=номер, 3=чекбокс, 4=код(скрытая), 5=полная звезда, 6=полузвезда, 7=микрофон, 8=текст
    ============================================================ */
 
-/* ПЕРЕОПРЕДЕЛЯЕМ: Убеждаемся что колонка с полной звездой НИКОГДА не скрыта */
-#sentences-table tbody tr td.sentence-star-perfect,
-#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
-  padding: 4px !important;
-  text-align: center !important;
-  overflow: visible !important;
-}
-
-/* Даже если случайно добавили класс hidden-column - все равно показываем */
-#sentences-table tbody tr td.sentence-star-perfect.hidden-column {
-  display: table-cell !important;
-}
-
-/* Перекрываем правило для nth-child(5) - это должна быть полная звезда, а не код */
-#sentences-table tbody tr td:nth-child(5).sentence-star-perfect,
-#sentences-table tbody tr td:nth-child(5).sentence-progress-cell.sentence-star-perfect {
-  display: table-cell !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
-}
-
 /* Гарантируем видимость иконки внутри */
 #sentences-table tbody tr td.sentence-star-perfect i,
 #sentences-table tbody tr td.sentence-star-perfect i[data-lucide="star"],
@@ -5090,14 +5066,6 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table tbody tr td:nth-child(5).sentence-star-perfect i,
 #sentences-table tbody tr td:nth-child(5).sentence-star-perfect svg {
   display: inline-block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
   width: 20px !important;
   height: 20px !important;
-}
-
-/* ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: перекрываем ВСЕ inline стили через атрибут style */
-#sentences-table tbody tr td.sentence-star-perfect[style*="display: none"],
-#sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect[style*="display: none"] {
-  display: table-cell !important;
 }

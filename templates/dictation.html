@@ -188,6 +188,17 @@
             <!-- Таблица с прокруткой -->
             <div class="table-container">
                 <table id="sentences-table">
+                    <colgroup>
+                        <col class="col-rownum">
+                        <col class="col-choice">
+                        <col class="col-code">
+                        <col class="col-progress">
+                        <col class="col-progress">
+                        <col class="col-progress">
+                        <col class="col-progress">
+                        <col class="col-text-original">
+                        <col class="col-text-translation">
+                    </colgroup>
                     <thead>
                         <tr>
                             <th id="thSentenceRowNumber" data-keep-empty="true">№</th>
@@ -197,10 +208,10 @@
                                 </button>
                             </th>
                             <th class="hidden-column">Код</th>
-                            <th><i data-lucide="star"></i></th>
-                            <th><i data-lucide="star-half"></i></th>
-                            <th><i data-lucide="mic"></i></th>
-                            <th title="попытки/ошибки">m</th>
+                            <th class="col-progress"><i data-lucide="star"></i></th>
+                            <th class="col-progress"><i data-lucide="star-half"></i></th>
+                            <th class="col-progress"><i data-lucide="mic"></i></th>
+                            <th class="col-progress" title="попытки/ошибки">m</th>
                             <th id="thSentenceOriginal"></th>
                             <th id="thSentenceTranslation"></th>
                         </tr>

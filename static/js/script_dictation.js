@@ -2947,26 +2947,27 @@ function applySentenceColumnPrefsToUi() {
         try {
             const table = document.getElementById('sentences-table');
             if (table) {
-                const ths = table.querySelectorAll('thead th');
-                [3, 4, 5, 6].forEach((idx) => {
-                    const th = ths && ths[idx] ? ths[idx] : null;
-                    if (th) th.style.display = showP ? '' : 'none';
+                const progressHeads = table.querySelectorAll('thead th.col-progress');
+                progressHeads.forEach((th) => {
+                    try {
+                        th.style.display = showP ? '' : 'none';
+                    } catch (e) {
+                    }
                 });
             }
         } catch (e) {
         }
 
-        if (thSentenceOriginal) thSentenceOriginal.style.display = showO ? '' : 'none';
-        if (thSentenceTranslation) thSentenceTranslation.style.display = showT ? '' : 'none';
-
         try {
             const rows = document.querySelectorAll('#sentences-table tbody tr');
-            rows.forEach(row => {
+            rows.forEach((row) => {
                 try {
-                    const tds = row.querySelectorAll('td');
-                    [3, 4, 5, 6].forEach((idx) => {
-                        const td = tds && tds[idx] ? tds[idx] : null;
-                        if (td) td.style.display = showP ? '' : 'none';
+                    const tdsP = row.querySelectorAll('td.col-progress');
+                    tdsP.forEach((td) => {
+                        try {
+                            td.style.display = showP ? '' : 'none';
+                        } catch (e) {
+                        }
                     });
                 } catch (e) {
                 }
@@ -5181,23 +5182,23 @@ function renderSelectionTable() {
         codeCell.style.fontSize = '12px';
 
         const perfectCell = document.createElement('td');
-        perfectCell.className = 'sentence-progress-cell sentence-star-perfect';
+        perfectCell.className = 'sentence-progress-cell sentence-star-perfect col-progress';
         const perfectColor = totalPerfect > 0 ? 'var(--color-button-mint)' : 'var(--color-button-gray)';
         perfectCell.innerHTML = `<i data-lucide="star" style="color:${perfectColor};"></i>`;
 
         const correctedCell = document.createElement('td');
-        correctedCell.className = 'sentence-progress-cell sentence-star-corrected';
+        correctedCell.className = 'sentence-progress-cell sentence-star-corrected col-progress';
         const correctedColor = totalCorrected > 0 ? 'var(--color-button-lightgreen)' : 'var(--color-button-gray)';
         const correctedText = totalCorrected > 0 ? `<span>${totalCorrected}</span>` : '';
         correctedCell.innerHTML = `<i data-lucide="star-half" style="color:${correctedColor};"></i>${correctedText}`;
 
         const audioCell = document.createElement('td');
-        audioCell.className = 'sentence-progress-cell sentence-microphone';
+        audioCell.className = 'sentence-progress-cell sentence-microphone col-progress';
         // Ячейка будет обновлена через updateTableRowStatus, здесь только создаем
         audioCell.innerHTML = '';
 
         const attemptsCell = document.createElement('td');
-        attemptsCell.className = 'sentence-progress-cell sentence-attempts';
+        attemptsCell.className = 'sentence-progress-cell sentence-attempts col-progress';
         const attemptsTotal = Number(s.attempts_total) || 0;
         const failedChecks = Number(s.error_count) || 0;
         attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
