@@ -140,14 +140,6 @@
             </div>
 
             <div class="start-modal-controls">
-                <!-- Виділити все в таблиці all-control-->
-                <div class="all-checkbox-container">
-                    <button id="allCheckbox" class="all-checkbox-btn">
-                        <i data-lucide="circle-check-big"></i>
-                        <span>отметить все</span>
-                    </button>
-                </div>
-
                 <div class="all-checkbox-container" style="display:flex; align-items:center; gap:10px;">
                     <button id="toggleOriginalColumnBtn" class="all-checkbox-btn" type="button" title="Оригинал">
                         <i data-lucide="circle"></i>
@@ -178,21 +170,19 @@
                 <table id="sentences-table">
                     <thead>
                         <tr>
-                            <th class="audio-settings-header-cell">
-                                <button id="audioSettingsButton" class="audio-settings-header-btn"
-                                    title="Настройки">
-                                    <i data-lucide="settings"></i>
+                            <th id="thSentenceRowNumber"></th>
+                            <th id="thSentenceChoice">
+                                <button id="allCheckbox" class="all-checkbox-btn" type="button" title="Отметить все" aria-label="Отметить все">
+                                    <i data-lucide="circle"></i>
                                 </button>
                             </th>
-                            <th id="thSentenceChoice">Выбор</th>
-                            <th id="thSentenceRowNumber">Номер строки</th>
                             <th class="hidden-column">Код</th>
                             <th><i data-lucide="star"></i></th>
                             <th><i data-lucide="star-half"></i></th>
                             <th><i data-lucide="mic"></i></th>
                             <th><i data-lucide="repeat"></i></th>
-                            <th id="thSentenceOriginal">Предложение</th>
-                            <th id="thSentenceTranslation">Перевод</th>
+                            <th id="thSentenceOriginal"></th>
+                            <th id="thSentenceTranslation"></th>
                         </tr>
                     </thead>
                     <tbody>

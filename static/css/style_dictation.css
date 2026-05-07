@@ -2488,20 +2488,10 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Фиксированные ширины для колонок таблицы предложений */
-/* Колонка 0: Настройки (audio-settings-header-cell) */
-#sentences-table td.audio-settings-header-cell,
-#final-sentences-table td.audio-settings-header-cell {
-  width: 40px !important;
-  min-width: 40px !important;
-  max-width: 40px !important;
-  padding: 4px !important;
-  overflow: visible !important;
-}
-
-/* Колонка 1: Номер строки (ПЕРВАЯ после settingsCell) */
+/* Колонка 1: Номер строки */
 #sentences-table td.sentence-number-cell,
-#sentences-table td:nth-child(2),
-#final-sentences-table td:nth-child(2) {
+#sentences-table td:nth-child(1),
+#final-sentences-table td:nth-child(1) {
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -2512,8 +2502,8 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Колонка 2: Выбор */
-#sentences-table td:nth-child(3),
-#final-sentences-table td:nth-child(3) {
+#sentences-table td:nth-child(2),
+#final-sentences-table td:nth-child(2) {
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -2523,8 +2513,8 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Колонка 3: Код (скрытая) - ТОЛЬКО для элементов с классом hidden-column */
-#sentences-table td:nth-child(4).hidden-column,
-#final-sentences-table td:nth-child(4).hidden-column {
+#sentences-table td:nth-child(3).hidden-column,
+#final-sentences-table td:nth-child(3).hidden-column {
   width: 0 !important;
   min-width: 0 !important;
   max-width: 0 !important;
@@ -2537,8 +2527,8 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table td.sentence-star-perfect,
 #sentences-table td.sentence-progress-cell.sentence-star-perfect,
 #sentences-table tbody tr td.sentence-star-perfect,
-#sentences-table tbody tr td:nth-child(5),
-#final-sentences-table td:nth-child(5) {
+#sentences-table tbody tr td:nth-child(4),
+#final-sentences-table td:nth-child(4) {
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -2562,8 +2552,8 @@ html[dir="rtl"] .audio-players-wrapper {
 
 /* Колонка 5: Звезда 2 (corrected) */
 #sentences-table td.sentence-star-corrected,
-#sentences-table td:nth-child(6),
-#final-sentences-table td:nth-child(6) {
+#sentences-table td:nth-child(5),
+#final-sentences-table td:nth-child(5) {
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -2573,8 +2563,8 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Колонка 6: Микрофон */
-#sentences-table td:nth-child(7),
-#final-sentences-table td:nth-child(7) {
+#sentences-table td:nth-child(6),
+#final-sentences-table td:nth-child(6) {
   width: 50px !important;
   min-width: 50px !important;
   max-width: 50px !important;
@@ -2593,8 +2583,9 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 
-#sentences-table thead {
-  display: none;
+#sentences-table thead,
+#final-sentences-table thead {
+  display: table-header-group;
 }
 
 
@@ -2986,6 +2977,54 @@ html[dir="rtl"] .audio-players-wrapper {
   margin-left: auto;
 }
 
+@media (max-width: 768px) {
+  #start-modal .dikt-number-badge {
+    display: none;
+  }
+
+  #start-modal #btnBackToList {
+    display: none;
+  }
+
+  #start-modal #toggleOriginalColumnBtn,
+  #start-modal #toggleTranslationColumnBtn {
+    display: none;
+  }
+
+  #start-modal #mixControl span,
+  #start-modal #resetProgressBtn span {
+    display: none;
+  }
+
+  #start-modal #mixControl,
+  #start-modal #resetProgressBtn {
+    gap: 0;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  #start-modal .table-container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  #start-modal #sentences-table {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  #start-modal #sentences-table th,
+  #start-modal #sentences-table td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  #start-modal #sentences-table th:nth-child(8),
+  #start-modal #sentences-table td:nth-child(8) {
+    display: none;
+  }
+}
+
 /* Контейнер настроек аудио в модальном окне - подстраивается под содержимое */
 #start-modal #audioSettingsContainer {
   width: fit-content;
@@ -3143,7 +3182,7 @@ html[dir="rtl"] .audio-players-wrapper {
 /* Убеждаемся, что колонка с полной звездой всегда видна - максимальная специфичность */
 #sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect,
 #sentences-table tbody tr td.sentence-star-perfect,
-#sentences-table tbody tr td:nth-child(5) {
+#sentences-table tbody tr td:nth-child(4) {
   display: table-cell !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -3187,26 +3226,16 @@ html[dir="rtl"] .audio-players-wrapper {
 }
 
 /* Отступы в ячейках таблицы */
-/* Колонка 0: settingsCell (audio-settings-header-cell) */
-#sentences-table td.audio-settings-header-cell,
-#sentences-table td:first-child.audio-settings-header-cell {
-  padding: 4px !important;
-  text-align: center !important;
-  width: 40px !important;
-  min-width: 40px !important;
-  max-width: 40px !important;
-}
-
-/* Колонка 1: Номер строки (ПЕРВАЯ после settingsCell) */
+/* Колонка 1: Номер строки */
 #sentences-table td.sentence-number-cell,
-#sentences-table td:nth-child(2) {
+#sentences-table td:nth-child(1) {
   padding: 4px 8px !important;
   text-align: center !important;
   font-weight: 500;
 }
 
 /* Колонка 2: Выбор */
-#sentences-table td:nth-child(3) {
+#sentences-table td:nth-child(2) {
   padding: 4px !important;
   text-align: center !important;
 }
@@ -3214,7 +3243,7 @@ html[dir="rtl"] .audio-players-wrapper {
 /* Колонка 4: Звезда 1 (perfect) - полная звезда - ВСЕГДА ВИДНА */
 #sentences-table td.sentence-star-perfect,
 #sentences-table td.sentence-progress-cell.sentence-star-perfect,
-#sentences-table td:nth-child(5) {
+#sentences-table td:nth-child(4) {
   padding: 4px !important;
   text-align: center !important;
   display: table-cell !important;
@@ -3235,13 +3264,13 @@ html[dir="rtl"] .audio-players-wrapper {
 
 /* Колонка 5: Звезда 2 (corrected) */
 #sentences-table td.sentence-star-corrected,
-#sentences-table td:nth-child(6) {
+#sentences-table td:nth-child(5) {
   padding: 4px !important;
   text-align: center !important;
 }
 
 /* Колонка 6: Микрофон */
-#sentences-table td:nth-child(7) {
+#sentences-table td:nth-child(6) {
   padding: 4px !important;
   text-align: center !important;
 }
@@ -3475,8 +3504,6 @@ html[dir="rtl"] .audio-players-wrapper {
   height: 50px;
   background: var(--color-button-purple);
   border-radius: 8px;
-  margin-left: 5px;
-  margin-top: 2px;
   pointer-events: none;
 }
 

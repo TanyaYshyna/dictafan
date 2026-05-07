@@ -1365,8 +1365,8 @@ async function applyDictationI18n() {
     try {
         const el = document.getElementById('allCheckbox');
         if (el) {
-            const span = el.querySelector('span');
-            if (span) span.textContent = dictationT('start_modal.select_all', span.textContent || '');
+            el.title = dictationT('start_modal.select_all', el.title || '');
+            el.setAttribute('aria-label', el.title || dictationT('start_modal.select_all', 'Отметить все'));
         }
     } catch (e) {
     }
@@ -1407,22 +1407,30 @@ async function applyDictationI18n() {
 
     try {
         const el = document.getElementById('thSentenceChoice');
-        if (el) el.textContent = dictationT('start_modal.table.choice', el.textContent || '');
+        if (el && !el.querySelector('#allCheckbox')) {
+            el.textContent = dictationT('start_modal.table.choice', el.textContent || '');
+        }
     } catch (e) {
     }
     try {
         const el = document.getElementById('thSentenceRowNumber');
-        if (el) el.textContent = dictationT('start_modal.table.row_number', el.textContent || '');
+        if (el) {
+            if (!el.dataset.keepEmpty) el.textContent = dictationT('start_modal.table.row_number', el.textContent || '');
+        }
     } catch (e) {
     }
     try {
         const el = document.getElementById('thSentenceOriginal');
-        if (el) el.textContent = dictationT('start_modal.table.sentence', el.textContent || '');
+        if (el) {
+            if (!el.dataset.keepEmpty) el.textContent = dictationT('start_modal.table.sentence', el.textContent || '');
+        }
     } catch (e) {
     }
     try {
         const el = document.getElementById('thSentenceTranslation');
-        if (el) el.textContent = dictationT('start_modal.table.translation', el.textContent || '');
+        if (el) {
+            if (!el.dataset.keepEmpty) el.textContent = dictationT('start_modal.table.translation', el.textContent || '');
+        }
     } catch (e) {
     }
 
@@ -5010,11 +5018,6 @@ function renderSelectionTable() {
         const totalCorrected = Number(s.number_of_corrected) || 0;
         const totalAudio = Number(s.number_of_audio) || 0;
 
-        // Пустая ячейка для выравнивания с заголовком настроек
-        const settingsCell = document.createElement('td');
-        settingsCell.className = 'audio-settings-header-cell';
-        settingsCell.style.width = '40px';
-
         // Колонка номера строки (позиция из БД) - ПЕРВАЯ
         const rowNumberCell = document.createElement('td');
         let rowNumber = NaN;
@@ -5071,7 +5074,6 @@ function renderSelectionTable() {
         tdTr.className = 'sentence-text-translation';
         tdTr.textContent = (s && (s.translation != null)) ? String(s.translation) : '';
 
-        row.appendChild(settingsCell);
         row.appendChild(rowNumberCell);  // Номер строки ПЕРВЫМ
         row.appendChild(selectCell);
         row.appendChild(codeCell);
@@ -5237,7 +5239,9 @@ function updateAllCheckboxState() {
     }
 
     const label = dictationT('start_modal.select_all', 'Отметить все');
-    allCheckbox.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(label)}</span>`;
+    allCheckbox.title = label;
+    allCheckbox.setAttribute('aria-label', label);
+    allCheckbox.innerHTML = `<i data-lucide="${iconName}"></i>`;
 
     // Обновляем иконки Lucide
     lucide.createIcons();
