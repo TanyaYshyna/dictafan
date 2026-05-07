@@ -1393,6 +1393,8 @@ async function applyDictationI18n() {
         if (el) {
             const span = el.querySelector('span');
             if (span) span.textContent = dictationT('start_modal.direct_order', span.textContent || '');
+            el.title = dictationT('start_modal.direct_order', el.title || '');
+            el.setAttribute('aria-label', el.title || dictationT('start_modal.direct_order', 'Прямой порядок'));
         }
     } catch (e) {
     }
@@ -1401,6 +1403,8 @@ async function applyDictationI18n() {
         if (el) {
             const span = el.querySelector('span');
             if (span) span.textContent = dictationT('start_modal.reset', span.textContent || '');
+            el.title = dictationT('start_modal.reset', el.title || '');
+            el.setAttribute('aria-label', el.title || dictationT('start_modal.reset', 'Давай по новой'));
         }
     } catch (e) {
     }
@@ -1422,7 +1426,7 @@ async function applyDictationI18n() {
     try {
         const el = document.getElementById('thSentenceOriginal');
         if (el) {
-            if (!el.dataset.keepEmpty) el.textContent = dictationT('start_modal.table.sentence', el.textContent || '');
+            if (!el.dataset.keepEmpty) el.textContent = dictationT('start_modal.table.original', el.textContent || '');
         }
     } catch (e) {
     }
@@ -2799,12 +2803,14 @@ let mixControl = document.getElementById('mixControl');
 let tableCheckboxes = [];
 let resetProgressBtn = document.getElementById('resetProgressBtn');
 
+let toggleProgressColumnsBtn = document.getElementById('toggleProgressColumnsBtn');
 let toggleOriginalColumnBtn = document.getElementById('toggleOriginalColumnBtn');
 let toggleTranslationColumnBtn = document.getElementById('toggleTranslationColumnBtn');
 let thSentenceOriginal = document.getElementById('thSentenceOriginal');
 let thSentenceTranslation = document.getElementById('thSentenceTranslation');
 
 let __sentenceColumnPrefs = {
+    show_progress: true,
     show_original: false,
     show_translation: false
 };
@@ -2866,7 +2872,7 @@ function _getDraftSettingsObject() {
 }
 
 function loadSentenceColumnPrefs() {
-    const defaults = { show_original: false, show_translation: false };
+    const defaults = { show_progress: true, show_original: false, show_translation: false };
 
     // Special entry points
     try {
@@ -2879,8 +2885,9 @@ function loadSentenceColumnPrefs() {
             try {
                 const userSettings = _getUserSettingsObject();
                 const sc = (userSettings && typeof userSettings.sentence_columns === 'object') ? userSettings.sentence_columns : null;
-                if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+                if (sc && (typeof sc.show_progress !== 'undefined' || typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
                     __sentenceColumnPrefs = {
+                        show_progress: (sc.show_progress === undefined) ? defaults.show_progress : Boolean(sc.show_progress),
                         show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
                         show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
                     };
@@ -2899,8 +2906,9 @@ function loadSentenceColumnPrefs() {
     try {
         const draftSettings = _getDraftSettingsObject();
         const sc = (draftSettings && typeof draftSettings.sentence_columns === 'object') ? draftSettings.sentence_columns : null;
-        if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+        if (sc && (typeof sc.show_progress !== 'undefined' || typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
             __sentenceColumnPrefs = {
+                show_progress: (sc.show_progress === undefined) ? defaults.show_progress : Boolean(sc.show_progress),
                 show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
                 show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
             };
@@ -2912,8 +2920,9 @@ function loadSentenceColumnPrefs() {
     try {
         const userSettings = _getUserSettingsObject();
         const sc = (userSettings && typeof userSettings.sentence_columns === 'object') ? userSettings.sentence_columns : null;
-        if (sc && (typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
+        if (sc && (typeof sc.show_progress !== 'undefined' || typeof sc.show_original !== 'undefined' || typeof sc.show_translation !== 'undefined')) {
             __sentenceColumnPrefs = {
+                show_progress: (sc.show_progress === undefined) ? defaults.show_progress : Boolean(sc.show_progress),
                 show_original: (sc.show_original === undefined) ? defaults.show_original : Boolean(sc.show_original),
                 show_translation: (sc.show_translation === undefined) ? defaults.show_translation : Boolean(sc.show_translation)
             };
@@ -2931,8 +2940,21 @@ function applySentenceColumnPrefsToUi() {
         // IMPORTANT: treat prefs as strict booleans. Undefined/null must behave like false.
         // Otherwise some flows (re-render + partial state restore) can make a column appear
         // even when the toggle button looks unchecked.
+        const showP = __sentenceColumnPrefs.show_progress !== false;
         const showO = __sentenceColumnPrefs.show_original === true;
         const showT = __sentenceColumnPrefs.show_translation === true;
+
+        try {
+            const table = document.getElementById('sentences-table');
+            if (table) {
+                const ths = table.querySelectorAll('thead th');
+                [3, 4, 5, 6].forEach((idx) => {
+                    const th = ths && ths[idx] ? ths[idx] : null;
+                    if (th) th.style.display = showP ? '' : 'none';
+                });
+            }
+        } catch (e) {
+        }
 
         if (thSentenceOriginal) thSentenceOriginal.style.display = showO ? '' : 'none';
         if (thSentenceTranslation) thSentenceTranslation.style.display = showT ? '' : 'none';
@@ -2940,6 +2962,14 @@ function applySentenceColumnPrefsToUi() {
         try {
             const rows = document.querySelectorAll('#sentences-table tbody tr');
             rows.forEach(row => {
+                try {
+                    const tds = row.querySelectorAll('td');
+                    [3, 4, 5, 6].forEach((idx) => {
+                        const td = tds && tds[idx] ? tds[idx] : null;
+                        if (td) td.style.display = showP ? '' : 'none';
+                    });
+                } catch (e) {
+                }
                 const tdO = row.querySelector('td.sentence-text-original');
                 const tdT = row.querySelector('td.sentence-text-translation');
                 if (tdO) tdO.style.display = showO ? '' : 'none';
@@ -2948,6 +2978,7 @@ function applySentenceColumnPrefsToUi() {
         } catch (e) {
         }
 
+        renderLucideToggleFlagButton(toggleProgressColumnsBtn, showP, dictationT('start_modal.progress', 'Прогрес'));
         renderLucideToggleFlagButton(toggleOriginalColumnBtn, showO, dictationT('start_modal.original', 'Оригинал'));
         renderLucideToggleFlagButton(toggleTranslationColumnBtn, showT, dictationT('start_modal.translation', 'Перевод'));
     } catch (e) {
@@ -2978,6 +3009,7 @@ async function _saveSentenceColumnPrefsToUser() {
         if (!settings.sentence_columns || typeof settings.sentence_columns !== 'object') {
             settings.sentence_columns = {};
         }
+        settings.sentence_columns.show_progress = Boolean(__sentenceColumnPrefs.show_progress !== false);
         settings.sentence_columns.show_original = Boolean(__sentenceColumnPrefs.show_original);
         settings.sentence_columns.show_translation = Boolean(__sentenceColumnPrefs.show_translation);
 
@@ -3007,6 +3039,18 @@ function installSentenceColumnToggles() {
     try {
         loadSentenceColumnPrefs();
         applySentenceColumnPrefsToUi();
+
+        if (toggleProgressColumnsBtn && !toggleProgressColumnsBtn.dataset.listenerAttached) {
+            toggleProgressColumnsBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                __sentenceColumnPrefs.show_progress = !(__sentenceColumnPrefs.show_progress !== false);
+                applySentenceColumnPrefsToUi();
+                _updateDraftSentenceColumnPrefs();
+                _saveSentenceColumnPrefsToUser().catch(() => { });
+            });
+            toggleProgressColumnsBtn.dataset.listenerAttached = '1';
+        }
 
         if (toggleOriginalColumnBtn && !toggleOriginalColumnBtn.dataset.listenerAttached) {
             toggleOriginalColumnBtn.addEventListener('click', async (e) => {
@@ -3047,6 +3091,93 @@ let currentDictation = {
 let isAudioLoaded = false;
 const startModal = document.getElementById('start-modal');
 const confirmStartBtn = document.getElementById('confirmStartBtn');
+
+const clearSentenceProgressModal = document.getElementById('clearSentenceProgressModal');
+const clearSentenceProgressCloseBtn = document.getElementById('clearSentenceProgressCloseBtn');
+const clearSentenceProgressConfirmBtn = document.getElementById('clearSentenceProgressConfirmBtn');
+
+let __clearSentenceProgressKey = null;
+
+function hideClearSentenceProgressModal() {
+    try {
+        if (clearSentenceProgressModal) clearSentenceProgressModal.style.display = 'none';
+    } catch (e) {
+    }
+    __clearSentenceProgressKey = null;
+}
+
+function showClearSentenceProgressModal(key) {
+    __clearSentenceProgressKey = String(key || '');
+    try {
+        if (!clearSentenceProgressModal) return;
+        clearSentenceProgressModal.style.display = 'block';
+        if (window.lucide?.createIcons) {
+            window.lucide.createIcons({ root: clearSentenceProgressModal });
+        }
+    } catch (e) {
+    }
+}
+
+function clearSentenceProgressByKey(key) {
+    const sKey = String(key || '');
+    if (!sKey) return;
+    const s = makeByKeyMap(allSentences).get(sKey);
+    if (!s) return;
+
+    s.number_of_perfect = 0;
+    s.number_of_corrected = 0;
+    s.number_of_audio = 0;
+    s.attempts_total = 0;
+    s.error_count = 0;
+    s.all_audio_completed = false;
+    s.selection_state = 'unchecked';
+
+    try {
+        updateTableRowStatus(s);
+        updateAllCheckboxState();
+        scheduleDraftAutosave('clear_sentence_progress');
+    } catch (e) {
+    }
+}
+
+try {
+    if (clearSentenceProgressCloseBtn && !clearSentenceProgressCloseBtn.dataset.listenerAttached) {
+        clearSentenceProgressCloseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            hideClearSentenceProgressModal();
+        });
+        clearSentenceProgressCloseBtn.dataset.listenerAttached = '1';
+    }
+    if (clearSentenceProgressConfirmBtn && !clearSentenceProgressConfirmBtn.dataset.listenerAttached) {
+        clearSentenceProgressConfirmBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const k = __clearSentenceProgressKey;
+            hideClearSentenceProgressModal();
+            clearSentenceProgressByKey(k);
+            try {
+                if (confirmStartBtn && typeof confirmStartBtn.focus === 'function') {
+                    confirmStartBtn.focus();
+                }
+            } catch (e) {
+            }
+        });
+        clearSentenceProgressConfirmBtn.dataset.listenerAttached = '1';
+    }
+    if (clearSentenceProgressModal && !clearSentenceProgressModal.dataset.backdropCloseBound) {
+        clearSentenceProgressModal.dataset.backdropCloseBound = '1';
+        clearSentenceProgressModal.addEventListener('click', (e) => {
+            try {
+                if (e.target === clearSentenceProgressModal) {
+                    hideClearSentenceProgressModal();
+                }
+            } catch (e) {
+            }
+        });
+    }
+} catch (e) {
+}
 
 try {
     if (startModal && !startModal.dataset.backdropNoCloseBound) {
@@ -4936,7 +5067,13 @@ function renderSelectionStateButton(statusBtn, s, row = null) {
     if (state === 'completed') {
         statusBtn.dataset.checked = 'star';
         statusBtn.innerHTML = '<i data-lucide="circle-star"></i>';
-        statusBtn.style.cursor = 'not-allowed';
+        statusBtn.style.cursor = 'pointer';
+        try {
+            const t = dictationT('start_modal.clear_sentence_progress', 'Очистить прогрес по предложению');
+            statusBtn.title = t;
+            statusBtn.setAttribute('aria-label', t);
+        } catch (e) {
+        }
         if (row) {
             row.classList.add('sentence-row-completed');
         }
@@ -5182,8 +5319,11 @@ function handleSentenceTableClick(e) {
     const s = makeByKeyMap(allSentences).get(key);
     if (!s) return;
 
-    // Нельзя изменить состояние completed
     if (s.selection_state === 'completed' || statusBtn.dataset.checked === 'star') {
+        try {
+            showClearSentenceProgressModal(key);
+        } catch (e) {
+        }
         return;
     }
 
@@ -5311,7 +5451,9 @@ function initializeMixControl() {
             const textName = newState === 'true'
                 ? dictationT('start_modal.shuffle_order', 'Перемешать предложения')
                 : dictationT('start_modal.direct_order', 'Прямой порядок');
-            this.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(textName)}</span>`;
+            this.innerHTML = `<i data-lucide="${iconName}"></i>`;
+            this.title = textName;
+            this.setAttribute('aria-label', textName);
 
             if (window.lucide?.createIcons) {
                 lucide.createIcons();
@@ -5324,7 +5466,9 @@ function initializeMixControl() {
     const textName = mixControl.dataset.checked === 'true'
         ? dictationT('start_modal.shuffle_order', 'Перемешать предложения')
         : dictationT('start_modal.direct_order', 'Прямой порядок');
-    mixControl.innerHTML = `<i data-lucide="${iconName}"></i><span>${escapeHtml(textName)}</span>`;
+    mixControl.innerHTML = `<i data-lucide="${iconName}"></i>`;
+    mixControl.title = textName;
+    mixControl.setAttribute('aria-label', textName);
 
     if (window.lucide?.createIcons) {
         lucide.createIcons();
@@ -5335,6 +5479,17 @@ function initializeResetProgressButton() {
     resetProgressBtn = document.getElementById('resetProgressBtn');
     if (!resetProgressBtn) return;
     if (resetProgressBtn.dataset.listenerAttached) return;
+
+    try {
+        const textName = dictationT('start_modal.reset', 'Давай по новой');
+        resetProgressBtn.innerHTML = '<i data-lucide="rotate-ccw"></i>';
+        resetProgressBtn.title = textName;
+        resetProgressBtn.setAttribute('aria-label', textName);
+        if (window.lucide?.createIcons) {
+            lucide.createIcons();
+        }
+    } catch (e) {
+    }
 
     resetProgressBtn.addEventListener('click', () => {
         try {

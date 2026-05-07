@@ -103,6 +103,22 @@
         </div>
     </div>
 
+    <div id="clearSentenceProgressModal" class="modal">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="start-modal-title-row" style="margin-bottom: 10px;">
+                <h2 id="clearSentenceProgressTitle" style="text-align:left;">Очистить прогрес по предложению?</h2>
+                <div class="start-modal-header-actions">
+                    <button id="clearSentenceProgressCloseBtn" class="start-modal-close-btn" title="Закрыть" type="button">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button id="clearSentenceProgressConfirmBtn" class="button-color-red" type="button">Очистить</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно выбора предложений -->
     <div id="start-modal" class="modal">
         <div class="modal-content">
@@ -141,6 +157,10 @@
 
             <div class="start-modal-controls">
                 <div class="all-checkbox-container" style="display:flex; align-items:center; gap:10px;">
+                    <button id="toggleProgressColumnsBtn" class="all-checkbox-btn" type="button" title="Прогрес">
+                        <i data-lucide="activity"></i>
+                        <span>прогрес</span>
+                    </button>
                     <button id="toggleOriginalColumnBtn" class="all-checkbox-btn" type="button" title="Оригинал">
                         <i data-lucide="circle"></i>
                         <span>оригинал</span>
@@ -170,7 +190,7 @@
                 <table id="sentences-table">
                     <thead>
                         <tr>
-                            <th id="thSentenceRowNumber"></th>
+                            <th id="thSentenceRowNumber" data-keep-empty="true">№</th>
                             <th id="thSentenceChoice">
                                 <button id="allCheckbox" class="all-checkbox-btn" type="button" title="Отметить все" aria-label="Отметить все">
                                     <i data-lucide="circle"></i>
@@ -180,7 +200,7 @@
                             <th><i data-lucide="star"></i></th>
                             <th><i data-lucide="star-half"></i></th>
                             <th><i data-lucide="mic"></i></th>
-                            <th><i data-lucide="repeat"></i></th>
+                            <th title="попытки/ошибки">m</th>
                             <th id="thSentenceOriginal"></th>
                             <th id="thSentenceTranslation"></th>
                         </tr>

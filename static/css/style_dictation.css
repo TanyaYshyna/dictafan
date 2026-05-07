@@ -2492,11 +2492,11 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table td.sentence-number-cell,
 #sentences-table td:nth-child(1),
 #final-sentences-table td:nth-child(1) {
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
   text-align: center;
-  padding: 4px 8px !important;
+  padding: 2px 4px !important;
   overflow: visible !important;
   font-weight: 500;
 }
@@ -2504,10 +2504,10 @@ html[dir="rtl"] .audio-players-wrapper {
 /* Колонка 2: Выбор */
 #sentences-table td:nth-child(2),
 #final-sentences-table td:nth-child(2) {
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
-  padding: 4px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  padding: 2px !important;
   overflow: visible !important;
   text-align: center;
 }
@@ -2529,11 +2529,11 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table tbody tr td.sentence-star-perfect,
 #sentences-table tbody tr td:nth-child(4),
 #final-sentences-table td:nth-child(4) {
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
   text-align: center !important;
-  padding: 4px !important;
+  padding: 2px !important;
   overflow: visible !important;
   display: table-cell !important;
   visibility: visible !important;
@@ -2545,20 +2545,20 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table tbody tr td.sentence-progress-cell {
   display: table-cell !important;
   visibility: visible !important;
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
 }
 
 /* Колонка 5: Звезда 2 (corrected) */
 #sentences-table td.sentence-star-corrected,
 #sentences-table td:nth-child(5),
 #final-sentences-table td:nth-child(5) {
-  width: 50px !important;
-  min-width: 50px !important;
-  max-width: 50px !important;
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
   text-align: center;
-  padding: 4px !important;
+  padding: 2px !important;
   overflow: visible !important;
 }
 
