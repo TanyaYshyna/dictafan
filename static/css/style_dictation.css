@@ -3233,6 +3233,39 @@ html[dir="rtl"] .audio-players-wrapper {
   vertical-align: middle;
 }
 
+.sentence-code-cell {
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.sentence-progress-cell {
+  color: var(--color-button-gray);
+}
+
+.sentence-progress-cell.sentence-star-perfect.is-on {
+  color: var(--color-button-mint);
+}
+
+.sentence-progress-cell.sentence-star-corrected.is-on {
+  color: var(--color-button-lightgreen);
+}
+
+.sentence-progress-cell.sentence-microphone.is-on {
+  color: var(--color-button-purple);
+}
+
+/* Гарантируем видимость иконки полузвезды внутри */
+#sentences-table tbody tr td.sentence-star-corrected i,
+#sentences-table tbody tr td.sentence-star-corrected svg,
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-corrected i,
+#sentences-table tbody tr td.sentence-progress-cell.sentence-star-corrected svg,
+#final-sentences-table tbody tr td:nth-child(5) i,
+#final-sentences-table tbody tr td:nth-child(5) svg {
+  display: inline-block !important;
+  width: 20px !important;
+  height: 20px !important;
+}
+
 /* Уменьшаем высоту строк таблицы */
 #sentences-table td {
   padding: 4px 8px;
@@ -5083,8 +5116,8 @@ html[dir="rtl"] .audio-players-wrapper {
 #sentences-table tbody tr td.sentence-star-perfect svg,
 #sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect i,
 #sentences-table tbody tr td.sentence-progress-cell.sentence-star-perfect svg,
-#sentences-table tbody tr td:nth-child(5).sentence-star-perfect i,
-#sentences-table tbody tr td:nth-child(5).sentence-star-perfect svg {
+#sentences-table tbody tr td:nth-child(4).sentence-star-perfect i,
+#sentences-table tbody tr td:nth-child(4).sentence-star-perfect svg {
   display: inline-block !important;
   width: 20px !important;
   height: 20px !important;

@@ -5201,29 +5201,27 @@ function renderSelectionTable() {
 
         // Колонка кода (скрытая)
         const codeCell = document.createElement('td');
-        codeCell.className = 'hidden-column';
+        codeCell.className = 'hidden-column sentence-code-cell';
         codeCell.textContent = s.key;
-        codeCell.style.fontFamily = 'monospace';
-        codeCell.style.fontSize = '12px';
 
         const perfectCell = document.createElement('td');
-        perfectCell.className = 'sentence-progress-cell sentence-star-perfect col-progress';
-        const perfectColor = totalPerfect > 0 ? 'var(--color-button-mint)' : 'var(--color-button-gray)';
-        perfectCell.innerHTML = `<i data-lucide="star" style="color:${perfectColor};"></i>`;
+        perfectCell.className = 'sentence-progress-cell sentence-star-perfect';
+        if (totalPerfect > 0) perfectCell.classList.add('is-on');
+        perfectCell.innerHTML = '<i data-lucide="star"></i>';
 
         const correctedCell = document.createElement('td');
-        correctedCell.className = 'sentence-progress-cell sentence-star-corrected col-progress';
-        const correctedColor = totalCorrected > 0 ? 'var(--color-button-lightgreen)' : 'var(--color-button-gray)';
+        correctedCell.className = 'sentence-progress-cell sentence-star-corrected';
+        if (totalCorrected > 0) correctedCell.classList.add('is-on');
         const correctedText = totalCorrected > 0 ? `<span>${totalCorrected}</span>` : '';
-        correctedCell.innerHTML = `<i data-lucide="star-half" style="color:${correctedColor};"></i>${correctedText}`;
+        correctedCell.innerHTML = `<i data-lucide="star-half"></i>${correctedText}`;
 
         const audioCell = document.createElement('td');
-        audioCell.className = 'sentence-progress-cell sentence-microphone col-progress';
+        audioCell.className = 'sentence-progress-cell sentence-microphone';
         // Ячейка будет обновлена через updateTableRowStatus, здесь только создаем
         audioCell.innerHTML = '';
 
         const attemptsCell = document.createElement('td');
-        attemptsCell.className = 'sentence-progress-cell sentence-attempts col-progress';
+        attemptsCell.className = 'sentence-progress-cell sentence-attempts';
         const attemptsTotal = Number(s.attempts_total) || 0;
         const failedChecks = Number(s.error_count) || 0;
         attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
@@ -5765,19 +5763,19 @@ function updateTableRowStatus(s) {
     const unavailable = getUnavailable(s);
 
     if (starCell) {
-        const perfectColor = totalPerfect > 0 ? 'var(--color-button-mint)' : 'var(--color-button-gray)';
-        starCell.innerHTML = `<i data-lucide="star" style="color:${perfectColor};"></i>`;
+        starCell.classList.toggle('is-on', totalPerfect > 0);
+        starCell.innerHTML = '<i data-lucide="star"></i>';
     }
     if (halfStarCell) {
-        const correctedColor = totalCorrected > 0 ? 'var(--color-button-lightgreen)' : 'var(--color-button-gray)';
+        halfStarCell.classList.toggle('is-on', totalCorrected > 0);
         const correctedText = totalCorrected > 0 ? `<span>${totalCorrected}</span>` : '';
-        halfStarCell.innerHTML = `<i data-lucide="star-half" style="color:${correctedColor};"></i>${correctedText}`;
+        halfStarCell.innerHTML = `<i data-lucide="star-half"></i>${correctedText}`;
     }
     if (micCell) {
-        const iconColor = totalAudio > 0 ? 'var(--color-button-purple)' : 'var(--color-button-gray)';
         const micIcon = totalAudio > 0 ? 'mic-off' : 'mic';
         const micCount = totalAudio > 0 ? `<span>${totalAudio}</span>` : '';
-        micCell.innerHTML = `<i data-lucide="${micIcon}" style="color:${iconColor};"></i>${micCount}`;
+        micCell.classList.toggle('is-on', totalAudio > 0);
+        micCell.innerHTML = `<i data-lucide="${micIcon}"></i>${micCount}`;
     }
 
     if (attemptsCell) {
