@@ -278,6 +278,7 @@
         "row_number": "Row number",
         "original": "Original",
         "sentence": "Sentence",
+        "code": "Code",
         "translation": "Translation"
       }
     },

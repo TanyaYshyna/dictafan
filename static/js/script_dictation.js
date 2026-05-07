@@ -1436,6 +1436,15 @@ async function applyDictationI18n() {
     } catch (e) {
     }
 
+    try {
+        const el = document.querySelector('#start-modal #sentences-table thead th.hidden-column');
+        if (el) {
+            // Keep it hidden, but localize for consistency/debugging
+            el.textContent = dictationT('start_modal.table.code', el.textContent || '');
+        }
+    } catch (e) {
+    }
+
     // Start modal header actions titles
     try {
         const el = document.getElementById('startModalSendInterimReportBtn');

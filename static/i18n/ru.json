@@ -278,6 +278,7 @@
         "row_number": "Номер строки",
         "original": "Оригинал",
         "sentence": "Предложение",
+        "code": "Код",
         "translation": "Перевод"
       }
     },
