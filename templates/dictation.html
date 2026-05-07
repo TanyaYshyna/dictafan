@@ -159,15 +159,12 @@
                 <div class="all-checkbox-container" style="display:flex; align-items:center; gap:10px;">
                     <button id="toggleProgressColumnsBtn" class="all-checkbox-btn" type="button" title="Прогрес">
                         <i data-lucide="activity"></i>
-                        <span>прогрес</span>
                     </button>
                     <button id="toggleOriginalColumnBtn" class="all-checkbox-btn" type="button" title="Оригинал">
-                        <i data-lucide="circle"></i>
-                        <span>оригинал</span>
+                        <span class="sentence-col-flag-letter" aria-hidden="true">o</span>
                     </button>
                     <button id="toggleTranslationColumnBtn" class="all-checkbox-btn" type="button" title="Перевод">
-                        <i data-lucide="circle"></i>
-                        <span>перевод</span>
+                        <span class="sentence-col-flag-letter" aria-hidden="true">t</span>
                     </button>
                 </div>
 
@@ -211,8 +208,8 @@
                             <th class="col-progress"><i data-lucide="star-half"></i></th>
                             <th class="col-progress"><i data-lucide="mic"></i></th>
                             <th class="col-progress" title="попытки/ошибки">m</th>
-                            <th id="thSentenceOriginal"></th>
-                            <th id="thSentenceTranslation"></th>
+                            <th id="thSentenceOriginal">Оригинал</th>
+                            <th id="thSentenceTranslation">Перевод</th>
                         </tr>
                     </thead>
                     <tbody>

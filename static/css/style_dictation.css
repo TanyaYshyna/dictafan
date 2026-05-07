@@ -2487,7 +2487,7 @@ html[dir="rtl"] .audio-players-wrapper {
 
 #sentences-table col.col-progress,
 #final-sentences-table col.col-progress {
-  width: 38px;
+  width: 26px;
 }
 
 #sentences-table col.col-text-original,
@@ -3001,11 +3001,6 @@ html[dir="rtl"] .audio-players-wrapper {
     display: none;
   }
 
-  #start-modal #toggleOriginalColumnBtn,
-  #start-modal #toggleTranslationColumnBtn {
-    display: none;
-  }
-
   #start-modal #mixControl span,
   #start-modal #resetProgressBtn span {
     display: none;
@@ -3034,10 +3029,6 @@ html[dir="rtl"] .audio-players-wrapper {
     padding-right: 6px;
   }
 
-  #start-modal #sentences-table th:nth-child(8),
-  #start-modal #sentences-table td:nth-child(8) {
-    display: none;
-  }
 }
 
 /* Контейнер настроек аудио в модальном окне - подстраивается под содержимое */
@@ -3082,6 +3073,26 @@ html[dir="rtl"] .audio-players-wrapper {
   border-radius: 4px;
   transition: none;
   box-shadow: none !important;
+}
+
+.all-checkbox-btn.is-checked {
+  background-color: var(--color-button-gray);
+}
+
+#start-modal .sentence-col-flag-letter {
+  display: inline-block;
+  font-weight: 800;
+  font-size: 14px;
+  line-height: 1;
+}
+
+#start-modal #toggleProgressColumnsBtn,
+#start-modal #toggleOriginalColumnBtn,
+#start-modal #toggleTranslationColumnBtn {
+  padding: 8px;
+  min-width: 42px;
+  justify-content: center;
+  gap: 0;
 }
 
 .sentence-check:hover {

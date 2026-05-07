@@ -1373,18 +1373,16 @@ async function applyDictationI18n() {
     try {
         const el = document.getElementById('toggleOriginalColumnBtn');
         if (el) {
-            const span = el.querySelector('span');
-            if (span) span.textContent = dictationT('start_modal.original', span.textContent || '');
             el.title = dictationT('start_modal.original', el.title || '');
+            el.setAttribute('aria-label', el.title || dictationT('start_modal.original', 'Оригинал'));
         }
     } catch (e) {
     }
     try {
         const el = document.getElementById('toggleTranslationColumnBtn');
         if (el) {
-            const span = el.querySelector('span');
-            if (span) span.textContent = dictationT('start_modal.translation', span.textContent || '');
             el.title = dictationT('start_modal.translation', el.title || '');
+            el.setAttribute('aria-label', el.title || dictationT('start_modal.translation', 'Перевод'));
         }
     } catch (e) {
     }
@@ -2822,17 +2820,27 @@ function renderLucideToggleFlagButton(btn, checked, title) {
         if (!btn) return;
         btn.dataset.checked = checked ? '1' : '0';
         btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+        btn.classList.toggle('is-checked', !!checked);
         if (title) btn.title = String(title);
-        const icon = checked ? 'circle-check-big' : 'circle';
-        const label = (() => {
+
+        const labelHtml = (() => {
             try {
-                const span = btn.querySelector('span');
-                return span ? span.textContent : '';
+                if (btn.id === 'toggleProgressColumnsBtn') {
+                    return '<i data-lucide="activity"></i>';
+                }
+                if (btn.id === 'toggleOriginalColumnBtn') {
+                    return '<span class="sentence-col-flag-letter" aria-hidden="true">o</span>';
+                }
+                if (btn.id === 'toggleTranslationColumnBtn') {
+                    return '<span class="sentence-col-flag-letter" aria-hidden="true">t</span>';
+                }
             } catch (e) {
-                return '';
             }
+            return '';
         })();
-        btn.innerHTML = `<i data-lucide="${icon}"></i>${label ? `<span>${label}</span>` : ''}`;
+
+        btn.innerHTML = labelHtml;
+
         if (window.lucide?.createIcons) {
             window.lucide.createIcons({ root: btn });
         }
@@ -2955,6 +2963,12 @@ function applySentenceColumnPrefsToUi() {
                     }
                 });
             }
+        } catch (e) {
+        }
+
+        try {
+            if (thSentenceOriginal) thSentenceOriginal.style.display = showO ? '' : 'none';
+            if (thSentenceTranslation) thSentenceTranslation.style.display = showT ? '' : 'none';
         } catch (e) {
         }
 
