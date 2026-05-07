@@ -5191,7 +5191,7 @@ function renderSelectionTable() {
             rowNumber = Number(rowIndex) + 1;
         }
         rowNumberCell.textContent = isFinite(rowNumber) ? rowNumber : '';
-        rowNumberCell.className = 'sentence-number-cell';
+        rowNumberCell.className = '';
 
         // Колонка выбора
         const selectCell = document.createElement('td');
@@ -5201,27 +5201,32 @@ function renderSelectionTable() {
 
         // Колонка кода (скрытая)
         const codeCell = document.createElement('td');
-        codeCell.className = 'hidden-column sentence-code-cell';
+        codeCell.className = 'hidden-column';
         codeCell.textContent = s.key;
 
         const perfectCell = document.createElement('td');
-        perfectCell.className = 'sentence-progress-cell sentence-star-perfect';
-        if (totalPerfect > 0) perfectCell.classList.add('is-on');
+        perfectCell.className = 'sentence-progress-cell';
+        perfectCell.dataset.progress = 'perfect';
+        perfectCell.dataset.on = totalPerfect > 0 ? '1' : '0';
         perfectCell.innerHTML = '<i data-lucide="star"></i>';
 
         const correctedCell = document.createElement('td');
-        correctedCell.className = 'sentence-progress-cell sentence-star-corrected';
-        if (totalCorrected > 0) correctedCell.classList.add('is-on');
+        correctedCell.className = 'sentence-progress-cell';
+        correctedCell.dataset.progress = 'corrected';
+        correctedCell.dataset.on = totalCorrected > 0 ? '1' : '0';
         const correctedText = totalCorrected > 0 ? `<span>${totalCorrected}</span>` : '';
         correctedCell.innerHTML = `<i data-lucide="star-half"></i>${correctedText}`;
 
         const audioCell = document.createElement('td');
-        audioCell.className = 'sentence-progress-cell sentence-microphone';
+        audioCell.className = 'sentence-progress-cell';
+        audioCell.dataset.progress = 'audio';
+        audioCell.dataset.on = totalAudio > 0 ? '1' : '0';
         // Ячейка будет обновлена через updateTableRowStatus, здесь только создаем
         audioCell.innerHTML = '';
 
         const attemptsCell = document.createElement('td');
-        attemptsCell.className = 'sentence-progress-cell sentence-attempts';
+        attemptsCell.className = 'sentence-progress-cell';
+        attemptsCell.dataset.progress = 'attempts';
         const attemptsTotal = Number(s.attempts_total) || 0;
         const failedChecks = Number(s.error_count) || 0;
         attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
@@ -5720,7 +5725,7 @@ function getRemainingAllResult(s) {
     return {
         totalPerfect,
         totalCorrected,
-        totalAudio
+        totalAudio,
     };
 }
 
@@ -5740,41 +5745,29 @@ function updateTableRowStatus(s) {
         renderSelectionStateButton(statusIcon, s, row);
     }
 
-    // Порядок колонок в таблице (ОБНОВЛЕНО):
-    // 1. settingsCell (audio-settings-header-cell)
-    // 2. Номер строки (sentence-number-cell)
-    // 3. Выбор/чекбокс
-    // 4. Код (hidden-column)
-    // 5. Звезда (perfect)
-    // 6. Полузвезда (corrected)
-    // 7. Микрофон (audio)
-    // 8. Попытки (attempts)
-    // 9. Предложение
-    // Используем классы для надежного поиска колонок
-    const starCell = row.querySelector('td.sentence-star-perfect');
-    const halfStarCell = row.querySelector('td.sentence-star-corrected');
-    const micCell = row.querySelector('td.sentence-microphone');
-    const attemptsCell = row.querySelector('td.sentence-attempts');
+    const starCell = row.querySelector('td.sentence-progress-cell[data-progress="perfect"]');
+    const halfStarCell = row.querySelector('td.sentence-progress-cell[data-progress="corrected"]');
+    const micCell = row.querySelector('td.sentence-progress-cell[data-progress="audio"]');
+    const attemptsCell = row.querySelector('td.sentence-progress-cell[data-progress="attempts"]');
 
     const totalPerfect = Number(s.number_of_perfect) || 0;
     const totalCorrected = Number(s.number_of_corrected) || 0;
     const totalAudio = Number(s.number_of_audio) || 0;
-    const remainingAudio = getRemainingAudio(s);
     const unavailable = getUnavailable(s);
 
     if (starCell) {
-        starCell.classList.toggle('is-on', totalPerfect > 0);
+        starCell.dataset.on = totalPerfect > 0 ? '1' : '0';
         starCell.innerHTML = '<i data-lucide="star"></i>';
     }
     if (halfStarCell) {
-        halfStarCell.classList.toggle('is-on', totalCorrected > 0);
+        halfStarCell.dataset.on = totalCorrected > 0 ? '1' : '0';
         const correctedText = totalCorrected > 0 ? `<span>${totalCorrected}</span>` : '';
         halfStarCell.innerHTML = `<i data-lucide="star-half"></i>${correctedText}`;
     }
     if (micCell) {
         const micIcon = totalAudio > 0 ? 'mic-off' : 'mic';
         const micCount = totalAudio > 0 ? `<span>${totalAudio}</span>` : '';
-        micCell.classList.toggle('is-on', totalAudio > 0);
+        micCell.dataset.on = totalAudio > 0 ? '1' : '0';
         micCell.innerHTML = `<i data-lucide="${micIcon}"></i>${micCount}`;
     }
 
@@ -5791,9 +5784,6 @@ function updateTableRowStatus(s) {
     } else {
         row.classList.remove('sentence-row-completed');
     }
-
-    // // Обновляем счетчик выбранных
-    // updateSelectedCount();
 
     // Обновляем иконки Lucide
     if (window.lucide?.createIcons) {
