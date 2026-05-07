@@ -2501,8 +2501,8 @@ html[dir="rtl"] .audio-players-wrapper {
 #final-sentences-table th,
 #sentences-table td,
 #final-sentences-table td {
-  padding: 8px 12px;
-  text-align: left;
+  /* padding: 8px 12px; */
+  /* text-align: left; */
   border: 1px solid var(--color-panel-bg);
 }
 
