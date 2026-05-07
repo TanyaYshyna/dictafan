@@ -3075,15 +3075,16 @@ html[dir="rtl"] .audio-players-wrapper {
   box-shadow: none !important;
 }
 
-.all-checkbox-btn.is-checked {
-  background-color: var(--color-button-gray);
-}
-
 #start-modal .sentence-col-flag-letter {
   display: inline-block;
   font-weight: 800;
   font-size: 14px;
   line-height: 1;
+}
+
+#start-modal .sentence-col-flag-icon {
+  width: 18px;
+  height: 18px;
 }
 
 #start-modal #toggleProgressColumnsBtn,
@@ -3092,7 +3093,7 @@ html[dir="rtl"] .audio-players-wrapper {
   padding: 8px;
   min-width: 42px;
   justify-content: center;
-  gap: 0;
+  gap: 6px;
 }
 
 .sentence-check:hover {

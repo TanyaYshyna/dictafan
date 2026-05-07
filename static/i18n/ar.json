@@ -275,6 +275,7 @@
       "table": {
         "choice": "اختيار",
         "row_number": "رقم السطر",
+        "original": "الأصل",
         "sentence": "الجملة",
         "translation": "الترجمة"
       }

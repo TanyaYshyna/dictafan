@@ -276,6 +276,7 @@
       "table": {
         "choice": "Вибір",
         "row_number": "Номер рядка",
+        "original": "Оригінал",
         "sentence": "Речення",
         "translation": "Переклад"
       }

@@ -2823,6 +2823,8 @@ function renderLucideToggleFlagButton(btn, checked, title) {
         btn.classList.toggle('is-checked', !!checked);
         if (title) btn.title = String(title);
 
+        const flagIcon = checked ? 'circle-check-big' : 'circle';
+
         const labelHtml = (() => {
             try {
                 if (btn.id === 'toggleProgressColumnsBtn') {
@@ -2839,7 +2841,7 @@ function renderLucideToggleFlagButton(btn, checked, title) {
             return '';
         })();
 
-        btn.innerHTML = labelHtml;
+        btn.innerHTML = `<i class="sentence-col-flag-icon" data-lucide="${flagIcon}"></i>${labelHtml}`;
 
         if (window.lucide?.createIcons) {
             window.lucide.createIcons({ root: btn });

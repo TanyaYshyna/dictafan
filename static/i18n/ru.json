@@ -276,6 +276,7 @@
       "table": {
         "choice": "Выбор",
         "row_number": "Номер строки",
+        "original": "Оригинал",
         "sentence": "Предложение",
         "translation": "Перевод"
       }

@@ -276,6 +276,7 @@
       "table": {
         "choice": "Choice",
         "row_number": "Row number",
+        "original": "Original",
         "sentence": "Sentence",
         "translation": "Translation"
       }
