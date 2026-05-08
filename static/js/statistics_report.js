@@ -152,6 +152,34 @@ class StatisticsReport {
         return {};
     }
 
+    formatIsoLocal(d) {
+        try {
+            const dt = (d instanceof Date) ? d : new Date(d);
+            if (Number.isNaN(dt.getTime())) return '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    formatDurationHMS(ms) {
+        let v = 0;
+        try {
+            v = Number(ms || 0);
+        } catch (e) {
+            v = 0;
+        }
+        if (!Number.isFinite(v) || v <= 0) return '00:00:00';
+        const totalSec = Math.max(0, Math.floor(v / 1000));
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
     formatDateForInput(dt) {
         try {
             const d = (dt instanceof Date) ? dt : new Date(dt);
@@ -2614,18 +2642,7 @@ class ActivityTrackerReport {
         } catch (e) {
         }
 
-        try {
-            if (!modal.__activityTrackerOverlayBound) {
-                modal.__activityTrackerOverlayBound = true;
-                modal.addEventListener('click', (e) => {
-                    try {
-                        if (e.target === modal) this.hide();
-                    } catch (e2) {
-                    }
-                });
-            }
-        } catch (e) {
-        }
+        // NOTE: we intentionally do NOT close on overlay click for this modal.
 
         try {
             const prevBtn = document.getElementById('activityTrackerYearPrev');
@@ -2808,19 +2825,19 @@ class ActivityTrackerReport {
             const raw = this.getLanguageData() || {};
             const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
 
-            const sel = new LanguageSelector(wrap, dataWithAll, {
-                defaultLanguage: String(this.selectedLanguage || 'all'),
-                onChange: (code) => {
-                    this.selectedLanguage = String(code || 'all');
+            const codes = ['all', ...Object.keys(raw || {}).map(k => String(k).toLowerCase()).filter(Boolean).sort()];
+            new LanguageSelector({
+                container: wrap,
+                mode: 'report-selector',
+                languageData: dataWithAll,
+                nativeLanguage: 'all',
+                learningLanguages: codes,
+                currentLearning: String(this.selectedLanguage || 'all').trim().toLowerCase() || 'all',
+                onLanguageChange: ({ currentLearning }) => {
+                    this.selectedLanguage = String(currentLearning || 'all').trim().toLowerCase() || 'all';
                     this.reloadData({ force: true });
                 }
             });
-            try {
-                if (sel && typeof sel.setSelectedLanguage === 'function') {
-                    sel.setSelectedLanguage(String(this.selectedLanguage || 'all'));
-                }
-            } catch (e2) {
-            }
             this._languageSelectorInited = true;
         } catch (e) {
         }
@@ -2864,7 +2881,7 @@ class ActivityTrackerReport {
                     continue;
                 }
                 const isInYear = day.getFullYear() === year;
-                const iso = day.toISOString().slice(0, 10);
+                const iso = this.formatIsoLocal(day);
                 if (!isInYear) {
                     dayParts.push(`<div class="reports-tracker-cell reports-tracker-cell--out" title="${this.escapeHtml(iso)}"></div>`);
                     continue;
@@ -2880,7 +2897,8 @@ class ActivityTrackerReport {
                     const idx = Math.min(12, Math.floor((capped - 15) / 15) + 1);
                     cls += ` reports-tracker-cell--l${idx}`;
                 }
-                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(iso)}"></div>`);
+                const title = `${iso} ${this.formatDurationHMS(ms)}`;
+                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(title)}"></div>`);
             }
         }
         dayParts.push('</div>');
@@ -2950,10 +2968,20 @@ class ActivityTrackerReport {
             this.createModal();
         }
 
-        await this.ensureUsersLoaded();
-        this.populateUsers();
-        this.initLanguageSelector();
+        // Show modal immediately (avoid "appears later" effect).
         this.modal.style.display = 'flex';
+        // Render an empty year grid immediately, then load data in background.
+        try {
+            this.renderYear();
+            this.updateYearButtons();
+        } catch (e) {
+        }
+
+        // Initialize selector UI immediately (so user sees language control right away).
+        try {
+            this.initLanguageSelector();
+        } catch (e) {
+        }
 
         try {
             if (typeof lucide !== 'undefined') {
@@ -2962,7 +2990,20 @@ class ActivityTrackerReport {
         } catch (e) {
         }
 
-        await this.reloadData({ force: true });
+
+        // Background load: users list and year data.
+        (async () => {
+            try {
+                await this.ensureUsersLoaded();
+                this.populateUsers();
+            } catch (e) {
+            }
+
+            try {
+                await this.reloadData({ force: true });
+            } catch (e) {
+            }
+        })();
     }
 
     static async open(activityHistory) {

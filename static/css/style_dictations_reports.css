@@ -80,6 +80,15 @@
   padding-top: 8px;
 }
 
+.reports-modal-content--activity-tracker .reports-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reports-modal-content--activity-tracker #updateActivityTrackerBtn {
+  margin-left: auto;
+}
+
 .reports-tracker-grid {
   display: flex;
   flex-direction: column;
