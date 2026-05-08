@@ -103,4 +103,20 @@
   --color-audio-orange-secondary: #d97706;   /* темный оранжевый */
   --color-audio-orange-light: rgba(245, 158, 11, 0.1);   /* светлый оранжевый фон */
   --color-audio-orange-medium: rgba(245, 158, 11, 0.2);  /* средний оранжевый */
+
+  /* ========== ЦВЕТА ДЛЯ ТРЕКЕРА АКТИВНОСТИ (годовой календарь) ========== */
+  --tracker-activity-0: rgb(218, 217, 213);
+  --tracker-activity-white: #ffffff;
+  --tracker-activity-1: #e8f3ff;
+  --tracker-activity-2: #d6ebff;
+  --tracker-activity-3: #c2e1ff;
+  --tracker-activity-4: #add7ff;
+  --tracker-activity-5: #96ccff;
+  --tracker-activity-6: #7fc0ff;
+  --tracker-activity-7: #66b2ff;
+  --tracker-activity-8: #4ea3ff;
+  --tracker-activity-9: #3492ff;
+  --tracker-activity-10: #1f7fff;
+  --tracker-activity-11: #0f6aff;
+  --tracker-activity-12: #0056e0;
 }

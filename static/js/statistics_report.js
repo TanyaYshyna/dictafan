@@ -1510,6 +1510,24 @@ class PlanFactReport {
         }
     }
 
+    getTokenSafe() {
+        try {
+            if (window.UM && window.UM.token) return window.UM.token;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('jwt_token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
     formatIsoDate(d) {
         try {
             const dt = (d instanceof Date) ? d : new Date(d);
@@ -2532,6 +2550,27 @@ class ActivityTrackerReport {
         this.selectedYear = Number(options.year) || (new Date()).getFullYear();
         this._users = [];
         this._languageSelectorInited = false;
+        this._dataDaysByIso = {};
+        this._bounds = { minYear: null, maxYear: null };
+        this._updateSeq = 0;
+    }
+
+    getTokenSafe() {
+        try {
+            if (window.UM && window.UM.token) return window.UM.token;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('jwt_token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
     }
 
     getLanguageData() {
@@ -2565,10 +2604,12 @@ class ActivityTrackerReport {
         }
 
         try {
-            const backBtn = document.getElementById('backActivityTrackerBtn');
-            if (backBtn && !backBtn.__activityTrackerBound) {
-                backBtn.__activityTrackerBound = true;
-                backBtn.addEventListener('click', () => this.hide());
+            const updateBtn = document.getElementById('updateActivityTrackerBtn');
+            if (updateBtn && !updateBtn.__activityTrackerBound) {
+                updateBtn.__activityTrackerBound = true;
+                updateBtn.addEventListener('click', async () => {
+                    await this.reloadData({ force: true });
+                });
             }
         } catch (e) {
         }
@@ -2592,15 +2633,19 @@ class ActivityTrackerReport {
             if (prevBtn && !prevBtn.__activityTrackerBound) {
                 prevBtn.__activityTrackerBound = true;
                 prevBtn.addEventListener('click', () => {
-                    this.selectedYear = Number(this.selectedYear) - 1;
-                    this.renderYear();
+                    const nextYear = Number(this.selectedYear) - 1;
+                    if (this._bounds.minYear != null && nextYear < this._bounds.minYear) return;
+                    this.selectedYear = nextYear;
+                    this.reloadData({ force: false });
                 });
             }
             if (nextBtn && !nextBtn.__activityTrackerBound) {
                 nextBtn.__activityTrackerBound = true;
                 nextBtn.addEventListener('click', () => {
-                    this.selectedYear = Number(this.selectedYear) + 1;
-                    this.renderYear();
+                    const nextYear = Number(this.selectedYear) + 1;
+                    if (this._bounds.maxYear != null && nextYear > this._bounds.maxYear) return;
+                    this.selectedYear = nextYear;
+                    this.reloadData({ force: false });
                 });
             }
         } catch (e) {
@@ -2616,11 +2661,100 @@ class ActivityTrackerReport {
                         this.selectedUserId = v ? (Number(v) || null) : null;
                     } catch (e2) {
                     }
-                    this.renderYear();
+                    this.reloadData({ force: true });
                 });
             }
         } catch (e) {
         }
+    }
+
+    async reloadData({ force }) {
+        const seq = ++this._updateSeq;
+        try {
+            await this.loadYearData({ force });
+        } catch (e) {
+        }
+        if (seq !== this._updateSeq) return;
+        this.renderYear();
+        this.updateYearButtons();
+    }
+
+    updateYearButtons() {
+        try {
+            const prevBtn = document.getElementById('activityTrackerYearPrev');
+            const nextBtn = document.getElementById('activityTrackerYearNext');
+            const y = Number(this.selectedYear) || (new Date()).getFullYear();
+            if (prevBtn) {
+                prevBtn.disabled = (this._bounds.minYear != null) ? (y <= this._bounds.minYear) : false;
+            }
+            if (nextBtn) {
+                nextBtn.disabled = (this._bounds.maxYear != null) ? (y >= this._bounds.maxYear) : false;
+            }
+        } catch (e) {
+        }
+    }
+
+    async loadYearData({ force }) {
+        const t = this.getTokenSafe();
+        if (!t) {
+            this._dataDaysByIso = {};
+            this._bounds = { minYear: null, maxYear: null };
+            return;
+        }
+
+        const y = Number(this.selectedYear) || (new Date()).getFullYear();
+        const cacheKey = `${String(this.selectedUserId || '')}::${String(this.selectedLanguage || 'all')}::${String(y)}`;
+        if (!force && this._lastCacheKey === cacheKey && this._dataDaysByIso) {
+            return;
+        }
+
+        const body = {
+            user_id: this.selectedUserId,
+            year: y,
+            language_code: String(this.selectedLanguage || 'all'),
+        };
+
+        const res = await fetch('/api/statistics/activity/tracker', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${t}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body),
+        });
+
+        const js = await res.json().catch(() => null);
+        if (!(res && res.ok && js && js.success)) {
+            this._dataDaysByIso = {};
+            this._bounds = { minYear: null, maxYear: null };
+            return;
+        }
+
+        const minY = (js.min_year == null) ? null : Number(js.min_year);
+        const maxY = (js.max_year == null) ? null : Number(js.max_year);
+        this._bounds = {
+            minYear: Number.isFinite(minY) ? minY : null,
+            maxYear: Number.isFinite(maxY) ? maxY : null,
+        };
+
+        try {
+            const srvYear = Number(js.year);
+            if (Number.isFinite(srvYear)) this.selectedYear = srvYear;
+        } catch (e) {
+        }
+
+        const map = {};
+        const days = Array.isArray(js.days) ? js.days : [];
+        for (const d of days) {
+            try {
+                const iso = String(d.date || '').slice(0, 10);
+                if (!iso) continue;
+                map[iso] = Number(d.lead_time || 0) || 0;
+            } catch (e) {
+            }
+        }
+        this._dataDaysByIso = map;
+        this._lastCacheKey = cacheKey;
     }
 
     hide() {
@@ -2678,7 +2812,7 @@ class ActivityTrackerReport {
                 defaultLanguage: String(this.selectedLanguage || 'all'),
                 onChange: (code) => {
                     this.selectedLanguage = String(code || 'all');
-                    this.renderYear();
+                    this.reloadData({ force: true });
                 }
             });
             try {
@@ -2706,9 +2840,15 @@ class ActivityTrackerReport {
         const monthParts = [];
         monthParts.push(`<div class="reports-tracker-months" style="grid-template-columns: 40px repeat(${weeks.length}, 12px);">`);
         monthParts.push('<div></div>');
+        let lastM = '';
         for (let w = 0; w < weeks.length; w++) {
             const m = monthMarkers[w];
-            monthParts.push(m ? `<div class="reports-tracker-month">${this.escapeHtml(m)}</div>` : '<div></div>');
+            if (m && m !== lastM) {
+                monthParts.push(`<div class="reports-tracker-month">${this.escapeHtml(m)}</div>`);
+                lastM = m;
+            } else {
+                monthParts.push('<div></div>');
+            }
         }
         monthParts.push('</div>');
 
@@ -2724,8 +2864,23 @@ class ActivityTrackerReport {
                     continue;
                 }
                 const isInYear = day.getFullYear() === year;
-                const cls = isInYear ? 'reports-tracker-cell' : 'reports-tracker-cell reports-tracker-cell--out';
-                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(day.toISOString().slice(0, 10))}"></div>`);
+                const iso = day.toISOString().slice(0, 10);
+                if (!isInYear) {
+                    dayParts.push(`<div class="reports-tracker-cell reports-tracker-cell--out" title="${this.escapeHtml(iso)}"></div>`);
+                    continue;
+                }
+
+                const ms = Number(this._dataDaysByIso && this._dataDaysByIso[iso] ? this._dataDaysByIso[iso] : 0) || 0;
+                const minutes = ms / 60000;
+                let cls = 'reports-tracker-cell';
+                if (minutes > 0 && minutes < 15) {
+                    cls += ' reports-tracker-cell--white';
+                } else if (minutes >= 15) {
+                    const capped = Math.min(180, minutes);
+                    const idx = Math.min(12, Math.floor((capped - 15) / 15) + 1);
+                    cls += ` reports-tracker-cell--l${idx}`;
+                }
+                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(iso)}"></div>`);
             }
         }
         dayParts.push('</div>');
@@ -2807,7 +2962,7 @@ class ActivityTrackerReport {
         } catch (e) {
         }
 
-        this.renderYear();
+        await this.reloadData({ force: true });
     }
 
     static async open(activityHistory) {

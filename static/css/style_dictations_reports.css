@@ -120,11 +120,29 @@
   height: 12px;
   border-radius: 2px;
   box-sizing: border-box;
-  background: #575757;
+  background: var(--tracker-activity-0, var(--color-cesh-text));
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .reports-tracker-cell--out {
-  background: #575757;
-  border: 1px solid rgba(255, 255, 255, 0.03);
+  background: transparent;
+  border-color: transparent;
 }
+
+.reports-tracker-cell--white {
+  background: var(--tracker-activity-white, #ffffff);
+  border-color: rgba(0, 0, 0, 0.04);
+}
+
+.reports-tracker-cell--l1 { background: var(--tracker-activity-1); }
+.reports-tracker-cell--l2 { background: var(--tracker-activity-2); }
+.reports-tracker-cell--l3 { background: var(--tracker-activity-3); }
+.reports-tracker-cell--l4 { background: var(--tracker-activity-4); }
+.reports-tracker-cell--l5 { background: var(--tracker-activity-5); }
+.reports-tracker-cell--l6 { background: var(--tracker-activity-6); }
+.reports-tracker-cell--l7 { background: var(--tracker-activity-7); }
+.reports-tracker-cell--l8 { background: var(--tracker-activity-8); }
+.reports-tracker-cell--l9 { background: var(--tracker-activity-9); }
+.reports-tracker-cell--l10 { background: var(--tracker-activity-10); }
+.reports-tracker-cell--l11 { background: var(--tracker-activity-11); }
+.reports-tracker-cell--l12 { background: var(--tracker-activity-12); }

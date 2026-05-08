@@ -13,6 +13,8 @@ from helpers.db_history import (
     add_activity, add_success, get_success_count, get_success_counts_for_dictations,
     get_activity_totals_by_period,
     get_success_count_for_subset,
+    get_activity_lead_time_by_day_range,
+    get_activity_lead_time_year_bounds,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -1166,6 +1168,79 @@ def api_activity_report():
         rows = get_activity_totals_by_period(target_user_id, start_date, end_date, language_code=language_code)
         grouped = _group_activity_rows(rows, group_by)
         return jsonify({"success": True, "stats": grouped})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@statistics_bp.route('/activity/tracker', methods=['POST'])
+@jwt_required()
+def api_activity_tracker():
+    """Годовой трекер активности: lead_time (ms) по датам + доступный диапазон лет."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        data = request.get_json(silent=True) or {}
+        requested_user_id = data.get('user_id')
+        language_code = data.get('language_code')
+        year_raw = data.get('year')
+
+        current_user_id = int(user.get('id'))
+        target_user_id = current_user_id
+        if requested_user_id is not None and str(requested_user_id).strip() != "":
+            try:
+                target_user_id = int(requested_user_id)
+            except Exception:
+                return jsonify({"success": False, "error": "Invalid user_id"}), 400
+
+        if target_user_id != current_user_id:
+            if not _can_teacher_view_student_activity(
+                teacher_user_id=current_user_id,
+                student_user_id=target_user_id,
+            ):
+                return jsonify({"success": False, "error": "Forbidden"}), 403
+
+        language_code_norm = None
+        try:
+            lc = str(language_code or '').strip().lower()
+            if lc and lc not in ('all', '*'):
+                language_code_norm = lc
+        except Exception:
+            language_code_norm = None
+
+        min_year, max_year = get_activity_lead_time_year_bounds(target_user_id, language_code=language_code_norm)
+        if min_year is None or max_year is None:
+            # данных нет
+            now_year = datetime.now().year
+            return jsonify({
+                "success": True,
+                "min_year": None,
+                "max_year": None,
+                "year": int(year_raw) if year_raw is not None and str(year_raw).strip().isdigit() else now_year,
+                "days": [],
+            })
+
+        try:
+            year = int(year_raw) if year_raw is not None else int(max_year)
+        except Exception:
+            year = int(max_year)
+        if year < int(min_year):
+            year = int(min_year)
+        if year > int(max_year):
+            year = int(max_year)
+
+        start_date = datetime(year, 1, 1).date()
+        end_date = datetime(year, 12, 31).date()
+        days = get_activity_lead_time_by_day_range(target_user_id, start_date, end_date, language_code=language_code_norm)
+        return jsonify({
+            "success": True,
+            "min_year": int(min_year),
+            "max_year": int(max_year),
+            "year": int(year),
+            "days": days,
+        })
     except Exception as exc:
         return jsonify({"success": False, "error": str(exc)}), 500
 

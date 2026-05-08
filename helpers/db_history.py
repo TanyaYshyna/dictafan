@@ -178,6 +178,106 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
         conn.close()
 
 
+def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, language_code=None):
+    """Return summed lead_time (ms) by day from history_activity for a given period.
+
+    Returns:
+        list[dict]: [{date: 'YYYY-MM-DD', lead_time: int}, ...]
+    """
+    conn = get_db_connection()
+    try:
+        if isinstance(start_date, str):
+            start_date = datetime.fromisoformat(start_date).date()
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date).date()
+
+        with conn.cursor() as cur:
+            if language_code and str(language_code).strip().lower() not in ('all', '*'):
+                cur.execute(
+                    """
+                    SELECT
+                        date,
+                        COALESCE(SUM(lead_time), 0) AS lead_time
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date >= %s
+                      AND date <= %s
+                      AND dictation_language_code = %s
+                    GROUP BY date
+                    ORDER BY date ASC
+                    """,
+                    (int(user_id), start_date, end_date, str(language_code).strip().lower()),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT
+                        date,
+                        COALESCE(SUM(lead_time), 0) AS lead_time
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND date >= %s
+                      AND date <= %s
+                    GROUP BY date
+                    ORDER BY date ASC
+                    """,
+                    (int(user_id), start_date, end_date),
+                )
+            rows = cur.fetchall() or []
+
+        out = []
+        for r in rows:
+            if isinstance(r, dict):
+                d = r.get('date')
+                date_iso = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+                out.append({'date': date_iso, 'lead_time': int(r.get('lead_time') or 0)})
+            else:
+                d = r[0]
+                date_iso = d.isoformat() if hasattr(d, 'isoformat') else str(d)
+                out.append({'date': date_iso, 'lead_time': int(r[1] or 0)})
+        return out
+    finally:
+        conn.close()
+
+
+def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
+    """Return (min_year, max_year) where user has any activity rows (lead_time or counts) in history_activity."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if language_code and str(language_code).strip().lower() not in ('all', '*'):
+                cur.execute(
+                    """
+                    SELECT
+                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
+                    FROM history_activity
+                    WHERE user_id = %s
+                      AND dictation_language_code = %s
+                    """,
+                    (int(user_id), str(language_code).strip().lower()),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT
+                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
+                    FROM history_activity
+                    WHERE user_id = %s
+                    """,
+                    (int(user_id),),
+                )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return (row.get('min_year'), row.get('max_year'))
+            if not row:
+                return (None, None)
+            return (row[0], row[1])
+    finally:
+        conn.close()
+
+
 def add_activity_bulk(
     user_id,
     dictation_id,
