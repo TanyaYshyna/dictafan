@@ -5242,14 +5242,14 @@ function renderSelectionTable() {
 
         row.appendChild(rowNumberCell);  // Номер строки ПЕРВЫМ
         row.appendChild(selectCell);
-        row.appendChild(codeCell);
         row.appendChild(perfectCell);
         row.appendChild(correctedCell);
         row.appendChild(audioCell);
         row.appendChild(attemptsCell);
         row.appendChild(tdText);
         row.appendChild(tdTr);
-
+        row.appendChild(codeCell);
+ 
         tableSentences.appendChild(row);
 
         // КРИТИЧНО: Инициализируем иконки Lucide сразу после добавления строки
