@@ -2534,26 +2534,6 @@ class ActivityTrackerReport {
         this._languageSelectorInited = false;
     }
 
-    getToken() {
-        try {
-            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
-                return window.UM.token;
-            }
-        } catch (e) {
-        }
-        try {
-            const t = localStorage.getItem('token');
-            if (t) return t;
-        } catch (e) {
-        }
-        try {
-            const t = localStorage.getItem('jwt_token');
-            if (t) return t;
-        } catch (e) {
-        }
-        return null;
-    }
-
     getLanguageData() {
         try {
             if (window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function') {
@@ -2569,107 +2549,67 @@ class ActivityTrackerReport {
     }
 
     createModal() {
-        let modal = document.getElementById('activity-tracker-modal');
-        if (modal) {
-            this.modal = modal;
-            return;
+        const modal = document.getElementById('activity-tracker-modal');
+        if (!modal) {
+            throw new Error('activity-tracker-modal not found (reports_modal.html not included)');
         }
-
-        modal = document.createElement('div');
-        modal.id = 'activity-tracker-modal';
-        modal.className = 'modal';
-        modal.style.display = 'none';
-        modal.style.position = 'fixed';
-        modal.style.left = '0';
-        modal.style.top = '0';
-        modal.style.width = '100%';
-        modal.style.height = '100%';
-        modal.style.alignItems = 'center';
-        modal.style.justifyContent = 'center';
-        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-        modal.style.backdropFilter = 'blur(4px)';
-        modal.style.overflow = 'hidden';
-        modal.style.zIndex = '10150';
-
-        modal.innerHTML = `
-            <div class="modal-content statistics-modal-content" style="max-width: 1100px;">
-                <div class="statistics-header" style="display:flex; align-items:flex-start; justify-content: space-between; gap: 14px;">
-                    <div style="display:flex; flex-direction: column; gap: 10px; min-width: 0; flex: 1 1 auto;">
-                        <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
-                            <div style="font-size: 22px; font-weight: 700; line-height: 1.1;">Трекер активности</div>
-                            <div id="activityTrackerLanguagePicker" style="position: relative; min-width: 210px;"></div>
-                            <select id="activityTrackerUserSelect" class="group-select" style="min-width: 240px;"></select>
-                            <div style="display:flex; align-items:center; gap: 8px; margin-left: auto;">
-                                <button type="button" class="action-btn" id="activityTrackerYearPrev" title="Предыдущий год" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                                    <i data-lucide="chevron-left" style="width: 18px; height: 18px;"></i>
-                                </button>
-                                <div id="activityTrackerYearLabel" style="font-size: 18px; font-weight: 700; min-width: 70px; text-align:center;"></div>
-                                <button type="button" class="action-btn" id="activityTrackerYearNext" title="Следующий год" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
-                                    <i data-lucide="chevron-right" style="width: 18px; height: 18px;"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    <button class="close-statistics-btn" id="closeActivityTrackerBtn" type="button" title="Закрыть" style="flex: 0 0 auto;">
-                        <i data-lucide="x"></i>
-                    </button>
-                </div>
-
-                <div class="statistics-content" style="padding-top: 8px;">
-                    <div id="activityTrackerGrid" style="display:flex; flex-direction: column; gap: 8px;"></div>
-                </div>
-
-                <div class="statistics-footer">
-                    <button id="backActivityTrackerBtn" class="button-color-gray">Вернуться</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
         this.modal = modal;
 
         try {
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
+            const closeBtn = document.getElementById('closeActivityTrackerBtn');
+            if (closeBtn && !closeBtn.__activityTrackerBound) {
+                closeBtn.__activityTrackerBound = true;
+                closeBtn.addEventListener('click', () => this.hide());
             }
         } catch (e) {
         }
 
-        try {
-            const closeBtn = document.getElementById('closeActivityTrackerBtn');
-            if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
-        } catch (e) {
-        }
         try {
             const backBtn = document.getElementById('backActivityTrackerBtn');
-            if (backBtn) backBtn.addEventListener('click', () => this.hide());
+            if (backBtn && !backBtn.__activityTrackerBound) {
+                backBtn.__activityTrackerBound = true;
+                backBtn.addEventListener('click', () => this.hide());
+            }
         } catch (e) {
         }
 
-        modal.addEventListener('click', (e) => {
-            try {
-                if (e.target === modal) this.hide();
-            } catch (e2) {
+        try {
+            if (!modal.__activityTrackerOverlayBound) {
+                modal.__activityTrackerOverlayBound = true;
+                modal.addEventListener('click', (e) => {
+                    try {
+                        if (e.target === modal) this.hide();
+                    } catch (e2) {
+                    }
+                });
             }
-        });
+        } catch (e) {
+        }
 
         try {
             const prevBtn = document.getElementById('activityTrackerYearPrev');
             const nextBtn = document.getElementById('activityTrackerYearNext');
-            if (prevBtn) prevBtn.addEventListener('click', () => {
-                this.selectedYear = Number(this.selectedYear) - 1;
-                this.renderYear();
-            });
-            if (nextBtn) nextBtn.addEventListener('click', () => {
-                this.selectedYear = Number(this.selectedYear) + 1;
-                this.renderYear();
-            });
+            if (prevBtn && !prevBtn.__activityTrackerBound) {
+                prevBtn.__activityTrackerBound = true;
+                prevBtn.addEventListener('click', () => {
+                    this.selectedYear = Number(this.selectedYear) - 1;
+                    this.renderYear();
+                });
+            }
+            if (nextBtn && !nextBtn.__activityTrackerBound) {
+                nextBtn.__activityTrackerBound = true;
+                nextBtn.addEventListener('click', () => {
+                    this.selectedYear = Number(this.selectedYear) + 1;
+                    this.renderYear();
+                });
+            }
         } catch (e) {
         }
 
         try {
             const userSel = document.getElementById('activityTrackerUserSelect');
-            if (userSel) {
+            if (userSel && !userSel.__activityTrackerBound) {
+                userSel.__activityTrackerBound = true;
                 userSel.addEventListener('change', () => {
                     try {
                         const v = String(userSel.value || '').trim();
@@ -2763,42 +2703,34 @@ class ActivityTrackerReport {
         const weeks = this.buildYearWeeks(year);
         const monthMarkers = this.buildMonthMarkers(year, weeks);
 
-        const monthRow = (() => {
-            const parts = [];
-            parts.push('<div style="display:grid; grid-template-columns: 40px repeat(' + String(weeks.length) + ', 12px); column-gap: 3px; align-items:end;">');
-            parts.push('<div></div>');
-            for (let w = 0; w < weeks.length; w++) {
-                const m = monthMarkers[w];
-                if (m) {
-                    parts.push('<div style="grid-column: ' + String(w + 2) + ' / span 1; font-size: 12px; opacity: 0.8; transform: translateX(-2px);">' + this.escapeHtml(m) + '</div>');
-                } else {
-                    parts.push('<div></div>');
-                }
-            }
-            parts.push('</div>');
-            return parts.join('');
-        })();
+        const monthParts = [];
+        monthParts.push(`<div class="reports-tracker-months" style="grid-template-columns: 40px repeat(${weeks.length}, 12px);">`);
+        monthParts.push('<div></div>');
+        for (let w = 0; w < weeks.length; w++) {
+            const m = monthMarkers[w];
+            monthParts.push(m ? `<div class="reports-tracker-month">${this.escapeHtml(m)}</div>` : '<div></div>');
+        }
+        monthParts.push('</div>');
 
-        const weekdays = ['M', '', 'W', '', 'F', '', 'S'];
-        const gridParts = [];
-        gridParts.push('<div style="display:grid; grid-template-columns: 40px repeat(' + String(weeks.length) + ', 12px); column-gap: 3px; row-gap: 3px;">');
+        const weekdays = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
+        const dayParts = [];
+        dayParts.push(`<div class="reports-tracker-days" style="grid-template-columns: 40px repeat(${weeks.length}, 12px);">`);
         for (let d = 0; d < 7; d++) {
-            gridParts.push('<div style="font-size: 12px; opacity: 0.8; display:flex; align-items:center; justify-content:flex-end; padding-right: 6px;">' + this.escapeHtml(weekdays[d]) + '</div>');
+            dayParts.push(`<div class="reports-tracker-weekday">${this.escapeHtml(weekdays[d])}</div>`);
             for (let w = 0; w < weeks.length; w++) {
                 const day = weeks[w][d];
                 if (!day) {
-                    gridParts.push('<div style="width: 12px; height: 12px;"></div>');
+                    dayParts.push('<div></div>');
                     continue;
                 }
                 const isInYear = day.getFullYear() === year;
-                const base = isInYear ? '#243041' : '#151c25';
-                const border = isInYear ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
-                gridParts.push('<div title="' + this.escapeHtml(day.toISOString().slice(0, 10)) + '" style="width: 12px; height: 12px; border-radius: 2px; background: ' + base + '; border: 1px solid ' + border + '; box-sizing: border-box;"></div>');
+                const cls = isInYear ? 'reports-tracker-cell' : 'reports-tracker-cell reports-tracker-cell--out';
+                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(day.toISOString().slice(0, 10))}"></div>`);
             }
         }
-        gridParts.push('</div>');
+        dayParts.push('</div>');
 
-        root.innerHTML = [monthRow, gridParts.join('')].join('');
+        root.innerHTML = `${monthParts.join('')}${dayParts.join('')}`;
     }
 
     buildYearWeeks(year) {

@@ -1,0 +1,130 @@
+/* /dictations_report/  */
+
+#activity-tracker-modal.modal {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  z-index: 10150;
+}
+
+.reports-modal-content--activity-tracker {
+  max-width: 1100px;
+}
+
+.reports-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.reports-modal-header-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.reports-modal-title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.reports-modal-lang {
+  position: relative;
+  min-width: 210px;
+}
+
+.reports-modal-user {
+  min-width: 240px;
+}
+
+.reports-year-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.reports-year-picker-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.reports-year-picker-btn i {
+  width: 18px;
+  height: 18px;
+}
+
+.reports-year-picker-label {
+  font-size: 18px;
+  font-weight: 700;
+  min-width: 70px;
+  text-align: center;
+}
+
+.reports-modal-body {
+  padding-top: 8px;
+}
+
+.reports-tracker-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reports-tracker-months,
+.reports-tracker-days {
+  display: grid;
+  column-gap: 3px;
+}
+
+.reports-tracker-months {
+  align-items: end;
+}
+
+.reports-tracker-days {
+  row-gap: 3px;
+}
+
+.reports-tracker-weekday {
+  font-size: 12px;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 6px;
+}
+
+.reports-tracker-month {
+  font-size: 12px;
+  opacity: 0.8;
+  transform: translateX(-2px);
+}
+
+.reports-tracker-cell {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  box-sizing: border-box;
+  background: #575757;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.reports-tracker-cell--out {
+  background: #575757;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}

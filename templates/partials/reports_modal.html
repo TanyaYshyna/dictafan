@@ -1,0 +1,34 @@
+<!-- для отчетов -->
+
+<!-- трекер активноси -->
+<div id="activity-tracker-modal" class="modal" style="display: none;">
+    <div class="modal-content statistics-modal-content reports-modal-content reports-modal-content--activity-tracker">
+        <div class="statistics-header reports-modal-header reports-modal-header--activity-tracker">
+            <div class="reports-modal-header-main">
+                <div class="reports-modal-title">Трекер активности</div>
+                <div id="activityTrackerLanguagePicker" class="reports-modal-lang"></div>
+                <select id="activityTrackerUserSelect" class="group-select reports-modal-user"></select>
+                <div class="reports-year-picker" aria-label="Выбор года">
+                    <button type="button" class="action-btn reports-year-picker-btn" id="activityTrackerYearPrev" title="Предыдущий год">
+                        <i data-lucide="chevron-left"></i>
+                    </button>
+                    <div id="activityTrackerYearLabel" class="reports-year-picker-label"></div>
+                    <button type="button" class="action-btn reports-year-picker-btn" id="activityTrackerYearNext" title="Следующий год">
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+            <button class="close-statistics-btn" id="closeActivityTrackerBtn" type="button" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="statistics-content reports-modal-body">
+            <div id="activityTrackerGrid" class="reports-tracker-grid"></div>
+        </div>
+
+        <div class="statistics-footer reports-modal-footer">
+            <button id="backActivityTrackerBtn" class="button-color-gray">Вернуться</button>
+        </div>
+    </div>
+</div>
