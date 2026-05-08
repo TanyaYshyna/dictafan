@@ -2615,6 +2615,34 @@ class ActivityTrackerReport {
         return {};
     }
 
+    formatIsoLocal(d) {
+        try {
+            const dt = (d instanceof Date) ? d : new Date(d);
+            if (Number.isNaN(dt.getTime())) return '';
+            const y = dt.getFullYear();
+            const m = String(dt.getMonth() + 1).padStart(2, '0');
+            const day = String(dt.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch (e) {
+            return '';
+        }
+    }
+
+    formatDurationHMS(ms) {
+        let v = 0;
+        try {
+            v = Number(ms || 0);
+        } catch (e) {
+            v = 0;
+        }
+        if (!Number.isFinite(v) || v <= 0) return '00:00:00';
+        const totalSec = Math.max(0, Math.floor(v / 1000));
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
     createModal() {
         const modal = document.getElementById('activity-tracker-modal');
         if (!modal) {
