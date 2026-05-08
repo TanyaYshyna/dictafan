@@ -1032,7 +1032,12 @@ def update_user_streak(email):
 @statistics_bp.route('/activity', methods=['POST'])
 @jwt_required()
 def save_activity():
-    """Сохранить активность пользователя (perfect/corrected/audio) в БД"""
+    """Сохранить активность пользователя в history_activity.
+
+    Поддерживает:
+    - legacy: {type_activity, number, lead_time_ms}
+    - bulk: {perfect_count, corrected_count, audio_count, lead_time_ms}
+    """
     try:
         current_email = get_jwt_identity()
         data = request.get_json()
@@ -1043,19 +1048,30 @@ def save_activity():
         print(f'   данные: {data}')
         
         dictation_id = data.get('dictation_id')  # может быть dict_<id> или integer
-        type_activity = data.get('type_activity')  # 'perfect', 'corrected' или 'audio'
-        number = data.get('number', 1)  # опционально, по умолчанию 1
+        type_activity = data.get('type_activity')  # 'perfect', 'corrected' или 'audio' (legacy)
+        number = data.get('number', 1)  # legacy
+        lead_time_ms = data.get('lead_time_ms')
         activity_date = data.get('date')  # опционально: YYYY-MM-DD
         dictation_language_code = data.get('dictation_language_code')
         selected_sentence_positions = data.get('selected_sentence_positions')
+
+        perfect_count = data.get('perfect_count')
+        corrected_count = data.get('corrected_count')
+        audio_count = data.get('audio_count')
         
-        if not dictation_id or not type_activity:
-            print(f'❌ [SAVE_ACTIVITY] Ошибка: не указаны dictation_id или type_activity')
-            return jsonify({'error': 'Не указаны dictation_id или type_activity'}), 400
-        
-        if type_activity not in ['perfect', 'corrected', 'audio']:
-            print(f'❌ [SAVE_ACTIVITY] Ошибка: неверный type_activity: {type_activity}')
-            return jsonify({'error': f'Неверный type_activity: {type_activity}. Допустимые: perfect, corrected, audio'}), 400
+        if not dictation_id:
+            print(f'❌ [SAVE_ACTIVITY] Ошибка: не указан dictation_id')
+            return jsonify({'error': 'Не указан dictation_id'}), 400
+
+        is_bulk = (perfect_count is not None) or (corrected_count is not None) or (audio_count is not None)
+
+        if not is_bulk:
+            if not type_activity:
+                print(f'❌ [SAVE_ACTIVITY] Ошибка: не указан type_activity')
+                return jsonify({'error': 'Не указан type_activity'}), 400
+            if type_activity not in ['perfect', 'corrected', 'audio']:
+                print(f'❌ [SAVE_ACTIVITY] Ошибка: неверный type_activity: {type_activity}')
+                return jsonify({'error': f'Неверный type_activity: {type_activity}. Допустимые: perfect, corrected, audio'}), 400
         
         # Получаем user_id из БД по email
         user = get_user_by_email(current_email)
@@ -1067,15 +1083,30 @@ def save_activity():
         print(f'✅ [SAVE_ACTIVITY] Найден user_id: {user_id} для email: {current_email}')
         
         # Сохраняем активность в БД (агрегируется по дням; для "План‑Факт" ключ включает selected_sentence_positions)
-        activity = add_activity(
-            user_id,
-            dictation_id,
-            type_activity,
-            number,
-            activity_date,
-            dictation_language_code,
-            selected_sentence_positions,
-        )
+        if is_bulk:
+            from helpers.db_history import add_activity_bulk
+            activity = add_activity_bulk(
+                user_id,
+                dictation_id,
+                perfect_count=perfect_count or 0,
+                corrected_count=corrected_count or 0,
+                audio_count=audio_count or 0,
+                lead_time_ms=lead_time_ms or 0,
+                date_override=activity_date,
+                dictation_language_code=dictation_language_code,
+                selected_sentence_positions=selected_sentence_positions,
+            )
+        else:
+            activity = add_activity(
+                user_id,
+                dictation_id,
+                type_activity,
+                number,
+                activity_date,
+                dictation_language_code,
+                selected_sentence_positions,
+                lead_time_ms,
+            )
         
         print(f'✅ [SAVE_ACTIVITY] Активность успешно сохранена в БД')
         

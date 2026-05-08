@@ -1253,6 +1253,7 @@ let hasDraftLoaded = false; // Флаг загрузки черновика (д�
 let dictationCompletionSaved = false; // Флаг: успех записан, черновик нужно не пересоздавать
 let dictationErrorWordCounts = {};
 let __dictationCompletionHandling = false;
+let activityLeadTimeOldMs = 0;
 let __registerCompletedInFlight = false;
 // let userManager = null;
 // circleBtn будет переопределен после рендера панели прогресса
@@ -2107,7 +2108,7 @@ function getLocalDateId() {
     return `${y}${m}${day}`;
 }
 
-async function enqueueOfflineActivity(type_activity, number = 1) {
+async function enqueueOfflineActivity(type_activity, number = 1, lead_time_ms = 0) {
     try {
         const userId = getDraftUserIdForKey();
         if (!userId) return false;
@@ -2148,6 +2149,12 @@ async function enqueueOfflineActivity(type_activity, number = 1) {
         if (type_activity === 'perfect') existing.perfect_count += n;
         if (type_activity === 'corrected') existing.corrected_count += n;
         if (type_activity === 'audio') existing.audio_count += n;
+
+        try {
+            const lt = Number(lead_time_ms) || 0;
+            existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + lt;
+        } catch (e) {
+        }
         existing.updatedAt = Date.now();
 
         await idbPut('activity_outbox', existing);
@@ -2166,11 +2173,6 @@ async function syncOfflineActivityOutbox() {
         if (!rows.length) return true;
 
         for (const row of rows) {
-            const toSend = [];
-            if (row.perfect_count) toSend.push({ type_activity: 'perfect', number: row.perfect_count });
-            if (row.corrected_count) toSend.push({ type_activity: 'corrected', number: row.corrected_count });
-            if (row.audio_count) toSend.push({ type_activity: 'audio', number: row.audio_count });
-
             let dictationId = row.dictation_id || row.dictationId || null;
             if (!dictationId) {
                 try {
@@ -2189,38 +2191,41 @@ async function syncOfflineActivityOutbox() {
                 ? row.selected_sentence_positions
                 : null;
 
-            let sentAll = true;
-            for (const item of toSend) {
-                let dictLang = null;
-                try {
-                    dictLang = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
-                    if (dictLang.includes('-')) dictLang = dictLang.split('-')[0];
-                } catch (e) {
-                    dictLang = null;
-                }
-                const response = await fetch('/api/statistics/activity', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        dictation_id: dictationId,
-                        // Всегда YYYYMMDD
-                        date: row.date,
-                        type_activity: item.type_activity,
-                        number: item.number,
-                        dictation_language_code: dictLang,
-                        selected_sentence_positions: selectedSentencePositions
-                    })
-                });
-                if (!response.ok) {
-                    sentAll = false;
-                    break;
-                }
+            let dictLang = null;
+            try {
+                dictLang = String(currentDictation && currentDictation.language_original ? currentDictation.language_original : '').trim().toLowerCase();
+                if (dictLang.includes('-')) dictLang = dictLang.split('-')[0];
+            } catch (e) {
+                dictLang = null;
             }
 
-            if (sentAll) {
+            let leadTimeTotalMs = 0;
+            try {
+                leadTimeTotalMs = Number(row.lead_time_ms_total) || 0;
+            } catch (e) {
+                leadTimeTotalMs = 0;
+            }
+
+            const response = await fetch('/api/statistics/activity', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    dictation_id: dictationId,
+                    // Всегда YYYYMMDD
+                    date: row.date,
+                    perfect_count: Number(row.perfect_count) || 0,
+                    corrected_count: Number(row.corrected_count) || 0,
+                    audio_count: Number(row.audio_count) || 0,
+                    lead_time_ms: leadTimeTotalMs,
+                    dictation_language_code: dictLang,
+                    selected_sentence_positions: selectedSentencePositions
+                })
+            });
+
+            if (response.ok) {
                 await idbDelete('activity_outbox', row.key);
             } else {
                 return false;
@@ -3384,6 +3389,14 @@ async function startGame(isResume = false) {
         showCurrentSentence(0, currentSentenceIndex);
     } catch (e) {
         console.error('[startGame] showCurrentSentence failed', e);
+    }
+
+    try {
+        const snapshot = getProgressTimerSnapshot();
+        const elapsedMs = getTimerDisplayMs(snapshot);
+        activityLeadTimeOldMs = isResume ? elapsedMs : 0;
+    } catch (e) {
+        activityLeadTimeOldMs = 0;
     }
 
     try {
@@ -8994,11 +9007,21 @@ async function saveActivityToDB(type_activity) {
             return;
         }
 
+        let leadTimeMs = 0;
+        try {
+            const snapshot = getProgressTimerSnapshot();
+            const elapsedMs = getTimerDisplayMs(snapshot);
+            leadTimeMs = Math.max(0, (Number(elapsedMs) || 0) - (Number(activityLeadTimeOldMs) || 0));
+            activityLeadTimeOldMs = Number(elapsedMs) || 0;
+        } catch (e) {
+            leadTimeMs = 0;
+        }
+
         // Получаем токен из UserManager (это свойство, а не метод)
         const token = window.UM?.token || localStorage.getItem('jwt_token');
         if (!token) {
             console.warn('⚠️ [CLIENT] Не могу сохранить активность: нет токена (кладу в outbox)');
-            await enqueueOfflineActivity(type_activity, 1);
+            await enqueueOfflineActivity(type_activity, 1, leadTimeMs);
             try {
                 if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
                     window.UM.incrementTodayActivityTotal(1);
@@ -9010,8 +9033,10 @@ async function saveActivityToDB(type_activity) {
 
         const requestData = {
             dictation_id: currentDictation.id,
-            type_activity: type_activity,
-            number: 1
+            perfect_count: (type_activity === 'perfect') ? 1 : 0,
+            corrected_count: (type_activity === 'corrected') ? 1 : 0,
+            audio_count: (type_activity === 'audio') ? 1 : 0,
+            lead_time_ms: leadTimeMs,
         };
 
         try {
@@ -9049,7 +9074,7 @@ async function saveActivityToDB(type_activity) {
             console.warn(`⚠️ [CLIENT] Ошибка сохранения активности ${type_activity}:`, response.status, response.statusText);
             const errorText = await response.text();
             console.warn(`⚠️ [CLIENT] Текст ошибки:`, errorText);
-            await enqueueOfflineActivity(type_activity, 1);
+            await enqueueOfflineActivity(type_activity, 1, leadTimeMs);
             try {
                 if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
                     window.UM.incrementTodayActivityTotal(1);
@@ -9078,7 +9103,16 @@ async function saveActivityToDB(type_activity) {
         }
     } catch (error) {
         console.error(`❌ [CLIENT] Ошибка при сохранении активности ${type_activity}:`, error);
-        await enqueueOfflineActivity(type_activity, 1);
+        let leadTimeMs = 0;
+        try {
+            const snapshot = getProgressTimerSnapshot();
+            const elapsedMs = getTimerDisplayMs(snapshot);
+            leadTimeMs = Math.max(0, (Number(elapsedMs) || 0) - (Number(activityLeadTimeOldMs) || 0));
+            activityLeadTimeOldMs = Number(elapsedMs) || 0;
+        } catch (e) {
+            leadTimeMs = 0;
+        }
+        await enqueueOfflineActivity(type_activity, 1, leadTimeMs);
         try {
             if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
                 window.UM.incrementTodayActivityTotal(1);

@@ -7,7 +7,7 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
-def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None):
+def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
     
@@ -80,6 +80,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     print(f'   date: {target_date}')
     print(f'   dictation_language_code: {dictation_language_code}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
+    print(f'   lead_time_ms: {lead_time_ms}')
 
     # Нормализуем selected_sentence_positions к int[] для БД.
     # Пустой массив означает: все предложения.
@@ -115,19 +116,40 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
             else:  # audio
                 update_field = 'audio_count'
 
+            try:
+                lead_time_ms_int = int(lead_time_ms or 0)
+            except Exception:
+                lead_time_ms_int = 0
+            if lead_time_ms_int < 0:
+                lead_time_ms_int = 0
+
             query = sql.SQL("""
                 INSERT INTO history_activity 
-                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, {field}, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, {field}, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, dictation_id, date, selected_sentence_positions)
                 DO UPDATE SET 
                     {field} = history_activity.{field} + %s,
+                    lead_time = COALESCE(history_activity.lead_time, 0) + %s,
                     dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, created_at, updated_at
+                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, lead_time, created_at, updated_at
             """).format(field=sql.Identifier(update_field))
 
-            cur.execute(query, (user_id, dictation_id, target_date, selected_sentence_positions_arr, dictation_language_code, number, number))
+            cur.execute(
+                query,
+                (
+                    user_id,
+                    dictation_id,
+                    target_date,
+                    selected_sentence_positions_arr,
+                    dictation_language_code,
+                    lead_time_ms_int,
+                    number,
+                    number,
+                    lead_time_ms_int,
+                ),
+            )
 
             row = cur.fetchone()
             conn.commit()
@@ -142,8 +164,9 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
                 'perfect_count': row[6],
                 'corrected_count': row[7],
                 'audio_count': row[8],
-                'created_at': row[9].isoformat() if row[9] else None,
-                'updated_at': row[10].isoformat() if row[10] else None,
+                'lead_time': row[9],
+                'created_at': row[10].isoformat() if row[10] else None,
+                'updated_at': row[11].isoformat() if row[11] else None,
             }
 
             print(f'✅ [HISTORY_ACTIVITY] Активность сохранена: id={activity["id"]}, date={activity["date"]}, {update_field}={activity[update_field]}')
@@ -151,6 +174,155 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
     except Exception as e:
         conn.rollback()
         raise Exception(f"Failed to add activity: {e}")
+    finally:
+        conn.close()
+
+
+def add_activity_bulk(
+    user_id,
+    dictation_id,
+    perfect_count=0,
+    corrected_count=0,
+    audio_count=0,
+    lead_time_ms=0,
+    date_override=None,
+    dictation_language_code=None,
+    selected_sentence_positions=None,
+):
+    if isinstance(dictation_id, str):
+        if dictation_id.startswith('dict_'):
+            try:
+                dictation_id = int(dictation_id.replace('dict_', ''))
+            except ValueError:
+                raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
+        else:
+            try:
+                dictation_id = int(dictation_id)
+            except ValueError:
+                raise ValueError(f"Неверный формат dictation_id: {dictation_id}")
+
+    if date_override is None:
+        target_date = datetime.now().date()
+    else:
+        if isinstance(date_override, str):
+            raw = date_override.strip()
+            if raw.isdigit() and len(raw) == 8:
+                year = int(raw[:4])
+                month = int(raw[4:6])
+                day = int(raw[6:8])
+                target_date = datetime(year, month, day).date()
+            else:
+                target_date = datetime.fromisoformat(raw).date()
+        elif isinstance(date_override, int):
+            raw = str(date_override)
+            if raw.isdigit() and len(raw) == 8:
+                year = int(raw[:4])
+                month = int(raw[4:6])
+                day = int(raw[6:8])
+                target_date = datetime(year, month, day).date()
+            else:
+                target_date = datetime.now().date()
+        else:
+            target_date = date_override
+
+    try:
+        perfect_count_int = int(perfect_count or 0)
+    except Exception:
+        perfect_count_int = 0
+    try:
+        corrected_count_int = int(corrected_count or 0)
+    except Exception:
+        corrected_count_int = 0
+    try:
+        audio_count_int = int(audio_count or 0)
+    except Exception:
+        audio_count_int = 0
+    try:
+        lead_time_ms_int = int(lead_time_ms or 0)
+    except Exception:
+        lead_time_ms_int = 0
+
+    if perfect_count_int < 0:
+        perfect_count_int = 0
+    if corrected_count_int < 0:
+        corrected_count_int = 0
+    if audio_count_int < 0:
+        audio_count_int = 0
+    if lead_time_ms_int < 0:
+        lead_time_ms_int = 0
+
+    try:
+        if selected_sentence_positions is None:
+            selected_sentence_positions_arr = []
+        elif isinstance(selected_sentence_positions, str):
+            raw = selected_sentence_positions.strip()
+            if not raw or raw == '[]':
+                selected_sentence_positions_arr = []
+            else:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        selected_sentence_positions_arr = [int(x) for x in parsed]
+                    else:
+                        selected_sentence_positions_arr = []
+                except Exception:
+                    selected_sentence_positions_arr = []
+        else:
+            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
+    except Exception:
+        selected_sentence_positions_arr = []
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            query = sql.SQL("""
+                INSERT INTO history_activity
+                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, perfect_count, corrected_count, audio_count, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (user_id, dictation_id, date, selected_sentence_positions)
+                DO UPDATE SET
+                    perfect_count = COALESCE(history_activity.perfect_count, 0) + EXCLUDED.perfect_count,
+                    corrected_count = COALESCE(history_activity.corrected_count, 0) + EXCLUDED.corrected_count,
+                    audio_count = COALESCE(history_activity.audio_count, 0) + EXCLUDED.audio_count,
+                    lead_time = COALESCE(history_activity.lead_time, 0) + EXCLUDED.lead_time,
+                    dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
+                    updated_at = CURRENT_TIMESTAMP
+                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, lead_time, created_at, updated_at
+            """)
+            cur.execute(
+                query,
+                (
+                    user_id,
+                    dictation_id,
+                    target_date,
+                    selected_sentence_positions_arr,
+                    dictation_language_code,
+                    lead_time_ms_int,
+                    perfect_count_int,
+                    corrected_count_int,
+                    audio_count_int,
+                ),
+            )
+            row = cur.fetchone()
+            conn.commit()
+
+            return {
+                'id': row[0],
+                'user_id': row[1],
+                'dictation_id': row[2],
+                'date': row[3].isoformat() if row[3] else None,
+                'selected_sentence_positions': row[4],
+                'dictation_language_code': row[5],
+                'perfect_count': row[6],
+                'corrected_count': row[7],
+                'audio_count': row[8],
+                'lead_time': row[9],
+                'created_at': row[10].isoformat() if row[10] else None,
+                'updated_at': row[11].isoformat() if row[11] else None,
+            }
+    except Exception as e:
+        conn.rollback()
+        raise Exception(f"Failed to add bulk activity: {e}")
     finally:
         conn.close()
 
