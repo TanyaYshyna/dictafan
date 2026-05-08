@@ -60,6 +60,11 @@ function applyPrivateLibraryTranslations() {
     if (planFactLabel) planFactLabel.textContent = libT('private_library.user_menu.plan_fact');
   } catch (e) {
   }
+  try {
+    const trackerLabel = document.querySelector('#userMenuActivityTrackerBtn span');
+    if (trackerLabel) trackerLabel.textContent = libT('private_library.user_menu.activity_tracker', null, 'Трекер активности');
+  } catch (e) {
+  }
 
   try {
     const streak = document.querySelector('.streak');
@@ -519,6 +524,7 @@ function setupUserDropdownMenu() {
   const dropdown = document.getElementById('userMenuDropdown');
   const profileBtn = document.getElementById('userMenuProfileBtn');
   const activityBtn = document.getElementById('userMenuActivityReportBtn');
+  const trackerBtn = document.getElementById('userMenuActivityTrackerBtn');
   const ratingBtn = document.getElementById('userMenuRatingReportBtn');
   const planFactBtn = document.getElementById('userMenuPlanFactBtn');
 
@@ -578,6 +584,29 @@ function setupUserDropdownMenu() {
       try { e.preventDefault(); } catch (e2) {}
       close();
       window.location.href = '/user/profile';
+    });
+  }
+
+  if (trackerBtn) {
+    trackerBtn.addEventListener('click', async (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+
+      if (typeof ActivityTrackerReport === 'undefined') {
+        alert(libT('private_library.reports.activity_tracker_unavailable', null, 'Отчет недоступен'));
+        return;
+      }
+      if (typeof UserActivityHistory === 'undefined') {
+        alert(libT('private_library.reports.activity_tracker_unavailable', null, 'Отчет недоступен'));
+        return;
+      }
+
+      try {
+        const history = new UserActivityHistory('/user/api');
+        await ActivityTrackerReport.open(history);
+      } catch (err) {
+        alert(libT('private_library.reports.activity_tracker_open_failed', null, 'Не удалось открыть отчет'));
+      }
     });
   }
 
@@ -664,9 +693,10 @@ function installUserMenuReportsClickFallback() {
       if (!target || !target.closest) return;
 
       const activityBtn = target.closest('#userMenuActivityReportBtn');
+      const trackerBtn = target.closest('#userMenuActivityTrackerBtn');
       const ratingBtn = target.closest('#userMenuRatingReportBtn');
       const planFactBtn = target.closest('#userMenuPlanFactBtn');
-      if (!activityBtn && !ratingBtn && !planFactBtn) return;
+      if (!activityBtn && !trackerBtn && !ratingBtn && !planFactBtn) return;
 
       try {
         console.log('[user_menu_reports] click', { activity: !!activityBtn, planFact: !!planFactBtn });
@@ -697,6 +727,20 @@ function installUserMenuReportsClickFallback() {
           } catch (e0) {
           }
           alert(libT('private_library.reports.activity_open_failed'));
+        }
+        return;
+      }
+
+      if (trackerBtn) {
+        if (typeof ActivityTrackerReport === 'undefined' || typeof UserActivityHistory === 'undefined') {
+          alert(libT('private_library.reports.activity_tracker_unavailable', null, 'Отчет недоступен'));
+          return;
+        }
+        try {
+          const history = new UserActivityHistory('/user/api');
+          await ActivityTrackerReport.open(history);
+        } catch (err) {
+          alert(libT('private_library.reports.activity_tracker_open_failed', null, 'Не удалось открыть отчет'));
         }
         return;
       }

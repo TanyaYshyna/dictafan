@@ -1323,10 +1323,12 @@ class PlanFactReport {
         this.history = activityHistory;
         this.modal = null;
         this.selectedUserId = options.userId || null;
+        this.selectedLanguage = 'all';
+        this.selectedYear = new Date().getFullYear();
         this._activityUsers = [];
         this._userDropdownOpen = false;
-        this.selectedLanguage = 'all';
         this._languageSelectorInited = false;
+        this._yearSelectorInited = false;
         this._updateTimer = null;
         this._updateSeq = 0;
         this._telegramSendBusy = false;
@@ -2517,6 +2519,367 @@ class PlanFactReport {
 
     static async open(activityHistory) {
         const rep = new PlanFactReport(activityHistory);
+        await rep.show();
+    }
+}
+
+class ActivityTrackerReport {
+    constructor(activityHistory, options = {}) {
+        this.history = activityHistory;
+        this.modal = null;
+        this.selectedUserId = options.userId || null;
+        this.selectedLanguage = options.language || 'all';
+        this.selectedYear = Number(options.year) || (new Date()).getFullYear();
+        this._users = [];
+        this._languageSelectorInited = false;
+    }
+
+    getToken() {
+        try {
+            if (typeof window !== 'undefined' && window && window.UM && window.UM.token) {
+                return window.UM.token;
+            }
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('token');
+            if (t) return t;
+        } catch (e) {
+        }
+        try {
+            const t = localStorage.getItem('jwt_token');
+            if (t) return t;
+        } catch (e) {
+        }
+        return null;
+    }
+
+    getLanguageData() {
+        try {
+            if (window.LanguageManager && typeof window.LanguageManager.getLanguageData === 'function') {
+                return window.LanguageManager.getLanguageData() || {};
+            }
+        } catch (e) {
+        }
+        try {
+            return (window.LANGUAGE_DATA && typeof window.LANGUAGE_DATA === 'object') ? window.LANGUAGE_DATA : {};
+        } catch (e) {
+        }
+        return {};
+    }
+
+    createModal() {
+        let modal = document.getElementById('activity-tracker-modal');
+        if (modal) {
+            this.modal = modal;
+            return;
+        }
+
+        modal = document.createElement('div');
+        modal.id = 'activity-tracker-modal';
+        modal.className = 'modal';
+        modal.style.display = 'none';
+        modal.style.position = 'fixed';
+        modal.style.left = '0';
+        modal.style.top = '0';
+        modal.style.width = '100%';
+        modal.style.height = '100%';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        modal.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        modal.style.backdropFilter = 'blur(4px)';
+        modal.style.overflow = 'hidden';
+        modal.style.zIndex = '10150';
+
+        modal.innerHTML = `
+            <div class="modal-content statistics-modal-content" style="max-width: 1100px;">
+                <div class="statistics-header" style="display:flex; align-items:flex-start; justify-content: space-between; gap: 14px;">
+                    <div style="display:flex; flex-direction: column; gap: 10px; min-width: 0; flex: 1 1 auto;">
+                        <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+                            <div style="font-size: 22px; font-weight: 700; line-height: 1.1;">Трекер активности</div>
+                            <div id="activityTrackerLanguagePicker" style="position: relative; min-width: 210px;"></div>
+                            <select id="activityTrackerUserSelect" class="group-select" style="min-width: 240px;"></select>
+                            <div style="display:flex; align-items:center; gap: 8px; margin-left: auto;">
+                                <button type="button" class="action-btn" id="activityTrackerYearPrev" title="Предыдущий год" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                                    <i data-lucide="chevron-left" style="width: 18px; height: 18px;"></i>
+                                </button>
+                                <div id="activityTrackerYearLabel" style="font-size: 18px; font-weight: 700; min-width: 70px; text-align:center;"></div>
+                                <button type="button" class="action-btn" id="activityTrackerYearNext" title="Следующий год" style="display:flex; align-items:center; justify-content:center; padding-left: 10px; padding-right: 10px;">
+                                    <i data-lucide="chevron-right" style="width: 18px; height: 18px;"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="close-statistics-btn" id="closeActivityTrackerBtn" type="button" title="Закрыть" style="flex: 0 0 auto;">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+
+                <div class="statistics-content" style="padding-top: 8px;">
+                    <div id="activityTrackerGrid" style="display:flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+
+                <div class="statistics-footer">
+                    <button id="backActivityTrackerBtn" class="button-color-gray">Вернуться</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        this.modal = modal;
+
+        try {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        } catch (e) {
+        }
+
+        try {
+            const closeBtn = document.getElementById('closeActivityTrackerBtn');
+            if (closeBtn) closeBtn.addEventListener('click', () => this.hide());
+        } catch (e) {
+        }
+        try {
+            const backBtn = document.getElementById('backActivityTrackerBtn');
+            if (backBtn) backBtn.addEventListener('click', () => this.hide());
+        } catch (e) {
+        }
+
+        modal.addEventListener('click', (e) => {
+            try {
+                if (e.target === modal) this.hide();
+            } catch (e2) {
+            }
+        });
+
+        try {
+            const prevBtn = document.getElementById('activityTrackerYearPrev');
+            const nextBtn = document.getElementById('activityTrackerYearNext');
+            if (prevBtn) prevBtn.addEventListener('click', () => {
+                this.selectedYear = Number(this.selectedYear) - 1;
+                this.renderYear();
+            });
+            if (nextBtn) nextBtn.addEventListener('click', () => {
+                this.selectedYear = Number(this.selectedYear) + 1;
+                this.renderYear();
+            });
+        } catch (e) {
+        }
+
+        try {
+            const userSel = document.getElementById('activityTrackerUserSelect');
+            if (userSel) {
+                userSel.addEventListener('change', () => {
+                    try {
+                        const v = String(userSel.value || '').trim();
+                        this.selectedUserId = v ? (Number(v) || null) : null;
+                    } catch (e2) {
+                    }
+                    this.renderYear();
+                });
+            }
+        } catch (e) {
+        }
+    }
+
+    hide() {
+        if (this.modal) {
+            this.modal.style.display = 'none';
+        }
+    }
+
+    async ensureUsersLoaded() {
+        try {
+            if (Array.isArray(this._users) && this._users.length) return;
+            if (!this.history || typeof this.history.listActivityReportUsers !== 'function') {
+                this._users = [];
+                return;
+            }
+            this._users = await this.history.listActivityReportUsers();
+        } catch (e) {
+            this._users = [];
+        }
+    }
+
+    populateUsers() {
+        const sel = document.getElementById('activityTrackerUserSelect');
+        if (!sel) return;
+        const users = Array.isArray(this._users) ? this._users : [];
+        const options = [];
+        for (const u of users) {
+            try {
+                const id = Number(u && u.id);
+                if (!Number.isFinite(id)) continue;
+                const label = String(u && (u.label || u.username || u.name) ? (u.label || u.username || u.name) : `User #${id}`);
+                options.push({ id, label });
+            } catch (e) {
+            }
+        }
+        sel.innerHTML = options.map(o => `<option value="${String(o.id)}">${this.escapeHtml(o.label)}</option>`).join('');
+        try {
+            if (this.selectedUserId == null && options.length) this.selectedUserId = options[0].id;
+            if (this.selectedUserId != null) sel.value = String(this.selectedUserId);
+        } catch (e) {
+        }
+    }
+
+    initLanguageSelector() {
+        try {
+            const wrap = document.getElementById('activityTrackerLanguagePicker');
+            if (!wrap) return;
+            if (this._languageSelectorInited) return;
+            if (typeof LanguageSelector === 'undefined') return;
+
+            const raw = this.getLanguageData() || {};
+            const dataWithAll = { all: { language_ru: 'Все языки', language_en: 'All languages' }, ...raw };
+
+            const sel = new LanguageSelector(wrap, dataWithAll, {
+                defaultLanguage: String(this.selectedLanguage || 'all'),
+                onChange: (code) => {
+                    this.selectedLanguage = String(code || 'all');
+                    this.renderYear();
+                }
+            });
+            try {
+                if (sel && typeof sel.setSelectedLanguage === 'function') {
+                    sel.setSelectedLanguage(String(this.selectedLanguage || 'all'));
+                }
+            } catch (e2) {
+            }
+            this._languageSelectorInited = true;
+        } catch (e) {
+        }
+    }
+
+    renderYear() {
+        const year = Number(this.selectedYear) || (new Date()).getFullYear();
+        const yearLabel = document.getElementById('activityTrackerYearLabel');
+        if (yearLabel) yearLabel.textContent = String(year);
+
+        const root = document.getElementById('activityTrackerGrid');
+        if (!root) return;
+
+        const weeks = this.buildYearWeeks(year);
+        const monthMarkers = this.buildMonthMarkers(year, weeks);
+
+        const monthRow = (() => {
+            const parts = [];
+            parts.push('<div style="display:grid; grid-template-columns: 40px repeat(' + String(weeks.length) + ', 12px); column-gap: 3px; align-items:end;">');
+            parts.push('<div></div>');
+            for (let w = 0; w < weeks.length; w++) {
+                const m = monthMarkers[w];
+                if (m) {
+                    parts.push('<div style="grid-column: ' + String(w + 2) + ' / span 1; font-size: 12px; opacity: 0.8; transform: translateX(-2px);">' + this.escapeHtml(m) + '</div>');
+                } else {
+                    parts.push('<div></div>');
+                }
+            }
+            parts.push('</div>');
+            return parts.join('');
+        })();
+
+        const weekdays = ['M', '', 'W', '', 'F', '', 'S'];
+        const gridParts = [];
+        gridParts.push('<div style="display:grid; grid-template-columns: 40px repeat(' + String(weeks.length) + ', 12px); column-gap: 3px; row-gap: 3px;">');
+        for (let d = 0; d < 7; d++) {
+            gridParts.push('<div style="font-size: 12px; opacity: 0.8; display:flex; align-items:center; justify-content:flex-end; padding-right: 6px;">' + this.escapeHtml(weekdays[d]) + '</div>');
+            for (let w = 0; w < weeks.length; w++) {
+                const day = weeks[w][d];
+                if (!day) {
+                    gridParts.push('<div style="width: 12px; height: 12px;"></div>');
+                    continue;
+                }
+                const isInYear = day.getFullYear() === year;
+                const base = isInYear ? '#243041' : '#151c25';
+                const border = isInYear ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)';
+                gridParts.push('<div title="' + this.escapeHtml(day.toISOString().slice(0, 10)) + '" style="width: 12px; height: 12px; border-radius: 2px; background: ' + base + '; border: 1px solid ' + border + '; box-sizing: border-box;"></div>');
+            }
+        }
+        gridParts.push('</div>');
+
+        root.innerHTML = [monthRow, gridParts.join('')].join('');
+    }
+
+    buildYearWeeks(year) {
+        const jan1 = new Date(year, 0, 1);
+        const day = jan1.getDay();
+        const mondayIndex = (day + 6) % 7;
+        const start = new Date(jan1);
+        start.setDate(jan1.getDate() - mondayIndex);
+
+        const weeks = [];
+        const cursor = new Date(start);
+        for (let w = 0; w < 54; w++) {
+            const week = [];
+            for (let d = 0; d < 7; d++) {
+                week.push(new Date(cursor));
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            weeks.push(week);
+        }
+
+        let lastIdx = weeks.length - 1;
+        while (lastIdx >= 0) {
+            const wk = weeks[lastIdx];
+            const anyInYear = wk.some(dt => dt && dt.getFullYear && dt.getFullYear() === year);
+            if (anyInYear) break;
+            lastIdx--;
+        }
+        return weeks.slice(0, lastIdx + 1);
+    }
+
+    buildMonthMarkers(year, weeks) {
+        const labels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const markers = new Array(weeks.length).fill('');
+        for (let m = 0; m < 12; m++) {
+            const first = new Date(year, m, 1);
+            let idx = -1;
+            for (let w = 0; w < weeks.length; w++) {
+                const wk = weeks[w];
+                if (!wk) continue;
+                const has = wk.some(dt => dt && dt.getFullYear() === year && dt.getMonth() === m);
+                if (has) {
+                    idx = w;
+                    break;
+                }
+            }
+            if (idx >= 0) markers[idx] = labels[m];
+        }
+        return markers;
+    }
+
+    escapeHtml(text) {
+        return String(text || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    async show() {
+        if (!this.modal) {
+            this.createModal();
+        }
+
+        await this.ensureUsersLoaded();
+        this.populateUsers();
+        this.initLanguageSelector();
+        this.modal.style.display = 'flex';
+
+        try {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons({ root: this.modal });
+            }
+        } catch (e) {
+        }
+
+        this.renderYear();
+    }
+
+    static async open(activityHistory) {
+        const rep = new ActivityTrackerReport(activityHistory);
         await rep.show();
     }
 }
