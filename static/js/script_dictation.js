@@ -3391,7 +3391,7 @@ async function startGame(isResume = false) {
 
     try {
         const snapshot = getProgressTimerSnapshot();
-        const elapsedMs = getTimerDisplayMs(snapshot);
+        const elapsedMs = Number(snapshot && snapshot.elapsedMs != null ? snapshot.elapsedMs : 0) || 0;
         activityLeadTimeOldMs = isResume ? elapsedMs : 0;
     } catch (e) {
         activityLeadTimeOldMs = 0;
@@ -9016,9 +9016,27 @@ async function saveActivityToDB(type_activity) {
         let leadTimeMs = 0;
         try {
             const snapshot = getProgressTimerSnapshot();
-            const elapsedMs = getTimerDisplayMs(snapshot);
-            leadTimeMs = Math.max(0, (Number(elapsedMs) || 0) - (Number(activityLeadTimeOldMs) || 0));
-            activityLeadTimeOldMs = Number(elapsedMs) || 0;
+            // ВАЖНО: для activity lead_time всегда используем elapsedMs (накопленное время работы),
+            // а не getTimerDisplayMs(), потому что в режиме countdown он возвращает countdownRemainingMs
+            // и может давать огромные значения (например 13 часов "оставшегося" времени).
+            const elapsedMs = Number(snapshot && snapshot.elapsedMs != null ? snapshot.elapsedMs : 0) || 0;
+            const oldMs = Number(activityLeadTimeOldMs) || 0;
+            leadTimeMs = Math.max(0, elapsedMs - oldMs);
+            activityLeadTimeOldMs = elapsedMs;
+
+            console.log('⏱️ [CLIENT] Activity lead_time snapshot:', {
+                timer_mode: snapshot && snapshot.mode,
+                is_running: snapshot && snapshot.isRunning,
+                elapsed_ms: elapsedMs,
+                accumulated_ms: snapshot && snapshot.accumulatedMs,
+                countdown_remaining_ms: snapshot && snapshot.countdownRemainingMs,
+                old_ms: oldMs,
+                delta_ms: leadTimeMs,
+            });
+
+            if (leadTimeMs > 6 * 60 * 60 * 1000) {
+                console.warn('⚠️ [CLIENT] leadTimeMs выглядит подозрительно большим, проверь таймер/настройки:', leadTimeMs);
+            }
         } catch (e) {
             leadTimeMs = 0;
         }
