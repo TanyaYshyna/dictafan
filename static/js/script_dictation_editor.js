@@ -8924,13 +8924,86 @@ function handleAudioEnd() {
 // ОБРАБОТЧИКИ СТАРТОВОГО МОДАЛЬНОГО ОКНА
 // ============================================================================
 
+function ensureStartModalDialogCheckbox() {
+    try {
+        const modal = document.getElementById('startModal');
+        if (!modal) return null;
+
+        let isDialogCheckbox = document.getElementById('isDialogCheckbox');
+        if (isDialogCheckbox) return isDialogCheckbox;
+
+        const line = modal.querySelector('.form-group-line');
+        if (!line) return null;
+
+        const dialogGroup = document.createElement('div');
+        dialogGroup.className = 'form-group';
+        dialogGroup.innerHTML = `
+            <label class="checkbox-label" id="dialogCheckboxLabel">
+                <input type="checkbox" id="isDialogCheckbox" style="display: none;">
+                <i data-lucide="circle" class="checkbox-icon"></i>
+                ${typeof editorT === 'function' ? editorT('dictation_editor.dialog.is_dialog', 'Диалог') : 'Диалог'}
+            </label>
+        `;
+
+        line.insertBefore(dialogGroup, line.firstChild);
+
+        isDialogCheckbox = document.getElementById('isDialogCheckbox');
+        if (!isDialogCheckbox) return null;
+
+        try {
+            const tabIsDialogCheckbox = document.getElementById('tabIsDialogCheckbox');
+            if (tabIsDialogCheckbox) {
+                isDialogCheckbox.checked = !!tabIsDialogCheckbox.checked;
+            } else if (currentDictation) {
+                isDialogCheckbox.checked = !!currentDictation.is_dialog;
+            }
+        } catch (e) {
+        }
+
+        try {
+            updateCheckboxIcon(!!isDialogCheckbox.checked);
+            toggleSpeakersTable(!!isDialogCheckbox.checked);
+        } catch (e) {
+        }
+
+        try {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        } catch (e) {
+        }
+
+        return isDialogCheckbox;
+    } catch (e) {
+        return null;
+    }
+}
+
 function setupStartModalHandlers() {
     // Чекбокс диалога
-    const isDialogCheckbox = document.getElementById('isDialogCheckbox');
+    const isDialogCheckbox = ensureStartModalDialogCheckbox() || document.getElementById('isDialogCheckbox');
     if (isDialogCheckbox) {
         isDialogCheckbox.addEventListener('change', (e) => {
             toggleSpeakersTable(e.target.checked);
             updateCheckboxIcon(e.target.checked);
+
+            try {
+                const tabIsDialogCheckbox = document.getElementById('tabIsDialogCheckbox');
+                if (tabIsDialogCheckbox) {
+                    tabIsDialogCheckbox.checked = !!e.target.checked;
+                    const checkboxIcon = document.querySelector('#tabDialogCheckboxLabel .checkbox-icon');
+                    if (checkboxIcon) {
+                        checkboxIcon.setAttribute('data-lucide', tabIsDialogCheckbox.checked ? 'circle-check' : 'circle');
+                        if (typeof lucide !== 'undefined') {
+                            lucide.createIcons();
+                        }
+                    }
+                }
+                if (currentDictation) {
+                    currentDictation.is_dialog = !!e.target.checked;
+                }
+            } catch (e) {
+            }
         });
     }
 
@@ -8970,8 +9043,9 @@ function setupStartModalHandlers() {
 
     // Обработчики удаления спикеров
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('remove-speaker')) {
-            removeSpeaker(e.target);
+        const btn = e.target && e.target.closest ? e.target.closest('.remove-speaker') : null;
+        if (btn) {
+            removeSpeaker(btn);
         }
     });
 
@@ -9569,8 +9643,22 @@ async function createDictationFromStart() {
     const startEl = document.getElementById('startTextInput');
     const rawText = (startEl && (startEl.innerText || startEl.textContent)) ? (startEl.innerText || startEl.textContent) : '';
     const text = normalizeDictationInvisibleChars(normalizeNewlines(rawText)).trim();
-    const delimiter = document.getElementById('translationDelimiter').value.trim();
-    const isDialog = document.getElementById('isDialogCheckbox').checked;
+    const delimiterEl = document.getElementById('translationDelimiter');
+    const delimiter = delimiterEl ? String(delimiterEl.value || '').trim() : '';
+    const isDialogEl = document.getElementById('isDialogCheckbox');
+    let isDialog = !!(isDialogEl && isDialogEl.checked);
+    if (!isDialogEl) {
+        try {
+            const tabIsDialogCheckbox = document.getElementById('tabIsDialogCheckbox');
+            if (tabIsDialogCheckbox) {
+                isDialog = !!tabIsDialogCheckbox.checked;
+            } else {
+                isDialog = !!(currentDictation && currentDictation.is_dialog);
+            }
+        } catch (e) {
+            isDialog = false;
+        }
+    }
 
     let isRefill = false;
     try {
