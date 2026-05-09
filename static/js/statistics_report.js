@@ -2581,6 +2581,7 @@ class ActivityTrackerReport {
         this._dataDaysByIso = {};
         this._bounds = { minYear: null, maxYear: null };
         this._updateSeq = 0;
+        this._selectedIso = '';
     }
 
     getTokenSafe() {
@@ -2711,6 +2712,59 @@ class ActivityTrackerReport {
             }
         } catch (e) {
         }
+
+        try {
+            const root = document.getElementById('activityTrackerGrid');
+            if (root && !root.__activityTrackerClickBound) {
+                root.__activityTrackerClickBound = true;
+                root.addEventListener('click', (e) => {
+                    try {
+                        const cell = e && e.target ? e.target.closest('.reports-tracker-cell[data-iso]') : null;
+                        if (!cell) return;
+                        const iso = String(cell.getAttribute('data-iso') || '').trim();
+                        if (!iso) return;
+                        this.setSelectedIso(iso);
+                    } catch (e2) {
+                    }
+                });
+            }
+        } catch (e) {
+        }
+    }
+
+    setSelectedIso(iso) {
+        this._selectedIso = String(iso || '').trim();
+        try {
+            const root = document.getElementById('activityTrackerGrid');
+            if (!root) return;
+            const prev = root.querySelector('.reports-tracker-cell--active');
+            if (prev) prev.classList.remove('reports-tracker-cell--active');
+            const next = root.querySelector(`.reports-tracker-cell[data-iso="${CSS.escape(this._selectedIso)}"]`);
+            if (next) next.classList.add('reports-tracker-cell--active');
+        } catch (e) {
+        }
+        this.renderSelectedDetails();
+    }
+
+    renderSelectedDetails() {
+        const box = document.getElementById('activityTrackerDetails');
+        if (!box) return;
+
+        const iso = String(this._selectedIso || '').trim();
+        if (!iso) {
+            box.innerHTML = '';
+            return;
+        }
+
+        const row = (this._dataDaysByIso && this._dataDaysByIso[iso]) ? this._dataDaysByIso[iso] : null;
+        const ms = row && row.ms != null ? Number(row.ms) || 0 : 0;
+        const act = row && row.activity != null ? Number(row.activity) || 0 : 0;
+
+        box.innerHTML = `
+            <div class="reports-tracker-details-line">${this.escapeHtml(iso)}</div>
+            <div class="reports-tracker-details-line">${this.escapeHtml(this.formatDurationHMS(ms))}</div>
+            <div class="reports-tracker-details-line">активность ${this.escapeHtml(String(act))}</div>
+        `;
     }
 
     async reloadData({ force }) {
@@ -2794,7 +2848,10 @@ class ActivityTrackerReport {
             try {
                 const iso = String(d.date || '').slice(0, 10);
                 if (!iso) continue;
-                map[iso] = Number(d.lead_time || 0) || 0;
+                map[iso] = {
+                    ms: Number(d.lead_time || 0) || 0,
+                    activity: Number(d.activity || 0) || 0,
+                };
             } catch (e) {
             }
         }
@@ -2915,7 +2972,9 @@ class ActivityTrackerReport {
                     continue;
                 }
 
-                const ms = Number(this._dataDaysByIso && this._dataDaysByIso[iso] ? this._dataDaysByIso[iso] : 0) || 0;
+                const row = (this._dataDaysByIso && this._dataDaysByIso[iso]) ? this._dataDaysByIso[iso] : null;
+                const ms = row && row.ms != null ? Number(row.ms) || 0 : 0;
+                const activity = row && row.activity != null ? Number(row.activity) || 0 : 0;
                 const minutes = ms / 60000;
                 let cls = 'reports-tracker-cell';
                 if (minutes > 0 && minutes < 15) {
@@ -2925,13 +2984,15 @@ class ActivityTrackerReport {
                     const idx = Math.min(12, Math.floor((capped - 15) / 15) + 1);
                     cls += ` reports-tracker-cell--l${idx}`;
                 }
-                const title = `${iso} ${this.formatDurationHMS(ms)}`;
-                dayParts.push(`<div class="${cls}" title="${this.escapeHtml(title)}"></div>`);
+                const title = `${iso} ${this.formatDurationHMS(ms)} активность ${activity}`;
+                const active = (this._selectedIso && this._selectedIso === iso) ? ' reports-tracker-cell--active' : '';
+                dayParts.push(`<div class="${cls}${active}" data-iso="${this.escapeHtml(iso)}" title="${this.escapeHtml(title)}"></div>`);
             }
         }
         dayParts.push('</div>');
 
         root.innerHTML = `${monthParts.join('')}${dayParts.join('')}`;
+        this.renderSelectedDetails();
     }
 
     buildYearWeeks(year) {

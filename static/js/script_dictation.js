@@ -4991,20 +4991,34 @@ function resetInactivityTimer() {
     // Запускаем новый таймер только если игра активна и не на паузе
     if (pauseModal.style.display !== 'flex' && startModal.style.display !== 'flex') {
         inactivityTimer = setTimeout(() => {
-            try {
-                const isPlaying = (window.AudioManager && typeof window.AudioManager.isPlaying === 'function')
-                    ? window.AudioManager.isPlaying()
-                    : !!(window.AudioManager && window.AudioManager.audio && !window.AudioManager.audio.paused && !window.AudioManager.audio.ended);
-                if (isPlaying) {
-                    resetInactivityTimer();
-                    return;
-                }
-            } catch (e) {
-            }
             console.log('⏱️ Таймер бездействия: открываем модальное окно паузы');
             pauseGame(true); // Передаем true, чтобы указать, что пауза из-за бездействия
         }, currentInactivityTimeout);
     }
+}
+
+// Автопауза при уходе со вкладки/потере фокуса (чтобы lead_time не превращался в "прошло времени")
+try {
+    if (!window.__DICTATION_VISIBILITY_PAUSE_BOUND) {
+        window.__DICTATION_VISIBILITY_PAUSE_BOUND = true;
+        document.addEventListener('visibilitychange', () => {
+            try {
+                if (!gameHasAlreadyBegun) return;
+                if (!document.hidden) return;
+                pauseGame(true);
+            } catch (e) {
+            }
+        }, true);
+
+        window.addEventListener('blur', () => {
+            try {
+                if (!gameHasAlreadyBegun) return;
+                pauseGame(true);
+            } catch (e) {
+            }
+        }, true);
+    }
+} catch (e) {
 }
 
 

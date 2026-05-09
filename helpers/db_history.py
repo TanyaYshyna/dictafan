@@ -179,10 +179,10 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
 
 def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, language_code=None):
-    """Return summed lead_time (ms) by day from history_activity for a given period.
+    """Return summed lead_time (ms) and activity counters by day from history_activity for a given period.
 
     Returns:
-        list[dict]: [{date: 'YYYY-MM-DD', lead_time: int}, ...]
+        list[dict]: [{date: 'YYYY-MM-DD', lead_time: int, activity: int}, ...]
     """
     conn = get_db_connection()
     try:
@@ -197,7 +197,8 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                     """
                     SELECT
                         date,
-                        COALESCE(SUM(lead_time), 0) AS lead_time
+                        COALESCE(SUM(lead_time), 0) AS lead_time,
+                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
                     FROM history_activity
                     WHERE user_id = %s
                       AND date >= %s
@@ -213,7 +214,8 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                     """
                     SELECT
                         date,
-                        COALESCE(SUM(lead_time), 0) AS lead_time
+                        COALESCE(SUM(lead_time), 0) AS lead_time,
+                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
                     FROM history_activity
                     WHERE user_id = %s
                       AND date >= %s
@@ -230,11 +232,19 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
             if isinstance(r, dict):
                 d = r.get('date')
                 date_iso = d.isoformat() if hasattr(d, 'isoformat') else str(d)
-                out.append({'date': date_iso, 'lead_time': int(r.get('lead_time') or 0)})
+                out.append({
+                    'date': date_iso,
+                    'lead_time': int(r.get('lead_time') or 0),
+                    'activity': int(r.get('activity') or 0),
+                })
             else:
                 d = r[0]
                 date_iso = d.isoformat() if hasattr(d, 'isoformat') else str(d)
-                out.append({'date': date_iso, 'lead_time': int(r[1] or 0)})
+                out.append({
+                    'date': date_iso,
+                    'lead_time': int(r[1] or 0),
+                    'activity': int(r[2] or 0) if len(r) > 2 else 0,
+                })
         return out
     finally:
         conn.close()

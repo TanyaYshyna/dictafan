@@ -138,6 +138,24 @@
   border-color: transparent;
 }
 
+.reports-tracker-cell--active {
+  outline: 2px solid var(--color-button-blue);
+  outline-offset: 1px;
+}
+
+.reports-tracker-details {
+  margin-top: 10px;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.reports-tracker-details-line {
+  line-height: 1.2;
+}
+
 .reports-tracker-cell--white {
   background: var(--tracker-activity-white, #ffffff);
   border-color: rgba(0, 0, 0, 0.04);
