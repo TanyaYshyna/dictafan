@@ -1,5 +1,3 @@
-// console.log("👀 renderSentenceCounter вызвана");
-
 let originalAudioVisual = null;
 let translationPlayButton = null;
 
