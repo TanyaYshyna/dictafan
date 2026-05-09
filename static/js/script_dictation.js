@@ -1,5 +1,3 @@
-// console.log("👀 renderSentenceCounter вызвана");
-
 let originalAudioVisual = null;
 let translationPlayButton = null;
 
@@ -5005,14 +5003,8 @@ try {
             try {
                 if (!gameHasAlreadyBegun) return;
                 if (!document.hidden) return;
-                pauseGame(true);
-            } catch (e) {
-            }
-        }, true);
-
-        window.addEventListener('blur', () => {
-            try {
-                if (!gameHasAlreadyBegun) return;
+                if (pauseModal && pauseModal.style && pauseModal.style.display === 'flex') return;
+                if (startModal && startModal.style && startModal.style.display === 'flex') return;
                 pauseGame(true);
             } catch (e) {
             }
