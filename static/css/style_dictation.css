@@ -733,6 +733,14 @@ body.playing-audio::after {
   z-index: 1301;
 }
 
+#clearSentenceProgressModal {
+  z-index: 1400;
+}
+
+#clearSentenceProgressModal .modal-content {
+  z-index: 1401;
+}
+
 /* кнопка стартар по центру */
 #confirmStartBtn {
   /* padding: 12px 24px; */

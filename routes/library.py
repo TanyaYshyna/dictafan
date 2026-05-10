@@ -19,6 +19,7 @@ from helpers.db_books import (
     get_orphan_dictations,
     add_dictation_to_book,
     remove_dictation_from_book,
+    add_dictation_to_group_desks,
 )
 from helpers.db_dictations import get_dictation_sentences
 from routes.index import get_cover_url_for_id
@@ -242,6 +243,40 @@ def api_add_dictation_to_desk(dictation_id: int):
         return jsonify({"success": True, "added": added})
     except Exception as exc:
         logger.error("Ошибка добавления диктанта %s на стол: %s", dictation_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@library_bp.route("/api/dictation/<int:dictation_id>/add-to-desk-group", methods=["POST"])
+@jwt_required()
+def api_add_dictation_to_group_desks(dictation_id: int):
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    payload = request.get_json(silent=True) or {}
+    group_id = payload.get("group_id")
+    planned_date = payload.get("planned_date")
+    try:
+        gid = int(group_id)
+    except Exception:
+        gid = 0
+
+    if gid <= 0:
+        return jsonify({"success": False, "error": "Invalid group_id"}), 400
+
+    try:
+        res = add_dictation_to_group_desks(
+            teacher_user_id=int(user["id"]),
+            group_id=int(gid),
+            dictation_id=int(dictation_id),
+            planned_date=planned_date,
+        )
+        return jsonify(res)
+    except PermissionError:
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+    except Exception as exc:
+        logger.error("Ошибка добавления диктанта %s на стол группы %s: %s", dictation_id, gid, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
