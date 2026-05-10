@@ -5040,6 +5040,219 @@ async function syncDeskFromServerIncremental() {
   return { success: true, added: added.length, removed: removed.length };
 }
 
+let __deskTeacherGroupsCache = null;
+let __deskTeacherGroupsLoadPromise = null;
+
+async function loadTeacherGroupsForDeskAdd() {
+  try {
+    if (__deskTeacherGroupsCache) return __deskTeacherGroupsCache;
+    if (__deskTeacherGroupsLoadPromise) return await __deskTeacherGroupsLoadPromise;
+
+    __deskTeacherGroupsLoadPromise = (async () => {
+      try {
+        const res = await apiRequest('/groups/api/my', { method: 'GET' });
+        const groups = (res && res.success && Array.isArray(res.groups)) ? res.groups : [];
+        __deskTeacherGroupsCache = groups;
+        return groups;
+      } finally {
+        __deskTeacherGroupsLoadPromise = null;
+      }
+    })();
+
+    return await __deskTeacherGroupsLoadPromise;
+  } catch (e) {
+    __deskTeacherGroupsCache = [];
+    __deskTeacherGroupsLoadPromise = null;
+    return [];
+  }
+}
+
+function pickGroupsWithStudents(groups) {
+  const arr = Array.isArray(groups) ? groups : [];
+  return arr.filter(g => {
+    try {
+      const studentsCount = Number(g && g.students_count != null ? g.students_count : 0) || 0;
+      const isPersonal = !!(g && g.is_personal);
+      if (!studentsCount) return false;
+      if (!isPersonal) return true;
+      return studentsCount > 1;
+    } catch (e) {
+      return false;
+    }
+  });
+}
+
+function getDictationCardUiMeta(dictationId) {
+  try {
+    const card = document.querySelector(`.short-card[data-dictation-id="${String(dictationId)}"]:not(.desk-card)`);
+    if (!card) return null;
+    const title = (card.querySelector('.short-title') && card.querySelector('.short-title').textContent)
+      ? String(card.querySelector('.short-title').textContent).trim()
+      : '';
+    const coverEl = card.querySelector('.short-thumb img');
+    const cover = coverEl ? (coverEl.getAttribute('src') || '') : '';
+    const lang = (card.querySelector('.short-lang-flags') && card.querySelector('.short-lang-flags').textContent)
+      ? String(card.querySelector('.short-lang-flags').textContent).trim()
+      : '';
+    const cntEl = card.querySelector('.short-sentences-count span');
+    const sentencesCount = cntEl && cntEl.textContent ? String(cntEl.textContent).trim() : '';
+    return { title, cover, lang, sentencesCount };
+  } catch (e) {
+    return null;
+  }
+}
+
+function ensureAddToDeskGroupModal() {
+  let modal = document.getElementById('add-to-desk-group-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'add-to-desk-group-modal';
+  modal.className = 'modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.background = 'rgba(0,0,0,0.5)';
+  modal.style.zIndex = '100220';
+
+  modal.innerHTML = `
+    <div class="modal-content home-library-modal-content" style="width:min(640px, 94vw); margin:auto;">
+      <div class="modal-header home-library-modal-header" style="gap:12px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <img id="add-to-desk-group-cover" src="" alt="" style="width:56px; height:56px; border-radius:12px; object-fit:cover; background: rgba(0,0,0,0.06); flex-shrink:0;" />
+          <div style="min-width:0;">
+            <div style="font-weight:800; line-height:1.15;" id="add-to-desk-group-title">Добавляем на рабочий стол пользователей</div>
+            <div style="margin-top:6px; font-weight:700; opacity:0.85;" id="add-to-desk-group-dictation-name"></div>
+            <div style="margin-top:4px; font-size:12px; opacity:0.75;" id="add-to-desk-group-dictation-meta"></div>
+          </div>
+        </div>
+        <button type="button" class="modal-close" id="add-to-desk-group-close" title="Закрыть" style="margin-left:auto;">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="modal-body home-library-modal-body">
+        <input type="hidden" id="add-to-desk-group-dictation-id" value="" />
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <div style="flex:1; min-width:220px;">
+            <label for="add-to-desk-group-select" style="display:block; font-size:12px; opacity:0.7; margin-bottom:6px;">Группа</label>
+            <select id="add-to-desk-group-select" style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid rgba(0,0,0,0.15); background:#fff;"></select>
+          </div>
+          <div style="display:flex; align-items:flex-end; justify-content:flex-end; flex:0 0 auto; min-width:120px;">
+            <button type="button" class="btn-primary" id="add-to-desk-group-submit" style="white-space:nowrap;">Давить</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const closeBtn = document.getElementById('add-to-desk-group-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      try { modal.style.display = 'none'; } catch (e) {}
+    });
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      try { modal.style.display = 'none'; } catch (e2) {}
+    }
+  });
+
+  return modal;
+}
+
+async function openAddToDeskGroupModal(dictationId) {
+  const modal = ensureAddToDeskGroupModal();
+  const groups = pickGroupsWithStudents(await loadTeacherGroupsForDeskAdd());
+  const select = document.getElementById('add-to-desk-group-select');
+  const hidden = document.getElementById('add-to-desk-group-dictation-id');
+  if (hidden) hidden.value = String(dictationId);
+
+  if (select) {
+    select.innerHTML = '';
+    groups.forEach(g => {
+      const opt = document.createElement('option');
+      opt.value = String(g.id);
+      const cnt = Number(g.students_count) || 0;
+      opt.textContent = `${g.title || ('Группа ' + g.id)} (${cnt})`;
+      select.appendChild(opt);
+    });
+  }
+
+  const meta = getDictationCardUiMeta(dictationId);
+  const cover = document.getElementById('add-to-desk-group-cover');
+  const name = document.getElementById('add-to-desk-group-dictation-name');
+  const metaLine = document.getElementById('add-to-desk-group-dictation-meta');
+  if (cover) {
+    try {
+      cover.src = (meta && meta.cover) ? meta.cover : '';
+    } catch (e) {
+      cover.src = '';
+    }
+  }
+  if (name) name.textContent = meta && meta.title ? meta.title : '';
+  if (metaLine) {
+    const lang = meta && meta.lang ? meta.lang : '';
+    const sc = meta && meta.sentencesCount ? meta.sentencesCount : '';
+    metaLine.textContent = `${lang}${lang && sc ? ' - ' : ''}${sc ? `${sc} предложений` : ''}`;
+  }
+
+  const submit = document.getElementById('add-to-desk-group-submit');
+  if (submit && submit.dataset.listenerAttached !== '1') {
+    submit.dataset.listenerAttached = '1';
+    submit.addEventListener('click', async () => {
+      const did = document.getElementById('add-to-desk-group-dictation-id');
+      const sid = did ? String(did.value || '').trim() : '';
+      const sel = document.getElementById('add-to-desk-group-select');
+      const gid = sel ? String(sel.value || '').trim() : '';
+      if (!sid || !gid) return;
+
+      try {
+        showLoadingIndicator('Добавляю на рабочий стол…');
+        const res = await apiRequest(`/library/api/dictation/${encodeURIComponent(sid)}/add-to-desk-group`, {
+          method: 'POST',
+          body: JSON.stringify({ group_id: gid })
+        });
+
+        if (res && res.success) {
+          const added = Number(res.added_count) || 0;
+          const skipped = Number(res.skipped_count) || 0;
+          const total = Number(res.students_total) || 0;
+          completeLoadingIndicator(`Готово: добавлено ${added} из ${total}${skipped ? ` (уже было: ${skipped})` : ''}`, 1500);
+          try { modal.style.display = 'none'; } catch (e) {}
+        } else {
+          const msg = res && (res.error || res.message) ? String(res.error || res.message) : '';
+          showToast(msg ? `Не удалось добавить: ${msg}` : 'Ошибка при добавлении');
+        }
+      } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        showToast(`Ошибка при добавлении: ${msg}`);
+      } finally {
+        const overlay = document.getElementById('loading-overlay');
+        if (!overlay || overlay.dataset.autoclosing !== '1') {
+          hideLoadingIndicator();
+        }
+      }
+    });
+  }
+
+  try {
+    modal.style.display = 'flex';
+  } catch (e) {
+    modal.style.display = 'block';
+  }
+  try {
+    if (window.lucide) lucide.createIcons();
+  } catch (e) {
+  }
+}
+
 // Добавляет или удаляет диктант со стола (используется кликом на карточку в библиотеке)
 async function toggleDictationOnDesk(dictationId) {
   if (!dictationId) return;
@@ -5052,31 +5265,22 @@ async function toggleDictationOnDesk(dictationId) {
   const isOnDesk = isDictationOnDesk(dictationId);
 
   if (isOnDesk) {
-    // Удаляем со стола
-    try {
-      const ok = confirm('Вы точно хотите убрать диктант с рабочего стола?');
-      if (!ok) {
-        deskToggleInFlight.delete(key);
-        return;
-      }
-    } catch (e) {
-    }
-
-    const itemId = getDeskItemId(dictationId);
-    if (!itemId) {
-      console.error('❌ Не найден item_id для диктанта на столе:', dictationId);
-      deskToggleInFlight.delete(key);
-      return;
-    }
-
-    try {
-      await removeFromDesk(itemId, dictationId);
-    } finally {
-      deskToggleInFlight.delete(key);
-    }
+    // В библиотеке мы НЕ удаляем со стола. Если диктант уже есть — просто информируем.
+    showToast('Диктант был добавлен ранее');
+    deskToggleInFlight.delete(key);
+    return;
   } else {
     // Добавляем на стол
     try {
+      try {
+        const groups = pickGroupsWithStudents(await loadTeacherGroupsForDeskAdd());
+        if (groups && groups.length) {
+          await openAddToDeskGroupModal(dictationId);
+          return;
+        }
+      } catch (e) {
+      }
+
       showLoadingIndicator('Добавляю на рабочий стол…');
 
       console.log('===DESK_TOGGLE=== add flow: fast path (no prefetch)', { dictationId: String(dictationId) });

@@ -11303,8 +11303,8 @@ function check(original, userInput, currentKey) {
             }
             else {
                 disableCheckButton(1);         // отключить кнопку и нарисовать пол звезды на ней
+                saveActivityToDB('corrected'); // Сохраняем активность в БД
             }
-            saveActivityToDB('corrected'); // Сохраняем активность в БД
         }
 
         // Обновляем состояние выбора предложения (может стать completed)

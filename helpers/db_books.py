@@ -95,6 +95,81 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def add_dictation_to_group_desks(
+    *,
+    teacher_user_id: int,
+    group_id: int,
+    dictation_id: int,
+    planned_date: Optional[str] = None,
+) -> dict:
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT 1
+            FROM group_teachers
+            WHERE group_id = %s AND teacher_user_id = %s
+            """,
+            (int(group_id), int(teacher_user_id)),
+        )
+        if not cur.fetchone():
+            raise PermissionError("Not a group teacher")
+
+        cur.execute(
+            """
+            SELECT gs.student_user_id
+            FROM group_students gs
+            WHERE gs.group_id = %s
+              AND gs.status = 'active'
+              AND gs.removed_at IS NULL
+            ORDER BY gs.student_user_id ASC
+            """,
+            (int(group_id),),
+        )
+        rows = cur.fetchall() or []
+        student_ids: list[int] = []
+        for r in rows:
+            try:
+                sid = int((r.get('student_user_id') if isinstance(r, dict) else r[0]))
+                if sid and sid != int(teacher_user_id):
+                    student_ids.append(sid)
+            except Exception:
+                continue
+
+        added_ids: list[int] = []
+        skipped_ids: list[int] = []
+
+        for sid in student_ids:
+            cur.execute(
+                """
+                INSERT INTO desk_items (user_id, dictation_id, planned_date)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (user_id, dictation_id) DO NOTHING
+                """,
+                (int(sid), int(dictation_id), planned_date),
+            )
+            if cur.rowcount > 0:
+                added_ids.append(int(sid))
+            else:
+                skipped_ids.append(int(sid))
+
+        conn.commit()
+        return {
+            'success': True,
+            'group_id': int(group_id),
+            'dictation_id': int(dictation_id),
+            'planned_date': planned_date,
+            'students_total': len(student_ids),
+            'added_count': len(added_ids),
+            'skipped_count': len(skipped_ids),
+            'added_student_ids': added_ids,
+            'skipped_student_ids': skipped_ids,
+        }
+    finally:
+        cur.close()
+        conn.close()
+
+
 def remove_dictation_from_book(dictation_id: int, book_id: int) -> bool:
     """Убирает диктант из книги/раздела (удаляет связь из book_dictations)."""
     conn, cur = get_db_cursor()
