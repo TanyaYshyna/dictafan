@@ -5262,25 +5262,26 @@ async function toggleDictationOnDesk(dictationId) {
 
   console.log('===DESK_TOGGLE=== start', { dictationId: String(dictationId) });
 
-  const isOnDesk = isDictationOnDesk(dictationId);
+  // В библиотеке приоритет: если есть группы с учениками — предлагаем выбрать группу,
+  // даже если этот диктант уже есть на столе учителя.
+  try {
+    const groups = pickGroupsWithStudents(await loadTeacherGroupsForDeskAdd());
+    if (groups && groups.length) {
+      await openAddToDeskGroupModal(dictationId);
+      return;
+    }
+  } catch (e) {
+  }
 
+  const isOnDesk = isDictationOnDesk(dictationId);
   if (isOnDesk) {
-    // В библиотеке мы НЕ удаляем со стола. Если диктант уже есть — просто информируем.
     showToast('Диктант был добавлен ранее');
     deskToggleInFlight.delete(key);
     return;
-  } else {
-    // Добавляем на стол
-    try {
-      try {
-        const groups = pickGroupsWithStudents(await loadTeacherGroupsForDeskAdd());
-        if (groups && groups.length) {
-          await openAddToDeskGroupModal(dictationId);
-          return;
-        }
-      } catch (e) {
-      }
+  }
 
+  // Добавляем на стол
+  try {
       showLoadingIndicator('Добавляю на рабочий стол…');
 
       console.log('===DESK_TOGGLE=== add flow: fast path (no prefetch)', { dictationId: String(dictationId) });
@@ -5330,19 +5331,18 @@ async function toggleDictationOnDesk(dictationId) {
         console.warn('[toggleDictationOnDesk] add-to-desk failed', { dictationId, addData });
         showToast(apiMsg ? `Не удалось добавить диктант на стол: ${apiMsg}` : 'Ошибка при добавлении диктанта на стол');
       }
-    } catch (error) {
-      const msg = error && error.message ? error.message : String(error);
-      console.error('❌ Ошибка добавления диктанта на стол:', error);
-      showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
-      console.log('===DESK_TOGGLE=== failed', { dictationId: String(dictationId), msg });
-    } finally {
-      const overlay = document.getElementById('loading-overlay');
-      if (!overlay || overlay.dataset.autoclosing !== '1') {
-        hideLoadingIndicator();
-      }
-      console.log('===DESK_TOGGLE=== finally', { dictationId: String(dictationId) });
-      deskToggleInFlight.delete(key);
+  } catch (error) {
+    const msg = error && error.message ? error.message : String(error);
+    console.error('❌ Ошибка добавления диктанта на стол:', error);
+    showToast(`Ошибка при добавлении диктанта на стол: ${msg}`);
+    console.log('===DESK_TOGGLE=== failed', { dictationId: String(dictationId), msg });
+  } finally {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay || overlay.dataset.autoclosing !== '1') {
+      hideLoadingIndicator();
     }
+    console.log('===DESK_TOGGLE=== finally', { dictationId: String(dictationId) });
+    deskToggleInFlight.delete(key);
   }
 }
 
