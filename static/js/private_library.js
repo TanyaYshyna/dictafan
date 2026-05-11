@@ -5119,7 +5119,7 @@ function ensureAddToDeskGroupModal() {
   modal.style.zIndex = '100220';
 
   modal.innerHTML = `
-    <div class="modal-content home-library-modal-content" style="width:min(640px, 94vw); margin:auto;">
+    <div class="modal-content home-library-modal-content" style="width:min(520px, 92vw); margin:auto; height:auto; max-height:min(520px, 90vh);">
       <div class="modal-header home-library-modal-header" style="gap:12px; align-items:center;">
         <div style="display:flex; align-items:center; gap:12px; min-width:0;">
           <img id="add-to-desk-group-cover" src="" alt="" style="width:56px; height:56px; border-radius:12px; object-fit:cover; background: rgba(0,0,0,0.06); flex-shrink:0;" />
@@ -5134,7 +5134,7 @@ function ensureAddToDeskGroupModal() {
         </button>
       </div>
 
-      <div class="modal-body home-library-modal-body">
+      <div class="modal-body home-library-modal-body" style="padding:16px 24px 20px; overflow:visible; flex:0 0 auto;">
         <input type="hidden" id="add-to-desk-group-dictation-id" value="" />
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <div style="flex:1; min-width:220px;">
@@ -5176,6 +5176,12 @@ async function openAddToDeskGroupModal(dictationId) {
 
   if (select) {
     select.innerHTML = '';
+
+    const optSelf = document.createElement('option');
+    optSelf.value = '__self__';
+    optSelf.textContent = 'Мой рабочий стол';
+    select.appendChild(optSelf);
+
     groups.forEach(g => {
       const opt = document.createElement('option');
       opt.value = String(g.id);
@@ -5215,6 +5221,30 @@ async function openAddToDeskGroupModal(dictationId) {
 
       try {
         showLoadingIndicator('Добавляю на рабочий стол…');
+
+        if (gid === '__self__') {
+          const addRes = await apiRequest(`/library/api/dictation/${encodeURIComponent(sid)}/add-to-desk`, {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+
+          if (addRes && addRes.success) {
+            try {
+              await syncDeskFromServerIncremental();
+            } catch (e) {
+              await loadDeskItems();
+            }
+            const wasAdded = !!(addRes && addRes.success && (addRes.added === true || addRes.added === 1));
+            completeLoadingIndicator(wasAdded ? 'Диктант добавлен на рабочий стол' : 'Диктант уже на рабочем столе', 1500);
+            try { modal.style.display = 'none'; } catch (e) {}
+            return;
+          }
+
+          const apiMsg = (addRes && (addRes.error || addRes.message)) ? String(addRes.error || addRes.message) : '';
+          showToast(apiMsg ? `Не удалось добавить: ${apiMsg}` : 'Ошибка при добавлении');
+          return;
+        }
+
         const res = await apiRequest(`/library/api/dictation/${encodeURIComponent(sid)}/add-to-desk-group`, {
           method: 'POST',
           body: JSON.stringify({ group_id: gid })

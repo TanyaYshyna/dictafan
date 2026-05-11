@@ -4889,8 +4889,13 @@ function pauseGame(isInactivityPause = false) {
     }
 
     // Останавливаем запись если активна
-    if (mediaRecorder?.state === 'recording') {
-        stopRecording('pause');
+    try {
+        const unifiedActive = !!(unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording);
+        const mediaActive = (mediaRecorder && mediaRecorder.state === 'recording');
+        if (unifiedActive || mediaActive) {
+            stopRecording('pause');
+        }
+    } catch (e) {
     }
 
     // Останавливаем все аудио
@@ -6374,6 +6379,16 @@ function stopTimer(options) {
     const panel = getProgressPanelInstance();
     if (panel) {
         panel.pauseSession();
+    }
+
+    // Останавливаем запись если активна (на случай, если пауза включилась не через pauseGame)
+    try {
+        const unifiedActive = !!(unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording);
+        const mediaActive = (mediaRecorder && mediaRecorder.state === 'recording');
+        if (unifiedActive || mediaActive) {
+            stopRecording('pause');
+        }
+    } catch (e) {
     }
 
     currentInactivityTimeout = INACTIVITY_TIMEOUT_DEFAULT;
