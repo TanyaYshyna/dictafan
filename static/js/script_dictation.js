@@ -1919,9 +1919,9 @@ const PAGE_NAME = 'dictation';
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         const rev = data && (data.revision || data.app_cache_revision || data.value);
-        console.log('[Version]', `${PAGE_NAME}__${rev || 'unknown'}`);
+        // console.log('[Version]', `${PAGE_NAME}__${rev || 'unknown'}`);
     } catch (e) {
-        console.log('[Version]', `${PAGE_NAME}__unknown`);
+        // console.log('[Version]', `${PAGE_NAME}__unknown`);
     }
 })();
 
@@ -4238,17 +4238,16 @@ function setupAuthHandlers() {
         if (!window.__DICTATION_EXIT_BTN_DELEGATE_BOUND) {
             window.__DICTATION_EXIT_BTN_DELEGATE_BOUND = true;
             document.addEventListener('click', async (e) => {
-                console.log('WWWWWWWWWWWWWWWWW');
                 try {
                     // const btn = e && e.target ? e.target.closest('#startModalExitToIndexBtn') : null;
                     // if (!btn) return;
-                    console.log('🚪 [exit] click captured', {
-                        targetTag: e && e.target ? e.target.tagName : null,
-                        targetId: e && e.target ? (e.target.id || null) : null,
-                        targetClass: e && e.target ? (typeof e.target.className === 'string' ? e.target.className : null) : null,
-                        btnDisabled: !!btn.disabled,
-                        btnTitle: btn.getAttribute('title') || null
-                    });
+                    // console.log('🚪 [exit] click captured', {
+                    //     targetTag: e && e.target ? e.target.tagName : null,
+                    //     targetId: e && e.target ? (e.target.id || null) : null,
+                    //     targetClass: e && e.target ? (typeof e.target.className === 'string' ? e.target.className : null) : null,
+                    //     btnDisabled: !!btn.disabled,
+                    //     btnTitle: btn.getAttribute('title') || null
+                    // });
                     e.preventDefault();
                     e.stopPropagation();
                     // If exit modal isn't present for some reason, still allow leaving.
@@ -4857,7 +4856,7 @@ function pauseGame(isInactivityPause = false) {
             // Вычитаем время бездействия из накопленного времени
             const inactivityTime = currentInactivityTimeout || INACTIVITY_TIMEOUT_DEFAULT;
             panel.timerState.dictationAccumulatedMs = Math.max(0, panel.timerState.dictationAccumulatedMs - inactivityTime);
-            console.log('[pauseGame] Вычтено время бездействия:', inactivityTime, 'мс');
+            console.log('⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰⏰[pauseGame] Вычтено время бездействия:', inactivityTime, 'мс');
         }
     }
 
@@ -5322,7 +5321,7 @@ function renderSelectionTable() {
         });
     }
 
-    console.log('[renderSelectionTable] selectedSentences после рендеринга:', selectedSentences.length, selectedSentences);
+    // console.log('[renderSelectionTable] selectedSentences после рендеринга:', selectedSentences.length, selectedSentences);
 
     if (!tableSentences.dataset.listenerAttached) {
         tableSentences.addEventListener('click', handleSentenceTableClick);
@@ -5889,7 +5888,7 @@ function getSelectedSentences() {
         return sentence && calculateSentenceSelectionState(sentence) === 'checked';
     });
 
-    console.log('[getSelectedSentences] Выбрано предложений:', selectedSentences.length, selectedSentences);
+    // console.log('[getSelectedSentences] Выбрано предложений:', selectedSentences.length, selectedSentences);
 }
 
 async function checkDictationAudioCachedOrThrow(sentenceKeys) {
@@ -6260,7 +6259,7 @@ function sumRez() {
 }
 
 function updateStats(circle = null) {
-    console.log('[updateStats] updateStats', circle);
+    // console.log('[updateStats] updateStats', circle);
     const panel = getProgressPanelInstance();
 
     // Прогресс/счетчики могли измениться — сохраняем локально (debounce).
@@ -6284,7 +6283,7 @@ function updateStats(circle = null) {
         // чтобы итог в шапке был точной суммой колонки внизу.
         if (corrected > 0) {
             totalCorrected += corrected;
-            console.log('[updateStats] Предложение', s.key, 'учтено как corrected, perfect=', perfect, 'corrected=', corrected);
+            // console.log('[updateStats] Предложение', s.key, 'учтено как corrected, perfect=', perfect, 'corrected=', corrected);
         }
         // Аудио уже хранится как счётчик и суммируется по всем предложениям
         totalAudio += audio;
@@ -6864,7 +6863,7 @@ function checkIfAllCompleted() {
                 // Обновляем состояние чекбокса "Выбрать все"
                 updateAllCheckboxState();
 
-                console.log('✅ Автоматически выбрано следующее предложение:', nextSentence.key);
+                // console.log('✅ Автоматически выбрано следующее предложение:', nextSentence.key);
             }
         }
     }
@@ -7330,11 +7329,11 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         const result = recognitionResult || window.lastRecognitionResult;
         window.lastRecognitionResult = null; // очищаем
 
-        console.log(`🔍 [saveRecording] Обрабатываем результат UnifiedSpeechRecognition:`, result);
+        // console.log(`🔍 [saveRecording] Обрабатываем результат UnifiedSpeechRecognition:`, result);
 
         try {
             const t = (result && typeof result.text === 'string') ? result.text : '';
-            console.log(`[SR#8] using recognition result mode=${result?.mode} textLen=${t.length} textPreview="${t.slice(0, 80)}"`);
+            // console.log(`[SR#8] using recognition result mode=${result?.mode} textLen=${t.length} textPreview="${t.slice(0, 80)}"`);
         } catch (e) {}
         
             const audioBlob = result.audioBlob || unifiedSpeechRecognizer?.getAudioBlob();
@@ -7403,7 +7402,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                             prompt
                         );
 
-                        console.log('Результат Whisper (unified, полный):', whisperResult);
+                        // console.log('Результат Whisper (unified, полный):', whisperResult);
 
                         let recognizedText = '';
                         if (whisperResult && typeof whisperResult === 'object') {
@@ -7426,7 +7425,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                             recognizedText = whisperResult.trim();
                         }
 
-                        console.log('Whisper распознал (unified, извлеченный текст):', recognizedText);
+                        // console.log('Whisper распознал (unified, извлеченный текст):', recognizedText);
                         if (recognizedText) {
                             spokenText = recognizedText;
                         }
@@ -7436,7 +7435,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                 console.error('❌ Ошибка распознавания через Whisper (unified):', error);
             }
         }
-        console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
+        // console.log(`🔍 [saveRecording] Распознанный текст: "${spokenText}"`);
 
         try {
             const userAudioAnswerEl = document.getElementById('userAudioAnswer');
@@ -7466,7 +7465,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
         // Получаем оригинальный текст
         const originalText = currentSentence?.text ?? '';
-        console.log(`🔍 [saveRecording] Оригинальный текст: "${originalText}"`);
+        // console.log(`🔍 [saveRecording] Оригинальный текст: "${originalText}"`);
         
         if (!originalText) {
             console.error(`❌ [saveRecording] currentSentence.text пустой! currentSentence:`, currentSentence);
@@ -7474,17 +7473,17 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
         // Считаем процент совпадения
         const percent = computeMatchPercentASR(originalText, spokenText);
-        console.log(`🔍 [saveRecording] Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
+        // console.log(`🔍 [saveRecording] Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
 
-        console.log(`[SR#9] computed percent=${percent} spokenLen=${(spokenText || '').length} originalLen=${(originalText || '').length}`);
+        // console.log(`[SR#9] computed percent=${percent} spokenLen=${(spokenText || '').length} originalLen=${(originalText || '').length}`);
         
         // Обновляем отображение процента
         const percentEl = getCountPercentEl();
         if (percentEl) {
             percentEl.textContent = percent;
-            console.log(`[SR#10] UI count_percent.textContent now=${percentEl.textContent}`);
+            // console.log(`[SR#10] UI count_percent.textContent now=${percentEl.textContent}`);
         } else {
-            console.log(`[SR#10] UI count_percent element not found`);
+            // console.log(`[SR#10] UI count_percent element not found`);
         }
 
         // После распознавания обычно меняется прогресс/статистика — сохраняем локально.
@@ -7492,7 +7491,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         
         // Проверяем «зачтено»
         let isPassed = percent >= MIN_MATCH_PERCENT;
-        console.log(`🔍 [saveRecording] Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
+        // console.log(`🔍 [saveRecording] Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
 
         // Если пользователь упорно повторяет и каждый раз попадает >50%, но не может добить до MIN_MATCH_PERCENT,
         // то после нескольких попыток засчитываем аудио, чтобы не демотивировать.
@@ -7524,11 +7523,11 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
         }
         
         if (isPassed) {
-            console.log('✅ [saveRecording] Запись засчитана, уменьшаем счетчик');
+            // console.log('✅ [saveRecording] Запись засчитана, уменьшаем счетчик');
             playSuccessSound();
             decreaseAudioCounter();
         } else {
-            console.log('❌ [saveRecording] Запись не засчитана, счетчик не уменьшается');
+            // console.log('❌ [saveRecording] Запись не засчитана, счетчик не уменьшается');
             // Если не засчитано — фиксируем, что фокус должен остаться на записи
             // (после того как кнопка снова станет enabled)
             window.__forceFocusRecordAfterRecognition = true;
@@ -7563,7 +7562,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     }
     
     // Fallback на старую логику
-    console.log(`🔍 [saveRecording] Fallback на старую логику, audioChunks.length: ${audioChunks.length}`);
+    // console.log(`🔍 [saveRecording] Fallback на старую логику, audioChunks.length: ${audioChunks.length}`);
 
     if (!audioChunks.length) {
         console.warn("Нет аудиоданных для сохранения");
@@ -7589,7 +7588,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     if (getEffectiveSpeechRecognitionMode() === 'route-off') {
         // Проверяем наличие модели (в памяти или в localStorage)
         const hasModel = hasWhisperModel(currentLang, selectedSize);
-        console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
+        // console.log(`🔍 [saveRecording] Режим route-off, модель для ${currentLang}${selectedSize ? ' (' + selectedSize + ')' : ''} доступна: ${hasModel}`);
 
         if (!hasModel) {
             console.log(`⚠️ [saveRecording] Модель Whisper не найдена, используем Web Speech API результаты`);
@@ -7616,23 +7615,23 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
 
                 // Генерируем промпт из подсказки (explanation)
                 const explanation = currentSentence.explanation || '';
-                console.log(`🔍 [saveRecording] explanation: "${explanation}"`);
+                // console.log(`🔍 [saveRecording] explanation: "${explanation}"`);
 
                 // Определяем язык оригинала для правильного извлечения имен
                 const originalLang = langCodeUrl?.split('-')[0] || (typeof currentDictation !== 'undefined' && currentDictation?.language_original ? currentDictation.language_original.split('-')[0] : 'en');
-                console.log(`🔍 [saveRecording] Язык оригинала диктанта: ${originalLang}`);
+                // console.log(`🔍 [saveRecording] Язык оригинала диктанта: ${originalLang}`);
 
                 const names = extractNamesFromHint(explanation, originalLang);
-                console.log(`🔍 [saveRecording] Извлеченные имена:`, names);
+                // console.log(`🔍 [saveRecording] Извлеченные имена:`, names);
 
                 const prompt = generateWhisperPrompt(explanation, originalLang);
-                console.log(`🔍 [saveRecording] Сгенерированный промпт:`, prompt);
+                // console.log(`🔍 [saveRecording] Сгенерированный промпт:`, prompt);
 
-                if (prompt) {
-                    console.log(`📝 Используем промпт для улучшения распознавания: "${prompt}"`);
-                } else {
-                    console.log(`⚠️ [saveRecording] Промпт не сгенерирован (имена не найдены или explanation пустой)`);
-                }
+                // if (prompt) {
+                //     console.log(`📝 Используем промпт для улучшения распознавания: "${prompt}"`);
+                // } else {
+                //     console.log(`⚠️ [saveRecording] Промпт не сгенерирован (имена не найдены или explanation пустой)`);
+                // }
 
                 // Используем WhisperModelManager для распознавания с промптом
                 const whisperManager = window.WhisperModelManager ? new window.WhisperModelManager() : null;
@@ -7650,7 +7649,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                 animateProgressBar(progressBarId, progressDuration);
 
                 // Используем метод transcribe с поддержкой промпта
-                console.log(`🔄 [saveRecording] Вызываем whisperManager.transcribe для языка ${currentLang}`);
+                // console.log(`🔄 [saveRecording] Вызываем whisperManager.transcribe для языка ${currentLang}`);
                 const result = await whisperManager.transcribe(
                     audioBlob,
                     currentLang,
@@ -7660,7 +7659,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
 
                 // Transformers.js возвращает объект с полем text
                 // Формат: { text: "распознанный текст", chunks: [...] }
-                console.log('Результат Whisper (полный):', result);
+                // console.log('Результат Whisper (полный):', result);
 
                 let recognizedText = '';
                 if (result && typeof result === 'object') {
@@ -7685,7 +7684,7 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
                     recognizedText = result.trim();
                 }
 
-                console.log('Whisper распознал (извлеченный текст):', recognizedText);
+                // console.log('Whisper распознал (извлеченный текст):', recognizedText);
 
                 // Если распознавание не дало результата, используем fallback
                 if (!recognizedText || recognizedText.length === 0) {
@@ -7726,24 +7725,24 @@ async function saveRecording(cause = undefined, recognitionResult = null) {
     }
 
     // Логируем для отладки
-    console.log('Распознанный текст:', spokenText);
-    console.log('Оригинальный текст:', originalText);
+    // console.log('Распознанный текст:', spokenText);
+    // console.log('Оригинальный текст:', originalText);
 
     // ⬇️ добавлено: считаем % совпадения
     const percent = computeMatchPercentASR(originalText, spokenText);
-    console.log(`Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
+    // console.log(`Процент совпадения: ${percent}% (минимум: ${MIN_MATCH_PERCENT}%)`);
 
     // ⬇️ добавлено: проверяем «зачтено»
     const isPassed = percent >= MIN_MATCH_PERCENT;
-    console.log(`Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
+    // console.log(`Запись ${isPassed ? 'засчитана' : 'не засчитана'}: ${percent}% >= ${MIN_MATCH_PERCENT}%`);
 
     if (isPassed) {
         // Уменьшаем счетчик только если запись зачтена
-        console.log('✅ Запись засчитана, уменьшаем счетчик');
+        // console.log('✅ Запись засчитана, уменьшаем счетчик');
         playSuccessSound();
         decreaseAudioCounter();
     } else {
-        console.log('❌ Запись не засчитана, счетчик не уменьшается');
+        // console.log('❌ Запись не засчитана, счетчик не уменьшается');
         // Фокус должен остаться на записи (после восстановления доступности кнопки)
         window.__forceFocusRecordAfterRecognition = true;
         window.__lockFocusOnRecordUntil = Date.now() + 1500;
@@ -7877,7 +7876,7 @@ async function checkInternetConnection() {
         });
         return response.ok;
     } catch (error) {
-        console.log('Интернет недоступен, используем локальное распознавание');
+        // console.log('Интернет недоступен, используем локальное распознавание');
         return false;
     }
 }
@@ -7891,7 +7890,7 @@ function checkWebSpeechAPI() {
 // ВАЖНО: Web Speech API в Chrome на самом деле требует интернет
 // Аудио отправляется на серверы Google для распознавания
 function initOfflineRecognition() {
-    console.log('Режим "локального" распознавания через Web Speech API (требует интернет)');
+    // console.log('Режим "локального" распознавания через Web Speech API (требует интернет)');
     initWebSpeechRecognition();
 }
 
@@ -7950,12 +7949,12 @@ function initSpeechRecognition() {
 
     if (effectiveMode === 'route') {
         // Только через интернет (Web Speech API - требует интернет)
-        console.log('✅ [initSpeechRecognition] Режим: только через интернет (Web Speech API)');
+        // console.log('✅ [initSpeechRecognition] Режим: только через интернет (Web Speech API)');
         initWebSpeechRecognition();
         updateRecognitionModeIcon(); // Обновляем иконку
         return;
     } else if (effectiveMode === 'route-server') {
-        console.log('✅ [initSpeechRecognition] Режим: сервер (Whisper)');
+        // console.log('✅ [initSpeechRecognition] Режим: сервер (Whisper)');
         // Ничего не инициализируем заранее: запись идёт на клиенте,
         // транскрипция будет выполняться после stop (через /api/speech-recognition/transcribe)
         updateRecognitionModeIcon();
@@ -8020,7 +8019,7 @@ function initWebSpeechRecognition() {
 
     recognition = new SpeechRecognition();
     recognition.lang = langCodeUrl; // Используем переданный язык
-    console.log('Recognition language set to:', recognition.lang, '(Web Speech API - требует интернет)');
+    // console.log('Recognition language set to:', recognition.lang, '(Web Speech API - требует интернет)');
 
     recognition.interimResults = true;
     recognition.continuous = true; // Добавляем непрерывное распознавание
@@ -9172,7 +9171,7 @@ async function saveActivityToDB(type_activity) {
 // ===== Инициализация диктанта =================================================================== 
 // ===== Инициализация диктанта =================================================================== 
 function loadDictationData() {
-    console.log('=======================loadDictationData:');
+    // console.log('=======================loadDictationData:');
     const dictationDataElement = document.getElementById('dictation-data');
     if (!dictationDataElement) {
         console.error('Элемент dictation-data не найден');
@@ -9203,7 +9202,7 @@ function loadDictationData() {
 
         // Инициализация старой статистики
         dictationStatistics.init().then(() => {
-            console.log('✅ Старая статистика инициализирована');
+            // console.log('✅ Старая статистика инициализирована');
             // После инициализации синхронизируем UI
             if (progressPanel) progressPanel.updateUI();
         });
@@ -9219,11 +9218,11 @@ function loadDictationData() {
         currentDictation.title_orig = dictationDataElement.dataset.titleOrig || '';
 
         // Логируем для отладки
-        console.log('📝 Загружен язык из data-атрибутов:', {
-            language_original: currentDictation.language_original,
-            language_translation: currentDictation.language_translation,
-            dictationId: currentDictation.id
-        });
+        // console.log('📝 Загружен язык из data-атрибутов:', {
+        //     language_original: currentDictation.language_original,
+        //     language_translation: currentDictation.language_translation,
+        //     dictationId: currentDictation.id
+        // });
 
         if (!currentDictation.language_original) {
             console.warn('⚠️ language_original пустой! Проверьте data-language-original в HTML');
@@ -9233,7 +9232,7 @@ function loadDictationData() {
         const translationLanguageElement = document.querySelector('.translation-audio-button-wrapper .language');
         if (translationLanguageElement && currentDictation.language_translation) {
             translationLanguageElement.textContent = currentDictation.language_translation;
-            console.log('✅ Обновлен язык перевода в интерфейсе:', currentDictation.language_translation);
+            // console.log('✅ Обновлен язык перевода в интерфейсе:', currentDictation.language_translation);
         } else if (!translationLanguageElement) {
             console.warn('⚠️ Элемент .translation-audio-button-wrapper .language не найден');
         } else if (!currentDictation.language_translation) {
@@ -9272,7 +9271,7 @@ function loadDictationData() {
         }
 
         // Предложения будут загружены через API, здесь только метаданные
-        console.log('Данные диктанта:', currentDictation);
+        // console.log('Данные диктанта:', currentDictation);
 
         return true;
     } catch (error) {
@@ -9378,7 +9377,7 @@ async function loadSentencesFromIndexedDb() {
             if (s.number_of_audio === undefined) s.number_of_audio = 0;
         });
 
-        console.log('✅ Загружено предложений из IndexedDB:', allSentences.length);
+        // console.log('✅ Загружено предложений из IndexedDB:', allSentences.length);
         return true;
     } catch (error) {
         console.error('❌ Ошибка загрузки предложений из IndexedDB:', error);
@@ -9388,7 +9387,7 @@ async function loadSentencesFromIndexedDb() {
 
 async function initializeDictation() {
     // Сначала загружаем данные
-    console.log('=======================initializeDictation:');
+    // console.log('=======================initializeDictation:');
 
     // Загружаем настройки аудио из данных пользователя (до загрузки черновика)
     await loadAudioSettingsFromUser();
@@ -9737,14 +9736,14 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
 // Функция переходу до наступного речення
 function nextSentence() {
-    console.log('nextSentence (before)', currentSentenceIndex, totalSelectedSentences);
+    // console.log('nextSentence (before)', currentSentenceIndex, totalSelectedSentences);
     // Используем сохраненное общее количество, а не текущее selectedSentences.length
     let newSentenceIndex = currentSentenceIndex + 1; // по списку выбранных чеком ключей к предложениям
 
     if (newSentenceIndex < totalSelectedSentences) {
         if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {stopRecording('manual');}
         currentSentenceIndex = newSentenceIndex;
-        console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
+        // console.log('nextSentence (after)', currentSentenceIndex, totalSelectedSentences);
         updateSimpleSentenceCounter();
         showCurrentSentence(0, newSentenceIndex); // функция загрузки предложения
         updateResultNextBtnUI();
@@ -9802,16 +9801,16 @@ function recordAudio() {
 // startNewGame
 // document.addEventListener("DOMContentLoaded", function () {
 async function onloadInitializeDictation() {
-    console.log('=======================document.addEventListener("DOMContentLoaded", function () {:');
+    // console.log('=======================document.addEventListener("DOMContentLoaded", function () {:');
     // Инициализируем диалоговые метаданные из data-атрибутов
     const dataNode = document.getElementById('dictation-data');
     if (dataNode) {
         const isDialogAttr = dataNode.getAttribute('data-is-dialog');
         dictationIsDialog = String(isDialogAttr) === 'true';
-        console.log('[onloadInitializeDictation] data-is-dialog атрибут:', isDialogAttr, '-> dictationIsDialog:', dictationIsDialog);
+        // console.log('[onloadInitializeDictation] data-is-dialog атрибут:', isDialogAttr, '-> dictationIsDialog:', dictationIsDialog);
         try {
             dictationSpeakers = JSON.parse(dataNode.getAttribute('data-speakers') || '{}') || {};
-            console.log('[onloadInitializeDictation] dictationSpeakers:', dictationSpeakers);
+            // console.log('[onloadInitializeDictation] dictationSpeakers:', dictationSpeakers);
         } catch (e) {
             console.error('[onloadInitializeDictation] Ошибка парсинга data-speakers:', e);
             dictationSpeakers = {};
@@ -10217,7 +10216,7 @@ async function onloadInitializeDictation() {
         const key = (event.key || '').toLowerCase();
         if (event.code === 'KeyS' || SAVE_KEY_VALUES.includes(key)) {
             event.preventDefault();
-            console.log('[Draft] hotkey save triggered', { key: event.key, code: event.code });
+            // console.log('[Draft] hotkey save triggered', { key: event.key, code: event.code });
 
             const panel = getProgressPanelInstance();
             const historySavePromise = panel
@@ -10236,7 +10235,7 @@ async function onloadInitializeDictation() {
                     if (panel && success) {
                         panel.markClean();
                     }
-                    console.log('[Draft] hotkey save completed', { success });
+                    // console.log('[Draft] hotkey save completed', { success });
                 })
                 .catch(error => {
                     console.error('[Draft] hotkey save error', error);
@@ -11456,12 +11455,12 @@ function checkText() {
             acc[t] = (acc[t] || 0) + 1;
             return acc;
         }, {});
-        console.log('[Dictation][Check] sentence_key=', currentSentence?.key,
-            'failedChecks=', failedChecks,
-            'allCorrect=', allCorrect,
-            'typeCounts=', typeCounts);
+        // console.log('[Dictation][Check] sentence_key=', currentSentence?.key,
+        //     'failedChecks=', failedChecks,
+        //     'allCorrect=', allCorrect,
+        //     'typeCounts=', typeCounts);
     } catch (e) {
-        console.log('[Dictation][Check] failedChecks=', failedChecks, '(failed to build typeCounts)', e);
+        // console.log('[Dictation][Check] failedChecks=', failedChecks, '(failed to build typeCounts)', e);
     }
 
     correctAnswerDiv.style.display = "block";
@@ -11666,7 +11665,7 @@ async function registerCompletedDictation() {
         const timerSnapshot = getProgressTimerSnapshot();
         const totalTimeMs = timerSnapshot.accumulatedMs || 0;
 
-        console.log('[Register] Регистрируем завершенный диктант:', {
+        console.log('⏰⏰⏰[Register] Регистрируем завершенный диктант:', {
             dictation_id: currentDictation.id,
             perfect_count: totalPerfect,
             corrected_count: totalCorrected,
@@ -11785,7 +11784,7 @@ async function registerCompletedDictation() {
 
             if (successResponse.ok) {
                 const result = await successResponse.json();
-                console.log('[Register] ✅ Успех сохранен в history_successes:', result.success_data);
+                console.log('[Register] ✅✅✅✅✅ Успех сохранен в history_successes:', result.success_data);
                 dictationCompletionSaved = true;
                 await bumpCompletionCountsCache(dictationIdForDb);
                 try {
@@ -11885,16 +11884,16 @@ async function registerCompletedDictation() {
 
     const changedCount = Object.keys(state.per_sentence || {}).length;
 
-    console.log('[Draft] saveDictationDraft: prepared payload', {
-        dictationId: currentDictation.id,
-        changedSentences: changedCount,
-        isMixed: !!state.is_mixed,
-        currentIndex: currentSentenceIndex || 0
-    });
+    // console.log('[Draft] saveDictationDraft: prepared payload', {
+    //     dictationId: currentDictation.id,
+    //     changedSentences: changedCount,
+    //     isMixed: !!state.is_mixed,
+    //     currentIndex: currentSentenceIndex || 0
+    // });
 
     await saveDraftToIndexedDbAndQueueSync('manual');
 
-    console.log('[Draft] saveDictationDraft: completed', { success: true });
+    // console.log('[Draft] saveDictationDraft: completed', { success: true });
     return true;
 }
 
@@ -11926,7 +11925,7 @@ async function loadAndApplyDraft(forceClear = false) {
                 const local = await idbGet('drafts', key);
                 if (local && local.state) {
                     draft = local.state;
-                    console.log('[Draft][IDB] local draft loaded', { updatedAt: local.updatedAt || null });
+                    // console.log('[Draft][IDB] local draft loaded', { updatedAt: local.updatedAt || null });
                 }
             } catch (e) {
                 console.warn('[Draft][IDB] failed to load local draft', e);
@@ -12083,7 +12082,7 @@ async function loadAndApplyDraft(forceClear = false) {
                         if (correctedValue !== null && correctedValue !== undefined) {
                             const numValue = Number(correctedValue);
                             s.number_of_corrected = isNaN(numValue) ? 0 : numValue;
-                            console.log('[loadAndApplyDraft] Загружено number_of_corrected для', key, '=', s.number_of_corrected, '(было:', correctedValue, ')');
+                            // console.log('[loadAndApplyDraft] Загружено number_of_corrected для', key, '=', s.number_of_corrected, '(было:', correctedValue, ')');
                         } else {
                             s.number_of_corrected = 0;
                         }
@@ -12174,7 +12173,7 @@ async function loadAndApplyDraft(forceClear = false) {
             }
         });
 
-        console.log('[loadAndApplyDraft] Восстановлено selectedSentences:', selectedSentences.length, selectedSentences);
+        // console.log('[loadAndApplyDraft] Восстановлено selectedSentences:', selectedSentences.length, selectedSentences);
 
         // Восстанавливаем current_index
         if (draft.current_index !== undefined && draft.current_index < selectedSentences.length) {
@@ -12207,7 +12206,7 @@ async function loadAndApplyDraft(forceClear = false) {
             }
         });
 
-        console.log('[loadAndApplyDraft] Финальный selectedSentences:', selectedSentences.length, selectedSentences);
+        // console.log('[loadAndApplyDraft] Финальный selectedSentences:', selectedSentences.length, selectedSentences);
 
         // Обновляем отображение всех строк таблицы после загрузки черновика
         // Это важно для правильного отображения прогресса (звезды, полузвезды, микрофоны)
@@ -12230,7 +12229,7 @@ async function loadAndApplyDraft(forceClear = false) {
             const accumulatedMs = parseInt(draft.dictation_accumulated_ms) || 0;
             if (panel.timerState) {
                 panel.timerState.dictationAccumulatedMs = accumulatedMs;
-                console.log('[loadAndApplyDraft] Восстановлено накопленное время:', accumulatedMs, 'мс');
+                console.log('⏰⏰⏰⏰⏰⏰⏰⏰[loadAndApplyDraft] Восстановлено накопленное время:', accumulatedMs, 'мс');
             }
         }
 
@@ -12859,6 +12858,11 @@ function initAudioSettingsModal() {
             // но это нормально - это гарантирует, что иконка будет обновлена
             console.log(`🔄 [onSettingsChange] Вызываем applyAudioSettingsToUI() после изменения настроек`);
             applyAudioSettingsToUI();
+
+            try {
+                updateStartModalProgressUi();
+            } catch (e) {
+            }
         }
     });
     audioSettingsPanel = audioSettingsModalPanel;
