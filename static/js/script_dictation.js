@@ -11532,11 +11532,32 @@ function check(original, userInput, currentKey) {
         // Обновляем строку в таблице модального окна (если оно открыто)
         updateTableRowStatus(currentSentence);
 
-        // перевести фокус на кнопку микрофона после завершения всех обновлений DOM
-        // Используем setTimeout чтобы дать время браузеру обновить DOM
+        // Фокус после успешной проверки текста:
+        // - если аудио еще нужно — на микрофон
+        // - если аудио уже выполнено/недоступно — на "Далее"
         setTimeout(() => {
-            if (recordButton) {
-                recordButton.focus();
+            try {
+                const remaining = getRemainingAudio(currentSentence);
+                const rb = document.getElementById('recordButton');
+                const nextBtn = document.getElementById('resultNextBtn') || document.getElementById('checkNext');
+
+                const rbOk = !!(rb && !rb.disabled && rb.offsetParent !== null);
+                const nextOk = !!(nextBtn && !nextBtn.disabled && nextBtn.offsetParent !== null);
+
+                if (remaining > 0 && rbOk) {
+                    rb.focus();
+                    return;
+                }
+
+                if (nextOk) {
+                    nextBtn.focus();
+                    return;
+                }
+
+                if (rbOk) {
+                    rb.focus();
+                }
+            } catch (e) {
             }
         }, 0);
     } else {
