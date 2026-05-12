@@ -132,6 +132,52 @@ html[dir="rtl"] .topbar-save-group {
   padding-bottom: calc(35px + env(safe-area-inset-bottom));
 }
 
+.dictation-top-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.dictation-task-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    max-width: 100%;
+}
+
+.dictation-task-progress-bar {
+    position: relative;
+    flex: 1 1 auto;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--color-button-gray, #eeede8ff);
+    overflow: hidden;
+}
+
+.dictation-task-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: var(--color-button-yellow, rgb(252, 235, 163));
+    border-radius: 999px;
+    transition: width 160ms ease;
+}
+
+.dictation-task-progress-label {
+    flex: 0 0 auto;
+    min-width: 56px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 800;
+    color: rgba(31, 41, 51, 0.75);
+    white-space: nowrap;
+}
+
 /* Адаптивность для узких экранов на странице диктанта */
 @media (max-width: 768px) {
     body.page-dictation {

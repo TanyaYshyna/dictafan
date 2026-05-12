@@ -1758,14 +1758,134 @@ function updateResultNextBtnUI() {
     }
 }
 
+function updateDictationTaskProgressUi() {
+    try {
+        const root = document.getElementById('dictationTaskProgress');
+        const fill = document.getElementById('dictationTaskProgressFill');
+        const label = document.getElementById('dictationTaskProgressLabel');
+        if (!root || !fill || !label) return;
+
+        const total = Array.isArray(selectedSentences) ? selectedSentences.length : 0;
+        if (!total) {
+            root.style.display = 'none';
+            return;
+        }
+
+        let done = 0;
+        for (const key of selectedSentences) {
+            const s = allSentences.find(x => String(x.key) === String(key));
+            if (s && String(s.selection_state) === 'completed') done++;
+        }
+
+        const percent = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+        fill.style.width = `${percent}%`;
+        label.textContent = `${done}/${total}`;
+        root.style.display = 'flex';
+    } catch (e) {
+    }
+}
+
+function _isSentenceCompletedForNav(s) {
+    try {
+        if (!s) return false;
+        updateSentenceSelectionState(s, true);
+        return String(s.selection_state) === 'completed';
+    } catch (e) {
+        return false;
+    }
+}
+
+function _findNextIncompleteSelectedIndex(fromIndex) {
+    try {
+        const total = Number(totalSelectedSentences) || 0;
+        if (!total) return null;
+
+        const start = Number(fromIndex) || 0;
+        for (let step = 1; step <= total; step++) {
+            const idx = (start + step) % total;
+            const key = selectedSentences[idx];
+            const s = allSentences.find(x => String(x.key) === String(key));
+            if (s && !_isSentenceCompletedForNav(s)) {
+                return idx;
+            }
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function _autoSelectNextUnselectedSentence() {
+    try {
+        if (!Array.isArray(allSentences) || !Array.isArray(selectedSentences)) return null;
+        const selectedSet = new Set(selectedSentences.map(k => String(k)));
+
+        let candidate = null;
+        for (const s of allSentences) {
+            const key = String(s.key);
+            if (selectedSet.has(key)) continue;
+            if (_isSentenceCompletedForNav(s)) continue;
+            candidate = s;
+            break;
+        }
+
+        if (!candidate) return null;
+
+        candidate.selection_state = 'checked';
+        updateSentenceSelectionState(candidate);
+
+        const row = document.querySelector(`#sentences-table tbody tr button[data-key="${candidate.key}"]`)?.closest('tr');
+        if (row) {
+            const statusBtn = row.querySelector('.sentence-check');
+            if (statusBtn) {
+                renderSelectionStateButton(statusBtn, candidate, row);
+            }
+        }
+
+        updateAllCheckboxState();
+
+        selectedSentences.push(String(candidate.key));
+        totalSelectedSentences = selectedSentences.length;
+
+        const btnTotal = document.getElementById("sentenceTotalNumber");
+        if (btnTotal && totalSelectedSentences > 0) {
+            btnTotal.textContent = `/ ${totalSelectedSentences}`;
+        }
+
+        updateDictationTaskProgressUi();
+        updateResultNextBtnUI();
+
+        return selectedSentences.length - 1;
+    } catch (e) {
+        return null;
+    }
+}
+
 function goNextFromResultButton() {
     try {
-        const isLastSentenceInRun = Number(currentSentenceIndex) >= (Number(totalSelectedSentences) - 1);
-        if (isLastSentenceInRun) {
-            checkIfAllCompleted();
-        } else {
-            nextSentence();
+        if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {
+            stopRecording('manual');
         }
+
+        const nextIdx = _findNextIncompleteSelectedIndex(currentSentenceIndex);
+        if (nextIdx !== null && nextIdx !== undefined) {
+            currentSentenceIndex = nextIdx;
+            updateSimpleSentenceCounter();
+            showCurrentSentence(0, nextIdx);
+            updateResultNextBtnUI();
+            return;
+        }
+
+        const addedIdx = _autoSelectNextUnselectedSentence();
+        if (addedIdx !== null && addedIdx !== undefined) {
+            currentSentenceIndex = addedIdx;
+            updateSimpleSentenceCounter();
+            showCurrentSentence(0, addedIdx);
+            updateResultNextBtnUI();
+            return;
+        }
+
+        checkIfAllCompleted();
     } catch (e) {
         try { nextSentence(); } catch (e2) {}
     }
@@ -5585,6 +5705,22 @@ function resetDictationProgress() {
     } catch (e) {
     }
 
+    const pickDefaultFirstSentenceKey = () => {
+        try {
+            if (!Array.isArray(allSentences) || !allSentences.length) return null;
+            for (const s of allSentences) {
+                if (!s) continue;
+                updateSentenceSelectionState(s, true);
+                if (String(s.selection_state) !== 'completed') {
+                    return String(s.key);
+                }
+            }
+            return String(allSentences[0].key);
+        } catch (e) {
+            return null;
+        }
+    };
+
     allSentences.forEach(s => {
         s.number_of_perfect = 0;
         s.number_of_corrected = 0;
@@ -5601,6 +5737,24 @@ function resetDictationProgress() {
         }
     });
 
+    // После сброса прогресса дефолтная схема: выбрано только одно (первое) предложение.
+    // Важно: "первое" — это первое в текущем наборе allSentences (может быть подмножество задания).
+    try {
+        const firstKey = pickDefaultFirstSentenceKey();
+        allSentences.forEach(s => {
+            if (!s) return;
+            s.selection_state = (firstKey != null && String(s.key) === String(firstKey)) ? 'checked' : 'unchecked';
+        });
+        selectedSentences = firstKey != null ? [String(firstKey)] : [];
+        totalSelectedSentences = selectedSentences.length;
+        currentSentenceIndex = 0;
+        const btnTotal = document.getElementById("sentenceTotalNumber");
+        if (btnTotal) {
+            btnTotal.textContent = totalSelectedSentences > 0 ? `/ ${totalSelectedSentences}` : '/ 0';
+        }
+    } catch (e) {
+    }
+
     number_of_perfect = 0;
     number_of_corrected = 0;
     number_of_audio = 0;
@@ -5609,9 +5763,6 @@ function resetDictationProgress() {
 
     // Очищаем localStorage черновика
     clearLocalStorageDraft();
-
-    // Все предложения выбраны после сброса
-    selectedSentences = allSentences.map(s => s.key);
 
     const panel = getProgressPanelInstance();
     if (panel) {
@@ -6328,6 +6479,11 @@ function updateStats(circle = null) {
         updateStartModalProgressUi();
     } catch (e) {
     }
+
+    try {
+        updateDictationTaskProgressUi();
+    } catch (e) {
+    }
 };
 
 // Убрали переключение между кругами - всегда показываем полные итоги
@@ -6669,7 +6825,6 @@ window.updateErrorCountLabel = updateErrorCountLabel;
 function checkIfAllCompleted() {
     // const s = statsLite(circle_number);
 
-    selectedSentences = [];// ?
     const timerSnapshot = getProgressTimerSnapshot();
     const completedMs = getTimerDisplayMs(timerSnapshot);
     currentDictation.dictationTimerInterval = completedMs;
@@ -9506,6 +9661,38 @@ async function initializeDictation() {
         selectedSentences = allSentences
             .filter(s => s.selection_state === 'checked')
             .map(s => s.key);
+    }
+
+    // Если выбор пуст (часто бывает при запуске из "Список заданий", когда cached selection_state уже выставлен)
+    // — гарантируем, что по умолчанию выбрано первое (не completed) предложение в текущем списке.
+    try {
+        if (!Array.isArray(selectedSentences) || selectedSentences.length === 0) {
+            let firstKey = null;
+            for (const s of allSentences) {
+                if (!s) continue;
+                updateSentenceSelectionState(s, true);
+                if (String(s.selection_state) !== 'completed') {
+                    firstKey = String(s.key);
+                    break;
+                }
+            }
+            if (firstKey == null && Array.isArray(allSentences) && allSentences.length) {
+                firstKey = String(allSentences[0].key);
+            }
+
+            if (firstKey != null) {
+                allSentences.forEach(s => {
+                    if (!s) return;
+                    if (String(s.key) === String(firstKey)) {
+                        s.selection_state = 'checked';
+                    } else if (String(s.selection_state) !== 'completed') {
+                        s.selection_state = 'unchecked';
+                    }
+                });
+                selectedSentences = [String(firstKey)];
+            }
+        }
+    } catch (e) {
     }
 
     renderSelectionTable();

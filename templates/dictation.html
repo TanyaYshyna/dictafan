@@ -363,8 +363,16 @@
                     <span id="unsavedStar" class="unsaved-star"
                         title="Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)" style="display:none">*</span>
                 </div>
-                <!-- Контейнер для рендера прогресс-панели (страница) -->
-                <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
+                <div class="dictation-top-progress-wrap">
+                    <!-- Контейнер для рендера прогресс-панели (страница) -->
+                    <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
+                    <div id="dictationTaskProgress" class="dictation-task-progress" aria-hidden="true">
+                        <div class="dictation-task-progress-bar">
+                            <div id="dictationTaskProgressFill" class="dictation-task-progress-fill"></div>
+                        </div>
+                        <div id="dictationTaskProgressLabel" class="dictation-task-progress-label"></div>
+                    </div>
+                </div>
             </div>
         </div>
 

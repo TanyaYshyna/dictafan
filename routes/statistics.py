@@ -1664,7 +1664,7 @@ def api_planfact_report():
 @statistics_bp.route('/rating', methods=['POST'])
 @jwt_required()
 def api_rating_report():
-    """Рейтинг активности: агрегируем perfect/corrected/audio за период по self + ученики."""
+    """Рейтинг активности: агрегируем perfect/corrected/audio за период по всем пользователям."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -1724,100 +1724,124 @@ def api_rating_report():
             end_date = datetime.now().date()
             start_date = end_date - timedelta(days=int(period_days) - 1)
 
-        candidates = {current_user_id: str(user.get('username') or 'Я')}
+        out = []
         conn = get_db_connection()
         try:
             with conn.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT DISTINCT u.id AS user_id, u.username
-                    FROM group_students gs
-                    JOIN group_teachers gt ON gt.group_id = gs.group_id
-                    JOIN users u ON u.id = gs.student_user_id
-                    WHERE gt.teacher_user_id = %s
-                      AND gs.status = 'active'
-                      AND gs.removed_at IS NULL
-                      AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
-                    ORDER BY u.id ASC
-                    """,
-                    (current_user_id,),
-                )
-                rows = cur.fetchall() or []
-                for r in rows:
-                    uid = int(r.get('user_id') if isinstance(r, dict) else r[0])
-                    if uid == current_user_id:
-                        continue
-                    uname = (r.get('username') if isinstance(r, dict) else r[1])
-                    candidates[uid] = str(uname or f"User #{uid}")
-
-                user_ids = list(candidates.keys())
-                aggregates = {}
-                if user_ids:
+                lang = None
+                try:
                     if language_code and str(language_code).strip().lower() not in ('all', '*'):
-                        cur.execute(
-                            """
+                        lang = str(language_code).strip().lower()
+                except Exception:
+                    lang = None
+
+                if lang:
+                    cur.execute(
+                        """
+                        WITH activity AS (
                             SELECT
-                                user_id,
-                                COALESCE(SUM(perfect_count), 0) AS perfect,
-                                COALESCE(SUM(corrected_count), 0) AS corrected,
-                                COALESCE(SUM(audio_count), 0) AS audio
+                                ha.user_id,
+                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
+                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
+                                COALESCE(SUM(ha.audio_count), 0) AS audio
                             FROM history_activity ha
                             LEFT JOIN dictations d ON d.id = ha.dictation_id
-                            WHERE ha.user_id = ANY(%s)
-                              AND ha.date >= %s
+                            WHERE ha.date >= %s
                               AND ha.date <= %s
                               AND COALESCE(ha.dictation_language_code, d.language_code) = %s
-                            GROUP BY user_id
-                            """,
-                            (user_ids, start_date, end_date, str(language_code).strip().lower()),
+                            GROUP BY ha.user_id
+                        ),
+                        times AS (
+                            SELECT
+                                hs.user_id,
+                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
+                            FROM history_successes hs
+                            LEFT JOIN dictations d ON d.id = hs.dictation_id
+                            WHERE DATE(hs.created_at) >= %s
+                              AND DATE(hs.created_at) <= %s
+                              AND COALESCE(hs.dictation_language_code, d.language_code) = %s
+                            GROUP BY hs.user_id
+                        )
+                        SELECT
+                            a.user_id,
+                            u.username,
+                            a.perfect,
+                            a.corrected,
+                            a.audio,
+                            COALESCE(t.time_ms, 0) AS time_ms
+                        FROM activity a
+                        JOIN users u ON u.id = a.user_id
+                        LEFT JOIN times t ON t.user_id = a.user_id
+                        """,
+                        (start_date, end_date, lang, start_date, end_date, lang),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        WITH activity AS (
+                            SELECT
+                                ha.user_id,
+                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
+                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
+                                COALESCE(SUM(ha.audio_count), 0) AS audio
+                            FROM history_activity ha
+                            WHERE ha.date >= %s
+                              AND ha.date <= %s
+                            GROUP BY ha.user_id
+                        ),
+                        times AS (
+                            SELECT
+                                hs.user_id,
+                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
+                            FROM history_successes hs
+                            WHERE DATE(hs.created_at) >= %s
+                              AND DATE(hs.created_at) <= %s
+                            GROUP BY hs.user_id
+                        )
+                        SELECT
+                            a.user_id,
+                            u.username,
+                            a.perfect,
+                            a.corrected,
+                            a.audio,
+                            COALESCE(t.time_ms, 0) AS time_ms
+                        FROM activity a
+                        JOIN users u ON u.id = a.user_id
+                        LEFT JOIN times t ON t.user_id = a.user_id
+                        """,
+                        (start_date, end_date, start_date, end_date),
+                    )
+
+                rows = cur.fetchall() or []
+                for r in rows:
+                    if isinstance(r, dict):
+                        uid = int(r.get('user_id') or 0)
+                        out.append(
+                            {
+                                'user_id': uid,
+                                'username': str(r.get('username') or f"User #{uid}"),
+                                'perfect': int(r.get('perfect') or 0),
+                                'corrected': int(r.get('corrected') or 0),
+                                'audio': int(r.get('audio') or 0),
+                                'time_ms': int(r.get('time_ms') or 0),
+                            }
                         )
                     else:
-                        cur.execute(
-                            """
-                            SELECT
-                                user_id,
-                                COALESCE(SUM(perfect_count), 0) AS perfect,
-                                COALESCE(SUM(corrected_count), 0) AS corrected,
-                                COALESCE(SUM(audio_count), 0) AS audio
-                            FROM history_activity
-                            WHERE user_id = ANY(%s)
-                              AND date >= %s
-                              AND date <= %s
-                            GROUP BY user_id
-                            """,
-                            (user_ids, start_date, end_date),
+                        uid = int(r[0] or 0)
+                        out.append(
+                            {
+                                'user_id': uid,
+                                'username': str(r[1] or f"User #{uid}"),
+                                'perfect': int(r[2] or 0),
+                                'corrected': int(r[3] or 0),
+                                'audio': int(r[4] or 0),
+                                'time_ms': int(r[5] or 0),
+                            }
                         )
-                    arows = cur.fetchall() or []
-                    for ar in arows:
-                        if isinstance(ar, dict):
-                            uid = int(ar.get('user_id') or 0)
-                            aggregates[uid] = {
-                                'perfect': int(ar.get('perfect') or 0),
-                                'corrected': int(ar.get('corrected') or 0),
-                                'audio': int(ar.get('audio') or 0),
-                            }
-                        else:
-                            uid = int(ar[0] or 0)
-                            aggregates[uid] = {
-                                'perfect': int(ar[1] or 0),
-                                'corrected': int(ar[2] or 0),
-                                'audio': int(ar[3] or 0),
-                            }
         finally:
             conn.close()
 
-        out = []
-        for uid, uname in candidates.items():
-            agg = aggregates.get(uid) or {}
-            out.append(
-                {
-                    'user_id': int(uid),
-                    'username': str(uname or f"User #{uid}"),
-                    'perfect': int(agg.get('perfect') or 0),
-                    'corrected': int(agg.get('corrected') or 0),
-                    'audio': int(agg.get('audio') or 0),
-                }
-            )
+        total_users = len(out)
 
         out.sort(
             key=lambda x: (
@@ -1834,6 +1858,7 @@ def api_rating_report():
                 'period_days': int(period_days),
                 'start_date': start_date.isoformat(),
                 'end_date': end_date.isoformat(),
+                'total_users': int(total_users),
                 'rating': out,
             }
         )
