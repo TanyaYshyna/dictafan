@@ -1765,16 +1765,30 @@ function updateDictationTaskProgressUi() {
         const label = document.getElementById('dictationTaskProgressLabel');
         if (!root || !fill || !label) return;
 
-        const total = Array.isArray(selectedSentences) ? selectedSentences.length : 0;
+        const total = (() => {
+            try {
+                const fromMeta = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
+                if (fromMeta > 0) return fromMeta;
+            } catch (e) {
+            }
+            return Array.isArray(allSentences) ? allSentences.length : 0;
+        })();
+
         if (!total) {
             root.style.display = 'none';
             return;
         }
 
         let done = 0;
-        for (const key of selectedSentences) {
-            const s = allSentences.find(x => String(x.key) === String(key));
-            if (s && String(s.selection_state) === 'completed') done++;
+        try {
+            if (Array.isArray(allSentences)) {
+                for (const s of allSentences) {
+                    if (!s) continue;
+                    updateSentenceSelectionState(s, true);
+                    if (String(s.selection_state) === 'completed') done++;
+                }
+            }
+        } catch (e) {
         }
 
         const percent = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
@@ -5313,9 +5327,9 @@ function renderSelectionTable() {
         // Синхронизируем с selectedSentences
         updateSentenceSelectionState(s);
 
-        // Добавляем в обновленный список все предложения (checked и completed)
-        // unchecked тоже остаются в списке для навигации
-        if (s.selection_state === 'checked' || s.selection_state === 'completed' || s.selection_state === 'unchecked') {
+        // В selectedSentences храним только реально выбранные предложения:
+        // checked + completed. unchecked не включаем (иначе ломается логика авто-подбора следующего задания).
+        if (s.selection_state === 'checked' || s.selection_state === 'completed') {
             updatedSelection.push(String(s.key));
         }
 
@@ -5409,36 +5423,32 @@ function renderSelectionTable() {
         updateTableRowStatus(s);
     });
 
-    // Обновляем selectedSentences - все предложения остаются в списке
-    // Просто синхронизируем порядок и добавляем новые, если есть
+    // Обновляем selectedSentences (только checked + completed)
     selectedSentences = Array.from(new Set(updatedSelection));
 
-    // Убеждаемся, что все предложения из allSentences есть в selectedSentences
-    allSentences.forEach(s => {
-        const sKey = String(s.key);
-        if (!selectedSentences.includes(sKey)) {
-            selectedSentences.push(sKey);
+    // Если по какой-то причине ничего не выбрано — включаем дефолт: первое НЕ completed.
+    if (selectedSentences.length === 0 && Array.isArray(allSentences) && allSentences.length > 0) {
+        let firstKey = null;
+        for (const s of allSentences) {
+            if (!s) continue;
+            updateSentenceSelectionState(s, true);
+            if (String(s.selection_state) !== 'completed') {
+                firstKey = String(s.key);
+                break;
+            }
         }
-    });
-
-    // Если после рендеринга selectedSentences пустой, но есть checked предложения - исправляем
-    if (selectedSentences.length === 0) {
+        if (firstKey == null) {
+            firstKey = String(allSentences[0].key);
+        }
         allSentences.forEach(s => {
-            if (s.selection_state === 'checked') {
-                selectedSentences.push(String(s.key));
-            }
-        });
-    }
-
-    // Убеждаемся что selectedSentences не пустой после рендеринга
-    if (selectedSentences.length === 0 && allSentences.length > 0) {
-        // Если ничего не выбрано, но есть предложения - выбираем все не-completed
-        allSentences.forEach(s => {
-            if (s.selection_state !== 'completed') {
+            if (!s) return;
+            if (String(s.key) === String(firstKey)) {
                 s.selection_state = 'checked';
-                selectedSentences.push(String(s.key));
+            } else if (String(s.selection_state) !== 'completed') {
+                s.selection_state = 'unchecked';
             }
         });
+        selectedSentences = [String(firstKey)];
     }
 
     // console.log('[renderSelectionTable] selectedSentences после рендеринга:', selectedSentences.length, selectedSentences);
