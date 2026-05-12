@@ -1765,31 +1765,43 @@ function updateDictationTaskProgressUi() {
         const label = document.getElementById('dictationTaskProgressLabel');
         if (!root || !fill || !label) return;
 
-        const total = (() => {
+        const n = (() => {
+            try {
+                if (Array.isArray(allSentences) && allSentences.length) return allSentences.length;
+            } catch (e) {
+            }
             try {
                 const fromMeta = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
                 if (fromMeta > 0) return fromMeta;
             } catch (e) {
             }
-            return Array.isArray(allSentences) ? allSentences.length : 0;
+            return 0;
         })();
+
+        const repeats = Math.max(0, Number(REQUIRED_PASSED_COUNT) || 0);
+        const total = n + (n * repeats);
 
         if (!total) {
             root.style.display = 'none';
             return;
         }
 
-        let done = 0;
+        let doneStars = 0;
+        let doneMics = 0;
         try {
             if (Array.isArray(allSentences)) {
                 for (const s of allSentences) {
                     if (!s) continue;
-                    updateSentenceSelectionState(s, true);
-                    if (String(s.selection_state) === 'completed') done++;
+                    const perfect = Number(s && s.number_of_perfect ? s.number_of_perfect : 0) || 0;
+                    if (perfect > 0) doneStars += 1;
+                    const audio = Number(s && s.number_of_audio ? s.number_of_audio : 0) || 0;
+                    doneMics += Math.min(audio, repeats);
                 }
             }
         } catch (e) {
         }
+
+        const done = doneStars + doneMics;
 
         const percent = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
         fill.style.width = `${percent}%`;
@@ -1875,27 +1887,69 @@ function _autoSelectNextUnselectedSentence() {
     }
 }
 
+function _checkNextEmptySentenceInStartModal() {
+    try {
+        if (!Array.isArray(allSentences)) return false;
+
+        const selectedSet = new Set();
+        try {
+            const checkButtons = document.querySelectorAll('#sentences-table .sentence-check[data-key]');
+            checkButtons.forEach((btn) => {
+                const key = String(btn.dataset.key || '');
+                if (!key) return;
+                if (btn.dataset.checked === 'true') selectedSet.add(key);
+            });
+        } catch (e) {
+        }
+
+        let candidate = null;
+        for (const s of allSentences) {
+            const key = String(s.key);
+            if (selectedSet.has(key)) continue;
+            if (_isSentenceCompletedForNav(s)) continue;
+            candidate = s;
+            break;
+        }
+
+        if (!candidate) return false;
+
+        candidate.selection_state = 'checked';
+        updateSentenceSelectionState(candidate);
+
+        const row = document.querySelector(`#sentences-table tbody tr button[data-key="${candidate.key}"]`)?.closest('tr');
+        if (row) {
+            const statusBtn = row.querySelector('.sentence-check');
+            if (statusBtn) {
+                renderSelectionStateButton(statusBtn, candidate, row);
+            }
+        }
+
+        updateAllCheckboxState();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function goNextFromResultButton() {
     try {
         if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {
             stopRecording('manual');
         }
 
-        const nextIdx = _findNextIncompleteSelectedIndex(currentSentenceIndex);
-        if (nextIdx !== null && nextIdx !== undefined) {
-            currentSentenceIndex = nextIdx;
-            updateSimpleSentenceCounter();
-            showCurrentSentence(0, nextIdx);
-            updateResultNextBtnUI();
+        try {
+            getSelectedSentences();
+        } catch (e) {
+        }
+
+        if (Array.isArray(selectedSentences) && selectedSentences.length > 0) {
+            startGame(true);
             return;
         }
 
-        const addedIdx = _autoSelectNextUnselectedSentence();
-        if (addedIdx !== null && addedIdx !== undefined) {
-            currentSentenceIndex = addedIdx;
-            updateSimpleSentenceCounter();
-            showCurrentSentence(0, addedIdx);
-            updateResultNextBtnUI();
+        const didCheckNext = _checkNextEmptySentenceInStartModal();
+        if (didCheckNext) {
+            startGame(false);
             return;
         }
 
@@ -5329,7 +5383,7 @@ function renderSelectionTable() {
 
         // В selectedSentences храним только реально выбранные предложения:
         // checked + completed. unchecked не включаем (иначе ломается логика авто-подбора следующего задания).
-        if (s.selection_state === 'checked' || s.selection_state === 'completed') {
+        if (s.selection_state === 'checked') {
             updatedSelection.push(String(s.key));
         }
 
@@ -5423,8 +5477,16 @@ function renderSelectionTable() {
         updateTableRowStatus(s);
     });
 
-    // Обновляем selectedSentences (только checked + completed)
+    // Обновляем selectedSentences (только checked = активные предложения текущего круга)
     selectedSentences = Array.from(new Set(updatedSelection));
+    try {
+        const byKey = makeByKeyMap(allSentences || []);
+        selectedSentences = selectedSentences.filter((key) => {
+            const s = byKey.get(String(key));
+            return s && String(s.selection_state) === 'checked';
+        });
+    } catch (e) {
+    }
 
     // Если по какой-то причине ничего не выбрано — включаем дефолт: первое НЕ completed.
     if (selectedSentences.length === 0 && Array.isArray(allSentences) && allSentences.length > 0) {
@@ -12379,11 +12441,8 @@ async function loadAndApplyDraft(forceClear = false) {
         // Восстанавливаем selectedSentences на основе selection_state
         selectedSentences = [];
         allSentences.forEach(s => {
-            // Включаем в selectedSentences:
-            // 1. checked - явно выбранные пользователем
-            // 2. completed - полностью завершенные (должны оставаться в списке)
-            // 3. Предложения с прогрессом (perfect, corrected, audio)
-            if (s.selection_state === 'checked' || s.selection_state === 'completed') {
+            // Включаем в selectedSentences только checked — это активный список текущего круга.
+            if (s.selection_state === 'checked') {
                 const sKey = String(s.key);
                 if (!selectedSentences.includes(sKey)) {
                     selectedSentences.push(sKey);
@@ -12416,9 +12475,9 @@ async function loadAndApplyDraft(forceClear = false) {
                 updateSentenceSelectionState(s, false);
             }
 
-            // Добавляем в selectedSentences если checked или completed
+            // Добавляем в selectedSentences если checked
             const sKey = String(s.key);
-            if ((s.selection_state === 'checked' || s.selection_state === 'completed') &&
+            if ((s.selection_state === 'checked') &&
                 !selectedSentences.includes(sKey)) {
                 selectedSentences.push(sKey);
             }
