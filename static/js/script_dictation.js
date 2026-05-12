@@ -1765,31 +1765,43 @@ function updateDictationTaskProgressUi() {
         const label = document.getElementById('dictationTaskProgressLabel');
         if (!root || !fill || !label) return;
 
-        const total = (() => {
+        const n = (() => {
+            try {
+                if (Array.isArray(allSentences) && allSentences.length) return allSentences.length;
+            } catch (e) {
+            }
             try {
                 const fromMeta = Number(currentDictation && currentDictation.sentences_count ? currentDictation.sentences_count : 0) || 0;
                 if (fromMeta > 0) return fromMeta;
             } catch (e) {
             }
-            return Array.isArray(allSentences) ? allSentences.length : 0;
+            return 0;
         })();
+
+        const repeats = Math.max(0, Number(REQUIRED_PASSED_COUNT) || 0);
+        const total = n + (n * repeats);
 
         if (!total) {
             root.style.display = 'none';
             return;
         }
 
-        let done = 0;
+        let doneStars = 0;
+        let doneMics = 0;
         try {
             if (Array.isArray(allSentences)) {
                 for (const s of allSentences) {
                     if (!s) continue;
-                    updateSentenceSelectionState(s, true);
-                    if (String(s.selection_state) === 'completed') done++;
+                    const perfect = Number(s && s.number_of_perfect ? s.number_of_perfect : 0) || 0;
+                    if (perfect > 0) doneStars += 1;
+                    const audio = Number(s && s.number_of_audio ? s.number_of_audio : 0) || 0;
+                    doneMics += Math.min(audio, repeats);
                 }
             }
         } catch (e) {
         }
+
+        const done = doneStars + doneMics;
 
         const percent = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
         fill.style.width = `${percent}%`;
@@ -5329,7 +5341,7 @@ function renderSelectionTable() {
 
         // В selectedSentences храним только реально выбранные предложения:
         // checked + completed. unchecked не включаем (иначе ломается логика авто-подбора следующего задания).
-        if (s.selection_state === 'checked' || s.selection_state === 'completed') {
+        if (s.selection_state === 'checked') {
             updatedSelection.push(String(s.key));
         }
 
@@ -5423,8 +5435,16 @@ function renderSelectionTable() {
         updateTableRowStatus(s);
     });
 
-    // Обновляем selectedSentences (только checked + completed)
+    // Обновляем selectedSentences (только checked = активные предложения текущего круга)
     selectedSentences = Array.from(new Set(updatedSelection));
+    try {
+        const byKey = makeByKeyMap(allSentences || []);
+        selectedSentences = selectedSentences.filter((key) => {
+            const s = byKey.get(String(key));
+            return s && String(s.selection_state) === 'checked';
+        });
+    } catch (e) {
+    }
 
     // Если по какой-то причине ничего не выбрано — включаем дефолт: первое НЕ completed.
     if (selectedSentences.length === 0 && Array.isArray(allSentences) && allSentences.length > 0) {
@@ -12379,11 +12399,8 @@ async function loadAndApplyDraft(forceClear = false) {
         // Восстанавливаем selectedSentences на основе selection_state
         selectedSentences = [];
         allSentences.forEach(s => {
-            // Включаем в selectedSentences:
-            // 1. checked - явно выбранные пользователем
-            // 2. completed - полностью завершенные (должны оставаться в списке)
-            // 3. Предложения с прогрессом (perfect, corrected, audio)
-            if (s.selection_state === 'checked' || s.selection_state === 'completed') {
+            // Включаем в selectedSentences только checked — это активный список текущего круга.
+            if (s.selection_state === 'checked') {
                 const sKey = String(s.key);
                 if (!selectedSentences.includes(sKey)) {
                     selectedSentences.push(sKey);
@@ -12416,9 +12433,9 @@ async function loadAndApplyDraft(forceClear = false) {
                 updateSentenceSelectionState(s, false);
             }
 
-            // Добавляем в selectedSentences если checked или completed
+            // Добавляем в selectedSentences если checked
             const sKey = String(s.key);
-            if ((s.selection_state === 'checked' || s.selection_state === 'completed') &&
+            if ((s.selection_state === 'checked') &&
                 !selectedSentences.includes(sKey)) {
                 selectedSentences.push(sKey);
             }
