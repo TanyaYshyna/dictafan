@@ -904,6 +904,7 @@ class RatingReport {
         this.customStartDate = null;
         this.customEndDate = null;
         this.selectedLanguage = 'all';
+        this.topLimit = 10;
     }
 
     getLanguageData() {
@@ -1077,6 +1078,13 @@ class RatingReport {
                             <option value="custom">За период</option>
                         </select>
 
+                        <div style="display:flex; align-items:center; gap: 8px;">
+                            <span style="opacity: 0.8; font-size: 13px;">выводить первых</span>
+                            <input id="ratingTopLimit" type="number" min="1" max="50" step="1" value="10" class="date-input" style="width: 70px; padding-right: 12px;">
+                        </div>
+
+                        <div id="ratingTotalParticipants" style="opacity: 0.85; font-size: 13px;"></div>
+
                         <div class="date-range-controls" style="display:flex; align-items:center; gap: 8px; flex-wrap: nowrap;">
                             <input type="date" id="ratingStartDate" class="date-input" style="width: 112px; padding-right: 18px;">
                             <span>—</span>
@@ -1181,6 +1189,33 @@ class RatingReport {
         }
 
         this.applyPeriodToDateInputs();
+
+        try {
+            const topLimitInput = document.getElementById('ratingTopLimit');
+            if (topLimitInput) {
+                topLimitInput.value = String(this.topLimit);
+                topLimitInput.addEventListener('change', () => {
+                    const v = parseInt(String(topLimitInput.value || ''), 10);
+                    if (!isNaN(v)) {
+                        this.topLimit = Math.min(50, Math.max(1, v));
+                        topLimitInput.value = String(this.topLimit);
+                        this.updateRating();
+                    }
+                });
+                topLimitInput.addEventListener('blur', () => {
+                    const v = parseInt(String(topLimitInput.value || ''), 10);
+                    if (isNaN(v) || v < 1) {
+                        this.topLimit = 10;
+                        topLimitInput.value = String(this.topLimit);
+                        this.updateRating();
+                        return;
+                    }
+                    this.topLimit = Math.min(50, Math.max(1, v));
+                    topLimitInput.value = String(this.topLimit);
+                });
+            }
+        } catch (e) {
+        }
     }
 
     async show() {
@@ -1222,6 +1257,7 @@ class RatingReport {
         }
 
         let rating = [];
+        let totalUsers = null;
         try {
             const isCustom = String(this.selectedPeriod) === 'custom';
             const startInput = document.getElementById('ratingStartDate');
@@ -1255,6 +1291,7 @@ class RatingReport {
                 rating = [];
             } else {
                 rating = js.rating;
+                totalUsers = js.total_users != null ? Number(js.total_users) : null;
             }
         } catch (e) {
             rating = [];
@@ -1271,40 +1308,84 @@ class RatingReport {
         }
 
         if (!root) return;
+
+        try {
+            const totalEl = document.getElementById('ratingTotalParticipants');
+            if (totalEl) {
+                if (totalUsers != null && !Number.isNaN(totalUsers)) {
+                    totalEl.textContent = `в рейтинге всего участвовало ${totalUsers}`;
+                } else {
+                    totalEl.textContent = '';
+                }
+            }
+        } catch (e) {
+        }
+
         if (!rating.length) {
             root.innerHTML = '<p class="no-data">Нет данных</p>';
             return;
         }
 
-        const rows = rating.map((r, idx) => {
+        let currentUserId = null;
+        try {
+            if (window.UM && typeof window.UM.getCurrentUser === 'function') {
+                currentUserId = Number(window.UM.getCurrentUser()?.id);
+            } else if (window.UM && window.UM.userData && window.UM.userData.id != null) {
+                currentUserId = Number(window.UM.userData.id);
+            }
+        } catch (e) {
+            currentUserId = null;
+        }
+        if (currentUserId != null && Number.isNaN(currentUserId)) currentUserId = null;
+
+        const limit = Math.min(50, Math.max(1, Number(this.topLimit) || 10));
+        const top = rating.slice(0, limit);
+        const selfIndex = currentUserId != null
+            ? rating.findIndex(r => Number(r && r.user_id) === currentUserId)
+            : -1;
+        const selfRow = selfIndex >= 0 ? rating[selfIndex] : null;
+        const isSelfInTop = selfIndex >= 0 && selfIndex < limit;
+
+        const listToRender = isSelfInTop
+            ? top
+            : (
+                selfRow
+                    ? [...top, { __ellipsis: true }, { ...selfRow, __forcedRank: selfIndex + 1, __isSelf: true }]
+                    : top
+            );
+
+        const rows = listToRender.map((r, idx) => {
+            if (r && r.__ellipsis) {
+                return `
+                    <div class="chart-row" style="align-items:center; gap: 12px; padding: 10px 12px; opacity: 0.7;">
+                        <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">…</div>
+                        <div style="flex: 1 1 auto; font-size: 14px;">…</div>
+                    </div>
+                `;
+            }
+
             const uid = Number(r && r.user_id);
             const name = String(r && r.username ? r.username : '');
             const perfect = Number(r && r.perfect) || 0;
             const corrected = Number(r && r.corrected) || 0;
             const audio = Number(r && r.audio) || 0;
+            const timeMs = Number(r && r.time_ms) || 0;
             const avatar = this.avatarUrlForUser(uid);
 
-            let currentUserId = null;
-            try {
-                if (window.UM && typeof window.UM.getCurrentUser === 'function') {
-                    currentUserId = Number(window.UM.getCurrentUser()?.id);
-                } else if (window.UM && window.UM.userData && window.UM.userData.id != null) {
-                    currentUserId = Number(window.UM.userData.id);
-                }
-            } catch (e) {
-                currentUserId = null;
-            }
-            const isSelf = (currentUserId != null && !Number.isNaN(currentUserId) && uid === currentUserId);
+            const forcedRank = r && r.__forcedRank ? Number(r.__forcedRank) : null;
+            const rank = (forcedRank != null && !Number.isNaN(forcedRank)) ? forcedRank : (idx + 1);
+            const isSelf = (currentUserId != null && uid === currentUserId) || Boolean(r && r.__isSelf);
             const rowStyle = isSelf
                 ? 'border: 2px solid var(--color-button-text-yellow, rgb(255, 198, 9)); border-radius: 12px; padding: 10px 12px;'
                 : 'padding: 10px 12px;';
+            const nameStyle = isSelf ? 'font-weight: 800;' : 'font-weight: 600;';
 
             return `
                 <div class="chart-row" style="align-items:center; gap: 12px; ${rowStyle}">
-                    <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">${idx + 1}</div>
+                    <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">${rank}</div>
                     <img src="${avatar}" alt="" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background:#e9eef5; flex: 0 0 auto;" onerror="this.onerror=null; this.src='/static/icons/default-avatar-small.svg';">
                     <div style="flex: 1 1 auto; min-width: 0; display:flex; align-items:center; gap: 12px;">
-                        <div style="font-size: 15px; font-weight: 600; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(name)}</div>
+                        <div style="font-size: 15px; ${nameStyle} overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(name)}</div>
                         <div style="margin-left: auto; display:flex; align-items:center; gap: 12px; flex: 0 0 auto;">
                             <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
                                 <i data-lucide="star" style="width: 18px; height: 18px;"></i>
@@ -1317,6 +1398,10 @@ class RatingReport {
                             <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
                                 <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
                                 <span style="font-size: 16px; font-weight: 700;">${audio}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px; color: rgba(31,41,51,0.75);">
+                                <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
+                                <span style="font-size: 14px; font-weight: 700;">${this.formatDurationHhMmSs(timeMs)}</span>
                             </div>
                         </div>
                     </div>
