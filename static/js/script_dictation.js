@@ -1887,27 +1887,69 @@ function _autoSelectNextUnselectedSentence() {
     }
 }
 
+function _checkNextEmptySentenceInStartModal() {
+    try {
+        if (!Array.isArray(allSentences)) return false;
+
+        const selectedSet = new Set();
+        try {
+            const checkButtons = document.querySelectorAll('#sentences-table .sentence-check[data-key]');
+            checkButtons.forEach((btn) => {
+                const key = String(btn.dataset.key || '');
+                if (!key) return;
+                if (btn.dataset.checked === 'true') selectedSet.add(key);
+            });
+        } catch (e) {
+        }
+
+        let candidate = null;
+        for (const s of allSentences) {
+            const key = String(s.key);
+            if (selectedSet.has(key)) continue;
+            if (_isSentenceCompletedForNav(s)) continue;
+            candidate = s;
+            break;
+        }
+
+        if (!candidate) return false;
+
+        candidate.selection_state = 'checked';
+        updateSentenceSelectionState(candidate);
+
+        const row = document.querySelector(`#sentences-table tbody tr button[data-key="${candidate.key}"]`)?.closest('tr');
+        if (row) {
+            const statusBtn = row.querySelector('.sentence-check');
+            if (statusBtn) {
+                renderSelectionStateButton(statusBtn, candidate, row);
+            }
+        }
+
+        updateAllCheckboxState();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 function goNextFromResultButton() {
     try {
         if (mediaRecorder?.state === 'recording' || (unifiedSpeechRecognizer && unifiedSpeechRecognizer.state && unifiedSpeechRecognizer.state.isRecording)) {
             stopRecording('manual');
         }
 
-        const nextIdx = _findNextIncompleteSelectedIndex(currentSentenceIndex);
-        if (nextIdx !== null && nextIdx !== undefined) {
-            currentSentenceIndex = nextIdx;
-            updateSimpleSentenceCounter();
-            showCurrentSentence(0, nextIdx);
-            updateResultNextBtnUI();
+        try {
+            getSelectedSentences();
+        } catch (e) {
+        }
+
+        if (Array.isArray(selectedSentences) && selectedSentences.length > 0) {
+            startGame(true);
             return;
         }
 
-        const addedIdx = _autoSelectNextUnselectedSentence();
-        if (addedIdx !== null && addedIdx !== undefined) {
-            currentSentenceIndex = addedIdx;
-            updateSimpleSentenceCounter();
-            showCurrentSentence(0, addedIdx);
-            updateResultNextBtnUI();
+        const didCheckNext = _checkNextEmptySentenceInStartModal();
+        if (didCheckNext) {
+            startGame(false);
             return;
         }
 
