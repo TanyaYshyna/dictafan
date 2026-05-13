@@ -1622,6 +1622,44 @@ function getSentenceByKeySafe(list, key) {
     }
 }
 
+function _buildUsedSentenceKeySet() {
+    const used = new Set();
+    try {
+        const orig = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+            ? workingData.original.sentences
+            : [];
+        for (const s of orig) {
+            const k = s && (s.key || s.sentence_key) ? String(s.key || s.sentence_key).trim() : '';
+            if (k) used.add(k);
+        }
+    } catch (e) {
+    }
+    return used;
+}
+
+function createSentenceKeyAllocator(existingUsedKeysSet) {
+    const used = (existingUsedKeysSet instanceof Set) ? existingUsedKeysSet : new Set();
+    let nextCandidate = 0;
+
+    const normalizeToKey = (n) => String(Math.max(0, Math.min(999, n))).padStart(3, '0');
+
+    const alloc = () => {
+        // Find next free key from 000..999. Add to used immediately.
+        for (let attempts = 0; attempts < 1000; attempts++) {
+            const k = normalizeToKey(nextCandidate);
+            nextCandidate = (nextCandidate + 1) % 1000;
+            if (!used.has(k)) {
+                used.add(k);
+                return k;
+            }
+        }
+        throw new Error('No free sentence keys available (000-999)');
+    };
+
+    alloc._used = used;
+    return alloc;
+}
+
 function recomputeSentencePositionsFromDom() {
     try {
         const rows = document.querySelectorAll('#sentences-table tbody tr');
@@ -9870,6 +9908,11 @@ async function createDictationFromStart() {
     showLoadingIndicator(isAppend ? 'Дополнение диктанта...' : 'Формирование диктанта...');
 
     try {
+        const existingOrigSent = (isAppend && !isRefill && workingData && workingData.original && Array.isArray(workingData.original.sentences))
+            ? workingData.original.sentences
+            : [];
+        const appendOffset = (isAppend && !isRefill) ? (existingOrigSent.length || 0) : 0;
+
         let effectiveIsDialog = isDialog;
         let speakers = isDialog ? getSpeakersFromTable() : { '1': 'Спикер 1' };
         if (isAppend) {
@@ -9887,13 +9930,18 @@ async function createDictationFromStart() {
             }
         }
 
-        const existingOrigSent = (!isRefill && isAppend && workingData && workingData.original && Array.isArray(workingData.original.sentences))
-            ? workingData.original.sentences
-            : [];
-        const appendOffset = (isAppend && !isRefill) ? (existingOrigSent.length || 0) : 0;
+        // Build an economical key allocator (000..999). On append it includes existing keys,
+        // so new sentences never overwrite old ones even if rows were deleted/reordered.
+        let keyAllocator = null;
+        try {
+            const used = (isRefill && !isAppend) ? new Set() : _buildUsedSentenceKeySet();
+            keyAllocator = createSentenceKeyAllocator(used);
+        } catch (e0) {
+            keyAllocator = createSentenceKeyAllocator(new Set());
+        }
 
         // Парсинг текста
-        const parsedData = await parseInputText(text, delimiter, effectiveIsDialog, speakers, appendOffset);
+        const parsedData = await parseInputText(text, delimiter, effectiveIsDialog, speakers, keyAllocator);
 
         try {
             if (parsedData && Array.isArray(parsedData.original)) {
@@ -11074,7 +11122,7 @@ async function generateAudioForSentence(sentence, language) {
 /**
  * Парсинг текста диктанта
  */
-async function parseInputText(text, delimiter, isDialog, speakers, keyOffset) {
+async function parseInputText(text, delimiter, isDialog, speakers, keyAllocatorOrOffset) {
     // Удалить пустые строки
     const lines = normalizeDictationInvisibleChars(text)
         .split('\n')
@@ -11089,13 +11137,23 @@ async function parseInputText(text, delimiter, isDialog, speakers, keyOffset) {
     const language_translation = currentDictation.language_translation;
     const original = [];
     const translation = [];
-    let key_i = 0; // индекс для генерации ключа
+
+    // Sentence key generator:
+    // - preferred: allocator function returning a free key from 000..999
+    // - fallback: sequential counter with optional numeric offset
+    let key_i = 0;
+    let allocKey = null;
     try {
-        const base = Number(keyOffset);
-        if (Number.isFinite(base) && base > 0) {
-            key_i = Math.floor(base);
+        if (typeof keyAllocatorOrOffset === 'function') {
+            allocKey = keyAllocatorOrOffset;
+        } else {
+            const base = Number(keyAllocatorOrOffset);
+            if (Number.isFinite(base) && base > 0) {
+                key_i = Math.floor(base);
+            }
         }
     } catch (e) {
+        allocKey = null;
         key_i = 0;
     }
     let i_next = 0; // индекс наступного рядка в тексті, якщо в наступному рядку э /* то перекладати не тереба 
@@ -11117,8 +11175,8 @@ async function parseInputText(text, delimiter, isDialog, speakers, keyOffset) {
             continue;
         }
 
-        const key = key_i.toString().padStart(3, '0'); // ключ поточного речення);
-        key_i++; // наступне речення
+        const key = allocKey ? String(allocKey()) : key_i.toString().padStart(3, '0'); // ключ поточного речення);
+        if (!allocKey) key_i++; // наступне речення
         const audio_originalFileName = generateAudioFileName(key, language_original);
         const audio_translationFileName = generateAudioFileName(key, language_translation);
 
