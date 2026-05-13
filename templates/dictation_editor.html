@@ -886,6 +886,22 @@
         </div>
     </div>
 
+    <div id="refillTableModal" class="modal" style="display: none;">
+        <div class="modal-content exit-modal-content">
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                <h2 style="margin: 0;">Перезаполнить таблицу</h2>
+                <button class="modal-close" id="refillTableModalClose" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <p id="refillTableModalMessage">Что сделать с текущими предложениями?</p>
+            <div class="exit-modal-buttons">
+                <button id="refillTableModalClearBtn" class="button-color-lightgreen">Очистить таблицу</button>
+                <button id="refillTableModalAppendBtn" class="button-color-yellow">Дополнить таблицу</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно обрезки изображения для ковера -->
     <div id="crop-modal" class="modal" style="display: none;">
         <div class="modal-content crop-modal-content">
