@@ -10020,7 +10020,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
         inputField.innerHTML = currentSentence.text;
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = currentSentence.text_translation;
-        correctAnswerDiv.style.color = 'var(--color-text)';
+        correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
         disableCheckButton(0);
     } else if (corrected > 0) {
         // ИСПРАВЛЕНО: Если только corrected (полузвезда), текст НЕ заполняется,
@@ -11805,7 +11805,7 @@ function checkText() {
     if (allCorrect) {
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = translation;
-        correctAnswerDiv.style.color = 'var(--color-text)';
+        correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
