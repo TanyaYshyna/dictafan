@@ -542,9 +542,10 @@ body.exercise-ltr .check-group {
 
 #correctAnswer {
   font-size: 20px;
-  color: var(--color-button-text-gray);
+  color: var(--color-text);
   padding: 6px 10px;
-  border-radius: 6px;
+  margin-bottom: 10px;
+  border-radius: 10px;
   max-width: 100%;
   /* font-style: italic; */
   /* border: 1px dashed #ccc; */

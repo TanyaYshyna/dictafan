@@ -10020,7 +10020,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
         inputField.innerHTML = currentSentence.text;
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = currentSentence.text_translation;
-        correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
+        correctAnswerDiv.style.color = 'var(--color-text)';
         disableCheckButton(0);
     } else if (corrected > 0) {
         // ИСПРАВЛЕНО: Если только corrected (полузвезда), текст НЕ заполняется,
@@ -11805,13 +11805,13 @@ function checkText() {
     if (allCorrect) {
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = translation;
-        correctAnswerDiv.style.color = 'var(--color-button-gray)';
+        correctAnswerDiv.style.color = 'var(--color-text)';
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
         updateTableRowStatus(currentSentence);
 
-        // После ⭐: если аудио по этому предложению уже не требуется/выполнено — сразу переходим дальше.
+        // После : если аудио по этому предложению уже не требуется/выполнено — сразу переходим дальше.
         // Иначе переводим фокус на запись (как и было задумано).
         try {
             setTimeout(() => {
