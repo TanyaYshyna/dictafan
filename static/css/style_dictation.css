@@ -542,7 +542,7 @@ body.exercise-ltr .check-group {
 
 #correctAnswer {
   font-size: 20px;
-  color: var(--color-text);
+  color: var(--color-button-text-gray);
   padding: 6px 10px;
   margin-bottom: 10px;
   border-radius: 10px;
@@ -595,7 +595,7 @@ body.exercise-ltr .check-group {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin: 2px;
+  margin: 2px 2px 2px 8px;
 }
 
 @media (max-width: 500px) {
@@ -2256,6 +2256,15 @@ html[dir="rtl"] .audio-players-wrapper {
   border-spacing: 0;
   table-layout: fixed;
   width: 100%;
+}
+
+.audio-user-table,
+.audio-user-table tr,
+.audio-user-table td,
+.audio-user-table th {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 .audio-user-col-1,
