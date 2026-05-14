@@ -855,6 +855,11 @@ function applyAudioSettingsFromUserData(userData) {
                     }
                 }
 
+                const cachedMode = getCachedDictationSpeechRecognitionMode();
+                if (cachedMode) {
+                    speechRecognitionMode = cachedMode;
+                }
+
                 return true;
             } catch (error) {
                 console.warn('Ошибка парсинга settings_json:', error);
@@ -899,10 +904,20 @@ function applyAudioSettingsFromUserData(userData) {
                     }
                 }
 
+                const cachedMode = getCachedDictationSpeechRecognitionMode();
+                if (cachedMode) {
+                    speechRecognitionMode = cachedMode;
+                }
+
                 return true;
             } catch (error) {
                 console.warn('Ошибка парсинга audio_settings_json:', error);
             }
+        }
+
+        const cachedMode = getCachedDictationSpeechRecognitionMode();
+        if (cachedMode) {
+            speechRecognitionMode = cachedMode;
         }
 
         if (userData.audio_start !== undefined && userData.audio_start !== null) {
@@ -1573,6 +1588,11 @@ async function applyDictationI18n() {
     try {
         const el = document.getElementById('recognitionModeIcon');
         if (el) el.title = dictationT('main.recognition_mode', el.title || '');
+    } catch (e) {
+    }
+
+    try {
+        updateResultNextBtnUI();
     } catch (e) {
     }
 }
@@ -3866,6 +3886,31 @@ function stripDisallowedChars(text) {
 }
 let recognitionActivityTimer = null;  // Таймер для отслеживания активности распознавания
 let speechRecognitionMode = 'route';  // Метод распознавания речи: 'route' (браузер/WebSpeech), 'route-server' (сервер), 'route-off' (локально, только если модель загружена)
+
+const DICTATION_SPEECH_RECOGNITION_MODE_CACHE_KEY = 'dictafan_dictation_speech_recognition_mode_v1';
+
+function _isValidSpeechRecognitionMode(mode) {
+    const m = String(mode || '').trim();
+    return m === 'route' || m === 'route-server' || m === 'route-off';
+}
+
+function getCachedDictationSpeechRecognitionMode() {
+    try {
+        const raw = localStorage.getItem(DICTATION_SPEECH_RECOGNITION_MODE_CACHE_KEY);
+        if (!_isValidSpeechRecognitionMode(raw)) return null;
+        return String(raw);
+    } catch (e) {
+        return null;
+    }
+}
+
+function setCachedDictationSpeechRecognitionMode(mode) {
+    try {
+        if (!_isValidSpeechRecognitionMode(mode)) return;
+        localStorage.setItem(DICTATION_SPEECH_RECOGNITION_MODE_CACHE_KEY, String(mode));
+    } catch (e) {
+    }
+}
 
 let whisperPreloadInFlight = null;
 let whisperPreloadAfterTableDone = false;
@@ -9924,14 +9969,27 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     // ИСПРАВЛЕНО: 
     //  - если диктант НЕ диалог, показываем только подсказку (explanationHint или пусто)
     //  - если диктант диалог, показываем "ИмяСпикера: подсказка" или просто "ИмяСпикера:"
-    const speakerDiv = document.getElementById('speaker');
-    if (speakerDiv) {
+    try {
+        const speakerSentenceNumber = document.getElementById('speakerSentenceNumber');
+        if (speakerSentenceNumber) {
+            const pos = Number(currentSentence && currentSentence.position !== undefined && currentSentence.position !== null ? currentSentence.position : NaN);
+            if (Number.isFinite(pos) && pos > 0) {
+                speakerSentenceNumber.textContent = `(${pos})`;
+            } else {
+                speakerSentenceNumber.textContent = '';
+            }
+        }
+    } catch (e) {
+    }
+
+    const speakerTextSpan = document.getElementById('speakerText');
+    if (speakerTextSpan) {
         if (!dictationIsDialog) {
             // Обычный (не диалоговый) диктант — показываем только пояснение, без спикера
             if (explanationHint) {
-                speakerDiv.textContent = `${explanationHint}`;
+                speakerTextSpan.textContent = `${explanationHint}`;
             } else {
-                speakerDiv.textContent = '';
+                speakerTextSpan.textContent = '';
             }
         } else {
             // Диктант является диалогом - показываем спикера
@@ -9940,14 +9998,14 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
             if (explanationHint) {
                 if (speakerName) {
-                    speakerDiv.textContent = `${speakerName}: ${explanationHint}`;
+                    speakerTextSpan.textContent = `Спикер: ${speakerName} — ${explanationHint}`;
                 } else {
-                    speakerDiv.textContent = `${explanationHint}`;
+                    speakerTextSpan.textContent = `${explanationHint}`;
                 }
             } else if (speakerName) {
-                speakerDiv.textContent = `${speakerName}:`;
+                speakerTextSpan.textContent = `Спикер: ${speakerName}`;
             } else {
-                speakerDiv.textContent = '';
+                speakerTextSpan.textContent = '';
             }
         }
     }
@@ -9962,7 +10020,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
         inputField.innerHTML = currentSentence.text;
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = currentSentence.text_translation;
-        correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
+        correctAnswerDiv.style.color = 'var(--color-text)';
         disableCheckButton(0);
     } else if (corrected > 0) {
         // ИСПРАВЛЕНО: Если только corrected (полузвезда), текст НЕ заполняется,
@@ -11747,13 +11805,13 @@ function checkText() {
     if (allCorrect) {
         correctAnswerDiv.style.display = "block";
         correctAnswerDiv.textContent = translation;
-        correctAnswerDiv.style.color = 'var(--color-button-gray)';
+        correctAnswerDiv.style.color = 'var(--color-text)';
         // Сбрасываем флаг "показывать текст", так как теперь показывается результат проверки
         correctAnswerDiv.dataset.showTextHint = 'false';
         setTimeout(() => playAudioSequence(playSequenceSuccess), 500); // "ot" с задержкой
         updateTableRowStatus(currentSentence);
 
-        // После ⭐: если аудио по этому предложению уже не требуется/выполнено — сразу переходим дальше.
+        // После : если аудио по этому предложению уже не требуется/выполнено — сразу переходим дальше.
         // Иначе переводим фокус на запись (как и было задумано).
         try {
             setTimeout(() => {
@@ -13091,6 +13149,8 @@ function initAudioSettingsModal() {
                 console.log(`🔄 [onSettingsChange] Изменяем режим распознавания: ${speechRecognitionMode} -> ${settings.speech_recognition_mode}`);
                 const oldMode = speechRecognitionMode;
                 speechRecognitionMode = settings.speech_recognition_mode;
+
+                setCachedDictationSpeechRecognitionMode(speechRecognitionMode);
                 
                 // Если режим изменился, останавливаем старый движок и сбрасываем unifiedSpeechRecognizer,
                 // чтобы он пересоздался с новым режимом.
@@ -13120,7 +13180,9 @@ function initAudioSettingsModal() {
             // Сохраняем настройки в БД
             setAudioSettingsBusy(true);
             try {
-                await saveAudioSettingsToUser(settings);
+                const settingsToSave = { ...(settings || {}) };
+                delete settingsToSave.speech_recognition_mode;
+                await saveAudioSettingsToUser(settingsToSave);
             } finally {
                 setAudioSettingsBusy(false);
             }

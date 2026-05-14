@@ -129,6 +129,8 @@
         "title": "Link Telegram",
         "toggle_aria": "Collapse/expand Telegram link section",
         "get_code": "Get code",
+        "open_bot": "Open bot",
+        "open_bot_title": "Open bot in Telegram",
         "code_placeholder": "code",
         "copy_start_cmd_title": "Copy /start command to clipboard",
         "refresh_status_title": "Refresh status without page reload",
@@ -317,6 +319,7 @@
     "main": {
       "check_title": "Press Enter/Return when you finish typing",
       "check": "Check",
+      "next": "Next",
       "input_empty": "You haven't typed a single letter yet — what do you want to check?",
       "input_min_half": "Type at least half of the sentence before checking.",
       "virtual_keyboard": "Show keyboard",
@@ -395,7 +398,8 @@
       "profile": "User profile",
       "activity_report": "Activity report",
       "rating": "Rating",
-      "plan_fact": "Plan vs fact report"
+      "plan_fact": "Plan-fact report",
+      "support": "Buy me a coffee"
     },
     "delete_modal": {
       "title": "Delete dictation",
@@ -703,4 +707,15 @@
         "creating_account": "Creating account…"
       }
     }
+  },
+  "support": {
+    "topbar": {
+      "title": "Buy me a coffee"
+    },
+    "modal": {
+      "title": "Support the project",
+      "text": "If you like DictaFan, you can support development via monobank.",
+      "open": "Open jar"
+    }
   }
+}

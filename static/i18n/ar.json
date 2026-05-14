@@ -128,6 +128,8 @@
         "title": "ربط Telegram",
         "toggle_aria": "طي/توسيع ربط Telegram",
         "get_code": "الحصول على رمز",
+        "open_bot": "فتح البوت",
+        "open_bot_title": "فتح البوت في Telegram",
         "code_placeholder": "رمز",
         "copy_start_cmd_title": "نسخ أمر /start إلى الحافظة",
         "refresh_status_title": "تحديث الحالة بدون إعادة تحميل الصفحة",
@@ -316,6 +318,7 @@
     "main": {
       "check_title": "اضغط Enter/Return عند الانتهاء من كتابة النص",
       "check": "تحقق",
+      "next": "التالي",
       "input_empty": "لم تكتب أي حرف بعد — ماذا تريد أن تتحقق؟",
       "input_min_half": "اكتب على الأقل نصف الجملة قبل التحقق.",
       "virtual_keyboard": "إظهار لوحة المفاتيح",
@@ -394,7 +397,8 @@
       "profile": "الملف الشخصي",
       "activity_report": "تقرير النشاط",
       "rating": "التصنيف",
-      "plan_fact": "تقرير الخطة مقابل الواقع"
+      "plan_fact": "تقرير الخطة مقابل الواقع",
+      "support": "ادعمني بقهوة"
     },
     "delete_modal": {
       "title": "حذف الإملاء",
@@ -700,6 +704,17 @@
       "saving": "جارٍ الحفظ...",
       "logging_in": "جارٍ تسجيل الدخول...",
       "creating_account": "جارٍ إنشاء الحساب..."
+    }
+  },
+
+  "support": {
+    "topbar": {
+      "title": "ادعمني بقهوة"
+    },
+    "modal": {
+      "title": "ادعم المشروع",
+      "text": "إذا أعجبك DictaFan يمكنك دعم التطوير عبر monobank.",
+      "open": "فتح الجرة"
     }
   }
 }

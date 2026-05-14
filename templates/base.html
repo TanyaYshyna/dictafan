@@ -42,6 +42,14 @@
     <script src="{{ url_for('static', filename='js/build_helpers.js') }}"></script>
     <script src="{{ url_for('static', filename='js/i18n.js') }}?v={{ app_cache_revision }}"></script>
     <script>
+        try {
+            if (window && typeof window.__MONOBANK_JAR_URL === 'undefined') {
+                window.__MONOBANK_JAR_URL = "{{ monobank_jar_url|default('') }}";
+            }
+        } catch (e) {
+        }
+    </script>
+    <script>
         var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
 
         if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
@@ -61,6 +69,7 @@
 
     {% block modals %}
     {% include 'partials/login_modal.html' %}
+    {% include 'partials/support_modal.html' %}
     {% endblock %}
 
     {% block content %}{% endblock %}
@@ -76,6 +85,7 @@
     <script src="{{ url_for('static', filename='js/user_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/auth_interceptor.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/login_modal.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/support_modal.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/sw_register.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/sw_status_bar.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/cover_manager.js') }}?v={{ app_cache_revision }}"></script>

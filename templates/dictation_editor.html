@@ -112,6 +112,9 @@
 
             <div class="user-section" id="user-section">
                 <!-- Заполнится JavaScript -->
+                <button type="button" id="supportTopbarBtn" class="topbar-icon-btn" title="{{ t('support.topbar.title') }}">
+                    <i data-lucide="heart"></i>
+                </button>
                 <div class="username">
                     <span class="user-avatar-small"></span>
                     <span class="username-text"></span>
@@ -715,7 +718,7 @@
                 </button>
             </div>
             <div class="form-group">
-                <label>Текст диктанта:</label>
+                <label id="startTextLabel">Текст диктанта:</label>
             </div>
             <div class="form-group">
                 <div id="startTextInput" contenteditable="true" class="start-text-editor" rows="10" placeholder="Введите текст диктанта..."></div>
@@ -886,6 +889,22 @@
         </div>
     </div>
 
+    <div id="refillTableModal" class="modal" style="display: none;">
+        <div class="modal-content exit-modal-content">
+            <div class="modal-header" style="display:flex; align-items:center; justify-content:space-between; gap: 12px;">
+                <h2 style="margin: 0;">{{ t('ui.dictation_editor.table.refill') }}</h2>
+                <button class="modal-close" id="refillTableModalClose" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <p id="refillTableModalMessage">Что сделать с текущими предложениями?</p>
+            <div class="exit-modal-buttons">
+                <button id="refillTableModalClearBtn" class="button-color-lightgreen">Очистить таблицу</button>
+                <button id="refillTableModalAppendBtn" class="button-color-yellow">Дополнить таблицу</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно обрезки изображения для ковера -->
     <div id="crop-modal" class="modal" style="display: none;">
         <div class="modal-content crop-modal-content">
@@ -914,6 +933,21 @@
         // Инициализация UserManager перед загрузкой основного скрипта
         document.addEventListener('DOMContentLoaded', async function () {
             // console.log('🚀 Начало инициализации редактора диктанта...');
+
+            try {
+                const btn = document.getElementById('supportTopbarBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        try {
+                            if (window.SupportModal && typeof window.SupportModal.open === 'function') {
+                                window.SupportModal.open();
+                            }
+                        } catch (e) {
+                        }
+                    });
+                }
+            } catch (e) {
+            }
 
             if (!window.UM) {
                 console.warn('⚠️ UserManager не найден, создаем новый экземпляр');

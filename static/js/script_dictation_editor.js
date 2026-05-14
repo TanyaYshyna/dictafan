@@ -263,7 +263,7 @@ function applyDictationEditorTranslations() {
         });
         const addSp = document.getElementById('addSpeakerBtn');
         if (addSp) addSp.setAttribute('title', editorT('dictation_editor.dialog.add_speaker', 'Добавить спикера'));
-        const startTextLabel = document.querySelector('#startModal .form-group > label:not([for])');
+        const startTextLabel = document.getElementById('startTextLabel');
         if (startTextLabel) startTextLabel.textContent = editorT('dictation_editor.start_modal.text', 'Текст диктанта:');
         const startText = document.getElementById('startTextInput');
         if (startText) startText.setAttribute('placeholder', editorT('dictation_editor.start_modal.text_placeholder', 'Введите текст диктанта...'));
@@ -1620,6 +1620,44 @@ function getSentenceByKeySafe(list, key) {
     } catch (e) {
         return null;
     }
+}
+
+function _buildUsedSentenceKeySet() {
+    const used = new Set();
+    try {
+        const orig = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+            ? workingData.original.sentences
+            : [];
+        for (const s of orig) {
+            const k = s && (s.key || s.sentence_key) ? String(s.key || s.sentence_key).trim() : '';
+            if (k) used.add(k);
+        }
+    } catch (e) {
+    }
+    return used;
+}
+
+function createSentenceKeyAllocator(existingUsedKeysSet) {
+    const used = (existingUsedKeysSet instanceof Set) ? existingUsedKeysSet : new Set();
+    let nextCandidate = 0;
+
+    const normalizeToKey = (n) => String(Math.max(0, Math.min(999, n))).padStart(3, '0');
+
+    const alloc = () => {
+        // Find next free key from 000..999. Add to used immediately.
+        for (let attempts = 0; attempts < 1000; attempts++) {
+            const k = normalizeToKey(nextCandidate);
+            nextCandidate = (nextCandidate + 1) % 1000;
+            if (!used.has(k)) {
+                used.add(k);
+                return k;
+            }
+        }
+        throw new Error('No free sentence keys available (000-999)');
+    };
+
+    alloc._used = used;
+    return alloc;
 }
 
 function recomputeSentencePositionsFromDom() {
@@ -9055,7 +9093,7 @@ function setupStartModalHandlers() {
         cancelStartBtn.addEventListener('click', () => {
             try {
                 const mode = window.__DICTATION_EDITOR_START_MODAL_MODE;
-                if (mode === 'refill') {
+                if (mode === 'refill' || mode === 'append') {
                     closeStartModal();
                     return;
                 }
@@ -9112,16 +9150,61 @@ function setupStartModalHandlers() {
     const refillTableBtn = document.getElementById('refillTableBtn');
     if (refillTableBtn) {
         refillTableBtn.addEventListener('click', () => {
-            if (confirm('Это удалит все существующие предложения и аудио. Продолжить?')) {
+            const modal = document.getElementById('refillTableModal');
+            if (!modal) return;
+            modal.style.display = 'flex';
+            try {
+                if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                    lucide.createIcons({ root: modal });
+                }
+            } catch (e) {
+            }
+        });
+    }
+
+    try {
+        const modal = document.getElementById('refillTableModal');
+        const closeBtn = document.getElementById('refillTableModalClose');
+        const clearBtn = document.getElementById('refillTableModalClearBtn');
+        const appendBtn = document.getElementById('refillTableModalAppendBtn');
+
+        const close = () => {
+            if (modal) modal.style.display = 'none';
+        };
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                close();
+            });
+        }
+        if (modal) {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) close();
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                close();
                 try {
                     window.__DICTATION_EDITOR_START_MODAL_MODE = 'refill';
                 } catch (e) {
                 }
-
-                // Открыть стартовое модальное окно (реальная очистка будет только после "Сформировать")
                 openStartModal();
-            }
-        });
+            });
+        }
+        if (appendBtn) {
+            appendBtn.addEventListener('click', () => {
+                close();
+                try {
+                    window.__DICTATION_EDITOR_START_MODAL_MODE = 'append';
+                } catch (e) {
+                }
+                openStartModal();
+            });
+        }
+    } catch (e) {
     }
 
     // Кнопка переключения видимости колонки explanation
@@ -9201,6 +9284,48 @@ function openStartModal() {
             }
         } catch (e) {
         }
+
+        try {
+            const mode = window.__DICTATION_EDITOR_START_MODAL_MODE;
+            const isAppend = mode === 'append';
+
+            const createBtn = document.getElementById('createDictationBtn');
+            if (createBtn) {
+                if (isAppend) {
+                    createBtn.textContent = editorT('dictation_editor.start_modal.append', 'Дополнить диктант');
+                } else {
+                    createBtn.textContent = editorT('dictation_editor.start_modal.create', 'Сформировать диктант');
+                }
+            }
+
+            const titleInput = document.getElementById('startTitleInput');
+            const titleGroup = titleInput ? titleInput.closest('.form-group') : null;
+            if (titleGroup) {
+                titleGroup.style.display = isAppend ? 'none' : '';
+            }
+
+            const dialogLabel = document.getElementById('dialogCheckboxLabel');
+            if (dialogLabel) {
+                const dialogGroup = dialogLabel.closest('.form-group');
+                if (dialogGroup) dialogGroup.style.display = isAppend ? 'none' : '';
+            }
+
+            const speakersTable = document.getElementById('speakersTable');
+            if (speakersTable && isAppend) {
+                speakersTable.style.display = 'none';
+            }
+
+            const isDialogEl = document.getElementById('isDialogCheckbox');
+            if (isDialogEl && isAppend) {
+                try {
+                    isDialogEl.checked = !!(currentDictation && currentDictation.is_dialog);
+                    updateCheckboxIcon(!!isDialogEl.checked);
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+
         modal.style.display = 'flex';
         document.body.style.overflow = 'hidden';
 
@@ -9661,13 +9786,17 @@ async function createDictationFromStart() {
     }
 
     let isRefill = false;
+    let isAppend = false;
     try {
         isRefill = window.__DICTATION_EDITOR_START_MODAL_MODE === 'refill';
+        isAppend = window.__DICTATION_EDITOR_START_MODAL_MODE === 'append';
     } catch (e) {
         isRefill = false;
+        isAppend = false;
     }
 
     // Apply selected languages from modal.
+    // For append mode: do not change dictation metadata (title/dialog), but language pair is allowed.
     let modalLang = '';
     let modalTr = '';
     try {
@@ -9745,27 +9874,29 @@ async function createDictationFromStart() {
         }
     }
 
-    try {
-        const startTitleInput = document.getElementById('startTitleInput');
-        const titleVal = startTitleInput ? String(startTitleInput.value || '') : '';
-        const titleInput = document.getElementById('title');
-        if (titleInput) {
-            titleInput.value = titleVal;
-        }
-        const tabTitleInput = document.getElementById('tabTitle');
-        if (tabTitleInput) {
-            tabTitleInput.value = titleVal;
-        }
-        try { setDictationNameTitle(titleVal); } catch (e2) {}
+    if (!isAppend) {
         try {
-            if (workingData && workingData.original) {
-                workingData.original.title = titleVal;
+            const startTitleInput = document.getElementById('startTitleInput');
+            const titleVal = startTitleInput ? String(startTitleInput.value || '') : '';
+            const titleInput = document.getElementById('title');
+            if (titleInput) {
+                titleInput.value = titleVal;
             }
-        } catch (e3) {
+            const tabTitleInput = document.getElementById('tabTitle');
+            if (tabTitleInput) {
+                tabTitleInput.value = titleVal;
+            }
+            try { setDictationNameTitle(titleVal); } catch (e2) {}
+            try {
+                if (workingData && workingData.original) {
+                    workingData.original.title = titleVal;
+                }
+            } catch (e3) {
+            }
+            // Ensure translation title exists by auto translating on create.
+            await autoTranslateTitleIntoMainFields(titleVal);
+        } catch (e) {
         }
-        // Ensure translation title exists by auto translating on create.
-        await autoTranslateTitleIntoMainFields(titleVal);
-    } catch (e) {
     }
 
     if (!text) {
@@ -9774,38 +9905,79 @@ async function createDictationFromStart() {
     }
 
     // Показываем индикатор загрузки
-    showLoadingIndicator('Формирование диктанта...');
+    showLoadingIndicator(isAppend ? 'Дополнение диктанта...' : 'Формирование диктанта...');
 
     try {
-        const speakers = isDialog ? getSpeakersFromTable() : { '1': 'Спикер 1' };
+        const existingOrigSent = (isAppend && !isRefill && workingData && workingData.original && Array.isArray(workingData.original.sentences))
+            ? workingData.original.sentences
+            : [];
+        const appendOffset = (isAppend && !isRefill) ? (existingOrigSent.length || 0) : 0;
+
+        let effectiveIsDialog = isDialog;
+        let speakers = isDialog ? getSpeakersFromTable() : { '1': 'Спикер 1' };
+        if (isAppend) {
+            try {
+                effectiveIsDialog = !!(currentDictation && currentDictation.is_dialog);
+            } catch (e) {
+                effectiveIsDialog = false;
+            }
+            try {
+                speakers = (currentDictation && currentDictation.speakers && typeof currentDictation.speakers === 'object')
+                    ? currentDictation.speakers
+                    : (effectiveIsDialog ? getSpeakersFromTable() : { '1': 'Спикер 1' });
+            } catch (e2) {
+                speakers = effectiveIsDialog ? getSpeakersFromTable() : { '1': 'Спикер 1' };
+            }
+        }
+
+        // Build an economical key allocator (000..999). On append it includes existing keys,
+        // so new sentences never overwrite old ones even if rows were deleted/reordered.
+        let keyAllocator = null;
+        try {
+            const used = (isRefill && !isAppend) ? new Set() : _buildUsedSentenceKeySet();
+            keyAllocator = createSentenceKeyAllocator(used);
+        } catch (e0) {
+            keyAllocator = createSentenceKeyAllocator(new Set());
+        }
 
         // Парсинг текста
-        const parsedData = await parseInputText(text, delimiter, isDialog, speakers);
+        const parsedData = await parseInputText(text, delimiter, effectiveIsDialog, speakers, keyAllocator);
 
         try {
             if (parsedData && Array.isArray(parsedData.original)) {
                 parsedData.original.forEach((s, idx) => {
-                    if (s && typeof s === 'object') s.position = idx + 1;
+                    if (s && typeof s === 'object') s.position = appendOffset + idx + 1;
                 });
             }
             if (parsedData && Array.isArray(parsedData.translation)) {
                 parsedData.translation.forEach((s, idx) => {
-                    if (s && typeof s === 'object') s.position = idx + 1;
+                    if (s && typeof s === 'object') s.position = appendOffset + idx + 1;
                 });
             }
         } catch (e) {
         }
 
         // Обновить глобальные данные
-        currentDictation.is_dialog = isDialog;
-        currentDictation.speakers = speakers;
+        if (!isAppend) {
+            currentDictation.is_dialog = effectiveIsDialog;
+            currentDictation.speakers = speakers;
+        }
 
-        workingData.original = {
-            language: currentDictation.language_original,
-            title: document.getElementById('title').value || 'Диктант',
-            speakers: speakers,
-            sentences: parsedData.original
-        };
+        if (isAppend && !isRefill && existingOrigSent.length) {
+            workingData.original = {
+                language: currentDictation.language_original,
+                title: document.getElementById('title').value || 'Диктант',
+                speakers: speakers,
+                sentences: existingOrigSent.concat(parsedData.original || [])
+            };
+        } else {
+            workingData.original = {
+                language: currentDictation.language_original,
+                title: document.getElementById('title').value || 'Диктант',
+                speakers: speakers,
+                sentences: parsedData.original
+            };
+        }
 
         try {
             const activeTr = normalizeLangCode(currentDictation && currentDictation.language_translation);
@@ -9815,7 +9987,11 @@ async function createDictationFromStart() {
                     trObj.language = activeTr;
                     trObj.title = document.getElementById('title_translation').value || 'Перевод';
                     trObj.speakers = speakers;
-                    trObj.sentences = parsedData.translation;
+                    if (isAppend && !isRefill && Array.isArray(trObj.sentences) && trObj.sentences.length) {
+                        trObj.sentences = trObj.sentences.concat(parsedData.translation || []);
+                    } else {
+                        trObj.sentences = parsedData.translation;
+                    }
                 }
             }
         } catch (e) {
@@ -9841,7 +10017,8 @@ async function createDictationFromStart() {
                 if (!bucket) continue;
                 bucket.language = code;
                 bucket.speakers = speakers;
-                bucket.sentences = origSent.map((s) => ({
+                const existingBucketSent = (isAppend && !isRefill && Array.isArray(bucket.sentences)) ? bucket.sentences : [];
+                const mapped = origSent.map((s) => ({
                     key: s && (s.key || s.sentence_key) ? String(s.key || s.sentence_key) : '',
                     position: (s && s.position !== undefined && s.position !== null) ? s.position : null,
                     text: '',
@@ -9854,6 +10031,13 @@ async function createDictationFromStart() {
                     chain: false,
                     explanation: ''
                 })).filter(x => x && x.key);
+                if (isAppend && !isRefill && existingBucketSent.length) {
+                    const existingKeys = new Set(existingBucketSent.map(x => x && x.key ? String(x.key) : '').filter(Boolean));
+                    const newOnes = mapped.filter(x => x && x.key && !existingKeys.has(String(x.key)));
+                    bucket.sentences = existingBucketSent.concat(newOnes);
+                } else {
+                    bucket.sentences = mapped;
+                }
             }
         } catch (e) {
         }
@@ -10938,7 +11122,7 @@ async function generateAudioForSentence(sentence, language) {
 /**
  * Парсинг текста диктанта
  */
-async function parseInputText(text, delimiter, isDialog, speakers) {
+async function parseInputText(text, delimiter, isDialog, speakers, keyAllocatorOrOffset) {
     // Удалить пустые строки
     const lines = normalizeDictationInvisibleChars(text)
         .split('\n')
@@ -10953,7 +11137,25 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
     const language_translation = currentDictation.language_translation;
     const original = [];
     const translation = [];
-    let key_i = 0; // индекс для генерации ключа
+
+    // Sentence key generator:
+    // - preferred: allocator function returning a free key from 000..999
+    // - fallback: sequential counter with optional numeric offset
+    let key_i = 0;
+    let allocKey = null;
+    try {
+        if (typeof keyAllocatorOrOffset === 'function') {
+            allocKey = keyAllocatorOrOffset;
+        } else {
+            const base = Number(keyAllocatorOrOffset);
+            if (Number.isFinite(base) && base > 0) {
+                key_i = Math.floor(base);
+            }
+        }
+    } catch (e) {
+        allocKey = null;
+        key_i = 0;
+    }
     let i_next = 0; // индекс наступного рядка в тексті, якщо в наступному рядку э /* то перекладати не тереба 
     let original_line = "";
     let translation_line = "";
@@ -10973,8 +11175,8 @@ async function parseInputText(text, delimiter, isDialog, speakers) {
             continue;
         }
 
-        const key = key_i.toString().padStart(3, '0'); // ключ поточного речення);
-        key_i++; // наступне речення
+        const key = allocKey ? String(allocKey()) : key_i.toString().padStart(3, '0'); // ключ поточного речення);
+        if (!allocKey) key_i++; // наступне речення
         const audio_originalFileName = generateAudioFileName(key, language_original);
         const audio_translationFileName = generateAudioFileName(key, language_translation);
 

@@ -76,6 +76,7 @@ def inject_app_cache_revision():
             't': t_i18n,
             'ui_lang': ui_lang,
             'ui_dir': get_ui_dir(ui_lang),
+            'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
         }
     except Exception:
         return {
@@ -83,6 +84,7 @@ def inject_app_cache_revision():
             't': t_i18n,
             'ui_lang': 'en',
             'ui_dir': 'ltr',
+            'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
         }
 
 # Нужен валидный app.static_folder для логики бэкенда, где используются пути

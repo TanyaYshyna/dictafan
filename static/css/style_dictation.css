@@ -326,6 +326,14 @@ html[dir="rtl"] .topbar-save-group {
     min-height: 18px;
 }
 
+.speaker-tablo-overlay #speakerSentenceNumber {
+    display: inline-block;
+    margin-right: 6px;
+    color: var(--color-button-text-gray);
+    background: transparent;
+    font-weight: 600;
+}
+
 .speaker-tablo-overlay #tablo_result {
     position: absolute;
     right: 0;
@@ -534,9 +542,10 @@ body.exercise-ltr .check-group {
 
 #correctAnswer {
   font-size: 20px;
-  color: var(--color-button-text-gray);
+  color: var(--color-text);
   padding: 6px 10px;
-  border-radius: 6px;
+  margin-bottom: 10px;
+  border-radius: 10px;
   max-width: 100%;
   /* font-style: italic; */
   /* border: 1px dashed #ccc; */
@@ -2299,6 +2308,20 @@ html[dir="rtl"] .audio-players-wrapper {
 #resultNextBtn.is-last {
   background: var(--color-button-lightgreen);
   color: var(--color-button-text-lightgreen);
+}
+
+#resultNextBtn.is-last:focus {
+  outline: 2px solid var(--color-button-text-lightgreen);
+  outline-offset: 2px;
+}
+
+#resultNextBtn.is-last:hover {
+  border: 1px solid var(--color-button-shadow-lightgreen);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-lightgreen);
+}
+
+#resultNextBtn.is-last:active {
+  border: 1px solid var(--color-button-shadow-lightgreen);
 }
 
 @media (max-width: 500px) {
