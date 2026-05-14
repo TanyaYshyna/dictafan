@@ -57,6 +57,9 @@
         <div id="dictation-topbar-candy" style="display:none; margin-left:10px; align-items:center; gap:4px; padding:3px 8px; border-radius:10px; background: var(--color-hover-panel); color: var(--color-button-text-yellow); font-size:12px; font-weight:800; white-space:nowrap;"><i data-lucide="candy"></i><span id="dictation-topbar-candy-count" style="line-height:1;">0</span></div>
         <div class="user-section" id="user-section">
             <!-- Заполнится JavaScript -->
+            <button type="button" id="supportTopbarBtn" class="topbar-icon-btn" title="{{ t('support.topbar.title') }}">
+                <i data-lucide="heart"></i>
+            </button>
             <a href="/user/profile" class="username">
                 <span class="user-avatar-small"></span>
                 <span class="username-text"></span>
@@ -560,6 +563,21 @@
         // Инициализация UserManager и основного скрипта
         document.addEventListener('DOMContentLoaded', async function () {
             console.log('🚀 Начало инициализации диктанта...');
+
+            try {
+                const btn = document.getElementById('supportTopbarBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        try {
+                            if (window.SupportModal && typeof window.SupportModal.open === 'function') {
+                                window.SupportModal.open();
+                            }
+                        } catch (e) {
+                        }
+                    });
+                }
+            } catch (e) {
+            }
 
             // Используем уже существующий UserManager (не создаем новый!)
             if (!window.UM) {

@@ -65,6 +65,11 @@ function applyPrivateLibraryTranslations() {
     if (trackerLabel) trackerLabel.textContent = libT('private_library.user_menu.activity_tracker', null, 'Трекер активности');
   } catch (e) {
   }
+  try {
+    const supportLabel = document.querySelector('#userMenuSupportBtn span');
+    if (supportLabel) supportLabel.textContent = libT('private_library.user_menu.support', null, 'На каву');
+  } catch (e) {
+  }
 
   try {
     const streak = document.querySelector('.streak');
@@ -527,6 +532,7 @@ function setupUserDropdownMenu() {
   const trackerBtn = document.getElementById('userMenuActivityTrackerBtn');
   const ratingBtn = document.getElementById('userMenuRatingReportBtn');
   const planFactBtn = document.getElementById('userMenuPlanFactBtn');
+  const supportBtn = document.getElementById('userMenuSupportBtn');
 
   if (!toggleBtn || !dropdown) return;
 
@@ -665,6 +671,19 @@ function setupUserDropdownMenu() {
         PlanFactReport.open(history);
       } catch (err) {
         alert(libT('private_library.reports.plan_fact_open_failed'));
+      }
+    });
+  }
+
+  if (supportBtn) {
+    supportBtn.addEventListener('click', (e) => {
+      try { e.preventDefault(); } catch (e2) {}
+      close();
+      try {
+        if (window.SupportModal && typeof window.SupportModal.open === 'function') {
+          window.SupportModal.open();
+        }
+      } catch (e3) {
       }
     });
   }

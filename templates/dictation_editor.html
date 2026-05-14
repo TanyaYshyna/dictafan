@@ -112,6 +112,9 @@
 
             <div class="user-section" id="user-section">
                 <!-- Заполнится JavaScript -->
+                <button type="button" id="supportTopbarBtn" class="topbar-icon-btn" title="{{ t('support.topbar.title') }}">
+                    <i data-lucide="heart"></i>
+                </button>
                 <div class="username">
                     <span class="user-avatar-small"></span>
                     <span class="username-text"></span>
@@ -930,6 +933,21 @@
         // Инициализация UserManager перед загрузкой основного скрипта
         document.addEventListener('DOMContentLoaded', async function () {
             // console.log('🚀 Начало инициализации редактора диктанта...');
+
+            try {
+                const btn = document.getElementById('supportTopbarBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        try {
+                            if (window.SupportModal && typeof window.SupportModal.open === 'function') {
+                                window.SupportModal.open();
+                            }
+                        } catch (e) {
+                        }
+                    });
+                }
+            } catch (e) {
+            }
 
             if (!window.UM) {
                 console.warn('⚠️ UserManager не найден, создаем новый экземпляр');
