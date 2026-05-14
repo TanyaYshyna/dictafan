@@ -1590,6 +1590,11 @@ async function applyDictationI18n() {
         if (el) el.title = dictationT('main.recognition_mode', el.title || '');
     } catch (e) {
     }
+
+    try {
+        updateResultNextBtnUI();
+    } catch (e) {
+    }
 }
 
 function isDictationModalOpen() {
@@ -9964,23 +9969,27 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     // ИСПРАВЛЕНО: 
     //  - если диктант НЕ диалог, показываем только подсказку (explanationHint или пусто)
     //  - если диктант диалог, показываем "ИмяСпикера: подсказка" или просто "ИмяСпикера:"
-    const speakerDiv = document.getElementById('speaker');
-    if (speakerDiv) {
-        let positionPrefix = '';
-        try {
+    try {
+        const speakerSentenceNumber = document.getElementById('speakerSentenceNumber');
+        if (speakerSentenceNumber) {
             const pos = Number(currentSentence && currentSentence.position !== undefined && currentSentence.position !== null ? currentSentence.position : NaN);
             if (Number.isFinite(pos) && pos > 0) {
-                positionPrefix = `(${pos}) `;
+                speakerSentenceNumber.textContent = `(${pos})`;
+            } else {
+                speakerSentenceNumber.textContent = '';
             }
-        } catch (e) {
-            positionPrefix = '';
         }
+    } catch (e) {
+    }
+
+    const speakerTextSpan = document.getElementById('speakerText');
+    if (speakerTextSpan) {
         if (!dictationIsDialog) {
             // Обычный (не диалоговый) диктант — показываем только пояснение, без спикера
             if (explanationHint) {
-                speakerDiv.textContent = `${positionPrefix}${explanationHint}`;
+                speakerTextSpan.textContent = `${explanationHint}`;
             } else {
-                speakerDiv.textContent = '';
+                speakerTextSpan.textContent = '';
             }
         } else {
             // Диктант является диалогом - показываем спикера
@@ -9989,14 +9998,14 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
             if (explanationHint) {
                 if (speakerName) {
-                    speakerDiv.textContent = `${positionPrefix}Спикер: ${speakerName} — ${explanationHint}`;
+                    speakerTextSpan.textContent = `Спикер: ${speakerName} — ${explanationHint}`;
                 } else {
-                    speakerDiv.textContent = `${positionPrefix}${explanationHint}`;
+                    speakerTextSpan.textContent = `${explanationHint}`;
                 }
             } else if (speakerName) {
-                speakerDiv.textContent = `${positionPrefix}Спикер: ${speakerName}`;
+                speakerTextSpan.textContent = `Спикер: ${speakerName}`;
             } else {
-                speakerDiv.textContent = '';
+                speakerTextSpan.textContent = '';
             }
         }
     }

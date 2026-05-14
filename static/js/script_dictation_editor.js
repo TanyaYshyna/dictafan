@@ -263,7 +263,7 @@ function applyDictationEditorTranslations() {
         });
         const addSp = document.getElementById('addSpeakerBtn');
         if (addSp) addSp.setAttribute('title', editorT('dictation_editor.dialog.add_speaker', 'Добавить спикера'));
-        const startTextLabel = document.querySelector('#startModal .form-group > label:not([for])');
+        const startTextLabel = document.getElementById('startTextLabel');
         if (startTextLabel) startTextLabel.textContent = editorT('dictation_editor.start_modal.text', 'Текст диктанта:');
         const startText = document.getElementById('startTextInput');
         if (startText) startText.setAttribute('placeholder', editorT('dictation_editor.start_modal.text_placeholder', 'Введите текст диктанта...'));

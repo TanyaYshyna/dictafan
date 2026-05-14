@@ -317,6 +317,7 @@
     "main": {
       "check_title": "Press Enter/Return when you finish typing",
       "check": "Check",
+      "next": "Next",
       "input_empty": "You haven't typed a single letter yet — what do you want to check?",
       "input_min_half": "Type at least half of the sentence before checking.",
       "virtual_keyboard": "Show keyboard",

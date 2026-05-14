@@ -326,6 +326,14 @@ html[dir="rtl"] .topbar-save-group {
     min-height: 18px;
 }
 
+.speaker-tablo-overlay #speakerSentenceNumber {
+    display: inline-block;
+    margin-right: 6px;
+    color: var(--color-button-text-gray);
+    background: transparent;
+    font-weight: 600;
+}
+
 .speaker-tablo-overlay #tablo_result {
     position: absolute;
     right: 0;
