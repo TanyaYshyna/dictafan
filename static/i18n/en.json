@@ -129,6 +129,8 @@
         "title": "Link Telegram",
         "toggle_aria": "Collapse/expand Telegram link section",
         "get_code": "Get code",
+        "open_bot": "Open bot",
+        "open_bot_title": "Open bot in Telegram",
         "code_placeholder": "code",
         "copy_start_cmd_title": "Copy /start command to clipboard",
         "refresh_status_title": "Refresh status without page reload",

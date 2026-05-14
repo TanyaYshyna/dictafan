@@ -694,6 +694,7 @@ function renderTelegramSection() {
     const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
     const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
+    const openBotBtn = document.getElementById('telegramOpenBotBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
     const collapseBtn = document.getElementById('telegramLinkCollapseBtn');
@@ -816,6 +817,44 @@ function renderTelegramSection() {
             getCodeBtn.disabled = false;
         }
     };
+
+    if (openBotBtn) {
+        openBotBtn.onclick = async () => {
+            try {
+                openBotBtn.disabled = true;
+
+                const botUsername = 'dictafan_user_bot';
+
+                const isLinked = Boolean((UM && UM.userData) ? UM.userData.telegram_chat_id : null);
+                if (isLinked) {
+                    const url = `https://t.me/${encodeURIComponent(botUsername)}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+
+                let code = String(codeInput.value || '').trim();
+                if (!code) {
+                    const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
+                    if (!data || !data.success || !data.code) {
+                        throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
+                    }
+                    code = String(data.code).trim();
+                    codeInput.value = code;
+                    if (UM && UM.userData) {
+                        UM.userData.telegram_link_code = code;
+                    }
+                    try { copyBtn.disabled = false; } catch (e2) {}
+                }
+
+                const url = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(code)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } catch (e) {
+                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+            } finally {
+                openBotBtn.disabled = false;
+            }
+        };
+    }
 
     refreshBtn.onclick = async () => {
         try {

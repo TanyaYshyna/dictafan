@@ -2309,6 +2309,20 @@ html[dir="rtl"] .audio-players-wrapper {
   color: var(--color-button-text-lightgreen);
 }
 
+#resultNextBtn.is-last:focus {
+  outline: 2px solid var(--color-button-text-lightgreen);
+  outline-offset: 2px;
+}
+
+#resultNextBtn.is-last:hover {
+  border: 1px solid var(--color-button-shadow-lightgreen);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-lightgreen);
+}
+
+#resultNextBtn.is-last:active {
+  border: 1px solid var(--color-button-shadow-lightgreen);
+}
+
 @media (max-width: 500px) {
   .audio-user-col-5 {
     width: 44px;

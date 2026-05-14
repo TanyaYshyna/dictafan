@@ -129,6 +129,8 @@
         "title": "Привязать Telegram",
         "toggle_aria": "Свернуть/развернуть привязку Telegram",
         "get_code": "Получить код",
+        "open_bot": "Открыть бота",
+        "open_bot_title": "Открыть бота в Telegram",
         "code_placeholder": "код",
         "copy_start_cmd_title": "Скопировать команду /start в буфер",
         "refresh_status_title": "увидеть актуальный статус без перезагрузки страницы",

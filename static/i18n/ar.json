@@ -128,6 +128,8 @@
         "title": "ربط Telegram",
         "toggle_aria": "طي/توسيع ربط Telegram",
         "get_code": "الحصول على رمز",
+        "open_bot": "فتح البوت",
+        "open_bot_title": "فتح البوت في Telegram",
         "code_placeholder": "رمز",
         "copy_start_cmd_title": "نسخ أمر /start إلى الحافظة",
         "refresh_status_title": "تحديث الحالة بدون إعادة تحميل الصفحة",
