@@ -243,6 +243,10 @@
                                     <span>{{ t('profile.telegram.self_reports.label_html') | safe }}</span>
                                 </div>
                             </div>
+                                    <button type="button" id="telegramOpenBotBtn" class="button-secondary" title="{{ t('profile.telegram.link.open_bot_title') }}">
+                                        <i data-lucide="send"></i>
+                                        {{ t('profile.telegram.link.open_bot') }}
+                                    </button>
                         </div>
 
                         <div class="telegram-right-panel">
@@ -259,10 +263,6 @@
                                     <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
                                         <i data-lucide="key"></i>
                                         {{ t('profile.telegram.link.get_code') }}
-                                    </button>
-                                    <button type="button" id="telegramOpenBotBtn" class="button-secondary" title="{{ t('profile.telegram.link.open_bot_title') }}">
-                                        <i data-lucide="send"></i>
-                                        {{ t('profile.telegram.link.open_bot') }}
                                     </button>
                                     <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" style="flex: 1;">
                                     <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">

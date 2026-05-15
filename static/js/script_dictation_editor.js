@@ -4497,10 +4497,15 @@ function setupTabsPanel() {
     const titleTranslationInput = document.getElementById('title_translation');
     const tabTitleTranslationInput = document.getElementById('tabTitleTranslation');
 
-    if (titleInput && tabTitleInput) {
-        // Синхронизация из основной формы во вкладку
+    // Основное поле названия (original): должно помечать изменения, даже если вкладочного поля нет.
+    if (titleInput) {
         titleInput.addEventListener('input', () => {
-            tabTitleInput.value = titleInput.value;
+            try {
+                if (tabTitleInput) {
+                    tabTitleInput.value = titleInput.value;
+                }
+            } catch (e) {
+            }
             try {
                 if (workingData && workingData.original) {
                     workingData.original.title = titleInput.value;
@@ -4511,7 +4516,27 @@ function setupTabsPanel() {
             setDirtyFlags({ db: true });
             try { updateUnsavedStar(); } catch (e) {}
         });
+    }
 
+    // Основное поле названия перевода: должно помечать изменения, даже если вкладочного поля нет.
+    if (titleTranslationInput) {
+        titleTranslationInput.addEventListener('input', () => {
+            try {
+                if (tabTitleTranslationInput) {
+                    tabTitleTranslationInput.value = titleTranslationInput.value;
+                }
+            } catch (e) {
+            }
+            try {
+                const tr = getCurrentTranslationData({ createIfMissing: false });
+                if (tr) tr.title = titleTranslationInput.value;
+            } catch (e) {
+            }
+            setDirtyFlags({ db: true });
+        });
+    }
+
+    if (titleInput && tabTitleInput) {
         // Синхронизация из вкладки в основную форму
         tabTitleInput.addEventListener('input', () => {
             titleInput.value = tabTitleInput.value;
@@ -4528,17 +4553,6 @@ function setupTabsPanel() {
     }
 
     if (titleTranslationInput && tabTitleTranslationInput) {
-        // Синхронизация из основной формы во вкладку
-        titleTranslationInput.addEventListener('input', () => {
-            tabTitleTranslationInput.value = titleTranslationInput.value;
-            try {
-                const tr = getCurrentTranslationData({ createIfMissing: false });
-                if (tr) tr.title = titleTranslationInput.value;
-            } catch (e) {
-            }
-            setDirtyFlags({ db: true });
-        });
-
         // Синхронизация из вкладки в основную форму
         tabTitleTranslationInput.addEventListener('input', () => {
             titleTranslationInput.value = tabTitleTranslationInput.value;
