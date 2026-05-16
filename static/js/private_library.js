@@ -2224,6 +2224,9 @@ async function openTeacherAssignmentsPanel() {
   const groupSelect = document.getElementById('teacher-assignments-group');
   const list = document.getElementById('teacher-assignments-list');
 
+  // Guard against concurrent opens (double click / re-entrance) that can append options multiple times.
+  const openSeq = (window.__TEACHER_ASSIGNMENTS_OPEN_SEQ = (Number(window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) || 0) + 1);
+
   const close = () => {
     try { panel.style.display = 'none'; } catch (e) { }
   };
@@ -2244,8 +2247,21 @@ async function openTeacherAssignmentsPanel() {
 
   try {
     const groups = await loadMyGroupsForAssignmentModal();
+    // If another open call started after this one, ignore this render.
+    if (openSeq !== window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) return;
     if (groupSelect) {
+      // Defensive de-duplication (API/cache can sometimes return duplicates)
+      const uniq = [];
+      const seen = new Set();
       groups.forEach(g => {
+        const id = g && g.id != null ? String(g.id) : '';
+        if (!id) return;
+        if (seen.has(id)) return;
+        seen.add(id);
+        uniq.push(g);
+      });
+
+      uniq.forEach(g => {
         const o = document.createElement('option');
         o.value = String(g.id);
         o.textContent = String(g.title || `Группа ${g.id}`);
@@ -2254,11 +2270,11 @@ async function openTeacherAssignmentsPanel() {
       const last = getAssignmentLastGroupId();
       if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
         groupSelect.value = last;
-      } else if (groups.length === 1) {
-        groupSelect.value = String(groups[0].id);
+      } else if (uniq.length === 1) {
+        groupSelect.value = String(uniq[0].id);
         try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      } else if (groups.length > 0) {
-        groupSelect.value = String(groups[0].id);
+      } else if (uniq.length > 0) {
+        groupSelect.value = String(uniq[0].id);
         try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
       }
     }
