@@ -10755,6 +10755,14 @@ const CONTRACTIONS_DICT = {
     // I am / I'm (уже есть выше)
 };
 
+// === НЕРЕГУЛЯРНЫЕ ЭКВИВАЛЕНТНОСТИ (ОДНО СЛОВО ↔ ОДНО СЛОВО) ===
+// simplifyText() убирает апострофы, поэтому "can't" превращается в "cant".
+// "cannot" часто используется как одно слово и должно считаться эквивалентным "can't".
+const EQUIVALENT_WORDS_DICT = {
+    "cannot": ["cant"],
+    "cant": ["cannot"],
+};
+
 /**
  * Проверяет, эквивалентны ли два слова с учетом сокращений
  * @param {string} word1 - первое слово (уже нормализованное, без апострофов)
@@ -10764,6 +10772,15 @@ const CONTRACTIONS_DICT = {
 function areWordsEquivalent(word1, word2) {
     if (!word1 || !word2) return false;
     if (word1 === word2) return true;
+
+    // Нерегулярные пары (одно слово ↔ одно слово), например cannot ↔ can't
+    try {
+        const eq1 = EQUIVALENT_WORDS_DICT[word1];
+        if (eq1 && Array.isArray(eq1) && eq1.includes(word2)) return true;
+        const eq2 = EQUIVALENT_WORDS_DICT[word2];
+        if (eq2 && Array.isArray(eq2) && eq2.includes(word1)) return true;
+    } catch (e) {
+    }
 
     // Проверяем, является ли word1 сокращением word2
     const expansion1 = CONTRACTIONS_DICT[word1];
