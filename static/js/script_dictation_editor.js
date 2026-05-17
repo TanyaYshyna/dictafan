@@ -11326,36 +11326,8 @@ async function parseInputText(text, delimiter, isDialog, speakers, keyAllocatorO
             sentence.speaker = speakerId;
         }
 
-        // Если есть строки без спикеров
-        if (linesWithoutSpeakers.length > 0) {
-            let message = `В следующих строках не указан спикер:\n`;
-            linesWithoutSpeakers.forEach(item => {
-                message += `${item.index}. ${item.text}\n`;
-            });
-
-            if (linesWithoutSpeakers.length === original.length) {
-                // Если во всех строках нет спикеров, расставляем по кругу
-                message += `\nСпикеры будут расставлены автоматически по порядку. Проверьте реплики!`;
-
-                for (let i = 0; i < original.length; i++) {
-                    const speakerId = speakerIds[currentSpeakerIndex % speakerIds.length];
-                    original[i].speaker = speakerId;
-                    currentSpeakerIndex++;
-                }
-            } else {
-                // Если только в некоторых строках нет спикеров, проставляем первого спикера
-                message += `\nВ этих строках будет проставлен спикер "1".`;
-
-                linesWithoutSpeakers.forEach(item => {
-                    const index = item.index - 1; // индекс в массиве
-                    if (original[index]) {
-                        original[index].speaker = '1';
-                    }
-                });
-            }
-
-            alert(message);
-        }
+        // Если есть строки без спикеров — ничего не делаем.
+        // Это может быть, например, блок вопросов/комментариев без конкретного спикера.
 
         // Синхронизируем спикеров и чистый текст для перевода.
         // Важно: при авто-переводе префиксы вида "1:" могут попасть в translation.
@@ -11985,7 +11957,8 @@ function buildSpeakerDropdown(cellEl, selectedId, onSelect) {
     // Пустой вариант
     const emptyItem = document.createElement('div');
     emptyItem.className = 'speaker-option';
-    emptyItem.textContent = '';
+    emptyItem.textContent = '—';
+    emptyItem.title = 'Без спикера';
     emptyItem.addEventListener('click', () => {
         button.querySelector('.speaker-code').textContent = '';
         menu.classList.remove('open');
