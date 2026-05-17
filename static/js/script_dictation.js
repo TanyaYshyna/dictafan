@@ -9998,12 +9998,12 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
 
             if (explanationHint) {
                 if (speakerName) {
-                    speakerTextSpan.textContent = `Спикер: ${speakerName} — ${explanationHint}`;
+                    speakerTextSpan.textContent = `${speakerName}: ${explanationHint}`;
                 } else {
                     speakerTextSpan.textContent = `${explanationHint}`;
                 }
             } else if (speakerName) {
-                speakerTextSpan.textContent = `Спикер: ${speakerName}`;
+                speakerTextSpan.textContent = `${speakerName}:`;
             } else {
                 speakerTextSpan.textContent = '';
             }
