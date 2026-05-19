@@ -7,6 +7,121 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
+def _normalize_selected_sentence_positions(selected_sentence_positions):
+    try:
+        if selected_sentence_positions is None:
+            return []
+        if isinstance(selected_sentence_positions, str):
+            raw = selected_sentence_positions.strip()
+            if not raw or raw == '[]':
+                return []
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [int(x) for x in parsed]
+                return []
+            except Exception:
+                return []
+        return [int(x) for x in list(selected_sentence_positions or [])]
+    except Exception:
+        return []
+
+
+def _ensure_dictation_exercise(cur, dictation_id: int, positions_arr: list[int]) -> int:
+    """Возвращает id упражнения (dictation_exercises), создавая его при необходимости.
+
+    positions_arr=[] означает Full (весь диктант).
+    """
+    cur.execute(
+        """
+        INSERT INTO dictation_exercises (dictation_id, positions)
+        VALUES (%s, %s)
+        ON CONFLICT (dictation_id, positions)
+        DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+        RETURNING id
+        """,
+        (int(dictation_id), positions_arr),
+    )
+    row = cur.fetchone()
+    return int(row[0])
+
+
+def _resolve_teacher_id(cur, user_id: int, source_group_id) -> int:
+    if not source_group_id:
+        return int(user_id)
+    cur.execute(
+        """
+        SELECT teacher_id
+        FROM groups
+        WHERE id = %s
+        """,
+        (int(source_group_id),),
+    )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return int(user_id)
+    return int(row[0])
+
+
+def _upsert_history_by_day(
+    cur,
+    *,
+    user_id: int,
+    teacher_id: int,
+    dictation_language_code,
+    exercise_id: int,
+    date_plan,
+    date_fact,
+    perfect_delta: int = 0,
+    corrected_delta: int = 0,
+    audio_delta: int = 0,
+    lead_time_delta: int = 0,
+    successes_delta: int = 0,
+) -> None:
+    cur.execute(
+        """
+        INSERT INTO history_by_day (
+            user_id,
+            teacher_id,
+            dictation_language_code,
+            exercise_id,
+            date_plan,
+            date_fact,
+            perfect_count,
+            corrected_count,
+            audio_count,
+            lead_time,
+            successes,
+            created_at,
+            updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, teacher_id, exercise_id, date_plan, date_fact)
+        DO UPDATE SET
+            perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
+            corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
+            audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
+            lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
+            successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+            dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            int(user_id),
+            int(teacher_id),
+            dictation_language_code,
+            int(exercise_id),
+            date_plan,
+            date_fact,
+            int(perfect_delta or 0),
+            int(corrected_delta or 0),
+            int(audio_delta or 0),
+            int(lead_time_delta or 0),
+            int(successes_delta or 0),
+        ),
+    )
+
+
 def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
@@ -84,26 +199,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
     # Нормализуем selected_sentence_positions к int[] для БД.
     # Пустой массив означает: все предложения.
-    try:
-        if selected_sentence_positions is None:
-            selected_sentence_positions_arr = []
-        elif isinstance(selected_sentence_positions, str):
-            raw = selected_sentence_positions.strip()
-            if not raw or raw == '[]':
-                selected_sentence_positions_arr = []
-            else:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        selected_sentence_positions_arr = [int(x) for x in parsed]
-                    else:
-                        selected_sentence_positions_arr = []
-                except Exception:
-                    selected_sentence_positions_arr = []
-        else:
-            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
-    except Exception:
-        selected_sentence_positions_arr = []
+    selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
     
     conn = get_db_connection()
     try:
@@ -152,6 +248,39 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
             )
 
             row = cur.fetchone()
+
+            try:
+                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
+                if type_activity == 'perfect':
+                    perfect_delta = int(number or 0)
+                    corrected_delta = 0
+                    audio_delta = 0
+                elif type_activity == 'corrected':
+                    perfect_delta = 0
+                    corrected_delta = int(number or 0)
+                    audio_delta = 0
+                else:
+                    perfect_delta = 0
+                    corrected_delta = 0
+                    audio_delta = int(number or 0)
+
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(user_id),
+                    dictation_language_code=dictation_language_code,
+                    exercise_id=int(exercise_id),
+                    date_plan=target_date,
+                    date_fact=target_date,
+                    perfect_delta=perfect_delta,
+                    corrected_delta=corrected_delta,
+                    audio_delta=audio_delta,
+                    lead_time_delta=int(lead_time_ms_int or 0),
+                    successes_delta=0,
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             activity = {
@@ -361,26 +490,7 @@ def add_activity_bulk(
     if lead_time_ms_int < 0:
         lead_time_ms_int = 0
 
-    try:
-        if selected_sentence_positions is None:
-            selected_sentence_positions_arr = []
-        elif isinstance(selected_sentence_positions, str):
-            raw = selected_sentence_positions.strip()
-            if not raw or raw == '[]':
-                selected_sentence_positions_arr = []
-            else:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        selected_sentence_positions_arr = [int(x) for x in parsed]
-                    else:
-                        selected_sentence_positions_arr = []
-                except Exception:
-                    selected_sentence_positions_arr = []
-        else:
-            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
-    except Exception:
-        selected_sentence_positions_arr = []
+    selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
 
     conn = get_db_connection()
     try:
@@ -414,6 +524,26 @@ def add_activity_bulk(
                 ),
             )
             row = cur.fetchone()
+
+            try:
+                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(user_id),
+                    dictation_language_code=dictation_language_code,
+                    exercise_id=int(exercise_id),
+                    date_plan=target_date,
+                    date_fact=target_date,
+                    perfect_delta=int(perfect_count_int or 0),
+                    corrected_delta=int(corrected_count_int or 0),
+                    audio_delta=int(audio_count_int or 0),
+                    lead_time_delta=int(lead_time_ms_int or 0),
+                    successes_delta=0,
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             return {
@@ -663,6 +793,31 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
             """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions))
 
             row = cur.fetchone()
+
+            try:
+                selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
+                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
+                teacher_id = _resolve_teacher_id(cur, int(user_id), source_group_id)
+                date_fact = datetime.now().date()
+                date_plan = date_fact
+
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(teacher_id),
+                    dictation_language_code=dictation_language_code,
+                    exercise_id=int(exercise_id),
+                    date_plan=date_plan,
+                    date_fact=date_fact,
+                    perfect_delta=int(perfect_count or 0),
+                    corrected_delta=int(corrected_count or 0),
+                    audio_delta=int(audio_count or 0),
+                    lead_time_delta=0,
+                    successes_delta=1,
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             success = {
