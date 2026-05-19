@@ -107,8 +107,8 @@ def add_dictation_to_group_desks(
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
             (int(group_id), int(teacher_user_id)),
         )

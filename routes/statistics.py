@@ -80,8 +80,8 @@ def _can_teacher_view_student_activity(teacher_user_id: int, student_user_id: in
                     """
                     SELECT 1
                     FROM group_students gs
-                    JOIN group_teachers gt ON gt.group_id = gs.group_id
-                    WHERE gt.teacher_user_id = %s
+                    JOIN groups g ON g.id = gs.group_id
+                    WHERE g.teacher_id = %s
                       AND gs.student_user_id = %s
                       AND gs.status = 'active'
                       AND gs.removed_at IS NULL
@@ -1315,9 +1315,9 @@ def api_planfact_report():
                     """
                     SELECT DISTINCT u.id AS user_id
                     FROM group_students gs
-                    JOIN group_teachers gt ON gt.group_id = gs.group_id
                     JOIN users u ON u.id = gs.student_user_id
-                    WHERE gt.teacher_user_id = %s
+                    JOIN groups g ON g.id = gs.group_id
+                    WHERE g.teacher_id = %s
                       AND gs.status = 'active'
                       AND gs.removed_at IS NULL
                       AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
@@ -1886,9 +1886,9 @@ def api_activity_users():
                     """
                     SELECT DISTINCT u.id AS user_id, u.username
                     FROM group_students gs
-                    JOIN group_teachers gt ON gt.group_id = gs.group_id
                     JOIN users u ON u.id = gs.student_user_id
-                    WHERE gt.teacher_user_id = %s
+                    JOIN groups g ON g.id = gs.group_id
+                    WHERE g.teacher_id = %s
                       AND gs.status = 'active'
                       AND gs.removed_at IS NULL
                       AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE

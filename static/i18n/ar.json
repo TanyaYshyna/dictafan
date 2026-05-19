@@ -55,7 +55,8 @@
       "activity_goal": "هدف النشاط اليومي",
       "local_models": "نماذج محلية",
       "dictation_settings": "إعدادات الإملاء",
-      "assignment_history": "سجل الواجبات"
+      "assignment_history": "سجل الواجبات",
+      "groups": "المجموعات"
     },
     "activity_goal": {
       "label": "هدف النشاط اليومي:",
@@ -188,6 +189,14 @@
       "memberships": {
         "title": "أنا ضمن مجموعات",
         "leave_title": "مغادرة المجموعة"
+      },
+      "invites": {
+        "title": "الدعوات",
+        "accept": "قبول",
+        "accepted": "تم قبول الدعوة",
+        "decline": "رفض",
+        "declined": "تم رفض الدعوة",
+        "pending": "قيد الانتظار"
       },
       "modal": {
         "title": "مجموعة",

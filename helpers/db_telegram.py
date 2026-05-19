@@ -115,7 +115,7 @@ def list_teacher_chat_ids_for_student_success(student_user_id: int, dictation_id
     Only for:
     - active student in group_students
     - group_students.notify_teacher_on_success = TRUE
-    - group has active teacher (group_teachers)
+    - group has active teacher (groups.teacher_id)
     - teacher has telegram_chat_id and telegram_enabled
     - there exists an active assignment in that group for this dictation and date range
     """
@@ -125,8 +125,8 @@ def list_teacher_chat_ids_for_student_success(student_user_id: int, dictation_id
             """
             SELECT DISTINCT u.telegram_chat_id
             FROM group_students gs
-            JOIN group_teachers gt ON gt.group_id = gs.group_id
-            JOIN users u ON u.id = gt.teacher_user_id
+            JOIN groups g ON g.id = gs.group_id
+            JOIN users u ON u.id = g.teacher_id
             JOIN assignments a ON a.group_id = gs.group_id
             WHERE gs.student_user_id = %s
               AND gs.status = 'active'
@@ -185,8 +185,8 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
 
     Rules:
     - student is active in group_students
-    - COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE (student agrees)
-    - teacher is in group_teachers, teacher has telegram_chat_id and telegram_enabled
+    - COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE (учитель включил уведомления для ученика)
+    - teacher is groups.teacher_id, teacher has telegram_chat_id and telegram_enabled
     - teacher language preferences must not block student->teacher reports
     """
     conn, cur = get_db_cursor()
@@ -198,8 +198,8 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
                 u.username AS teacher_username,
                 u.telegram_chat_id
             FROM group_students gs
-            JOIN group_teachers gt ON gt.group_id = gs.group_id
-            JOIN users u ON u.id = gt.teacher_user_id
+            JOIN groups g ON g.id = gs.group_id
+            JOIN users u ON u.id = g.teacher_id
             WHERE gs.student_user_id = %s
               AND gs.status = 'active'
               AND gs.removed_at IS NULL
@@ -258,13 +258,13 @@ def filter_manual_teacher_chat_ids(
             """
             SELECT DISTINCT u.telegram_chat_id
             FROM group_students gs
-            JOIN group_teachers gt ON gt.group_id = gs.group_id
-            JOIN users u ON u.id = gt.teacher_user_id
+            JOIN groups g ON g.id = gs.group_id
+            JOIN users u ON u.id = g.teacher_id
             WHERE gs.student_user_id = %s
               AND gs.status = 'active'
               AND gs.removed_at IS NULL
               AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
-              AND gt.teacher_user_id = ANY(%s)
+              AND g.teacher_id = ANY(%s)
               AND u.telegram_chat_id IS NOT NULL
               AND u.telegram_enabled = TRUE
             """,
