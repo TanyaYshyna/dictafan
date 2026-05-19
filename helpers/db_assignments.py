@@ -31,10 +31,9 @@ def _ensure_teacher_of_group(cur, group_id: int, teacher_user_id: int) -> None:
     cur.execute(
         """
         SELECT 1
-        FROM group_teachers gt
-        JOIN groups g ON g.id = gt.group_id
-        WHERE gt.group_id = %s
-          AND gt.teacher_user_id = %s
+        FROM groups g
+        WHERE g.id = %s
+          AND g.teacher_id = %s
           AND g.archived_at IS NULL
         """,
         (group_id, teacher_user_id),
@@ -100,12 +99,7 @@ def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
             WHERE a.id = %s
-              AND EXISTS (
-                SELECT 1
-                FROM group_teachers gt
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
-              )
+              AND g.teacher_id = %s
             """,
             (assignment_id, teacher_user_id),
         )
@@ -283,10 +277,9 @@ def delete_assignments(ids: list[int], teacher_user_id: int) -> int:
             WHERE a.id = ANY(%s)
               AND EXISTS (
                 SELECT 1
-                FROM group_teachers gt
-                JOIN groups g ON g.id = gt.group_id
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
+                FROM groups g
+                WHERE g.id = a.group_id
+                  AND g.teacher_id = %s
                   AND g.archived_at IS NULL
               )
             """,
@@ -314,12 +307,7 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
             JOIN groups g ON g.id = a.group_id
             JOIN dictations d ON d.id = a.dictation_id
             WHERE a.id = %s
-              AND EXISTS (
-                SELECT 1
-                FROM group_teachers gt
-                WHERE gt.group_id = a.group_id
-                  AND gt.teacher_user_id = %s
-              )
+              AND g.teacher_id = %s
             """,
             (assignment_id, teacher_user_id),
         )

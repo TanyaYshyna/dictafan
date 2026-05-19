@@ -15,6 +15,109 @@ let profileTestAutoStopId = null;
 
 const PROFILE_SAVE_KEY_VALUES = ['s', 'ы', 'і', 'س'];
 
+async function refreshMyInvites() {
+    try {
+        const data = await groupsApiRequest('/groups/api/my-invites', { method: 'GET' });
+        const invites = data && Array.isArray(data.invites) ? data.invites : [];
+        groupsUiState.myInvites = invites;
+        renderMyInvitesTable();
+    } catch (e) {
+        groupsUiState.myInvites = [];
+        renderMyInvitesTable();
+    }
+}
+
+function renderMyInvitesTable() {
+    const table = document.getElementById('groupsMyInvitesTable');
+    if (!table) return;
+    table.innerHTML = '';
+
+    const invites = Array.isArray(groupsUiState.myInvites) ? groupsUiState.myInvites : [];
+    invites.forEach((inv) => {
+        const row = document.createElement('div');
+        row.className = 'groups-students-table-row groups-memberships-table-row';
+
+        const name = document.createElement('div');
+        name.className = 'groups-student-name';
+        name.textContent = String(inv.group_title || '');
+
+        const actions = document.createElement('div');
+        actions.className = 'groups-student-notify';
+
+        const acceptBtn = document.createElement('button');
+        acceptBtn.type = 'button';
+        acceptBtn.className = 'button-color-lightgreen';
+        acceptBtn.textContent = profileT('profile.groups.invites.accept', null, 'Принять');
+        acceptBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                acceptBtn.disabled = true;
+                const r = await groupsApiRequest(`/groups/api/invite/${encodeURIComponent(inv.id)}/accept`, {
+                    method: 'POST',
+                });
+                if (r && r.success) {
+                    showSuccess(profileT('profile.groups.invites.accepted', null, 'Приглашение принято'));
+                    await refreshMemberships();
+                    await refreshMyInvites();
+                } else {
+                    const msg = r && (r.error || r.message) ? String(r.error || r.message) : profileT('profile.common.error', null, 'Ошибка');
+                    showError(msg);
+                }
+            } catch (err) {
+                showError(err && err.message ? err.message : profileT('profile.common.error', null, 'Ошибка'));
+            } finally {
+                acceptBtn.disabled = false;
+            }
+        });
+
+        const declineBtn = document.createElement('button');
+        declineBtn.type = 'button';
+        declineBtn.className = 'button-secondary';
+        declineBtn.textContent = profileT('profile.groups.invites.decline', null, 'Отклонить');
+        declineBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+                declineBtn.disabled = true;
+                const r = await groupsApiRequest(`/groups/api/invite/${encodeURIComponent(inv.id)}/decline`, {
+                    method: 'POST',
+                });
+                if (r && r.success) {
+                    showSuccess(profileT('profile.groups.invites.declined', null, 'Приглашение отклонено'));
+                    await refreshMyInvites();
+                } else {
+                    const msg = r && (r.error || r.message) ? String(r.error || r.message) : profileT('profile.common.error', null, 'Ошибка');
+                    showError(msg);
+                }
+            } catch (err) {
+                showError(err && err.message ? err.message : profileT('profile.common.error', null, 'Ошибка'));
+            } finally {
+                declineBtn.disabled = false;
+            }
+        });
+
+        actions.appendChild(acceptBtn);
+        actions.appendChild(declineBtn);
+
+        const teacher = document.createElement('div');
+        teacher.className = 'groups-student-status groups-memberships-teacher';
+        const teacherName = document.createElement('span');
+        teacherName.textContent = String(inv.teacher_username || '');
+        teacher.appendChild(teacherName);
+
+        const status = document.createElement('div');
+        status.className = 'groups-student-status';
+        status.textContent = profileT('profile.groups.invites.pending', null, 'ожидает');
+
+        row.appendChild(name);
+        row.appendChild(actions);
+        row.appendChild(teacher);
+        row.appendChild(status);
+        table.appendChild(row);
+    });
+}
+
 function profileT(key, params, fallback) {
     try {
         if (window.I18n && typeof window.I18n.t === 'function') {
@@ -344,6 +447,7 @@ let groupsUiState = {
     filterMode: 'active',
     memberships: [],
     selectedMembershipGroupId: null,
+    myInvites: [],
 };
 
 function getGroupsFilterMode() {
@@ -433,57 +537,10 @@ function renderMembershipsTable() {
         const groupTitle = String(m.group_title || '');
         name.textContent = groupTitle;
 
-        const notifyWrap = document.createElement('div');
-        notifyWrap.className = 'groups-student-notify';
+        const actions = document.createElement('div');
+        actions.className = 'groups-student-notify';
 
-        const notifyLabel = document.createElement('span');
-        notifyLabel.className = 'groups-student-notify-label';
-        notifyLabel.textContent = 'TG';
-        notifyWrap.appendChild(notifyLabel);
-
-        const startChecked = m.notify_teacher_on_success !== false;
-        const notifyBtn = createLucideToggleButton({
-            checked: startChecked,
-            title: profileT('profile.groups.memberships.notify_teacher_title', null, 'Уведомлять учителя о моих выполнениях'),
-            disabled: false,
-        });
-        notifyBtn.addEventListener('click', async (e) => {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const current = notifyBtn.dataset.checked === '1';
-            const next = !current;
-            try {
-                notifyBtn.disabled = true;
-                await groupsApiRequest(`/groups/api/memberships/${m.group_id}/notify_teacher_on_success`, {
-                    method: 'POST',
-                    body: JSON.stringify({ enabled: next }),
-                });
-                notifyBtn.dataset.checked = next ? '1' : '0';
-                notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
-                notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
-                try {
-                    if (window.lucide) {
-                        window.lucide.createIcons({ root: notifyBtn });
-                    }
-                } catch (e) {
-                }
-
-                const list = Array.isArray(groupsUiState.memberships) ? groupsUiState.memberships : [];
-                const idx = list.findIndex((x) => String(x.group_id) === String(m.group_id));
-                if (idx >= 0) {
-                    list[idx] = Object.assign({}, list[idx], { notify_teacher_on_success: next });
-                    groupsUiState.memberships = list;
-                }
-                showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
-            } catch (e) {
-                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
-            } finally {
-                notifyBtn.disabled = false;
-            }
-        });
-        notifyWrap.appendChild(notifyBtn);
+        const st = String(m.status || '').toLowerCase();
 
         const teacher = document.createElement('div');
         teacher.className = 'groups-student-status groups-memberships-teacher';
@@ -498,9 +555,14 @@ function renderMembershipsTable() {
         teacher.appendChild(teacherAvatar);
         teacher.appendChild(teacherName);
 
+        const status = document.createElement('div');
+        status.className = 'groups-student-status';
+        status.textContent = '';
+
         row.appendChild(name);
-        row.appendChild(notifyWrap);
+        row.appendChild(actions);
         row.appendChild(teacher);
+        row.appendChild(status);
 
         row.addEventListener('click', () => {
             setSelectedMembership(m.group_id);
@@ -1076,7 +1138,7 @@ function renderStudentsTable(students) {
 
         row.appendChild(avatar);
         row.appendChild(name);
-        row.appendChild(notifyWrap);
+        row.appendChild(actions);
         row.appendChild(status);
 
         row.addEventListener('click', () => {
@@ -1380,6 +1442,8 @@ function initializeGroupsSection() {
     const membershipsRefreshBtn = document.getElementById('groupsMembershipsRefreshBtn');
     const membershipsLeaveBtn = document.getElementById('groupsMembershipsLeaveBtn');
 
+    const myInvitesRefreshBtn = document.getElementById('groupsMyInvitesRefreshBtn');
+
     const emailInviteModal = document.getElementById('groupEmailInviteModal');
     const emailInviteModalClose = document.getElementById('groupEmailInviteModalClose');
     const emailInviteModalCancel = document.getElementById('groupEmailInviteModalCancel');
@@ -1437,9 +1501,14 @@ function initializeGroupsSection() {
 
     membershipsRefreshBtn && membershipsRefreshBtn.addEventListener('click', async () => {
         await refreshMemberships();
+        await refreshMyInvites();
     });
     membershipsLeaveBtn && membershipsLeaveBtn.addEventListener('click', async () => {
         await leaveSelectedMembershipGroup();
+    });
+
+    myInvitesRefreshBtn && myInvitesRefreshBtn.addEventListener('click', async () => {
+        await refreshMyInvites();
     });
 
     if (emailInviteModal && emailInviteModalClose && emailInviteModalCancel && emailInviteModalSend) {
@@ -1475,6 +1544,7 @@ function initializeGroupsSection() {
 
     refreshGroups();
     refreshMemberships();
+    refreshMyInvites();
 }
 
 async function checkAppCacheRevision() {

@@ -69,22 +69,23 @@ def ensure_personal_group_for_user(user_id: int, username: str) -> Optional[dict
         if not row:
             cur.execute(
                 """
-                INSERT INTO groups (title, description, is_personal, personal_owner_user_id)
-                VALUES (%s, %s, TRUE, %s)
+                INSERT INTO groups (title, description, is_personal, personal_owner_user_id, teacher_id)
+                VALUES (%s, %s, TRUE, %s, %s)
                 RETURNING id, title, description, created_at, updated_at, archived_at, is_personal, personal_owner_user_id
                 """,
-                (str(username or '').strip() or 'Мой план', 'Личный план', int(user_id)),
+                (str(username or '').strip() or 'Мой план', 'Личный план', int(user_id), int(user_id)),
             )
             row = cur.fetchone() or {}
 
         group_id = int(row.get('id'))
+        # Ensure teacher_id is set for existing personal groups after migration.
         cur.execute(
             """
-            INSERT INTO group_teachers (group_id, teacher_user_id, role)
-            VALUES (%s, %s, 'owner')
-            ON CONFLICT DO NOTHING
+            UPDATE groups
+            SET teacher_id = %s
+            WHERE id = %s AND (teacher_id IS NULL OR teacher_id = 0)
             """,
-            (group_id, int(user_id)),
+            (int(user_id), group_id),
         )
         cur.execute(
             """
@@ -141,10 +142,7 @@ def _ensure_not_personal_group(cur, group_id: int, teacher_user_id: int) -> None
         SELECT is_personal, personal_owner_user_id
         FROM groups
         WHERE id = %s
-          AND EXISTS (
-            SELECT 1 FROM group_teachers gt
-            WHERE gt.group_id = groups.id AND gt.teacher_user_id = %s
-          )
+          AND teacher_id = %s
         """,
         (int(group_id), int(teacher_user_id)),
     )
@@ -158,22 +156,13 @@ def create_group(owner_user_id: int, title: str, description: str | None = None)
     try:
         cur.execute(
             """
-            INSERT INTO groups (title, description)
-            VALUES (%s, %s)
-            RETURNING id, title, description, created_at, updated_at, archived_at
+            INSERT INTO groups (title, description, teacher_id)
+            VALUES (%s, %s, %s)
+            RETURNING id, title, description, teacher_id, created_at, updated_at, archived_at
             """,
-            (title, description),
+            (title, description, int(owner_user_id)),
         )
         group_row = cur.fetchone() or {}
-
-        cur.execute(
-            """
-            INSERT INTO group_teachers (group_id, teacher_user_id, role)
-            VALUES (%s, %s, 'owner')
-            ON CONFLICT DO NOTHING
-            """,
-            (group_row["id"], owner_user_id),
-        )
 
         conn.commit()
 
@@ -196,10 +185,10 @@ def list_pending_email_invites_for_teacher(group_id: int, teacher_user_id: int) 
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -250,10 +239,10 @@ def create_group_email_invite(group_id: int, teacher_user_id: int, *, target_ema
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -531,14 +520,7 @@ def list_groups_for_student(student_user_id: int) -> list[dict]:
                 tu.username AS teacher_username
             FROM group_students gs
             JOIN groups g ON g.id = gs.group_id
-            JOIN LATERAL (
-                SELECT gt.teacher_user_id
-                FROM group_teachers gt
-                WHERE gt.group_id = gs.group_id
-                ORDER BY (gt.role = 'owner') DESC, gt.teacher_user_id ASC
-                LIMIT 1
-            ) t ON TRUE
-            JOIN users tu ON tu.id = t.teacher_user_id
+            JOIN users tu ON tu.id = g.teacher_id
             WHERE gs.student_user_id = %s
               AND gs.removed_at IS NULL
               AND gs.status = 'active'
@@ -565,38 +547,6 @@ def list_groups_for_student(student_user_id: int) -> list[dict]:
                 }
             )
         return result
-    finally:
-        cur.close()
-        conn.close()
-
-
-def set_my_group_notify_teacher_on_success(group_id: int, student_user_id: int, enabled: bool) -> None:
-    conn, cur = get_db_cursor()
-    try:
-        _ensure_not_personal_group_for_student(cur, group_id, student_user_id)
-        cur.execute(
-            """
-            SELECT column_name
-            FROM information_schema.columns
-            WHERE table_name='group_students'
-              AND column_name='notify_teacher_on_success'
-            """,
-        )
-        if not cur.fetchone():
-            raise RuntimeError("DB schema mismatch: group_students.notify_teacher_on_success is missing")
-
-        cur.execute(
-            """
-            UPDATE group_students
-            SET notify_teacher_on_success = %s
-            WHERE group_id = %s AND student_user_id = %s
-              AND removed_at IS NULL
-            """,
-            (bool(enabled), int(group_id), int(student_user_id)),
-        )
-        if cur.rowcount <= 0:
-            raise PermissionError("Not a group student")
-        conn.commit()
     finally:
         cur.close()
         conn.close()
@@ -642,7 +592,6 @@ def list_my_groups(user_id: int) -> list[dict]:
                 g.created_at,
                 g.updated_at,
                 g.archived_at,
-                gt.role AS teacher_role,
                 (
                     SELECT COUNT(*)::int
                     FROM group_students gs
@@ -652,8 +601,7 @@ def list_my_groups(user_id: int) -> list[dict]:
                 ) AS students_count
                 {extra_select}
             FROM groups g
-            JOIN group_teachers gt ON gt.group_id = g.id
-            WHERE gt.teacher_user_id = %s
+            WHERE g.teacher_id = %s
             ORDER BY g.archived_at NULLS FIRST, g.id DESC
             """.format(extra_select=extra_select),
             (user_id,),
@@ -669,7 +617,7 @@ def list_my_groups(user_id: int) -> list[dict]:
                     "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
                     "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
                     "archived_at": r.get("archived_at").isoformat() if r.get("archived_at") else None,
-                    "teacher_role": r.get("teacher_role"),
+                    "teacher_role": "owner",
                     "students_count": int(r.get("students_count") or 0),
                     "is_personal": bool(r.get("is_personal")) if 'is_personal' in gcols else False,
                     "personal_owner_user_id": int(r.get("personal_owner_user_id")) if ('personal_owner_user_id' in gcols and r.get('personal_owner_user_id') is not None) else None,
@@ -693,11 +641,10 @@ def get_group_for_teacher(group_id: int, teacher_user_id: int) -> Optional[dict]
 
         cur.execute(
             """
-            SELECT g.id, g.title, g.description, g.created_at, g.updated_at, g.archived_at, gt.role AS teacher_role
+            SELECT g.id, g.title, g.description, g.created_at, g.updated_at, g.archived_at
                    {extra_select}
             FROM groups g
-            JOIN group_teachers gt ON gt.group_id = g.id
-            WHERE g.id = %s AND gt.teacher_user_id = %s
+            WHERE g.id = %s AND g.teacher_id = %s
             """.format(extra_select=extra_select),
             (group_id, teacher_user_id),
         )
@@ -711,7 +658,7 @@ def get_group_for_teacher(group_id: int, teacher_user_id: int) -> Optional[dict]
             "created_at": row.get("created_at").isoformat() if row.get("created_at") else None,
             "updated_at": row.get("updated_at").isoformat() if row.get("updated_at") else None,
             "archived_at": row.get("archived_at").isoformat() if row.get("archived_at") else None,
-            "teacher_role": row.get("teacher_role"),
+            "teacher_role": "owner",
             "is_personal": bool(row.get('is_personal')) if 'is_personal' in gcols else False,
             "personal_owner_user_id": int(row.get('personal_owner_user_id')) if ('personal_owner_user_id' in gcols and row.get('personal_owner_user_id') is not None) else None,
         }
@@ -740,10 +687,7 @@ def update_group(group_id: int, teacher_user_id: int, updates: dict[str, Any]) -
             UPDATE groups
             SET {fields}, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-              AND EXISTS (
-                SELECT 1 FROM group_teachers gt
-                WHERE gt.group_id = groups.id AND gt.teacher_user_id = %s
-              )
+              AND teacher_id = %s
             RETURNING id, title, description, created_at, updated_at, archived_at
             """.format(fields=", ".join(fields)),
             (*values, group_id, teacher_user_id),
@@ -772,10 +716,10 @@ def create_group_invite(group_id: int, teacher_user_id: int, *, max_uses: int | 
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -823,10 +767,10 @@ def get_latest_active_group_invite(group_id: int, teacher_user_id: int) -> Optio
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -993,10 +937,10 @@ def list_group_students_for_teacher(group_id: int, teacher_user_id: int) -> list
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -1063,10 +1007,10 @@ def set_group_student_notify_teacher_on_success(
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")
@@ -1104,10 +1048,10 @@ def soft_remove_group_student(group_id: int, teacher_user_id: int, student_user_
         cur.execute(
             """
             SELECT 1
-            FROM group_teachers
-            WHERE group_id = %s AND teacher_user_id = %s
+            FROM groups
+            WHERE id = %s AND teacher_id = %s
             """,
-            (group_id, teacher_user_id),
+            (int(group_id), int(teacher_user_id)),
         )
         if not cur.fetchone():
             raise PermissionError("Not a group teacher")

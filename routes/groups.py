@@ -20,7 +20,6 @@ from helpers.db_groups import (
     list_pending_email_invites_for_student,
     list_group_students_for_teacher,
     list_my_groups,
-    set_my_group_notify_teacher_on_success,
     set_group_student_notify_teacher_on_success,
     soft_remove_group_student,
     update_group,
@@ -61,32 +60,6 @@ def api_my_memberships():
         return jsonify({"success": True, "memberships": memberships})
     except Exception as exc:
         logger.error("Ошибка получения memberships для пользователя %s: %s", user.get("id"), exc)
-        return jsonify({"success": False, "error": str(exc)}), 500
-
-
-@groups_bp.route("/api/memberships/<int:group_id>/notify_teacher_on_success", methods=["POST"])
-@jwt_required()
-def api_set_my_notify_teacher_on_success(group_id: int):
-    current_email = get_jwt_identity()
-    user = get_user_by_email(current_email)
-    if not user:
-        return jsonify({"success": False, "error": "User not found"}), 404
-
-    data = request.get_json(silent=True) or {}
-    enabled = bool(data.get("enabled"))
-
-    try:
-        set_my_group_notify_teacher_on_success(group_id, int(user["id"]), enabled)
-        return jsonify({"success": True, "enabled": enabled})
-    except PermissionError:
-        return jsonify({"success": False, "error": "Forbidden"}), 403
-    except Exception as exc:
-        logger.error(
-            "Ошибка обновления notify_teacher_on_success для memberships user=%s group=%s: %s",
-            user.get("id"),
-            group_id,
-            exc,
-        )
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
