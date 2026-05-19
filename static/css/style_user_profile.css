@@ -638,6 +638,12 @@ body .form-section #userAudioSettingsContainer .audio-explanations-column {
     gap: 18px;
  }
 
+ @media (max-width: 920px) {
+    .groups-layout {
+       grid-template-columns: minmax(0, 1fr);
+    }
+ }
+
  .groups-left,
  .groups-right {
     display: flex;

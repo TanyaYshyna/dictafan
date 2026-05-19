@@ -190,6 +190,14 @@
         "title": "I am in groups",
         "leave_title": "Leave group"
       },
+      "invites": {
+        "title": "Invitations",
+        "accept": "Accept",
+        "accepted": "Invitation accepted",
+        "decline": "Decline",
+        "declined": "Invitation declined",
+        "pending": "pending"
+      },
       "modal": {
         "title": "Group",
         "name": "Name",
@@ -706,8 +714,7 @@
         "logging_in": "Signing in…",
         "creating_account": "Creating account…"
       }
-    }
-  },
+    },
   "support": {
     "topbar": {
       "title": "Buy me a coffee"
