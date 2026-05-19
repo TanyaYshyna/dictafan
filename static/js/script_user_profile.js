@@ -1070,7 +1070,11 @@ function renderStudentsTable(students) {
         const status = document.createElement('div');
         status.className = 'groups-student-status';
         const st = String(s.status || '').toLowerCase();
-        status.textContent = st === 'active' ? '' : 'не подтвердил';
+        if (isEmailInviteRow) {
+            status.textContent = profileT('profile.groups.invites.pending', null, 'ожидает');
+        } else {
+            status.textContent = st === 'active' ? '' : 'не подтвердил';
+        }
 
         const notifyWrap = document.createElement('div');
         notifyWrap.className = 'groups-student-notify';
@@ -1138,7 +1142,7 @@ function renderStudentsTable(students) {
 
         row.appendChild(avatar);
         row.appendChild(name);
-        row.appendChild(actions);
+        row.appendChild(notifyWrap);
         row.appendChild(status);
 
         row.addEventListener('click', () => {
