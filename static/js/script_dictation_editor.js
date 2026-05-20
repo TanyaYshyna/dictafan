@@ -30,6 +30,318 @@ function editorT(key, fallback, params) {
     return (fallback !== undefined && fallback !== null) ? String(fallback) : String(key || '');
 }
 
+let __dictationExercisesState = {
+    exercises: [],
+    selectedExerciseId: null,
+};
+
+function renderLucideCheckboxButton(btn, checked, disabled) {
+    if (!btn) return;
+    btn.dataset.checked = checked ? '1' : '0';
+    btn.dataset.disabled = disabled ? '1' : '0';
+    btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+    btn.disabled = Boolean(disabled);
+    btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+    try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons({ root: btn });
+        }
+    } catch (e) {
+    }
+}
+
+function _positionsToTitle(positions) {
+    const arr = Array.isArray(positions) ? positions.map(x => Number(x)).filter(x => Number.isFinite(x)) : [];
+    if (!arr.length) return 'Full';
+    arr.sort((a, b) => a - b);
+    const ranges = [];
+    let start = arr[0];
+    let prev = arr[0];
+    for (let i = 1; i < arr.length; i++) {
+        const v = arr[i];
+        if (v === prev + 1) {
+            prev = v;
+            continue;
+        }
+        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+        start = v;
+        prev = v;
+    }
+    ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+    return `s: ${ranges.join(', ')}`;
+}
+
+async function fetchDictationExercises() {
+    try {
+        const raw = (currentDictation && currentDictation.id) ? String(currentDictation.id) : '';
+        if (!raw.startsWith('dict_')) return [];
+        const dictationId = Number(raw.replace('dict_', ''));
+        if (!Number.isFinite(dictationId) || dictationId <= 0) return [];
+
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return [];
+
+        const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+            cache: 'no-store'
+        });
+        if (!res.ok) return [];
+        const data = await res.json();
+        const items = (data && Array.isArray(data.exercises)) ? data.exercises : [];
+        __dictationExercisesState.exercises = items.filter(x => x && typeof x === 'object');
+        return __dictationExercisesState.exercises;
+    } catch (e) {
+        return [];
+    }
+}
+
+function renderExercisesTable() {
+    const tbody = document.getElementById('exercisesTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    if (!items.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="3" style="padding:10px; opacity:0.65;">Нет упражнений</td>`;
+        tbody.appendChild(tr);
+        return;
+    }
+
+    items.forEach((ex) => {
+        const id = Number(ex.id);
+        const positions = Array.isArray(ex.positions) ? ex.positions : [];
+        const title = (ex.title && String(ex.title).trim()) ? String(ex.title).trim() : _positionsToTitle(positions);
+        const posLabel = positions && positions.length ? _positionsToTitle(positions).replace(/^s:\s*/g, '') : 'весь диктант';
+
+        const tr = document.createElement('tr');
+        tr.dataset.exerciseId = String(id);
+        tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
+        tr.style.cursor = 'pointer';
+        if (__dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === id) {
+            tr.style.background = 'rgba(0,0,0,0.04)';
+        }
+        tr.innerHTML = `
+            <td style="padding:8px 10px;">${escapeHtml(title)}</td>
+            <td style="padding:8px 10px; white-space:nowrap; opacity:0.8; font-variant-numeric: tabular-nums;">${escapeHtml(posLabel)}</td>
+            <td style="padding:8px 10px; width:44px;"></td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (!tbody.dataset.listenerAttached) {
+        tbody.dataset.listenerAttached = '1';
+        tbody.addEventListener('click', (e) => {
+            const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
+            if (!row) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const id = Number(row.dataset.exerciseId);
+            if (!Number.isFinite(id)) return;
+            selectExerciseById(id);
+        });
+    }
+}
+
+function _setSentenceChecksFromPositions(positions) {
+    const all = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences : [];
+    const arr = Array.isArray(positions) ? positions.map(x => Number(x)).filter(x => Number.isFinite(x)) : [];
+    const set = new Set(arr);
+    const isFull = !arr.length;
+    all.forEach((s, idx) => {
+        const pos = Number(s && s.position ? s.position : (idx + 1));
+        s.checked = isFull ? true : set.has(pos);
+    });
+
+    try {
+        const cells = document.querySelectorAll('td.col-checkbox-create-audio');
+        cells.forEach(cell => {
+            const btn = cell.querySelector('.checkbox-btn');
+            if (!btn) return;
+            const key = btn.dataset.key;
+            if (!key) return;
+            const sentence = workingData.original.sentences.find(x => x.key === key);
+            const icon = btn.querySelector('.checkbox-icon');
+            if (icon && sentence) {
+                icon.setAttribute('data-lucide', sentence.checked === true ? 'circle-check' : 'circle');
+            }
+        });
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    } catch (e) {
+    }
+
+    try {
+        updateSelectAllCheckboxState();
+    } catch (e) {
+    }
+}
+
+function selectExerciseById(exerciseId) {
+    const id = Number(exerciseId);
+    if (!Number.isFinite(id)) return;
+    __dictationExercisesState.selectedExerciseId = id;
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    const ex = items.find(x => Number(x && x.id) === id);
+    const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
+    _setSentenceChecksFromPositions(positions);
+
+    const disable = !positions || positions.length === 0;
+    try {
+        const allBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
+        allBtns.forEach(b => {
+            b.disabled = Boolean(disable);
+            b.style.opacity = disable ? '0.7' : '';
+        });
+    } catch (e) {
+    }
+
+    renderExercisesTable();
+}
+
+function _collectCheckedPositions() {
+    const all = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences : [];
+    const selected = [];
+    all.forEach((s, idx) => {
+        if (!s || s.checked !== true) return;
+        const pos = Number(s && s.position ? s.position : (idx + 1));
+        if (Number.isFinite(pos)) selected.push(pos);
+    });
+    selected.sort((a, b) => a - b);
+    return selected;
+}
+
+async function createExerciseFromCurrentSelection() {
+    const raw = (currentDictation && currentDictation.id) ? String(currentDictation.id) : '';
+    if (!raw.startsWith('dict_')) return;
+    const dictationId = Number(raw.replace('dict_', ''));
+    if (!Number.isFinite(dictationId) || dictationId <= 0) return;
+
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return;
+
+    const positions = _collectCheckedPositions();
+    const allCount = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences.length : 0;
+    if (!allCount) {
+        try { window.showToast && window.showToast('Нет предложений', { durationMs: 3500 }); } catch (e) {}
+        return;
+    }
+    if (!positions.length) {
+        try { window.showToast && window.showToast('Нужно выбрать хотя бы одно предложение', { durationMs: 3500 }); } catch (e) {}
+        return;
+    }
+
+    const isFull = positions.length === allCount;
+    const payloadPositions = isFull ? [] : positions;
+    const title = _positionsToTitle(payloadPositions);
+
+    try {
+        const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ positions: payloadPositions, title: title })
+        });
+        await res.json().catch(() => null);
+        if (res.status === 409) {
+            try { window.showToast && window.showToast('Такое упражнение уже существует', { durationMs: 4500 }); } catch (e) {}
+            return;
+        }
+        if (!res.ok) {
+            try { window.showToast && window.showToast('Не удалось создать упражнение', { durationMs: 4500 }); } catch (e) {}
+            return;
+        }
+
+        await fetchDictationExercises();
+        const next = (__dictationExercisesState.exercises || []).find(x => _positionsToTitle(x.positions || []) === title);
+        if (next && next.id) {
+            selectExerciseById(Number(next.id));
+        } else {
+            renderExercisesTable();
+        }
+    } catch (e) {
+        try { window.showToast && window.showToast('Не удалось создать упражнение', { durationMs: 4500 }); } catch (e2) {}
+    }
+}
+
+async function deleteSelectedExercise() {
+    const id = Number(__dictationExercisesState.selectedExerciseId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    const ex = items.find(x => Number(x && x.id) === id);
+    const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
+    if (!positions || positions.length === 0) {
+        try { window.showToast && window.showToast('Упражнение "весь диктант" удалить нельзя', { durationMs: 4500 }); } catch (e) {}
+        return;
+    }
+
+    const raw = (currentDictation && currentDictation.id) ? String(currentDictation.id) : '';
+    if (!raw.startsWith('dict_')) return;
+    const dictationId = Number(raw.replace('dict_', ''));
+    if (!Number.isFinite(dictationId) || dictationId <= 0) return;
+
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return;
+
+    try {
+        const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises/${id}/delete`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            try { window.showToast && window.showToast('Не удалось удалить упражнение', { durationMs: 4500 }); } catch (e) {}
+            return;
+        }
+        await fetchDictationExercises();
+        const next = (__dictationExercisesState.exercises || [])[0];
+        __dictationExercisesState.selectedExerciseId = next ? Number(next.id) : null;
+        renderExercisesTable();
+        if (next && next.id) selectExerciseById(Number(next.id));
+    } catch (e) {
+        try { window.showToast && window.showToast('Не удалось удалить упражнение', { durationMs: 4500 }); } catch (e2) {}
+    }
+}
+
+function setupExercisesTabHandlers() {
+    const createBtn = document.getElementById('exerciseCreateBtn');
+    if (createBtn && !createBtn.dataset.listenerAttached) {
+        createBtn.dataset.listenerAttached = '1';
+        createBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await createExerciseFromCurrentSelection();
+        });
+    }
+
+    const deleteBtn = document.getElementById('exerciseDeleteBtn');
+    if (deleteBtn && !deleteBtn.dataset.listenerAttached) {
+        deleteBtn.dataset.listenerAttached = '1';
+        deleteBtn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            await deleteSelectedExercise();
+        });
+    }
+
+    try {
+        fetchDictationExercises().then(() => {
+            renderExercisesTable();
+            if (!__dictationExercisesState.selectedExerciseId) {
+                const first = (__dictationExercisesState.exercises || [])[0];
+                if (first && first.id) {
+                    selectExerciseById(Number(first.id));
+                }
+            }
+        });
+    } catch (e) {
+    }
+}
+
 function _notifyStorageUnavailableEditorOnce() {
     try {
         const now = Date.now();
@@ -97,11 +409,13 @@ function applyDictationEditorTranslations() {
         const dialog = document.querySelector('.tabs-header [data-tab="dialog"] span');
         const createAudio = document.querySelector('.tabs-header [data-tab="create-audio"] span');
         const translations = document.querySelector('.tabs-header [data-tab="translations"] span');
+        const exercises = document.querySelector('.tabs-header [data-tab="exercises"] span');
         if (general) general.textContent = editorT('dictation_editor.tabs.general', '1. Общие данные');
         if (audio) audio.textContent = editorT('dictation_editor.tabs.audio', '2. Настройка аудио');
         if (dialog) dialog.textContent = editorT('dictation_editor.tabs.dialog', '3. Диалог');
         if (createAudio) createAudio.textContent = editorT('dictation_editor.tabs.create_audio', '4. Создание аудио');
         if (translations) translations.textContent = editorT('dictation_editor.tabs.translations', '5. Переводы');
+        if (exercises) exercises.textContent = editorT('dictation_editor.tabs.exercises', '6. Упражнения');
     } catch (e) {
     }
 
@@ -3243,6 +3557,10 @@ async function initDictationGenerator() {
     // Инициализируем панель вкладок
     setupTabsPanel();
     try {
+        setupExercisesTabHandlers();
+    } catch (e) {
+    }
+    try {
         initTranslationsTabV2();
     } catch (e) {
     }
@@ -5390,7 +5708,41 @@ function applyTableViewForTab(tabName) {
 
     currentTabName = tabName;
 
-    if (tabName === 'audio') {
+    if (tabName === 'exercises') {
+        const table = document.getElementById('sentences-table');
+        if (table) {
+            table.classList.remove('state-original-translation', 'state-original-editing');
+
+            const allHeads = table.querySelectorAll('thead th');
+            const allCells = table.querySelectorAll('tbody td');
+            allHeads.forEach(th => { th.style.display = 'none'; });
+            allCells.forEach(td => { td.style.display = 'none'; });
+
+            const showHeads = table.querySelectorAll('thead th.col-number, thead th.col-checkbox-create-audio, thead th.col-original');
+            const showCells = table.querySelectorAll('tbody td.col-number, tbody td.col-checkbox-create-audio, tbody td.col-original');
+            showHeads.forEach(th => { th.style.display = 'table-cell'; });
+            showCells.forEach(td => { td.style.display = 'table-cell'; });
+        }
+
+        toggleCheckboxColumn(true);
+        toggleCreateAudioColumns(false);
+
+        try {
+            fetchDictationExercises().then(() => {
+                renderExercisesTable();
+                if (!__dictationExercisesState.selectedExerciseId) {
+                    const first = (__dictationExercisesState.exercises || [])[0];
+                    if (first && first.id) {
+                        selectExerciseById(Number(first.id));
+                    }
+                } else {
+                    selectExerciseById(Number(__dictationExercisesState.selectedExerciseId));
+                }
+            });
+        } catch (e) {
+        }
+
+    } else if (tabName === 'audio') {
         // Открываем режим редактирования
         toggleColumnGroup('original');
         // Учитываем текущее радио для показа правых колонок
@@ -5461,7 +5813,7 @@ function applyTableViewForTab(tabName) {
     }
 
     // Показываем колонку спикера во всех вкладках, если это диалог
-    const showSpeaker = (currentDictation.is_dialog || false);
+    const showSpeaker = (tabName !== 'exercises') && (currentDictation.is_dialog || false);
     const speakerHeader = document.querySelector('th.col-speaker');
     if (speakerHeader) {
         speakerHeader.style.display = showSpeaker ? 'table-cell' : 'none';

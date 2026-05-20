@@ -739,6 +739,90 @@ def api_create_dictation():
         return jsonify({'error': str(e)}), 500
 
 
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises', methods=['GET'])
+@jwt_required()
+def api_list_dictation_exercises(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from helpers.db_dictations import list_dictation_exercises
+
+    try:
+        items = list_dictation_exercises(int(dictation_id))
+        return jsonify({"success": True, "exercises": items})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises', methods=['POST'])
+@jwt_required()
+def api_create_dictation_exercise(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    positions = data.get('positions')
+    title = data.get('title')
+
+    from helpers.db_dictations import create_dictation_exercise
+
+    try:
+        item = create_dictation_exercise(int(dictation_id), positions=positions, title=title)
+        return jsonify({"success": True, "exercise": item})
+    except ValueError as e:
+        msg = str(e) or 'Exercise already exists'
+        if 'exists' in msg.lower():
+            return jsonify({"success": False, "error": msg, "code": "exists"}), 409
+        return jsonify({"success": False, "error": msg}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises/<int:exercise_id>/delete', methods=['POST'])
+@jwt_required()
+def api_delete_dictation_exercise(dictation_id: int, exercise_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from helpers.db_dictations import delete_dictation_exercise
+
+    try:
+        deleted = delete_dictation_exercise(int(dictation_id), int(exercise_id))
+        return jsonify({"success": True, "deleted": bool(deleted)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @editor_bp.route('/download/<path:filename>')
 def download(filename):
     return send_file(filename, as_attachment=True)

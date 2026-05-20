@@ -102,6 +102,176 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
         conn.close()
 
 
+def list_dictation_exercises(dictation_id: int) -> list[dict]:
+    if not dictation_id:
+        return []
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, dictation_id, positions, title, created_at, updated_at
+                FROM dictation_exercises
+                WHERE dictation_id = %s
+                ORDER BY id ASC
+                """,
+                (int(dictation_id),),
+            )
+            rows = cur.fetchall() or []
+
+            if not rows:
+                cur.execute(
+                    """
+                    INSERT INTO dictation_exercises (dictation_id, positions)
+                    VALUES (%s, %s)
+                    ON CONFLICT (dictation_id, positions) DO NOTHING
+                    RETURNING id, dictation_id, positions, title, created_at, updated_at
+                    """,
+                    (int(dictation_id), []),
+                )
+                row = cur.fetchone()
+                if row:
+                    conn.commit()
+                    rows = [row]
+                else:
+                    conn.commit()
+                    cur.execute(
+                        """
+                        SELECT id, dictation_id, positions, title, created_at, updated_at
+                        FROM dictation_exercises
+                        WHERE dictation_id = %s
+                        ORDER BY id ASC
+                        """,
+                        (int(dictation_id),),
+                    )
+                    rows = cur.fetchall() or []
+
+        out: list[dict] = []
+        for r in rows:
+            if isinstance(r, dict):
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "dictation_id": int(r.get("dictation_id") or 0),
+                        "positions": list(r.get("positions") or []),
+                        "title": r.get("title"),
+                        "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
+                        "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
+                    }
+                )
+            else:
+                out.append(
+                    {
+                        "id": int(r[0] or 0),
+                        "dictation_id": int(r[1] or 0),
+                        "positions": list(r[2] or []),
+                        "title": r[3],
+                        "created_at": r[4].isoformat() if r[4] else None,
+                        "updated_at": r[5].isoformat() if r[5] else None,
+                    }
+                )
+        return out
+    finally:
+        conn.close()
+
+
+def create_dictation_exercise(dictation_id: int, positions: list[int] | None = None, title: str | None = None) -> dict:
+    if not dictation_id:
+        raise ValueError("dictation_id is required")
+
+    prepared: list[int] = []
+    try:
+        for x in list(positions or []):
+            if x is None:
+                continue
+            prepared.append(int(x))
+    except Exception:
+        prepared = []
+    prepared = sorted({int(x) for x in prepared})
+
+    title_norm = None
+    try:
+        title_norm = str(title).strip() if title is not None else None
+    except Exception:
+        title_norm = None
+    if title_norm == "":
+        title_norm = None
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id
+                FROM dictation_exercises
+                WHERE dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(dictation_id), prepared),
+            )
+            existing = cur.fetchone()
+            if existing:
+                raise ValueError("Exercise already exists")
+
+            cur.execute(
+                """
+                INSERT INTO dictation_exercises (dictation_id, positions, title)
+                VALUES (%s, %s, %s)
+                RETURNING id, dictation_id, positions, title, created_at, updated_at
+                """,
+                (int(dictation_id), prepared, title_norm),
+            )
+            row = cur.fetchone()
+            conn.commit()
+
+        return {
+            "id": int(row[0] or 0),
+            "dictation_id": int(row[1] or 0),
+            "positions": list(row[2] or []),
+            "title": row[3],
+            "created_at": row[4].isoformat() if row[4] else None,
+            "updated_at": row[5].isoformat() if row[5] else None,
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        if isinstance(e, ValueError):
+            raise
+        raise Exception(f"Failed to create dictation exercise: {e}")
+    finally:
+        conn.close()
+
+
+def delete_dictation_exercise(dictation_id: int, exercise_id: int) -> bool:
+    if not dictation_id or not exercise_id:
+        return False
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM dictation_exercises
+                WHERE id = %s AND dictation_id = %s
+                """,
+                (int(exercise_id), int(dictation_id)),
+            )
+            deleted = cur.rowcount > 0
+            conn.commit()
+            return bool(deleted)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
 def refresh_dictation_translation_flags(dictation_id: int) -> None:
     """Recompute dictations.tr_* flags for a dictation.
 
