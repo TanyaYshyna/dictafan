@@ -322,6 +322,35 @@ function setupExercisesTabHandlers() {
         createBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            try {
+                if (currentTabName === 'exercises' && __dictationExercisesState.selectedIsFull === true) {
+                    __dictationExercisesState.selectedExerciseId = null;
+                    __dictationExercisesState.selectedIsFull = false;
+                    const all = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences : [];
+                    all.forEach((s) => {
+                        if (!s) return;
+                        s.checked = false;
+                    });
+                    try {
+                        const btns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
+                        btns.forEach((btn) => {
+                            renderLucideCheckboxButton(btn, false, false);
+                        });
+                    } catch (e2) {
+                    }
+                    try {
+                        updateSelectAllCheckboxState();
+                    } catch (e3) {
+                    }
+                    try {
+                        renderExercisesTable();
+                    } catch (e4) {
+                    }
+                    try { window.showToast && window.showToast('Выбери предложения и нажми + ещё раз', { durationMs: 4500 }); } catch (e5) {}
+                    return;
+                }
+            } catch (e1) {
+            }
             await createExerciseFromCurrentSelection();
         });
     }
