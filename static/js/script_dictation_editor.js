@@ -188,7 +188,7 @@ function selectExerciseById(exerciseId) {
     const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
     _setSentenceChecksFromPositions(positions);
 
-    const disable = !positions || positions.length === 0;
+    const disable = (currentTabName === 'create-audio') && (!positions || positions.length === 0);
     try {
         const allBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
         allBtns.forEach(b => {
@@ -5725,7 +5725,7 @@ function applyTableViewForTab(tabName) {
         }
 
         toggleCheckboxColumn(true);
-        toggleCreateAudioColumns(false);
+        
 
         try {
             fetchDictationExercises().then(() => {
@@ -11866,13 +11866,12 @@ function createTableRow(key, originalSentence, translationSentence) {
 
     row.appendChild(numberCell);
 
-    // Колонка 1: Чекбокс (видимость только на вкладке "Создание аудио")
+    // Колонка чекбокса (показывается на вкладках exercises/create-audio)
     const checkboxCell = document.createElement('td');
-    checkboxCell.className = 'col-checkbox-create-audio panel-create-audio';
+    checkboxCell.className = 'col-checkbox-create-audio';
     checkboxCell.dataset.col_id = 'col-checkbox-create-audio';
     checkboxCell.style.display = 'none'; // По умолчанию скрыта
-    
-    // Создаем кнопку на всю ширину ячейки (как у кнопки play)
+
     const checkboxBtn = document.createElement('button');
     checkboxBtn.className = 'checkbox-btn checkbox-btn-table';
     checkboxBtn.dataset.key = key;
@@ -11885,27 +11884,21 @@ function createTableRow(key, originalSentence, translationSentence) {
     checkboxBtn.style.display = 'flex';
     checkboxBtn.style.alignItems = 'center';
     checkboxBtn.style.justifyContent = 'center';
-    
+
     const checkboxIcon = document.createElement('i');
     checkboxIcon.className = 'checkbox-icon';
     checkboxIcon.setAttribute('data-lucide', 'circle');
-    
-    // Инициализируем поле checked в данных предложения, если его нет
+
     if (originalSentence && originalSentence.checked === undefined) {
         originalSentence.checked = false;
     }
-    
-    // Устанавливаем начальную иконку на основе данных
+
     const isChecked = originalSentence ? (originalSentence.checked === true) : false;
     checkboxIcon.setAttribute('data-lucide', isChecked ? 'circle-check' : 'circle');
-    
+
     checkboxBtn.appendChild(checkboxIcon);
     checkboxCell.appendChild(checkboxBtn);
-    
-    // Вешаем общий обработчик (как у кнопки play)
     checkboxBtn.addEventListener('click', handleCheckboxToggle);
-    
-    row.appendChild(checkboxCell);
 
     // Колонка 2: Спикер (всегда присутствует; видимость управляется чекбоксом)
     const speakerCell = document.createElement('td');
@@ -11990,6 +11983,8 @@ function createTableRow(key, originalSentence, translationSentence) {
 
     originalCell.appendChild(textareaOriginal);
     row.appendChild(originalCell);
+
+    row.appendChild(checkboxCell);
 
     // Колонка 3: Аудио Оригінал
     const audioCellOriginal = document.createElement('td');
