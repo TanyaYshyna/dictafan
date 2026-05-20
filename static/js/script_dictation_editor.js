@@ -33,6 +33,7 @@ function editorT(key, fallback, params) {
 let __dictationExercisesState = {
     exercises: [],
     selectedExerciseId: null,
+    selectedIsFull: false,
 };
 
 function renderLucideCheckboxButton(btn, checked, disabled) {
@@ -162,14 +163,15 @@ function _setSentenceChecksFromPositions(positions) {
             const key = btn.dataset.key;
             if (!key) return;
             const sentence = workingData.original.sentences.find(x => x.key === key);
-            const icon = btn.querySelector('.checkbox-icon');
-            if (icon && sentence) {
-                icon.setAttribute('data-lucide', sentence.checked === true ? 'circle-check' : 'circle');
-            }
+            if (!sentence) return;
+
+            // На вкладке exercises для Full показываем все галочки, но запрещаем снимать.
+            // На вкладке create-audio Full тоже запрещает клик (иначе режим некорректен).
+            const disable = ((currentTabName === 'exercises') || (currentTabName === 'create-audio')) && isFull;
+
+            // Унифицируем рендер с модалкой (circle-check-big)
+            renderLucideCheckboxButton(btn, sentence.checked === true, disable);
         });
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
     } catch (e) {
     }
 
@@ -186,17 +188,8 @@ function selectExerciseById(exerciseId) {
     const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
     const ex = items.find(x => Number(x && x.id) === id);
     const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
+    __dictationExercisesState.selectedIsFull = (!positions || positions.length === 0);
     _setSentenceChecksFromPositions(positions);
-
-    const disable = (currentTabName === 'create-audio') && (!positions || positions.length === 0);
-    try {
-        const allBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
-        allBtns.forEach(b => {
-            b.disabled = Boolean(disable);
-            b.style.opacity = disable ? '0.7' : '';
-        });
-    } catch (e) {
-    }
 
     renderExercisesTable();
 }
@@ -236,6 +229,21 @@ async function createExerciseFromCurrentSelection() {
     const isFull = positions.length === allCount;
     const payloadPositions = isFull ? [] : positions;
     const title = _positionsToTitle(payloadPositions);
+
+    // Если пользователь выбрал все предложения, это Full.
+    // Full уже существует (создаётся автоматически), поэтому не делаем POST, чтобы не ловить 409.
+    if (isFull) {
+        try {
+            const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+            const full = items.find(x => !x || !Array.isArray(x.positions) ? false : (x.positions.length === 0));
+            if (full && full.id) {
+                selectExerciseById(Number(full.id));
+            }
+        } catch (e) {
+        }
+        try { window.showToast && window.showToast('Упражнение Full уже существует', { durationMs: 4500 }); } catch (e) {}
+        return;
+    }
 
     try {
         const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises`, {
@@ -4999,6 +5007,8 @@ function handleCheckboxToggle(e) {
     if (!btn) {
         return;
     }
+
+    if (btn.disabled) return;
     
     const key = btn.dataset.key;
     
@@ -5010,26 +5020,9 @@ function handleCheckboxToggle(e) {
     
     // Переключаем состояние checked
     sentence.checked = !sentence.checked;
-    
-    // Находим иконку в этой кнопке и обновляем её
-    const icon = btn.querySelector('.checkbox-icon');
-    if (icon) {
-        const iconName = sentence.checked ? 'circle-check' : 'circle';
-        
-        // Очищаем старую иконку (удаляем SVG, если есть)
-        const oldSvg = icon.querySelector('svg');
-        if (oldSvg) {
-            oldSvg.remove();
-        }
-        
-        // Устанавливаем новый атрибут data-lucide
-        icon.setAttribute('data-lucide', iconName);
-        
-        // Перерисовываем иконку Lucide
-        if (typeof lucide !== 'undefined' && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    }
+
+    // Унифицированный рендер (как в модалке выбора предложений)
+    renderLucideCheckboxButton(btn, sentence.checked === true, btn.disabled);
     
     // Обновляем состояние общего чекбокса
     updateSelectAllCheckboxState();
@@ -5047,45 +5040,54 @@ function setupCreateAudioHandlers() {
     const selectAllCheckboxLabel = document.getElementById('selectAllCheckboxLabel');
     
     if (selectAllCheckbox && selectAllCheckboxLabel) {
-        // Обработчик клика на label
-        selectAllCheckboxLabel.addEventListener('click', function(e) {
-            e.preventDefault();
-            selectAllCheckbox.checked = !selectAllCheckbox.checked;
-            selectAllCheckbox.dispatchEvent(new Event('change'));
-        });
-        
-        // Обработчик изменения чекбокса
-        selectAllCheckbox.addEventListener('change', function() {
-            const isChecked = selectAllCheckbox.checked;
-            const checkboxIcon = selectAllCheckboxLabel.querySelector('.checkbox-icon');
-            
-            if (checkboxIcon) {
-                checkboxIcon.setAttribute('data-lucide', isChecked ? 'circle-check' : 'circle');
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
-            }
-            
-            // Устанавливаем состояние checked для всех предложений в данных
-            if (workingData && workingData.original && workingData.original.sentences) {
-                workingData.original.sentences.forEach(sentence => {
-                    sentence.checked = isChecked;
-                });
-            }
-            
-            // Обновляем иконки во всех строках таблицы
-            const allCheckboxBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
-            allCheckboxBtns.forEach(btn => {
-                const icon = btn.querySelector('.checkbox-icon');
-                if (icon) {
-                    icon.setAttribute('data-lucide', isChecked ? 'circle-check' : 'circle');
-                }
+        let selectAllBtn = selectAllCheckboxLabel.querySelector('button.checkbox-btn');
+        if (!selectAllBtn) {
+            selectAllBtn = document.createElement('button');
+            selectAllBtn.type = 'button';
+            selectAllBtn.className = 'checkbox-btn';
+            selectAllBtn.style.background = 'transparent';
+            selectAllBtn.style.border = 'none';
+            selectAllBtn.style.padding = '0';
+            selectAllBtn.style.cursor = 'pointer';
+            selectAllCheckboxLabel.insertBefore(selectAllBtn, selectAllCheckboxLabel.firstChild);
+        }
+
+        if (!selectAllBtn.dataset.listenerAttached) {
+            selectAllBtn.dataset.listenerAttached = '1';
+            selectAllBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                selectAllCheckbox.checked = !selectAllCheckbox.checked;
+                selectAllCheckbox.dispatchEvent(new Event('change'));
             });
-            
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-        });
+        }
+        
+        if (!selectAllCheckbox.dataset.listenerAttached) {
+            selectAllCheckbox.dataset.listenerAttached = '1';
+            // Обработчик изменения чекбокса
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = selectAllCheckbox.checked;
+
+                renderLucideCheckboxButton(selectAllBtn, Boolean(isChecked), false);
+                
+                // Устанавливаем состояние checked для всех предложений в данных
+                if (workingData && workingData.original && workingData.original.sentences) {
+                    workingData.original.sentences.forEach(sentence => {
+                        sentence.checked = isChecked;
+                    });
+                }
+                
+                // Обновляем иконки во всех строках таблицы
+                const allCheckboxBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
+                allCheckboxBtns.forEach(btn => {
+                    renderLucideCheckboxButton(btn, Boolean(isChecked), btn.disabled);
+                });
+            });
+        }
+
+        try {
+            renderLucideCheckboxButton(selectAllBtn, Boolean(selectAllCheckbox.checked), false);
+        } catch (e) {
+        }
     }
     
     // Обработчик кнопки "Создать файл"
@@ -5676,6 +5678,8 @@ function updateSelectAllCheckboxState() {
     const selectAllCheckboxLabel = document.getElementById('selectAllCheckboxLabel');
     
     if (!selectAllCheckbox || !selectAllCheckboxLabel) return;
+
+    const selectAllBtn = selectAllCheckboxLabel.querySelector('button.checkbox-btn') || null;
     
     // Получаем все предложения и проверяем их checked
     const allSentences = workingData.original.sentences || [];
@@ -5686,13 +5690,9 @@ function updateSelectAllCheckboxState() {
     } else {
         selectAllCheckbox.checked = (checkedCount === allSentences.length);
     }
-    
-    const checkboxIcon = selectAllCheckboxLabel.querySelector('.checkbox-icon');
-    if (checkboxIcon) {
-        checkboxIcon.setAttribute('data-lucide', selectAllCheckbox.checked ? 'circle-check' : 'circle');
-        if (typeof lucide !== 'undefined') {
-            lucide.createIcons();
-        }
+
+    if (selectAllBtn) {
+        renderLucideCheckboxButton(selectAllBtn, Boolean(selectAllCheckbox.checked), false);
     }
 }
 
@@ -5712,6 +5712,7 @@ function applyTableViewForTab(tabName) {
         const table = document.getElementById('sentences-table');
         if (table) {
             table.classList.remove('state-original-translation', 'state-original-editing');
+            table.classList.add('state-exercises');
 
             const allHeads = table.querySelectorAll('thead th');
             const allCells = table.querySelectorAll('tbody td');
@@ -5743,6 +5744,7 @@ function applyTableViewForTab(tabName) {
         }
 
     } else if (tabName === 'audio') {
+        try { table.classList.remove('state-exercises'); } catch (e) {}
         // Открываем режим редактирования
         toggleColumnGroup('original');
         // Учитываем текущее радио для показа правых колонок
@@ -11899,6 +11901,12 @@ function createTableRow(key, originalSentence, translationSentence) {
     checkboxBtn.appendChild(checkboxIcon);
     checkboxCell.appendChild(checkboxBtn);
     checkboxBtn.addEventListener('click', handleCheckboxToggle);
+
+    try {
+        // Унифицируем внешний вид чекбокса с модалкой (circle-check-big)
+        renderLucideCheckboxButton(checkboxBtn, Boolean(isChecked), false);
+    } catch (e) {
+    }
 
     // Колонка 2: Спикер (всегда присутствует; видимость управляется чекбоксом)
     const speakerCell = document.createElement('td');
