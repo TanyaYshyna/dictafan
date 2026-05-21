@@ -34,7 +34,53 @@ let __dictationExercisesState = {
     exercises: [],
     selectedExerciseId: null,
     selectedIsFull: false,
+    draft: null,
 };
+
+function _getVisibleExercisesList() {
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    return items.filter(x => x && x.__deleted !== true);
+}
+
+function _findExerciseById(id) {
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    return items.find(x => x && Number(x.id) === Number(id)) || null;
+}
+
+function _ensureExerciseIdentity(ex) {
+    if (!ex) return;
+    if (!ex.__localKey) {
+        try {
+            ex.__localKey = `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+        } catch (e) {
+            ex.__localKey = `ex_${Date.now()}`;
+        }
+    }
+}
+
+function _normalizePositionsArray(positions) {
+    const arr = Array.isArray(positions) ? positions : [];
+    const out = [];
+    arr.forEach((x) => {
+        const n = Number(x);
+        if (Number.isFinite(n)) out.push(n);
+    });
+    return [...new Set(out.map((x) => parseInt(String(x), 10)))].filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+}
+
+function _positionsKey(positions) {
+    try {
+        return JSON.stringify(_normalizePositionsArray(positions));
+    } catch (e) {
+        return '[]';
+    }
+}
+
+function _findExistingExerciseByPositions(positions) {
+    const key = _positionsKey(positions);
+    const items = _getVisibleExercisesList();
+    return items.find((x) => x && _positionsKey(x.positions || []) === key) || null;
+}
 
 function renderLucideCheckboxButton(btn, checked, disabled) {
     if (!btn) return;
@@ -102,29 +148,50 @@ function renderExercisesTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
-    if (!items.length) {
+    const items = _getVisibleExercisesList();
+    const draft = __dictationExercisesState.draft;
+    const rows = [];
+    if (draft && typeof draft === 'object') {
+        rows.push({ __draft: true, ...draft });
+    }
+    rows.push(...items);
+
+    if (!rows.length) {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td colspan="3" style="padding:10px; opacity:0.65;">Нет упражнений</td>`;
         tbody.appendChild(tr);
         return;
     }
 
-    items.forEach((ex) => {
-        const id = Number(ex.id);
+    rows.forEach((ex) => {
+        const isDraft = ex && ex.__draft === true;
+        const idRaw = isDraft ? 'draft' : String(Number(ex.id));
         const positions = Array.isArray(ex.positions) ? ex.positions : [];
         const title = (ex.title && String(ex.title).trim()) ? String(ex.title).trim() : _positionsToTitle(positions);
         const posLabel = positions && positions.length ? _positionsToTitle(positions).replace(/^s:\s*/g, '') : 'весь диктант';
 
         const tr = document.createElement('tr');
-        tr.dataset.exerciseId = String(id);
+        tr.dataset.exerciseId = idRaw;
         tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
         tr.style.cursor = 'pointer';
-        if (__dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === id) {
+        if (isDraft) {
+            if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
+                tr.style.background = 'rgba(0,0,0,0.04)';
+            }
+            if (__dictationExercisesState.draft && (__dictationExercisesState.draft.isDuplicate === true || __dictationExercisesState.draft.isInvalid === true)) {
+                tr.style.background = 'rgba(255, 0, 0, 0.08)';
+            }
+        } else if (__dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id)) {
             tr.style.background = 'rgba(0,0,0,0.04)';
         }
+        const isSelected = (isDraft && (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true))
+            || (!isDraft && __dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id));
+        const titleCellHtml = isSelected
+            ? `<input type="text" class="exercise-title-input" data-exercise-id="${escapeHtml(idRaw)}" value="${escapeHtml(title)}" style="width:100%; box-sizing:border-box;" />`
+            : `${escapeHtml(title)}`;
+
         tr.innerHTML = `
-            <td style="padding:8px 10px;">${escapeHtml(title)}</td>
+            <td style="padding:8px 10px;">${titleCellHtml}</td>
             <td style="padding:8px 10px; white-space:nowrap; opacity:0.8; font-variant-numeric: tabular-nums;">${escapeHtml(posLabel)}</td>
             <td style="padding:8px 10px; width:44px;"></td>
         `;
@@ -136,13 +203,156 @@ function renderExercisesTable() {
         tbody.addEventListener('click', (e) => {
             const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
             if (!row) return;
+            if (e && e.target && (e.target.classList && e.target.classList.contains('exercise-title-input'))) {
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
-            const id = Number(row.dataset.exerciseId);
+            const idRaw = row.dataset.exerciseId;
+            if (idRaw === 'draft') {
+                selectDraftExercise();
+                return;
+            }
+            const id = Number(idRaw);
             if (!Number.isFinite(id)) return;
             selectExerciseById(id);
         });
+
+        tbody.addEventListener('input', (e) => {
+            const inp = e && e.target ? e.target.closest('input.exercise-title-input') : null;
+            if (!inp) return;
+            const idRaw = inp.dataset.exerciseId;
+            const v = String(inp.value || '').trim();
+            if (idRaw === 'draft') {
+                if (!__dictationExercisesState.draft) return;
+                __dictationExercisesState.draft.title = v;
+                __dictationExercisesState.draft.customTitle = true;
+            } else {
+                const id = Number(idRaw);
+                if (!Number.isFinite(id)) return;
+                const ex = _findExerciseById(id);
+                if (!ex) return;
+                ex.title = v;
+                ex.customTitle = true;
+            }
+            try { markExercisesAsUnsaved(); } catch (e2) {}
+        });
     }
+}
+
+function _clearAllSentenceChecks() {
+    const all = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences : [];
+    all.forEach((s) => {
+        if (!s) return;
+        s.checked = false;
+    });
+    try {
+        const btns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
+        btns.forEach((btn) => {
+            renderLucideCheckboxButton(btn, false, false);
+        });
+    } catch (e2) {
+    }
+    try {
+        updateSelectAllCheckboxState();
+    } catch (e3) {
+    }
+}
+
+function _ensureDraftSelected() {
+    if (!__dictationExercisesState.draft) return;
+    __dictationExercisesState.draft.selected = true;
+    __dictationExercisesState.selectedExerciseId = null;
+    __dictationExercisesState.selectedIsFull = false;
+}
+
+function _updateDraftFromCurrentChecks() {
+    const draft = __dictationExercisesState.draft;
+    if (!draft) return;
+    const positions = _normalizePositionsArray(_collectCheckedPositions());
+    draft.positions = positions;
+    if (draft.customTitle !== true) {
+        draft.title = _positionsToTitle(positions);
+    }
+    draft.isInvalid = positions.length === 0;
+
+    const existing = _findExistingExerciseByPositions(positions);
+    draft.isDuplicate = Boolean(existing);
+    draft.duplicateExerciseId = existing && existing.id ? Number(existing.id) : null;
+    renderExercisesTable();
+}
+
+function _updateSelectedExerciseFromCurrentChecks() {
+    const id = Number(__dictationExercisesState.selectedExerciseId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    const ex = _findExerciseById(id);
+    if (!ex) return;
+
+    const positions = _normalizePositionsArray(_collectCheckedPositions());
+    ex.positions = positions;
+    if (ex.customTitle !== true) {
+        ex.title = _positionsToTitle(positions);
+    }
+    __dictationExercisesState.selectedIsFull = (!positions || positions.length === 0);
+    try { markExercisesAsUnsaved(); } catch (e2) {}
+    renderExercisesTable();
+}
+
+function _finalizeDraftIntoExercisesIfValid() {
+    const draft = __dictationExercisesState.draft;
+    if (!draft) return false;
+    _updateDraftFromCurrentChecks();
+    if (draft.isInvalid === true || draft.isDuplicate === true) {
+        return false;
+    }
+    const positions = _normalizePositionsArray(draft.positions || []);
+    if (!positions.length) return false;
+
+    const item = {
+        id: null,
+        positions: positions,
+        title: (draft.title && String(draft.title).trim()) ? String(draft.title).trim() : _positionsToTitle(positions),
+        customTitle: draft.customTitle === true,
+        __new: true,
+    };
+    _ensureExerciseIdentity(item);
+
+    __dictationExercisesState.exercises = [...(_getVisibleExercisesList()), item];
+    __dictationExercisesState.draft = null;
+    __dictationExercisesState.selectedExerciseId = null;
+    __dictationExercisesState.selectedIsFull = false;
+    try { markExercisesAsUnsaved(); } catch (e2) {}
+    return true;
+}
+
+function selectDraftExercise() {
+    if (!__dictationExercisesState.draft) return;
+    _ensureDraftSelected();
+    const positions = Array.isArray(__dictationExercisesState.draft.positions) ? __dictationExercisesState.draft.positions : [];
+    if (!positions.length) {
+        _clearAllSentenceChecks();
+    } else {
+        _setSentenceChecksFromPositions(positions);
+    }
+    try {
+        const isFull = false;
+        const cells = document.querySelectorAll('td.col-checkbox-create-audio');
+        cells.forEach(cell => {
+            const btn = cell.querySelector('.checkbox-btn');
+            if (!btn) return;
+            const key = btn.dataset.key;
+            if (!key) return;
+            const sentence = workingData.original.sentences.find(x => x.key === key);
+            if (!sentence) return;
+            renderLucideCheckboxButton(btn, sentence.checked === true, ((currentTabName === 'exercises') && isFull));
+        });
+    } catch (e) {
+    }
+    renderExercisesTable();
+}
+
+async function _persistDraftExerciseIfNeeded() {
+    return { ok: false, reason: 'disabled' };
 }
 
 function _setSentenceChecksFromPositions(positions) {
@@ -184,9 +394,23 @@ function _setSentenceChecksFromPositions(positions) {
 function selectExerciseById(exerciseId) {
     const id = Number(exerciseId);
     if (!Number.isFinite(id)) return;
+
+    // Если есть черновик — нельзя уходить с него, пока он не валиден и не уникален
+    if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
+        _updateDraftFromCurrentChecks();
+        if (__dictationExercisesState.draft.isInvalid === true) {
+            try { window.showToast && window.showToast('Выбери хотя бы одно предложение', { durationMs: 4500 }); } catch (e) {}
+            return;
+        }
+        if (__dictationExercisesState.draft.isDuplicate === true) {
+            try { window.showToast && window.showToast('Такое упражнение уже существует', { durationMs: 4500 }); } catch (e) {}
+            return;
+        }
+        _finalizeDraftIntoExercisesIfValid();
+    }
+
     __dictationExercisesState.selectedExerciseId = id;
-    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
-    const ex = items.find(x => Number(x && x.id) === id);
+    const ex = _findExerciseById(id);
     const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
     __dictationExercisesState.selectedIsFull = (!positions || positions.length === 0);
     _setSentenceChecksFromPositions(positions);
@@ -206,112 +430,59 @@ function _collectCheckedPositions() {
     return selected;
 }
 
-async function createExerciseFromCurrentSelection() {
-    const raw = (currentDictation && currentDictation.id) ? String(currentDictation.id) : '';
-    if (!raw.startsWith('dict_')) return;
-    const dictationId = Number(raw.replace('dict_', ''));
-    if (!Number.isFinite(dictationId) || dictationId <= 0) return;
-
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return;
-
-    const positions = _collectCheckedPositions();
-    const allCount = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences.length : 0;
-    if (!allCount) {
-        try { window.showToast && window.showToast('Нет предложений', { durationMs: 3500 }); } catch (e) {}
-        return;
-    }
-    if (!positions.length) {
-        try { window.showToast && window.showToast('Нужно выбрать хотя бы одно предложение', { durationMs: 3500 }); } catch (e) {}
-        return;
-    }
-
-    const isFull = positions.length === allCount;
-    const payloadPositions = isFull ? [] : positions;
-    const title = _positionsToTitle(payloadPositions);
-
-    // Если пользователь выбрал все предложения, это Full.
-    // Full уже существует (создаётся автоматически), поэтому не делаем POST, чтобы не ловить 409.
-    if (isFull) {
-        try {
-            const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
-            const full = items.find(x => !x || !Array.isArray(x.positions) ? false : (x.positions.length === 0));
-            if (full && full.id) {
-                selectExerciseById(Number(full.id));
-            }
-        } catch (e) {
-        }
-        try { window.showToast && window.showToast('Упражнение Full уже существует', { durationMs: 4500 }); } catch (e) {}
-        return;
-    }
-
+function _getExercisesPayloadForSave() {
     try {
-        const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ positions: payloadPositions, title: title })
-        });
-        await res.json().catch(() => null);
-        if (res.status === 409) {
-            try { window.showToast && window.showToast('Такое упражнение уже существует', { durationMs: 4500 }); } catch (e) {}
-            return;
-        }
-        if (!res.ok) {
-            try { window.showToast && window.showToast('Не удалось создать упражнение', { durationMs: 4500 }); } catch (e) {}
-            return;
+        // If there is a valid draft, include it too.
+        if (__dictationExercisesState.draft) {
+            _updateDraftFromCurrentChecks();
+            if (__dictationExercisesState.draft.isInvalid !== true && __dictationExercisesState.draft.isDuplicate !== true) {
+                _finalizeDraftIntoExercisesIfValid();
+            }
         }
 
-        await fetchDictationExercises();
-        const next = (__dictationExercisesState.exercises || []).find(x => _positionsToTitle(x.positions || []) === title);
-        if (next && next.id) {
-            selectExerciseById(Number(next.id));
-        } else {
-            renderExercisesTable();
-        }
+        const items = _getVisibleExercisesList();
+        return items
+            .filter((x) => x && typeof x === 'object')
+            .map((x) => {
+                const positions = _normalizePositionsArray(x.positions || []);
+                const title = (x.title && String(x.title).trim()) ? String(x.title).trim() : null;
+                const id = x.id ? Number(x.id) : null;
+                const out = {
+                    positions: positions,
+                };
+                if (id && Number.isFinite(id) && id > 0) out.id = id;
+                if (title) out.title = title;
+                return out;
+            });
     } catch (e) {
-        try { window.showToast && window.showToast('Не удалось создать упражнение', { durationMs: 4500 }); } catch (e2) {}
+        return [];
     }
+}
+
+async function createExerciseFromCurrentSelection() {
+    try { window.showToast && window.showToast('Упражнения сохраняются только при сохранении диктанта', { durationMs: 4500 }); } catch (e) {}
 }
 
 async function deleteSelectedExercise() {
     const id = Number(__dictationExercisesState.selectedExerciseId);
     if (!Number.isFinite(id) || id <= 0) return;
 
-    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
-    const ex = items.find(x => Number(x && x.id) === id);
+    const ex = _findExerciseById(id);
     const positions = ex && Array.isArray(ex.positions) ? ex.positions : [];
     if (!positions || positions.length === 0) {
         try { window.showToast && window.showToast('Упражнение "весь диктант" удалить нельзя', { durationMs: 4500 }); } catch (e) {}
         return;
     }
 
-    const raw = (currentDictation && currentDictation.id) ? String(currentDictation.id) : '';
-    if (!raw.startsWith('dict_')) return;
-    const dictationId = Number(raw.replace('dict_', ''));
-    if (!Number.isFinite(dictationId) || dictationId <= 0) return;
-
-    const token = localStorage.getItem('jwt_token');
-    if (!token) return;
-
+    ex.__deleted = true;
+    __dictationExercisesState.selectedExerciseId = null;
+    __dictationExercisesState.selectedIsFull = false;
+    try { markExercisesAsUnsaved(); } catch (e2) {}
+    renderExercisesTable();
     try {
-        const res = await fetch(`/dictation_editor/api/dictation/${dictationId}/exercises/${id}/delete`, {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (!res.ok) {
-            try { window.showToast && window.showToast('Не удалось удалить упражнение', { durationMs: 4500 }); } catch (e) {}
-            return;
-        }
-        await fetchDictationExercises();
-        const next = (__dictationExercisesState.exercises || [])[0];
-        __dictationExercisesState.selectedExerciseId = next ? Number(next.id) : null;
-        renderExercisesTable();
+        const next = (_getVisibleExercisesList() || [])[0];
         if (next && next.id) selectExerciseById(Number(next.id));
-    } catch (e) {
-        try { window.showToast && window.showToast('Не удалось удалить упражнение', { durationMs: 4500 }); } catch (e2) {}
+    } catch (e3) {
     }
 }
 
@@ -322,36 +493,22 @@ function setupExercisesTabHandlers() {
         createBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
-            try {
-                if (currentTabName === 'exercises' && __dictationExercisesState.selectedIsFull === true) {
-                    __dictationExercisesState.selectedExerciseId = null;
-                    __dictationExercisesState.selectedIsFull = false;
-                    const all = Array.isArray(workingData?.original?.sentences) ? workingData.original.sentences : [];
-                    all.forEach((s) => {
-                        if (!s) return;
-                        s.checked = false;
-                    });
-                    try {
-                        const btns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
-                        btns.forEach((btn) => {
-                            renderLucideCheckboxButton(btn, false, false);
-                        });
-                    } catch (e2) {
-                    }
-                    try {
-                        updateSelectAllCheckboxState();
-                    } catch (e3) {
-                    }
-                    try {
-                        renderExercisesTable();
-                    } catch (e4) {
-                    }
-                    try { window.showToast && window.showToast('Выбери предложения и нажми + ещё раз', { durationMs: 4500 }); } catch (e5) {}
-                    return;
-                }
-            } catch (e1) {
-            }
-            await createExerciseFromCurrentSelection();
+
+            // Алгоритм: + создаёт черновик, очищает чекбоксы, и дальше мы редактируем текущую строку
+            __dictationExercisesState.draft = {
+                positions: [],
+                title: 's: ',
+                selected: true,
+                isInvalid: true,
+                isDuplicate: false,
+                duplicateExerciseId: null,
+                customTitle: false,
+            };
+            _ensureDraftSelected();
+            _clearAllSentenceChecks();
+            renderExercisesTable();
+            try { window.showToast && window.showToast('Выбери предложения для нового упражнения', { durationMs: 4500 }); } catch (e1) {}
+            try { markExercisesAsUnsaved(); } catch (e2) {}
         });
     }
 
@@ -361,6 +518,21 @@ function setupExercisesTabHandlers() {
         deleteBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             e.stopPropagation();
+            if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
+                __dictationExercisesState.draft = null;
+                try { markExercisesAsUnsaved(); } catch (e1) {}
+                try {
+                    const first = (_getVisibleExercisesList() || [])[0];
+                    if (first && first.id) {
+                        selectExerciseById(Number(first.id));
+                    } else {
+                        renderExercisesTable();
+                    }
+                } catch (e2) {
+                    renderExercisesTable();
+                }
+                return;
+            }
             await deleteSelectedExercise();
         });
     }
@@ -1663,14 +1835,16 @@ window.__DICTATION_EDITOR_IS_EXITING = window.__DICTATION_EDITOR_IS_EXITING || f
 
 window.__DICTATION_EDITOR_DIRTY = window.__DICTATION_EDITOR_DIRTY || {
     db: false,
+    exercises: false,
     audio: false,
     cover: false
 };
 
 function setDirtyFlags(next = {}) {
     try {
-        const s = window.__DICTATION_EDITOR_DIRTY || (window.__DICTATION_EDITOR_DIRTY = { db: false, audio: false, cover: false });
+        const s = window.__DICTATION_EDITOR_DIRTY || (window.__DICTATION_EDITOR_DIRTY = { db: false, exercises: false, audio: false, cover: false });
         if (typeof next.db === 'boolean') s.db = next.db;
+        if (typeof next.exercises === 'boolean') s.exercises = next.exercises;
         if (typeof next.audio === 'boolean') s.audio = next.audio;
         if (typeof next.cover === 'boolean') s.cover = next.cover;
     } catch (e) {
@@ -1959,9 +2133,9 @@ async function updateDeskItemsIndexedDbCache(dictationDbId, meta) {
 
 function getDirtyFlags() {
     try {
-        return window.__DICTATION_EDITOR_DIRTY || { db: false, audio: false, cover: false };
+        return window.__DICTATION_EDITOR_DIRTY || { db: false, exercises: false, audio: false, cover: false };
     } catch (e) {
-        return { db: false, audio: false, cover: false };
+        return { db: false, exercises: false, audio: false, cover: false };
     }
 }
 
@@ -5055,6 +5229,18 @@ function handleCheckboxToggle(e) {
     
     // Обновляем состояние общего чекбокса
     updateSelectAllCheckboxState();
+
+    // Если это вкладка exercises и активен черновик — обновляем строку в таблице упражнений
+    try {
+        if (currentTabName === 'exercises') {
+            if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
+                _updateDraftFromCurrentChecks();
+            } else if (__dictationExercisesState.selectedExerciseId) {
+                _updateSelectedExerciseFromCurrentChecks();
+            }
+        }
+    } catch (e2) {
+    }
 }
 
 /**
@@ -5735,7 +5921,21 @@ function applyTableViewForTab(tabName) {
     const table = document.getElementById('sentences-table');
     if (!table) return;
 
+    const prevTab = currentTabName;
     currentTabName = tabName;
+
+    // Если уходим со вкладки exercises с черновиком — фиксируем локально или удаляем невалидный/дубликат
+    try {
+        if (prevTab === 'exercises' && tabName !== 'exercises' && __dictationExercisesState.draft) {
+            _updateDraftFromCurrentChecks();
+            if (__dictationExercisesState.draft.isInvalid === true || __dictationExercisesState.draft.isDuplicate === true) {
+                __dictationExercisesState.draft = null;
+            } else {
+                _finalizeDraftIntoExercisesIfValid();
+            }
+        }
+    } catch (e0) {
+    }
 
     if (tabName === 'exercises') {
         const table = document.getElementById('sentences-table');
@@ -10620,6 +10820,13 @@ function updateUnsavedStar() {
         dbStar.title = 'Изменения в тексте/БД';
     }
 
+    const exercisesStar = document.getElementById('unsavedStarExercises');
+    if (exercisesStar) {
+        exercisesStar.style.display = flags.exercises ? 'inline-flex' : 'none';
+        exercisesStar.style.color = 'var(--color-button-text-orange)';
+        exercisesStar.title = 'Изменения в упражнениях';
+    }
+
     const audioStar = document.getElementById('unsavedStarAudio');
     if (audioStar) {
         audioStar.style.display = flags.audio ? 'inline-flex' : 'none';
@@ -10649,7 +10856,7 @@ async function handleSaveAndExit() {
 function hasUnsavedChanges() {
     const flags = getDirtyFlags();
     const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
-    return !!(isNewNotSaved || flags.db || flags.audio || flags.cover);
+    return !!(isNewNotSaved || flags.db || flags.exercises || flags.audio || flags.cover);
 }
 
 /**
@@ -10660,6 +10867,13 @@ function markAsUnsaved() {
         currentDictation.isSaved = false;
     }
     setDirtyFlags({ db: true });
+}
+
+function markExercisesAsUnsaved() {
+    if (currentDictation.isSaved) {
+        currentDictation.isSaved = false;
+    }
+    setDirtyFlags({ exercises: true });
 }
 
 /**
@@ -10789,6 +11003,11 @@ async function saveDictationOnly() {
             // Если диктант создан из приватной библиотеки, сюда попадёт ID книги/раздела
             book_id: currentDictation.book_id || null
         };
+
+        try {
+            saveData.exercises = _getExercisesPayloadForSave();
+        } catch (e) {
+        }
 
         // Проверяем наличие токена
         // Используем jwt_token (как в user_manager.js) или токен из UserManager
@@ -10927,6 +11146,24 @@ async function saveDictationOnly() {
                 }
             }
 
+            // Exercises: reload after save so that draft/tmp state is replaced with persisted DB state
+            try {
+                const prevSelectedId = __dictationExercisesState.selectedExerciseId;
+                await fetchDictationExercises();
+                renderExercisesTable();
+                if (prevSelectedId) {
+                    const found = _findExerciseById(Number(prevSelectedId));
+                    if (found && found.id) {
+                        selectExerciseById(Number(found.id));
+                    }
+                }
+                if (!__dictationExercisesState.selectedExerciseId) {
+                    const first = (_getVisibleExercisesList() || [])[0];
+                    if (first && first.id) selectExerciseById(Number(first.id));
+                }
+            } catch (e) {
+            }
+
             try {
                 const deskDbId = (result && result.db_id) ? Number(result.db_id) : null;
                 if (deskDbId && isFinite(deskDbId) && deskDbId > 0) {
@@ -10946,7 +11183,7 @@ async function saveDictationOnly() {
             currentDictation.title_translations = titleTranslations;
             
             // DB сохранено
-            setDirtyFlags({ db: false });
+            setDirtyFlags({ db: false, exercises: false });
 
             // Commit any in-memory (unsaved) audio blobs into final cache before B2 upload.
             try {

@@ -1321,6 +1321,16 @@ def save_dictation_final():
             )
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
+
+        # Reconcile dictation exercises only during explicit dictation save.
+        # Client sends the desired exercises set (excluding Full if it wants; server ensures Full exists).
+        try:
+            exercises_payload = data.get('exercises')
+            if exercises_payload is not None:
+                from helpers.db_dictations import reconcile_dictation_exercises
+                reconcile_dictation_exercises(int(db_id), exercises_payload)
+        except Exception as e:
+            logger.warning(f"⚠️ Не удалось сохранить упражнения диктанта {db_id}: {e}")
         
         # Умное сохранение предложений: обновляем только изменённые, добавляем новые, удаляем только отсутствующие
         from helpers.db_dictations import get_sentence_by_key, update_sentence
