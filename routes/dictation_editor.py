@@ -1322,15 +1322,30 @@ def save_dictation_final():
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
 
+        exercises_saved = True
+        exercises_error = None
         # Reconcile dictation exercises only during explicit dictation save.
         # Client sends the desired exercises set (excluding Full if it wants; server ensures Full exists).
         try:
             exercises_payload = data.get('exercises')
             if exercises_payload is not None:
                 from helpers.db_dictations import reconcile_dictation_exercises
-                reconcile_dictation_exercises(int(db_id), exercises_payload)
+                reconcile_res = reconcile_dictation_exercises(int(db_id), exercises_payload)
+                try:
+                    logger.info(
+                        "✅ Упражнения сохранены для dictation_id=%s: %s",
+                        db_id,
+                        reconcile_res,
+                    )
+                except Exception:
+                    pass
         except Exception as e:
-            logger.warning(f"⚠️ Не удалось сохранить упражнения диктанта {db_id}: {e}")
+            exercises_saved = False
+            try:
+                exercises_error = str(e)
+            except Exception:
+                exercises_error = 'Failed to save exercises'
+            logger.warning(f"⚠️ Не удалось сохранить упражнения диктанта {db_id}: {exercises_error}")
         
         # Умное сохранение предложений: обновляем только изменённые, добавляем новые, удаляем только отсутствующие
         from helpers.db_dictations import get_sentence_by_key, update_sentence
@@ -1690,12 +1705,33 @@ def save_dictation_final():
             result = add_dictation_to_categories(dictation_id, info, category_key, db_id=db_id)
         
         if result:
-            return jsonify({"success": True, "message": "Dictation saved to DB and added to category", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB and added to category",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+            })
         elif target_book_id:
-            return jsonify({"success": True, "message": "Dictation saved to DB and added to book", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB and added to book",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+            })
         else:
             logger.warning("⚠️ Диктант сохранен в БД, но не добавлен ни в категорию, ни в книгу")
-            return jsonify({"success": True, "message": "Dictation saved to DB", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+            })
         
     except Exception as e:
         import traceback

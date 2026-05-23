@@ -11168,6 +11168,12 @@ async function saveDictationOnly() {
         const result = await response.json();
 
         if (result.success) {
+            try {
+                if (result.exercises_saved === false) {
+                    alert('Упражнения не сохранились: ' + (result.exercises_error || 'Неизвестная ошибка'));
+                }
+            } catch (e) {
+            }
             // Если диктант был создан в БД - обновляем ID
             if (result.dictation_id && result.db_id) {
                 currentDictation.id = result.dictation_id;
@@ -11183,19 +11189,22 @@ async function saveDictationOnly() {
             }
 
             // Exercises: reload after save so that draft/tmp state is replaced with persisted DB state
+            // But if exercises failed to save, do NOT reload: otherwise UI will drop the unsaved rows.
             try {
-                const prevSelectedId = __dictationExercisesState.selectedExerciseId;
-                await fetchDictationExercises();
-                renderExercisesTable();
-                if (prevSelectedId) {
-                    const found = _findExerciseById(Number(prevSelectedId));
-                    if (found && found.id) {
-                        selectExerciseById(Number(found.id));
+                if (result.exercises_saved !== false) {
+                    const prevSelectedId = __dictationExercisesState.selectedExerciseId;
+                    await fetchDictationExercises();
+                    renderExercisesTable();
+                    if (prevSelectedId) {
+                        const found = _findExerciseById(Number(prevSelectedId));
+                        if (found && found.id) {
+                            selectExerciseById(Number(found.id));
+                        }
                     }
-                }
-                if (!__dictationExercisesState.selectedExerciseId) {
-                    const first = (_getVisibleExercisesList() || [])[0];
-                    if (first && first.id) selectExerciseById(Number(first.id));
+                    if (!__dictationExercisesState.selectedExerciseId) {
+                        const first = (_getVisibleExercisesList() || [])[0];
+                        if (first && first.id) selectExerciseById(Number(first.id));
+                    }
                 }
             } catch (e) {
             }
