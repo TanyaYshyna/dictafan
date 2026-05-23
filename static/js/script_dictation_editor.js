@@ -510,7 +510,26 @@ function setupExercisesTabHandlers() {
             e.preventDefault();
             e.stopPropagation();
 
-            // Алгоритм: + создаёт черновик, очищает чекбоксы, и дальше мы редактируем текущую строку
+            // Если уже есть активный черновик — при повторном нажатии +
+            // сначала пытаемся зафиксировать его в упражнение (если валиден/не дубль),
+            // и только потом создаём следующий черновик.
+            try {
+                if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
+                    _updateDraftFromCurrentChecks();
+                    if (__dictationExercisesState.draft.isInvalid === true) {
+                        try { window.showToast && window.showToast('Выбери хотя бы одно предложение', { durationMs: 4500 }); } catch (e0) {}
+                        return;
+                    }
+                    if (__dictationExercisesState.draft.isDuplicate === true) {
+                        try { window.showToast && window.showToast('Такое упражнение уже существует', { durationMs: 4500 }); } catch (e0) {}
+                        return;
+                    }
+                    _finalizeDraftIntoExercisesIfValid();
+                }
+            } catch (e0) {
+            }
+
+            // Алгоритм: + создаёт новый черновик, очищает чекбоксы, и дальше мы редактируем текущую строку
             __dictationExercisesState.draft = {
                 positions: [],
                 title: 's: ',
@@ -5267,10 +5286,9 @@ let createdAudioFiles = [];
 
 function setupCreateAudioHandlers() {
     // Обработчик для общего чекбокса "Выбрать все"
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const selectAllCheckboxLabel = document.getElementById('selectAllCheckboxLabel');
     
-    if (selectAllCheckbox && selectAllCheckboxLabel) {
+    if (selectAllCheckboxLabel) {
         let selectAllBtn = selectAllCheckboxLabel.querySelector('button.checkbox-btn');
         if (!selectAllBtn) {
             selectAllBtn = document.createElement('button');
@@ -5287,36 +5305,39 @@ function setupCreateAudioHandlers() {
             selectAllBtn.dataset.listenerAttached = '1';
             selectAllBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                selectAllCheckbox.checked = !selectAllCheckbox.checked;
-                selectAllCheckbox.dispatchEvent(new Event('change'));
-            });
-        }
-        
-        if (!selectAllCheckbox.dataset.listenerAttached) {
-            selectAllCheckbox.dataset.listenerAttached = '1';
-            // Обработчик изменения чекбокса
-            selectAllCheckbox.addEventListener('change', function() {
-                const isChecked = selectAllCheckbox.checked;
+                const allSentences = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+                    ? workingData.original.sentences
+                    : [];
+                const checkedCount = allSentences.filter(s => s && s.checked === true).length;
+                const nextChecked = (allSentences.length > 0) ? !(checkedCount === allSentences.length) : false;
 
-                renderLucideCheckboxButton(selectAllBtn, Boolean(isChecked), false);
-                
                 // Устанавливаем состояние checked для всех предложений в данных
-                if (workingData && workingData.original && workingData.original.sentences) {
-                    workingData.original.sentences.forEach(sentence => {
-                        sentence.checked = isChecked;
-                    });
-                }
-                
+                allSentences.forEach(sentence => {
+                    if (!sentence) return;
+                    sentence.checked = nextChecked;
+                });
+
                 // Обновляем иконки во всех строках таблицы
                 const allCheckboxBtns = document.querySelectorAll('td.col-checkbox-create-audio .checkbox-btn');
                 allCheckboxBtns.forEach(btn => {
-                    renderLucideCheckboxButton(btn, Boolean(isChecked), btn.disabled);
+                    renderLucideCheckboxButton(btn, Boolean(nextChecked), btn.disabled);
                 });
+
+                // Обновляем иконку в заголовке
+                selectAllCheckboxLabel.dataset.checked = nextChecked ? '1' : '0';
+                renderLucideCheckboxButton(selectAllBtn, Boolean(nextChecked), false);
             });
         }
 
         try {
-            renderLucideCheckboxButton(selectAllBtn, Boolean(selectAllCheckbox.checked), false);
+            // Инициализируем иконку в заголовке по текущим данным
+            const allSentences = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+                ? workingData.original.sentences
+                : [];
+            const checkedCount = allSentences.filter(s => s && s.checked === true).length;
+            const isChecked = (allSentences.length > 0) && (checkedCount === allSentences.length);
+            selectAllCheckboxLabel.dataset.checked = isChecked ? '1' : '0';
+            renderLucideCheckboxButton(selectAllBtn, Boolean(isChecked), false);
         } catch (e) {
         }
     }
@@ -5905,25 +5926,23 @@ function getReferenceAudioFile(pauseType, originalSentence, translationSentence)
  * Обновить состояние чекбокса "Выбрать все" на основе состояния всех чекбоксов строк
  */
 function updateSelectAllCheckboxState() {
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const selectAllCheckboxLabel = document.getElementById('selectAllCheckboxLabel');
     
-    if (!selectAllCheckbox || !selectAllCheckboxLabel) return;
+    if (!selectAllCheckboxLabel) return;
 
     const selectAllBtn = selectAllCheckboxLabel.querySelector('button.checkbox-btn') || null;
     
     // Получаем все предложения и проверяем их checked
-    const allSentences = workingData.original.sentences || [];
-    const checkedCount = allSentences.filter(s => s.checked === true).length;
+    const allSentences = (workingData && workingData.original && Array.isArray(workingData.original.sentences))
+        ? workingData.original.sentences
+        : [];
+    const checkedCount = allSentences.filter(s => s && s.checked === true).length;
+    const isChecked = (allSentences.length > 0) && (checkedCount === allSentences.length);
     
-    if (allSentences.length === 0) {
-        selectAllCheckbox.checked = false;
-    } else {
-        selectAllCheckbox.checked = (checkedCount === allSentences.length);
-    }
+    selectAllCheckboxLabel.dataset.checked = isChecked ? '1' : '0';
 
     if (selectAllBtn) {
-        renderLucideCheckboxButton(selectAllBtn, Boolean(selectAllCheckbox.checked), false);
+        renderLucideCheckboxButton(selectAllBtn, Boolean(isChecked), false);
     }
 }
 
@@ -10839,7 +10858,7 @@ function updateUnsavedStar() {
     const exercisesStar = document.getElementById('unsavedStarExercises');
     if (exercisesStar) {
         exercisesStar.style.display = flags.exercises ? 'inline-flex' : 'none';
-        exercisesStar.style.color = 'var(--color-button-text-orange)';
+        exercisesStar.style.color = 'var(--color-button-pink)';
         exercisesStar.title = 'Изменения в упражнениях';
     }
 
