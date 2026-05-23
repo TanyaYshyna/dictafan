@@ -10909,6 +10909,7 @@ function markExercisesAsUnsaved() {
         currentDictation.isSaved = false;
     }
     setDirtyFlags({ exercises: true });
+    try { updateUnsavedStar(); } catch (e) {}
 }
 
 /**
