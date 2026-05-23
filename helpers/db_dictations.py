@@ -234,8 +234,16 @@ def reconcile_dictation_exercises(dictation_id: int, exercises_payload: list[dic
                 if title_norm == "":
                     title_norm = None
 
-                if ex_id_raw:
-                    ex_id = int(ex_id_raw)
+                ex_id_int: int | None = None
+                try:
+                    if ex_id_raw is not None and str(ex_id_raw).strip() != "":
+                        ex_id_int = int(ex_id_raw)
+                except Exception:
+                    ex_id_int = None
+
+                # Negative/zero ids are client-side temporary ids; treat them as new items
+                if ex_id_int is not None and ex_id_int > 0:
+                    ex_id = int(ex_id_int)
                     keep_ids.add(ex_id)
                     cur.execute(
                         """
@@ -263,8 +271,29 @@ def reconcile_dictation_exercises(dictation_id: int, exercises_payload: list[dic
                         (int(dictation_id), prepared, title_norm),
                     )
                     row = cur.fetchone()
+                    created_id: int | None = None
                     if row and row[0]:
-                        created_ids.append(int(row[0]))
+                        created_id = int(row[0])
+                        created_ids.append(created_id)
+                    else:
+                        # Conflict: exercise already exists for these positions, fetch its id so we don't delete it.
+                        cur.execute(
+                            """
+                            SELECT id
+                            FROM dictation_exercises
+                            WHERE dictation_id = %s AND positions = %s
+                            LIMIT 1
+                            """,
+                            (int(dictation_id), prepared),
+                        )
+                        r2 = cur.fetchone()
+                        if r2 and r2[0]:
+                            try:
+                                created_id = int(r2[0])
+                            except Exception:
+                                created_id = None
+                    if created_id is not None and created_id > 0:
+                        keep_ids.add(int(created_id))
 
             # delete removed (excluding Full)
             keep_ids_list = sorted(list(keep_ids))
