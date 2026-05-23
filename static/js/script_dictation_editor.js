@@ -37,6 +37,8 @@ let __dictationExercisesState = {
     draft: null,
 };
 
+let __exerciseTempIdSeq = 0;
+
 function _getVisibleExercisesList() {
     const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
     return items.filter(x => x && x.__deleted !== true);
@@ -49,6 +51,14 @@ function _findExerciseById(id) {
 
 function _ensureExerciseIdentity(ex) {
     if (!ex) return;
+    if (ex.id === null || ex.id === undefined || Number(ex.id) === 0 || Number.isNaN(Number(ex.id))) {
+        try {
+            __exerciseTempIdSeq = (__exerciseTempIdSeq + 1) % 1000;
+            ex.id = -Math.abs(Number(Date.now())) - __exerciseTempIdSeq;
+        } catch (e) {
+            ex.id = -1;
+        }
+    }
     if (!ex.__localKey) {
         try {
             ex.__localKey = `ex_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -136,7 +146,12 @@ async function fetchDictationExercises() {
         if (!res.ok) return [];
         const data = await res.json();
         const items = (data && Array.isArray(data.exercises)) ? data.exercises : [];
-        __dictationExercisesState.exercises = items.filter(x => x && typeof x === 'object');
+        __dictationExercisesState.exercises = items
+            .filter(x => x && typeof x === 'object')
+            .map((x) => {
+                try { _ensureExerciseIdentity(x); } catch (e) {}
+                return x;
+            });
         return __dictationExercisesState.exercises;
     } catch (e) {
         return [];
@@ -151,14 +166,14 @@ function renderExercisesTable() {
     const items = _getVisibleExercisesList();
     const draft = __dictationExercisesState.draft;
     const rows = [];
+    rows.push(...items);
     if (draft && typeof draft === 'object') {
         rows.push({ __draft: true, ...draft });
     }
-    rows.push(...items);
 
     if (!rows.length) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="3" style="padding:10px; opacity:0.65;">Нет упражнений</td>`;
+        tr.innerHTML = `<td colspan="3" class="exercises-empty">Нет упражнений</td>`;
         tbody.appendChild(tr);
         return;
     }
@@ -172,28 +187,27 @@ function renderExercisesTable() {
 
         const tr = document.createElement('tr');
         tr.dataset.exerciseId = idRaw;
-        tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
-        tr.style.cursor = 'pointer';
+        tr.classList.add('exercise-row');
         if (isDraft) {
             if (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true) {
-                tr.style.background = 'rgba(0,0,0,0.04)';
+                tr.classList.add('selected');
             }
             if (__dictationExercisesState.draft && (__dictationExercisesState.draft.isDuplicate === true || __dictationExercisesState.draft.isInvalid === true)) {
-                tr.style.background = 'rgba(255, 0, 0, 0.08)';
+                tr.classList.add('invalid');
             }
         } else if (__dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id)) {
-            tr.style.background = 'rgba(0,0,0,0.04)';
+            tr.classList.add('selected');
         }
         const isSelected = (isDraft && (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true))
             || (!isDraft && __dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id));
         const titleCellHtml = isSelected
-            ? `<input type="text" class="exercise-title-input" data-exercise-id="${escapeHtml(idRaw)}" value="${escapeHtml(title)}" style="width:100%; box-sizing:border-box;" />`
+            ? `<textarea class="sentence-text exercise-title-input" data-exercise-id="${escapeHtml(idRaw)}" rows="1">${escapeHtml(title)}</textarea>`
             : `${escapeHtml(title)}`;
 
         tr.innerHTML = `
-            <td style="padding:8px 10px;">${titleCellHtml}</td>
-            <td style="padding:8px 10px; white-space:nowrap; opacity:0.8; font-variant-numeric: tabular-nums;">${escapeHtml(posLabel)}</td>
-            <td style="padding:8px 10px; width:44px;"></td>
+            <td class="exercise-title-cell col-original panel-original">${titleCellHtml}</td>
+            <td class="exercise-positions-cell">${escapeHtml(posLabel)}</td>
+            <td class="exercise-actions-cell"></td>
         `;
         tbody.appendChild(tr);
     });
@@ -219,7 +233,7 @@ function renderExercisesTable() {
         });
 
         tbody.addEventListener('input', (e) => {
-            const inp = e && e.target ? e.target.closest('input.exercise-title-input') : null;
+            const inp = e && e.target ? e.target.closest('textarea.exercise-title-input, input.exercise-title-input') : null;
             if (!inp) return;
             const idRaw = inp.dataset.exerciseId;
             const v = String(inp.value || '').trim();
@@ -319,9 +333,11 @@ function _finalizeDraftIntoExercisesIfValid() {
 
     __dictationExercisesState.exercises = [...(_getVisibleExercisesList()), item];
     __dictationExercisesState.draft = null;
-    __dictationExercisesState.selectedExerciseId = null;
+    __dictationExercisesState.selectedExerciseId = Number(item.id);
     __dictationExercisesState.selectedIsFull = false;
     try { markExercisesAsUnsaved(); } catch (e2) {}
+    try { _setSentenceChecksFromPositions(positions); } catch (e3) {}
+    try { renderExercisesTable(); } catch (e4) {}
     return true;
 }
 
