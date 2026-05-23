@@ -10936,7 +10936,7 @@ async function saveDictationOnly() {
     try {
         const flagsBefore = { ...getDirtyFlags() };
         const isNewNotSaved = currentDictation.isNew && !currentDictation.db_id;
-        const shouldSaveDb = !!(isNewNotSaved || flagsBefore.db);
+        const shouldSaveDb = !!(isNewNotSaved || flagsBefore.db || flagsBefore.exercises);
         // For brand-new dictations, media may already exist in cache but dirty flags may still be false
         // (e.g. generated as part of creation flow). We still want to attempt upload to B2 after the
         // first successful Save; upload helpers will no-op if no cached files are found.
