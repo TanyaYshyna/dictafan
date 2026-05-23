@@ -86,6 +86,59 @@ function _positionsKey(positions) {
     }
 }
 
+function _syncExercisesIdsAfterSave(exercisesAfterSave) {
+    const persisted = Array.isArray(exercisesAfterSave) ? exercisesAfterSave : [];
+    const mapByKey = new Map();
+    persisted.forEach((ex) => {
+        if (!ex) return;
+        const id = Number(ex.id);
+        if (!Number.isFinite(id) || id <= 0) return;
+        const key = _positionsKey(ex.positions || []);
+        mapByKey.set(key, ex);
+    });
+
+    const items = Array.isArray(__dictationExercisesState.exercises) ? __dictationExercisesState.exercises : [];
+    let selectedUpdated = false;
+    items.forEach((ex) => {
+        if (!ex) return;
+        const oldId = Number(ex.id);
+        if (!(Number.isFinite(oldId) && oldId < 0)) return;
+        const key = _positionsKey(ex.positions || []);
+        const persistedEx = mapByKey.get(key);
+        if (!persistedEx) return;
+        const newId = Number(persistedEx.id);
+        if (!Number.isFinite(newId) || newId <= 0) return;
+
+        // Update in-memory id
+        ex.id = newId;
+
+        // If selected, update selection too
+        if (Number(__dictationExercisesState.selectedExerciseId) === oldId) {
+            __dictationExercisesState.selectedExerciseId = newId;
+            selectedUpdated = true;
+        }
+
+        // Update DOM row identifiers without full re-render
+        try {
+            const row = document.querySelector(`#exercisesTableBody tr[data-exercise-id="${oldId}"]`);
+            if (row) {
+                row.dataset.exerciseId = String(newId);
+                row.setAttribute('data-exercise-id', String(newId));
+                const inp = row.querySelector('textarea.exercise-title-input, input.exercise-title-input');
+                if (inp) {
+                    inp.dataset.exerciseId = String(newId);
+                    inp.setAttribute('data-exercise-id', String(newId));
+                }
+            }
+        } catch (e) {
+        }
+    });
+
+    // No re-render here by design. Selection highlight stays as-is.
+    // selectedUpdated kept for potential future tweaks.
+    return { ok: true, selectedUpdated };
+}
+
 function _findExistingExerciseByPositions(positions) {
     const key = _positionsKey(positions);
     const items = _getVisibleExercisesList();
@@ -11189,21 +11242,11 @@ async function saveDictationOnly() {
             }
 
             // Exercises: reload after save so that draft/tmp state is replaced with persisted DB state
-            // But if exercises failed to save, do NOT reload: otherwise UI will drop the unsaved rows.
+            // No reload / rerender here: we only remap temporary ids using server response.
             try {
                 if (result.exercises_saved !== false) {
-                    const prevSelectedId = __dictationExercisesState.selectedExerciseId;
-                    await fetchDictationExercises();
-                    renderExercisesTable();
-                    if (prevSelectedId) {
-                        const found = _findExerciseById(Number(prevSelectedId));
-                        if (found && found.id) {
-                            selectExerciseById(Number(found.id));
-                        }
-                    }
-                    if (!__dictationExercisesState.selectedExerciseId) {
-                        const first = (_getVisibleExercisesList() || [])[0];
-                        if (first && first.id) selectExerciseById(Number(first.id));
+                    if (result.exercises_after_save) {
+                        _syncExercisesIdsAfterSave(result.exercises_after_save);
                     }
                 }
             } catch (e) {

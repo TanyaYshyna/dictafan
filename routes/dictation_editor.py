@@ -1324,6 +1324,7 @@ def save_dictation_final():
 
         exercises_saved = True
         exercises_error = None
+        exercises_after_save = None
         # Reconcile dictation exercises only during explicit dictation save.
         # Client sends the desired exercises set (excluding Full if it wants; server ensures Full exists).
         try:
@@ -1331,6 +1332,11 @@ def save_dictation_final():
             if exercises_payload is not None:
                 from helpers.db_dictations import reconcile_dictation_exercises
                 reconcile_res = reconcile_dictation_exercises(int(db_id), exercises_payload)
+                try:
+                    from helpers.db_dictations import list_dictation_exercises
+                    exercises_after_save = list_dictation_exercises(int(db_id))
+                except Exception:
+                    exercises_after_save = None
                 try:
                     logger.info(
                         "✅ Упражнения сохранены для dictation_id=%s: %s",
@@ -1712,6 +1718,7 @@ def save_dictation_final():
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
             })
         elif target_book_id:
             return jsonify({
@@ -1721,6 +1728,7 @@ def save_dictation_final():
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
             })
         else:
             logger.warning("⚠️ Диктант сохранен в БД, но не добавлен ни в категорию, ни в книгу")
@@ -1731,6 +1739,7 @@ def save_dictation_final():
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
             })
         
     except Exception as e:
