@@ -2836,13 +2836,97 @@ async function openCreateAssignmentModal(dictationId) {
   const closeBtn = document.getElementById('create-assignment-close');
   const saveBtn = document.getElementById('create-assignment-save');
 
+  const persistExercises = async () => {
+    const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+    if (!dictationIdRaw) {
+      showToast('Не найден dictation_id');
+      return false;
+    }
+
+    const dictation_id = Number(dictationIdRaw);
+    if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
+      showToast('Неверный dictation_id');
+      return false;
+    }
+
+    const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
+
+    try {
+      const exSt = getCreateAssignmentExercisesState(modal);
+      const isDraftSelected = Boolean(exSt && exSt.draft && exSt.draft.selected === true);
+      if (isDraftSelected && Array.isArray(selectedPositions) && selectedPositions.length === 0) {
+        showToast('Выбери хотя бы одно предложение');
+        return false;
+      }
+    } catch (e0) {
+    }
+
+    try {
+      const exSt = getCreateAssignmentExercisesState(modal);
+      if (exSt && exSt.dirty === true) {
+        const exercisesPayload = _getCreateAssignmentExercisesPayloadForSave(modal);
+        const reconcile = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
+          method: 'POST',
+          body: JSON.stringify({ exercises: exercisesPayload })
+        });
+        if (!reconcile || reconcile.success !== true) {
+          const msg = reconcile && reconcile.error ? String(reconcile.error) : 'Не удалось сохранить упражнения';
+          showToast(msg, { durationMs: 3500 });
+          return false;
+        }
+
+        try {
+          const items = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
+          const next = getCreateAssignmentExercisesState(modal);
+          next.exercises = items;
+          next.draft = null;
+          if (next.selectedExerciseId && !findCreateAssignmentExerciseById(modal, Number(next.selectedExerciseId))) {
+            next.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
+          }
+          setCreateAssignmentExercisesState(modal, next);
+          setCreateAssignmentExercisesDirty(modal, false);
+          renderCreateAssignmentExercisesTable(modal);
+        } catch (e) {
+          try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) {}
+        }
+      }
+    } catch (e) {
+      showToast('Ошибка сохранения упражнений', { durationMs: 2500 });
+      return false;
+    }
+
+    showToast('Упражнения сохранены', { durationMs: 2500 });
+    return true;
+  };
+
   const close = () => {
     try { modal.style.display = 'none'; } catch (e) { }
   };
 
-  if (closeBtn) closeBtn.onclick = () => close();
+  const maybeCloseWithPrompt = async () => {
+    const st = getCreateAssignmentExercisesState(modal);
+    if (!st || st.dirty !== true) {
+      close();
+      return;
+    }
+
+    const wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
+    if (wantSave) {
+      const ok = await persistExercises();
+      if (ok) close();
+      return;
+    }
+
+    const wantDiscard = window.confirm('Выйти без сохранения?');
+    if (wantDiscard) {
+      close();
+      return;
+    }
+  };
+
+  if (closeBtn) closeBtn.onclick = () => { void maybeCloseWithPrompt(); };
   modal.onclick = (e) => {
-    if (e.target === modal) close();
+    if (e.target === modal) { void maybeCloseWithPrompt(); }
   };
 
   const createBtn = document.getElementById('create-assignment-exercise-create');
@@ -2916,70 +3000,7 @@ async function openCreateAssignmentModal(dictationId) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
-        const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-        if (!dictationIdRaw) {
-          showToast('Не найден dictation_id');
-          return;
-        }
-
-        const dictation_id = Number(dictationIdRaw);
-        if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
-          showToast('Неверный dictation_id');
-          return;
-        }
-
-        const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
-
-        try {
-          const exSt = getCreateAssignmentExercisesState(modal);
-          const isDraftSelected = Boolean(exSt && exSt.draft && exSt.draft.selected === true);
-          if (isDraftSelected && Array.isArray(selectedPositions) && selectedPositions.length === 0) {
-            showToast('Выбери хотя бы одно предложение');
-            return;
-          }
-        } catch (e0) {
-        }
-
-        // If exercises were edited in this modal, persist them to dictation.
-        try {
-          const exSt = getCreateAssignmentExercisesState(modal);
-          if (exSt && exSt.dirty === true) {
-            const exercisesPayload = _getCreateAssignmentExercisesPayloadForSave(modal);
-            const reconcile = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
-              method: 'POST',
-              body: JSON.stringify({ exercises: exercisesPayload })
-            });
-            if (!reconcile || reconcile.success !== true) {
-              const msg = reconcile && reconcile.error ? String(reconcile.error) : 'Не удалось сохранить упражнения';
-              showToast(msg, { durationMs: 3500 });
-              return;
-            }
-
-            try {
-              const items = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
-              const next = getCreateAssignmentExercisesState(modal);
-              next.exercises = items;
-              next.draft = null;
-              if (next.selectedExerciseId && !findCreateAssignmentExerciseById(modal, Number(next.selectedExerciseId))) {
-                next.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
-              }
-              setCreateAssignmentExercisesState(modal, next);
-              setCreateAssignmentExercisesDirty(modal, false);
-              renderCreateAssignmentExercisesTable(modal);
-            } catch (e) {
-              // If UI refresh failed, exercises were still reconciled.
-              try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) {}
-            }
-          }
-        } catch (e) {
-          // If reconcile step throws, keep UI state unchanged.
-          showToast('Ошибка сохранения упражнений', { durationMs: 2500 });
-          return;
-        }
-
-        showToast('Упражнения сохранены', { durationMs: 2500 });
-        close();
-        return;
+        await persistExercises();
       } catch (e) {
         showToast((e && e.message) ? String(e.message) : 'Ошибка сохранения', { durationMs: 20000, sticky: true });
       }
