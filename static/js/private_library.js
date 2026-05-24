@@ -2916,50 +2916,19 @@ async function openCreateAssignmentModal(dictationId) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
-        const groupId = (() => {
-          try {
-            const sel = document.getElementById('teacher-assignments-group');
-            const v = sel ? String(sel.value || '').trim() : '';
-            if (v) return v;
-          } catch (e0) {
-          }
-          try {
-            const last = getAssignmentLastGroupId();
-            return last ? String(last).trim() : '';
-          } catch (e1) {
-            return '';
-          }
-        })();
         const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-
-        if (!groupId) {
-          showToast('Выбери группу');
-          return;
-        }
         if (!dictationIdRaw) {
           showToast('Не найден dictation_id');
           return;
         }
 
-        const group_id = Number(groupId);
         const dictation_id = Number(dictationIdRaw);
-        if (!Number.isFinite(group_id) || group_id <= 0) {
-          showToast('Неверный group_id');
-          return;
-        }
         if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
           showToast('Неверный dictation_id');
           return;
         }
 
-        const state = getCreateAssignmentDaysState(modal);
-        const days = (Array.isArray(state) ? state : []).map(x => ({
-          date: String(x?.date || '').trim(),
-          required_completions: Number(x?.count || 1)
-        })).filter(x => x.date);
-
         const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
-        const selected_sentence_positions = selectedPositions.length ? selectedPositions : null;
 
         try {
           const exSt = getCreateAssignmentExercisesState(modal);
@@ -2971,38 +2940,7 @@ async function openCreateAssignmentModal(dictationId) {
         } catch (e0) {
         }
 
-        if (!days.length) {
-          showToast('Добавь хотя бы один день');
-          return;
-        }
-
-        for (const d of days) {
-          if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
-            showToast('Неверное число попыток в плане');
-            return;
-          }
-        }
-
-        const uniq = Array.from(new Set(days.map(x => x.date))).sort();
-        if (uniq.length > 7) {
-          showToast('Максимум 7 дней');
-          return;
-        }
-        const span = uniq.length ? diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]) : 0;
-        if (span != null && span > 6) {
-          showToast('Максимум 7 дней');
-          return;
-        }
-
-        const editIdRaw = (() => {
-          try { return modal.dataset.editAssignmentId || ''; } catch (e) { return ''; }
-        })();
-        const editId = Number(editIdRaw);
-
-        const isEdit = Number.isFinite(editId) && editId > 0;
-
-        // If exercises were edited in this modal, persist them to dictation before creating assignment,
-        // so the new exercise becomes available system-wide.
+        // If exercises were edited in this modal, persist them to dictation.
         try {
           const exSt = getCreateAssignmentExercisesState(modal);
           if (exSt && exSt.dirty === true) {
@@ -3029,51 +2967,18 @@ async function openCreateAssignmentModal(dictationId) {
               setCreateAssignmentExercisesDirty(modal, false);
               renderCreateAssignmentExercisesTable(modal);
             } catch (e) {
-              // If UI refresh failed, still proceed with assignment create; exercises were reconciled.
+              // If UI refresh failed, exercises were still reconciled.
               try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) {}
             }
           }
         } catch (e) {
-          // If reconcile step throws, do not create assignment silently with stale data.
+          // If reconcile step throws, keep UI state unchanged.
           showToast('Ошибка сохранения упражнений', { durationMs: 2500 });
           return;
         }
 
-        const res = isEdit
-          ? await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-              group_id,
-              days,
-              selected_sentence_positions
-            })
-          })
-          : await apiRequest('/api/assignments/teacher/create', {
-            method: 'POST',
-            body: JSON.stringify({
-              group_id,
-              dictation_id,
-              mode: 'days',
-              days,
-              selected_sentence_positions
-            })
-          });
-
-        if (!res || !res.success) {
-          const rawErr = res && res.error ? String(res.error) : '';
-          const friendly = (rawErr && rawErr.toLowerCase().includes('overlap'))
-            ? 'На выбранные даты уже есть задание для этого диктанта и этого же набора предложений. Если хочешь второе задание — выбери другой набор предложений или другую дату.'
-            : (rawErr || 'Ошибка сохранения');
-          showToast(friendly, { durationMs: 20000, sticky: true });
-          return;
-        }
-
-        showToast('Задание сохранено', { durationMs: 2500 });
+        showToast('Упражнения сохранены', { durationMs: 2500 });
         close();
-        try {
-          await _teacherAssignmentsReload();
-        } catch (e) {
-        }
         return;
       } catch (e) {
         showToast((e && e.message) ? String(e.message) : 'Ошибка сохранения', { durationMs: 20000, sticky: true });
