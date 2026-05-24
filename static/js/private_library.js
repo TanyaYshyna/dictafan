@@ -16,6 +16,23 @@ function libT(key, params, fallback) {
   return String(key || '');
 }
 
+function _getCreateAssignmentSelectedPositionsForSave(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  if (st.draft && st.draft.selected === true) {
+    const pos = normalizeExercisePositions(st.draft.positions || []);
+    return pos;
+  }
+  const id = Number(st.selectedExerciseId);
+  if (Number.isFinite(id) && id > 0) {
+    const ex = findCreateAssignmentExerciseById(modal, id);
+    const pos = normalizeExercisePositions(ex && ex.positions ? ex.positions : []);
+    return pos;
+  }
+  const sentenceState = getCreateAssignmentSentencesState(modal);
+  const pos = normalizeExercisePositions(Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : []);
+  return pos;
+}
+
 function applyPrivateLibraryTranslations() {
   try {
     document.title = libT('private_library.page_title');
@@ -1059,7 +1076,9 @@ function renderCreateAssignmentExercisesTable(modal) {
     const isDraft = ex && ex.__draft === true;
     const idRaw = isDraft ? 'draft' : String(Number(ex.id));
     const pos = Array.isArray(ex.positions) ? ex.positions : [];
-    const posLabel = pos.length ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '') : 'весь диктант';
+    const posLabel = pos.length
+      ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '')
+      : (isDraft ? '' : 'весь диктант');
 
     const tr = document.createElement('tr');
     tr.dataset.exerciseId = idRaw;
@@ -1197,7 +1216,7 @@ function ensureCreateAssignmentModal() {
                 <table id="create-assignment-exercises-table" style="width:100%; border-collapse: collapse;">
                   <thead>
                     <tr>
-                      <th style="text-align:left; padding:8px 10px;">Предложения</th>
+                      <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.assignments.exercises_column', null, 'Упражнения'))}</th>
                     </tr>
                   </thead>
                   <tbody id="create-assignment-exercisesTableBody"></tbody>
@@ -2885,10 +2904,10 @@ async function openCreateAssignmentModal(dictationId) {
           required_completions: Number(x?.count || 1)
         })).filter(x => x.date);
 
-        const sentenceState = getCreateAssignmentSentencesState(modal);
-        const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
+        const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
+        const selected_sentence_positions = selectedPositions.length ? selectedPositions : null;
 
-        if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
+        if (Array.isArray(selectedPositions) && selectedPositions.length === 0) {
           showToast('Выбери хотя бы одно предложение');
           return;
         }
@@ -2969,7 +2988,15 @@ async function openCreateAssignmentModal(dictationId) {
 
   try {
     const t = document.querySelector('.create-assignment-modal-title-text');
-    if (t) t.textContent = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
+    if (t) {
+      const label = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
+      const star = document.getElementById('create-assignment-unsaved-star');
+      if (star) {
+        t.innerHTML = `${escapeHtml(label)}${star.outerHTML}`;
+      } else {
+        t.textContent = label;
+      }
+    }
   } catch (e) {
   }
 

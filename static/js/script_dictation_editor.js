@@ -226,7 +226,7 @@ function renderExercisesTable() {
 
     if (!rows.length) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="3" class="exercises-empty">Нет упражнений</td>`;
+        tr.innerHTML = `<td colspan="2" class="exercises-empty">Нет упражнений</td>`;
         tbody.appendChild(tr);
         return;
     }
@@ -235,7 +235,6 @@ function renderExercisesTable() {
         const isDraft = ex && ex.__draft === true;
         const idRaw = isDraft ? 'draft' : String(Number(ex.id));
         const positions = Array.isArray(ex.positions) ? ex.positions : [];
-        const title = (ex.title && String(ex.title).trim()) ? String(ex.title).trim() : _positionsToTitle(positions);
         const posLabel = positions && positions.length ? _positionsToTitle(positions).replace(/^s:\s*/g, '') : 'весь диктант';
 
         const tr = document.createElement('tr');
@@ -251,14 +250,7 @@ function renderExercisesTable() {
         } else if (__dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id)) {
             tr.classList.add('selected');
         }
-        const isSelected = (isDraft && (__dictationExercisesState.draft && __dictationExercisesState.draft.selected === true))
-            || (!isDraft && __dictationExercisesState.selectedExerciseId && Number(__dictationExercisesState.selectedExerciseId) === Number(ex.id));
-        const titleCellHtml = isSelected
-            ? `<textarea class="sentence-text exercise-title-input" data-exercise-id="${escapeHtml(idRaw)}" rows="1">${escapeHtml(title)}</textarea>`
-            : `${escapeHtml(title)}`;
-
         tr.innerHTML = `
-            <td class="exercise-title-cell col-original panel-original">${titleCellHtml}</td>
             <td class="exercise-positions-cell">${escapeHtml(posLabel)}</td>
             <td class="exercise-actions-cell"></td>
         `;
@@ -270,9 +262,6 @@ function renderExercisesTable() {
         tbody.addEventListener('click', (e) => {
             const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
             if (!row) return;
-            if (e && e.target && (e.target.classList && e.target.classList.contains('exercise-title-input'))) {
-                return;
-            }
             e.preventDefault();
             e.stopPropagation();
             const idRaw = row.dataset.exerciseId;
@@ -283,26 +272,6 @@ function renderExercisesTable() {
             const id = Number(idRaw);
             if (!Number.isFinite(id)) return;
             selectExerciseById(id);
-        });
-
-        tbody.addEventListener('input', (e) => {
-            const inp = e && e.target ? e.target.closest('textarea.exercise-title-input, input.exercise-title-input') : null;
-            if (!inp) return;
-            const idRaw = inp.dataset.exerciseId;
-            const v = String(inp.value || '').trim();
-            if (idRaw === 'draft') {
-                if (!__dictationExercisesState.draft) return;
-                __dictationExercisesState.draft.title = v;
-                __dictationExercisesState.draft.customTitle = true;
-            } else {
-                const id = Number(idRaw);
-                if (!Number.isFinite(id)) return;
-                const ex = _findExerciseById(id);
-                if (!ex) return;
-                ex.title = v;
-                ex.customTitle = true;
-            }
-            try { markExercisesAsUnsaved(); } catch (e2) {}
         });
     }
 }
