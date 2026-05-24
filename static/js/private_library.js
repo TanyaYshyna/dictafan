@@ -33,6 +33,44 @@ function _getCreateAssignmentSelectedPositionsForSave(modal) {
   return pos;
 }
 
+function _getCreateAssignmentExercisesPayloadForSave(modal) {
+  try {
+    const st = getCreateAssignmentExercisesState(modal);
+    const items = getVisibleCreateAssignmentExercises(modal);
+    const out = [];
+
+    // If there's an active draft with positions, include it too.
+    if (st && st.draft && st.draft.selected === true) {
+      const pos = normalizeExercisePositions(st.draft.positions || []);
+      if (pos && pos.length) {
+        out.push({ positions: pos });
+      }
+    }
+
+    (Array.isArray(items) ? items : []).forEach((ex) => {
+      if (!ex || ex.__deleted === true) return;
+      const positions = normalizeExercisePositions(ex.positions || []);
+      const id = Number(ex.id);
+      const title = (ex.title && String(ex.title).trim()) ? String(ex.title).trim() : null;
+      const row = { positions };
+      if (Number.isFinite(id) && id > 0) row.id = id;
+      if (title) row.title = title;
+      out.push(row);
+    });
+
+    // De-dup by positions key, keep first occurrence.
+    const seen = new Set();
+    return out.filter((x) => {
+      const key = createAssignmentPositionsKey(x.positions || []);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
 function applyPrivateLibraryTranslations() {
   try {
     document.title = libT('private_library.page_title');
@@ -968,8 +1006,8 @@ function setCreateAssignmentExercisesDirty(modal, isDirty) {
   st.dirty = !!isDirty;
   setCreateAssignmentExercisesState(modal, st);
   try {
-    const star = document.getElementById('create-assignment-unsaved-star');
-    if (star) star.style.display = st.dirty ? 'inline' : 'none';
+    const star2 = document.getElementById('create-assignment-dictation-unsaved-star');
+    if (star2) star2.style.display = st.dirty ? 'inline' : 'none';
   } catch (e) {
   }
 }
@@ -1166,7 +1204,7 @@ function ensureCreateAssignmentModal() {
       <div class="modal-header create-assignment-modal-header">
         <div class="create-assignment-modal-title">
           <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}<span id="create-assignment-unsaved-star" class="unsaved-star" style="display:none;">*</span></div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}</div>
         </div>
 
         <div class="create-assignment-modal-header-actions">
@@ -2730,7 +2768,10 @@ async function openCreateAssignmentModal(dictationId) {
     const titleEl = document.getElementById('create-assignment-dictation-title');
     const coverImg = document.getElementById('create-assignment-cover-img');
     const metaEl = document.getElementById('create-assignment-cover-meta');
-    if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
+    if (titleEl) {
+      const title = meta && meta.title ? String(meta.title) : '';
+      titleEl.innerHTML = `${escapeHtml(title)}<span id="create-assignment-dictation-unsaved-star" class="unsaved-star" style="display:none;">*</span>`;
+    }
     if (coverImg) coverImg.src = meta && meta.cover_url ? String(meta.cover_url) : '';
     if (metaEl) {
       const level = meta && meta.level ? String(meta.level) : '—';
@@ -2960,6 +3001,44 @@ async function openCreateAssignmentModal(dictationId) {
 
         const isEdit = Number.isFinite(editId) && editId > 0;
 
+        // If exercises were edited in this modal, persist them to dictation before creating assignment,
+        // so the new exercise becomes available system-wide.
+        try {
+          const exSt = getCreateAssignmentExercisesState(modal);
+          if (exSt && exSt.dirty === true) {
+            const exercisesPayload = _getCreateAssignmentExercisesPayloadForSave(modal);
+            const reconcile = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
+              method: 'POST',
+              body: JSON.stringify({ exercises: exercisesPayload })
+            });
+            if (!reconcile || reconcile.success !== true) {
+              const msg = reconcile && reconcile.error ? String(reconcile.error) : 'Не удалось сохранить упражнения';
+              showToast(msg, { durationMs: 3500 });
+              return;
+            }
+
+            try {
+              const items = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
+              const next = getCreateAssignmentExercisesState(modal);
+              next.exercises = items;
+              next.draft = null;
+              if (next.selectedExerciseId && !findCreateAssignmentExerciseById(modal, Number(next.selectedExerciseId))) {
+                next.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
+              }
+              setCreateAssignmentExercisesState(modal, next);
+              setCreateAssignmentExercisesDirty(modal, false);
+              renderCreateAssignmentExercisesTable(modal);
+            } catch (e) {
+              // If UI refresh failed, still proceed with assignment create; exercises were reconciled.
+              try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) {}
+            }
+          }
+        } catch (e) {
+          // If reconcile step throws, do not create assignment silently with stale data.
+          showToast('Ошибка сохранения упражнений', { durationMs: 2500 });
+          return;
+        }
+
         const res = isEdit
           ? await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}`, {
             method: 'PUT',
@@ -3008,12 +3087,7 @@ async function openCreateAssignmentModal(dictationId) {
     const t = document.querySelector('.create-assignment-modal-title-text');
     if (t) {
       const label = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
-      const star = document.getElementById('create-assignment-unsaved-star');
-      if (star) {
-        t.innerHTML = `${escapeHtml(label)}${star.outerHTML}`;
-      } else {
-        t.textContent = label;
-      }
+      t.textContent = label;
     }
   } catch (e) {
   }
