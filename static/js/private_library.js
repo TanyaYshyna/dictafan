@@ -917,8 +917,209 @@ function renderCreateAssignmentSentencesTable(modal) {
       const setAll = allPos.length > 0 && nextSelected.length === allPos.length;
       setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: setAll ? null : nextSelected }));
       renderCreateAssignmentSentencesTable(modal);
+
+      try {
+        syncCreateAssignmentSelectedExerciseFromSentences(modal);
+      } catch (e2) {
+      }
     });
   }
+}
+
+function getCreateAssignmentExercisesState(modal) {
+  try {
+    const raw = modal && modal.dataset ? modal.dataset.exercisesState : '';
+    if (!raw) return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+    return Object.assign({ exercises: [], selectedExerciseId: null, draft: null, dirty: false }, parsed);
+  } catch (e) {
+    return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+  }
+}
+
+function setCreateAssignmentExercisesState(modal, state) {
+  try {
+    if (!modal || !modal.dataset) return;
+    modal.dataset.exercisesState = JSON.stringify(state && typeof state === 'object' ? state : { exercises: [], selectedExerciseId: null, draft: null, dirty: false });
+  } catch (e) {
+  }
+}
+
+function setCreateAssignmentExercisesDirty(modal, isDirty) {
+  const st = getCreateAssignmentExercisesState(modal);
+  st.dirty = !!isDirty;
+  setCreateAssignmentExercisesState(modal, st);
+  try {
+    const star = document.getElementById('create-assignment-unsaved-star');
+    if (star) star.style.display = st.dirty ? 'inline' : 'none';
+  } catch (e) {
+  }
+}
+
+function normalizeExercisePositions(positions) {
+  const prepared = [];
+  try {
+    for (const x of Array.isArray(positions) ? positions : []) {
+      const n = Number(x);
+      if (!Number.isFinite(n)) continue;
+      prepared.push(n);
+    }
+  } catch (e) {
+  }
+  const uniq = Array.from(new Set(prepared));
+  uniq.sort((a, b) => a - b);
+  return uniq;
+}
+
+function createAssignmentPositionsKey(positions) {
+  try {
+    return JSON.stringify(normalizeExercisePositions(positions));
+  } catch (e) {
+    return '[]';
+  }
+}
+
+function createAssignmentPositionsToTitle(positions) {
+  const arr = normalizeExercisePositions(positions);
+  if (!arr.length) return 'весь диктант';
+  const ranges = [];
+  let start = arr[0];
+  let prev = arr[0];
+  for (let i = 1; i < arr.length; i++) {
+    const cur = arr[i];
+    if (cur === prev + 1) {
+      prev = cur;
+      continue;
+    }
+    ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+    start = cur;
+    prev = cur;
+  }
+  ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+  return `s: ${ranges.join(', ')}`;
+}
+
+function getVisibleCreateAssignmentExercises(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = Array.isArray(st.exercises) ? st.exercises : [];
+  return items.filter(x => x && x.__deleted !== true);
+}
+
+function findCreateAssignmentExerciseById(modal, id) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = Array.isArray(st.exercises) ? st.exercises : [];
+  return items.find(x => x && Number(x.id) === Number(id)) || null;
+}
+
+function syncCreateAssignmentSelectedExerciseFromSentences(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const sent = getCreateAssignmentSentencesState(modal);
+  const sel = Array.isArray(sent.selectedPositions) ? normalizeExercisePositions(sent.selectedPositions) : null;
+  const positions = sel == null ? [] : sel;
+
+  if (st.draft && st.draft.selected === true) {
+    st.draft.positions = positions;
+    setCreateAssignmentExercisesState(modal, st);
+    setCreateAssignmentExercisesDirty(modal, true);
+    try { renderCreateAssignmentExercisesTable(modal); } catch (e2) {}
+    return;
+  }
+
+  const id = Number(st.selectedExerciseId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const ex = findCreateAssignmentExerciseById(modal, id);
+  if (!ex) return;
+  ex.positions = positions;
+  setCreateAssignmentExercisesState(modal, st);
+  setCreateAssignmentExercisesDirty(modal, true);
+  try { renderCreateAssignmentExercisesTable(modal); } catch (e2) {}
+}
+
+function renderCreateAssignmentExercisesTable(modal) {
+  const tbody = document.getElementById('create-assignment-exercisesTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = getVisibleCreateAssignmentExercises(modal);
+  const rows = items.slice();
+  if (st.draft && typeof st.draft === 'object') {
+    rows.push(Object.assign({ __draft: true }, st.draft));
+  }
+
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="2" style="padding:10px; color: rgba(0,0,0,0.55);">Нет упражнений</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  rows.forEach((ex) => {
+    const isDraft = ex && ex.__draft === true;
+    const idRaw = isDraft ? 'draft' : String(Number(ex.id));
+    const pos = Array.isArray(ex.positions) ? ex.positions : [];
+    const posLabel = pos.length ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '') : 'весь диктант';
+
+    const tr = document.createElement('tr');
+    tr.dataset.exerciseId = idRaw;
+    tr.classList.add('exercise-row');
+
+    if (isDraft) {
+      if (st.draft && st.draft.selected === true) tr.classList.add('selected');
+    } else if (st.selectedExerciseId && Number(st.selectedExerciseId) === Number(ex.id)) {
+      tr.classList.add('selected');
+    }
+
+    tr.innerHTML = `
+      <td style="padding:8px 10px;">${escapeHtml(posLabel)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (!tbody.dataset.listenerAttached) {
+    tbody.dataset.listenerAttached = '1';
+    tbody.addEventListener('click', (e) => {
+      const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const idRaw = row.dataset.exerciseId;
+      if (idRaw === 'draft') {
+        selectCreateAssignmentDraftExercise(modal);
+        return;
+      }
+      const id = Number(idRaw);
+      if (!Number.isFinite(id)) return;
+      selectCreateAssignmentExerciseById(modal, id);
+    });
+  }
+}
+
+function selectCreateAssignmentExerciseById(modal, id) {
+  const st = getCreateAssignmentExercisesState(modal);
+  st.selectedExerciseId = id;
+  if (st.draft) st.draft.selected = false;
+  setCreateAssignmentExercisesState(modal, st);
+
+  const ex = findCreateAssignmentExerciseById(modal, id);
+  const positions = ex && Array.isArray(ex.positions) ? normalizeExercisePositions(ex.positions) : [];
+  const curSent = getCreateAssignmentSentencesState(modal);
+  setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: positions.length ? positions : null }));
+  renderCreateAssignmentSentencesTable(modal);
+  renderCreateAssignmentExercisesTable(modal);
+}
+
+function selectCreateAssignmentDraftExercise(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  if (!st.draft) return;
+  st.selectedExerciseId = null;
+  st.draft.selected = true;
+  setCreateAssignmentExercisesState(modal, st);
+  const curSent = getCreateAssignmentSentencesState(modal);
+  setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: [] }));
+  renderCreateAssignmentSentencesTable(modal);
+  renderCreateAssignmentExercisesTable(modal);
 }
 
 function ensureCreateAssignmentModal() {
@@ -946,7 +1147,7 @@ function ensureCreateAssignmentModal() {
       <div class="modal-header create-assignment-modal-header">
         <div class="create-assignment-modal-title">
           <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.assignments.modal_title'))}</div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}<span id="create-assignment-unsaved-star" class="unsaved-star" style="display:none;">*</span></div>
         </div>
 
         <div class="create-assignment-modal-header-actions">
@@ -978,7 +1179,7 @@ function ensureCreateAssignmentModal() {
             <div id="create-assignment-cover-meta" class="create-assignment-cover-meta"></div>
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row">
-                <select id="create-assignment-group" class="create-assignment-select"></select>
+                <div></div>
               </div>
             </div>
           </div>
@@ -986,14 +1187,22 @@ function ensureCreateAssignmentModal() {
 
         <!-- НИЖНЯЯ ПАНЕЛЬ -->
         <div id="create-assignment-bottom" class="create-assignment-bottom">
-          <div id="create-assignment-days-panel" class="create-assignment-panel create-assignment-panel--days">
+          <div id="create-assignment-exercises-panel" class="create-assignment-panel create-assignment-panel--days">
             <div class="create-assignment-panel-body">
               <div class="create-assignment-panel-actions">
-                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn create-assignment-icon-btn" title="${escapeHtml(libT('private_library.assignments.add_day'))}">
-                  <i data-lucide="plus"></i>
-                </button>
+                <button type="button" id="create-assignment-exercise-create" class="topbar-icon-btn create-assignment-icon-btn" title="Создать упражнение"><i data-lucide="plus"></i></button>
+                <button type="button" id="create-assignment-exercise-delete" class="topbar-icon-btn create-assignment-icon-btn" title="Удалить упражнение"><i data-lucide="trash-2"></i></button>
               </div>
-              <div id="create-assignment-days-table"></div>
+              <div style="max-height: 420px; overflow: auto;">
+                <table id="create-assignment-exercises-table" style="width:100%; border-collapse: collapse;">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left; padding:8px 10px;">Предложения</th>
+                    </tr>
+                  </thead>
+                  <tbody id="create-assignment-exercisesTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -2476,39 +2685,26 @@ async function openCreateAssignmentModal(dictationId) {
   } catch (e) {
   }
 
-  const idInput = document.getElementById('create-assignment-dictation-id');
-  if (idInput) idInput.value = String(dictationId || '');
+  const today = getTodayIsoDate();
 
-  const groupSelect = document.getElementById('create-assignment-group');
-  if (groupSelect) {
-    groupSelect.innerHTML = '';
-  }
+  const editAssignmentId = (() => {
+    try {
+      const raw = modal.dataset.editAssignmentId;
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch (e) {
+      return null;
+    }
+  })();
 
   try {
-    const groups = await loadMyGroupsForAssignmentModal();
-    if (groupSelect) {
-      groups.forEach(g => {
-        const o = document.createElement('option');
-        o.value = String(g.id);
-        o.textContent = String(g.title || `Группа ${g.id}`);
-        groupSelect.appendChild(o);
-      });
-
-      const last = getAssignmentLastGroupId();
-      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
-        groupSelect.value = last;
-      } else if (groups.length > 0) {
-        groupSelect.value = String(groups[0].id);
-      }
-    }
+    modal.__assignmentDays = [{ date: today, required_completions: 1 }];
   } catch (e) {
   }
 
-  if (groupSelect) {
-    groupSelect.onchange = () => {
-      setAssignmentLastGroupId(groupSelect.value);
-    };
-  }
+  const idInput = document.getElementById('create-assignment-dictation-id');
+  if (idInput) idInput.value = String(dictationId || '');
 
   try {
     const meta = await loadDictationMetaForAssignmentModal(dictationId);
@@ -2534,93 +2730,24 @@ async function openCreateAssignmentModal(dictationId) {
     renderCreateAssignmentSentencesTable(modal);
   }
 
-  const daysAddBtn = document.getElementById('create-assignment-days-add');
+  setCreateAssignmentExercisesState(modal, { exercises: [], selectedExerciseId: null, draft: null, dirty: false });
+  setCreateAssignmentExercisesDirty(modal, false);
 
-  const today = getTodayIsoDate();
+  try {
+    const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`, { method: 'GET' });
+    const items = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
+    const st = getCreateAssignmentExercisesState(modal);
+    st.exercises = items;
+    st.draft = null;
+    st.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
+    setCreateAssignmentExercisesState(modal, st);
 
-  setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
-  renderCreateAssignmentDaysTable(modal);
-
-  const editAssignmentId = (() => {
-    try {
-      const raw = modal.dataset.editAssignmentId;
-      if (!raw) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    } catch (e) {
-      return null;
+    renderCreateAssignmentExercisesTable(modal);
+    if (st.selectedExerciseId) {
+      selectCreateAssignmentExerciseById(modal, Number(st.selectedExerciseId));
     }
-  })();
-
-  if (editAssignmentId) {
-    try {
-      const a = await loadAssignmentForTeacherModal(editAssignmentId);
-      if (a && typeof a === 'object') {
-        try {
-          if (groupSelect && a.group_id != null) {
-            const v = String(a.group_id);
-            if (groupSelect.querySelector(`option[value="${CSS.escape(v)}"]`)) {
-              groupSelect.value = v;
-              setAssignmentLastGroupId(v);
-            }
-          }
-        } catch (e) {
-        }
-
-        try {
-          const daysSrc = Array.isArray(a.days) ? a.days : [];
-          const preparedDays = (daysSrc.length ? daysSrc : [{ date: today, required_completions: 1 }])
-            .map(x => ({
-              date: String(x && (x.date || x.day_date) ? (x.date || x.day_date) : '').trim(),
-              count: Number(x && (x.required_completions ?? x.count) ? (x.required_completions ?? x.count) : 1) || 1,
-            }))
-            .filter(x => x.date);
-
-          setCreateAssignmentDaysState(modal, preparedDays.length ? preparedDays : [{ date: today, count: 1 }]);
-          renderCreateAssignmentDaysTable(modal);
-          if (daysAddBtn) daysAddBtn.disabled = false;
-        } catch (e) {
-        }
-
-        try {
-          const curSent = getCreateAssignmentSentencesState(modal);
-          const selected = Array.isArray(a.selected_sentence_positions)
-            ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-            : null;
-          setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: selected && selected.length ? selected : null }));
-          renderCreateAssignmentSentencesTable(modal);
-        } catch (e) {
-        }
-      }
-    } catch (e) {
-    }
-  } else {
-    if (daysAddBtn) daysAddBtn.disabled = false;
-  }
-
-  if (daysAddBtn) {
-    daysAddBtn.onclick = () => {
-      const cur0 = getCreateAssignmentDaysState(modal);
-      const uniq0 = Array.from(new Set(cur0.map(x => String(x && x.date ? x.date : '').trim()).filter(Boolean)));
-      if (uniq0.length >= 7) {
-        try { showToast('Максимум 7 дней'); } catch (e) { }
-        return;
-      }
-      const cur = getCreateAssignmentDaysState(modal);
-      const last = cur.length > 0 ? cur[cur.length - 1] : null;
-      const lastDate = last && last.date ? String(last.date) : today;
-      cur.push({ date: addDaysIsoDate(lastDate, 1), count: 1 });
-      setCreateAssignmentDaysState(modal, cur);
-
-      const v = validateAssignmentDaysWeekLimit(modal);
-      if (!v.ok) {
-        cur.pop();
-        setCreateAssignmentDaysState(modal, cur);
-        try { showToast(v.reason); } catch (e) { }
-        return;
-      }
-      renderCreateAssignmentDaysTable(modal);
-    };
+  } catch (e) {
+    renderCreateAssignmentExercisesTable(modal);
   }
 
   const toggleAllBtn = document.getElementById('create-assignment-sentences-toggle-all');
@@ -2638,6 +2765,11 @@ async function openCreateAssignmentModal(dictationId) {
 
       setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: allSelected ? [] : null }));
       renderCreateAssignmentSentencesTable(modal);
+
+      try {
+        syncCreateAssignmentSelectedExerciseFromSentences(modal);
+      } catch (e2) {
+      }
     };
   }
 
@@ -2652,6 +2784,74 @@ async function openCreateAssignmentModal(dictationId) {
   modal.onclick = (e) => {
     if (e.target === modal) close();
   };
+
+  const createBtn = document.getElementById('create-assignment-exercise-create');
+  if (createBtn && createBtn.dataset.listenerAttached !== '1') {
+    createBtn.dataset.listenerAttached = '1';
+    createBtn.addEventListener('click', () => {
+      const st = getCreateAssignmentExercisesState(modal);
+
+      if (st.draft && st.draft.selected === true) {
+        const pos = normalizeExercisePositions(st.draft.positions || []);
+        if (!pos.length) {
+          try { showToast('Выбери хотя бы одно предложение'); } catch (e) { }
+          return;
+        }
+        const key = createAssignmentPositionsKey(pos);
+        const exists = getVisibleCreateAssignmentExercises(modal).some(x => x && createAssignmentPositionsKey(x.positions || []) === key);
+        if (exists) {
+          try { showToast('Такое упражнение уже существует'); } catch (e) { }
+          return;
+        }
+
+        const nextId = -Math.floor(Math.random() * 1000000000) - 1;
+        st.exercises = Array.isArray(st.exercises) ? st.exercises : [];
+        st.exercises.push({ id: nextId, positions: pos });
+        st.draft = null;
+        st.selectedExerciseId = nextId;
+      }
+
+      st.draft = { positions: [], selected: true };
+      st.selectedExerciseId = null;
+      setCreateAssignmentExercisesState(modal, st);
+      setCreateAssignmentExercisesDirty(modal, true);
+
+      const curSent = getCreateAssignmentSentencesState(modal);
+      setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: [] }));
+      renderCreateAssignmentSentencesTable(modal);
+      renderCreateAssignmentExercisesTable(modal);
+    });
+  }
+
+  const deleteBtn = document.getElementById('create-assignment-exercise-delete');
+  if (deleteBtn && deleteBtn.dataset.listenerAttached !== '1') {
+    deleteBtn.dataset.listenerAttached = '1';
+    deleteBtn.addEventListener('click', () => {
+      const st = getCreateAssignmentExercisesState(modal);
+      if (st.draft && st.draft.selected === true) {
+        st.draft = null;
+        setCreateAssignmentExercisesState(modal, st);
+        setCreateAssignmentExercisesDirty(modal, true);
+        renderCreateAssignmentExercisesTable(modal);
+        return;
+      }
+
+      const id = Number(st.selectedExerciseId);
+      if (!Number.isFinite(id)) return;
+      const ex = findCreateAssignmentExerciseById(modal, id);
+      if (!ex) return;
+      const pos = Array.isArray(ex.positions) ? ex.positions : [];
+      if (!pos.length) {
+        try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e) { }
+        return;
+      }
+      ex.__deleted = true;
+      st.selectedExerciseId = null;
+      setCreateAssignmentExercisesState(modal, st);
+      setCreateAssignmentExercisesDirty(modal, true);
+      renderCreateAssignmentExercisesTable(modal);
+    });
+  }
 
   if (saveBtn) {
     saveBtn.onclick = async () => {

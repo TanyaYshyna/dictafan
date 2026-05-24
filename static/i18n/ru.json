@@ -506,7 +506,7 @@
     },
     "dictation_card_actions": {
       "title": "Действия",
-      "create_assignment_new": "Новое задание",
+      "create_assignment_new": "Упражнения",
       "cache": "Получить в кеш",
       "edit": "Редактировать",
       "show_in_book": "Показать в книге",

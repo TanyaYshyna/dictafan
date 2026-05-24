@@ -764,6 +764,35 @@ def api_list_dictation_exercises(dictation_id: int):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises/reconcile', methods=['POST'])
+@jwt_required()
+def api_reconcile_dictation_exercises(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    exercises_payload = data.get('exercises')
+
+    from helpers.db_dictations import reconcile_dictation_exercises, list_dictation_exercises
+
+    try:
+        reconcile_res = reconcile_dictation_exercises(int(dictation_id), exercises_payload)
+        items = list_dictation_exercises(int(dictation_id))
+        return jsonify({"success": True, "result": reconcile_res, "exercises": items})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises', methods=['POST'])
 @jwt_required()
 def api_create_dictation_exercise(dictation_id: int):

@@ -506,7 +506,7 @@
     },
     "dictation_card_actions": {
       "title": "Actions",
-      "create_assignment_new": "New assignment",
+      "create_assignment_new": "Exercises",
       "cache": "Cache",
       "edit": "Edit",
       "show_in_book": "Show in book",
