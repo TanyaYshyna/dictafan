@@ -3064,7 +3064,7 @@ async function openCreateAssignmentModal(dictationId) {
           const friendly = (rawErr && rawErr.toLowerCase().includes('overlap'))
             ? 'На выбранные даты уже есть задание для этого диктанта и этого же набора предложений. Если хочешь второе задание — выбери другой набор предложений или другую дату.'
             : (rawErr || 'Ошибка сохранения');
-          showToast(friendly, { durationMs: 4000 });
+          showToast(friendly, { durationMs: 20000, sticky: true });
           return;
         }
 
@@ -3076,7 +3076,7 @@ async function openCreateAssignmentModal(dictationId) {
         }
         return;
       } catch (e) {
-        showToast('Ошибка сохранения', { durationMs: 2500 });
+        showToast((e && e.message) ? String(e.message) : 'Ошибка сохранения', { durationMs: 20000, sticky: true });
       }
     };
   }
@@ -4075,8 +4075,9 @@ async function apiRequest(url, options = {}) {
 }
 
 function showToast(message, opts = {}) {
-  const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1000;
+  const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 4000;
   const beepUrl = typeof opts.beepUrl === 'string' ? opts.beepUrl : null;
+  const sticky = opts && opts.sticky === true;
 
   let el = document.getElementById('auto-toast');
   if (!el) {
@@ -4086,7 +4087,7 @@ function showToast(message, opts = {}) {
     el.style.left = '50%';
     el.style.top = '24px';
     el.style.transform = 'translateX(-50%)';
-    el.style.zIndex = '100000';
+    el.style.zIndex = '200500';
     el.style.background = 'rgba(0,0,0,0.78)';
     el.style.color = '#fff';
     el.style.padding = '10px 14px';
@@ -4094,7 +4095,15 @@ function showToast(message, opts = {}) {
     el.style.fontSize = '14px';
     el.style.maxWidth = 'min(92vw, 520px)';
     el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+    el.style.userSelect = 'text';
+    el.style.cursor = 'pointer';
     el.style.display = 'none';
+    el.addEventListener('click', () => {
+      try {
+        el.style.display = 'none';
+      } catch (e) {
+      }
+    });
     document.body.appendChild(el);
   }
 
@@ -4111,13 +4120,15 @@ function showToast(message, opts = {}) {
   }
 
   if (el._hideTimer) window.clearTimeout(el._hideTimer);
-  el._hideTimer = window.setTimeout(() => {
-    try {
-      const node = document.getElementById('auto-toast');
-      if (node) node.style.display = 'none';
-    } catch (e) {
-    }
-  }, Math.max(0, durationMs));
+  if (!sticky) {
+    el._hideTimer = window.setTimeout(() => {
+      try {
+        const node = document.getElementById('auto-toast');
+        if (node) node.style.display = 'none';
+      } catch (e) {
+      }
+    }, Math.max(0, durationMs));
+  }
 }
 
 const deskToggleInFlight = new Set();
