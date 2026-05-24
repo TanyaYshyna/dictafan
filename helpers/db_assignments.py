@@ -82,6 +82,207 @@ def _validate_max_range(start_d: date, end_d: date) -> None:
         raise ValueError("Assignment date range must be <= 7 days")
 
 
+def _normalize_positions_for_plan(positions: Any) -> list[int]:
+    if positions is None:
+        return []
+    if isinstance(positions, str):
+        raw = positions.strip()
+        if not raw or raw == '[]':
+            return []
+        try:
+            import json
+
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                out: list[int] = []
+                for x in parsed:
+                    try:
+                        out.append(int(x))
+                    except Exception:
+                        continue
+                return sorted({x for x in out if x > 0})
+        except Exception:
+            pass
+        if ',' in raw:
+            out2: list[int] = []
+            for p in raw.split(','):
+                try:
+                    out2.append(int(p.strip()))
+                except Exception:
+                    continue
+            return sorted({x for x in out2 if x > 0})
+        try:
+            v = int(raw)
+            return [v] if v > 0 else []
+        except Exception:
+            return []
+    if isinstance(positions, (list, tuple, set)):
+        out3: list[int] = []
+        for x in list(positions):
+            try:
+                out3.append(int(x))
+            except Exception:
+                continue
+        return sorted({x for x in out3 if x > 0})
+    return []
+
+
+def list_plan_tasks_for_teacher(group_id: int, dictation_id: int, teacher_user_id: int) -> list[dict]:
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_teacher_of_group(cur, int(group_id), int(teacher_user_id))
+        cur.execute(
+            """
+            SELECT id, groups_id, dictation_id, positions, date_plan, repeat_count, created_at, updated_at
+            FROM plan_tasks
+            WHERE groups_id = %s AND dictation_id = %s
+            ORDER BY date_plan ASC, id ASC
+            """,
+            (int(group_id), int(dictation_id)),
+        )
+        rows = cur.fetchall() or []
+        out: list[dict] = []
+        for r in rows:
+            if isinstance(r, dict):
+                out.append(
+                    {
+                        'id': int(r.get('id')),
+                        'groups_id': int(r.get('groups_id')),
+                        'dictation_id': int(r.get('dictation_id')),
+                        'positions': list(r.get('positions') or []),
+                        'date_plan': r.get('date_plan').isoformat() if r.get('date_plan') else None,
+                        'repeat_count': int(r.get('repeat_count') or 1),
+                        'created_at': r.get('created_at').isoformat() if r.get('created_at') else None,
+                        'updated_at': r.get('updated_at').isoformat() if r.get('updated_at') else None,
+                    }
+                )
+            else:
+                out.append(
+                    {
+                        'id': int(r[0]),
+                        'groups_id': int(r[1]),
+                        'dictation_id': int(r[2]),
+                        'positions': list(r[3] or []),
+                        'date_plan': r[4].isoformat() if r[4] else None,
+                        'repeat_count': int(r[5] or 1),
+                        'created_at': r[6].isoformat() if r[6] else None,
+                        'updated_at': r[7].isoformat() if r[7] else None,
+                    }
+                )
+        return out
+    finally:
+        cur.close()
+        conn.close()
+
+
+def reconcile_plan_tasks_for_teacher(group_id: int, dictation_id: int, teacher_user_id: int, tasks_payload: Any) -> dict:
+    if tasks_payload is None:
+        tasks_payload = []
+    if not isinstance(tasks_payload, list):
+        raise ValueError('tasks must be list')
+
+    conn, cur = get_db_cursor()
+    try:
+        _ensure_teacher_of_group(cur, int(group_id), int(teacher_user_id))
+
+        cur.execute(
+            """
+            SELECT id
+            FROM plan_tasks
+            WHERE groups_id = %s AND dictation_id = %s
+            """,
+            (int(group_id), int(dictation_id)),
+        )
+        existing = cur.fetchall() or []
+        existing_ids = {int(r.get('id') if isinstance(r, dict) else r[0]) for r in existing}
+
+        payload_ids: set[int] = set()
+        created_ids: list[int] = []
+        updated_ids: list[int] = []
+
+        for item in tasks_payload:
+            if not isinstance(item, dict):
+                continue
+            raw_id = item.get('id')
+            item_id = None
+            try:
+                if raw_id is not None and raw_id != '':
+                    item_id = int(raw_id)
+            except Exception:
+                item_id = None
+
+            positions = _normalize_positions_for_plan(item.get('positions'))
+            day_d = _parse_date(item.get('date_plan') or item.get('date'))
+            if not day_d:
+                raise ValueError('date_plan is required')
+            try:
+                repeat = int(item.get('repeat_count') or item.get('count') or item.get('number') or 1)
+            except Exception:
+                raise ValueError('repeat_count must be int')
+            if repeat <= 0:
+                raise ValueError('repeat_count must be > 0')
+
+            if item_id and item_id in existing_ids:
+                payload_ids.add(item_id)
+                cur.execute(
+                    """
+                    UPDATE plan_tasks
+                    SET positions = %s,
+                        date_plan = %s,
+                        repeat_count = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s AND groups_id = %s AND dictation_id = %s
+                    """,
+                    (positions, day_d, repeat, int(item_id), int(group_id), int(dictation_id)),
+                )
+                updated_ids.append(int(item_id))
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO plan_tasks (groups_id, dictation_id, positions, date_plan, repeat_count, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (groups_id, dictation_id, positions, date_plan)
+                    DO UPDATE SET repeat_count = EXCLUDED.repeat_count, updated_at = CURRENT_TIMESTAMP
+                    RETURNING id
+                    """,
+                    (int(group_id), int(dictation_id), positions, day_d, int(repeat)),
+                )
+                row = cur.fetchone()
+                if row is not None:
+                    new_id = int(row.get('id') if isinstance(row, dict) else row[0])
+                    created_ids.append(new_id)
+
+        to_delete = sorted(existing_ids - payload_ids)
+        deleted_count = 0
+        if to_delete:
+            cur.execute(
+                """
+                DELETE FROM plan_tasks
+                WHERE id = ANY(%s)
+                  AND groups_id = %s
+                  AND dictation_id = %s
+                """,
+                (to_delete, int(group_id), int(dictation_id)),
+            )
+            deleted_count = int(cur.rowcount or 0)
+
+        conn.commit()
+        return {
+            'created_ids': created_ids,
+            'updated_ids': updated_ids,
+            'deleted_count': deleted_count,
+        }
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        cur.close()
+        conn.close()
+
+
 def get_assignment_for_teacher(assignment_id: int, teacher_user_id: int) -> dict:
     conn, cur = get_db_cursor()
     try:

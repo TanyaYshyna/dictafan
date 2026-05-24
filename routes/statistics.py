@@ -1939,6 +1939,23 @@ def save_success():
         completion_count_after = data.get('completion_count_after')
         selected_sentence_positions = data.get('selected_sentence_positions')
         dictation_language_code = data.get('dictation_language_code')
+
+        started_at = None
+        try:
+            started_at_iso = data.get('started_at') or data.get('started_at_iso')
+            started_at_ms = data.get('started_at_ms')
+            started_at_tz_offset_min = data.get('started_at_tz_offset_min')
+            if started_at_iso:
+                started_at = datetime.fromisoformat(str(started_at_iso))
+            elif started_at_ms is not None:
+                ms = int(started_at_ms)
+                tz_min = int(started_at_tz_offset_min) if started_at_tz_offset_min is not None else int(completed_at_tz_offset_min) if completed_at_tz_offset_min is not None else None
+                if tz_min is None:
+                    started_at = datetime.utcfromtimestamp(ms / 1000.0)
+                else:
+                    started_at = datetime.utcfromtimestamp((ms - (tz_min * 60 * 1000)) / 1000.0)
+        except Exception:
+            started_at = None
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -1971,6 +1988,7 @@ def save_success():
             source_group_id=source_group_id,
             selected_sentence_positions=selected_sentence_positions,
             dictation_language_code=dictation_language_code,
+            started_at=started_at,
         )
 
         # Telegram уведомления отправляются отдельной процедурой /teacher_report/send_auto

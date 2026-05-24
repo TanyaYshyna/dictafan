@@ -69,7 +69,8 @@ def _upsert_history_by_day(
     user_id: int,
     teacher_id: int,
     dictation_language_code,
-    exercise_id: int,
+    dictation_id: int,
+    positions=None,
     date_plan,
     date_fact,
     perfect_delta: int = 0,
@@ -78,13 +79,15 @@ def _upsert_history_by_day(
     lead_time_delta: int = 0,
     successes_delta: int = 0,
 ) -> None:
+    positions_arr = _normalize_selected_sentence_positions(positions)
     cur.execute(
         """
         INSERT INTO history_by_day (
             user_id,
             teacher_id,
             dictation_language_code,
-            exercise_id,
+            dictation_id,
+            positions,
             date_plan,
             date_fact,
             perfect_count,
@@ -95,8 +98,8 @@ def _upsert_history_by_day(
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, teacher_id, exercise_id, date_plan, date_fact)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
             corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
@@ -110,7 +113,8 @@ def _upsert_history_by_day(
             int(user_id),
             int(teacher_id),
             dictation_language_code,
-            int(exercise_id),
+            int(dictation_id),
+            positions_arr,
             date_plan,
             date_fact,
             int(perfect_delta or 0),
@@ -250,7 +254,6 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
             row = cur.fetchone()
 
             try:
-                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
                 if type_activity == 'perfect':
                     perfect_delta = int(number or 0)
                     corrected_delta = 0
@@ -269,7 +272,8 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
                     user_id=int(user_id),
                     teacher_id=int(user_id),
                     dictation_language_code=dictation_language_code,
-                    exercise_id=int(exercise_id),
+                    dictation_id=int(dictation_id),
+                    positions=selected_sentence_positions_arr,
                     date_plan=target_date,
                     date_fact=target_date,
                     perfect_delta=perfect_delta,
@@ -526,13 +530,13 @@ def add_activity_bulk(
             row = cur.fetchone()
 
             try:
-                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
                 _upsert_history_by_day(
                     cur,
                     user_id=int(user_id),
                     teacher_id=int(user_id),
                     dictation_language_code=dictation_language_code,
-                    exercise_id=int(exercise_id),
+                    dictation_id=int(dictation_id),
+                    positions=selected_sentence_positions_arr,
                     date_plan=target_date,
                     date_fact=target_date,
                     perfect_delta=int(perfect_count_int or 0),
@@ -742,7 +746,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -785,18 +789,22 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            # По новой логике history_successes хранит только "полный диктант".
+            # Любые выбранные предложения (subset) запрещаем.
+            normalized_pos = _normalize_selected_sentence_positions(selected_sentence_positions)
+            if normalized_pos and len(normalized_pos) > 0:
+                raise ValueError('history_successes supports only full dictation')
+
             cur.execute("""
                 INSERT INTO history_successes 
-                (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at
-            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions))
+                (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at
+            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, None, started_at))
 
             row = cur.fetchone()
 
             try:
-                selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
-                exercise_id = _ensure_dictation_exercise(cur, int(dictation_id), selected_sentence_positions_arr)
                 teacher_id = _resolve_teacher_id(cur, int(user_id), source_group_id)
                 date_fact = datetime.now().date()
                 date_plan = date_fact
@@ -806,7 +814,8 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     user_id=int(user_id),
                     teacher_id=int(teacher_id),
                     dictation_language_code=dictation_language_code,
-                    exercise_id=int(exercise_id),
+                    dictation_id=int(dictation_id),
+                    positions=[],
                     date_plan=date_plan,
                     date_fact=date_fact,
                     perfect_delta=int(perfect_count or 0),
@@ -833,8 +842,9 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'time_ms': row[9],
                 'source_group_id': row[10],
                 'selected_sentence_positions': list(row[11] or []) if row[11] is not None else None,
-                'created_at': row[12].isoformat() if row[12] else None,
-                'updated_at': row[13].isoformat() if row[13] else None,
+                'started_at': row[12].isoformat() if row[12] else None,
+                'created_at': row[13].isoformat() if row[13] else None,
+                'updated_at': row[14].isoformat() if row[14] else None,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')

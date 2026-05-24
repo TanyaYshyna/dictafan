@@ -1347,6 +1347,516 @@ function ensureCreateAssignmentModal() {
   return modal;
 }
 
+function ensurePlanTasksModal() {
+  let modal = document.getElementById('plan-tasks-modal');
+  if (modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'plan-tasks-modal';
+  modal.className = 'modal';
+  modal.style.display = 'none';
+  modal.style.position = 'fixed';
+  modal.style.left = '0';
+  modal.style.top = '0';
+  modal.style.width = '100%';
+  modal.style.height = '100%';
+  modal.style.justifyContent = 'center';
+  modal.style.alignItems = 'center';
+  modal.style.backgroundColor = 'rgba(0, 0, 0, 0.35)';
+  modal.style.backdropFilter = 'blur(2px)';
+  modal.style.webkitBackdropFilter = 'blur(2px)';
+  modal.style.zIndex = '100200';
+
+  modal.innerHTML = `
+    <div class="modal-content create-assignment-modal-content">
+      <div class="modal-header create-assignment-modal-header">
+        <div class="create-assignment-modal-title">
+          <div class="create-assignment-modal-title-icon"><i data-lucide="calendar-plus"></i></div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.plan_tasks.title', null, 'Запланировать'))}</div>
+        </div>
+
+        <div class="create-assignment-modal-header-actions">
+          <button type="button" id="plan-tasks-save" class="btn-primary create-assignment-save-btn">
+            <i data-lucide="save"></i>
+            <span>${escapeHtml(libT('private_library.common.save'))}</span>
+          </button>
+          <button type="button" id="plan-tasks-close" class="modal-close create-assignment-close-btn" title="${escapeHtml(libT('private_library.common.close'))}">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-body create-assignment-modal-body">
+        <input type="hidden" id="plan-tasks-dictation-id" value="">
+        <div class="create-assignment-top">
+          <div class="create-assignment-cover">
+            <div class="create-assignment-cover-box">
+              <img id="plan-tasks-cover-img" alt="" class="create-assignment-cover-img" />
+            </div>
+          </div>
+          <div class="create-assignment-top-right">
+            <div id="plan-tasks-dictation-title" class="create-assignment-dictation-title"></div>
+            <div id="plan-tasks-cover-meta" class="create-assignment-cover-meta"></div>
+            <div class="create-assignment-top-controls">
+              <div class="create-assignment-top-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <select id="plan-tasks-group" style="height:40px; border-radius:12px; padding:0 10px; border:1px solid rgba(0,0,0,0.16); min-width: 240px;"></select>
+                <button type="button" id="plan-tasks-add" class="topbar-icon-btn" style="height:40px; width:40px;" title="${escapeHtml(libT('private_library.plan_tasks.add', null, 'Добавить'))}"><i data-lucide="plus"></i></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="create-assignment-bottom" style="display:block;">
+          <div class="create-assignment-panel create-assignment-panel--days" style="width:100%;">
+            <div class="create-assignment-panel-body">
+              <div style="max-height:520px; overflow:auto;">
+                <table class="create-assignment-table" style="width:100%; border-collapse: collapse; font-size: 13px;">
+                  <thead>
+                    <tr style="border-bottom:1px solid rgba(0,0,0,0.08);">
+                      <th style="text-align:left; padding:8px 10px; width:34%;">${escapeHtml(libT('private_library.plan_tasks.date', null, 'Дата'))}</th>
+                      <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.plan_tasks.exercise', null, 'Упражнение'))}</th>
+                      <th style="text-align:left; padding:8px 10px; width:120px;"><i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i></th>
+                      <th style="text-align:center; padding:8px 10px; width:52px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="plan-tasks-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
+
+  return modal;
+}
+
+function _getPlanTasksState(modal) {
+  try {
+    const raw = modal.dataset.planTasksState;
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function _setPlanTasksState(modal, tasks) {
+  try {
+    modal.dataset.planTasksState = JSON.stringify(Array.isArray(tasks) ? tasks : []);
+  } catch (e) {
+  }
+}
+
+function _getPlanTasksExercises(modal) {
+  try {
+    const raw = modal.dataset.planTasksExercises;
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function _setPlanTasksExercises(modal, exercises) {
+  try {
+    modal.dataset.planTasksExercises = JSON.stringify(Array.isArray(exercises) ? exercises : []);
+  } catch (e) {
+  }
+}
+
+function _planPositionsKey(pos) {
+  try {
+    const arr = Array.isArray(pos) ? pos.map(x => Number(x)).filter(x => Number.isFinite(x)).sort((a, b) => a - b) : [];
+    return arr.join(',');
+  } catch (e) {
+    return '';
+  }
+}
+
+function _planExerciseLabel(ex) {
+  try {
+    if (!ex) return '';
+    const t = (ex.title != null) ? String(ex.title).trim() : '';
+    if (t) return t;
+    const pos = Array.isArray(ex.positions) ? ex.positions : [];
+    if (!pos.length) return 'Весь диктант';
+    return `s: ${pos.join(', ')}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+async function _loadGroupsForPlanTasksModal() {
+  const res = await apiRequest('/groups/api/my', { method: 'GET' });
+  if (!res || !res.success) return [];
+  const groups = Array.isArray(res.groups) ? res.groups : [];
+
+  const personal = groups.filter(g => g && g.is_personal === true);
+  const activeTeacher = groups.filter(g => g && !g.archived_at && g.is_personal !== true);
+
+  const out = [];
+  (personal || []).forEach(g => out.push(g));
+  (activeTeacher || []).forEach(g => out.push(g));
+  return out;
+}
+
+function _fillPlanTasksGroupsSelect(groups, preferredGroupId) {
+  const sel = document.getElementById('plan-tasks-group');
+  if (!sel) return null;
+  sel.innerHTML = '';
+
+  const items = Array.isArray(groups) ? groups : [];
+  items.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = String(g && g.id != null ? g.id : '');
+    const isPersonal = Boolean(g && g.is_personal === true);
+    const title = g && g.title ? String(g.title) : '';
+    opt.textContent = isPersonal ? 'Моя группа' : title;
+    sel.appendChild(opt);
+  });
+
+  const pick = (() => {
+    const pref = Number(preferredGroupId);
+    if (Number.isFinite(pref) && pref > 0 && items.some(g => Number(g && g.id) === pref)) return String(pref);
+    const p = items.find(g => g && g.is_personal === true);
+    if (p && p.id != null) return String(p.id);
+    const a = items.find(g => g && !g.archived_at);
+    if (a && a.id != null) return String(a.id);
+    return (items[0] && items[0].id != null) ? String(items[0].id) : '';
+  })();
+
+  if (pick) sel.value = String(pick);
+  return pick ? Number(pick) : null;
+}
+
+async function _loadPlanTasksForSelectedGroup(modal) {
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+  const dictationIdNum = Number(dictationIdRaw);
+  const groupSel = document.getElementById('plan-tasks-group');
+  const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
+
+  if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0 || !Number.isFinite(groupIdNum) || groupIdNum <= 0) {
+    _setPlanTasksExercises(modal, []);
+    _setPlanTasksState(modal, []);
+    _renderPlanTasksTable(modal);
+    return;
+  }
+
+  try {
+    const exRes = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationIdNum))}/exercises`, { method: 'GET' });
+    const exercises = (exRes && exRes.success && Array.isArray(exRes.exercises)) ? exRes.exercises : [];
+    _setPlanTasksExercises(modal, exercises);
+  } catch (e) {
+    _setPlanTasksExercises(modal, []);
+  }
+
+  try {
+    const res = await apiRequest(`/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}`, { method: 'GET' });
+    const tasks = (res && res.success && Array.isArray(res.tasks)) ? res.tasks : [];
+    _setPlanTasksState(modal, tasks.map(t => ({
+      id: t && t.id != null ? Number(t.id) : null,
+      positions: Array.isArray(t && t.positions) ? t.positions : [],
+      date_plan: t && t.date_plan ? String(t.date_plan) : '',
+      repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+    })));
+  } catch (e) {
+    _setPlanTasksState(modal, []);
+  }
+
+  try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
+  _renderPlanTasksTable(modal);
+}
+
+function _renderPlanTasksTable(modal) {
+  const body = document.getElementById('plan-tasks-body');
+  if (!body) return;
+  body.innerHTML = '';
+
+  const tasks = _getPlanTasksState(modal);
+  const exercises = _getPlanTasksExercises(modal);
+
+  if (!tasks.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 4;
+    td.style.padding = '12px 10px';
+    td.style.color = 'rgba(0,0,0,0.55)';
+    td.textContent = 'Добавь план кнопкой +';
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  const exKeyToId = new Map();
+  (Array.isArray(exercises) ? exercises : []).forEach(ex => {
+    const k = _planPositionsKey(ex && ex.positions ? ex.positions : []);
+    if (!exKeyToId.has(k)) exKeyToId.set(k, ex && ex.id != null ? String(ex.id) : '');
+  });
+
+  tasks.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
+
+    const tdDate = document.createElement('td');
+    tdDate.style.padding = '0';
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = row && row.date_plan ? String(row.date_plan) : '';
+    dateInput.style.height = '40px';
+    dateInput.style.width = '100%';
+    dateInput.style.padding = '0 8px';
+    dateInput.style.border = '0';
+    dateInput.style.background = 'transparent';
+    dateInput.style.boxSizing = 'border-box';
+    tdDate.appendChild(dateInput);
+
+    const tdEx = document.createElement('td');
+    tdEx.style.padding = '0';
+    const exSelect = document.createElement('select');
+    exSelect.style.height = '40px';
+    exSelect.style.width = '100%';
+    exSelect.style.padding = '0 8px';
+    exSelect.style.border = '0';
+    exSelect.style.background = 'transparent';
+    exSelect.style.boxSizing = 'border-box';
+    (Array.isArray(exercises) ? exercises : []).forEach(ex => {
+      const opt = document.createElement('option');
+      opt.value = String(ex && ex.id != null ? ex.id : '');
+      opt.textContent = _planExerciseLabel(ex);
+      exSelect.appendChild(opt);
+    });
+    const selectedKey = _planPositionsKey(row && row.positions ? row.positions : []);
+    const selectedId = exKeyToId.get(selectedKey);
+    if (selectedId != null && String(selectedId) !== '') {
+      exSelect.value = String(selectedId);
+    }
+    tdEx.appendChild(exSelect);
+
+    const tdCount = document.createElement('td');
+    tdCount.style.padding = '0';
+    const countInput = document.createElement('input');
+    countInput.type = 'number';
+    countInput.min = '1';
+    countInput.step = '1';
+    countInput.value = String((row && row.repeat_count != null ? row.repeat_count : 1) || 1);
+    countInput.style.height = '40px';
+    countInput.style.width = '100%';
+    countInput.style.padding = '0 10px';
+    countInput.style.border = '0';
+    countInput.style.background = 'transparent';
+    countInput.style.boxSizing = 'border-box';
+    tdCount.appendChild(countInput);
+
+    const tdDel = document.createElement('td');
+    tdDel.style.padding = '0';
+    tdDel.style.textAlign = 'center';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'topbar-icon-btn';
+    delBtn.style.width = '100%';
+    delBtn.style.height = '40px';
+    delBtn.style.borderRadius = '0';
+    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+    tdDel.appendChild(delBtn);
+
+    const markDirty = () => {
+      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+    };
+
+    dateInput.addEventListener('change', () => {
+      const next = _getPlanTasksState(modal);
+      next[idx] = Object.assign({}, next[idx], { date_plan: String(dateInput.value || '') });
+      _setPlanTasksState(modal, next);
+      markDirty();
+    });
+    exSelect.addEventListener('change', () => {
+      const exId = exSelect.value;
+      const ex = (Array.isArray(exercises) ? exercises : []).find(x => String(x && x.id != null ? x.id : '') === String(exId || ''));
+      const positions = ex && Array.isArray(ex.positions) ? ex.positions.map(p => Number(p)).filter(p => Number.isFinite(p)) : [];
+      const next = _getPlanTasksState(modal);
+      next[idx] = Object.assign({}, next[idx], { positions });
+      _setPlanTasksState(modal, next);
+      markDirty();
+    });
+    countInput.addEventListener('change', () => {
+      const v = parseInt(String(countInput.value || '1'), 10);
+      const repeat = Number.isFinite(v) && v > 0 ? v : 1;
+      const next = _getPlanTasksState(modal);
+      next[idx] = Object.assign({}, next[idx], { repeat_count: repeat });
+      _setPlanTasksState(modal, next);
+      markDirty();
+    });
+    delBtn.addEventListener('click', () => {
+      const next = _getPlanTasksState(modal);
+      next.splice(idx, 1);
+      _setPlanTasksState(modal, next);
+      markDirty();
+      _renderPlanTasksTable(modal);
+    });
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdEx);
+    tr.appendChild(tdCount);
+    tr.appendChild(tdDel);
+    body.appendChild(tr);
+  });
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: body });
+    }
+  } catch (e) {
+  }
+}
+
+async function openPlanTasksModal(dictationId) {
+  const modal = ensurePlanTasksModal();
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  if (idInput) idInput.value = String(dictationId || '');
+
+  _setPlanTasksState(modal, []);
+  _setPlanTasksExercises(modal, []);
+  _renderPlanTasksTable(modal);
+
+  try {
+    const meta = await loadDictationMetaForAssignmentModal(dictationId);
+    const titleEl = document.getElementById('plan-tasks-dictation-title');
+    const coverImg = document.getElementById('plan-tasks-cover-img');
+    const coverMeta = document.getElementById('plan-tasks-cover-meta');
+
+    if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
+    if (coverImg) coverImg.src = meta && meta.coverUrl ? String(meta.coverUrl) : '';
+    if (coverMeta) coverMeta.textContent = meta && meta.metaText ? String(meta.metaText) : '';
+  } catch (e) {
+  }
+
+  const closeBtn = document.getElementById('plan-tasks-close');
+  const saveBtn = document.getElementById('plan-tasks-save');
+  const addBtn = document.getElementById('plan-tasks-add');
+  const groupSel = document.getElementById('plan-tasks-group');
+
+  try {
+    const groups = await _loadGroupsForPlanTasksModal();
+    _fillPlanTasksGroupsSelect(groups, groupSel ? groupSel.value : null);
+  } catch (e) {
+  }
+
+  try {
+    await _loadPlanTasksForSelectedGroup(modal);
+  } catch (e) {
+  }
+
+  if (!modal.dataset.listenersAttached) {
+    modal.dataset.listenersAttached = '1';
+    modal.addEventListener('click', (e) => {
+      try {
+        if (e.target === modal) {
+          modal.style.display = 'none';
+        }
+      } catch (e2) {
+      }
+    });
+  }
+
+  if (closeBtn && !closeBtn.dataset.listenerAttached) {
+    closeBtn.dataset.listenerAttached = '1';
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  if (saveBtn && !saveBtn.dataset.listenerAttached) {
+    saveBtn.dataset.listenerAttached = '1';
+    saveBtn.addEventListener('click', async () => {
+      const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+      const dictationIdNum = Number(dictationIdRaw);
+      const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
+
+      if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0) {
+        showToast('Не найден dictation_id');
+        return;
+      }
+      if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
+        showToast('Не выбрана группа');
+        return;
+      }
+
+      const tasks = _getPlanTasksState(modal);
+      const payload = (Array.isArray(tasks) ? tasks : []).map(t => ({
+        id: t && t.id != null ? Number(t.id) : null,
+        positions: Array.isArray(t && t.positions) ? t.positions : [],
+        date_plan: t && t.date_plan ? String(t.date_plan) : '',
+        repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+      }));
+
+      for (const t of payload) {
+        if (!t.date_plan) {
+          showToast('Заполни дату во всех строках');
+          return;
+        }
+        if (!Number.isFinite(Number(t.repeat_count)) || Number(t.repeat_count) <= 0) {
+          showToast('Повторы должны быть >= 1');
+          return;
+        }
+      }
+
+      try {
+        const res = await apiRequest(
+          `/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}/reconcile`,
+          { method: 'POST', body: JSON.stringify({ tasks: payload }) }
+        );
+        if (!res || res.success !== true) {
+          const msg = res && res.error ? String(res.error) : 'Не удалось сохранить планы';
+          showToast(msg, { durationMs: 3500 });
+          return;
+        }
+        const next = (res && Array.isArray(res.tasks)) ? res.tasks : [];
+        _setPlanTasksState(modal, next);
+        try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
+        _renderPlanTasksTable(modal);
+        showToast('Планы сохранены', { durationMs: 2500 });
+      } catch (e) {
+        showToast('Ошибка сохранения планов', { durationMs: 2500 });
+      }
+    });
+  }
+  if (addBtn && !addBtn.dataset.listenerAttached) {
+    addBtn.dataset.listenerAttached = '1';
+    addBtn.addEventListener('click', () => {
+      const next = _getPlanTasksState(modal);
+      next.push({ date_plan: getTodayIsoDate(), positions: [], repeat_count: 1 });
+      _setPlanTasksState(modal, next);
+      _renderPlanTasksTable(modal);
+    });
+  }
+  if (groupSel && !groupSel.dataset.listenerAttached) {
+    groupSel.dataset.listenerAttached = '1';
+    groupSel.addEventListener('change', () => { void _loadPlanTasksForSelectedGroup(modal); });
+  }
+
+  modal.style.display = 'flex';
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
+}
+
 function getTodayIsoDate() {
   const d = new Date();
   const y = d.getFullYear();
@@ -5797,6 +6307,10 @@ function createDictationCard(item, isDeskCard = false) {
                   <i data-lucide="clipboard-list"></i>
                   <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}</span>
                 </button>
+                <button class="dropdown-menu-item" data-action="plan-tasks" data-dictation-id="${dictationId}">
+                  <i data-lucide="calendar-plus"></i>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.plan', null, 'Запланировать'))}</span>
+                </button>
                 <button class="dropdown-menu-item" type="button" data-action="prefetch-dictation-cache" data-dictation-id="${dictationId}" data-lang-original="${escapeHtml(langOriginal)}" data-cover-url="${escapeHtml(coverUrl || '')}" data-translation-langs="${escapeHtml(availableTranslations.join(','))}">
                   <i data-lucide="download"></i>
                   <span>${escapeHtml(libT('private_library.dictation_card_actions.cache'))}</span>
@@ -5893,6 +6407,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dbId}">
                   <i data-lucide="clipboard-list"></i>
                   <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment'))}</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="plan-tasks" data-dictation-id="${dbId}">
+                  <i data-lucide="calendar-plus"></i>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.plan', null, 'Запланировать'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="folder-symlink"></i>
@@ -7923,6 +8441,16 @@ function installEventHandlers() {
       const dictationId = btn.getAttribute('data-dictation-id');
       if (dictationId) {
         openCreateAssignmentModal(dictationId);
+      }
+    }
+
+    if (e.target.closest('[data-action="plan-tasks"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="plan-tasks"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      if (dictationId) {
+        openPlanTasksModal(dictationId);
       }
     }
 
