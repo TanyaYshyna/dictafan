@@ -1822,6 +1822,12 @@
   color: rgba(255, 105, 180, 0.95);
 }
 
+#create-assignment-dictation-unsaved-star {
+  margin-left: 6px;
+  font-weight: 700;
+  color: var(--color-button-pink);
+}
+
 #book-edit-modal .modal-header h3 {
   margin: 0;
   font-size: 18px;
