@@ -1078,7 +1078,7 @@ function renderCreateAssignmentExercisesTable(modal) {
     const pos = Array.isArray(ex.positions) ? ex.positions : [];
     const posLabel = pos.length
       ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '')
-      : (isDraft ? '' : 'весь диктант');
+      : (isDraft ? 'выбери предложения' : 'весь диктант');
 
     const tr = document.createElement('tr');
     tr.dataset.exerciseId = idRaw;
@@ -1213,7 +1213,7 @@ function ensureCreateAssignmentModal() {
                 <button type="button" id="create-assignment-exercise-delete" class="topbar-icon-btn create-assignment-icon-btn" title="Удалить упражнение"><i data-lucide="trash-2"></i></button>
               </div>
               <div style="max-height: 420px; overflow: auto;">
-                <table id="create-assignment-exercises-table" style="width:100%; border-collapse: collapse;">
+                <table id="create-assignment-exercises-table" class="create-assignment-table" style="width:100%; border-collapse: collapse;">
                   <thead>
                     <tr>
                       <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.assignments.exercises_column', null, 'Упражнения'))}</th>
@@ -2875,7 +2875,20 @@ async function openCreateAssignmentModal(dictationId) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
-        const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
+        const groupId = (() => {
+          try {
+            const sel = document.getElementById('teacher-assignments-group');
+            const v = sel ? String(sel.value || '').trim() : '';
+            if (v) return v;
+          } catch (e0) {
+          }
+          try {
+            const last = getAssignmentLastGroupId();
+            return last ? String(last).trim() : '';
+          } catch (e1) {
+            return '';
+          }
+        })();
         const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
 
         if (!groupId) {
@@ -2907,9 +2920,14 @@ async function openCreateAssignmentModal(dictationId) {
         const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
         const selected_sentence_positions = selectedPositions.length ? selectedPositions : null;
 
-        if (Array.isArray(selectedPositions) && selectedPositions.length === 0) {
-          showToast('Выбери хотя бы одно предложение');
-          return;
+        try {
+          const exSt = getCreateAssignmentExercisesState(modal);
+          const isDraftSelected = Boolean(exSt && exSt.draft && exSt.draft.selected === true);
+          if (isDraftSelected && Array.isArray(selectedPositions) && selectedPositions.length === 0) {
+            showToast('Выбери хотя бы одно предложение');
+            return;
+          }
+        } catch (e0) {
         }
 
         if (!days.length) {

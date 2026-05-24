@@ -226,7 +226,7 @@ function renderExercisesTable() {
 
     if (!rows.length) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="2" class="exercises-empty">Нет упражнений</td>`;
+        tr.innerHTML = `<td colspan="1" class="exercises-empty">Нет упражнений</td>`;
         tbody.appendChild(tr);
         return;
     }
@@ -252,7 +252,6 @@ function renderExercisesTable() {
         }
         tr.innerHTML = `
             <td class="exercise-positions-cell">${escapeHtml(posLabel)}</td>
-            <td class="exercise-actions-cell"></td>
         `;
         tbody.appendChild(tr);
     });

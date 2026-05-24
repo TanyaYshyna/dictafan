@@ -1816,6 +1816,12 @@
   color: var(--color-button-text-yellow, #f9c609);
 }
 
+#create-assignment-unsaved-star {
+  margin-left: 6px;
+  font-weight: 900;
+  color: rgba(255, 105, 180, 0.95);
+}
+
 #book-edit-modal .modal-header h3 {
   margin: 0;
   font-size: 18px;
@@ -3144,6 +3150,23 @@
 
 .create-assignment-table tbody td {
   padding: 8px 10px;
+}
+
+#create-assignment-exercises-table tbody tr.exercise-row {
+  cursor: pointer;
+}
+
+#create-assignment-exercises-table tbody tr.exercise-row.selected {
+  background: rgba(255, 105, 180, 0.12);
+}
+
+#create-assignment-exercises-table tbody tr.exercise-row.selected td {
+  border-top-color: rgba(255, 105, 180, 0.25);
+  border-bottom-color: rgba(255, 105, 180, 0.25);
+}
+
+#create-assignment-exercises-table tbody tr.exercise-row[data-exercise-id="draft"] td {
+  color: rgba(0, 0, 0, 0.55);
 }
 
 .create-assignment-th-num {
