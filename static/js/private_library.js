@@ -1114,6 +1114,7 @@ function renderCreateAssignmentExercisesTable(modal) {
     const isDraft = ex && ex.__draft === true;
     const idRaw = isDraft ? 'draft' : String(Number(ex.id));
     const pos = Array.isArray(ex.positions) ? ex.positions : [];
+    const canDelete = isDraft ? true : (pos.length > 0);
     const posLabel = pos.length
       ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '')
       : (isDraft ? 'выбери предложения' : 'весь диктант');
@@ -1130,6 +1131,11 @@ function renderCreateAssignmentExercisesTable(modal) {
 
     tr.innerHTML = `
       <td style="padding:8px 10px;">${escapeHtml(posLabel)}</td>
+      <td style="padding:8px 10px; text-align:right; width: 1%; white-space: nowrap;">
+        ${canDelete
+          ? `<button type="button" class="topbar-icon-btn create-assignment-icon-btn" data-action="delete-exercise" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>`
+          : ''}
+      </td>
     `;
     tbody.appendChild(tr);
   });
@@ -1137,6 +1143,41 @@ function renderCreateAssignmentExercisesTable(modal) {
   if (!tbody.dataset.listenerAttached) {
     tbody.dataset.listenerAttached = '1';
     tbody.addEventListener('click', (e) => {
+      const delBtn = e.target && e.target.closest ? e.target.closest('button[data-action="delete-exercise"]') : null;
+      if (delBtn) {
+        const row = delBtn.closest ? delBtn.closest('tr[data-exercise-id]') : null;
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const idRaw = row.dataset.exerciseId;
+        const st = getCreateAssignmentExercisesState(modal);
+        if (idRaw === 'draft') {
+          if (st.draft) {
+            st.draft = null;
+            setCreateAssignmentExercisesState(modal, st);
+            setCreateAssignmentExercisesDirty(modal, true);
+            renderCreateAssignmentExercisesTable(modal);
+          }
+          return;
+        }
+        const id = Number(idRaw);
+        if (!Number.isFinite(id)) return;
+        const ex = findCreateAssignmentExerciseById(modal, id);
+        if (!ex) return;
+        const pos = Array.isArray(ex.positions) ? ex.positions : [];
+        if (!pos.length) {
+          try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e2) { }
+          return;
+        }
+        ex.__deleted = true;
+        if (st.selectedExerciseId && Number(st.selectedExerciseId) === Number(id)) {
+          st.selectedExerciseId = null;
+        }
+        setCreateAssignmentExercisesState(modal, st);
+        setCreateAssignmentExercisesDirty(modal, true);
+        renderCreateAssignmentExercisesTable(modal);
+        return;
+      }
       const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
       if (!row) return;
       e.preventDefault();
@@ -1150,6 +1191,13 @@ function renderCreateAssignmentExercisesTable(modal) {
       if (!Number.isFinite(id)) return;
       selectCreateAssignmentExerciseById(modal, id);
     });
+  }
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: tbody });
+    }
+  } catch (e) {
   }
 }
 
@@ -1204,7 +1252,7 @@ function ensureCreateAssignmentModal() {
       <div class="modal-header create-assignment-modal-header">
         <div class="create-assignment-modal-title">
           <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}</div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения'))}</div>
         </div>
 
         <div class="create-assignment-modal-header-actions">
@@ -1255,6 +1303,7 @@ function ensureCreateAssignmentModal() {
                   <thead>
                     <tr>
                       <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.assignments.exercises_column', null, 'Упражнения'))}</th>
+                      <th style="text-align:right; padding:8px 10px;"></th>
                     </tr>
                   </thead>
                   <tbody id="create-assignment-exercisesTableBody"></tbody>
@@ -3012,8 +3061,7 @@ async function openCreateAssignmentModal(dictationId) {
   try {
     const t = document.querySelector('.create-assignment-modal-title-text');
     if (t) {
-      const label = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
-      t.textContent = label;
+      t.textContent = libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения');
     }
   } catch (e) {
   }
