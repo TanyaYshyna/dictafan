@@ -225,7 +225,8 @@
 
 .plan-tasks-table-wrap {
   max-height: 520px;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .plan-tasks-table {
@@ -245,11 +246,11 @@
 }
 
 .plan-tasks-th-date {
-  width: 150px;
+  width: 120px;
 }
 
 .plan-tasks-th-award {
-  width: 120px;
+  width: 72px;
 }
 
 .plan-tasks-award-icon {

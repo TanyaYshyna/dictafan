@@ -1566,8 +1566,8 @@ function _renderPlanTasksTable(modal) {
 
     const tdDate = document.createElement('td');
     tdDate.style.padding = '0';
-    tdDate.style.width = '150px';
-    tdDate.style.maxWidth = '150px';
+    tdDate.style.width = '120px';
+    tdDate.style.maxWidth = '120px';
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.value = row && row.date_plan ? String(row.date_plan) : '';
@@ -1604,6 +1604,8 @@ function _renderPlanTasksTable(modal) {
 
     const tdCount = document.createElement('td');
     tdCount.style.padding = '0';
+    tdCount.style.width = '72px';
+    tdCount.style.maxWidth = '72px';
     const countInput = document.createElement('input');
     countInput.type = 'number';
     countInput.min = '1';
