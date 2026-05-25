@@ -1376,9 +1376,8 @@ function ensurePlanTasksModal() {
         </div>
 
         <div class="create-assignment-modal-header-actions">
-          <button type="button" id="plan-tasks-save" class="btn-primary create-assignment-save-btn">
-            <i data-lucide="save"></i>
-            <span>${escapeHtml(libT('private_library.common.save'))}</span>
+          <button type="button" id="plan-tasks-refresh" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.common.refresh', null, 'Обновить'))}">
+            <i data-lucide="refresh-cw"></i>
           </button>
           <button type="button" id="plan-tasks-close" class="modal-close create-assignment-close-btn" title="${escapeHtml(libT('private_library.common.close'))}">
             <i data-lucide="x"></i>
@@ -1400,7 +1399,6 @@ function ensurePlanTasksModal() {
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
                 <select id="plan-tasks-group" style="height:40px; border-radius:12px; padding:0 10px; border:1px solid rgba(0,0,0,0.16); min-width: 240px;"></select>
-                <button type="button" id="plan-tasks-add" class="topbar-icon-btn" style="height:40px; width:40px;" title="${escapeHtml(libT('private_library.plan_tasks.add', null, 'Добавить'))}"><i data-lucide="plus"></i></button>
               </div>
             </div>
           </div>
@@ -1416,7 +1414,12 @@ function ensurePlanTasksModal() {
                       <th style="text-align:left; padding:8px 10px; width:34%;">${escapeHtml(libT('private_library.plan_tasks.date', null, 'Дата'))}</th>
                       <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.plan_tasks.exercise', null, 'Упражнение'))}</th>
                       <th style="text-align:left; padding:8px 10px; width:120px;"><i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i></th>
-                      <th style="text-align:center; padding:8px 10px; width:52px;"></th>
+                      <th style="text-align:right; padding:8px 10px; width:92px;">
+                        <div style="display:flex; justify-content:flex-end; gap:8px;">
+                          <button type="button" id="plan-tasks-add" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.plan_tasks.add', null, 'Добавить'))}"><i data-lucide="plus"></i></button>
+                          <button type="button" id="plan-tasks-delete" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>
+                        </div>
+                      </th>
                     </tr>
                   </thead>
                   <tbody id="plan-tasks-body"></tbody>
@@ -1473,6 +1476,24 @@ function _getPlanTasksExercises(modal) {
 function _setPlanTasksExercises(modal, exercises) {
   try {
     modal.dataset.planTasksExercises = JSON.stringify(Array.isArray(exercises) ? exercises : []);
+  } catch (e) {
+  }
+}
+
+function _getPlanTasksCurrentIndex(modal) {
+  try {
+    const raw = modal && modal.dataset ? modal.dataset.planTasksCurrentIndex : '';
+    const n = parseInt(String(raw || ''), 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function _setPlanTasksCurrentIndex(modal, idx) {
+  try {
+    const n = parseInt(String(idx), 10);
+    modal.dataset.planTasksCurrentIndex = String(Number.isFinite(n) && n >= 0 ? n : 0);
   } catch (e) {
   }
 }
@@ -1589,6 +1610,15 @@ function _renderPlanTasksTable(modal) {
   const tasks = _getPlanTasksState(modal);
   const exercises = _getPlanTasksExercises(modal);
 
+  let currentIdx = _getPlanTasksCurrentIndex(modal);
+  if (!Array.isArray(tasks) || !tasks.length) {
+    _setPlanTasksCurrentIndex(modal, 0);
+  } else {
+    if (!Number.isFinite(currentIdx) || currentIdx < 0) currentIdx = 0;
+    if (currentIdx >= tasks.length) currentIdx = Math.max(0, tasks.length - 1);
+    _setPlanTasksCurrentIndex(modal, currentIdx);
+  }
+
   if (!tasks.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
@@ -1610,6 +1640,16 @@ function _renderPlanTasksTable(modal) {
   tasks.forEach((row, idx) => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
+    if (idx === currentIdx) {
+      tr.style.background = 'rgba(236, 72, 153, 0.10)';
+    }
+
+    tr.addEventListener('click', () => {
+      const nextTasks = _getPlanTasksState(modal);
+      if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+      _setPlanTasksCurrentIndex(modal, idx);
+      _renderPlanTasksTable(modal);
+    });
 
     const tdDate = document.createElement('td');
     tdDate.style.padding = '0';
@@ -1701,10 +1741,14 @@ function _renderPlanTasksTable(modal) {
       markDirty();
     });
     delBtn.addEventListener('click', () => {
+      try { tr.click(); } catch (e) { }
       const next = _getPlanTasksState(modal);
       next.splice(idx, 1);
       _setPlanTasksState(modal, next);
       markDirty();
+      const cur = _getPlanTasksCurrentIndex(modal);
+      const nextIdx = cur >= next.length ? Math.max(0, next.length - 1) : cur;
+      _setPlanTasksCurrentIndex(modal, nextIdx);
       _renderPlanTasksTable(modal);
     });
 
@@ -1739,7 +1783,18 @@ async function openPlanTasksModal(dictationId) {
     const coverMeta = document.getElementById('plan-tasks-cover-meta');
 
     if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
-    if (coverImg) coverImg.src = meta && meta.coverUrl ? String(meta.coverUrl) : '';
+    if (coverImg) {
+      const rawId = String(dictationId || '').trim();
+      const numericId = rawId.replace(/^dict_/, '').trim();
+      const canonicalCover = numericId ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp` : '';
+      const src = (
+        (meta && (meta.cover_url || meta.coverUrl))
+          ? String(meta.cover_url || meta.coverUrl)
+          : canonicalCover
+      );
+      coverImg.src = src || '';
+      coverImg.onerror = () => { coverImg.src = '/static/data/covers/cover_en.webp'; };
+    }
     if (coverMeta) coverMeta.textContent = meta && meta.metaText ? String(meta.metaText) : '';
   } catch (e) {
   }
@@ -1747,6 +1802,7 @@ async function openPlanTasksModal(dictationId) {
   const closeBtn = document.getElementById('plan-tasks-close');
   const saveBtn = document.getElementById('plan-tasks-save');
   const addBtn = document.getElementById('plan-tasks-add');
+  const deleteBtn = document.getElementById('plan-tasks-delete');
   const groupSel = document.getElementById('plan-tasks-group');
 
   try {
@@ -1839,6 +1895,23 @@ async function openPlanTasksModal(dictationId) {
       const next = _getPlanTasksState(modal);
       next.push({ date_plan: getTodayIsoDate(), positions: [], repeat_count: 1 });
       _setPlanTasksState(modal, next);
+      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+      _setPlanTasksCurrentIndex(modal, Math.max(0, next.length - 1));
+      _renderPlanTasksTable(modal);
+    });
+  }
+  if (deleteBtn && !deleteBtn.dataset.listenerAttached) {
+    deleteBtn.dataset.listenerAttached = '1';
+    deleteBtn.addEventListener('click', () => {
+      const next = _getPlanTasksState(modal);
+      if (!Array.isArray(next) || !next.length) return;
+      const idx = _getPlanTasksCurrentIndex(modal);
+      const safeIdx = Number.isFinite(idx) && idx >= 0 && idx < next.length ? idx : 0;
+      next.splice(safeIdx, 1);
+      _setPlanTasksState(modal, next);
+      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+      const nextIdx = safeIdx >= next.length ? Math.max(0, next.length - 1) : safeIdx;
+      _setPlanTasksCurrentIndex(modal, nextIdx);
       _renderPlanTasksTable(modal);
     });
   }
