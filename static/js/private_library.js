@@ -1452,9 +1452,14 @@ function _buildPlanTasksPayload(modal) {
 
 function _validatePlanTasksPayload(payload) {
   const items = Array.isArray(payload) ? payload : [];
+  const seen = new Set();
   for (const t of items) {
     if (!t.date_plan) return 'Заполни дату во всех строках';
     if (!Number.isFinite(Number(t.repeat_count)) || Number(t.repeat_count) <= 0) return 'Повторы должны быть >= 1';
+
+    const k = `${String(t.date_plan)}|${_planPositionsKey(Array.isArray(t.positions) ? t.positions : [])}`;
+    if (seen.has(k)) return 'Нельзя сохранять две одинаковые строки (одна дата + одно упражнение)';
+    seen.add(k);
   }
   return null;
 }
@@ -1522,6 +1527,146 @@ function _schedulePlanTasksAutosave(modal) {
     void _reconcilePlanTasksNow(modal, { silent: true });
   }, 450);
   _planTasksAutosaveTimers.set(modal, t);
+}
+
+function _ensurePlanTaskEditOverlay() {
+  let el = document.getElementById('plan-task-edit-overlay');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'plan-task-edit-overlay';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+  return el;
+}
+
+function _closePlanTaskEditor() {
+  const el = document.getElementById('plan-task-edit-overlay');
+  if (el) el.style.display = 'none';
+}
+
+function _fillPlanTaskEditorExercises(exSel, exercises, positions) {
+  if (!exSel) return;
+  exSel.innerHTML = '';
+  (Array.isArray(exercises) ? exercises : []).forEach(ex => {
+    const opt = document.createElement('option');
+    opt.value = String(ex && ex.id != null ? ex.id : '');
+    opt.textContent = _planExerciseLabel(ex);
+    exSel.appendChild(opt);
+  });
+
+  const posKey = _planPositionsKey(Array.isArray(positions) ? positions : []);
+  const found = (Array.isArray(exercises) ? exercises : []).find(ex => _planPositionsKey(ex && ex.positions ? ex.positions : []) === posKey);
+  if (found && found.id != null) {
+    exSel.value = String(found.id);
+  } else {
+    const first = (Array.isArray(exercises) ? exercises : [])[0];
+    if (first && first.id != null) exSel.value = String(first.id);
+  }
+}
+
+function _openPlanTaskEditor(modal, opts) {
+  const el = _ensurePlanTaskEditOverlay();
+  const dateInput = el.querySelector('#plan-task-edit-date');
+  const exSel = el.querySelector('#plan-task-edit-ex');
+  const countInput = el.querySelector('#plan-task-edit-count');
+  const saveBtn = el.querySelector('#plan-task-edit-save');
+  const closeBtn = el.querySelector('#plan-task-edit-close');
+
+  const mode = opts && opts.mode ? String(opts.mode) : 'edit';
+  const idx = Number(opts && opts.idx != null ? opts.idx : -1);
+
+  const tasks = Array.isArray(_getPlanTasksState(modal)) ? _getPlanTasksState(modal) : [];
+  const exercises = Array.isArray(_getPlanTasksExercises(modal)) ? _getPlanTasksExercises(modal) : [];
+  const row = (idx >= 0 && idx < tasks.length) ? tasks[idx] : null;
+
+  try { el.dataset.mode = mode; } catch (e) { }
+  try { el.dataset.idx = String(Number.isFinite(idx) ? idx : -1); } catch (e) { }
+
+  const initDate = (row && row.date_plan) ? String(row.date_plan) : getTodayIsoDate();
+  const initPositions = (row && Array.isArray(row.positions)) ? row.positions : [];
+  const initRepeat = (row && row.repeat_count != null) ? Number(row.repeat_count) : 1;
+
+  if (dateInput) dateInput.value = initDate;
+  if (countInput) countInput.value = String((Number.isFinite(initRepeat) && initRepeat > 0 ? initRepeat : 1) || 1);
+  _fillPlanTaskEditorExercises(exSel, exercises, initPositions);
+
+  const isDelete = mode === 'delete';
+  if (dateInput) dateInput.disabled = isDelete;
+  if (exSel) exSel.disabled = isDelete;
+  if (countInput) countInput.disabled = isDelete;
+  if (saveBtn) saveBtn.textContent = isDelete ? 'Удалить' : 'Сохранить';
+
+  if (!el.dataset.listenersAttached) {
+    el.dataset.listenersAttached = '1';
+    el.addEventListener('click', (e) => { if (e.target === el) _closePlanTaskEditor(); });
+    if (closeBtn) closeBtn.addEventListener('click', () => { _closePlanTaskEditor(); });
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const overlay = document.getElementById('plan-task-edit-overlay');
+        if (!overlay) return;
+
+        const modeNow = String(overlay.dataset.mode || 'edit');
+        const idxNow = Number(overlay.dataset.idx || '-1');
+
+        const dEl = overlay.querySelector('#plan-task-edit-date');
+        const exEl = overlay.querySelector('#plan-task-edit-ex');
+        const cEl = overlay.querySelector('#plan-task-edit-count');
+
+        const datePlan = dEl ? String(dEl.value || '').trim() : '';
+        const exId = exEl ? String(exEl.value || '').trim() : '';
+        const repeatRaw = cEl ? parseInt(String(cEl.value || '1'), 10) : 1;
+        const repeatCount = Number.isFinite(repeatRaw) && repeatRaw > 0 ? repeatRaw : 1;
+
+        if (!datePlan) {
+          showToast('Укажи дату', { durationMs: 2200 });
+          return;
+        }
+
+        const tasksNow = Array.isArray(_getPlanTasksState(modal)) ? _getPlanTasksState(modal) : [];
+        const exercisesNow = Array.isArray(_getPlanTasksExercises(modal)) ? _getPlanTasksExercises(modal) : [];
+        const exObj = exercisesNow.find(x => String(x && x.id != null ? x.id : '') === String(exId));
+        const positions = exObj && Array.isArray(exObj.positions) ? exObj.positions.map(p => Number(p)).filter(p => Number.isFinite(p)) : [];
+
+        if (modeNow !== 'delete') {
+          const isDup = tasksNow.some((t, j) => {
+            if (modeNow !== 'new' && Number.isFinite(idxNow) && j === idxNow) return false;
+            const sameDate = String(t && t.date_plan ? t.date_plan : '') === datePlan;
+            const samePos = _planPositionsKey(t && t.positions ? t.positions : []) === _planPositionsKey(positions);
+            return sameDate && samePos;
+          });
+          if (isDup) {
+            showToast('Нельзя сохранять две одинаковые строки (одна дата + одно упражнение)', { durationMs: 3200 });
+            return;
+          }
+        }
+
+        const next = tasksNow.slice();
+
+        if (modeNow === 'new') {
+          next.push({ id: null, date_plan: datePlan, positions, repeat_count: repeatCount });
+          _setPlanTasksState(modal, next);
+          _setPlanTasksCurrentIndex(modal, Math.max(0, next.length - 1));
+        } else if (modeNow === 'delete') {
+          if (Number.isFinite(idxNow) && idxNow >= 0 && idxNow < next.length) {
+            next.splice(idxNow, 1);
+            _setPlanTasksState(modal, next);
+            _setPlanTasksCurrentIndex(modal, Math.max(0, Math.min(idxNow, next.length - 1)));
+          }
+        } else {
+          if (Number.isFinite(idxNow) && idxNow >= 0 && idxNow < next.length) {
+            next[idxNow] = Object.assign({}, next[idxNow], { date_plan: datePlan, positions, repeat_count: repeatCount });
+            _setPlanTasksState(modal, next);
+            _setPlanTasksCurrentIndex(modal, idxNow);
+          }
+        }
+
+        await _reconcilePlanTasksNow(modal, { silent: false });
+        _closePlanTaskEditor();
+      });
+    }
+  }
+
+  el.style.display = 'flex';
 }
 
 async function _loadGroupsForPlanTasksModal() {
@@ -1665,6 +1810,7 @@ function _renderPlanTasksTable(modal) {
       const nextTasks = _getPlanTasksState(modal);
       if (!Array.isArray(nextTasks) || !nextTasks.length) return;
       setCurrentIndexSoft(idx);
+      _openPlanTaskEditor(modal, { mode: 'edit', idx });
     });
 
     const tdDate = document.createElement('td');
@@ -1674,6 +1820,7 @@ function _renderPlanTasksTable(modal) {
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.value = row && row.date_plan ? String(row.date_plan) : '';
+    dateInput.disabled = true;
     dateInput.style.height = '40px';
     dateInput.style.width = '100%';
     dateInput.style.padding = '0 8px';
@@ -1685,6 +1832,7 @@ function _renderPlanTasksTable(modal) {
     const tdEx = document.createElement('td');
     tdEx.style.padding = '0';
     const exSelect = document.createElement('select');
+    exSelect.disabled = true;
     exSelect.style.height = '40px';
     exSelect.style.width = '100%';
     exSelect.style.maxWidth = '100%';
@@ -1714,6 +1862,7 @@ function _renderPlanTasksTable(modal) {
     countInput.min = '1';
     countInput.step = '1';
     countInput.value = String((row && row.repeat_count != null ? row.repeat_count : 1) || 1);
+    countInput.disabled = true;
     countInput.style.height = '40px';
     countInput.style.width = '100%';
     countInput.style.padding = '0 10px';
@@ -1722,37 +1871,7 @@ function _renderPlanTasksTable(modal) {
     countInput.style.boxSizing = 'border-box';
     tdCount.appendChild(countInput);
 
-    dateInput.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
-    exSelect.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
-    countInput.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
-
-    const markDirty = () => {
-      _schedulePlanTasksAutosave(modal);
-    };
-
-    dateInput.addEventListener('change', () => {
-      const next = _getPlanTasksState(modal);
-      next[idx] = Object.assign({}, next[idx], { date_plan: String(dateInput.value || '') });
-      _setPlanTasksState(modal, next);
-      markDirty();
-    });
-    exSelect.addEventListener('change', () => {
-      const exId = exSelect.value;
-      const ex = (Array.isArray(exercises) ? exercises : []).find(x => String(x && x.id != null ? x.id : '') === String(exId || ''));
-      const positions = ex && Array.isArray(ex.positions) ? ex.positions.map(p => Number(p)).filter(p => Number.isFinite(p)) : [];
-      const next = _getPlanTasksState(modal);
-      next[idx] = Object.assign({}, next[idx], { positions });
-      _setPlanTasksState(modal, next);
-      markDirty();
-    });
-    countInput.addEventListener('change', () => {
-      const v = parseInt(String(countInput.value || '1'), 10);
-      const repeat = Number.isFinite(v) && v > 0 ? v : 1;
-      const next = _getPlanTasksState(modal);
-      next[idx] = Object.assign({}, next[idx], { repeat_count: repeat });
-      _setPlanTasksState(modal, next);
-      markDirty();
-    });
+    // Inline controls are disabled; editing is done via the overlay.
 
     tr.appendChild(tdDate);
     tr.appendChild(tdEx);
@@ -1844,12 +1963,7 @@ async function openPlanTasksModal(dictationId) {
   if (addBtn && !addBtn.dataset.listenerAttached) {
     addBtn.dataset.listenerAttached = '1';
     addBtn.addEventListener('click', () => {
-      const next = _getPlanTasksState(modal);
-      next.push({ date_plan: getTodayIsoDate(), positions: [], repeat_count: 1 });
-      _setPlanTasksState(modal, next);
-      _schedulePlanTasksAutosave(modal);
-      _setPlanTasksCurrentIndex(modal, Math.max(0, next.length - 1));
-      _renderPlanTasksTable(modal);
+      _openPlanTaskEditor(modal, { mode: 'new' });
     });
   }
   if (deleteBtn && !deleteBtn.dataset.listenerAttached) {
@@ -1859,12 +1973,8 @@ async function openPlanTasksModal(dictationId) {
       if (!Array.isArray(next) || !next.length) return;
       const idx = _getPlanTasksCurrentIndex(modal);
       const safeIdx = Number.isFinite(idx) && idx >= 0 && idx < next.length ? idx : 0;
-      next.splice(safeIdx, 1);
-      _setPlanTasksState(modal, next);
-      _schedulePlanTasksAutosave(modal);
-      const nextIdx = safeIdx >= next.length ? Math.max(0, next.length - 1) : safeIdx;
-      _setPlanTasksCurrentIndex(modal, nextIdx);
-      _renderPlanTasksTable(modal);
+      _setPlanTasksCurrentIndex(modal, safeIdx);
+      _openPlanTaskEditor(modal, { mode: 'delete', idx: safeIdx });
     });
   }
   if (groupSel && !groupSel.dataset.listenerAttached) {
