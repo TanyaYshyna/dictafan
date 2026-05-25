@@ -207,6 +207,10 @@
   display: block;
 }
 
+.plan-tasks-modal .create-assignment-bottom {
+  grid-template-columns: 360px 1fr;
+}
+
 .plan-tasks-panel {
   width: 100%;
 }
@@ -250,7 +254,7 @@
 }
 
 .plan-tasks-th-award {
-  width: 72px;
+  width: 56px;
 }
 
 .plan-tasks-award-icon {

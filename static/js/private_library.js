@@ -1604,8 +1604,8 @@ function _renderPlanTasksTable(modal) {
 
     const tdCount = document.createElement('td');
     tdCount.style.padding = '0';
-    tdCount.style.width = '72px';
-    tdCount.style.maxWidth = '72px';
+    tdCount.style.width = '56px';
+    tdCount.style.maxWidth = '56px';
     const countInput = document.createElement('input');
     countInput.type = 'number';
     countInput.min = '1';
