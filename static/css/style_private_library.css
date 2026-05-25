@@ -188,6 +188,76 @@
   height: 18px;
 }
 
+.plan-tasks-modal {
+  display: none;
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 100200;
+}
+
+.plan-tasks-bottom {
+  display: block;
+}
+
+.plan-tasks-panel {
+  width: 100%;
+}
+
+.plan-tasks-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0 0 8px 0;
+}
+
+.plan-tasks-tool-btn {
+  height: 36px;
+  width: 36px;
+}
+
+.plan-tasks-table-wrap {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.plan-tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
+}
+
+.plan-tasks-tr-head {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.plan-tasks-th {
+  text-align: left;
+  padding: 8px 10px;
+}
+
+.plan-tasks-th-date {
+  width: 150px;
+}
+
+.plan-tasks-th-award {
+  width: 120px;
+}
+
+.plan-tasks-award-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--color-button-yellow-dark, #eab308);
+}
+
 #loading-overlay {
   position: fixed !important;
   z-index: 99999 !important;
@@ -3026,6 +3096,23 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.plan-tasks-header-group {
+  justify-content: flex-end;
+  flex: 1;
+  padding: 0 12px;
+}
+
+.plan-tasks-header-label {
+  color: rgba(0, 0, 0, 0.72);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.plan-tasks-group-select {
+  min-width: 240px;
+  border-radius: 12px;
 }
 
 .create-assignment-select {
