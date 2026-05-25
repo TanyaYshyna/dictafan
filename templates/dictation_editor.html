@@ -6,7 +6,6 @@
 
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/style_dictation_editor.css">
-    <link rel="stylesheet" href="/static/css/style_private_library.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script src="{{ url_for('static', filename='js/waveform_canvas.js') }}"></script>
@@ -648,8 +647,6 @@
 
 {% block modals %}
     {{ super() }}
-
-    {% include 'partials/plan_tasks_modal.html' %}
 
         <!-- Модалка: создать массив переводов для нового языка -->
         <div id="createTranslationLangModal" class="modal">
