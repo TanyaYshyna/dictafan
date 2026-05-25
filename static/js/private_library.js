@@ -1428,6 +1428,102 @@ function _planExerciseLabel(ex) {
   }
 }
 
+const _planTasksAutosaveTimers = new WeakMap();
+const _planTasksAutosaveInFlight = new WeakMap();
+
+function _getPlanTasksContext(modal) {
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+  const dictationIdNum = Number(dictationIdRaw);
+  const groupSel = document.getElementById('plan-tasks-group');
+  const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
+  return { dictationIdNum, groupIdNum };
+}
+
+function _buildPlanTasksPayload(modal) {
+  const tasks = _getPlanTasksState(modal);
+  return (Array.isArray(tasks) ? tasks : []).map(t => ({
+    id: t && t.id != null ? Number(t.id) : null,
+    positions: Array.isArray(t && t.positions) ? t.positions : [],
+    date_plan: t && t.date_plan ? String(t.date_plan) : '',
+    repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+  }));
+}
+
+function _validatePlanTasksPayload(payload) {
+  const items = Array.isArray(payload) ? payload : [];
+  for (const t of items) {
+    if (!t.date_plan) return 'Заполни дату во всех строках';
+    if (!Number.isFinite(Number(t.repeat_count)) || Number(t.repeat_count) <= 0) return 'Повторы должны быть >= 1';
+  }
+  return null;
+}
+
+async function _reconcilePlanTasksNow(modal, opts) {
+  const silent = Boolean(opts && opts.silent);
+  if (!modal) return;
+
+  const { dictationIdNum, groupIdNum } = _getPlanTasksContext(modal);
+  if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0) return;
+  if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) return;
+  if (_planTasksAutosaveInFlight.get(modal) === true) return;
+
+  const payload = _buildPlanTasksPayload(modal);
+  const validationError = _validatePlanTasksPayload(payload);
+  if (validationError) {
+    if (!silent) showToast(validationError);
+    return;
+  }
+
+  _planTasksAutosaveInFlight.set(modal, true);
+  try {
+    const res = await apiRequest(
+      `/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}/reconcile`,
+      { method: 'POST', body: JSON.stringify({ tasks: payload }) }
+    );
+    if (!res || res.success !== true) {
+      if (!silent) {
+        const msg = res && res.error ? String(res.error) : 'Не удалось сохранить планы';
+        showToast(msg, { durationMs: 3500 });
+      }
+      return;
+    }
+
+    const next = (res && Array.isArray(res.tasks)) ? res.tasks : [];
+    _setPlanTasksState(modal, next.map(t => ({
+      id: t && t.id != null ? Number(t.id) : null,
+      positions: Array.isArray(t && t.positions) ? t.positions : [],
+      date_plan: t && t.date_plan ? String(t.date_plan) : '',
+      repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+    })));
+    try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
+    _renderPlanTasksTable(modal);
+  } catch (e) {
+    if (!silent) showToast('Ошибка сохранения планов', { durationMs: 2500 });
+  } finally {
+    _planTasksAutosaveInFlight.set(modal, false);
+    try {
+      if (modal.dataset.planTasksDirty === '1') {
+        _schedulePlanTasksAutosave(modal);
+      }
+    } catch (e) {
+    }
+  }
+}
+
+function _schedulePlanTasksAutosave(modal) {
+  if (!modal) return;
+  try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+
+  const prev = _planTasksAutosaveTimers.get(modal);
+  if (prev) clearTimeout(prev);
+  const t = setTimeout(() => {
+    _planTasksAutosaveTimers.delete(modal);
+    void _reconcilePlanTasksNow(modal, { silent: true });
+  }, 450);
+  _planTasksAutosaveTimers.set(modal, t);
+}
+
 async function _loadGroupsForPlanTasksModal() {
   const res = await apiRequest('/groups/api/my', { method: 'GET' });
   if (!res || !res.success) return [];
@@ -1620,7 +1716,7 @@ function _renderPlanTasksTable(modal) {
     tdCount.appendChild(countInput);
 
     const markDirty = () => {
-      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+      _schedulePlanTasksAutosave(modal);
     };
 
     dateInput.addEventListener('change', () => {
@@ -1731,56 +1827,7 @@ async function openPlanTasksModal(dictationId) {
   if (saveBtn && !saveBtn.dataset.listenerAttached) {
     saveBtn.dataset.listenerAttached = '1';
     saveBtn.addEventListener('click', async () => {
-      const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-      const dictationIdNum = Number(dictationIdRaw);
-      const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
-
-      if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0) {
-        showToast('Не найден dictation_id');
-        return;
-      }
-      if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) {
-        showToast('Не выбрана группа');
-        return;
-      }
-
-      const tasks = _getPlanTasksState(modal);
-      const payload = (Array.isArray(tasks) ? tasks : []).map(t => ({
-        id: t && t.id != null ? Number(t.id) : null,
-        positions: Array.isArray(t && t.positions) ? t.positions : [],
-        date_plan: t && t.date_plan ? String(t.date_plan) : '',
-        repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
-      }));
-
-      for (const t of payload) {
-        if (!t.date_plan) {
-          showToast('Заполни дату во всех строках');
-          return;
-        }
-        if (!Number.isFinite(Number(t.repeat_count)) || Number(t.repeat_count) <= 0) {
-          showToast('Повторы должны быть >= 1');
-          return;
-        }
-      }
-
-      try {
-        const res = await apiRequest(
-          `/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}/reconcile`,
-          { method: 'POST', body: JSON.stringify({ tasks: payload }) }
-        );
-        if (!res || res.success !== true) {
-          const msg = res && res.error ? String(res.error) : 'Не удалось сохранить планы';
-          showToast(msg, { durationMs: 3500 });
-          return;
-        }
-        const next = (res && Array.isArray(res.tasks)) ? res.tasks : [];
-        _setPlanTasksState(modal, next);
-        try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
-        _renderPlanTasksTable(modal);
-        showToast('Планы сохранены', { durationMs: 2500 });
-      } catch (e) {
-        showToast('Ошибка сохранения планов', { durationMs: 2500 });
-      }
+      await _reconcilePlanTasksNow(modal, { silent: false });
     });
   }
   if (addBtn && !addBtn.dataset.listenerAttached) {
@@ -1789,7 +1836,7 @@ async function openPlanTasksModal(dictationId) {
       const next = _getPlanTasksState(modal);
       next.push({ date_plan: getTodayIsoDate(), positions: [], repeat_count: 1 });
       _setPlanTasksState(modal, next);
-      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+      _schedulePlanTasksAutosave(modal);
       _setPlanTasksCurrentIndex(modal, Math.max(0, next.length - 1));
       _renderPlanTasksTable(modal);
     });
@@ -1803,7 +1850,7 @@ async function openPlanTasksModal(dictationId) {
       const safeIdx = Number.isFinite(idx) && idx >= 0 && idx < next.length ? idx : 0;
       next.splice(safeIdx, 1);
       _setPlanTasksState(modal, next);
-      try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+      _schedulePlanTasksAutosave(modal);
       const nextIdx = safeIdx >= next.length ? Math.max(0, next.length - 1) : safeIdx;
       _setPlanTasksCurrentIndex(modal, nextIdx);
       _renderPlanTasksTable(modal);
