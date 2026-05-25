@@ -1398,6 +1398,7 @@ function ensurePlanTasksModal() {
             <div id="plan-tasks-cover-meta" class="create-assignment-cover-meta"></div>
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div style="color: rgba(0,0,0,0.72); font-size: 13px;">План по диктанту для</div>
                 <select id="plan-tasks-group" style="height:40px; border-radius:12px; padding:0 10px; border:1px solid rgba(0,0,0,0.16); min-width: 240px;"></select>
               </div>
             </div>
@@ -1407,19 +1408,17 @@ function ensurePlanTasksModal() {
         <div class="create-assignment-bottom" style="display:block;">
           <div class="create-assignment-panel create-assignment-panel--days" style="width:100%;">
             <div class="create-assignment-panel-body">
+              <div style="display:flex; justify-content:flex-end; gap:8px; padding: 0 0 8px 0;">
+                <button type="button" id="plan-tasks-add" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.plan_tasks.add', null, 'Добавить'))}"><i data-lucide="plus"></i></button>
+                <button type="button" id="plan-tasks-delete" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>
+              </div>
               <div style="max-height:520px; overflow:auto;">
-                <table class="create-assignment-table" style="width:100%; border-collapse: collapse; font-size: 13px;">
+                <table class="create-assignment-table" style="width:100%; border-collapse: collapse; font-size: 13px; table-layout: fixed;">
                   <thead>
                     <tr style="border-bottom:1px solid rgba(0,0,0,0.08);">
-                      <th style="text-align:left; padding:8px 10px; width:34%;">${escapeHtml(libT('private_library.plan_tasks.date', null, 'Дата'))}</th>
+                      <th style="text-align:left; padding:8px 10px; width:150px;">${escapeHtml(libT('private_library.plan_tasks.date', null, 'Дата'))}</th>
                       <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.plan_tasks.exercise', null, 'Упражнение'))}</th>
                       <th style="text-align:left; padding:8px 10px; width:120px;"><i data-lucide="award" style="width:18px; height:18px; color: var(--color-button-yellow-dark, #eab308);"></i></th>
-                      <th style="text-align:right; padding:8px 10px; width:92px;">
-                        <div style="display:flex; justify-content:flex-end; gap:8px;">
-                          <button type="button" id="plan-tasks-add" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.plan_tasks.add', null, 'Добавить'))}"><i data-lucide="plus"></i></button>
-                          <button type="button" id="plan-tasks-delete" class="topbar-icon-btn" style="height:36px; width:36px;" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>
-                        </div>
-                      </th>
                     </tr>
                   </thead>
                   <tbody id="plan-tasks-body"></tbody>
@@ -1622,7 +1621,7 @@ function _renderPlanTasksTable(modal) {
   if (!tasks.length) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 4;
+    td.colSpan = 3;
     td.style.padding = '12px 10px';
     td.style.color = 'rgba(0,0,0,0.55)';
     td.textContent = 'Добавь план кнопкой +';
@@ -1644,7 +1643,12 @@ function _renderPlanTasksTable(modal) {
       tr.style.background = 'rgba(236, 72, 153, 0.10)';
     }
 
-    tr.addEventListener('click', () => {
+    tr.addEventListener('click', (e) => {
+      try {
+        const tag = e && e.target && e.target.tagName ? String(e.target.tagName).toUpperCase() : '';
+        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON' || tag === 'OPTION' || tag === 'LABEL') return;
+      } catch (e0) {
+      }
       const nextTasks = _getPlanTasksState(modal);
       if (!Array.isArray(nextTasks) || !nextTasks.length) return;
       _setPlanTasksCurrentIndex(modal, idx);
@@ -1653,6 +1657,8 @@ function _renderPlanTasksTable(modal) {
 
     const tdDate = document.createElement('td');
     tdDate.style.padding = '0';
+    tdDate.style.width = '150px';
+    tdDate.style.maxWidth = '150px';
     const dateInput = document.createElement('input');
     dateInput.type = 'date';
     dateInput.value = row && row.date_plan ? String(row.date_plan) : '';
@@ -1669,6 +1675,7 @@ function _renderPlanTasksTable(modal) {
     const exSelect = document.createElement('select');
     exSelect.style.height = '40px';
     exSelect.style.width = '100%';
+    exSelect.style.maxWidth = '100%';
     exSelect.style.padding = '0 8px';
     exSelect.style.border = '0';
     exSelect.style.background = 'transparent';
@@ -1701,18 +1708,6 @@ function _renderPlanTasksTable(modal) {
     countInput.style.boxSizing = 'border-box';
     tdCount.appendChild(countInput);
 
-    const tdDel = document.createElement('td');
-    tdDel.style.padding = '0';
-    tdDel.style.textAlign = 'center';
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.className = 'topbar-icon-btn';
-    delBtn.style.width = '100%';
-    delBtn.style.height = '40px';
-    delBtn.style.borderRadius = '0';
-    delBtn.innerHTML = '<i data-lucide="trash-2"></i>';
-    tdDel.appendChild(delBtn);
-
     const markDirty = () => {
       try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
     };
@@ -1740,22 +1735,10 @@ function _renderPlanTasksTable(modal) {
       _setPlanTasksState(modal, next);
       markDirty();
     });
-    delBtn.addEventListener('click', () => {
-      try { tr.click(); } catch (e) { }
-      const next = _getPlanTasksState(modal);
-      next.splice(idx, 1);
-      _setPlanTasksState(modal, next);
-      markDirty();
-      const cur = _getPlanTasksCurrentIndex(modal);
-      const nextIdx = cur >= next.length ? Math.max(0, next.length - 1) : cur;
-      _setPlanTasksCurrentIndex(modal, nextIdx);
-      _renderPlanTasksTable(modal);
-    });
 
     tr.appendChild(tdDate);
     tr.appendChild(tdEx);
     tr.appendChild(tdCount);
-    tr.appendChild(tdDel);
     body.appendChild(tr);
   });
 
@@ -1821,7 +1804,7 @@ async function openPlanTasksModal(dictationId) {
     modal.addEventListener('click', (e) => {
       try {
         if (e.target === modal) {
-          modal.style.display = 'none';
+          return;
         }
       } catch (e2) {
       }
