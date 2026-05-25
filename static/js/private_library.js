@@ -1641,6 +1641,19 @@ function _renderPlanTasksTable(modal) {
     if (!exKeyToId.has(k)) exKeyToId.set(k, ex && ex.id != null ? String(ex.id) : '');
   });
 
+  const setCurrentIndexSoft = (nextIdx) => {
+    const idxNum = Number(nextIdx);
+    if (!Number.isFinite(idxNum) || idxNum < 0) return;
+    _setPlanTasksCurrentIndex(modal, idxNum);
+    try {
+      const rows = Array.from(body.querySelectorAll('tr'));
+      rows.forEach((r, i) => {
+        r.style.background = (i === idxNum) ? 'rgba(236, 72, 153, 0.10)' : '';
+      });
+    } catch (e) {
+    }
+  };
+
   tasks.forEach((row, idx) => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
@@ -1649,15 +1662,9 @@ function _renderPlanTasksTable(modal) {
     }
 
     tr.addEventListener('click', (e) => {
-      try {
-        const tag = e && e.target && e.target.tagName ? String(e.target.tagName).toUpperCase() : '';
-        if (tag === 'SELECT' || tag === 'INPUT' || tag === 'BUTTON' || tag === 'OPTION' || tag === 'LABEL') return;
-      } catch (e0) {
-      }
       const nextTasks = _getPlanTasksState(modal);
       if (!Array.isArray(nextTasks) || !nextTasks.length) return;
-      _setPlanTasksCurrentIndex(modal, idx);
-      _renderPlanTasksTable(modal);
+      setCurrentIndexSoft(idx);
     });
 
     const tdDate = document.createElement('td');
@@ -1714,6 +1721,10 @@ function _renderPlanTasksTable(modal) {
     countInput.style.background = 'transparent';
     countInput.style.boxSizing = 'border-box';
     tdCount.appendChild(countInput);
+
+    dateInput.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
+    exSelect.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
+    countInput.addEventListener('focus', () => { setCurrentIndexSoft(idx); });
 
     const markDirty = () => {
       _schedulePlanTasksAutosave(modal);
