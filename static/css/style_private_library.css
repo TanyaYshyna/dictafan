@@ -298,8 +298,10 @@
 .plan-task-edit-body {
   padding: 12px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .plan-task-edit-input {
@@ -309,10 +311,26 @@
   padding: 0 10px;
 }
 
+#plan-task-edit-date {
+  width: 150px;
+  flex: 0 0 auto;
+}
+
+#plan-task-edit-count {
+  width: 72px;
+  flex: 0 0 auto;
+}
+
+#plan-task-edit-ex {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .plan-task-edit-actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex: 0 0 auto;
 }
 
 .plan-task-edit-save-btn {
@@ -320,8 +338,18 @@
   padding: 0 14px;
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.10);
-  background: rgba(236, 72, 153, 0.12);
+  background: var(--color-button-yellow, #fbbf24);
+  color: var(--color-button-text-yellow, #1f2933);
   font-weight: 600;
+}
+
+.plan-task-edit-save-btn:hover {
+  background: var(--color-button-yellow-dark, #eab308);
+}
+
+.plan-task-edit-save-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 #loading-overlay {

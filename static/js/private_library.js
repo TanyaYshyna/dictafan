@@ -1605,6 +1605,11 @@ function _openPlanTaskEditor(modal, opts) {
         const overlay = document.getElementById('plan-task-edit-overlay');
         if (!overlay) return;
 
+        if (saveBtn.disabled) return;
+        saveBtn.disabled = true;
+
+        try {
+
         const modeNow = String(overlay.dataset.mode || 'edit');
         const idxNow = Number(overlay.dataset.idx || '-1');
 
@@ -1662,6 +1667,9 @@ function _openPlanTaskEditor(modal, opts) {
 
         await _reconcilePlanTasksNow(modal, { silent: false });
         _closePlanTaskEditor();
+        } finally {
+          saveBtn.disabled = false;
+        }
       });
     }
   }
@@ -1814,64 +1822,27 @@ function _renderPlanTasksTable(modal) {
     });
 
     const tdDate = document.createElement('td');
-    tdDate.style.padding = '0';
+    tdDate.style.padding = '10px';
     tdDate.style.width = '120px';
     tdDate.style.maxWidth = '120px';
-    const dateInput = document.createElement('input');
-    dateInput.type = 'date';
-    dateInput.value = row && row.date_plan ? String(row.date_plan) : '';
-    dateInput.disabled = true;
-    dateInput.style.height = '40px';
-    dateInput.style.width = '100%';
-    dateInput.style.padding = '0 8px';
-    dateInput.style.border = '0';
-    dateInput.style.background = 'transparent';
-    dateInput.style.boxSizing = 'border-box';
-    tdDate.appendChild(dateInput);
+    tdDate.style.whiteSpace = 'nowrap';
+    tdDate.textContent = row && row.date_plan ? String(row.date_plan) : '';
 
     const tdEx = document.createElement('td');
-    tdEx.style.padding = '0';
-    const exSelect = document.createElement('select');
-    exSelect.disabled = true;
-    exSelect.style.height = '40px';
-    exSelect.style.width = '100%';
-    exSelect.style.maxWidth = '100%';
-    exSelect.style.padding = '0 8px';
-    exSelect.style.border = '0';
-    exSelect.style.background = 'transparent';
-    exSelect.style.boxSizing = 'border-box';
-    (Array.isArray(exercises) ? exercises : []).forEach(ex => {
-      const opt = document.createElement('option');
-      opt.value = String(ex && ex.id != null ? ex.id : '');
-      opt.textContent = _planExerciseLabel(ex);
-      exSelect.appendChild(opt);
-    });
+    tdEx.style.padding = '10px';
+    tdEx.style.whiteSpace = 'nowrap';
+    tdEx.style.overflow = 'hidden';
+    tdEx.style.textOverflow = 'ellipsis';
     const selectedKey = _planPositionsKey(row && row.positions ? row.positions : []);
-    const selectedId = exKeyToId.get(selectedKey);
-    if (selectedId != null && String(selectedId) !== '') {
-      exSelect.value = String(selectedId);
-    }
-    tdEx.appendChild(exSelect);
+    const exObj = (Array.isArray(exercises) ? exercises : []).find(ex => _planPositionsKey(ex && ex.positions ? ex.positions : []) === selectedKey);
+    tdEx.textContent = _planExerciseLabel(exObj || { positions: (row && row.positions) ? row.positions : [] });
 
     const tdCount = document.createElement('td');
-    tdCount.style.padding = '0';
+    tdCount.style.padding = '10px';
     tdCount.style.width = '56px';
     tdCount.style.maxWidth = '56px';
-    const countInput = document.createElement('input');
-    countInput.type = 'number';
-    countInput.min = '1';
-    countInput.step = '1';
-    countInput.value = String((row && row.repeat_count != null ? row.repeat_count : 1) || 1);
-    countInput.disabled = true;
-    countInput.style.height = '40px';
-    countInput.style.width = '100%';
-    countInput.style.padding = '0 10px';
-    countInput.style.border = '0';
-    countInput.style.background = 'transparent';
-    countInput.style.boxSizing = 'border-box';
-    tdCount.appendChild(countInput);
-
-    // Inline controls are disabled; editing is done via the overlay.
+    tdCount.style.whiteSpace = 'nowrap';
+    tdCount.textContent = String((row && row.repeat_count != null ? row.repeat_count : 1) || 1);
 
     tr.appendChild(tdDate);
     tr.appendChild(tdEx);
