@@ -2337,6 +2337,9 @@ function openStudentPlanLaunchConfirmModal(ctx) {
     const coverEl = modal.querySelector('#student-plan-launch-confirm-cover');
     const titleEl = modal.querySelector('#student-plan-launch-confirm-title');
     const subtitleEl = modal.querySelector('#student-plan-launch-confirm-subtitle');
+    const warningEl = modal.querySelector('#student-plan-launch-confirm-warning');
+    const positionsEl = modal.querySelector('#student-plan-launch-confirm-positions');
+    const sentencesEl = modal.querySelector('#student-plan-launch-confirm-sentences');
     const closeBtn = modal.querySelector('#student-plan-launch-confirm-close');
     const startBtn = modal.querySelector('#student-plan-launch-confirm-start');
 
@@ -2364,6 +2367,96 @@ function openStudentPlanLaunchConfirmModal(ctx) {
     }
     if (coverEl) {
       coverEl.style.backgroundImage = coverUrl ? `url(${coverUrl})` : '';
+    }
+
+    const positions = Array.isArray(payload.selected_sentence_positions)
+      ? payload.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+      : [];
+    try { positions.sort((a, b) => a - b); } catch (e) { }
+
+    if (warningEl) {
+      warningEl.textContent = String(libT('private_library.student_plan_launch.warning') || '');
+    }
+
+    if (positionsEl) {
+      positionsEl.textContent = positions.length ? positions.join(', ') : '';
+    }
+
+    if (sentencesEl) {
+      sentencesEl.innerHTML = '';
+      const box = document.createElement('div');
+      box.style.padding = '8px 0';
+      box.style.color = 'rgba(0,0,0,0.55)';
+      box.style.fontSize = '13px';
+      box.textContent = positions.length ? 'Загрузка…' : '';
+      sentencesEl.appendChild(box);
+    }
+
+    try {
+      console.log('[student_plan] launch_modal_open', {
+        dictation_id: dictationId,
+        lang,
+        title,
+        coverUrl,
+        positions_count: positions.length,
+        positions,
+      });
+    } catch (e) {
+    }
+
+    try {
+      if (sentencesEl && positions.length && dictationId != null) {
+        const langOrig = String(lang || 'en').trim().toLowerCase() || 'en';
+        const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+          ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+          : '';
+        const langTr = (nativeLang || langOrig || 'en');
+        apiRequest(`/api/dictation/dict_${Number(dictationId)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langTr)}/sentences`, { method: 'GET' })
+          .then((res) => {
+            try {
+              if (!res || !res.success) {
+                throw new Error('sentences fetch failed');
+              }
+              const all = Array.isArray(res.sentences) ? res.sentences : [];
+              const set = new Set(positions);
+              const subset = all.filter(s => {
+                const p = (s && (s.position != null ? Number(s.position) : Number(s.serial_number))) || null;
+                return p != null && set.has(p);
+              });
+
+              sentencesEl.innerHTML = '';
+              subset.slice(0, 50).forEach((s) => {
+                const p = (s && (s.position != null ? Number(s.position) : Number(s.serial_number))) || '';
+                const t = s && s.text ? String(s.text) : '';
+                const row = document.createElement('div');
+                row.style.padding = '8px 10px';
+                row.style.border = '1px solid rgba(0,0,0,0.08)';
+                row.style.borderRadius = '12px';
+                row.style.background = 'rgba(0,0,0,0.02)';
+                row.style.fontSize = '13px';
+                row.innerHTML = `<div style=\"font-weight:900; font-size:12px; color: rgba(0,0,0,0.60);\">${escapeHtml(String(p))}</div><div style=\"margin-top:2px;\">${escapeHtml(t)}</div>`;
+                sentencesEl.appendChild(row);
+              });
+
+              try {
+                console.log('[student_plan] launch_modal_sentences', { total: all.length, subset: subset.length });
+              } catch (e2) {
+              }
+            } catch (err) {
+              try {
+                sentencesEl.innerHTML = '<div style="padding:8px 0; color: rgba(0,0,0,0.55); font-size:13px;">Не удалось загрузить предложения</div>';
+              } catch (e2) {
+              }
+            }
+          })
+          .catch(() => {
+            try {
+              sentencesEl.innerHTML = '<div style="padding:8px 0; color: rgba(0,0,0,0.55); font-size:13px;">Не удалось загрузить предложения</div>';
+            } catch (e2) {
+            }
+          });
+      }
+    } catch (e) {
     }
 
     if (closeBtn && !closeBtn.__splc_bound) {

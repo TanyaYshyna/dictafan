@@ -62,6 +62,12 @@ class StudentPlanPanel {
         }
         const items = Array.isArray(res.assignments) ? res.assignments : [];
 
+        try {
+          const sample = (items && items.length) ? items[0] : null;
+          console.log('[student_plan] api_success', { date: d, count: Array.isArray(items) ? items.length : null, sample });
+        } catch (e) {
+        }
+
         const tRender0 = _nowTs();
         renderStudentPlan(d, items);
         _planLog('render', tRender0);
@@ -169,22 +175,37 @@ function renderStudentPlan(dateIso, items) {
     list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Заданий нет</div>';
     return;
   }
+  try {
+    const sample = (rows && rows.length) ? rows[0] : null;
+    console.log('[student_plan] render_start', { date: dateIso, count: rows.length, sample });
+  } catch (e) {
+  }
   list.innerHTML = rows.map((a) => {
     const dictId = a && a.dictation_id != null ? String(a.dictation_id) : '';
     const lang = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
     const title = a && a.dictation_title ? String(a.dictation_title) : '';
+    const coverUrl = a && a.dictation_cover_url ? String(a.dictation_cover_url) : '';
     const group = a && (a.group_title || a.group_id) ? String(a.group_title || a.group_id) : '';
     const req = Number(a && a.required_completions ? a.required_completions : 1);
     const done = Number(a && typeof a.done !== 'undefined' ? a.done : 0);
+    const assignmentId = a && a.id != null ? String(a.id) : '';
+    const groupId = a && a.group_id != null ? String(a.group_id) : '';
+    const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
+      ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+      : [];
+    const selectedPositionsAttr = selectedPositions.length ? selectedPositions.join(',') : '';
     return `<div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; background:#fff;">
       <div style="display:flex; justify-content:space-between; gap:12px;">
-        <div style="min-width:0;">
-          <div style="font-weight:900; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(title)}</div>
-          <div style="margin-top:3px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(group)}</div>
+        <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+          <div style="width:42px; height:42px; border-radius:12px; background:#e9eef5; flex:0 0 auto; background-size:cover; background-position:center; ${coverUrl ? `background-image:url(${escapeHtml(coverUrl)});` : ''}"></div>
+          <div style="min-width:0;">
+            <div style="font-weight:900; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(title)}</div>
+            <div style="margin-top:3px; font-size:12px; color: rgba(0,0,0,0.55); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(group)}</div>
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:10px;">
           <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,0.06); font-weight:900; font-size:12px;">${done}/${req}</div>
-          <button type="button" class="button-color-yellow" data-action="student-plan-open" data-dictation-id="${escapeHtml(dictId)}" data-dictation-lang="${escapeHtml(lang)}" style="height:34px; padding:0 10px;">${escapeHtml(libT('private_library.student_plan_launch.start'))}</button>
+          <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(assignmentId)}" data-source-group-id="${escapeHtml(groupId)}" data-source-group-title="${escapeHtml(group)}" data-selected-positions="${escapeHtml(selectedPositionsAttr)}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${escapeHtml(dictId)}" data-dictation-lang="${escapeHtml(lang)}" data-plan-date="${escapeHtml(String(dateIso || ''))}" data-dictation-title="${escapeHtml(String(title || ''))}" data-dictation-cover-url="${escapeHtml(String(coverUrl || ''))}" style="height:34px; padding:0 10px;">${escapeHtml(libT('private_library.student_plan_launch.start'))}</button>
         </div>
       </div>
     </div>`;
@@ -194,7 +215,46 @@ function renderStudentPlan(dateIso, items) {
       e.preventDefault();
       const dictId = btn.getAttribute('data-dictation-id');
       const lang = btn.getAttribute('data-dictation-lang');
-      _setAssignmentLaunchContext({ dictation_id: Number(dictId) });
+      const assignmentId = btn.getAttribute('data-assignment-id');
+      const sourceGroupId = btn.getAttribute('data-source-group-id');
+      const sourceGroupTitle = btn.getAttribute('data-source-group-title');
+      const selectedPositionsStr = btn.getAttribute('data-selected-positions');
+      const requiredCompletions = btn.getAttribute('data-required-completions');
+      const planDate = btn.getAttribute('data-plan-date');
+      const dictTitle = btn.getAttribute('data-dictation-title');
+      const coverUrl = btn.getAttribute('data-dictation-cover-url');
+      const positions = String(selectedPositionsStr || '')
+        .split(',')
+        .map(x => Number(String(x || '').trim()))
+        .filter(x => Number.isFinite(x));
+
+      const ctx = {
+        assignment_id: assignmentId ? Number(assignmentId) : null,
+        dictation_id: dictId ? Number(dictId) : null,
+        dictation_language_code: lang,
+        dictation_title: String(dictTitle || ''),
+        dictation_cover_url: String(coverUrl || ''),
+        plan_date: planDate != null ? String(planDate) : null,
+        source_group_id: sourceGroupId ? Number(sourceGroupId) : null,
+        source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
+        selected_sentence_positions: positions.length ? positions : null,
+        required_completions: Number(requiredCompletions || 0) || 0,
+      };
+
+      try {
+        console.log('[student_plan] launch_click', ctx);
+      } catch (e2) {
+      }
+
+      try {
+        if (typeof openStudentPlanLaunchConfirmModal === 'function') {
+          openStudentPlanLaunchConfirmModal(ctx);
+          return;
+        }
+      } catch (e2) {
+      }
+
+      _setAssignmentLaunchContext(ctx);
       _studentPlanOpenDictation(dictId, lang);
     });
   });
