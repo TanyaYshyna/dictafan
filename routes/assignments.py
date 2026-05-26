@@ -11,7 +11,7 @@ from helpers.db_assignments import (
     get_assignment_for_teacher,
     get_assignment_students_progress_for_teacher,
     list_group_assignments_for_teacher,
-    list_my_assignments_for_student,
+    list_my_plan_tasks_for_student,
     update_assignment_for_teacher,
 )
 
@@ -207,7 +207,7 @@ def api_student_my_assignments():
 
     try:
         t_db0 = time.perf_counter()
-        items = list_my_assignments_for_student(user["id"], for_date=for_date)
+        items = list_my_plan_tasks_for_student(user["id"], for_date=for_date)
         t_db1 = time.perf_counter()
         try:
             logger.info(

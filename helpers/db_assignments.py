@@ -466,6 +466,83 @@ def update_assignment_for_teacher(
         conn.close()
 
 
+def list_my_plan_tasks_for_student(student_user_id: int, *, for_date: Any) -> list[dict]:
+    target_date = _parse_date(for_date)
+    if not target_date:
+        raise ValueError("date is required")
+
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT pt.id,
+                   pt.groups_id AS group_id,
+                   pt.dictation_id,
+                   g.teacher_id AS created_by_teacher_user_id,
+                   pt.positions,
+                   pt.repeat_count AS required_completions,
+                   pt.created_at,
+                   pt.updated_at,
+                   g.title AS group_title,
+                   d.title AS dictation_title,
+                   d.language_code AS dictation_language_code,
+                   d.level AS dictation_level,
+                   d.sentences_count AS dictation_sentences_count
+            FROM plan_tasks pt
+            JOIN groups g ON g.id = pt.groups_id
+            JOIN dictations d ON d.id = pt.dictation_id
+            WHERE pt.date_plan = %s
+              AND EXISTS (
+                SELECT 1
+                FROM group_students gs
+                WHERE gs.group_id = pt.groups_id
+                  AND gs.student_user_id = %s
+                  AND gs.status = 'active'
+                  AND gs.removed_at IS NULL
+              )
+              AND g.archived_at IS NULL
+            ORDER BY pt.id ASC
+            """,
+            (target_date, int(student_user_id)),
+        )
+        rows = cur.fetchall() or []
+
+        result: list[dict] = []
+        for r in rows:
+            a = _row_to_assignment(r)
+
+            a["group_title"] = r.get("group_title")
+            a["dictation_title"] = r.get("dictation_title")
+            a["dictation_language_code"] = r.get("dictation_language_code")
+            a["dictation_level"] = r.get("dictation_level")
+            a["dictation_sentences_count"] = int(r.get("dictation_sentences_count") or 0)
+
+            # positions==NULL/[] => full dictation
+            pos = r.get("positions")
+            if pos is None or (isinstance(pos, (list, tuple)) and len(pos) == 0):
+                a["selected_sentence_positions"] = None
+            else:
+                try:
+                    a["selected_sentence_positions"] = [int(x) for x in list(pos or [])]
+                except Exception:
+                    a["selected_sentence_positions"] = None
+
+            try:
+                a["required_completions"] = int(r.get("required_completions") or 1)
+            except Exception:
+                a["required_completions"] = 1
+
+            a["done"] = 0
+            a["mode"] = "days"
+            a["overdue"] = False
+            result.append(a)
+
+        return result
+    finally:
+        cur.close()
+        conn.close()
+
+
 def delete_assignments(ids: list[int], teacher_user_id: int) -> int:
     if not ids:
         return 0
