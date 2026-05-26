@@ -5235,14 +5235,31 @@ function ensureDeskGridContainer() {
 function insertDeskCardElement(item, position = 'start') {
   const grid = ensureDeskGridContainer();
   if (!grid) return null;
-  const html = createDictationCard(item, true);
-  if (position === 'end') {
-    grid.insertAdjacentHTML('beforeend', html);
-  } else {
-    grid.insertAdjacentHTML('afterbegin', html);
+  let el = null;
+  try {
+    if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
+      const fresh = window.DictationKart.createDeskCardElement(item);
+      if (fresh) {
+        if (position === 'end') {
+          grid.appendChild(fresh);
+        } else {
+          grid.insertBefore(fresh, grid.firstChild);
+        }
+        el = fresh;
+      }
+    }
+  } catch (e) {
   }
 
-  const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+  if (!el) {
+    const html = createDictationCard(item, true);
+    if (position === 'end') {
+      grid.insertAdjacentHTML('beforeend', html);
+    } else {
+      grid.insertAdjacentHTML('afterbegin', html);
+    }
+    el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+  }
   if (!el) return null;
 
   try {
@@ -5746,6 +5763,13 @@ async function toggleDictationOnDesk(dictationId) {
 // item - объект с данными диктанта
 // isDeskCard - true для карточки на столе, false для карточки в книге
 function createDictationCard(item, isDeskCard = false) {
+  try {
+    if (window.DictationKart && typeof window.DictationKart.render === 'function') {
+      return window.DictationKart.render(item, { context: isDeskCard ? 'desk' : 'book' });
+    }
+  } catch (e) {
+  }
+
   if (isDeskCard) {
     // Карточка для рабочего стола
     const dictationId = item.dictation_id;
@@ -6276,6 +6300,16 @@ function renderDeskCards(items) {
   grid.className = 'shorts-grid';
 
   items.forEach(item => {
+    try {
+      if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
+        const el = window.DictationKart.createDeskCardElement(item);
+        if (el) {
+          grid.appendChild(el);
+          return;
+        }
+      }
+    } catch (e) {
+    }
     const cardHtml = createDictationCard(item, true); // true = карточка для стола
     grid.insertAdjacentHTML('beforeend', cardHtml);
   });

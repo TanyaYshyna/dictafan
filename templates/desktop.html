@@ -5,6 +5,7 @@
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/desktop.css?v=42">
     <link rel="stylesheet" href="/static/css/style_private_library.css?v=42">
+    <link rel="stylesheet" href="/static/css/dictation_kart.css?v=1">
 {% endblock %}
 
 {% block body_attrs %}class="page-index"{% endblock %}
@@ -89,5 +90,6 @@
 
 {% block scripts %}
     {{ super() }}
+    <script defer src="/static/js/dictation_kart.js?v=1"></script>
     <script defer src="/static/js/desktop.js?v=42"></script>
 {% endblock %}
