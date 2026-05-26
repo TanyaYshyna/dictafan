@@ -441,7 +441,7 @@ class UserManager {
         if (existing) {
           try { existing.remove(); } catch (e2) {}
         }
-        return;
+        // do not early-return; keep rendering the rest of the header (avatar, logout, etc.)
       }
 
       const todayTotal = Number(userData?.today_activity_total);
