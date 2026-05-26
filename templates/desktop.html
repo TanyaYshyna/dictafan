@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}DictaFan{% endblock %}
+
+{% block page_head %}
+    <link rel="stylesheet" href="/static/css/desktop.css?v=42">
+{% endblock %}
+
+{% block body_attrs %}class="page-index"{% endblock %}
+
+{% block build_channel %}dictafan:build:desktop{% endblock %}
+
+{% block topbar %}
+    <div class="topbar">
+        <a href="/" class="logo-link">
+            <img src="/static/icons/logo.svg" class="logo">
+        </a>
+        <div class="user-section" id="user-section">
+            <div class="auth-buttons" style="display: none;"></div>
+            <div class="user-info" style="display: none;"></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="desktop-page">
+        <div class="desktop-header">
+            <div class="desktop-title">Desktop</div>
+            <a class="button-secondary" href="/">Library</a>
+        </div>
+
+        <div id="desktop-root" class="desktop-root"></div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script defer src="/static/js/desktop.js?v=42"></script>
+{% endblock %}

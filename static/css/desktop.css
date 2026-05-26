@@ -1,0 +1,23 @@
+.desktop-page {
+  padding: 14px;
+}
+
+.desktop-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desktop-title {
+  font-weight: 900;
+  font-size: 18px;
+}
+
+.desktop-root {
+  margin-top: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  background: #fff;
+  min-height: 240px;
+}
