@@ -1,0 +1,38 @@
+<div id="student-plan-panel" class="modal student-plan-panel" style="display: none;">
+    <div id="student-plan-panel-drawer" class="student-plan-panel-drawer" tabindex="-1">
+        <div class="student-plan-panel-header">
+            <div class="student-plan-panel-header-left">
+                <div class="student-plan-panel-icon">
+                    <i data-lucide="calendar-check"></i>
+                </div>
+                <div>
+                    <div class="student-plan-panel-title"></div>
+                    <div id="student-plan-subtitle" class="student-plan-panel-subtitle"></div>
+                </div>
+            </div>
+            <button type="button" id="student-plan-close" class="modal-close" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+
+        <div class="student-plan-panel-toolbar">
+            <div class="student-plan-panel-toolbar-left">
+                <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="">
+                    <i data-lucide="chevron-left"></i>
+                </button>
+                <input type="date" id="student-plan-date" class="student-plan-panel-date" />
+                <button type="button" id="student-plan-next" class="topbar-icon-btn" title="">
+                    <i data-lucide="chevron-right"></i>
+                </button>
+            </div>
+            <div class="student-plan-panel-toolbar-right">
+                <button type="button" id="student-plan-today" class="button-secondary student-plan-panel-today"></button>
+                <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="">
+                    <i data-lucide="refresh-cw"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="student-plan-list" class="student-plan-panel-list"></div>
+    </div>
+</div>

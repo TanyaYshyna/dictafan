@@ -1646,7 +1646,13 @@ function _openPlanTaskEditor(modal, opts) {
 
   if (!el.dataset.listenersAttached) {
     el.dataset.listenersAttached = '1';
-    el.addEventListener('click', (e) => { if (e.target === el) _maybeClosePlanTaskEditor(); });
+    el.addEventListener('click', (e) => {
+      if (e && e.target === el) {
+        try { e.preventDefault(); } catch (e2) { }
+        try { e.stopPropagation(); } catch (e2) { }
+        return;
+      }
+    });
     if (closeBtn) closeBtn.addEventListener('click', () => { _maybeClosePlanTaskEditor(); });
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
@@ -2700,7 +2706,16 @@ function _studentPlanRender(panel, dateIso, items) {
       ? first.dictation_title
       : libT('private_library.student_plan.dictation_fallback_title', { id: first.dictation_id }));
     const level = first && first.dictation_level ? String(first.dictation_level) : '—';
-    const coverUrl = String(first && first.dictation_cover_url ? first.dictation_cover_url : '');
+    let coverUrl = String(first && first.dictation_cover_url ? first.dictation_cover_url : '');
+    try {
+      if (window.ImageManager && typeof window.ImageManager.getCoverUrl === 'function') {
+        const did = first && first.dictation_id != null ? first.dictation_id : null;
+        const lang = first && first.dictation_language_code ? first.dictation_language_code : null;
+        const u = window.ImageManager.getCoverUrl(did, lang);
+        if (u) coverUrl = String(u);
+      }
+    } catch (e) {
+    }
     const isCached = !!(first && first.__cached);
     const cacheBadge = isCached
       ? `<div title="${escapeHtml(libT('private_library.student_plan.cached_title'))}" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>${escapeHtml(libT('private_library.student_plan.cached_badge'))}</span></div>`
@@ -2882,35 +2897,12 @@ async function openStudentPlanPanel(dateIso = null) {
 
     updateTodayVisibility();
 
-    try {
-      const tClean0 = _nowTs();
-      await _cleanupStudentPlanCacheIdb();
-      _planLog('cleanup_cache', tClean0);
-    } catch (e) {
-    }
-
-    if (!forceRefresh) {
-      const tIdb0 = _nowTs();
-      const cached = await _getStudentPlanCacheForDateIdb(d);
-      _planLog('idb_read', tIdb0);
-      if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
-        _studentPlanRender(panel, d, cached.assignments);
-      } else {
-        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-      }
-    } else {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-    }
+    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
     try {
       const tNet0 = _nowTs();
       const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
       _planLog('api_fetch', tNet0);
       if (!res || !res.success) {
-        const fallback = await _getStudentPlanCacheForDateIdb(d);
-        if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
-          _studentPlanRender(panel, d, fallback.assignments);
-          return;
-        }
         if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
         return;
       }
@@ -2931,20 +2923,11 @@ async function openStudentPlanPanel(dateIso = null) {
       } catch (e) {
       }
 
-      const tIdbW0 = _nowTs();
-      await _setStudentPlanCacheForDateIdb(d, items);
-      _planLog('idb_write', tIdbW0);
-
       const tRender0 = _nowTs();
       _studentPlanRender(panel, d, items);
       _planLog('render', tRender0);
       _planLog(`load_total(force=${forceRefresh ? '1' : '0'})`, tLoad0);
     } catch (e) {
-      const fallback = await _getStudentPlanCacheForDateIdb(d);
-      if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
-        _studentPlanRender(panel, d, fallback.assignments);
-        return;
-      }
       if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
     }
   };
@@ -7797,7 +7780,13 @@ function installEventHandlers() {
   const studentPlanBtn = document.getElementById('btnStudentPlan');
   if (studentPlanBtn) {
     studentPlanBtn.addEventListener('click', () => {
-      openStudentPlanPanel().catch(() => { });
+      try {
+        if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+          window.StudentPlanPanel.open().catch(() => { });
+          return;
+        }
+      } catch (e) {
+      }
     });
   }
 
@@ -9688,23 +9677,19 @@ async function _autoOpenTodayPlanIfNeeded() {
   const panel = document.getElementById('student-plan-panel');
   if (panel && panel.style && panel.style.display && panel.style.display !== 'none') return;
 
-  // 1) Fast path: check cached assignments for today (if any)
-  try {
-    const cached = await _getStudentPlanCacheForDateIdb(today);
-    if (cached && Array.isArray(cached.assignments) && _hasUnfinishedTodayHomework(cached.assignments)) {
-      openStudentPlanPanel(today);
-      return;
-    }
-  } catch (e) {
-  }
-
-  // 2) Network verification: open if API says there is unfinished homework
+  // Network verification: open if API says there is unfinished homework
   try {
     const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(today)}`, { method: 'GET' });
     if (res && res.success) {
       const items = Array.isArray(res.assignments) ? res.assignments : [];
       if (_hasUnfinishedTodayHomework(items)) {
-        openStudentPlanPanel(today);
+        try {
+          if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+            window.StudentPlanPanel.open(today);
+            return;
+          }
+        } catch (e) {
+        }
       }
     }
   } catch (e) {

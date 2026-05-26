@@ -68,6 +68,7 @@
     {{ super() }}
     {% include 'partials/reports_modal.html' %}
     {% include 'partials/plan_tasks_modal.html' %}
+    {% include 'partials/student_plan_panel.html' %}
     <div id="delete-dictation-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
@@ -340,5 +341,6 @@
     <script src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/student_plan_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/private_library.js') }}?v={{ app_cache_revision }}"></script>
 {% endblock %}
