@@ -1351,58 +1351,71 @@ function ensurePlanTasksModal() {
   return modal;
 }
 
+const _planTasksStore = new WeakMap();
+
+function _ensurePlanTasksStore(modal) {
+  if (!modal) return { tasks: [], exercises: [], currentId: null, dirty: false };
+  const existing = _planTasksStore.get(modal);
+  if (existing) return existing;
+  const init = { tasks: [], exercises: [], currentId: null, dirty: false };
+  _planTasksStore.set(modal, init);
+  return init;
+}
+
+function _sortPlanTasks(items) {
+  const tasks = Array.isArray(items) ? items.slice() : [];
+  tasks.sort((a, b) => {
+    const da = String(a && a.date_plan ? a.date_plan : '');
+    const db = String(b && b.date_plan ? b.date_plan : '');
+    if (da < db) return -1;
+    if (da > db) return 1;
+    const ia = (a && a.id != null) ? Number(a.id) : NaN;
+    const ib = (b && b.id != null) ? Number(b.id) : NaN;
+    if (Number.isFinite(ia) && Number.isFinite(ib)) return ia - ib;
+    return 0;
+  });
+  return tasks;
+}
+
 function _getPlanTasksState(modal) {
-  try {
-    const raw = modal.dataset.planTasksState;
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return _ensurePlanTasksStore(modal).tasks;
 }
 
 function _setPlanTasksState(modal, tasks) {
-  try {
-    modal.dataset.planTasksState = JSON.stringify(Array.isArray(tasks) ? tasks : []);
-  } catch (e) {
-  }
+  const st = _ensurePlanTasksStore(modal);
+  st.tasks = _sortPlanTasks(tasks);
 }
 
 function _getPlanTasksExercises(modal) {
-  try {
-    const raw = modal.dataset.planTasksExercises;
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return _ensurePlanTasksStore(modal).exercises;
 }
 
 function _setPlanTasksExercises(modal, exercises) {
-  try {
-    modal.dataset.planTasksExercises = JSON.stringify(Array.isArray(exercises) ? exercises : []);
-  } catch (e) {
-  }
+  const st = _ensurePlanTasksStore(modal);
+  st.exercises = Array.isArray(exercises) ? exercises.slice() : [];
 }
 
-function _getPlanTasksCurrentIndex(modal) {
-  try {
-    const raw = modal && modal.dataset ? modal.dataset.planTasksCurrentIndex : '';
-    const n = parseInt(String(raw || ''), 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  } catch (e) {
-    return 0;
-  }
+function _getPlanTasksCurrentId(modal) {
+  return _ensurePlanTasksStore(modal).currentId;
 }
 
-function _setPlanTasksCurrentIndex(modal, idx) {
-  try {
-    const n = parseInt(String(idx), 10);
-    modal.dataset.planTasksCurrentIndex = String(Number.isFinite(n) && n >= 0 ? n : 0);
-  } catch (e) {
-  }
+function _setPlanTasksCurrentId(modal, id) {
+  const st = _ensurePlanTasksStore(modal);
+  st.currentId = (id == null || id === '') ? null : Number(id);
+}
+
+function _setPlanTasksDirty(modal, dirty) {
+  _ensurePlanTasksStore(modal).dirty = Boolean(dirty);
+}
+
+function _getPlanTasksDirty(modal) {
+  return Boolean(_ensurePlanTasksStore(modal).dirty);
+}
+
+function _findPlanTaskIndexById(tasks, id) {
+  const idNum = Number(id);
+  if (!Array.isArray(tasks) || !Number.isFinite(idNum)) return -1;
+  return tasks.findIndex(t => Number(t && t.id) === idNum);
 }
 
 function _planPositionsKey(pos) {
@@ -1500,24 +1513,19 @@ async function _reconcilePlanTasksNow(modal, opts) {
       date_plan: t && t.date_plan ? String(t.date_plan) : '',
       repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
     })));
-    try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
+    _setPlanTasksDirty(modal, false);
     _renderPlanTasksTable(modal);
   } catch (e) {
     if (!silent) showToast('Ошибка сохранения планов', { durationMs: 2500 });
   } finally {
     _planTasksAutosaveInFlight.set(modal, false);
-    try {
-      if (modal.dataset.planTasksDirty === '1') {
-        _schedulePlanTasksAutosave(modal);
-      }
-    } catch (e) {
-    }
+    if (_getPlanTasksDirty(modal)) _schedulePlanTasksAutosave(modal);
   }
 }
 
 function _schedulePlanTasksAutosave(modal) {
   if (!modal) return;
-  try { modal.dataset.planTasksDirty = '1'; } catch (e) { }
+  _setPlanTasksDirty(modal, true);
 
   const prev = _planTasksAutosaveTimers.get(modal);
   if (prev) clearTimeout(prev);
@@ -1604,14 +1612,16 @@ function _openPlanTaskEditor(modal, opts) {
   const closeBtn = el.querySelector('#plan-task-edit-close');
 
   const mode = opts && opts.mode ? String(opts.mode) : 'edit';
-  const idx = Number(opts && opts.idx != null ? opts.idx : -1);
+  const taskId = (opts && opts.id != null) ? Number(opts.id) : null;
+  const idxFallback = Number(opts && opts.idx != null ? opts.idx : -1);
 
   const tasks = Array.isArray(_getPlanTasksState(modal)) ? _getPlanTasksState(modal) : [];
   const exercises = Array.isArray(_getPlanTasksExercises(modal)) ? _getPlanTasksExercises(modal) : [];
+  const idx = (taskId != null) ? _findPlanTaskIndexById(tasks, taskId) : idxFallback;
   const row = (idx >= 0 && idx < tasks.length) ? tasks[idx] : null;
 
   try { el.dataset.mode = mode; } catch (e) { }
-  try { el.dataset.idx = String(Number.isFinite(idx) ? idx : -1); } catch (e) { }
+  try { el.dataset.taskId = (taskId != null ? String(taskId) : ''); } catch (e) { }
 
   const initDate = (row && row.date_plan) ? String(row.date_plan) : getTodayIsoDate();
   const initPositions = (row && Array.isArray(row.positions)) ? row.positions : [];
@@ -1649,7 +1659,8 @@ function _openPlanTaskEditor(modal, opts) {
         try {
 
         const modeNow = String(overlay.dataset.mode || 'edit');
-        const idxNow = Number(overlay.dataset.idx || '-1');
+        const idNowRaw = String(overlay.dataset.taskId || '').trim();
+        const idNow = idNowRaw ? Number(idNowRaw) : null;
 
         const dEl = overlay.querySelector('#plan-task-edit-date');
         const exEl = overlay.querySelector('#plan-task-edit-ex');
@@ -1672,7 +1683,7 @@ function _openPlanTaskEditor(modal, opts) {
 
         if (modeNow !== 'delete') {
           const isDup = tasksNow.some((t, j) => {
-            if (modeNow !== 'new' && Number.isFinite(idxNow) && j === idxNow) return false;
+            if (modeNow !== 'new' && idNow != null && Number(t && t.id) === Number(idNow)) return false;
             const sameDate = String(t && t.date_plan ? t.date_plan : '') === datePlan;
             const samePos = _planPositionsKey(t && t.positions ? t.positions : []) === _planPositionsKey(positions);
             return sameDate && samePos;
@@ -1688,18 +1699,17 @@ function _openPlanTaskEditor(modal, opts) {
         if (modeNow === 'new') {
           next.push({ id: null, date_plan: datePlan, positions, repeat_count: repeatCount });
           _setPlanTasksState(modal, next);
-          _setPlanTasksCurrentIndex(modal, Math.max(0, next.length - 1));
         } else if (modeNow === 'delete') {
-          if (Number.isFinite(idxNow) && idxNow >= 0 && idxNow < next.length) {
-            next.splice(idxNow, 1);
+          if (idNow != null) {
+            const delIdx = _findPlanTaskIndexById(next, idNow);
+            if (delIdx >= 0) next.splice(delIdx, 1);
             _setPlanTasksState(modal, next);
-            _setPlanTasksCurrentIndex(modal, Math.max(0, Math.min(idxNow, next.length - 1)));
           }
         } else {
-          if (Number.isFinite(idxNow) && idxNow >= 0 && idxNow < next.length) {
-            next[idxNow] = Object.assign({}, next[idxNow], { date_plan: datePlan, positions, repeat_count: repeatCount });
+          if (idNow != null) {
+            const editIdx = _findPlanTaskIndexById(next, idNow);
+            if (editIdx >= 0) next[editIdx] = Object.assign({}, next[editIdx], { date_plan: datePlan, positions, repeat_count: repeatCount });
             _setPlanTasksState(modal, next);
-            _setPlanTasksCurrentIndex(modal, idxNow);
           }
         }
 
@@ -1805,13 +1815,16 @@ function _renderPlanTasksTable(modal) {
   const tasks = _getPlanTasksState(modal);
   const exercises = _getPlanTasksExercises(modal);
 
-  let currentIdx = _getPlanTasksCurrentIndex(modal);
+  let currentId = _getPlanTasksCurrentId(modal);
   if (!Array.isArray(tasks) || !tasks.length) {
-    _setPlanTasksCurrentIndex(modal, 0);
+    _setPlanTasksCurrentId(modal, null);
   } else {
-    if (!Number.isFinite(currentIdx) || currentIdx < 0) currentIdx = 0;
-    if (currentIdx >= tasks.length) currentIdx = Math.max(0, tasks.length - 1);
-    _setPlanTasksCurrentIndex(modal, currentIdx);
+    const hasCurrent = currentId != null && _findPlanTaskIndexById(tasks, currentId) >= 0;
+    if (!hasCurrent) {
+      const firstId = (tasks[0] && tasks[0].id != null) ? Number(tasks[0].id) : null;
+      _setPlanTasksCurrentId(modal, firstId);
+      currentId = firstId;
+    }
   }
 
   if (!tasks.length) {
@@ -1832,14 +1845,13 @@ function _renderPlanTasksTable(modal) {
     if (!exKeyToId.has(k)) exKeyToId.set(k, ex && ex.id != null ? String(ex.id) : '');
   });
 
-  const setCurrentIndexSoft = (nextIdx) => {
-    const idxNum = Number(nextIdx);
-    if (!Number.isFinite(idxNum) || idxNum < 0) return;
-    _setPlanTasksCurrentIndex(modal, idxNum);
+  const setCurrentIdSoft = (nextId) => {
+    _setPlanTasksCurrentId(modal, nextId);
     try {
       const rows = Array.from(body.querySelectorAll('tr'));
-      rows.forEach((r, i) => {
-        r.style.background = (i === idxNum) ? 'rgba(236, 72, 153, 0.10)' : '';
+      rows.forEach((r) => {
+        const rid = r && r.dataset ? String(r.dataset.taskId || '') : '';
+        r.style.background = (nextId != null && rid && Number(rid) === Number(nextId)) ? 'rgba(236, 72, 153, 0.10)' : '';
       });
     } catch (e) {
     }
@@ -1848,15 +1860,17 @@ function _renderPlanTasksTable(modal) {
   tasks.forEach((row, idx) => {
     const tr = document.createElement('tr');
     tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
-    if (idx === currentIdx) {
+    const rowId = (row && row.id != null) ? Number(row.id) : null;
+    try { tr.dataset.taskId = (rowId != null ? String(rowId) : ''); } catch (e) { }
+    if (rowId != null && currentId != null && Number(rowId) === Number(currentId)) {
       tr.style.background = 'rgba(236, 72, 153, 0.10)';
     }
 
     tr.addEventListener('click', (e) => {
       const nextTasks = _getPlanTasksState(modal);
       if (!Array.isArray(nextTasks) || !nextTasks.length) return;
-      setCurrentIndexSoft(idx);
-      _openPlanTaskEditor(modal, { mode: 'edit', idx });
+      if (rowId != null) setCurrentIdSoft(rowId);
+      _openPlanTaskEditor(modal, { mode: 'edit', id: rowId, idx });
     });
 
     const tdDate = document.createElement('td');
@@ -1980,10 +1994,14 @@ async function openPlanTasksModal(dictationId) {
     deleteBtn.addEventListener('click', () => {
       const next = _getPlanTasksState(modal);
       if (!Array.isArray(next) || !next.length) return;
-      const idx = _getPlanTasksCurrentIndex(modal);
-      const safeIdx = Number.isFinite(idx) && idx >= 0 && idx < next.length ? idx : 0;
-      _setPlanTasksCurrentIndex(modal, safeIdx);
-      _openPlanTaskEditor(modal, { mode: 'delete', idx: safeIdx });
+      const currentId = _getPlanTasksCurrentId(modal);
+      let idx = (currentId != null) ? _findPlanTaskIndexById(next, currentId) : -1;
+      if (!(idx >= 0 && idx < next.length)) idx = 0;
+
+      const row = next[idx];
+      const rowId = (row && row.id != null) ? Number(row.id) : null;
+      if (rowId != null) _setPlanTasksCurrentId(modal, rowId);
+      _openPlanTaskEditor(modal, { mode: 'delete', id: rowId, idx });
     });
   }
   if (groupSel && !groupSel.dataset.listenerAttached) {
