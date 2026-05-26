@@ -2328,6 +2328,74 @@ function _setAssignmentLaunchContext(ctx) {
   }
 }
 
+function openStudentPlanLaunchConfirmModal(ctx) {
+  try {
+    const payload = (ctx && typeof ctx === 'object') ? ctx : {};
+    const modal = ensureStudentPlanLaunchConfirmModal();
+    if (!modal) return;
+
+    const coverEl = modal.querySelector('#student-plan-launch-confirm-cover');
+    const titleEl = modal.querySelector('#student-plan-launch-confirm-title');
+    const subtitleEl = modal.querySelector('#student-plan-launch-confirm-subtitle');
+    const closeBtn = modal.querySelector('#student-plan-launch-confirm-close');
+    const startBtn = modal.querySelector('#student-plan-launch-confirm-start');
+
+    const dictationId = payload.dictation_id != null ? Number(payload.dictation_id) : null;
+    const lang = payload.dictation_language_code != null ? String(payload.dictation_language_code) : 'en';
+    const title = payload.dictation_title != null ? String(payload.dictation_title) : '';
+    let coverUrl = payload.dictation_cover_url != null ? String(payload.dictation_cover_url) : '';
+
+    try {
+      if (!coverUrl && window.ImageManager && typeof window.ImageManager.getCoverUrl === 'function' && dictationId != null) {
+        const u = window.ImageManager.getCoverUrl(dictationId, lang);
+        if (u) coverUrl = String(u);
+      }
+    } catch (e) {
+    }
+
+    if (titleEl) {
+      titleEl.textContent = title || libT('private_library.student_plan.dictation_fallback_title', { id: dictationId });
+    }
+    if (subtitleEl) {
+      const parts = [];
+      if (payload.plan_date) parts.push(String(payload.plan_date));
+      if (payload.source_group_title) parts.push(String(payload.source_group_title));
+      subtitleEl.textContent = parts.join(' · ');
+    }
+    if (coverEl) {
+      coverEl.style.backgroundImage = coverUrl ? `url(${coverUrl})` : '';
+    }
+
+    if (closeBtn && !closeBtn.__splc_bound) {
+      closeBtn.__splc_bound = true;
+      closeBtn.addEventListener('click', () => {
+        try { modal.style.display = 'none'; } catch (e) { }
+      });
+    }
+
+    if (startBtn && !startBtn.__splc_bound) {
+      startBtn.__splc_bound = true;
+      startBtn.addEventListener('click', () => {
+        try {
+          _setAssignmentLaunchContext(payload);
+        } catch (e) {
+        }
+        try { modal.style.display = 'none'; } catch (e) { }
+        try { _studentPlanOpenDictation(dictationId, lang); } catch (e) { }
+      });
+    }
+
+    modal.style.display = 'block';
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons({ root: modal });
+      }
+    } catch (e) {
+    }
+  } catch (e) {
+  }
+}
+
 function ensureStudentPlanLaunchConfirmModal() {
   let modal = document.getElementById('student-plan-launch-confirm-modal');
   if (modal) return modal;

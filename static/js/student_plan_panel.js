@@ -54,22 +54,13 @@ class StudentPlanPanel {
           if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
           return;
         }
-        const items = Array.isArray(res.assignments) ? res.assignments : [];
 
         try {
-          const tCache0 = _nowTs();
-          const cachedIds = await _getCachedDictationIdSetIdb();
-          for (const it of items) {
-            try {
-              const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
-              const cleaned = did.replace(/^dict_/, '').trim();
-              if (cleaned) it.__cached = cachedIds.has(cleaned);
-            } catch (e) {
-            }
-          }
-          _planLog('check_dictations_cache', tCache0);
+          panel.dataset.studentPlanLastFetchedAt = new Date().toISOString();
+          panel.dataset.studentPlanLastFetchedDate = String(d);
         } catch (e) {
         }
+        const items = Array.isArray(res.assignments) ? res.assignments : [];
 
         const tRender0 = _nowTs();
         renderStudentPlan(d, items);
@@ -154,7 +145,24 @@ function _studentPlanOpenDictation(dictationId, dictationLanguageCode) {
 function renderStudentPlan(dateIso, items) {
   const list = document.getElementById('student-plan-list');
   const subtitle = document.getElementById('student-plan-subtitle');
-  if (subtitle) subtitle.textContent = dateIso ? String(dateIso) : '';
+  if (subtitle) {
+    let suffix = '';
+    try {
+      const panel = ensureStudentPlanPanel();
+      const fetchedAtIso = panel && panel.dataset ? panel.dataset.studentPlanLastFetchedAt : '';
+      const fetchedForDate = panel && panel.dataset ? panel.dataset.studentPlanLastFetchedDate : '';
+      if (fetchedAtIso && fetchedForDate && String(fetchedForDate) === String(dateIso || '')) {
+        const dt = new Date(String(fetchedAtIso));
+        if (!Number.isNaN(dt.getTime())) {
+          const d = dt.toLocaleDateString('ru-RU');
+          const t = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          suffix = ` · обновлено ${d} ${t}`;
+        }
+      }
+    } catch (e) {
+    }
+    subtitle.textContent = (dateIso ? String(dateIso) : '') + suffix;
+  }
   if (!list) return;
   const rows = Array.isArray(items) ? items : [];
   if (!rows.length) {
