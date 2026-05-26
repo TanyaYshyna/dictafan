@@ -2140,64 +2140,9 @@ function setCreateAssignmentDaysState(modal, days) {
 }
 
 function ensureStudentPlanPanel() {
-  let panel = document.getElementById('student-plan-panel');
+  const panel = document.getElementById('student-plan-panel');
   if (panel) return panel;
-
-  panel = document.createElement('div');
-  panel.id = 'student-plan-panel';
-  panel.tabIndex = -1;
-  panel.style.display = 'none';
-  panel.style.position = 'fixed';
-  panel.style.left = '0';
-  panel.style.top = '0';
-  panel.style.width = '100%';
-  panel.style.height = '100%';
-  panel.style.zIndex = '100000';
-  panel.style.background = 'rgba(0,0,0,0.35)';
-  panel.style.backdropFilter = 'blur(4px)';
-  panel.style.outline = 'none';
-
-  panel.innerHTML = `
-    <div id="student-plan-panel-drawer" tabindex="-1" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column; outline:none;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
-            <i data-lucide="calendar-check"></i>
-          </div>
-          <div>
-            <div style="font-weight:700; font-size:16px; line-height:1.1;">${escapeHtml(libT('private_library.student_plan.title'))}</div>
-            <div id="student-plan-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
-          </div>
-        </div>
-        <button type="button" id="student-plan-close" class="modal-close" title="${escapeHtml(libT('private_library.common.close'))}" style="background:transparent; border:0; cursor:pointer; padding:6px;">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-
-      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.prev_day'))}" style="width:40px; height:40px;">
-            <i data-lucide="chevron-left"></i>
-          </button>
-          <input type="date" id="student-plan-date" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);">
-          <button type="button" id="student-plan-next" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.next_day'))}" style="width:40px; height:40px;">
-            <i data-lucide="chevron-right"></i>
-          </button>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">${escapeHtml(libT('private_library.student_plan.today'))}</button>
-          <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.refresh'))}" style="width:40px; height:40px;">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-      </div>
-
-      <div id="student-plan-list" style="padding:14px; overflow:auto; flex:1;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(panel);
-  return panel;
+  throw new Error('student-plan-panel not found');
 }
 
 function ensureTeacherAssignmentStudentsModal() {
@@ -2438,130 +2383,7 @@ function ensureStudentPlanLaunchConfirmModal() {
   return modal;
 }
 
-async function openStudentPlanLaunchConfirmModal(ctx) {
-  const modal = ensureStudentPlanLaunchConfirmModal();
-  const closeBtn = document.getElementById('student-plan-launch-confirm-close');
-  const startBtn = document.getElementById('student-plan-launch-confirm-start');
-  const titleEl = document.getElementById('student-plan-launch-confirm-title');
-  const subtitleEl = document.getElementById('student-plan-launch-confirm-subtitle');
-  const coverEl = document.getElementById('student-plan-launch-confirm-cover');
-  const warningEl = document.getElementById('student-plan-launch-confirm-warning');
-  const posEl = document.getElementById('student-plan-launch-confirm-positions');
-  const sentsEl = document.getElementById('student-plan-launch-confirm-sentences');
 
-  if (titleEl) titleEl.textContent = String((ctx && ctx.dictation_title) || libT('private_library.student_plan_launch.dictation_fallback_title'));
-  if (subtitleEl) subtitleEl.textContent = String((ctx && ctx.plan_date) ? libT('private_library.student_plan_launch.assignment_for_date', { date: ctx.plan_date }) : '');
-  if (coverEl) {
-    const url = String((ctx && ctx.dictation_cover_url) || '');
-    coverEl.style.backgroundImage = url ? `url(${escapeHtml(url)})` : 'none';
-  }
-  if (warningEl) {
-    warningEl.textContent = libT('private_library.student_plan_launch.past_day_warning');
-  }
-
-  const positions = Array.isArray(ctx && ctx.selected_sentence_positions)
-    ? ctx.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-    : [];
-  positions.sort((a, b) => a - b);
-
-  const formatPositionsLabel = () => {
-    try {
-      if (!positions.length) return libT('private_library.student_plan_launch.all_sentences');
-      const uniq = Array.from(new Set(positions));
-      uniq.sort((a, b) => a - b);
-      const ranges = [];
-      let start = null;
-      let prev = null;
-      for (const n of uniq) {
-        if (start == null) {
-          start = n;
-          prev = n;
-          continue;
-        }
-        if (n === prev + 1) {
-          prev = n;
-          continue;
-        }
-        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-        start = n;
-        prev = n;
-      }
-      if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-      const compact = ranges.join(',');
-      return compact ? `(${compact})` : libT('private_library.student_plan_launch.all_sentences');
-    } catch (e) {
-      return '';
-    }
-  };
-
-  if (posEl) posEl.textContent = formatPositionsLabel();
-  if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.loading'))}</div>`;
-
-  try {
-    const did = Number(ctx && ctx.dictation_id);
-    const all = await loadDictationSentencesForAssignmentModal(did);
-    const list = Array.isArray(all) ? all : [];
-
-    let pick = list;
-    if (positions.length) {
-      const set = new Set(positions);
-      pick = list.filter(s => {
-        try {
-          const p = Number(s && s.position);
-          return Number.isFinite(p) && set.has(p);
-        } catch (e) {
-          return false;
-        }
-      });
-    }
-
-    const rows = pick.slice(0, 60).map(s => {
-      const p = Number(s && s.position);
-      const txt = String((s && (s.text || s.sentence || s.value)) || '').trim();
-      const short = txt.length > 160 ? `${txt.slice(0, 160)}…` : txt;
-      return `
-        <div style="display:flex; gap:10px; padding:10px 12px; border-radius:14px; background: rgba(0,0,0,0.04);">
-          <div style="flex:0 0 auto; min-width:38px; height:26px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.06); font-weight:900; font-size:12px;">${escapeHtml(String(Number.isFinite(p) ? p : ''))}</div>
-          <div style="flex:1 1 auto; font-size:13px; line-height:1.35; color: rgba(0,0,0,0.78);">${escapeHtml(short || '')}</div>
-        </div>
-      `;
-    }).join('');
-    if (sentsEl) sentsEl.innerHTML = rows || `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.no_sentences'))}</div>`;
-  } catch (e) {
-    if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.load_sentences_failed'))}</div>`;
-  }
-
-  const close = () => {
-    try { modal.style.display = 'none'; } catch (e) { }
-  };
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  if (startBtn) {
-    startBtn.onclick = () => {
-      try {
-        _setAssignmentLaunchContext({
-          assignment_id: Number(ctx && ctx.assignment_id),
-          dictation_id: Number(ctx && ctx.dictation_id),
-          source_group_id: ctx && ctx.source_group_id != null ? Number(ctx.source_group_id) : null,
-          source_group_title: ctx && ctx.source_group_title != null ? String(ctx.source_group_title) : null,
-          selected_sentence_positions: positions.length ? positions : null,
-          required_completions: Number(ctx && ctx.required_completions || 0) || 0,
-        });
-      } catch (e) {
-      }
-      close();
-      _studentPlanOpenDictation(ctx && ctx.dictation_id, ctx && ctx.dictation_language_code);
-    };
-  }
-
-  modal.style.display = 'block';
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: modal });
-    }
-  } catch (e) {
-  }
-}
 
 const STUDENT_PLAN_CACHE_STORE = 'student_plan_cache';
 const STUDENT_PLAN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -2813,10 +2635,7 @@ function _studentPlanRender(panel, dateIso, items) {
           .map(x => Number(String(x || '').trim()))
           .filter(x => Number.isFinite(x));
 
-        const today = getTodayIsoDate();
-        const forDay = String(planDate || '').trim();
-        const isToday = Boolean(forDay && today && forDay === today);
-        if (isToday) {
+        try {
           _setAssignmentLaunchContext({
             assignment_id: Number(assignmentId),
             dictation_id: Number(dictationId),
@@ -2824,23 +2643,14 @@ function _studentPlanRender(panel, dateIso, items) {
             source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
             selected_sentence_positions: positions.length ? positions : null,
             required_completions: Number(requiredCompletions || 0) || 0,
+            plan_date: planDate != null ? String(planDate) : null,
+            dictation_title: String(dictTitle || ''),
+            dictation_cover_url: String(coverUrl || ''),
           });
-          _studentPlanOpenDictation(dictationId, lang);
-          return;
+        } catch (e) {
         }
-
-        openStudentPlanLaunchConfirmModal({
-          assignment_id: Number(assignmentId),
-          dictation_id: Number(dictationId),
-          dictation_language_code: String(lang || ''),
-          dictation_title: String(dictTitle || ''),
-          dictation_cover_url: String(coverUrl || ''),
-          plan_date: forDay,
-          source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
-          source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
-          selected_sentence_positions: positions.length ? positions : null,
-          required_completions: Number(requiredCompletions || 0) || 0,
-        });
+        _studentPlanOpenDictation(dictationId, lang);
+        return;
       }
     });
   });
@@ -2854,116 +2664,12 @@ function _studentPlanRender(panel, dateIso, items) {
 }
 
 async function openStudentPlanPanel(dateIso = null) {
-  const panel = ensureStudentPlanPanel();
-  const dateInput = document.getElementById('student-plan-date');
-  const closeBtn = document.getElementById('student-plan-close');
-  const prevBtn = document.getElementById('student-plan-prev');
-  const nextBtn = document.getElementById('student-plan-next');
-  const todayBtn = document.getElementById('student-plan-today');
-  const refreshBtn = document.getElementById('student-plan-refresh');
-
-  const today = getTodayIsoDate();
-  const initial = String(dateIso || (dateInput && dateInput.value) || today);
-  if (dateInput) dateInput.value = initial;
-
-  const close = () => {
-    try { panel.style.display = 'none'; } catch (e) { }
-  };
-
-  panel.onclick = (e) => {
-    const drawer = document.getElementById('student-plan-panel-drawer');
-    if (e.target === panel) close();
-    if (drawer && e.target === drawer) {
-    }
-  };
-
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  const updateTodayVisibility = () => {
-    try {
-      if (!todayBtn) return;
-      const v = dateInput ? String(dateInput.value || '').trim() : '';
-      todayBtn.style.display = (v && v === today) ? 'none' : 'inline-flex';
-    } catch (e) {
-    }
-  };
-
-  const load = async (opts = {}) => {
-    const forceRefresh = !!(opts && opts.forceRefresh);
-    const tLoad0 = _nowTs();
-    const d = dateInput ? String(dateInput.value || '').trim() : '';
-    if (!d) return;
-    const list = document.getElementById('student-plan-list');
-
-    updateTodayVisibility();
-
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-    try {
-      const tNet0 = _nowTs();
-      const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
-      _planLog('api_fetch', tNet0);
-      if (!res || !res.success) {
-        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-        return;
-      }
-      const items = Array.isArray(res.assignments) ? res.assignments : [];
-
-      try {
-        const tCache0 = _nowTs();
-        const cachedIds = await _getCachedDictationIdSetIdb();
-        for (const it of items) {
-          try {
-            const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
-            const cleaned = did.replace(/^dict_/, '').trim();
-            if (cleaned) it.__cached = cachedIds.has(cleaned);
-          } catch (e) {
-          }
-        }
-        _planLog('check_dictations_cache', tCache0);
-      } catch (e) {
-      }
-
-      const tRender0 = _nowTs();
-      _studentPlanRender(panel, d, items);
-      _planLog('render', tRender0);
-      _planLog(`load_total(force=${forceRefresh ? '1' : '0'})`, tLoad0);
-    } catch (e) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-    }
-  };
-
-  if (dateInput) dateInput.onchange = () => load();
-  if (todayBtn) todayBtn.onclick = () => {
-    if (dateInput) dateInput.value = today;
-    load();
-  };
-  if (refreshBtn) refreshBtn.onclick = () => {
-    load({ forceRefresh: true });
-  };
-  if (prevBtn) prevBtn.onclick = () => {
-    if (!dateInput) return;
-    const cur = String(dateInput.value || today);
-    dateInput.value = addDaysIsoDate(cur, -1);
-    load();
-  };
-  if (nextBtn) nextBtn.onclick = () => {
-    if (!dateInput) return;
-    const cur = String(dateInput.value || today);
-    dateInput.value = addDaysIsoDate(cur, 1);
-    load();
-  };
-
-  panel.style.display = 'block';
-
   try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: panel });
+    if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+      await window.StudentPlanPanel.open(dateIso);
     }
   } catch (e) {
   }
-
-  updateTodayVisibility();
-  await load();
 }
 
 function renderCreateAssignmentDaysTable(modal) {
