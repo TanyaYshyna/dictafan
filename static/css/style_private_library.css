@@ -791,6 +791,9 @@
   object-fit: cover;
   object-position: center center; /* Центрируем картинку, чтобы не вылезала */
   display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .short-in-work-indicator {

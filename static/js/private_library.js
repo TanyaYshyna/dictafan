@@ -5792,7 +5792,7 @@ function createDictationCard(item, isDeskCard = false) {
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${escapeHtml(noticeMessage)}" role="link" tabindex="0">
-            <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async">
+            <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false">
             <div class="card-progress-stats"></div>
           </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>

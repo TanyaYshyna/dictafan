@@ -4,6 +4,7 @@
 
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/desktop.css?v=42">
+    <link rel="stylesheet" href="/static/css/style_private_library.css?v=42">
 {% endblock %}
 
 {% block body_attrs %}class="page-index"{% endblock %}
@@ -17,19 +18,87 @@
         </a>
         <div class="user-section" id="user-section">
             <div class="auth-buttons" style="display: none;"></div>
-            <div class="user-info" style="display: none;"></div>
+            <div class="user-info" style="display: none;">
+                <div class="desktop-user-meta">
+                    <div class="dropdown-menu-wrapper" id="desktopUserMenuWrapper">
+                        <button type="button" class="username" id="desktopUserMenuToggle" aria-haspopup="true" aria-expanded="false">
+                            <div class="user-avatar-small"></div>
+                            <span class="username-text"></span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="desktopUserMenuDropdown" role="menu" style="display:none;">
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-profile" role="menuitem">
+                                <i data-lucide="user"></i>
+                                <span>Профиль пользователя</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
+                                <i data-lucide="calendar"></i>
+                                <span>Трекер</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-ratings" role="menuitem">
+                                <i data-lucide="trophy"></i>
+                                <span>Рейтинги</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-coffee" role="menuitem">
+                                <i data-lucide="coffee"></i>
+                                <span>На кофе</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="logout-btn" title="">
+                        <i data-lucide="log-out"></i>
+                        <span class="logout-text"></span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
 
 {% block content %}
-    <div class="desktop-page">
-        <div class="desktop-header">
-            <div class="desktop-title">Desktop</div>
-            <a class="button-secondary" href="/">Library</a>
-        </div>
+    <div class="panel">
+        <div class="desk-zone" id="desktopDeskZone">
+            <div class="tool-palette tool-palette--desk" id="desktopToolPalette">
+                <button class="tool-palette-btn" type="button" data-action="desktop-new" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-home" title="">
+                    <i data-lucide="home"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-public" title="">
+                    <i data-lucide="globe"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-plan" title="">
+                    <i data-lucide="calendar-check"></i>
+                </button>
+                <div class="tool-palette-separator"></div>
+                <button class="tool-palette-btn" type="button" data-action="desktop-zoom-in" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-zoom-out" title="">
+                    <i data-lucide="minus"></i>
+                </button>
+            </div>
 
-        <div id="desktop-root" class="desktop-root"></div>
+            <div class="desktop-right-menu" id="desktopRightMenu">
+                <button type="button" class="tool-palette-btn" data-action="desktop-right-1" title="">
+                    <i data-lucide="settings"></i>
+                </button>
+                <button type="button" class="tool-palette-btn" data-action="desktop-right-2" title="">
+                    <i data-lucide="bar-chart-3"></i>
+                </button>
+                <button type="button" class="tool-palette-btn" data-action="desktop-right-3" title="">
+                    <i data-lucide="clipboard-check"></i>
+                </button>
+                <button type="button" class="tool-palette-btn" data-action="desktop-right-4" title="">
+                    <i data-lucide="life-buoy"></i>
+                </button>
+            </div>
+
+            <div class="desk-scroll-container">
+                <div class="desk-cards-container" id="deskCardsContainer"></div>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
