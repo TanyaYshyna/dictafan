@@ -380,7 +380,7 @@ class UserManager {
     let hideActivity = false;
     try {
       const p = String(window.location && window.location.pathname ? window.location.pathname : '');
-      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor');
+      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor') || p.startsWith('/desktop');
     } catch (e) {
       hideActivity = false;
     }
@@ -436,6 +436,14 @@ class UserManager {
 
     // Daily activity plan: show as today/goal near username
     try {
+      if (hideActivity) {
+        const existing = userSection.querySelector('.daily-activity-progress');
+        if (existing) {
+          try { existing.remove(); } catch (e2) {}
+        }
+        return;
+      }
+
       const todayTotal = Number(userData?.today_activity_total);
       const goal = Number(userData?.daily_activity_goal);
       const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;

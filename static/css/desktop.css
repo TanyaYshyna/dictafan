@@ -2,6 +2,25 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.desktop-user-meta .username {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.desktop-user-meta .username-text {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.desktop-user-meta .dropdown-menu-wrapper,
+.desktop-user-meta .logout-btn {
+  flex: 0 0 auto;
 }
 
 .desktop-right-menu {

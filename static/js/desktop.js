@@ -22,7 +22,7 @@ window.Desktop = window.Desktop || {
     if (!toggle || !dropdown) return;
 
     const close = () => {
-      dropdown.style.display = 'none';
+      try { dropdown.classList.remove('show'); } catch (e0) {}
       try {
         toggle.setAttribute('aria-expanded', 'false');
       } catch (e) {
@@ -30,7 +30,7 @@ window.Desktop = window.Desktop || {
     };
 
     const open = () => {
-      dropdown.style.display = 'block';
+      try { dropdown.classList.add('show'); } catch (e0) {}
       try {
         toggle.setAttribute('aria-expanded', 'true');
       } catch (e) {
@@ -38,7 +38,9 @@ window.Desktop = window.Desktop || {
       this.renderLucide(dropdown);
     };
 
-    const isOpen = () => dropdown.style.display !== 'none' && dropdown.style.display !== '';
+    const isOpen = () => {
+      try { return dropdown.classList.contains('show'); } catch (e) { return false; }
+    };
 
     toggle.addEventListener('click', (e) => {
       e.preventDefault();
