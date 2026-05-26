@@ -330,7 +330,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex: 0 0 auto;
+  flex: 1 1 100%;
+  width: 100%;
 }
 
 .plan-task-edit-save-btn {
@@ -3272,7 +3273,7 @@
 
 .create-assignment-panel {
   border: 0;
-  border-radius: 14px;
+  /* border-radius: 14px; */
   overflow: hidden;
   min-height: 260px;
   display: flex;

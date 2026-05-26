@@ -1866,11 +1866,62 @@ function _renderPlanTasksTable(modal) {
       tr.style.background = 'rgba(236, 72, 153, 0.10)';
     }
 
+    let pressTimer = null;
+    let didLongPress = false;
+    const clearPressTimer = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    };
+
     tr.addEventListener('click', (e) => {
+      if (didLongPress) {
+        didLongPress = false;
+        return;
+      }
+      const nextTasks = _getPlanTasksState(modal);
+      if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+      if (rowId != null) setCurrentIdSoft(rowId);
+    });
+
+    tr.addEventListener('dblclick', (e) => {
       const nextTasks = _getPlanTasksState(modal);
       if (!Array.isArray(nextTasks) || !nextTasks.length) return;
       if (rowId != null) setCurrentIdSoft(rowId);
       _openPlanTaskEditor(modal, { mode: 'edit', id: rowId, idx });
+    });
+
+    tr.addEventListener('pointerdown', (e) => {
+      try {
+        if (!e || e.pointerType !== 'touch') return;
+      } catch (err) {
+        return;
+      }
+
+      clearPressTimer();
+      didLongPress = false;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        didLongPress = true;
+
+        const nextTasks = _getPlanTasksState(modal);
+        if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+        if (rowId != null) setCurrentIdSoft(rowId);
+        _openPlanTaskEditor(modal, { mode: 'edit', id: rowId, idx });
+      }, 600);
+    });
+
+    tr.addEventListener('pointerup', () => {
+      clearPressTimer();
+    });
+
+    tr.addEventListener('pointercancel', () => {
+      clearPressTimer();
+    });
+
+    tr.addEventListener('pointermove', () => {
+      clearPressTimer();
     });
 
     const tdDate = document.createElement('td');
