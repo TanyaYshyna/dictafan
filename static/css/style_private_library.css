@@ -274,7 +274,7 @@
 }
 
 .plan-task-edit-card {
-  width: 340px;
+  width: 408px;
   max-width: calc(100vw - 24px);
   background: #fff;
   border-radius: 14px;
@@ -301,7 +301,7 @@
   flex-direction: row;
   gap: 10px;
   align-items: center;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .plan-task-edit-input {
@@ -312,17 +312,17 @@
 }
 
 #plan-task-edit-date {
-  width: 150px;
+  width: 112px;
   flex: 0 0 auto;
 }
 
 #plan-task-edit-count {
-  width: 72px;
+  width: 44px;
   flex: 0 0 auto;
 }
 
 #plan-task-edit-ex {
-  min-width: 0;
+  min-width: 80px;
   flex: 1 1 auto;
 }
 
@@ -336,6 +336,7 @@
 .plan-task-edit-save-btn {
   height: 40px;
   padding: 0 14px;
+  min-width: 110px;
   border-radius: 10px;
   border: 1px solid rgba(0, 0, 0, 0.10);
   background: var(--color-button-yellow, #fbbf24);

@@ -178,7 +178,6 @@ function applyPrivateLibraryTranslations() {
   setAttr('btnHomeLibrary', 'title', 'private_library.toolbar.my_library');
   setAttr('btnPublicLibrary', 'title', 'private_library.toolbar.public_library');
   setAttr('btnStudentPlan', 'title', 'private_library.toolbar.plan');
-  setAttr('btnTeacherAssignments', 'title', 'private_library.toolbar.assignments');
   setAttr('btnDeskZoomIn', 'title', 'private_library.toolbar.zoom_in');
   setAttr('btnDeskZoomOut', 'title', 'private_library.toolbar.zoom_out');
 
@@ -1544,6 +1543,38 @@ function _closePlanTaskEditor() {
   if (el) el.style.display = 'none';
 }
 
+function _maybeClosePlanTaskEditor() {
+  const overlay = document.getElementById('plan-task-edit-overlay');
+  if (!overlay) return;
+
+  try {
+    const modeNow = String(overlay.dataset.mode || 'edit');
+    const isDelete = modeNow === 'delete';
+    if (!isDelete) {
+      const dEl = overlay.querySelector('#plan-task-edit-date');
+      const exEl = overlay.querySelector('#plan-task-edit-ex');
+      const cEl = overlay.querySelector('#plan-task-edit-count');
+
+      const curDate = dEl ? String(dEl.value || '').trim() : '';
+      const curEx = exEl ? String(exEl.value || '').trim() : '';
+      const curCount = cEl ? String(cEl.value || '').trim() : '';
+
+      const initDate = String(overlay.dataset.initDate || '');
+      const initEx = String(overlay.dataset.initEx || '');
+      const initCount = String(overlay.dataset.initCount || '');
+
+      const dirty = (curDate !== initDate) || (curEx !== initEx) || (curCount !== initCount);
+      if (dirty) {
+        const ok = confirm('Закрыть без сохранения?');
+        if (!ok) return;
+      }
+    }
+  } catch (e) {
+  }
+
+  _closePlanTaskEditor();
+}
+
 function _fillPlanTaskEditorExercises(exSel, exercises, positions) {
   if (!exSel) return;
   exSel.innerHTML = '';
@@ -1590,6 +1621,13 @@ function _openPlanTaskEditor(modal, opts) {
   if (countInput) countInput.value = String((Number.isFinite(initRepeat) && initRepeat > 0 ? initRepeat : 1) || 1);
   _fillPlanTaskEditorExercises(exSel, exercises, initPositions);
 
+  try {
+    el.dataset.initDate = dateInput ? String(dateInput.value || '').trim() : '';
+    el.dataset.initEx = exSel ? String(exSel.value || '').trim() : '';
+    el.dataset.initCount = countInput ? String(countInput.value || '').trim() : '';
+  } catch (e) {
+  }
+
   const isDelete = mode === 'delete';
   if (dateInput) dateInput.disabled = isDelete;
   if (exSel) exSel.disabled = isDelete;
@@ -1598,8 +1636,8 @@ function _openPlanTaskEditor(modal, opts) {
 
   if (!el.dataset.listenersAttached) {
     el.dataset.listenersAttached = '1';
-    el.addEventListener('click', (e) => { if (e.target === el) _closePlanTaskEditor(); });
-    if (closeBtn) closeBtn.addEventListener('click', () => { _closePlanTaskEditor(); });
+    el.addEventListener('click', (e) => { if (e.target === el) _maybeClosePlanTaskEditor(); });
+    if (closeBtn) closeBtn.addEventListener('click', () => { _maybeClosePlanTaskEditor(); });
     if (saveBtn) {
       saveBtn.addEventListener('click', async () => {
         const overlay = document.getElementById('plan-task-edit-overlay');
@@ -2874,366 +2912,6 @@ async function openStudentPlanPanel(dateIso = null) {
 
   updateTodayVisibility();
   await load();
-}
-
-function ensureTeacherAssignmentsPanel() {
-  let panel = document.getElementById('teacher-assignments-panel');
-  if (panel) return panel;
-
-  panel = document.createElement('div');
-  panel.id = 'teacher-assignments-panel';
-  panel.style.display = 'none';
-  panel.style.position = 'fixed';
-  panel.style.left = '0';
-  panel.style.top = '0';
-  panel.style.width = '100%';
-  panel.style.height = '100%';
-  panel.style.zIndex = '100000';
-  panel.style.background = 'rgba(0,0,0,0.35)';
-  panel.style.backdropFilter = 'blur(4px)';
-
-  panel.innerHTML = `
-    <div id="teacher-assignments-panel-drawer" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
-            <i data-lucide="hat-glasses"></i>
-          </div>
-          <div>
-            <div style="font-weight:700; font-size:16px; line-height:1.1;">Задания</div>
-            <div style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;">Список заданий для выбранной группы</div>
-          </div>
-        </div>
-        <button type="button" id="teacher-assignments-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-
-      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; flex-direction:column; gap:10px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-            <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
-            <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
-          </div>
-          <button type="button" id="teacher-assignments-refresh" class="topbar-icon-btn" title="Обновить" style="width:40px; height:40px;">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-      </div>
-
-      <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(panel);
-  return panel;
-}
-
-function _teacherAssignmentsRender(items) {
-  const list = document.getElementById('teacher-assignments-list');
-  if (!list) return;
-
-  const buildSubsetLabel = (selectedPositions, totalCount) => {
-    try {
-      const total = Number(totalCount || 0) || 0;
-      const pos = Array.isArray(selectedPositions)
-        ? selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
-        : [];
-      const uniq = Array.from(new Set(pos));
-      uniq.sort((a, b) => a - b);
-      const cnt = uniq.length;
-      const minP = cnt ? uniq[0] : null;
-      const maxP = cnt ? uniq[cnt - 1] : null;
-      if (!cnt) {
-        return total ? `${total}/${total}` : '';
-      }
-      const base = `${cnt}/${total || 0}`;
-      if (minP != null && maxP != null) {
-        return `${base} (${minP}-${maxP})`;
-      }
-      return base;
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const rows = Array.isArray(items) ? items : [];
-  if (!rows.length) {
-    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Заданий нет</div>';
-    return;
-  }
-
-  const blocks = rows.map(a => {
-    const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
-    const groupTitle = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : '');
-    const level = a && a.dictation_level ? String(a.dictation_level) : '—';
-    const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
-    const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
-      ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-      : null;
-    const subsetLabel = buildSubsetLabel(selectedPositions, sentencesCount);
-    const groupLabel = groupTitle ? `${groupTitle}${subsetLabel ? ` · ${subsetLabel}` : ''}` : '';
-    const sentenceCountLabel = subsetLabel ? subsetLabel : String(sentencesCount || 0);
-    const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
-    const days = Array.isArray(a && a.days ? a.days : null) ? a.days : [];
-    const dayDates = days
-      .map(d => String(d && (d.date || d.day_date) ? (d.date || d.day_date) : '').trim())
-      .filter(Boolean)
-      .sort();
-    const start = dayDates.length ? dayDates[0] : '';
-    const end = dayDates.length ? dayDates[dayDates.length - 1] : '';
-    const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
-    const req = (() => {
-      let maxReq = 1;
-      for (const d of days) {
-        const v = Number(d && (d.required_completions ?? d.count) ? (d.required_completions ?? d.count) : 1);
-        if (Number.isFinite(v) && v > maxReq) maxReq = v;
-      }
-      return maxReq;
-    })();
-    const isCached = !!(a && a.__cached);
-    const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
-    const badgeBg = 'rgba(245,158,11,0.16)';
-    const badgeColor = '#92400e';
-
-    const coverStyle = coverUrl
-      ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
-      : '';
-
-    const leftBadge = (pct == null)
-      ? ''
-      : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
-
-    const cacheBadge = isCached
-      ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
-      : '';
-
-    const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
-    const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
-
-    return `
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-          <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
-            <div style="min-width:0;">
-              <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)}${groupLabel ? ` · ${escapeHtml(groupLabel)}` : ''} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentenceCountLabel))} предлож.</div>
-              <div style="margin-top:8px;">${cacheBadge}</div>
-            </div>
-          </div>
-          <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
-            <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
-              <i data-lucide="user"></i>
-            </button>
-            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment-id="${escapeHtml(String(a.id))}" data-group-id="${escapeHtml(String(a.group_id))}" data-dictation-id="${escapeHtml(String(a.dictation_id))}" title="Редактировать" style="width:34px; height:34px;">
-              <i data-lucide="pencil"></i>
-            </button>
-            ${leftBadge}
-            <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
-            <button type="button" class="topbar-icon-btn" data-action="teacher-delete-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Удалить" style="width:34px; height:34px;"><i data-lucide="trash-2"></i></button>
-          </div>
-        </div>
-      </div>
-    `
-  }).join('');
-
-  list.innerHTML = blocks;
-
-  list.querySelectorAll('[data-action="teacher-delete-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      const ok = window.confirm('Удалить задание?');
-      if (!ok) return;
-      btn.disabled = true;
-      try {
-        await apiRequest('/api/assignments/teacher/delete', {
-          method: 'POST',
-          body: JSON.stringify({ ids: [Number(id)] }),
-        });
-        try { showToast('Задание удалено', { durationMs: 2000 }); } catch (e2) { }
-        await _teacherAssignmentsReload();
-      } catch (err) {
-        try { showToast('Не удалось удалить', { durationMs: 2500 }); } catch (e2) { }
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  list.querySelectorAll('[data-action="teacher-view-assignment-students"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      btn.disabled = true;
-      try {
-        await openTeacherAssignmentStudentsModal(id);
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  list.querySelectorAll('[data-action="teacher-edit-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      btn.disabled = true;
-      try {
-        let dictationId = null;
-        try {
-          const raw = btn.getAttribute('data-dictation-id');
-          const n = Number(String(raw || '').trim());
-          dictationId = (Number.isFinite(n) && n > 0) ? n : null;
-        } catch (e2) {
-        }
-
-        if (!dictationId) {
-          const a = await loadAssignmentForTeacherModal(id);
-          dictationId = (a && a.dictation_id != null) ? Number(a.dictation_id) : null;
-        }
-
-        if (!dictationId) {
-          try { showToast('Не найден dictation_id', { durationMs: 2500 }); } catch (e3) { }
-          return;
-        }
-
-        await openCreateAssignmentModal(dictationId, { edit_assignment_id: Number(id) });
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: list });
-    }
-  } catch (e) {
-  }
-}
-
-async function _teacherAssignmentsReload(opts = {}) {
-  const groupSelect = document.getElementById('teacher-assignments-group');
-  const list = document.getElementById('teacher-assignments-list');
-  const groupIdRaw = groupSelect ? String(groupSelect.value || '').trim() : '';
-  if (!groupIdRaw) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
-    return;
-  }
-
-  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-  try {
-    const groupIdInt = Number(groupIdRaw);
-    if (!Number.isFinite(groupIdInt) || groupIdInt <= 0) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Некорректная группа</div>';
-      return;
-    }
-    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(String(groupIdInt))}`, { method: 'GET' });
-    if (!res || !res.success) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-      return;
-    }
-    const items = Array.isArray(res.assignments) ? res.assignments : [];
-    _teacherAssignmentsRender(items);
-  } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-  }
-}
-
-async function openTeacherAssignmentsPanel() {
-  const panel = ensureTeacherAssignmentsPanel();
-  const closeBtn = document.getElementById('teacher-assignments-close');
-  const refreshBtn = document.getElementById('teacher-assignments-refresh');
-  const groupSelect = document.getElementById('teacher-assignments-group');
-  const list = document.getElementById('teacher-assignments-list');
-
-  // Guard against concurrent opens (double click / re-entrance) that can append options multiple times.
-  const openSeq = (window.__TEACHER_ASSIGNMENTS_OPEN_SEQ = (Number(window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) || 0) + 1);
-
-  const close = () => {
-    try { panel.style.display = 'none'; } catch (e) { }
-  };
-
-  panel.onclick = (e) => {
-    if (e.target === panel) close();
-  };
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  if (groupSelect) {
-    groupSelect.innerHTML = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = '— выбери группу —';
-    groupSelect.appendChild(opt);
-  }
-  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-
-  try {
-    const groups = await loadMyGroupsForAssignmentModal();
-    // If another open call started after this one, ignore this render.
-    if (openSeq !== window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) return;
-    if (groupSelect) {
-      // Defensive de-duplication (API/cache can sometimes return duplicates)
-      const uniq = [];
-      const seen = new Set();
-      groups.forEach(g => {
-        const id = g && g.id != null ? String(g.id) : '';
-        if (!id) return;
-        if (seen.has(id)) return;
-        seen.add(id);
-        uniq.push(g);
-      });
-
-      uniq.forEach(g => {
-        const o = document.createElement('option');
-        o.value = String(g.id);
-        o.textContent = String(g.title || `Группа ${g.id}`);
-        groupSelect.appendChild(o);
-      });
-      const last = getAssignmentLastGroupId();
-      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
-        groupSelect.value = last;
-      } else if (uniq.length === 1) {
-        groupSelect.value = String(uniq[0].id);
-        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      } else if (uniq.length > 0) {
-        groupSelect.value = String(uniq[0].id);
-        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      }
-    }
-  } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить группы</div>';
-  }
-
-  if (groupSelect) {
-    groupSelect.onchange = () => {
-      try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      _teacherAssignmentsReload().catch(() => { });
-    };
-  }
-  if (refreshBtn) {
-    refreshBtn.onclick = () => {
-      _teacherAssignmentsReload().catch(() => { });
-    };
-  }
-
-  panel.style.display = 'block';
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: panel });
-    }
-  } catch (e) {
-  }
-
-  await _teacherAssignmentsReload();
 }
 
 function renderCreateAssignmentDaysTable(modal) {
@@ -8051,13 +7729,6 @@ function installEventHandlers() {
   if (studentPlanBtn) {
     studentPlanBtn.addEventListener('click', () => {
       openStudentPlanPanel().catch(() => { });
-    });
-  }
-
-  const teacherAssignmentsBtn = document.getElementById('btnTeacherAssignments');
-  if (teacherAssignmentsBtn) {
-    teacherAssignmentsBtn.addEventListener('click', () => {
-      openTeacherAssignmentsPanel().catch(() => { });
     });
   }
 
