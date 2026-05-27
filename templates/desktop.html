@@ -3,9 +3,9 @@
 {% block title %}DictaFan{% endblock %}
 
 {% block page_head %}
-    <link rel="stylesheet" href="/static/css/desktop.css?v=42">
-    <link rel="stylesheet" href="/static/css/style_private_library.css?v=42">
-    <link rel="stylesheet" href="/static/css/dictation_kart.css?v=1">
+    <link rel="stylesheet" href="/static/css/desktop.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/style_private_library.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/dictation_kart.css?v={{ app_cache_revision }}">
 {% endblock %}
 
 {% block body_attrs %}class="page-index"{% endblock %}
@@ -90,7 +90,7 @@
 
 {% block scripts %}
     {{ super() }}
-    <script defer src="/static/js/dictation_kart.js?v=1"></script>
+    <script defer src="/static/js/dictation_kart.js?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
-    <script defer src="/static/js/desktop.js?v=42"></script>
+    <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}
