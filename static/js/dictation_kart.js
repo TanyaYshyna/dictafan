@@ -255,11 +255,8 @@ window.DictationKart = window.DictationKart || {
     const sentencesCount = typeof item.sentences_count === 'number' ? item.sentences_count : (parseInt(item.sentences_count, 10) || 0);
     const langPair = `${langOriginal}`;
 
-    const isCachedRender = !!(item && item.__desk_cached_render);
-    const coverSrc = isCachedRender
-      ? (coverUrl || 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==')
-      : 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
-    const coverLoading = isCachedRender ? 'eager' : 'lazy';
+    const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
+    const coverLoading = 'lazy';
 
     const noticeMessage = pick && pick.reason ? String(pick.reason) : '';
 
@@ -276,7 +273,7 @@ window.DictationKart = window.DictationKart || {
     return `
       <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
         <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${window.escapeHtml(noticeMessage)}" role="link" tabindex="0">
-          <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false">
+          <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
           <div class="card-progress-stats"></div>
         </div>
         <h3 class="short-title">${item.title || 'Без названия'}</h3>
