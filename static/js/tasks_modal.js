@@ -391,7 +391,7 @@
 
       if (!rows.length) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="2" style="padding:10px; color: rgba(0,0,0,0.55);">Нет упражнений</td>`;
+        tr.innerHTML = `<td style="padding:10px; color: rgba(0,0,0,0.55);">Нет упражнений</td>`;
         tbody.appendChild(tr);
         return;
       }
@@ -417,11 +417,6 @@
 
         tr.innerHTML = `
           <td style="padding:8px 10px;">${escapeHtml(posLabel)}</td>
-          <td style="padding:8px 10px; text-align:right; width: 1%; white-space: nowrap;">
-            ${canDelete
-              ? `<button type="button" class="topbar-icon-btn create-assignment-icon-btn" data-action="delete-exercise" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>`
-              : ''}
-          </td>
         `;
         tbody.appendChild(tr);
       });
@@ -429,41 +424,6 @@
       if (!tbody.dataset.listenerAttached) {
         tbody.dataset.listenerAttached = '1';
         tbody.addEventListener('click', (e) => {
-          const delBtn = e.target && e.target.closest ? e.target.closest('button[data-action="delete-exercise"]') : null;
-          if (delBtn) {
-            const row = delBtn.closest ? delBtn.closest('tr[data-exercise-id]') : null;
-            if (!row) return;
-            e.preventDefault();
-            e.stopPropagation();
-            const idRaw = row.dataset.exerciseId;
-            const st = getCreateAssignmentExercisesState(modal);
-            if (idRaw === 'draft') {
-              if (st.draft) {
-                st.draft = null;
-                setCreateAssignmentExercisesState(modal, st);
-                setCreateAssignmentExercisesDirty(modal, true);
-                renderCreateAssignmentExercisesTable(modal);
-              }
-              return;
-            }
-            const id = Number(idRaw);
-            if (!Number.isFinite(id)) return;
-            const ex = findCreateAssignmentExerciseById(modal, id);
-            if (!ex) return;
-            const pos = Array.isArray(ex.positions) ? ex.positions : [];
-            if (!pos.length) {
-              try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e2) { }
-              return;
-            }
-            ex.__deleted = true;
-            if (st.selectedExerciseId && Number(st.selectedExerciseId) === Number(id)) {
-              st.selectedExerciseId = null;
-            }
-            setCreateAssignmentExercisesState(modal, st);
-            setCreateAssignmentExercisesDirty(modal, true);
-            renderCreateAssignmentExercisesTable(modal);
-            return;
-          }
           const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
           if (!row) return;
           e.preventDefault();
@@ -756,10 +716,7 @@
 
         if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.open === 'function') {
           window.DesktopConfirmModal.open({
-            title: 'Сохранить изменения?',
-            message: 'Что сделать с текущими изменениями?',
             showSave: true,
-            onStay: () => {},
             onDiscard: () => close(),
             onSave: async () => {
               const ok = await persistExercises();
@@ -869,9 +826,29 @@
       modal.style.display = 'flex';
 
       try {
-        const t = document.querySelector('.create-assignment-modal-title-text');
+        const t = document.getElementById('create-assignment-modal-title') || document.querySelector('.create-assignment-modal-title-text');
         if (t) {
           t.textContent = libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения');
+        }
+      } catch (e) {
+      }
+
+      try {
+        const h = document.getElementById('create-assignment-exercises-col-title');
+        if (h) h.textContent = libT('private_library.assignments.exercises_column', null, 'Упражнения');
+      } catch (e) {
+      }
+
+      try {
+        const h = document.getElementById('create-assignment-sentences-col-text');
+        if (h) h.textContent = libT('private_library.assignments.text_column', null, 'Текст');
+      } catch (e) {
+      }
+
+      try {
+        const toggleAllBtn = document.getElementById('create-assignment-sentences-toggle-all');
+        if (toggleAllBtn) {
+          toggleAllBtn.title = libT('private_library.assignments.toggle_all_select');
         }
       } catch (e) {
       }

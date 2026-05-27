@@ -716,6 +716,15 @@
     }
   },
 
+  "desktop": {
+    "confirm": {
+      "title": "Сохранить изменения?",
+      "close_without_changes": "Закрыть без изменений",
+      "save_and_close": "Сохранить и закрыть",
+      "close": "Закрыть"
+    }
+  },
+
   "support": {
     "topbar": {
       "title": "На каву"

@@ -1,10 +1,20 @@
 (function () {
   try {
     const state = {
-      onStay: null,
       onDiscard: null,
       onSave: null,
     };
+
+    function t(key, fallback) {
+      try {
+        if (window.I18n && typeof window.I18n.t === 'function') {
+          const v = window.I18n.t(key);
+          if (v && v !== key) return String(v);
+        }
+      } catch (e) {
+      }
+      return String(fallback || '');
+    }
 
     function _getEl(id) {
       try { return document.getElementById(id); } catch (e) { return null; }
@@ -14,7 +24,6 @@
       const modal = _getEl('desktopConfirmModal');
       if (!modal) return;
       modal.style.display = 'none';
-      state.onStay = null;
       state.onDiscard = null;
       state.onSave = null;
     }
@@ -24,18 +33,41 @@
       if (!modal) return;
 
       const titleEl = _getEl('desktopConfirmModalTitle');
-      const msgEl = _getEl('desktopConfirmModalMessage');
       const saveBtn = _getEl('desktopConfirmSaveBtn');
+      const discardBtn = _getEl('desktopConfirmDiscardBtn');
+      const closeX = _getEl('desktopConfirmModalClose');
 
-      const title = opts && opts.title != null ? String(opts.title) : 'Сохранить изменения?';
-      const message = opts && opts.message != null ? String(opts.message) : 'Что сделать с текущими изменениями?';
+      const title = opts && opts.title != null
+        ? String(opts.title)
+        : t('desktop.confirm.title', 'Сохранить изменения?');
       const showSave = !!(opts && opts.showSave);
 
       if (titleEl) titleEl.textContent = title;
-      if (msgEl) msgEl.textContent = message;
       if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
 
-      state.onStay = (opts && typeof opts.onStay === 'function') ? opts.onStay : null;
+      try {
+        if (discardBtn) {
+          discardBtn.childNodes.forEach((n) => {
+            if (n && n.nodeType === Node.TEXT_NODE) n.textContent = ` ${t('desktop.confirm.close_without_changes', 'Закрыть без изменений')}`;
+          });
+        }
+      } catch (e) {
+      }
+
+      try {
+        if (saveBtn) {
+          saveBtn.childNodes.forEach((n) => {
+            if (n && n.nodeType === Node.TEXT_NODE) n.textContent = ` ${t('desktop.confirm.save_and_close', 'Сохранить и закрыть')}`;
+          });
+        }
+      } catch (e) {
+      }
+
+      try {
+        if (closeX) closeX.title = t('desktop.confirm.close', 'Закрыть');
+      } catch (e) {
+      }
+
       state.onDiscard = (opts && typeof opts.onDiscard === 'function') ? opts.onDiscard : null;
       state.onSave = (opts && typeof opts.onSave === 'function') ? opts.onSave : null;
 
@@ -48,8 +80,11 @@
       } catch (e) {
       }
 
-      const stayBtn = _getEl('desktopConfirmStayBtn');
-      if (stayBtn) stayBtn.focus();
+      try {
+        if (showSave && saveBtn) saveBtn.focus();
+        else if (discardBtn) discardBtn.focus();
+      } catch (e) {
+      }
     }
 
     function _bindOnce() {
@@ -58,7 +93,6 @@
       modal.dataset.bound = '1';
 
       const closeX = _getEl('desktopConfirmModalClose');
-      const stayBtn = _getEl('desktopConfirmStayBtn');
       const discardBtn = _getEl('desktopConfirmDiscardBtn');
       const saveBtn = _getEl('desktopConfirmSaveBtn');
 
@@ -75,16 +109,6 @@
           e.preventDefault();
           e.stopPropagation();
           _hide();
-        });
-      }
-
-      if (stayBtn) {
-        stayBtn.addEventListener('click', async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const fn = state.onStay;
-          _hide();
-          await safeCall(fn);
         });
       }
 

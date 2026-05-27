@@ -715,6 +715,14 @@
         "creating_account": "Creating account…"
       }
     },
+  "desktop": {
+    "confirm": {
+      "title": "Save changes?",
+      "close_without_changes": "Close without changes",
+      "save_and_close": "Save and close",
+      "close": "Close"
+    }
+  },
   "support": {
     "topbar": {
       "title": "Buy me a coffee"

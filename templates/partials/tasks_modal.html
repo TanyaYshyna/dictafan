@@ -3,7 +3,7 @@
         <div class="modal-header create-assignment-modal-header">
             <div class="create-assignment-modal-title">
                 <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-                <div class="create-assignment-modal-title-text">Все упражнения</div>
+                <div class="create-assignment-modal-title-text" id="create-assignment-modal-title">Все упражнения</div>
             </div>
 
             <div class="create-assignment-modal-header-actions">
@@ -49,8 +49,7 @@
                             <table id="create-assignment-exercises-table" class="create-assignment-table" style="width:100%; border-collapse: collapse;">
                                 <thead>
                                     <tr>
-                                        <th style="text-align:left; padding:8px 10px;">Упражнения</th>
-                                        <th style="text-align:right; padding:8px 10px;"></th>
+                                        <th id="create-assignment-exercises-col-title" style="text-align:left; padding:8px 10px;">Упражнения</th>
                                     </tr>
                                 </thead>
                                 <tbody id="create-assignment-exercisesTableBody"></tbody>
@@ -70,7 +69,7 @@
                                             <i data-lucide="circle"></i>
                                         </button>
                                     </th>
-                                    <th class="create-assignment-th-text">Текст</th>
+                                    <th class="create-assignment-th-text" id="create-assignment-sentences-col-text">Текст</th>
                                 </tr>
                             </thead>
                             <tbody id="create-assignment-sentences-body"></tbody>

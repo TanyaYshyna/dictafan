@@ -716,6 +716,15 @@
     }
   },
 
+  "desktop": {
+    "confirm": {
+      "title": "هل تريد حفظ التغييرات؟",
+      "close_without_changes": "إغلاق بدون تغييرات",
+      "save_and_close": "حفظ وإغلاق",
+      "close": "إغلاق"
+    }
+  },
+
   "support": {
     "topbar": {
       "title": "ادعمني بقهوة"
