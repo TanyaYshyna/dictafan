@@ -54,6 +54,303 @@ window.Desktop = window.Desktop || {
     }
   },
 
+  getDeskZoneEl() {
+    try {
+      return document.getElementById('desktopDeskZone') || document.querySelector('.desk-zone');
+    } catch (e) {
+      return null;
+    }
+  },
+
+  applyDeskZoom(zoom) {
+    try {
+      const deskZone = this.getDeskZoneEl();
+      if (!deskZone) return;
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const z = clamp(Number(zoom) || 1, 0.6, 1.8);
+      deskZone.style.setProperty('--desk-zoom', String(z));
+      try {
+        localStorage.setItem('desk_zoom', String(z));
+      } catch (e2) {
+      }
+    } catch (e) {
+    }
+  },
+
+  loadSavedDeskZoom() {
+    try {
+      const saved = localStorage.getItem('desk_zoom');
+      if (saved) this.applyDeskZoom(saved);
+    } catch (e) {
+    }
+  },
+
+  getDeskCardPosStorageKey(deskItemId) {
+    return `dictafan:desk:pos:${String(deskItemId || '')}`;
+  },
+
+  readDeskCardPos(deskItemId) {
+    try {
+      const raw = localStorage.getItem(this.getDeskCardPosStorageKey(deskItemId));
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const x = Number(parsed.x);
+      const y = Number(parsed.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return { x, y };
+    } catch (e) {
+      return null;
+    }
+  },
+
+  writeDeskCardPos(deskItemId, x, y) {
+    try {
+      const payload = { x: Number(x) || 0, y: Number(y) || 0, updatedAt: Date.now() };
+      localStorage.setItem(this.getDeskCardPosStorageKey(deskItemId), JSON.stringify(payload));
+    } catch (e) {
+    }
+  },
+
+  isDeskFreeLayoutEnabled() {
+    try {
+      return String(localStorage.getItem('dictafan:desk:layout') || '') === 'free';
+    } catch (e) {
+      return false;
+    }
+  },
+
+  setDeskFreeLayoutEnabled(enabled) {
+    try {
+      localStorage.setItem('dictafan:desk:layout', enabled ? 'free' : 'grid');
+    } catch (e) {
+    }
+  },
+
+  hasAnyDeskCardPositions(container) {
+    try {
+      const cards = container.querySelectorAll('.desk-card[data-desk-item-id]');
+      for (const card of cards) {
+        const deskItemId = card.getAttribute('data-desk-item-id');
+        if (!deskItemId) continue;
+        if (this.readDeskCardPos(deskItemId)) return true;
+      }
+    } catch (e) {
+    }
+    return false;
+  },
+
+  updateDeskLayoutToggleButtonState(btn) {
+    try {
+      if (!btn) return;
+      const enabled = this.isDeskFreeLayoutEnabled();
+      btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      btn.title = enabled
+        ? 'Свободный стол: можно таскать карточки'
+        : 'Обычный стол: карточки в ряд (таскать нельзя)';
+
+      const iconName = enabled ? 'move' : 'grip-vertical';
+      btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+      this.renderLucide(btn);
+
+      if (enabled) {
+        btn.classList.add('active');
+        btn.style.background = 'rgba(0,0,0,0.08)';
+        btn.style.border = '1px solid rgba(0,0,0,0.18)';
+      } else {
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.border = '';
+      }
+    } catch (e) {
+    }
+  },
+
+  enableDeskFreeLayout(container) {
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (!grid) return null;
+      grid.dataset.deskLayoutMode = 'free';
+      grid.style.position = 'relative';
+      grid.style.display = 'block';
+      grid.style.minHeight = grid.style.minHeight || '240px';
+
+      const cards = grid.querySelectorAll('.desk-card[data-desk-item-id]');
+      let maxBottom = 0;
+
+      cards.forEach((card, idx) => {
+        const deskItemId = card.getAttribute('data-desk-item-id');
+        const pos = deskItemId ? this.readDeskCardPos(deskItemId) : null;
+
+        const x = pos ? pos.x : (idx * 220);
+        const y = pos ? pos.y : 0;
+
+        card.style.position = 'absolute';
+        card.style.left = '0px';
+        card.style.top = '0px';
+        card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+        card.style.willChange = 'transform';
+        card.dataset.deskX = String(x);
+        card.dataset.deskY = String(y);
+        card.style.touchAction = 'none';
+
+        try {
+          const rect = card.getBoundingClientRect();
+          const h = rect && rect.height ? rect.height : 220;
+          maxBottom = Math.max(maxBottom, y + h);
+        } catch (e) {
+          maxBottom = Math.max(maxBottom, y + 220);
+        }
+      });
+
+      if (maxBottom > 0) {
+        grid.style.minHeight = `${Math.ceil(maxBottom + 40)}px`;
+      }
+
+      return grid;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  installDeskDragAndDrop(container) {
+    try {
+      const grid = container.querySelector('.shorts-grid');
+      if (!grid) return;
+      if (grid.dataset.deskDndInstalled === '1') return;
+      if (grid.dataset.deskLayoutMode !== 'free') return;
+      grid.dataset.deskDndInstalled = '1';
+
+      let dragging = null;
+
+      const onPointerDown = (e) => {
+        try {
+          if (!e || (e.button !== undefined && e.button !== 0)) return;
+          const thumb = e.target && e.target.closest ? e.target.closest('.desk-card .short-thumb') : null;
+          if (!thumb) return;
+          const card = thumb.closest('.desk-card[data-desk-item-id]');
+          if (!card) return;
+          if (e.target.closest('button')) return;
+
+          const deskItemId = card.getAttribute('data-desk-item-id');
+          if (!deskItemId) return;
+
+          const gridRect = grid.getBoundingClientRect();
+          const cardRect = card.getBoundingClientRect();
+          const startX = Number(card.dataset.deskX) || 0;
+          const startY = Number(card.dataset.deskY) || 0;
+          const pointerX = (e.clientX - gridRect.left);
+          const pointerY = (e.clientY - gridRect.top);
+          const cardLeft = (cardRect.left - gridRect.left);
+          const cardTop = (cardRect.top - gridRect.top);
+          const offsetX = pointerX - cardLeft;
+          const offsetY = pointerY - cardTop;
+
+          dragging = {
+            deskItemId,
+            card,
+            gridRect,
+            offsetX,
+            offsetY,
+            startX,
+            startY,
+            moved: false,
+            active: false,
+            pointerId: e.pointerId,
+          };
+
+          card.style.zIndex = '999';
+        } catch (err) {
+        }
+      };
+
+      const onPointerMove = (e) => {
+        try {
+          if (!dragging) return;
+          const gridRect = dragging.gridRect || grid.getBoundingClientRect();
+          const x = (e.clientX - gridRect.left) - dragging.offsetX;
+          const y = (e.clientY - gridRect.top) - dragging.offsetY;
+          const nx = Math.max(-2000, Math.min(20000, x));
+          const ny = Math.max(-2000, Math.min(20000, y));
+          if (Math.abs(nx - dragging.startX) > 3 || Math.abs(ny - dragging.startY) > 3) {
+            dragging.moved = true;
+          }
+          if (dragging.moved) {
+            if (!dragging.active) {
+              dragging.active = true;
+              if (dragging.card && dragging.card.setPointerCapture) {
+                try { dragging.card.setPointerCapture(dragging.pointerId); } catch (err) { }
+              }
+            }
+            dragging.card.style.transform = `translate(${Math.round(nx)}px, ${Math.round(ny)}px)`;
+            dragging.card.dataset.deskX = String(nx);
+            dragging.card.dataset.deskY = String(ny);
+            e.preventDefault();
+          }
+        } catch (err) {
+        }
+      };
+
+      const onPointerUp = (e) => {
+        try {
+          if (!dragging) return;
+          if (!dragging.active) {
+            dragging.card.style.zIndex = '';
+            dragging = null;
+            return;
+          }
+          const x = Number(dragging.card.dataset.deskX) || 0;
+          const y = Number(dragging.card.dataset.deskY) || 0;
+          this.writeDeskCardPos(dragging.deskItemId, x, y);
+          if (dragging.moved) {
+            dragging.card.dataset.deskJustDragged = '1';
+          }
+          dragging.card.style.zIndex = '';
+          dragging = null;
+          e.preventDefault();
+        } catch (err) {
+          dragging = null;
+        }
+      };
+
+      const onClickCapture = (e) => {
+        try {
+          const card = e.target && e.target.closest ? e.target.closest('.desk-card[data-desk-item-id]') : null;
+          if (!card) return;
+          const moved = card.dataset && card.dataset.deskJustDragged === '1';
+          if (moved) {
+            card.dataset.deskJustDragged = '';
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        } catch (err) {
+        }
+      };
+
+      grid.addEventListener('pointerdown', onPointerDown, { passive: false });
+      window.addEventListener('pointermove', onPointerMove, { passive: false });
+      window.addEventListener('pointerup', onPointerUp, { passive: false });
+      grid.addEventListener('click', onClickCapture, true);
+    } catch (e) {
+    }
+  },
+
+  applyDeskLayoutIfNeeded() {
+    try {
+      const container = document.getElementById('deskCardsContainer');
+      if (!container) return;
+
+      const btn = document.getElementById('btnDeskFreeLayoutToggle');
+      if (btn) this.updateDeskLayoutToggleButtonState(btn);
+
+      if (this.isDeskFreeLayoutEnabled() || this.hasAnyDeskCardPositions(container)) {
+        this.enableDeskFreeLayout(container);
+        this.installDeskDragAndDrop(container);
+      }
+    } catch (e) {
+    }
+  },
+
   stubAction(name) {
     try {
       console.log('[desktop] action', name);
@@ -118,12 +415,32 @@ window.Desktop = window.Desktop || {
     });
   },
 
-  initStubButtons() {
+  initToolPalette() {
+    this.loadSavedDeskZoom();
+    this.applyDeskLayoutIfNeeded();
+
     document.querySelectorAll('[data-action^="desktop-"]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
+
+        if (action === 'desktop-zoom-in' || action === 'desktop-zoom-out') {
+          const deskZone = this.getDeskZoneEl();
+          if (!deskZone) return;
+          const current = Number(getComputedStyle(deskZone).getPropertyValue('--desk-zoom')) || 1;
+          const step = 0.1;
+          this.applyDeskZoom(action === 'desktop-zoom-in' ? (current + step) : (current - step));
+          return;
+        }
+
+        if (action === 'desktop-layout-toggle') {
+          const enabled = !this.isDeskFreeLayoutEnabled();
+          this.setDeskFreeLayoutEnabled(enabled);
+          this.applyDeskLayoutIfNeeded();
+          return;
+        }
+
         this.stubAction(action);
       });
     });
@@ -180,6 +497,7 @@ window.Desktop = window.Desktop || {
 
     container.appendChild(grid);
     this.renderLucide(container);
+    this.applyDeskLayoutIfNeeded();
   },
 
   async loadDeskItems() {
@@ -262,7 +580,7 @@ window.Desktop = window.Desktop || {
 
   init() {
     this.initUserMenu();
-    this.initStubButtons();
+    this.initToolPalette();
     this.initDeskLoad();
     this.ensureDictationKartDeps();
     this.renderLucide(document.body);
