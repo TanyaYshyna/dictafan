@@ -6,6 +6,9 @@
     <link rel="stylesheet" href="/static/css/desktop.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/style_private_library.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_kart.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/tasks_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/desktop_confirm_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/style_dictations_reports.css?v={{ app_cache_revision }}">
 {% endblock %}
 
 {% block body_attrs %}class="page-index"{% endblock %}
@@ -89,11 +92,19 @@
             </div>
         </div>
     </div>
+
+    {% include 'partials/tasks_modal.html' %}
+    {% include 'partials/plan_tasks_modal.html' %}
+    {% include 'partials/reports_modal.html' %}
+
+    {% include 'partials/desktop_confirm_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
     {{ super() }}
     <script defer src="/static/js/dictation_kart.js?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/tasks_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/desktop_confirm_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}
