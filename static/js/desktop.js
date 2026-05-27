@@ -1,4 +1,50 @@
 window.Desktop = window.Desktop || {
+  ensureDictationKartDeps() {
+    try {
+      if (typeof window.escapeHtml !== 'function') {
+        window.escapeHtml = (s) => {
+          try {
+            return String(s ?? '')
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#39;');
+          } catch (e) {
+            return '';
+          }
+        };
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (typeof window.libT !== 'function') {
+        window.libT = (key, _params, fallback) => {
+          try {
+            return fallback != null ? String(fallback) : String(key || '');
+          } catch (e) {
+            return '';
+          }
+        };
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (typeof window.maybeCacheBustDictationCover !== 'function') {
+        window.maybeCacheBustDictationCover = (url) => {
+          try {
+            return String(url || '');
+          } catch (e) {
+            return '';
+          }
+        };
+      }
+    } catch (e) {
+    }
+  },
+
   renderLucide(root) {
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -92,16 +138,20 @@ window.Desktop = window.Desktop || {
       return;
     }
 
+    this.ensureDictationKartDeps();
+
     container.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'shorts-grid';
 
     for (const item of items) {
+      let inserted = false;
       try {
         if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
           const el = window.DictationKart.createDeskCardElement(item);
           if (el) {
             grid.appendChild(el);
+            inserted = true;
             continue;
           }
         }
@@ -113,9 +163,22 @@ window.Desktop = window.Desktop || {
           const html = window.DictationKart.render(item, { context: 'desk' });
           if (html) {
             grid.insertAdjacentHTML('beforeend', html);
+            inserted = true;
           }
         }
       } catch (e) {
+      }
+
+      if (!inserted) {
+        try {
+          const dictationId = (item && (item.dictation_id != null)) ? String(item.dictation_id) : '';
+          const title = (item && item.title != null) ? String(item.title) : 'Без названия';
+          grid.insertAdjacentHTML(
+            'beforeend',
+            `<div class="short-card desk-card" data-dictation-id="${window.escapeHtml(dictationId)}"><div style="padding:12px;">${window.escapeHtml(title)}</div></div>`
+          );
+        } catch (e2) {
+        }
       }
     }
 
@@ -205,6 +268,7 @@ window.Desktop = window.Desktop || {
     this.initUserMenu();
     this.initStubButtons();
     this.initDeskLoad();
+    this.ensureDictationKartDeps();
     this.renderLucide(document.body);
   },
 };
