@@ -221,6 +221,21 @@ window.Desktop = window.Desktop || {
       if (grid.dataset.deskLayoutMode !== 'free') return;
       grid.dataset.deskDndInstalled = '1';
 
+      try {
+        grid.querySelectorAll('img').forEach((img) => {
+          if (img.dataset && img.dataset.deskNoNativeDrag === '1') return;
+          if (img.dataset) img.dataset.deskNoNativeDrag = '1';
+          img.addEventListener('dragstart', (ev) => {
+            try {
+              ev.preventDefault();
+            } catch (e2) {
+            }
+            return false;
+          });
+        });
+      } catch (e) {
+      }
+
       let dragging = null;
 
       const onPointerDown = (e) => {
