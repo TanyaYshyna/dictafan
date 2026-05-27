@@ -656,6 +656,16 @@ class UserManager {
         this.token = token;
         this.userData = data.user;
 
+        // Важно: login endpoint может вернуть неполный объект user (без avatar и т.п.).
+        // Дотягиваем каноничные данные через /user/api/me, чтобы шапка/аватар работали одинаково на всех страницах.
+        try {
+          const fresh = await this.validateToken(token);
+          if (fresh && typeof fresh === 'object') {
+            this.userData = fresh;
+          }
+        } catch (e) {
+        }
+
         this._saveUserCache(this.userData);
 
         // Обновляем UI

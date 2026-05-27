@@ -143,14 +143,21 @@ window.Desktop = window.Desktop || {
 
     // stage 1: server
     try {
-      const api = (typeof window.apiRequest === 'function')
-        ? window.apiRequest
-        : async (url, opts) => {
-            const res = await fetch(url, opts || {});
-            return await res.json();
-          };
+      const data = await (async () => {
+        const res = await fetch('/desk/api/items', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
-      const data = await api('/desk/api/items');
+        try {
+          return await res.json();
+        } catch (e) {
+          return null;
+        }
+      })();
       if (data && data.success && Array.isArray(data.items)) {
         this.renderDeskCards(data.items);
         try {
@@ -185,6 +192,11 @@ window.Desktop = window.Desktop || {
     }
 
     window.addEventListener('user-logged-in', () => {
+      try {
+        const a = document.querySelector('#user-section .user-avatar-small');
+        if (a && !a.style.backgroundImage) a.style.backgroundImage = 'url(/static/icons/default-avatar-small.svg)';
+      } catch (e) {
+      }
       this.loadDeskItems().catch(() => { });
     });
   },
