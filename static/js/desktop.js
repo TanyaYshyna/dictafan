@@ -133,56 +133,45 @@ window.Desktop = window.Desktop || {
     const container = document.getElementById('deskCardsContainer');
     if (!container) return;
 
+    try {
+      console.log('[desktop] renderDeskCards: start, items:', Array.isArray(items) ? items.length : 'not-array');
+    } catch (e) {
+    }
+
     if (!Array.isArray(items) || items.length === 0) {
       container.innerHTML = '<div style="padding: 20px; color: var(--color-text-secondary);">Рабочий стол пуст</div>';
       return;
     }
-
-    this.ensureDictationKartDeps();
 
     container.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'shorts-grid';
 
     for (const item of items) {
-      let inserted = false;
       try {
-        if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
-          const el = window.DictationKart.createDeskCardElement(item);
-          if (el) {
-            grid.appendChild(el);
-            inserted = true;
-            continue;
-          }
-        }
+        const title = (item && item.title != null) ? String(item.title) : 'Без названия';
+        const dictationId = (item && item.dictation_id != null) ? String(item.dictation_id) : '';
+        grid.insertAdjacentHTML(
+          'beforeend',
+          `<div class="short-card desk-card" data-dictation-id="${dictationId}"><div style="padding:12px;">${title}</div></div>`
+        );
       } catch (e) {
-      }
-
-      try {
-        if (window.DictationKart && typeof window.DictationKart.render === 'function') {
-          const html = window.DictationKart.render(item, { context: 'desk' });
-          if (html) {
-            grid.insertAdjacentHTML('beforeend', html);
-            inserted = true;
-          }
-        }
-      } catch (e) {
-      }
-
-      if (!inserted) {
-        try {
-          const dictationId = (item && (item.dictation_id != null)) ? String(item.dictation_id) : '';
-          const title = (item && item.title != null) ? String(item.title) : 'Без названия';
-          grid.insertAdjacentHTML(
-            'beforeend',
-            `<div class="short-card desk-card" data-dictation-id="${window.escapeHtml(dictationId)}"><div style="padding:12px;">${window.escapeHtml(title)}</div></div>`
-          );
-        } catch (e2) {
-        }
       }
     }
 
     container.appendChild(grid);
+
+    try {
+      const rendered = grid && grid.children ? grid.children.length : 0;
+      console.log('[desktop] renderDeskCards: end, rendered:', rendered);
+      if (!rendered) {
+        container.insertAdjacentHTML(
+          'beforeend',
+          '<div style="padding: 16px; color: var(--color-text-secondary);">Карточки не отрисовались (0 элементов)</div>'
+        );
+      }
+    } catch (e) {
+    }
     this.renderLucide(container);
   },
 
@@ -191,6 +180,11 @@ window.Desktop = window.Desktop || {
       try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
     })();
     if (!token) return;
+
+    try {
+      console.log('[desktop] loadDeskItems: start');
+    } catch (e) {
+    }
 
     // stage 0: IDB cache
     try {
@@ -222,6 +216,10 @@ window.Desktop = window.Desktop || {
         }
       })();
       if (data && data.success && Array.isArray(data.items)) {
+        try {
+          console.log('[desktop] /desk/api/items ok, items:', data.items.length);
+        } catch (e0) {
+        }
         this.renderDeskCards(data.items);
         try {
           if (typeof window.idbPut === 'function') {
@@ -232,6 +230,11 @@ window.Desktop = window.Desktop || {
       }
     } catch (e) {
       // keep cache render
+    }
+
+    try {
+      console.log('[desktop] loadDeskItems: end');
+    } catch (e) {
     }
   },
 
