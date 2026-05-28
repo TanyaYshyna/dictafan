@@ -37,6 +37,21 @@
       }
     }
 
+    function updateCreateAssignmentExerciseLabelCell(modal, exerciseIdRaw, positions, isDraft) {
+      const tbody = document.getElementById('create-assignment-exercisesTableBody');
+      if (!tbody) return;
+      const idStr = String(exerciseIdRaw);
+      const row = tbody.querySelector(`tr[data-exercise-id="${idStr}"]`);
+      if (!row) return;
+      const td = row.querySelector('td');
+      if (!td) return;
+      const pos = Array.isArray(positions) ? positions : [];
+      const posLabel = pos.length
+        ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '')
+        : (isDraft ? 'выбери предложения' : 'весь диктант');
+      td.textContent = String(posLabel);
+    }
+
     async function apiRequest(url, options) {
       const opts = options && typeof options === 'object' ? options : {};
       const token = getToken();
@@ -399,7 +414,7 @@
         st.draft.positions = positions;
         setCreateAssignmentExercisesState(modal, st);
         setCreateAssignmentExercisesDirty(modal, true);
-        try { renderCreateAssignmentExercisesTable(modal); } catch (e2) { }
+        try { updateCreateAssignmentExerciseLabelCell(modal, 'draft', st.draft.positions, true); } catch (e2) { }
         return;
       }
 
@@ -410,7 +425,7 @@
       ex.positions = positions;
       setCreateAssignmentExercisesState(modal, st);
       setCreateAssignmentExercisesDirty(modal, true);
-      try { renderCreateAssignmentExercisesTable(modal); } catch (e2) { }
+      try { updateCreateAssignmentExerciseLabelCell(modal, String(id), ex.positions, false); } catch (e2) { }
     }
 
     function renderCreateAssignmentExercisesTable(modal) {
@@ -851,6 +866,22 @@
 
           const id = Number(st.selectedExerciseId);
           if (!Number.isFinite(id)) return;
+
+          let nextId = null;
+          try {
+            const beforeIds = getVisibleCreateAssignmentExercises(modal)
+              .map(x => Number(x && x.id))
+              .filter(x => Number.isFinite(x));
+            const idx = beforeIds.findIndex(x => x === id);
+            const afterIds = beforeIds.filter(x => x !== id);
+            if (afterIds.length) {
+              if (idx >= 0 && idx < afterIds.length) nextId = afterIds[idx];
+              else nextId = afterIds[afterIds.length - 1];
+            }
+          } catch (e) {
+            nextId = null;
+          }
+
           const ex = findCreateAssignmentExerciseById(modal, id);
           if (!ex) return;
           const pos = Array.isArray(ex.positions) ? ex.positions : [];
@@ -863,17 +894,20 @@
           } catch (e0) {
             ex.__deleted = true;
           }
-          st.selectedExerciseId = null;
+          st.selectedExerciseId = Number.isFinite(nextId) ? nextId : null;
           setCreateAssignmentExercisesState(modal, st);
           setCreateAssignmentExercisesDirty(modal, true);
-          renderCreateAssignmentExercisesTable(modal);
 
-          try {
-            const nextId = pickNeighborExerciseId(modal, id);
-            if (Number.isFinite(nextId)) {
-              selectCreateAssignmentExerciseById(modal, nextId);
+          if (Number.isFinite(nextId)) {
+            selectCreateAssignmentExerciseById(modal, nextId);
+          } else {
+            renderCreateAssignmentExercisesTable(modal);
+            try {
+              const curSent = getCreateAssignmentSentencesState(modal);
+              setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: null }));
+              renderCreateAssignmentSentencesTable(modal);
+            } catch (e2) {
             }
-          } catch (e2) {
           }
         });
       }
