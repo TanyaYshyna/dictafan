@@ -471,6 +471,8 @@
     },
     "assignments": {
       "max_7_days": "Maximum 7 days",
+      "exercises_modal_title": "All exercises",
+      "exercises_column": "Exercises",
       "modal_title": "Assignment",
       "add_day": "Add day",
       "text_column": "Text",

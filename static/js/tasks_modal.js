@@ -341,6 +341,25 @@
       return `s: ${ranges.join(', ')}`;
     }
 
+    function normalizeExerciseItem(raw) {
+      try {
+        const ex = raw && typeof raw === 'object' ? Object.assign({}, raw) : {};
+        let pos = ex.positions;
+        if (typeof pos === 'string') {
+          try {
+            pos = JSON.parse(pos);
+          } catch (e2) {
+            pos = [];
+          }
+        }
+        if (!Array.isArray(pos)) pos = [];
+        ex.positions = normalizeExercisePositions(pos);
+        return ex;
+      } catch (e) {
+        return { id: (raw && raw.id) != null ? raw.id : null, positions: [] };
+      }
+    }
+
     function getVisibleCreateAssignmentExercises(modal) {
       const st = getCreateAssignmentExercisesState(modal);
       const items = Array.isArray(st.exercises) ? st.exercises : [];
@@ -351,6 +370,23 @@
       const st = getCreateAssignmentExercisesState(modal);
       const items = Array.isArray(st.exercises) ? st.exercises : [];
       return items.find(x => x && Number(x.id) === Number(id)) || null;
+    }
+
+    function pickNeighborExerciseId(modal, deletedId) {
+      try {
+        const st = getCreateAssignmentExercisesState(modal);
+        const items = getVisibleCreateAssignmentExercises(modal);
+        const list = (Array.isArray(items) ? items : []).filter(x => x && Number.isFinite(Number(x.id)));
+        if (!list.length) return null;
+        const did = Number(deletedId);
+        const idx = list.findIndex(x => Number(x.id) === did);
+        if (idx < 0) return Number(list[0].id);
+        if (idx < list.length - 1) return Number(list[idx + 1].id);
+        if (idx > 0) return Number(list[idx - 1].id);
+        return null;
+      } catch (e) {
+        return null;
+      }
     }
 
     function syncCreateAssignmentSelectedExerciseFromSentences(modal) {
@@ -368,7 +404,7 @@
       }
 
       const id = Number(st.selectedExerciseId);
-      if (!Number.isFinite(id) || id <= 0) return;
+      if (!Number.isFinite(id)) return;
       const ex = findCreateAssignmentExerciseById(modal, id);
       if (!ex) return;
       ex.positions = positions;
@@ -480,7 +516,7 @@
         return pos;
       }
       const id = Number(st.selectedExerciseId);
-      if (Number.isFinite(id) && id > 0) {
+      if (Number.isFinite(id)) {
         const ex = findCreateAssignmentExerciseById(modal, id);
         const pos = normalizeExercisePositions(ex && ex.positions ? ex.positions : []);
         return pos;
@@ -599,7 +635,8 @@
 
       try {
         const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`, { method: 'GET' });
-        const items = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
+        const itemsRaw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
+        const items = itemsRaw.map(normalizeExerciseItem);
         const st = getCreateAssignmentExercisesState(modal);
         st.exercises = items;
         st.draft = null;
@@ -680,7 +717,8 @@
             }
 
             try {
-              const items = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
+              const itemsRaw = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
+              const items = itemsRaw.map(normalizeExerciseItem);
               const next = getCreateAssignmentExercisesState(modal);
               next.exercises = items;
               next.draft = null;
@@ -793,6 +831,14 @@
             setCreateAssignmentExercisesState(modal, st);
             setCreateAssignmentExercisesDirty(modal, true);
             renderCreateAssignmentExercisesTable(modal);
+
+            try {
+              const nextId = pickNeighborExerciseId(modal, null);
+              if (Number.isFinite(nextId)) {
+                selectCreateAssignmentExerciseById(modal, nextId);
+              }
+            } catch (e2) {
+            }
             return;
           }
 
@@ -810,6 +856,14 @@
           setCreateAssignmentExercisesState(modal, st);
           setCreateAssignmentExercisesDirty(modal, true);
           renderCreateAssignmentExercisesTable(modal);
+
+          try {
+            const nextId = pickNeighborExerciseId(modal, id);
+            if (Number.isFinite(nextId)) {
+              selectCreateAssignmentExerciseById(modal, nextId);
+            }
+          } catch (e2) {
+          }
         });
       }
 

@@ -471,6 +471,8 @@
     },
     "assignments": {
       "max_7_days": "Максимум 7 дней",
+      "exercises_modal_title": "Все упражнения",
+      "exercises_column": "Упражнения",
       "modal_title": "Задание",
       "add_day": "Добавить день",
       "text_column": "Текст",

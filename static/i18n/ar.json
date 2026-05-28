@@ -471,6 +471,8 @@
     },
     "assignments": {
       "max_7_days": "الحد الأقصى 7 أيام",
+      "exercises_modal_title": "كل التمارين",
+      "exercises_column": "تمارين",
       "modal_title": "مهمة",
       "add_day": "إضافة يوم",
       "text_column": "النص",
