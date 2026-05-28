@@ -568,6 +568,13 @@
       if (!modal) return;
 
       try {
+        if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
+          await window.I18n.ensureLoaded();
+        }
+      } catch (e) {
+      }
+
+      try {
         const z = parseInt(String(modal.style.zIndex || '0'), 10);
         modal.style.zIndex = String(Number.isFinite(z) ? Math.max(z, 100200) : 100200);
       } catch (e) {
@@ -851,7 +858,11 @@
             try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e) { }
             return;
           }
-          ex.__deleted = true;
+          try {
+            st.exercises = (Array.isArray(st.exercises) ? st.exercises : []).filter(x => Number(x && x.id) !== id);
+          } catch (e0) {
+            ex.__deleted = true;
+          }
           st.selectedExerciseId = null;
           setCreateAssignmentExercisesState(modal, st);
           setCreateAssignmentExercisesDirty(modal, true);
@@ -878,6 +889,27 @@
       }
 
       modal.style.display = 'flex';
+
+      if (modal.dataset.i18nListenerAttached !== '1') {
+        modal.dataset.i18nListenerAttached = '1';
+        window.addEventListener('ui-language-changed', () => {
+          try {
+            const t = document.getElementById('create-assignment-modal-title') || document.querySelector('.create-assignment-modal-title-text');
+            if (t) t.textContent = libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения');
+          } catch (e) {
+          }
+          try {
+            const h = document.getElementById('create-assignment-exercises-col-title');
+            if (h) h.textContent = libT('private_library.assignments.exercises_column', null, 'Упражнения');
+          } catch (e) {
+          }
+          try {
+            const h = document.getElementById('create-assignment-sentences-col-text');
+            if (h) h.textContent = libT('private_library.assignments.text_column', null, 'Текст');
+          } catch (e) {
+          }
+        });
+      }
 
       try {
         const t = document.getElementById('create-assignment-modal-title') || document.querySelector('.create-assignment-modal-title-text');
