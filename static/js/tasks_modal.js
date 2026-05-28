@@ -12,6 +12,9 @@
       return String(key || '');
     }
 
+    const _sentencesStateByModal = new WeakMap();
+    const _exercisesStateByModal = new WeakMap();
+
     function escapeHtml(s) {
       try {
         return String(s ?? '')
@@ -161,21 +164,15 @@
     }
 
     function getCreateAssignmentSentencesState(modal) {
-      try {
-        const raw = modal.dataset.sentencesState;
-        if (!raw) return { sentences: [], selectedPositions: null };
-        const parsed = JSON.parse(raw);
-        return parsed && typeof parsed === 'object' ? parsed : { sentences: [], selectedPositions: null };
-      } catch (e) {
-        return { sentences: [], selectedPositions: null };
-      }
+      const st = modal ? _sentencesStateByModal.get(modal) : null;
+      if (!st || typeof st !== 'object') return { sentences: [], selectedPositions: null };
+      return Object.assign({ sentences: [], selectedPositions: null }, st);
     }
 
     function setCreateAssignmentSentencesState(modal, state) {
-      try {
-        modal.dataset.sentencesState = JSON.stringify(state && typeof state === 'object' ? state : { sentences: [], selectedPositions: null });
-      } catch (e) {
-      }
+      if (!modal) return;
+      const next = (state && typeof state === 'object') ? state : { sentences: [], selectedPositions: null };
+      _sentencesStateByModal.set(modal, Object.assign({ sentences: [], selectedPositions: null }, next));
     }
 
     function renderLucideCheckboxButton(btn, checked, disabled) {
@@ -283,23 +280,15 @@
     }
 
     function getCreateAssignmentExercisesState(modal) {
-      try {
-        const raw = modal && modal.dataset ? modal.dataset.exercisesState : '';
-        if (!raw) return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
-        const parsed = JSON.parse(raw);
-        if (!parsed || typeof parsed !== 'object') return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
-        return Object.assign({ exercises: [], selectedExerciseId: null, draft: null, dirty: false }, parsed);
-      } catch (e) {
-        return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
-      }
+      const st = modal ? _exercisesStateByModal.get(modal) : null;
+      if (!st || typeof st !== 'object') return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+      return Object.assign({ exercises: [], selectedExerciseId: null, draft: null, dirty: false }, st);
     }
 
     function setCreateAssignmentExercisesState(modal, state) {
-      try {
-        if (!modal || !modal.dataset) return;
-        modal.dataset.exercisesState = JSON.stringify(state && typeof state === 'object' ? state : { exercises: [], selectedExerciseId: null, draft: null, dirty: false });
-      } catch (e) {
-      }
+      if (!modal) return;
+      const next = (state && typeof state === 'object') ? state : { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+      _exercisesStateByModal.set(modal, Object.assign({ exercises: [], selectedExerciseId: null, draft: null, dirty: false }, next));
     }
 
     function setCreateAssignmentExercisesDirty(modal, isDirty) {
