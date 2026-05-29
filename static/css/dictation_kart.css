@@ -1,3 +1,21 @@
 .dictation-kart {
   display: block;
 }
+
+#auto-toast {
+  position: fixed;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  z-index: 200500;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  max-width: min(92vw, 520px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  user-select: text;
+  cursor: pointer;
+  display: none;
+}

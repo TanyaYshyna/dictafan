@@ -23,21 +23,6 @@ window.DictationKart = window.DictationKart || {
     if (!el) {
       el = document.createElement('div');
       el.id = 'auto-toast';
-      el.style.position = 'fixed';
-      el.style.left = '50%';
-      el.style.top = '24px';
-      el.style.transform = 'translateX(-50%)';
-      el.style.zIndex = '200500';
-      el.style.background = 'rgba(0,0,0,0.78)';
-      el.style.color = '#fff';
-      el.style.padding = '10px 14px';
-      el.style.borderRadius = '12px';
-      el.style.fontSize = '14px';
-      el.style.maxWidth = 'min(92vw, 520px)';
-      el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
-      el.style.userSelect = 'text';
-      el.style.cursor = 'pointer';
-      el.style.display = 'none';
       el.addEventListener('click', () => {
         try { el.style.display = 'none'; } catch (e) { }
       });
@@ -56,6 +41,14 @@ window.DictationKart = window.DictationKart || {
   },
 
   _showLoadingIndicator(message) {
+    try {
+      if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+        window.DesktopLoadingModal.show(message || 'Загрузка…');
+        return;
+      }
+    } catch (e) {
+    }
+
     try {
       if (typeof window.setSwBarProgress === 'function') {
         const msg = String(message || '').trim();
@@ -88,6 +81,14 @@ window.DictationKart = window.DictationKart || {
   },
 
   _hideLoadingIndicator() {
+    try {
+      if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+        window.DesktopLoadingModal.hide();
+        return;
+      }
+    } catch (e) {
+    }
+
     try {
       if (typeof window.setSwBarProgress === 'function') {
         window.setSwBarProgress('', null, '');
@@ -560,6 +561,17 @@ window.DictationKart = window.DictationKart || {
         }
 
         try {
+          if (action === 'show-in-book') {
+            const dictationId = btn.getAttribute('data-dictation-id');
+            if (dictationId && window.BookModal && typeof window.BookModal.showDictationInBook === 'function') {
+              await window.BookModal.showDictationInBook(dictationId);
+              return;
+            }
+          }
+        } catch (e2) {
+        }
+
+        try {
           if (action === 'prefetch-dictation-cache') {
             const dictationId = btn.getAttribute('data-dictation-id');
             const langOriginal = btn.getAttribute('data-lang-original');
@@ -839,16 +851,193 @@ window.DictationKart = window.DictationKart || {
   },
 
   createDeskCardElement(item) {
-    const el = this._createElementFromHtml(this.renderDeskCard(item));
-    this._bindHandlers(el);
-    this._renderLucide(el);
-    return el;
+    const tpl = document.getElementById('dictationKartDeskTemplate');
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) {
+      const el = this._createElementFromHtml(this.renderDeskCard(item));
+      this._bindHandlers(el);
+      this._renderLucide(el);
+      return el;
+    }
+
+    const node = tpl.content.firstElementChild.cloneNode(true);
+
+    const dictationId = item.dictation_id;
+    const dictationIdFormatted = `dict_${dictationId}`;
+
+    const langOriginal = item.language_original || item.language_code || 'en';
+    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+      : '';
+
+    const availableTranslations = Array.isArray(item.translation_languages)
+      ? item.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const pick = window._pickTranslationLanguageForOpen
+      ? window._pickTranslationLanguageForOpen({
+          preferredNative: nativeLang,
+          availableTranslations,
+          fallbackLang: item.language_translation || nativeLang || langOriginal || 'en',
+        })
+      : { lang: item.language_translation || nativeLang || langOriginal || 'en', reason: '' };
+
+    const langTranslation = pick.lang;
+    const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+    const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+
+    const coverUrl = window.maybeCacheBustDictationCover
+      ? window.maybeCacheBustDictationCover(item.cover_url)
+      : (item.cover_url || '');
+    const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
+
+    const sentencesCount = typeof item.sentences_count === 'number'
+      ? item.sentences_count
+      : (parseInt(item.sentences_count, 10) || 0);
+
+    const noticeMessage = pick && pick.reason ? String(pick.reason) : '';
+
+    node.setAttribute('data-dictation-id', String(dictationId || ''));
+    node.setAttribute('data-desk-item-id', String(item.id || ''));
+
+    const thumb = node.querySelector('.short-thumb');
+    if (thumb) {
+      thumb.setAttribute('data-href', openUrl);
+      thumb.setAttribute('data-lang-notice', noticeMessage);
+    }
+
+    const img = node.querySelector('img.short-cover');
+    if (img) {
+      img.src = coverSrc;
+      img.setAttribute('data-cover-url', String(coverUrl || ''));
+    }
+
+    const titleSlot = node.querySelector('[data-slot="title"]');
+    if (titleSlot) titleSlot.textContent = item.title || 'Без названия';
+
+    const langPairSlot = node.querySelector('[data-slot="langPair"]');
+    if (langPairSlot) langPairSlot.textContent = `${langOriginal}`;
+
+    const levelSlot = node.querySelector('[data-slot="level"]');
+    if (levelSlot) levelSlot.textContent = item.level || '—';
+
+    const sentencesSlot = node.querySelector('[data-slot="sentencesCount"]');
+    if (sentencesSlot) sentencesSlot.textContent = String(sentencesCount);
+
+    const diktNumSlot = node.querySelector('[data-slot="dictationIdFormatted"]');
+    if (diktNumSlot) diktNumSlot.textContent = dictationIdFormatted;
+
+    const stats = node.querySelector('.short-stats');
+    if (stats) stats.setAttribute('data-dictation-id', String(dictationId || ''));
+
+    const menuSlot = node.querySelector('[data-slot="menu"]');
+    if (menuSlot) {
+      menuSlot.innerHTML = this.renderMenuHtml({
+        context: 'desk',
+        dictationId,
+        deskItemId: item.id,
+        editUrl,
+        langOriginal,
+        coverUrl,
+        availableTranslations,
+      });
+    }
+
+    this._bindHandlers(node);
+    this._renderLucide(node);
+    return node;
   },
 
   createBookCardElement(item) {
-    const el = this._createElementFromHtml(this.renderBookCard(item));
-    this._bindHandlers(el);
-    this._renderLucide(el);
-    return el;
+    const tpl = document.getElementById('dictationKartBookTemplate');
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) {
+      const el = this._createElementFromHtml(this.renderBookCard(item));
+      this._bindHandlers(el);
+      this._renderLucide(el);
+      return el;
+    }
+
+    const node = tpl.content.firstElementChild.cloneNode(true);
+
+    const d = item;
+    const coverUrl = d.cover_url || '';
+    const coverSrc = coverUrl || '/static/data/covers/cover_en.webp';
+
+    const langOriginal = d.language_original || d.language_code || 'en';
+    const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+      ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+      : '';
+
+    const availableTranslations = Array.isArray(d.translation_languages)
+      ? d.translation_languages.map((x) => String(x || '').trim().toLowerCase()).filter(Boolean)
+      : [];
+
+    const preferredNative = nativeLang && availableTranslations.includes(nativeLang) ? nativeLang : '';
+    const langTranslation = preferredNative || d.language_translation || nativeLang || d.language_code || 'en';
+
+    const dictationId = d.dictation_id || `dict_${d.id}`;
+    const dbId = d.db_id || d.id;
+    const editUrl = `/dictation_editor/${dictationId}/${langOriginal}/${langTranslation}`;
+
+    const isOnDesk = window.isDictationOnDesk ? window.isDictationOnDesk(dbId) : false;
+    const sentencesCount = typeof d.sentences_count === 'number' ? d.sentences_count : (parseInt(d.sentences_count, 10) || 0);
+
+    node.setAttribute('data-dictation-id', String(dbId || ''));
+    node.setAttribute('data-edit-url', editUrl);
+
+    const img = node.querySelector('.short-thumb img');
+    if (img) {
+      img.src = coverSrc;
+      img.alt = d.title || 'Обложка диктанта';
+    }
+
+    const titleSlot = node.querySelector('[data-slot="title"]');
+    if (titleSlot) titleSlot.textContent = d.title || 'Без названия';
+
+    const langPairSlot = node.querySelector('[data-slot="langPair"]');
+    if (langPairSlot) langPairSlot.textContent = `${langOriginal}`;
+
+    const levelSlot = node.querySelector('[data-slot="level"]');
+    if (levelSlot) levelSlot.textContent = d.level || '—';
+
+    const sentencesSlot = node.querySelector('[data-slot="sentencesCount"]');
+    if (sentencesSlot) sentencesSlot.textContent = String(sentencesCount);
+
+    const diktNumSlot = node.querySelector('[data-slot="dictationId"]');
+    if (diktNumSlot) diktNumSlot.textContent = String(dictationId || '');
+
+    const toggleBtn = node.querySelector('[data-action="toggle-desk-explicit"]');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('data-dictation-id', String(dbId || ''));
+      const icon = toggleBtn.querySelector('i[data-lucide]');
+      if (icon) icon.setAttribute('data-lucide', isOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash');
+    }
+
+    try {
+      if (isOnDesk) {
+        node.classList.add('short-card--on-desk');
+        node.classList.remove('short-card--off-desk');
+      } else {
+        node.classList.add('short-card--off-desk');
+        node.classList.remove('short-card--on-desk');
+      }
+    } catch (e) {
+    }
+
+    const menuSlot = node.querySelector('[data-slot="menu"]');
+    if (menuSlot) {
+      menuSlot.innerHTML = this.renderMenuHtml({
+        context: 'book',
+        dictationId: dbId,
+        deskItemId: null,
+        editUrl,
+        langOriginal,
+        coverUrl,
+        availableTranslations,
+      });
+    }
+
+    this._bindHandlers(node);
+    this._renderLucide(node);
+    return node;
   },
 };

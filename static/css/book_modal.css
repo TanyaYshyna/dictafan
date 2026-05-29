@@ -1,0 +1,21 @@
+#book-view-modal {
+  display: none;
+  z-index: 100220;
+}
+
+#book-edit-modal {
+  display: none;
+  z-index: 100240;
+}
+
+#book-edit-unsaved-star {
+  display: none;
+}
+
+#book-cover-preview {
+  display: none;
+}
+
+#book-cover-upload {
+  display: none;
+}

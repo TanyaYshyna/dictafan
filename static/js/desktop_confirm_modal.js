@@ -151,6 +151,43 @@
       open,
       hide: _hide,
     };
+
+    try {
+      const loadingState = {
+        visible: false,
+      };
+
+      function _getLoadingEl() {
+        try { return document.getElementById('desktopLoadingModal'); } catch (e) { return null; }
+      }
+
+      function show(message) {
+        const modal = _getLoadingEl();
+        if (!modal) return;
+        const textEl = document.getElementById('desktopLoadingModalText');
+        if (textEl) textEl.textContent = String(message || 'Загрузка...');
+        modal.style.display = 'flex';
+        loadingState.visible = true;
+      }
+
+      function hide() {
+        const modal = _getLoadingEl();
+        if (!modal) return;
+        modal.style.display = 'none';
+        loadingState.visible = false;
+      }
+
+      function isVisible() {
+        return !!loadingState.visible;
+      }
+
+      window.DesktopLoadingModal = window.DesktopLoadingModal || {
+        show,
+        hide,
+        isVisible,
+      };
+    } catch (e) {
+    }
   } catch (e) {
   }
 })();
