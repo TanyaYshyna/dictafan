@@ -720,8 +720,7 @@
   "desktop": {
     "confirm": {
       "title": "Save changes?",
-      "close_without_changes": "Close without changes",
-      "save_and_close": "Save and close",
+      "save": "Save",
       "close": "Close"
     }
   },

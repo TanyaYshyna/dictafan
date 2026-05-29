@@ -48,13 +48,13 @@
       if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
 
       try {
-        const label = t('desktop.confirm.close_without_changes', 'Закрыть без изменений');
+        const label = t('desktop.confirm.save', 'Сохранить');
         if (discardLabel) discardLabel.textContent = label;
       } catch (e) {
       }
 
       try {
-        const label = t('desktop.confirm.save_and_close', 'Сохранить и закрыть');
+        const label = t('desktop.confirm.save', 'Сохранить');
         if (saveLabel) saveLabel.textContent = label;
       } catch (e) {
       }

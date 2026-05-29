@@ -18,17 +18,48 @@
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   max-width: 640px;
-  width: calc(100% - 32px);
+  width: fit-content;
+  min-width: 320px;
+  max-width: calc(100% - 32px);
   padding: 20px;
   text-align: center;
+}
+
+.desktop-confirm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desktop-confirm-modal-title {
+  margin: 0;
 }
 
 .desktop-confirm-modal-buttons {
   margin-top: 20px;
   gap: 10px;
+  justify-content: flex-end;
 }
 
 .desktop-confirm-modal-buttons button {
   height: 44px;
   min-height: 44px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  line-height: 1;
+  margin: 6px;
+  padding: 6px;
+  white-space: nowrap;
+}
+
+.desktop-confirm-modal-buttons button i[data-lucide],
+.desktop-confirm-modal-buttons button svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  display: inline-block;
 }
