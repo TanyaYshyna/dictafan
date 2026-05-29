@@ -319,9 +319,11 @@
             </button>
           </div>
           <div class="plan-task-edit-body">
-            <input id="plan-task-edit-date" class="plan-task-edit-input" type="date" />
-            <select id="plan-task-edit-ex" class="plan-task-edit-input"></select>
-            <input id="plan-task-edit-count" class="plan-task-edit-input" type="number" min="1" step="1" />
+            <div class="plan-task-edit-row">
+              <input id="plan-task-edit-date" class="plan-task-edit-input" type="date" />
+              <select id="plan-task-edit-ex" class="plan-task-edit-input"></select>
+              <input id="plan-task-edit-count" class="plan-task-edit-input" type="number" min="1" step="1" />
+            </div>
             <div class="plan-task-edit-actions">
               <button type="button" id="plan-task-edit-save" class="plan-task-edit-save-btn">${escapeHtml(libT('profile.common.save', null, 'Сохранить'))}</button>
             </div>
