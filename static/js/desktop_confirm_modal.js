@@ -128,15 +128,6 @@
         });
       }
 
-      modal.addEventListener('click', (e) => {
-        try {
-          if (e.target === modal) {
-            _hide();
-          }
-        } catch (e2) {
-        }
-      });
-
       document.addEventListener('keydown', (e) => {
         try {
           if (e && e.key === 'Escape' && modal.style.display !== 'none') {
