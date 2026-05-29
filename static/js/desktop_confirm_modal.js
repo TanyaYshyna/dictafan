@@ -33,7 +33,6 @@
       if (!modal) return;
 
       const titleEl = _getEl('desktopConfirmModalTitle');
-      const msgEl = _getEl('desktopConfirmModalMessage');
       const saveBtn = _getEl('desktopConfirmSaveBtn');
       const discardBtn = _getEl('desktopConfirmDiscardBtn');
       const discardLabel = _getEl('desktopConfirmDiscardLabel');
@@ -43,13 +42,9 @@
       const title = opts && opts.title != null
         ? String(opts.title)
         : t('desktop.confirm.title', 'Сохранить изменения?');
-      const message = opts && opts.message != null
-        ? String(opts.message)
-        : t('desktop.confirm.message', 'Что сделать с текущими изменениями?');
       const showSave = !!(opts && opts.showSave);
 
       if (titleEl) titleEl.textContent = title;
-      if (msgEl) msgEl.textContent = message;
       if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
 
       try {
