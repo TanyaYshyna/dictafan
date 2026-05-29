@@ -33,33 +33,34 @@
       if (!modal) return;
 
       const titleEl = _getEl('desktopConfirmModalTitle');
+      const msgEl = _getEl('desktopConfirmModalMessage');
       const saveBtn = _getEl('desktopConfirmSaveBtn');
       const discardBtn = _getEl('desktopConfirmDiscardBtn');
+      const discardLabel = _getEl('desktopConfirmDiscardLabel');
+      const saveLabel = _getEl('desktopConfirmSaveLabel');
       const closeX = _getEl('desktopConfirmModalClose');
 
       const title = opts && opts.title != null
         ? String(opts.title)
         : t('desktop.confirm.title', 'Сохранить изменения?');
+      const message = opts && opts.message != null
+        ? String(opts.message)
+        : t('desktop.confirm.message', 'Что сделать с текущими изменениями?');
       const showSave = !!(opts && opts.showSave);
 
       if (titleEl) titleEl.textContent = title;
+      if (msgEl) msgEl.textContent = message;
       if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
 
       try {
-        if (discardBtn) {
-          discardBtn.childNodes.forEach((n) => {
-            if (n && n.nodeType === Node.TEXT_NODE) n.textContent = ` ${t('desktop.confirm.close_without_changes', 'Закрыть без изменений')}`;
-          });
-        }
+        const label = t('desktop.confirm.close_without_changes', 'Закрыть без изменений');
+        if (discardLabel) discardLabel.textContent = label;
       } catch (e) {
       }
 
       try {
-        if (saveBtn) {
-          saveBtn.childNodes.forEach((n) => {
-            if (n && n.nodeType === Node.TEXT_NODE) n.textContent = ` ${t('desktop.confirm.save_and_close', 'Сохранить и закрыть')}`;
-          });
-        }
+        const label = t('desktop.confirm.save_and_close', 'Сохранить и закрыть');
+        if (saveLabel) saveLabel.textContent = label;
       } catch (e) {
       }
 

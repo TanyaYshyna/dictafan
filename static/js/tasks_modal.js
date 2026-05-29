@@ -227,11 +227,11 @@
         const tr = document.createElement('tr');
         tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
         tr.innerHTML = `
-          <td style="padding:8px 10px; color: rgba(0,0,0,0.65); font-variant-numeric: tabular-nums; white-space:nowrap;">${escapeHtml(labelNum)}</td>
-          <td style="padding:8px 10px; width:46px;">
+          <td class="create-assignment-td-num" style="padding:8px 10px;">${escapeHtml(labelNum)}</td>
+          <td class="create-assignment-td-check" style="padding:8px 10px;">
             <button type="button" class="topbar-icon-btn create-assignment-sentence-check" data-position="${escapeHtml(fullPos)}" aria-label="${escapeHtml(libT('private_library.assignments.select_sentence'))}" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
           </td>
-          <td style="padding:8px 10px;">${escapeHtml(text)}</td>
+          <td class="create-assignment-td-text" style="padding:8px 10px;">${escapeHtml(text)}</td>
         `;
         tbody.appendChild(tr);
 
@@ -572,6 +572,14 @@
       if (!modal) return;
 
       try {
+        modal.style.display = 'flex';
+        modal.style.visibility = 'visible';
+        modal.style.opacity = '1';
+        modal.removeAttribute('hidden');
+      } catch (e) {
+      }
+
+      try {
         if (window.I18n && typeof window.I18n.ensureLoaded === 'function') {
           await window.I18n.ensureLoaded();
         }
@@ -753,7 +761,11 @@
       };
 
       const close = () => {
-        try { modal.style.display = 'none'; } catch (e) { }
+        try {
+          modal.style.display = 'none';
+          modal.style.visibility = '';
+          modal.style.opacity = '';
+        } catch (e) { }
       };
 
       const maybeCloseWithPrompt = async () => {

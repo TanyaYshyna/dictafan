@@ -7,10 +7,23 @@
   display: none;
   align-items: center;
   justify-content: center;
-  background-color: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   z-index: 100250;
+}
+
+.desktop-confirm-modal-content {
+  padding: 14px 16px 16px 16px;
+}
+
+.desktop-confirm-modal-message {
+  margin: 10px 0 0 0;
+}
+
+.desktop-confirm-modal-buttons {
+  margin-top: 12px;
+  gap: 10px;
 }
 
 .desktop-confirm-modal-buttons button {

@@ -147,19 +147,27 @@
 
 .create-assignment-bottom {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 200px 1fr;
   gap: 12px;
   min-height: 0;
   flex: 1;
 }
 
 .create-assignment-panel {
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 14px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.create-assignment-panel--days {
+  width: 200px;
+}
+
+.create-assignment-panel--sentences {
+  min-width: 0;
 }
 
 .create-assignment-panel-body {
@@ -188,6 +196,7 @@
 
 .create-assignment-table--sentences {
   width: 100%;
+  table-layout: fixed;
 }
 
 .create-assignment-th-num {
@@ -202,4 +211,23 @@
 
 .create-assignment-th-text {
   text-align: left;
+}
+
+.create-assignment-td-num {
+  width: 52px;
+  text-align: right;
+  color: rgba(0,0,0,0.65);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.create-assignment-td-check {
+  width: 52px;
+  text-align: center;
+}
+
+.create-assignment-td-text {
+  width: auto;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
