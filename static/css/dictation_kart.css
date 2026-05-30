@@ -13,6 +13,22 @@
   min-height: 0;
 }
 
+.page-index .short-card.dictation-kart {
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--color-panel-bg, #fff);
+  border: 2px solid var(--color-border, #e2e8f0);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .06);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.page-index .short-card.dictation-kart:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+
 .dictation-kart--book-row .dictation-kart-book-row__main {
   display: flex;
   align-items: stretch;
