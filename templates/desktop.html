@@ -6,6 +6,8 @@
     <link rel="stylesheet" href="/static/css/desktop.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_kart.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/book_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/private_library_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/global_library_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/tasks_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/desktop_confirm_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/plan_tasks_modal.css?v={{ app_cache_revision }}">
@@ -100,6 +102,9 @@
     {% include 'partials/dictation_kart.html' %}
     {% include 'partials/book_modal.html' %}
 
+    {% include 'partials/private_library_modal.html' %}
+    {% include 'partials/global_library_modal.html' %}
+
     {% include 'partials/desktop_confirm_modal.html' %}
 {% endblock %}
 
@@ -111,5 +116,7 @@
     <script defer src="/static/js/desktop_confirm_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/plan_tasks_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/book_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/private_library_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/global_library_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}

@@ -440,6 +440,26 @@ window.Desktop = window.Desktop || {
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
 
+        if (action === 'desktop-home') {
+          try {
+            if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.open === 'function') {
+              window.PrivateLibraryModal.open();
+              return;
+            }
+          } catch (e2) {
+          }
+        }
+
+        if (action === 'desktop-public') {
+          try {
+            if (window.GlobalLibraryModal && typeof window.GlobalLibraryModal.open === 'function') {
+              window.GlobalLibraryModal.open();
+              return;
+            }
+          } catch (e2) {
+          }
+        }
+
         if (action === 'desktop-zoom-in' || action === 'desktop-zoom-out') {
           const deskZone = this.getDeskZoneEl();
           if (!deskZone) return;

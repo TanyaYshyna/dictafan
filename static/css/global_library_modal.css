@@ -1,0 +1,92 @@
+#public-library-modal {
+  position: fixed !important;
+  top: var(--topbar-height, 56px) !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: calc(100% - var(--topbar-height, 56px)) !important;
+  z-index: 100160 !important;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.public-library-modal-content {
+  max-width: 95vw;
+  width: 95vw;
+  max-height: 90vh;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.public-library-modal-content .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border-light, #dee2e6);
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px 12px 0 0;
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+.public-library-modal-content .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+}
+
+.public-library-modal-content .modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  font-size: 24px;
+  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.public-library-modal-content .modal-close:hover {
+  background: var(--color-panel-bg, #fff);
+}
+
+.public-library-modal-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+#public-library-modal .public-library-content {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#public-library-modal .public-books-zone {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#public-library-modal #publicBooksList.books-list {
+  flex: 1;
+}

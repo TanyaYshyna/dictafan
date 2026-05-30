@@ -170,6 +170,28 @@
   padding-bottom: 40px;
 }
 
+#book-view-modal .book-card-max-actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 6px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+#book-view-modal .book-card-max-actions .dropdown-menu-wrapper {
+  position: relative;
+}
+
+#book-view-modal .book-card-max-actions .book-actions-menu {
+  right: 0;
+  left: auto;
+  bottom: 100%;
+  top: auto;
+  margin-bottom: 6px;
+}
+
 .book-card-max-creator {
   position: absolute;
   bottom: 0;
