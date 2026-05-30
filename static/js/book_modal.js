@@ -156,6 +156,56 @@
       lastLoadedBook: null,
     };
 
+    function initStaticTexts() {
+      try {
+        const setTextIfEmptyById = (id, text) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          const current = (el.textContent || '').trim();
+          if (current) return;
+          el.textContent = text;
+        };
+
+        const setTextIfEmpty = (selector, text) => {
+          const el = document.querySelector(selector);
+          if (!el) return;
+          const current = (el.textContent || '').trim();
+          if (current) return;
+          el.textContent = text;
+        };
+
+        setTextIfEmpty('.book-edit-save-header', 'Сохранить');
+        setTextIfEmpty('.book-edit-save-footer', 'Сохранить');
+        setTextIfEmptyById('book-cover-upload-btn', 'Загрузить обложку');
+
+        setTextIfEmpty('label[for="book-title-input"]', 'Название');
+        setTextIfEmpty('label[for="book-author-text-input"]', 'Автор');
+        setTextIfEmpty('label[for="book-author-materials-url-input"]', 'Ссылка на материалы автора');
+        setTextIfEmpty('label[for="book-theme-input"]', 'Тема');
+        setTextIfEmpty('label[for="book-visibility-input"]', 'Видимость');
+        setTextIfEmpty('label[for="book-description-input"]', 'Описание');
+
+        try {
+          const visibility = document.getElementById('book-visibility-input');
+          if (visibility) {
+            const privateOpt = visibility.querySelector('option[value="private"]');
+            if (privateOpt && !(privateOpt.textContent || '').trim()) privateOpt.textContent = 'Приватная';
+            const publicOpt = visibility.querySelector('option[value="public"]');
+            if (publicOpt && !(publicOpt.textContent || '').trim()) publicOpt.textContent = 'Публичная';
+          }
+        } catch (e) {
+        }
+
+        setTextIfEmpty('label[for="section-number-input"]', 'Номер');
+        setTextIfEmpty('label[for="section-title-input"]', 'Название');
+        setTextIfEmpty('.section-edit-submit', 'Сохранить');
+
+        setTextIfEmptyById('crop-cancel', 'Отмена');
+        setTextIfEmptyById('crop-confirm', 'Обрезать');
+      } catch (e) {
+      }
+    }
+
     function openSectionModal(section, parentId) {
       const modal = document.getElementById('section-edit-modal');
       const titleEl = document.getElementById('section-edit-title');
@@ -1139,6 +1189,8 @@
     }
 
     function _bindOnce() {
+      initStaticTexts();
+
       const viewClose = document.getElementById('book-view-close');
       if (viewClose && viewClose.dataset.bound !== '1') {
         viewClose.dataset.bound = '1';

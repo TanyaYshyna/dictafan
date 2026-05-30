@@ -177,7 +177,11 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `100200` — `#create-assignment-modal` (Задания → упражнения, группа `tasks_modal.*`)
 - `100200` — `#plan-tasks-modal` (План, группа `plan_tasks_modal.*`)
 - `100200` — `.desktop-right-menu` (палитра инструментов)
+- `100220` — `#book-view-modal` (просмотр книги справа, группа `book_modal.*`)
+- `100240` — `#book-edit-modal` (редактирование книги, группа `book_modal.*`)
+- `100246` — `#section-edit-modal` (создание/редактирование раздела, группа `book_modal.*`)
 - `100250` — `#desktopConfirmModal` (общее «закрыть/сохранить» для desktop-модалок на `/desktop`)
+- `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
 - `200500` — `#auto-toast` (всплывающие уведомления)
 
 ## Service Worker

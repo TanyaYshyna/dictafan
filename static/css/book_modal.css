@@ -29,13 +29,15 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   background: var(--color-panel-bg, #fff);
   border-radius: 0;
   box-shadow: -10px 0 40px rgba(0, 0, 0, 0.25);
 }
 
 #book-view-modal .modal-header {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -76,7 +78,7 @@
 
 #book-view-modal .book-view-modal-body {
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -92,6 +94,38 @@
 #book-edit-modal {
   display: none;
   z-index: 100240;
+}
+
+#book-edit-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.5);
+  overflow-y: auto;
+}
+
+#book-edit-modal[style*="flex"],
+#book-edit-modal.show {
+  display: flex !important;
+}
+
+#book-edit-modal .book-edit-modal-content {
+  position: relative;
+  z-index: 100241;
+  margin: auto;
+  max-width: 900px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  background-color: var(--color-panel-bg, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
 }
 
 #book-edit-unsaved-star {
@@ -129,7 +163,7 @@
 .active-book-content {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
   padding: 16px;
 }
 
@@ -138,6 +172,7 @@
   gap: 16px;
   align-items: stretch;
   position: relative;
+  overflow: visible;
 }
 
 .book-card-max-cover-wrapper {
@@ -168,6 +203,7 @@
   min-width: 0;
   position: relative;
   padding-bottom: 40px;
+  overflow: visible;
 }
 
 #book-view-modal .book-card-max-actions {
@@ -182,14 +218,33 @@
 
 #book-view-modal .book-card-max-actions .dropdown-menu-wrapper {
   position: relative;
+  overflow: visible;
 }
 
 #book-view-modal .book-card-max-actions .book-actions-menu {
+  position: absolute;
+  z-index: 1000;
   right: 0;
   left: auto;
   bottom: 100%;
   top: auto;
   margin-bottom: 6px;
+}
+
+#book-view-modal .dropdown-menu,
+#book-view-modal .dropdown-menu-wrapper {
+  z-index: 10;
+}
+
+#book-view-modal .shorts-grid,
+#book-view-modal .short-card,
+#book-view-modal .dictation-kart--book-row.short-card {
+  overflow: visible;
+}
+
+#book-view-modal .short-card .dropdown-menu,
+#book-view-modal .dictation-kart--book-row .dropdown-menu {
+  z-index: 20;
 }
 
 .book-card-max-creator {
@@ -240,7 +295,7 @@
 
 #book-view-modal .dictation-kart--book-row.short-card {
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 #book-view-modal .dictation-kart--book-row .short-thumb {
@@ -273,7 +328,7 @@
   height: 100%;
   justify-content: center;
   align-items: center;
-  z-index: 100260;
+  z-index: 100246;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
 }
@@ -285,7 +340,7 @@
 
 .section-edit-modal-content {
   position: relative;
-  z-index: 100261;
+  z-index: 100247;
   margin: auto;
   max-width: 500px;
   width: 90%;
