@@ -5,10 +5,10 @@
 
 #book-view-modal {
   position: fixed;
-  top: var(--topbar-height, 56px);
+  top: var(--topbar-height, 80px);
   left: 0;
   width: 100%;
-  height: calc(100% - var(--topbar-height, 56px));
+  height: calc(100% - var(--topbar-height, 80px));
   justify-content: flex-end;
   align-items: stretch;
   background-color: rgba(0, 0, 0, 0.5);
