@@ -15,6 +15,26 @@
       }
     }
 
+    function withCacheBust(url) {
+      try {
+        if (window.CoverManager && typeof window.CoverManager.withCacheBust === 'function') {
+          return window.CoverManager.withCacheBust(url);
+        }
+      } catch (e) {
+      }
+      return String(url || '');
+    }
+
+    function withCacheBustVersion(url, version) {
+      try {
+        if (window.CoverManager && typeof window.CoverManager.withCacheBustVersion === 'function') {
+          return window.CoverManager.withCacheBustVersion(url, version);
+        }
+      } catch (e) {
+      }
+      return withCacheBust(url);
+    }
+
     function getToken() {
       try {
         if (window.UM && window.UM.token) return window.UM.token;
@@ -136,6 +156,158 @@
       lastLoadedBook: null,
     };
 
+    function openSectionModal(section, parentId) {
+      const modal = document.getElementById('section-edit-modal');
+      const titleEl = document.getElementById('section-edit-title');
+      const idInput = document.getElementById('section-id-input');
+      const parentIdInput = document.getElementById('section-parent-id-input');
+      const numberInput = document.getElementById('section-number-input');
+      const titleInput = document.getElementById('section-title-input');
+      if (!modal || !titleEl || !idInput || !parentIdInput || !numberInput || !titleInput) return;
+
+      if (section) {
+        titleEl.textContent = 'Редактирование раздела';
+        idInput.value = section.id != null ? String(section.id) : '';
+        parentIdInput.value = section.parent_id != null ? String(section.parent_id) : '';
+        numberInput.value = section.order_index != null ? String(section.order_index) : '';
+        titleInput.value = section.title != null ? String(section.title) : '';
+      } else {
+        titleEl.textContent = 'Новый раздел';
+        idInput.value = '';
+        parentIdInput.value = parentId != null
+          ? String(parentId)
+          : (state.bookViewActiveBookId != null ? String(state.bookViewActiveBookId) : '');
+        numberInput.value = '1';
+        titleInput.value = '';
+      }
+
+      modal.style.display = 'flex';
+      modal.classList.add('show');
+      try { titleInput.focus(); } catch (e) { }
+
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons(modal ? { root: modal } : undefined);
+        }
+      } catch (e) {
+      }
+    }
+
+    function closeSectionModal() {
+      const modal = document.getElementById('section-edit-modal');
+      if (!modal) return;
+      modal.style.display = 'none';
+      modal.classList.remove('show');
+    }
+
+    async function handleSaveSection(event) {
+      try {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      } catch (e) {
+      }
+
+      const idInput = document.getElementById('section-id-input');
+      const parentIdInput = document.getElementById('section-parent-id-input');
+      const numberInput = document.getElementById('section-number-input');
+      const titleInput = document.getElementById('section-title-input');
+
+      const sectionId = idInput && idInput.value ? parseInt(String(idInput.value), 10) : null;
+      const parentIdRaw = parentIdInput ? String(parentIdInput.value || '').trim() : '';
+      const parentId = parentIdRaw ? parseInt(parentIdRaw, 10) : null;
+      const sectionNumber = numberInput && numberInput.value ? parseInt(String(numberInput.value), 10) : null;
+      const title = titleInput ? String(titleInput.value || '').trim() : '';
+
+      if (!title) {
+        showToast('Введите название раздела');
+        return;
+      }
+
+      if (!parentId || Number.isNaN(parentId)) {
+        showToast('Ошибка: не выбрана книга для раздела', { durationMs: 2500 });
+        return;
+      }
+
+      showLoadingIndicator('Сохранение раздела...');
+      try {
+        const payload = {
+          title,
+          parent_id: parentId,
+          author_text: null,
+          short_description: null,
+          original_language: null,
+          visibility: 'private',
+          theme: null,
+          order_index: sectionNumber,
+        };
+
+        let data;
+        if (sectionId) {
+          data = await apiRequest(`/library/api/book/${encodeURIComponent(String(sectionId))}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          });
+        } else {
+          data = await apiRequest('/library/api/book', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+        }
+
+        if (!data || !data.success) {
+          showToast((data && (data.error || data.message)) ? String(data.error || data.message) : 'Ошибка сохранения раздела');
+          return;
+        }
+
+        closeSectionModal();
+        if (state.bookViewActiveBookId) {
+          await openBookViewBook(state.bookViewActiveBookId, state.activeBookIsWorkbook);
+        }
+      } catch (e) {
+        showToast('Ошибка сохранения раздела');
+      } finally {
+        hideLoadingIndicator();
+      }
+    }
+
+    async function deleteBook(bookId) {
+      const idNum = Number(bookId);
+      if (!Number.isFinite(idNum) || idNum <= 0) return;
+
+      showLoadingIndicator('Удаление книги...');
+      try {
+        const data = await apiRequest(`/library/api/book/${encodeURIComponent(String(idNum))}`, {
+          method: 'DELETE',
+          body: JSON.stringify({}),
+        });
+
+        if (!data || !data.success) {
+          showToast((data && (data.error || data.message)) ? String(data.error || data.message) : 'Ошибка удаления книги');
+          return;
+        }
+
+        try { closeBookViewModal(); } catch (e) { }
+        showToast('Книга удалена', { durationMs: 1800 });
+
+        try {
+          if (window.PrivateLibraryModal && typeof window.PrivateLibraryModal.reload === 'function') {
+            window.PrivateLibraryModal.reload().catch(() => { });
+          }
+        } catch (e2) {
+        }
+      } catch (e) {
+        showToast('Ошибка удаления книги');
+      } finally {
+        hideLoadingIndicator();
+      }
+    }
+
+    function setDictationTargetBook(bookId) {
+      try {
+        sessionStorage.setItem('dictationTargetBook', String(bookId));
+      } catch (e) {
+      }
+    }
+
     function setBookEditDirty(nextDirty) {
       state.bookEditDirty = !!nextDirty;
       const star = document.getElementById('book-edit-unsaved-star');
@@ -231,100 +403,109 @@
     }
 
     function openBookModal(book) {
-      setBookEditDirty(false);
+      try {
+        setBookEditDirty(false);
 
-      const modal = document.getElementById('book-edit-modal');
-      const titleEl = document.getElementById('book-edit-title');
-      const idInput = document.getElementById('book-id-input');
-      const titleInput = document.getElementById('book-title-input');
-      const authorInput = document.getElementById('book-author-text-input');
-      const themeInput = document.getElementById('book-theme-input');
-      const visibilityInput = document.getElementById('book-visibility-input');
-      const descInput = document.getElementById('book-description-input');
-      const authorMaterialsUrlInput = document.getElementById('book-author-materials-url-input');
-      const coverPreview = document.getElementById('book-cover-preview');
-      const coverPlaceholder = document.getElementById('book-cover-placeholder');
-      const coverUploadInput = document.getElementById('book-cover-upload');
+        const modal = document.getElementById('book-edit-modal');
+        const titleEl = document.getElementById('book-edit-title');
+        const idInput = document.getElementById('book-id-input');
+        const titleInput = document.getElementById('book-title-input');
+        const authorInput = document.getElementById('book-author-text-input');
+        const themeInput = document.getElementById('book-theme-input');
+        const visibilityInput = document.getElementById('book-visibility-input');
+        const descInput = document.getElementById('book-description-input');
+        const authorMaterialsUrlInput = document.getElementById('book-author-materials-url-input');
+        const coverPreview = document.getElementById('book-cover-preview');
+        const coverPlaceholder = document.getElementById('book-cover-placeholder');
+        const coverUploadInput = document.getElementById('book-cover-upload');
 
-      if (!modal) return;
+        if (!modal) {
+          try { console.warn('[BookModal] Missing #book-edit-modal element in DOM'); } catch (e1) { }
+          try { showToast('Не найдено окно редактирования книги (book-edit-modal)', { durationMs: 3500 }); } catch (e2) { }
+          return;
+        }
 
-      state.lastLoadedBook = book || null;
+        state.lastLoadedBook = book || null;
 
-      if (book) {
-        if (titleEl) titleEl.textContent = 'Редактирование книги';
-        if (idInput) idInput.value = book.id;
-        if (titleInput) titleInput.value = book.title || '';
-        if (authorInput) authorInput.value = book.author_text || '';
-        if (themeInput) themeInput.value = book.theme || '';
-        if (visibilityInput) visibilityInput.value = book.visibility || 'private';
-        if (descInput) descInput.value = book.short_description || '';
-        if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = book.author_materials_url || '';
+        if (book) {
+          if (titleEl) titleEl.textContent = 'Редактирование книги';
+          if (idInput) idInput.value = book.id;
+          if (titleInput) titleInput.value = book.title || '';
+          if (authorInput) authorInput.value = book.author_text || '';
+          if (themeInput) themeInput.value = book.theme || '';
+          if (visibilityInput) visibilityInput.value = book.visibility || 'private';
+          if (descInput) descInput.value = book.short_description || '';
+          if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = book.author_materials_url || '';
 
-        if (coverPreview && coverPlaceholder) {
-          if (book.cover_url) {
-            coverPreview.src = book.cover_url;
-            coverPreview.style.display = 'block';
-            coverPlaceholder.style.display = 'none';
-          } else {
+          if (coverPreview && coverPlaceholder) {
+            if (book.cover_url) {
+              coverPreview.src = book.cover_url;
+              coverPreview.style.display = 'block';
+              coverPlaceholder.style.display = 'none';
+            } else {
+              coverPreview.style.display = 'none';
+              coverPlaceholder.style.display = 'flex';
+            }
+          }
+        } else {
+          if (titleEl) titleEl.textContent = 'Новая книга';
+          if (idInput) idInput.value = '';
+          if (titleInput) titleInput.value = '';
+          if (authorInput) authorInput.value = '';
+          if (themeInput) themeInput.value = '';
+          if (visibilityInput) visibilityInput.value = 'private';
+          if (descInput) descInput.value = '';
+          if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = '';
+          if (coverPreview && coverPlaceholder) {
             coverPreview.style.display = 'none';
             coverPlaceholder.style.display = 'flex';
+            coverPreview.src = '';
           }
+          if (coverUploadInput) coverUploadInput.value = '';
         }
-      } else {
-        if (titleEl) titleEl.textContent = 'Новая книга';
-        if (idInput) idInput.value = '';
-        if (titleInput) titleInput.value = '';
-        if (authorInput) authorInput.value = '';
-        if (themeInput) themeInput.value = '';
-        if (visibilityInput) visibilityInput.value = 'private';
-        if (descInput) descInput.value = '';
-        if (authorMaterialsUrlInput) authorMaterialsUrlInput.value = '';
-        if (coverPreview && coverPlaceholder) {
-          coverPreview.style.display = 'none';
-          coverPlaceholder.style.display = 'flex';
-          coverPreview.src = '';
+
+        modal.style.display = 'flex';
+        modal.classList.add('show');
+
+        const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
+        initBookLanguageSelector(defaultLang);
+
+        try {
+          const trackIds = [
+            'book-title-input',
+            'book-author-text-input',
+            'book-author-materials-url-input',
+            'book-theme-input',
+            'book-visibility-input',
+            'book-description-input',
+          ];
+          trackIds.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.dataset && el.dataset.bookDirtyBound === '1') return;
+            if (el.dataset) el.dataset.bookDirtyBound = '1';
+            el.addEventListener('input', () => setBookEditDirty(true));
+            el.addEventListener('change', () => setBookEditDirty(true));
+          });
+        } catch (e) {
         }
-        if (coverUploadInput) coverUploadInput.value = '';
-      }
 
-      modal.style.display = 'flex';
-      modal.classList.add('show');
+        try {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons(modal ? { root: modal } : undefined);
+          }
+        } catch (e) {
+        }
 
-      const defaultLang = book ? book.original_language : getDefaultOriginalLanguageForNewBook();
-      initBookLanguageSelector(defaultLang);
-
-      try {
-        const trackIds = [
-          'book-title-input',
-          'book-author-text-input',
-          'book-author-materials-url-input',
-          'book-theme-input',
-          'book-visibility-input',
-          'book-description-input',
-        ];
-        trackIds.forEach((id) => {
-          const el = document.getElementById(id);
-          if (!el) return;
-          if (el.dataset && el.dataset.bookDirtyBound === '1') return;
-          if (el.dataset) el.dataset.bookDirtyBound = '1';
-          el.addEventListener('input', () => setBookEditDirty(true));
-          el.addEventListener('change', () => setBookEditDirty(true));
-        });
-      } catch (e) {
-      }
-
-      try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons(modal ? { root: modal } : undefined);
+        try {
+          if (window.CoverManager) {
+            bindCoverHandlers();
+          }
+        } catch (e) {
         }
       } catch (e) {
-      }
-
-      try {
-        if (window.CoverManager) {
-          bindCoverHandlers();
-        }
-      } catch (e) {
+        try { console.warn('[BookModal] openBookModal failed', e); } catch (e2) { }
+        try { showToast('Ошибка открытия окна редактирования книги', { durationMs: 3500 }); } catch (e3) { }
       }
     }
 
@@ -531,9 +712,17 @@
       const opts = options && typeof options === 'object' ? options : {};
 
       const bookTitle = book && book.title ? String(book.title) : 'Книга';
-      const creatorName = book && book.creator_name ? String(book.creator_name) : '';
-      const finalAvatarUrl = book && book.creator_avatar_url ? String(book.creator_avatar_url) : '';
-      const coverUrl = book && book.cover_url ? String(book.cover_url) : '';
+      const creatorName = book && (book.creator_username || book.creator_name) ? String(book.creator_username || book.creator_name) : '';
+      const creatorUserId = book && book.creator_user_id ? Number(book.creator_user_id) : null;
+      const finalAvatarUrl = creatorUserId
+        ? withCacheBust(`/user/api/avatar?user_id=${encodeURIComponent(String(creatorUserId))}&size=small`)
+        : '';
+
+      const coverUrlRaw = book && book.cover_url ? String(book.cover_url) : '';
+      const coverV = coverUrlRaw && coverUrlRaw.includes('/library/api/book-cover')
+        ? (book.updated_at || Date.now())
+        : (window.__APP_BUILD || '1');
+      const coverUrl = coverUrlRaw ? withCacheBustVersion(coverUrlRaw, coverV) : '';
       const visibility = book && book.visibility ? String(book.visibility) : '';
 
       const visibilityBadge = visibility
@@ -581,9 +770,21 @@
                   <i data-lucide="more-vertical"></i>
                 </button>
                 <div class="dropdown-menu book-actions-menu" style="display: none;">
+                  <button class="dropdown-menu-item" data-action="add-section" type="button">
+                    <i data-lucide="plus"></i>
+                    <span>Добавить раздел</span>
+                  </button>
+                  <button class="dropdown-menu-item" data-action="add-dictation" type="button">
+                    <i data-lucide="plus"></i>
+                    <span>Добавить диктант</span>
+                  </button>
                   <button class="dropdown-menu-item" data-action="edit-book" type="button">
                     <i data-lucide="edit-3"></i>
                     <span>Редактировать книгу</span>
+                  </button>
+                  <button class="dropdown-menu-item dropdown-menu-item-danger" data-action="delete-book" type="button">
+                    <i data-lucide="trash-2"></i>
+                    <span>Удалить книгу</span>
                   </button>
                 </div>
               </div>
@@ -637,8 +838,43 @@
           bookActionsMenu.classList.remove('show');
           bookActionsMenu.style.display = 'none';
 
+          if (action === 'add-section') {
+            openSectionModal(null, (book && book.id != null) ? Number(book.id) : state.bookViewActiveBookId);
+            return;
+          }
+          if (action === 'add-dictation') {
+            try {
+              const id = (book && book.id != null) ? Number(book.id) : state.bookViewActiveBookId;
+              if (id) setDictationTargetBook(id);
+            } catch (e2) {
+            }
+            window.location.href = '/dictation_editor/new';
+            return;
+          }
           if (action === 'edit-book') {
             openBookModal(book);
+            return;
+          }
+          if (action === 'delete-book') {
+            try {
+              if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.confirm === 'function') {
+                window.DesktopConfirmModal.confirm({
+                  title: 'Удалить книгу',
+                  message: `Вы уверены, что хотите удалить книгу "${String(book && book.title ? book.title : 'книгу')}"?`,
+                  confirmText: 'Удалить',
+                  cancelText: 'Отмена',
+                  confirmButtonClass: 'btn-danger',
+                  onConfirm: () => deleteBook(book && book.id != null ? book.id : state.bookViewActiveBookId),
+                });
+                return;
+              }
+            } catch (e3) {
+            }
+
+            if (confirm(`Вы уверены, что хотите удалить книгу "${String(book && book.title ? book.title : 'книгу')}"?`)) {
+              deleteBook(book && book.id != null ? book.id : state.bookViewActiveBookId);
+            }
+            return;
           }
         });
       }
@@ -943,6 +1179,30 @@
       if (form && form.dataset.bound !== '1') {
         form.dataset.bound = '1';
         form.addEventListener('submit', handleSaveBook);
+      }
+
+      const sectionClose = document.getElementById('section-edit-close');
+      if (sectionClose && sectionClose.dataset.bound !== '1') {
+        sectionClose.dataset.bound = '1';
+        sectionClose.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          closeSectionModal();
+        });
+      }
+
+      const sectionModal = document.getElementById('section-edit-modal');
+      if (sectionModal && sectionModal.dataset.bound !== '1') {
+        sectionModal.dataset.bound = '1';
+        sectionModal.addEventListener('click', (e) => {
+          if (e && e.target === sectionModal) closeSectionModal();
+        });
+      }
+
+      const sectionForm = document.getElementById('section-edit-form');
+      if (sectionForm && sectionForm.dataset.bound !== '1') {
+        sectionForm.dataset.bound = '1';
+        sectionForm.addEventListener('submit', handleSaveSection);
       }
     }
 
