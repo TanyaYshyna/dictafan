@@ -10,18 +10,19 @@
 
 .dictation-kart--book-row.short-card {
   display: block;
+  min-height: 0;
 }
 
 .dictation-kart--book-row .dictation-kart-book-row__main {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 12px;
 }
 
 .dictation-kart--book-row .short-thumb {
-  flex: 0 0 86px;
-  width: 86px;
-  height: 86px;
+  flex: 0 0 200px;
+  width: 200px;
+  height: 120px;
   margin: 0;
   border-radius: 12px;
   overflow: hidden;
@@ -37,27 +38,48 @@
 .dictation-kart--book-row .dictation-kart-book-row__content {
   flex: 1 1 auto;
   min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__side-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .dictation-kart--book-row .short-title {
   white-space: normal;
   overflow: hidden;
   display: -webkit-box;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
-}
-
-.dictation-kart--book-row .short-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.dictation-kart--book-row .short-dikt-number {
-  margin-right: auto;
 }
 
 #auto-toast {
