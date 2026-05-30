@@ -208,7 +208,11 @@
 
     function openBookViewModal() {
       const modal = document.getElementById('book-view-modal');
-      if (!modal) return;
+      if (!modal) {
+        try { console.warn('[BookModal] Missing #book-view-modal element in DOM'); } catch (e) {}
+        try { showToast('Не найдено окно книги (book-view-modal)', { durationMs: 3500 }); } catch (e) {}
+        return;
+      }
       modal.style.display = 'flex';
       modal.classList.add('show');
       try {
@@ -768,7 +772,12 @@
 
       const card = document.getElementById('bookViewCard');
       const structure = document.getElementById('bookViewStructure');
-      if (!card || !structure) return;
+      if (!card || !structure) {
+        try { console.warn('[BookModal] Missing #bookViewCard or #bookViewStructure element in DOM'); } catch (e) {}
+        try { showToast('Не найдены элементы окна книги (bookViewCard/bookViewStructure)', { durationMs: 3500 }); } catch (e) {}
+        try { closeBookViewModal(); } catch (e) {}
+        return;
+      }
 
       showLoadingIndicator('Загрузка книги...');
       try {
