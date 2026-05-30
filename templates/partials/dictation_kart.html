@@ -26,7 +26,7 @@
 
         <div class="short-footer">
             <div class="short-dikt-number" data-slot="dictationIdFormatted"></div>
-            <div data-slot="menu"></div>
+            <div class="short-actions-menu-wrapper" data-slot="menu"></div>
         </div>
     </div>
 </template>
@@ -45,22 +45,20 @@
                     <div class="short-meta-left">
                         <span class="short-lang-flags" data-slot="langPair"></span>
                         <span class="short-level" data-slot="level"></span>
+                        <div class="short-dikt-number" data-slot="dictationId"></div>
                     </div>
                     <div class="short-meta-right">
                         <div class="short-sentences-count" title="Количество предложений">
                             <i data-lucide="layers"></i><span data-slot="sentencesCount"></span>
                         </div>
+                        <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="" title="" aria-label="">
+                            <i data-lucide="arrow-big-up-dash"></i>
+                        </button>
+                        <div data-slot="menu"></div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="short-footer">
-            <div class="short-dikt-number" data-slot="dictationId"></div>
-            <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="" title="" aria-label="">
-                <i data-lucide="arrow-big-up-dash"></i>
-            </button>
-            <div data-slot="menu"></div>
-        </div>
     </div>
 </template>
