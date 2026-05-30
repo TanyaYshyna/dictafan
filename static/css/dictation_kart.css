@@ -2,6 +2,59 @@
   display: block;
 }
 
+.dictation-kart--book-row {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dictation-kart--book-row .short-thumb {
+  flex: 0 0 86px;
+  width: 86px;
+  height: 86px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dictation-kart--book-row .short-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dictation-kart--book-row .short-title {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.dictation-kart--book-row .short-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.dictation-kart--book-row .short-dikt-number {
+  margin-right: auto;
+}
+
 #auto-toast {
   position: fixed;
   left: 50%;

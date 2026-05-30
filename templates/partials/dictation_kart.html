@@ -32,29 +32,34 @@
 </template>
 
 <template id="dictationKartBookTemplate">
-    <div class="short-card dictation-kart" data-dictation-id="" data-action="toggle-desk" data-edit-url="">
-        <div class="short-thumb">
-            <img src="" alt="" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
-        </div>
-        <h3 class="short-title" data-slot="title"></h3>
-
-        <div class="short-meta short-meta--row">
-            <div class="short-meta-left">
-                <span class="short-lang-flags" data-slot="langPair"></span>
-                <span class="short-level" data-slot="level"></span>
+    <div class="short-card dictation-kart dictation-kart--book-row" data-dictation-id="" data-action="toggle-desk" data-edit-url="">
+        <div class="dictation-kart-book-row__main">
+            <div class="short-thumb">
+                <img src="" alt="" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
             </div>
-            <div class="short-meta-right">
-                <div class="short-sentences-count" title="Количество предложений">
-                    <i data-lucide="layers"></i><span data-slot="sentencesCount"></span>
+
+            <div class="dictation-kart-book-row__content">
+                <h3 class="short-title" data-slot="title"></h3>
+
+                <div class="short-meta short-meta--row">
+                    <div class="short-meta-left">
+                        <span class="short-lang-flags" data-slot="langPair"></span>
+                        <span class="short-level" data-slot="level"></span>
+                    </div>
+                    <div class="short-meta-right">
+                        <div class="short-sentences-count" title="Количество предложений">
+                            <i data-lucide="layers"></i><span data-slot="sentencesCount"></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="short-footer">
+            <div class="short-dikt-number" data-slot="dictationId"></div>
             <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="" title="" aria-label="">
                 <i data-lucide="arrow-big-up-dash"></i>
             </button>
-            <div class="short-dikt-number" data-slot="dictationId"></div>
             <div data-slot="menu"></div>
         </div>
     </div>

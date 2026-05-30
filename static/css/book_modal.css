@@ -19,3 +19,17 @@
 #book-cover-upload {
   display: none;
 }
+
+#book-view-modal .shorts-grid {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 8px;
+  padding: 8px;
+}
+
+#book-view-modal .short-card {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}

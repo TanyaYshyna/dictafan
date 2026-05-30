@@ -666,7 +666,7 @@
         const wrap = document.createElement('div');
         wrap.className = 'book-structure-list';
         for (const section of sList) {
-          const sectionNumber = section && section.section_number ? `§ ${section.section_number}. ` : '§ ';
+          const sectionNumber = section && section.order_index ? `§ ${section.order_index}. ` : '§ ';
           const div = document.createElement('div');
           div.className = 'structure-item structure-section';
           div.setAttribute('data-section-id', String(section.id));

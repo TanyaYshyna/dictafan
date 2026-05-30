@@ -6606,7 +6606,7 @@ async function loadActiveBook(bookId, isWorkbook = false) {
 
       console.log('📚 Загружены разделы:', sections);
       sections.forEach(s => {
-        console.log(`  - Раздел ${s.id}: "${s.title}", section_number: ${s.section_number}`);
+        console.log(`  - Раздел ${s.id}: "${s.title}", order_index: ${s.order_index}`);
       });
 
       // Сохраняем разделы в глобальной переменной для доступа при редактировании
@@ -6635,7 +6635,7 @@ function renderBookContentTo(container, sections, dictations, isWorkbook = false
   if (!isWorkbook && sections && sections.length > 0) {
     html += '<div class="book-structure-list">';
     sections.forEach(section => {
-      const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
+      const sectionNumber = section.order_index ? `§ ${section.order_index}. ` : '§ ';
 
       html += `
           <div class="structure-item structure-section" data-section-id="${section.id}">
@@ -7136,7 +7136,7 @@ async function openSectionModal(section, parentId) {
     titleEl.textContent = "Редактирование раздела";
     idInput.value = section.id;
     parentIdInput.value = section.parent_id || '';
-    numberInput.value = section.section_number || '';
+    numberInput.value = section.order_index || '';
     titleInput.value = section.title || "";
   } else {
     // Создание нового раздела
@@ -7159,7 +7159,7 @@ async function openSectionModal(section, parentId) {
           // Находим максимальный номер и прибавляем 1
           const maxNumber = Math.max(
             ...sections
-              .map(s => s.section_number)
+              .map(s => s.order_index)
               .filter(n => n !== null && n !== undefined)
               .concat([0]) // Если все номера null, начинаем с 0
           );
@@ -7220,18 +7220,17 @@ async function handleSaveSection(event) {
     const payload = {
       title: titleInput.value.trim(),
       parent_id: parentId,
-      section_number: sectionNumber,
       // Разделы не имеют обложек, авторов и описаний
       author_text: null,
       short_description: null,
       original_language: null,
       visibility: 'private',
       theme: null,
-      order_index: 0
+      order_index: sectionNumber
     };
 
     console.log('💾 Сохраняю раздел с payload:', payload);
-    console.log('💾 section_number в payload:', payload.section_number, 'тип:', typeof payload.section_number);
+    console.log('💾 order_index в payload:', payload.order_index, 'тип:', typeof payload.order_index);
 
     let data;
     if (sectionId) {
@@ -7257,7 +7256,7 @@ async function handleSaveSection(event) {
     console.log('✅ Раздел сохранен, ответ сервера:', data);
     if (data.book) {
       console.log('📚 Сохраненный раздел:', data.book);
-      console.log('📚 section_number:', data.book.section_number);
+      console.log('📚 order_index:', data.book.order_index);
     }
 
     closeSectionModal();

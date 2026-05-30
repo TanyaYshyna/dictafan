@@ -324,7 +324,6 @@ def api_create_book():
         theme = (request.form.get("theme") or "").strip() or None
         parent_id = request.form.get("parent_id")
         order_index = request.form.get("order_index", 0)
-        section_number = request.form.get("section_number")
         author_materials_url = request.form.get("author_materials_url")
         cover_file = request.files.get("cover")
     else:
@@ -338,11 +337,10 @@ def api_create_book():
         theme = (payload.get("theme") or "").strip() or None
         parent_id = payload.get("parent_id")
         order_index = payload.get("order_index", 0)
-        section_number = payload.get("section_number")
         author_materials_url = payload.get("author_materials_url")
         cover_file = None
 
-    # Преобразуем parent_id, order_index и section_number в правильные типы
+    # Преобразуем parent_id и order_index в правильные типы
     if parent_id:
         try:
             parent_id = int(parent_id)
@@ -353,13 +351,6 @@ def api_create_book():
         order_index = int(order_index)
     except (ValueError, TypeError):
         order_index = 0
-    
-    section_number_int = None
-    if section_number:
-        try:
-            section_number_int = int(section_number)
-        except (ValueError, TypeError):
-            section_number_int = None
     
     author_materials_url_str = None
     if author_materials_url:
@@ -379,7 +370,6 @@ def api_create_book():
             theme=theme,
             parent_id=parent_id,
             order_index=order_index,
-            section_number=section_number_int,
             author_materials_url=author_materials_url_str,
         )
 
@@ -421,7 +411,6 @@ def api_update_book(book_id: int):
             "author_text": request.form.get("author_text"),
             "theme": request.form.get("theme"),
             "order_index": request.form.get("order_index"),
-            "section_number": request.form.get("section_number"),
             "author_materials_url": request.form.get("author_materials_url"),
         }
         # Убираем пустые значения, но сохраняем author_materials_url даже если пусто (для очистки)
@@ -434,7 +423,6 @@ def api_update_book(book_id: int):
             "short_description": request.form.get("short_description"),
             "theme": request.form.get("theme"),
             "order_index": request.form.get("order_index"),
-            "section_number": request.form.get("section_number"),
         }.items():
             if v:
                 update_data[k] = v.strip() if isinstance(v, str) else v
@@ -448,18 +436,12 @@ def api_update_book(book_id: int):
                 update_data["order_index"] = int(update_data["order_index"])
             except (ValueError, TypeError):
                 update_data.pop("order_index", None)
-        # section_number преобразуем в int
-        if "section_number" in update_data and update_data["section_number"] is not None:
-            try:
-                update_data["section_number"] = int(update_data["section_number"])
-            except (ValueError, TypeError):
-                update_data.pop("section_number", None)
         cover_file = request.files.get("cover")
     else:
         # JSON - получаем данные из JSON
         payload = request.get_json(silent=True) or {}
         update_data = {}
-        # Обрабатываем каждое поле отдельно, чтобы не потерять section_number
+        # Обрабатываем каждое поле отдельно
         if "title" in payload:
             update_data["title"] = payload.get("title")
         if "original_language" in payload:
@@ -477,17 +459,6 @@ def api_update_book(book_id: int):
                 update_data["order_index"] = int(payload.get("order_index")) if payload.get("order_index") is not None else None
             except (ValueError, TypeError):
                 pass
-        if "section_number" in payload:
-            # section_number может быть числом, строкой или None
-            section_number_val = payload.get("section_number")
-            if section_number_val is not None and section_number_val != "":
-                try:
-                    update_data["section_number"] = int(section_number_val)
-                except (ValueError, TypeError):
-                    # Если не удалось преобразовать в int, не добавляем в update_data
-                    pass
-            # Если передано None или пустая строка, не добавляем в update_data
-            # (чтобы не обновлять поле, если оно не указано явно)
         if "author_materials_url" in payload:
             update_data["author_materials_url"] = payload.get("author_materials_url")
         
