@@ -536,9 +536,7 @@
         ? `<span class="badge badge--${escapeHtml(visibility)}">${escapeHtml(visibility)}</span>`
         : '';
 
-      const closeButton = (opts && typeof opts.onClose === 'function')
-        ? `<button class="btn-close-active-book" type="button" title="Закрыть"><i data-lucide="x"></i></button>`
-        : '';
+      const closeButton = '';
 
       const coverContent = coverUrl
         ? `<img src="${escapeHtml(coverUrl)}" alt="" class="book-card-max-cover-img" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">`
