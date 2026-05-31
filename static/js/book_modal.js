@@ -174,8 +174,18 @@
           el.textContent = text;
         };
 
-        setTextIfEmpty('.book-edit-save-header', 'Сохранить');
-        setTextIfEmpty('.book-edit-save-footer', 'Сохранить');
+        try {
+          const btn = document.querySelector('.book-edit-save-header');
+          if (btn) {
+            const label = (window.I18n && typeof window.I18n.t === 'function')
+              ? window.I18n.t('common.save')
+              : 'Сохранить';
+            btn.title = String(label || 'Сохранить');
+            btn.setAttribute('aria-label', String(label || 'Сохранить'));
+          }
+        } catch (e) {
+        }
+
         setTextIfEmptyById('book-cover-upload-btn', 'Загрузить обложку');
 
         setTextIfEmpty('label[for="book-title-input"]', 'Название');

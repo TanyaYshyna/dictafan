@@ -22,7 +22,9 @@
         <div class="modal-header">
             <h3 id="book-edit-title"><span id="book-edit-unsaved-star">*</span></h3>
             <div class="book-edit-header-actions">
-                <button type="submit" form="book-edit-form" class="btn-primary book-edit-save-header"></button>
+                <button type="submit" form="book-edit-form" class="modal-close book-edit-save-header" aria-label="" title="">
+                    <i data-lucide="save"></i>
+                </button>
                 <button class="modal-close" id="book-edit-close" title="">
                     <i data-lucide="x"></i>
                 </button>
@@ -78,9 +80,6 @@
                         <textarea id="book-description-input" rows="3"></textarea>
                     </div>
                 </form>
-            </div>
-            <div class="book-edit-footer-actions">
-                <button type="submit" form="book-edit-form" class="btn-primary book-edit-save-footer"></button>
             </div>
         </div>
     </div>

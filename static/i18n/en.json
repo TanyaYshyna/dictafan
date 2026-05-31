@@ -721,6 +721,7 @@
     "confirm": {
       "title": "Save changes?",
       "save": "Save",
+      "exit": "Exit",
       "close": "Close"
     }
   },
