@@ -89,6 +89,9 @@
     <div class="modal-content section-edit-modal-content">
         <div class="modal-header section-edit-modal-header">
             <h3 id="section-edit-title"></h3>
+            <button class="section-edit-modal-save" id="section-edit-save" type="button" aria-label="" title="">
+                <i data-lucide="save"></i>
+            </button>
             <button class="modal-close section-edit-modal-close" id="section-edit-close" type="button" aria-label="" title="">
                 <i data-lucide="x"></i>
             </button>
@@ -105,8 +108,35 @@
                     <label for="section-title-input"></label>
                     <input type="text" id="section-title-input" required placeholder="">
                 </div>
-                <div class="form-actions section-edit-form-actions">
-                    <button type="submit" class="btn-primary section-edit-submit"></button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="move-dictation-modal" class="modal" style="display: none;">
+    <div class="modal-content move-dictation-modal-content">
+        <div class="modal-header">
+            <h3></h3>
+            <button class="modal-close" id="move-dictation-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body move-dictation-modal-body">
+            <form id="move-dictation-form">
+                <input type="hidden" id="move-dictation-id" value="">
+                <input type="hidden" id="move-target-section" value="">
+                <div class="form-row move-dictation-book-row">
+                    <label for="move-target-book"></label>
+                    <select id="move-target-book" class="form-control move-dictation-book-select" required>
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div id="move-dictation-sections-container" class="move-dictation-sections-container" style="display: none;">
+                    <label></label>
+                    <div id="move-dictation-sections-list" class="move-dictation-sections-list"></div>
+                </div>
+                <div class="form-actions move-dictation-actions">
+                    <button type="submit" class="btn-secondary move-dictation-submit"></button>
                 </div>
             </form>
         </div>

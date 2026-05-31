@@ -208,7 +208,39 @@
 
         setTextIfEmpty('label[for="section-number-input"]', 'Номер');
         setTextIfEmpty('label[for="section-title-input"]', 'Название');
-        setTextIfEmpty('.section-edit-submit', 'Сохранить');
+        try {
+          const btn = document.getElementById('section-edit-save');
+          if (btn) {
+            const label = (window.I18n && typeof window.I18n.t === 'function')
+              ? window.I18n.t('common.save')
+              : 'Сохранить';
+            btn.title = String(label || 'Сохранить');
+            btn.setAttribute('aria-label', String(label || 'Сохранить'));
+          }
+        } catch (e) {
+        }
+
+        try {
+          const h = document.querySelector('#move-dictation-modal .modal-header h3');
+          if (h && !(h.textContent || '').trim()) h.textContent = 'Переместить диктант';
+        } catch (e) {
+        }
+        try {
+          const close = document.getElementById('move-dictation-close');
+          if (close) {
+            if (!close.getAttribute('aria-label')) close.setAttribute('aria-label', 'Закрыть');
+            if (!close.getAttribute('title')) close.setAttribute('title', 'Закрыть');
+          }
+        } catch (e) {
+        }
+        setTextIfEmpty('#move-dictation-form label[for="move-target-book"]', 'Книга');
+        setTextIfEmpty('#move-dictation-sections-container > label', 'Раздел');
+        try {
+          const opt = document.querySelector('#move-target-book option[value=""]');
+          if (opt && !(opt.textContent || '').trim()) opt.textContent = 'Выберите книгу';
+        } catch (e) {
+        }
+        setTextIfEmpty('.move-dictation-submit', 'Выбрать');
 
         setTextIfEmptyById('crop-cancel', 'Отмена');
         setTextIfEmptyById('crop-confirm', 'Обрезать');
@@ -258,6 +290,249 @@
       if (!modal) return;
       modal.style.display = 'none';
       modal.classList.remove('show');
+    }
+
+    // ==================== Перемещение диктанта ====================
+
+    function closeMoveDictationModal() {
+      const modal = document.getElementById('move-dictation-modal');
+      if (modal) {
+        modal.classList.remove('show');
+        modal.style.display = 'none';
+
+        const form = document.getElementById('move-dictation-form');
+        if (form) {
+          try { form.reset(); } catch (e) { }
+        }
+
+        const sectionsContainer = document.getElementById('move-dictation-sections-container');
+        const sectionsList = document.getElementById('move-dictation-sections-list');
+        if (sectionsContainer) sectionsContainer.style.display = 'none';
+        if (sectionsList) sectionsList.innerHTML = '';
+
+        try {
+          document.querySelectorAll('.move-dictation-section-item').forEach((el) => el.classList.remove('selected'));
+        } catch (e) {
+        }
+      }
+    }
+
+    function toggleMoveSectionChildren(sectionId, itemElement) {
+      const toggle = itemElement.querySelector('.move-dictation-section-toggle');
+      const childrenContainer = itemElement.nextElementSibling;
+
+      if (!childrenContainer || !childrenContainer.classList.contains('move-dictation-section-children')) {
+        return;
+      }
+
+      const isExpanded = childrenContainer.classList.contains('expanded');
+      if (isExpanded) {
+        childrenContainer.classList.remove('expanded');
+        if (toggle) toggle.classList.remove('expanded');
+      } else {
+        childrenContainer.classList.add('expanded');
+        if (toggle) toggle.classList.add('expanded');
+      }
+
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (e) {
+      }
+    }
+
+    function renderMoveSectionsTree(sections, container, bookId, parentId = null, level = 0) {
+      const sList = Array.isArray(sections) ? sections : [];
+      const filtered = sList.filter((s) => {
+        if (level === 0 && parentId === bookId) {
+          const sectionParentId = parseInt(s && s.parent_id, 10);
+          const bookIdNum = parseInt(bookId, 10);
+          return sectionParentId === bookIdNum;
+        }
+        if (parentId === null) return !s.parent_id || s.parent_id === null;
+        const sectionParentId = parseInt(s && s.parent_id, 10);
+        const parentIdNum = parseInt(parentId, 10);
+        return sectionParentId === parentIdNum;
+      });
+
+      filtered.sort((a, b) => (a && a.order_index ? a.order_index : 0) - (b && b.order_index ? b.order_index : 0));
+
+      filtered.forEach((section) => {
+        const hasChildren = sList.some((s) => s && s.parent_id === section.id);
+
+        const item = document.createElement('div');
+        item.className = 'move-dictation-section-item';
+        item.setAttribute('data-level', String(level));
+        item.setAttribute('data-section-id', String(section.id));
+        item.setAttribute('data-book-id', String(bookId));
+
+        item.innerHTML = `
+          ${hasChildren ? `
+            <div class="move-dictation-section-toggle" data-section-id="${escapeHtml(String(section.id))}">
+              <i data-lucide="chevron-right"></i>
+            </div>
+          ` : '<div style="width: 20px;"></div>'}
+          <span class="move-dictation-section-title">${escapeHtml(String(section.title || 'Без названия'))}</span>
+        `;
+
+        item.addEventListener('click', (e) => {
+          if (e.target && e.target.closest && e.target.closest('.move-dictation-section-toggle')) {
+            e.stopPropagation();
+            toggleMoveSectionChildren(section.id, item);
+            return;
+          }
+
+          try {
+            document.querySelectorAll('.move-dictation-section-item').forEach((el) => el.classList.remove('selected'));
+          } catch (e2) {
+          }
+          item.classList.add('selected');
+
+          const sectionInput = document.getElementById('move-target-section');
+          if (sectionInput) sectionInput.value = String(section.id);
+        });
+
+        container.appendChild(item);
+
+        if (hasChildren) {
+          const childrenContainer = document.createElement('div');
+          childrenContainer.className = 'move-dictation-section-children';
+          childrenContainer.setAttribute('data-parent-id', String(section.id));
+          container.appendChild(childrenContainer);
+          renderMoveSectionsTree(sList, childrenContainer, bookId, section.id, level + 1);
+        }
+      });
+
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function' && filtered.length > 0) {
+          setTimeout(() => window.lucide.createIcons(), 0);
+        }
+      } catch (e) {
+      }
+    }
+
+    async function openMoveDictationModal(dictationId) {
+      const modal = document.getElementById('move-dictation-modal');
+      const dictIdInput = document.getElementById('move-dictation-id');
+      const bookSelect = document.getElementById('move-target-book');
+      const sectionsContainer = document.getElementById('move-dictation-sections-container');
+      const sectionsList = document.getElementById('move-dictation-sections-list');
+      const sectionInput = document.getElementById('move-target-section');
+
+      if (!modal || !dictIdInput || !bookSelect) return;
+
+      dictIdInput.value = String(dictationId || '');
+      if (sectionInput) sectionInput.value = '';
+
+      if (sectionsContainer) sectionsContainer.style.display = 'none';
+      if (sectionsList) sectionsList.innerHTML = '';
+
+      showLoadingIndicator('Загрузка книг...');
+      try {
+        const booksData = await apiRequest('/library/api/user-books');
+        const own = (booksData && booksData.success) ? (booksData.own_books || []) : [];
+        const books = Array.isArray(own) ? own.filter((b) => b && !b.is_workbook) : [];
+
+        bookSelect.innerHTML = '<option value=""></option>';
+        for (const b of books) {
+          if (!b || !b.id) continue;
+          const option = document.createElement('option');
+          option.value = String(b.id);
+          option.textContent = String(b.title || 'Без названия');
+          bookSelect.appendChild(option);
+        }
+
+        bookSelect.onchange = async function () {
+          const selectedBookId = String(this.value || '').trim();
+          const selectedBookIdInt = parseInt(selectedBookId, 10);
+          if (sectionInput) sectionInput.value = '';
+
+          if (!selectedBookId || !selectedBookIdInt || !isFinite(selectedBookIdInt)) {
+            if (sectionsContainer) sectionsContainer.style.display = 'none';
+            if (sectionsList) sectionsList.innerHTML = '';
+            return;
+          }
+
+          if (sectionsContainer) sectionsContainer.style.display = 'none';
+          if (sectionsList) sectionsList.innerHTML = '';
+
+          showLoadingIndicator('Загрузка разделов...');
+          try {
+            const data = await apiRequest(`/library/api/book/${encodeURIComponent(String(selectedBookIdInt))}/sections`);
+            const sections = (data && data.success) ? (data.sections || []) : [];
+            if (Array.isArray(sections) && sections.length > 0) {
+              if (sectionsContainer) sectionsContainer.style.display = 'block';
+              if (sectionsList) {
+                sectionsList.innerHTML = '';
+                renderMoveSectionsTree(sections, sectionsList, selectedBookIdInt, selectedBookIdInt, 0);
+              }
+            } else {
+              if (sectionsContainer) sectionsContainer.style.display = 'none';
+              if (sectionsList) sectionsList.innerHTML = '';
+            }
+          } finally {
+            hideLoadingIndicator();
+          }
+        };
+
+        modal.classList.add('show');
+        modal.style.display = 'flex';
+
+        try {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons(modal ? { root: modal } : undefined);
+          }
+        } catch (e) {
+        }
+      } finally {
+        hideLoadingIndicator();
+      }
+    }
+
+    async function handleMoveDictation(event) {
+      try {
+        if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      } catch (e) {
+      }
+
+      const dictationId = document.getElementById('move-dictation-id')?.value;
+      const bookId = document.getElementById('move-target-book')?.value;
+      const sectionId = document.getElementById('move-target-section')?.value || null;
+
+      if (!dictationId || !bookId) {
+        showToast('Выберите книгу', { durationMs: 2500 });
+        return;
+      }
+
+      const targetId = sectionId || bookId;
+
+      showLoadingIndicator('Перемещение...');
+      try {
+        const data = await apiRequest(`/library/api/dictation/${encodeURIComponent(String(dictationId))}/move-to-book`, {
+          method: 'POST',
+          body: JSON.stringify({ book_id: parseInt(String(targetId), 10) }),
+        });
+
+        if (data && data.success) {
+          showToast('Диктант перемещён');
+          closeMoveDictationModal();
+
+          const targetBookIdNum = parseInt(String(bookId), 10);
+          if (state.bookViewActiveBookId && targetBookIdNum && state.bookViewActiveBookId === targetBookIdNum) {
+            await openBookViewBook(state.bookViewActiveBookId, !!state.activeBookIsWorkbook);
+          } else if (state.bookViewActiveBookId) {
+            await openBookViewBook(state.bookViewActiveBookId, !!state.activeBookIsWorkbook);
+          }
+          return;
+        }
+
+        showToast('Не удалось переместить диктант', { durationMs: 3500 });
+      } catch (e) {
+        showToast('Ошибка перемещения диктанта', { durationMs: 3500 });
+      } finally {
+        hideLoadingIndicator();
+      }
     }
 
     async function handleSaveSection(event) {
@@ -1266,6 +1541,32 @@
         sectionForm.dataset.bound = '1';
         sectionForm.addEventListener('submit', handleSaveSection);
       }
+
+      const sectionSaveBtn = document.getElementById('section-edit-save');
+      if (sectionSaveBtn && sectionSaveBtn.dataset.bound !== '1') {
+        sectionSaveBtn.dataset.bound = '1';
+        sectionSaveBtn.addEventListener('click', handleSaveSection);
+      }
+
+      const moveCloseBtn = document.getElementById('move-dictation-close');
+      if (moveCloseBtn && moveCloseBtn.dataset.bound !== '1') {
+        moveCloseBtn.dataset.bound = '1';
+        moveCloseBtn.addEventListener('click', closeMoveDictationModal);
+      }
+
+      const moveForm = document.getElementById('move-dictation-form');
+      if (moveForm && moveForm.dataset.bound !== '1') {
+        moveForm.dataset.bound = '1';
+        moveForm.addEventListener('submit', handleMoveDictation);
+      }
+
+      const moveModal = document.getElementById('move-dictation-modal');
+      if (moveModal && moveModal.dataset.bound !== '1') {
+        moveModal.dataset.bound = '1';
+        moveModal.addEventListener('click', (e) => {
+          if (e && e.target === moveModal) closeMoveDictationModal();
+        });
+      }
     }
 
     try {
@@ -1281,6 +1582,7 @@
       openBook: (bookId, isWorkbook) => openBookViewBook(bookId, !!isWorkbook),
       showDictationInBook: (dictationId) => showDeskDictationInBook(dictationId),
       openEdit: (book) => openBookModal(book),
+      openMoveDictation: (dictationId) => openMoveDictationModal(dictationId),
       closeView: () => closeBookViewModal(),
       closeEdit: () => closeBookModal(),
     };
