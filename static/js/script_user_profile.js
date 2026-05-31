@@ -2132,8 +2132,9 @@ function initializeLanguageSelector() {
                 const b = learningSelector && typeof learningSelector.getValues === 'function' ? learningSelector.getValues() : null;
                 const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
                 const learningLanguages = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : ((b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages);
-                const currentLearning = (b && b.currentLearning) ? b.currentLearning : originalData.current_learning;
-                const safeCurrent = learningLanguages.includes(currentLearning) ? currentLearning : (learningLanguages[0] || currentLearning);
+                const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
+                const baseCurrent = fromSelector ? fromSelector : String(originalData.current_learning || '');
+                const safeCurrent = learningLanguages.includes(baseCurrent) ? baseCurrent : (learningLanguages[0] || baseCurrent);
                 return {
                     nativeLanguage: (a && a.nativeLanguage) ? a.nativeLanguage : originalData.native_language,
                     learningLanguages: learningLanguages,

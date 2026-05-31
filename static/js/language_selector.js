@@ -53,7 +53,27 @@ class LanguageSelector {
         this._modelsCentricModalTextEl = null;
         this._modelsCentricModalBarEl = null;
 
+        this._learningFlagsClickBound = false;
+
         this.init();
+    }
+
+    _renderLucideCheckboxButton(btn, checked, disabled) {
+        try {
+            if (!btn) return;
+            btn.dataset.checked = checked ? '1' : '0';
+            btn.dataset.disabled = disabled ? '1' : '0';
+            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+            btn.disabled = Boolean(disabled);
+            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+            try {
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons({ root: btn });
+                }
+            } catch (e) {
+            }
+        } catch (e) {
+        }
     }
 
     async init() {
@@ -300,11 +320,11 @@ class LanguageSelector {
                 const isChecked = selected.has(c);
                 const isCurrent = current && c === current;
                 return `
-                    <label class="learning-flag-row" data-lang="${c}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: 10px; cursor:pointer; ${isCurrent ? 'background: var(--color-hover, #f8f9fa);' : ''}">
-                        <input type="checkbox" class="learning-flag-checkbox" data-lang="${c}" ${isChecked ? 'checked' : ''}>
+                    <div class="learning-flag-row" data-lang="${c}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: 10px; ${isCurrent ? 'background: var(--color-hover, #f8f9fa);' : ''}">
+                        <button type="button" class="topbar-icon-btn checkbox-btn learning-flag-checkbox" data-lang="${c}" aria-label="${this.getLanguageName(c)}" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
                         ${this.createFlagElement(c, 'small')}
-                        <span style="flex: 1; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${this.getLanguageName(c)}</span>
-                    </label>
+                        <button type="button" class="learning-flag-toggle" data-lang="${c}" style="all: unset; cursor: pointer; flex: 1; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${this.getLanguageName(c)}</button>
+                    </div>
                 `;
             }).join('')}
         </div>
@@ -487,35 +507,6 @@ class LanguageSelector {
             }
         });
 
-        // 3. Чекбоксы языков (users.tr_* / multi-select)
-        this.options.container.addEventListener('change', (e) => {
-            try {
-                const cb = e.target && e.target.classList && e.target.classList.contains('learning-flag-checkbox') ? e.target : null;
-                if (!cb) return;
-                const lang = String(cb.dataset.lang || '').trim().toLowerCase();
-                if (!lang) return;
-
-                const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
-                const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
-                if (cb.checked) set.add(lang);
-                else set.delete(lang);
-
-                const next = [...set];
-                next.sort();
-                this.options.learningLanguages = next;
-
-                const cur = String(this.options.currentLearning || '').trim().toLowerCase();
-                if (cur && !set.has(cur)) {
-                    this.options.currentLearning = next[0] || '';
-                } else if (!cur && next.length) {
-                    this.options.currentLearning = next[0];
-                }
-
-                this.render();
-                this.triggerChange();
-            } catch (err) {
-            }
-        });
     }
 
     calculateStorageUsageV2() {
@@ -1720,36 +1711,85 @@ class LanguageSelector {
             return;
         }
 
-        // Чекбоксы языков (users.tr_* / multi-select)
+        // learning-flags (users.tr_*): локальные клики без полной перерисовки
         try {
-            this.options.container.addEventListener('change', (e) => {
-                try {
-                    const cb = e.target && e.target.classList && e.target.classList.contains('learning-flag-checkbox') ? e.target : null;
-                    if (!cb) return;
-                    const lang = String(cb.dataset.lang || '').trim().toLowerCase();
-                    if (!lang) return;
+            if (this.options.mode === 'learning-flags') {
+                const btns = this.options.container.querySelectorAll('.learning-flag-checkbox');
+                btns.forEach((btn) => {
+                    const lang = String(btn.dataset.lang || '').trim().toLowerCase();
+                    const isChecked = Array.isArray(this.options.learningLanguages)
+                        ? this.options.learningLanguages.map(x => String(x || '').trim().toLowerCase()).includes(lang)
+                        : false;
+                    this._renderLucideCheckboxButton(btn, isChecked, false);
+                });
+            }
+        } catch (e) {
+        }
 
-                    const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
-                    const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
-                    if (cb.checked) set.add(lang);
-                    else set.delete(lang);
+        try {
+            if (this.options.mode === 'learning-flags' && this._learningFlagsClickBound) {
+                return;
+            }
 
-                    const next = [...set];
-                    next.sort();
-                    this.options.learningLanguages = next;
+            this.options.container.addEventListener('click', (e) => {
+                const btn = e.target && e.target.closest ? e.target.closest('.learning-flag-checkbox') : null;
+                const toggle = e.target && e.target.closest ? e.target.closest('.learning-flag-toggle') : null;
+                const target = btn || toggle;
+                if (!target) return;
 
-                    const cur = String(this.options.currentLearning || '').trim().toLowerCase();
-                    if (cur && !set.has(cur)) {
-                        this.options.currentLearning = next[0] || '';
-                    } else if (!cur && next.length) {
-                        this.options.currentLearning = next[0];
+                if (this.options.mode !== 'learning-flags') return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const lang = String(target.dataset.lang || '').trim().toLowerCase();
+                if (!lang) return;
+
+                const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
+                const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+
+                const hasLang = set.has(lang);
+                if (hasLang && set.size <= 1) {
+                    try {
+                        const msg = this._t('profile.learning_languages.at_least_one', null, 'Нужно выбрать хотя бы один язык');
+                        if (window.showInfo) window.showInfo(msg);
+                        else alert(msg);
+                    } catch (e2) {
                     }
-
-                    this.render();
-                    this.triggerChange();
-                } catch (err) {
+                    return;
                 }
+
+                if (hasLang) set.delete(lang);
+                else set.add(lang);
+
+                const next = [...set];
+                next.sort();
+                this.options.learningLanguages = next;
+
+                const cur = String(this.options.currentLearning || '').trim().toLowerCase();
+                if (cur && !set.has(cur)) {
+                    this.options.currentLearning = next[0] || '';
+                } else if (!cur && next.length) {
+                    this.options.currentLearning = next[0];
+                }
+
+                // обновляем только иконку кликаемой строки
+                try {
+                    const row = target.closest('.learning-flag-row');
+                    const rowBtn = row ? row.querySelector('.learning-flag-checkbox') : null;
+                    if (rowBtn) {
+                        const nowChecked = set.has(lang);
+                        this._renderLucideCheckboxButton(rowBtn, nowChecked, false);
+                    }
+                } catch (e3) {
+                }
+
+                this.triggerChange();
             });
+
+            if (this.options.mode === 'learning-flags') {
+                this._learningFlagsClickBound = true;
+            }
         } catch (e) {
         }
 

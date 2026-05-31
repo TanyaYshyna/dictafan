@@ -28,6 +28,10 @@
     "native_language": {
       "label": "Native language:"
     },
+    "learning_languages": {
+      "label": "Learning languages:",
+      "at_least_one": "Select at least one language"
+    },
     "learning_language": {
       "label": "Learning language:"
     },
