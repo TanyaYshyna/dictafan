@@ -572,6 +572,30 @@ window.DictationKart = window.DictationKart || {
         }
 
         try {
+          if (action === 'move-dictation') {
+            const dictationId = btn.getAttribute('data-dictation-id');
+            if (!dictationId) return;
+
+            if (window.BookModal && typeof window.BookModal.openMoveDictation === 'function') {
+              await window.BookModal.openMoveDictation(dictationId);
+              return;
+            }
+
+            if (typeof window.openMoveDictationModal === 'function') {
+              window.openMoveDictationModal(dictationId);
+              return;
+            }
+
+            try {
+              console.warn('[dictation_kart] move-dictation: no modal opener found');
+            } catch (e0) {
+            }
+            return;
+          }
+        } catch (e2) {
+        }
+
+        try {
           if (action === 'prefetch-dictation-cache') {
             const dictationId = btn.getAttribute('data-dictation-id');
             const langOriginal = btn.getAttribute('data-lang-original');

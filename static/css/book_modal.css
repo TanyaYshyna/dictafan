@@ -1,6 +1,5 @@
 #book-view-modal {
   display: none;
-  z-index: 100220;
 }
 
 #book-view-modal {
@@ -12,8 +11,7 @@
   justify-content: flex-end;
   align-items: stretch;
   background-color: rgba(0, 0, 0, 0.5);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 #book-view-modal[style*="flex"],
@@ -29,7 +27,7 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: hidden;
   background: var(--color-panel-bg, #fff);
   border-radius: 0;
   box-shadow: -10px 0 40px rgba(0, 0, 0, 0.25);
@@ -78,7 +76,8 @@
 
 #book-view-modal .book-view-modal-body {
   flex: 1;
-  overflow: visible;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -93,7 +92,6 @@
 
 #book-edit-modal {
   display: none;
-  z-index: 100240;
 }
 
 #book-edit-modal {
@@ -381,8 +379,9 @@
 
 .active-book-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
   padding: 16px;
 }
 
@@ -488,7 +487,7 @@
 
  #move-dictation-modal .move-dictation-modal-content {
   position: relative;
-  z-index: 10031;
+  z-index: 100249;
   margin: auto;
   max-width: 800px;
   width: 90%;
@@ -717,20 +716,12 @@
   border-color: var(--color-button-text-yellow, #f9c609);
  }
 
-#book-view-modal .dropdown-menu,
 #book-view-modal .dropdown-menu-wrapper {
-  z-index: 10;
+  z-index: 1;
 }
 
-#book-view-modal .shorts-grid,
-#book-view-modal .short-card,
-#book-view-modal .dictation-kart--book-row.short-card {
-  overflow: visible;
-}
-
-#book-view-modal .short-card .dropdown-menu,
-#book-view-modal .dictation-kart--book-row .dropdown-menu {
-  z-index: 20;
+#book-view-modal .dropdown-menu {
+  z-index: 6000;
 }
 
 .book-card-max-creator {
@@ -814,7 +805,6 @@
   height: 100%;
   justify-content: center;
   align-items: center;
-  z-index: 100246;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
 }
@@ -949,7 +939,6 @@
   height: 100%;
   justify-content: center;
   align-items: center;
-  z-index: 100280;
   background-color: rgba(0, 0, 0, 0.7);
   overflow-y: auto;
 }

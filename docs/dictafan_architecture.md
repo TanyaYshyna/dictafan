@@ -6,6 +6,16 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Этот проект нужно развивать так, чтобы код оставался обслуживаемым и предсказуемым. Любые решения, которые делают систему «быстрее прямо сейчас», но «дороже в сопровождении потом», считаются ошибкой.
 
+## Объекты на удаление (план)
+
+- `templates/private_library.html`
+- `static/js/private_library.js`
+- `static/css/style_private_library.css`
+- `assignments`
+- `assignments_by_date`
+- `history_activity`
+- `history_successes`
+
 ## Принципы разделения ответственности
 
 - **HTML = структура**
@@ -172,6 +182,11 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Слои (z-index) — по возрастанию:
 
+Принцип:
+
+- Слои (иерархия `z-index`) должны быть собраны рядом и централизованы в `static/css/desktop.css`, чтобы в одном месте было видно «кто над кем» на странице `/desktop`.
+- Визуальные стили конкретных модалок (размеры, отступы, цвета, overflow/scroll и т.п.) должны оставаться в их профильных файлах (например `static/css/book_modal.css`).
+
 - `10000` — `#login-modal` (логин/регистрация)
 - `10150` — `#activity-tracker-modal` (Трекер активности / отчёты)
 - `100200` — `#create-assignment-modal` (Задания → упражнения, группа `tasks_modal.*`)
@@ -180,6 +195,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `100220` — `#book-view-modal` (просмотр книги справа, группа `book_modal.*`)
 - `100240` — `#book-edit-modal` (редактирование книги, группа `book_modal.*`)
 - `100246` — `#section-edit-modal` (создание/редактирование раздела, группа `book_modal.*`)
+- `100248` — `#move-dictation-modal` (перемещение диктанта, группа `book_modal.*`)
 - `100250` — `#desktopConfirmModal` (общее «закрыть/сохранить» для desktop-модалок на `/desktop`)
 - `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
 - `200500` — `#auto-toast` (всплывающие уведомления)

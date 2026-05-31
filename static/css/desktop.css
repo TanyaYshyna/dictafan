@@ -33,6 +33,18 @@
   z-index: 100200;
 }
 
+#book-view-modal {
+  z-index: 100220;
+}
+
+#book-edit-modal {
+  z-index: 100240;
+}
+
+#section-edit-modal {
+  z-index: 100246;
+}
+
 .desktop-right-menu .tool-palette-btn {
   width: 44px;
   height: 44px;
@@ -217,4 +229,16 @@
 
 .dropdown-menu-item-danger i {
   color: var(--color-error, #dc2626);
+}
+
+#move-dictation-modal {
+  z-index: 100248;
+}
+
+#move-dictation-modal .move-dictation-modal-content {
+  z-index: 100249;
+}
+
+#crop-modal {
+  z-index: 100280;
 }
