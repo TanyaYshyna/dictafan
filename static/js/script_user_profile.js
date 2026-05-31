@@ -6,6 +6,8 @@ let isSavingProfile = false;
 let pendingAvatarBlob = null;
 let passwordTouched = false;
 
+let learningListSelector = null;
+
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
 let profileTestChunks = [];
@@ -25,6 +27,36 @@ async function refreshMyInvites() {
         groupsUiState.myInvites = [];
         renderMyInvitesTable();
     }
+
+}
+
+function extractLearningFlagsFromUser(userData) {
+    const flags = {};
+    try {
+        if (!userData || typeof userData !== 'object') return flags;
+        Object.keys(userData).forEach((k) => {
+            if (!k || typeof k !== 'string') return;
+            if (!k.startsWith('tr_')) return;
+            const code = k.slice(3);
+            if (!code) return;
+            flags[code] = !!userData[k];
+        });
+    } catch (e) {
+    }
+    return flags;
+}
+
+function buildLearningFlagsFromLanguages(langs) {
+    const out = {};
+    try {
+        const list = Array.isArray(langs) ? langs.map(x => String(x || '').trim().toLowerCase()).filter(Boolean) : [];
+        list.forEach((code) => {
+            out[`tr_${code}`] = true;
+        });
+    } catch (e) {
+    }
+    return out;
+
 }
 
 function renderMyInvitesTable() {
@@ -155,6 +187,19 @@ function initializeUiLangSelector() {
     let uiLangSelector = null;
     try {
         const languageData = window.LanguageManager.getLanguageData();
+
+        const refreshLearningDropdownAvailable = () => {
+            try {
+                const values = languageSelector && typeof languageSelector.getValues === 'function' ? languageSelector.getValues() : null;
+                const learningLanguages = (values && Array.isArray(values.learningLanguages)) ? values.learningLanguages : originalData.learning_languages;
+                if (learningSelector && learningSelector.options) {
+                    learningSelector.options.learningAvailableLanguages = learningLanguages;
+                    learningSelector.render();
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            } catch (e) {
+            }
+        };
         uiLangSelector = new LanguageSelector({
             container,
             mode: 'native-selector',
@@ -1975,6 +2020,20 @@ function loadUserData() {
         })(),
     };
 
+    try {
+        originalData.learning_flags = extractLearningFlagsFromUser(userData);
+        const langsFromFlags = Object.entries(originalData.learning_flags)
+            .filter(([, v]) => !!v)
+            .map(([code]) => code);
+        if (langsFromFlags.length) {
+            originalData.learning_languages = langsFromFlags;
+            if (!originalData.learning_languages.includes(originalData.current_learning)) {
+                originalData.current_learning = originalData.learning_languages[0];
+            }
+        }
+    } catch (e) {
+    }
+
     document.getElementById('username').value = originalData.username;
     document.getElementById('email').value = originalData.email;
     try {
@@ -2017,6 +2076,8 @@ function initializeLanguageSelector() {
     const nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
     const learningContainer = document.getElementById('learningLanguageSelectorContainer');
 
+    const learningListContainer = document.getElementById('learningLanguagesListContainer');
+
     if (!nativeContainer || !learningContainer) {
         console.error('❌ Контейнеры для LanguageSelector не найдены');
         return;
@@ -2043,23 +2104,45 @@ function initializeLanguageSelector() {
             nativeLanguage: originalData.native_language,
             learningLanguages: originalData.learning_languages,
             currentLearning: originalData.current_learning,
+            learningAvailableLanguages: originalData.learning_languages,
             languageData: languageData,
             onLanguageChange: function () {
                 checkForChanges();
             }
         });
 
+        if (learningListContainer) {
+            learningListSelector = new LanguageSelector({
+                container: learningListContainer,
+                mode: 'learning-flags',
+                nativeLanguage: originalData.native_language,
+                learningLanguages: originalData.learning_languages,
+                currentLearning: originalData.current_learning,
+                languageData: languageData,
+                onLanguageChange: function () {
+                    try { refreshLearningDropdownAvailable(); } catch (e) {}
+                    checkForChanges();
+                }
+            });
+        }
+
         languageSelector = {
             getValues: function () {
                 const a = nativeSelector && typeof nativeSelector.getValues === 'function' ? nativeSelector.getValues() : null;
                 const b = learningSelector && typeof learningSelector.getValues === 'function' ? learningSelector.getValues() : null;
+                const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
+                const learningLanguages = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : ((b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages);
+                const currentLearning = (b && b.currentLearning) ? b.currentLearning : originalData.current_learning;
+                const safeCurrent = learningLanguages.includes(currentLearning) ? currentLearning : (learningLanguages[0] || currentLearning);
                 return {
                     nativeLanguage: (a && a.nativeLanguage) ? a.nativeLanguage : originalData.native_language,
-                    learningLanguages: (b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages,
-                    currentLearning: (b && b.currentLearning) ? b.currentLearning : originalData.current_learning,
+                    learningLanguages: learningLanguages,
+                    currentLearning: safeCurrent,
                 };
             }
         };
+
+        try { refreshLearningDropdownAvailable(); } catch (e) {}
 
         window.languageSelector = languageSelector;
 
@@ -2578,6 +2661,12 @@ async function saveProfile(options = {}) {
             learning_languages: formValues.learning_languages,
             current_learning: formValues.current_learning
         };
+
+        try {
+            const flags = buildLearningFlagsFromLanguages(formValues.learning_languages);
+            Object.assign(updateData, flags);
+        } catch (e) {
+        }
 
         if (formValues.password) {
             updateData.password = formValues.password;

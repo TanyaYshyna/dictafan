@@ -3,6 +3,7 @@
 // learning-selector - селектор языка изучения
 // learning-selector-compact - селектор языка изучения (только флаг в выбранном, флаг+название в списке)
 // learning-list - список изучаемых языков с чекбоксами
+// learning-flags - список всех языков с чекбоксами (для users.tr_*)
 // flag-combo - комбинация флагов (изучаемый → родной)
 // header-selector - выпадающий селектор для шапки
 // report-selector - текстовый селектор для отчетов (без флагов, включает "Все языки")
@@ -286,6 +287,30 @@ class LanguageSelector {
         `;
     }
 
+    createLearningFlags() {
+        const selected = new Set(Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : []);
+        const current = String(this.options.currentLearning || '').trim().toLowerCase();
+        const languages = Object.keys(this.languageData || {});
+
+        return `
+        <div class="learning-flags-list" style="border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: var(--color-panel-bg, #fff); padding: 8px; max-height: 240px; overflow: auto;">
+            ${languages.map(code => {
+                const c = String(code || '').trim().toLowerCase();
+                if (!c) return '';
+                const isChecked = selected.has(c);
+                const isCurrent = current && c === current;
+                return `
+                    <label class="learning-flag-row" data-lang="${c}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: 10px; cursor:pointer; ${isCurrent ? 'background: var(--color-hover, #f8f9fa);' : ''}">
+                        <input type="checkbox" class="learning-flag-checkbox" data-lang="${c}" ${isChecked ? 'checked' : ''}>
+                        ${this.createFlagElement(c, 'small')}
+                        <span style="flex: 1; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${this.getLanguageName(c)}</span>
+                    </label>
+                `;
+            }).join('')}
+        </div>
+        `;
+    }
+
     createReportSelector() {
         const current = this.options.currentLearning;
         const availableLanguages = Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : [];
@@ -459,6 +484,36 @@ class LanguageSelector {
                 const val = sel.value;
                 this._setSelectedModelKeyV2(lang, val);
                 return;
+            }
+        });
+
+        // 3. Чекбоксы языков (users.tr_* / multi-select)
+        this.options.container.addEventListener('change', (e) => {
+            try {
+                const cb = e.target && e.target.classList && e.target.classList.contains('learning-flag-checkbox') ? e.target : null;
+                if (!cb) return;
+                const lang = String(cb.dataset.lang || '').trim().toLowerCase();
+                if (!lang) return;
+
+                const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
+                const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+                if (cb.checked) set.add(lang);
+                else set.delete(lang);
+
+                const next = [...set];
+                next.sort();
+                this.options.learningLanguages = next;
+
+                const cur = String(this.options.currentLearning || '').trim().toLowerCase();
+                if (cur && !set.has(cur)) {
+                    this.options.currentLearning = next[0] || '';
+                } else if (!cur && next.length) {
+                    this.options.currentLearning = next[0];
+                }
+
+                this.render();
+                this.triggerChange();
+            } catch (err) {
             }
         });
     }
@@ -1591,6 +1646,9 @@ class LanguageSelector {
             case 'learning-list':
                 html = this.createLearningList();
                 break;
+            case 'learning-flags':
+                html = this.createLearningFlags();
+                break;
             case 'flag-combo':
                 html = this.createFlagCombo();
                 break;
@@ -1660,6 +1718,39 @@ class LanguageSelector {
         if (this.options.mode === 'models-centric') {
             this.bindModelsCentricEvents();
             return;
+        }
+
+        // Чекбоксы языков (users.tr_* / multi-select)
+        try {
+            this.options.container.addEventListener('change', (e) => {
+                try {
+                    const cb = e.target && e.target.classList && e.target.classList.contains('learning-flag-checkbox') ? e.target : null;
+                    if (!cb) return;
+                    const lang = String(cb.dataset.lang || '').trim().toLowerCase();
+                    if (!lang) return;
+
+                    const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
+                    const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+                    if (cb.checked) set.add(lang);
+                    else set.delete(lang);
+
+                    const next = [...set];
+                    next.sort();
+                    this.options.learningLanguages = next;
+
+                    const cur = String(this.options.currentLearning || '').trim().toLowerCase();
+                    if (cur && !set.has(cur)) {
+                        this.options.currentLearning = next[0] || '';
+                    } else if (!cur && next.length) {
+                        this.options.currentLearning = next[0];
+                    }
+
+                    this.render();
+                    this.triggerChange();
+                } catch (err) {
+                }
+            });
+        } catch (e) {
         }
 
         if (this.options.mode === 'report-selector') {

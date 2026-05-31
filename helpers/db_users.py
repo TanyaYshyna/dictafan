@@ -307,6 +307,16 @@ def get_user_by_email(email: str) -> Optional[dict]:
         has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
+
+        # tr_* flags (learning languages)
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='users' AND column_name LIKE 'tr\_%' ESCAPE '\\'
+            ORDER BY column_name
+        """)
+        tr_rows = cur.fetchall()
+        tr_columns = [r['column_name'] if isinstance(r, dict) else r[0] for r in tr_rows]
         
         # Формируем список полей для SELECT
         select_fields = [
@@ -330,6 +340,9 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.telegram_link_code")
         if has_telegram_self_reports_enabled:
             select_fields.append("u.telegram_self_reports_enabled")
+
+        for c in tr_columns:
+            select_fields.append(f"u.{c}")
         
         cur.execute(
             f"""
@@ -389,6 +402,13 @@ def get_user_by_email(email: str) -> Optional[dict]:
             result["telegram_link_code"] = row.get("telegram_link_code")
         if has_telegram_self_reports_enabled and "telegram_self_reports_enabled" in row:
             result["telegram_self_reports_enabled"] = bool(row.get("telegram_self_reports_enabled"))
+
+        try:
+            for c in tr_columns:
+                if c in row:
+                    result[c] = bool(row.get(c))
+        except Exception:
+            pass
         
         return result
     finally:
@@ -496,6 +516,19 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         has_daily_activity_goal = 'daily_activity_goal' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
 
+        tr_columns = []
+        try:
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='users' AND column_name LIKE 'tr\_%' ESCAPE '\\'
+                ORDER BY column_name
+            """)
+            tr_rows = cur.fetchall()
+            tr_columns = [r['column_name'] if isinstance(r, dict) else r[0] for r in tr_rows]
+        except Exception:
+            tr_columns = []
+
         if 'assignment_history_retention_days' in updates:
             if has_assignment_history_retention_days:
                 v = updates.get('assignment_history_retention_days')
@@ -569,6 +602,43 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
             update_values.append(email)  # для WHERE условия
             update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE email = %s"
             cur.execute(update_query, update_values)
+
+        # Обновляем tr_* флаги если они есть в таблице
+        try:
+            needs_tr_update = False
+            if tr_columns:
+                if 'learning_languages' in updates:
+                    needs_tr_update = True
+                else:
+                    for k in updates.keys():
+                        if isinstance(k, str) and k.startswith('tr_'):
+                            needs_tr_update = True
+                            break
+
+            if needs_tr_update:
+                selected = set()
+                if 'learning_languages' in updates and isinstance(updates.get('learning_languages'), list):
+                    selected = {str(x).strip().lower() for x in updates.get('learning_languages') if isinstance(x, str) and str(x).strip()}
+                else:
+                    for k, v in updates.items():
+                        if isinstance(k, str) and k.startswith('tr_') and bool(v):
+                            selected.add(k[3:].strip().lower())
+
+                # one UPDATE setting all columns
+                if tr_columns:
+                    parts = []
+                    vals = []
+                    for col in tr_columns:
+                        code = col[3:]
+                        parts.append(f"{col} = %s")
+                        vals.append(code in selected)
+                    vals.append(email)
+                    cur.execute(
+                        f"UPDATE users SET {', '.join(parts)}, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+                        tuple(vals),
+                    )
+        except Exception:
+            pass
         
         # Обновляем языки обучения если указаны
         if 'learning_languages' in updates:

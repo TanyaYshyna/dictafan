@@ -440,6 +440,14 @@ def api_get_current_user():
     user_copy.pop('password_hash', None)
 
     try:
+        # Ensure tr_* flags (learning languages) are preserved in response
+        for k, v in list(user_data.items()):
+            if isinstance(k, str) and k.startswith('tr_'):
+                user_copy[k] = bool(v)
+    except Exception:
+        pass
+
+    try:
         user_id_int = int(user_data.get('id'))
         user_copy['streak_days'] = calculate_streak_days(user_id_int)
         user_copy['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
@@ -557,6 +565,14 @@ def api_update_profile():
         
         if 'current_learning' in updates:
             db_updates['current_learning'] = updates['current_learning']
+
+        # tr_* flags (learning languages)
+        try:
+            for k, v in updates.items():
+                if isinstance(k, str) and k.startswith('tr_'):
+                    db_updates[k] = bool(v)
+        except Exception:
+            pass
         
         # Обновляем settings_json (новый способ хранения настроек)
         if 'settings_json' in updates:
@@ -590,6 +606,13 @@ def api_update_profile():
             'streak_days': updated_user['streak_days'],
             'role': updated_user['role'],
         }
+
+        try:
+            for k, v in updated_user.items():
+                if isinstance(k, str) and k.startswith('tr_'):
+                    user_response[k] = bool(v)
+        except Exception:
+            pass
 
         try:
             user_id_int = int(updated_user.get('id'))
@@ -649,6 +672,13 @@ def api_get_profile():
         'streak_days': user_db['streak_days'],
         'role': user_db['role'],
     }
+
+    try:
+        for k, v in user_db.items():
+            if isinstance(k, str) and k.startswith('tr_'):
+                user_response[k] = bool(v)
+    except Exception:
+        pass
 
     try:
         user_id_int = int(user_db.get('id'))
