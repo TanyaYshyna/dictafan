@@ -2111,6 +2111,19 @@ function initializeLanguageSelector() {
             }
         });
 
+        const refreshLearningDropdownAvailable = () => {
+            try {
+                const values = languageSelector && typeof languageSelector.getValues === 'function' ? languageSelector.getValues() : null;
+                const learningLanguages = (values && Array.isArray(values.learningLanguages)) ? values.learningLanguages : originalData.learning_languages;
+                if (learningSelector && learningSelector.options) {
+                    learningSelector.options.learningAvailableLanguages = learningLanguages;
+                    learningSelector.render();
+                    if (window.lucide) window.lucide.createIcons();
+                }
+            } catch (e) {
+            }
+        };
+
         if (learningListContainer) {
             learningListSelector = new LanguageSelector({
                 container: learningListContainer,

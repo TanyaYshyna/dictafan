@@ -28,6 +28,10 @@
     "native_language": {
       "label": "Рідна мова:"
     },
+    "learning_languages": {
+      "label": "Мови, які вивчаю:",
+      "at_least_one": "Потрібно вибрати хоча б одну мову"
+    },
     "learning_language": {
       "label": "Вивчаю мову:"
     },
