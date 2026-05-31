@@ -1829,8 +1829,7 @@ function bindProfileTestRecording() {
     };
 }
 
-// Инициализация при загрузке страницы - ТОЛЬКО ОДИН ОБРАБОТЧИК
-document.addEventListener('DOMContentLoaded', async function () {
+async function initUserProfilePageOrModal() {
     UM = new UserManager();
 
     try {
@@ -1858,7 +1857,11 @@ document.addEventListener('DOMContentLoaded', async function () {
             // Показываем сообщение вместо редиректа
             showError(profileT('profile.auth.please_login', null, 'Пожалуйста, войдите в систему'));
             // Скрываем форму профиля
-            document.querySelector('.profile-container').style.display = 'none';
+            try {
+                const c = document.querySelector('.profile-container');
+                if (c) c.style.display = 'none';
+            } catch (e) {
+            }
             return;
         }
 
@@ -1888,6 +1891,21 @@ document.addEventListener('DOMContentLoaded', async function () {
     } catch (error) {
         console.error('Ошибка инициализации:', error);
         showError(profileT('profile.errors.load_failed', { message: String(error && error.message ? error.message : '') }, `Ошибка загрузки профиля: ${error && error.message ? error.message : ''}`));
+    }
+}
+
+window.UserProfile = window.UserProfile || {};
+window.UserProfile.init = async function () {
+    return initUserProfilePageOrModal();
+};
+
+// Инициализация при загрузке страницы: запускаем только если элементы профиля реально присутствуют.
+document.addEventListener('DOMContentLoaded', async function () {
+    try {
+        if (document.getElementById('user-profile-modal')) {
+            await initUserProfilePageOrModal();
+        }
+    } catch (e) {
     }
 });
 

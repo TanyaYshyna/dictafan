@@ -1,0 +1,78 @@
+#user-profile-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10080;
+  display: none;
+  background: var(--color-panel-bg, #fff);
+}
+
+#user-profile-modal.show {
+  display: block;
+}
+
+#user-profile-modal .modal-content {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--color-panel-bg, #fff);
+  display: flex;
+  flex-direction: column;
+}
+
+#user-profile-modal .modal-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 64px;
+  padding: 0 16px;
+  background: var(--color-panel-bg, #fff);
+  border-bottom: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#user-profile-modal .user-profile-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+#user-profile-modal .user-profile-topbar-logo {
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}
+
+#user-profile-modal .user-profile-topbar-title {
+  font-size: 18px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#user-profile-modal .user-profile-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#user-profile-modal .modal-body {
+  flex: 1;
+  overflow: auto;
+}
+
+#user-profile-modal .profile-container {
+  height: auto;
+  padding: 20px;
+  padding-left: 5vw;
+  padding-right: 5vw;
+  box-sizing: border-box;
+  overflow: visible;
+}

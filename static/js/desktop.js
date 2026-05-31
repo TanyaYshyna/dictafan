@@ -368,6 +368,62 @@ window.Desktop = window.Desktop || {
 
   stubAction(name) {
     try {
+      if (name === 'desktop-menu-profile') {
+        try {
+          const modal = document.getElementById('user-profile-modal');
+          if (!modal) return;
+
+          const close = () => {
+            try { modal.style.display = 'none'; } catch (e0) {}
+            try { modal.classList.remove('show'); } catch (e1) {}
+          };
+
+          modal.style.display = 'flex';
+          modal.classList.add('show');
+
+          try {
+            const closeBtn = document.getElementById('userProfileModalClose');
+            if (closeBtn && closeBtn.dataset.boundClick !== '1') {
+              closeBtn.dataset.boundClick = '1';
+              closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                close();
+              });
+            }
+          } catch (e2) {
+          }
+
+          try {
+            if (modal.dataset.boundOverlay !== '1') {
+              modal.dataset.boundOverlay = '1';
+              modal.addEventListener('click', (e) => {
+                if (e && e.target === modal) close();
+              });
+              document.addEventListener('keydown', (e) => {
+                if (e && e.key === 'Escape') close();
+              });
+            }
+          } catch (e3) {
+          }
+
+          this.renderLucide(modal);
+
+          try {
+            if (modal.dataset.profileInit !== '1') {
+              modal.dataset.profileInit = '1';
+              if (window.UserProfile && typeof window.UserProfile.init === 'function') {
+                window.UserProfile.init();
+              }
+            }
+          } catch (e4) {
+          }
+
+          return;
+        } catch (e) {
+          return;
+        }
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }

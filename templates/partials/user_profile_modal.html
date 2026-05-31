@@ -1,0 +1,363 @@
+<div id="user-profile-modal" class="modal-overlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="user-profile-topbar-left">
+                <img src="/static/icons/logo.svg" class="user-profile-topbar-logo" onclick="window.location.href='/'" alt="Logo">
+                <div class="user-profile-topbar-title">{{ t('profile.header') }} <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span></div>
+            </div>
+            <div class="user-profile-topbar-actions">
+                <button id="saveButton" class="topbar-icon-btn" type="button" title="{{ t('profile.topbar.save') }}" disabled>
+                    <i data-lucide="save"></i>
+                </button>
+                <button type="button" id="userProfileModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body">
+            <div class="profile-container">
+                <!-- Основная информация и аватар в двухпанельной структуре -->
+                <div class="form-section">
+                    <div class="profile-panels-container">
+                        <!-- Левая панель - Аватар -->
+                        <div class="profile-panel avatar-panel">
+                            <div class="panel-content">
+                                <div class="avatar-preview">
+                                    <img id="avatarLarge" src="" alt="{{ t('profile.avatar.alt') }}" class="avatar-large">
+                                    <img id="avatarSmall" src="" alt="{{ t('profile.avatar.alt') }}" class="avatar-small">
+                                </div>
+                                <div class="avatar-upload">
+                                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                                    <button type="button" id="avatarUploadButton" class="topbar-icon-btn">
+                                        <i data-lucide="download"></i>
+                                        {{ t('profile.avatar.upload') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Правая панель - Основная информация -->
+                        <div class="profile-panel info-panel">
+                            <div class="panel-content">
+
+                                <div class="form-row">
+                                    <label for="username">{{ t('profile.name.label') }}</label>
+                                    <input type="text" id="username" name="username" required>
+                                </div>
+                                <div class="form-row">
+                                    <label for="email">{{ t('profile.email.label') }}</label>
+                                    <input type="email" id="email" name="email" readonly>
+                                </div>
+                                <div class="form-row">
+                                    <label for="password">{{ t('profile.password.label') }}</label>
+                                    <div class="password-input-wrapper">
+                                        <input type="password" id="password" name="password" placeholder="{{ t('profile.password.placeholder') }}">
+                                        <button type="button" class="button-color-transparent password-toggle-btn" aria-label="{{ t('profile.password.show_aria') }}" data-password-toggle="1" data-target-input="password">
+                                            <i data-lucide="eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="form-row" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
+                                    <label style="margin:0; white-space:nowrap;">{{ t('profile.native_language.label') }}</label>
+                                    <div id="nativeLanguageSelectorContainer" style="width: 220px; flex: 0 0 220px;"></div>
+
+                                    <label style="margin:0; white-space:nowrap;">{{ t('profile.ui_language.label_inline') }}</label>
+                                    <div id="uiLangSelectorContainer" style="width: 180px; flex: 0 0 180px;"></div>
+                                </div>
+
+                                <div class="form-row" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
+                                    <label style="margin:0; white-space:nowrap;">{{ t('profile.learning_language.label') }}</label>
+                                    <div id="learningLanguageSelectorContainer" style="width: 220px; flex: 0 0 220px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        {{ t('profile.sections.activity_goal') }}
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#activityGoalSection" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="activityGoalSection" class="profile-panel" style="display: none;">
+                        <div class="panel-content">
+                            <div class="form-row" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
+                                <label for="dailyActivityGoal" style="margin:0; white-space:nowrap;">{{ t('profile.activity_goal.label') }}</label>
+                                <input id="dailyActivityGoal" type="number" min="0" step="1" style="height:40px; width: 180px; flex: 0 0 180px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);" />
+                            </div>
+                            <div style="margin-top:8px; font-size:12px; color: rgba(0,0,0,0.55);">
+                                {{ t('profile.activity_goal.help') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Языковые модели -->
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        {{ t('profile.sections.local_models') }}
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#languageSelectorModelsContainer" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="languageSelectorModelsContainer" style="display: none;"></div>
+                </div>
+
+                <!-- Настройки для диктантов -->
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        {{ t('profile.sections.dictation_settings') }}
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#userAudioSettingsContainer" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="userAudioSettingsContainer" style="display: none;"></div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        Telegram
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#telegramSection" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="telegramSection" class="profile-panel" style="display: none;">
+                        <div class="panel-content">
+                            <div class="telegram-panels">
+                                <div class="telegram-left-panel">
+                                    <div class="telegram-status-row">
+                                        <div class="telegram-bot-name">@dictafan_user_bot</div>
+                                        <div id="telegramStatusText" class="telegram-status-text">—</div>
+                                    </div>
+
+                                    <div class="form-row telegram-toggle-row">
+                                        <div class="telegram-toggle-label">
+                                            <button type="button" id="telegramEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.teacher_notifications.title') }}">
+                                                <i data-lucide="circle"></i>
+                                            </button>
+                                            <span>{{ t('profile.telegram.teacher_notifications.label') }}</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-row telegram-toggle-row">
+                                        <div class="telegram-toggle-label">
+                                            <button type="button" id="telegramSelfReportsEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.self_reports.title') }}">
+                                                <i data-lucide="circle"></i>
+                                            </button>
+                                            <span>{{ t('profile.telegram.self_reports.label_html') | safe }}</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" id="telegramOpenBotBtn" class="button-secondary" title="{{ t('profile.telegram.link.open_bot_title') }}">
+                                        <i data-lucide="send"></i>
+                                        {{ t('profile.telegram.link.open_bot') }}
+                                    </button>
+                                </div>
+
+                                <div class="telegram-right-panel">
+                                    <div class="telegram-link-header">
+                                        <div class="telegram-link-title">{{ t('profile.telegram.link.title') }}</div>
+                                        <button type="button" id="telegramLinkCollapseBtn" class="topbar-icon-btn" aria-label="{{ t('profile.telegram.link.toggle_aria') }}">
+                                            <i data-lucide="chevrons-down"></i>
+                                        </button>
+                                    </div>
+
+                                    <div id="telegramLinkBody" class="telegram-link-body">
+                                        <div id="telegramHelpText" class="telegram-help-text"></div>
+                                        <div class="telegram-link-controls">
+                                            <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
+                                                <i data-lucide="key"></i>
+                                                {{ t('profile.telegram.link.get_code') }}
+                                            </button>
+                                            <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" style="flex: 1;">
+                                            <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
+                                                <i data-lucide="copy"></i>
+                                            </button>
+                                            <button type="button" id="telegramRefreshStatusBtn" class="topbar-icon-btn" title="{{ t('profile.telegram.link.refresh_status_title') }}">
+                                                <i data-lucide="refresh-cw"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        {{ t('profile.sections.groups') }}
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#groupsSection" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="groupsSection" class="profile-panel" style="display: none;">
+                        <div class="panel-content">
+                            <div class="groups-layout">
+                                <div class="groups-left">
+                                    <div class="groups-toolbar">
+                                        <div class="groups-toolbar-left">
+                                            <select id="groupsFilterSelect" class="groups-filter-select" title="{{ t('profile.groups.filter.title') }}">
+                                                <option value="active">{{ t('profile.groups.filter.active') }}</option>
+                                                <option value="all">{{ t('profile.groups.filter.all') }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="groups-toolbar-right">
+                                            <div class="groups-toolbar-actions">
+                                                <button type="button" id="groupsCreateBtn" class="topbar-icon-btn" title="{{ t('profile.groups.actions.create_group_title') }}">
+                                                    <i data-lucide="plus"></i>
+                                                </button>
+                                                <button type="button" id="groupsDeleteBtn" class="topbar-icon-btn" title="{{ t('profile.groups.actions.delete_group_title') }}">
+                                                    <i data-lucide="trash-2"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="groups-table" id="groupsTable"></div>
+                                </div>
+
+                                <div class="groups-right">
+                                    <div class="groups-details">
+                                        <div class="groups-details-row no-label">
+                                            <div class="groups-details-value" id="groupsDetailsTitle">—</div>
+                                        </div>
+                                        <div class="groups-details-row no-label">
+                                            <div class="groups-details-value" id="groupsDetailsDescription">—</div>
+                                        </div>
+
+                                        <div class="groups-details-row invite-row">
+                                            <div class="groups-details-label">{{ t('profile.groups.invite_link.label') }}</div>
+                                            <div class="groups-invite">
+                                                <input type="text" id="groupsInviteLink" class="groups-invite-input" readonly value="">
+                                                <button type="button" id="groupsInviteCopyBtn" class="topbar-icon-btn" title="{{ t('profile.common.copy') }}">
+                                                    <i data-lucide="copy"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="groups-students">
+                                            <div class="groups-toolbar groups-students-toolbar">
+                                                <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.students.title') }}</div>
+                                                <div class="groups-toolbar-actions">
+                                                    <button type="button" id="groupsStudentsRefreshBtn" class="topbar-icon-btn" title="{{ t('profile.common.refresh') }}">
+                                                        <i data-lucide="refresh-cw"></i>
+                                                    </button>
+                                                    <button type="button" id="groupsStudentsInviteEmailBtn" class="topbar-icon-btn" title="{{ t('profile.groups.students.invite_email_title') }}">
+                                                        <i data-lucide="plus"></i>
+                                                    </button>
+                                                    <button type="button" id="groupsStudentsInviteLinkBtn" class="topbar-icon-btn" title="{{ t('profile.groups.students.invite_link_title') }}">
+                                                        <i data-lucide="link"></i>
+                                                    </button>
+                                                    <button type="button" id="groupsStudentsDeleteBtn" class="topbar-icon-btn" title="{{ t('profile.groups.students.delete_title') }}">
+                                                        <i data-lucide="trash-2"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="groups-students-table" id="groupsStudentsTable"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="groups-students" style="margin-top: 20px;">
+                                <div class="groups-toolbar groups-students-toolbar">
+                                    <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.memberships.title') }}</div>
+                                    <div class="groups-toolbar-actions">
+                                        <button type="button" id="groupsMembershipsRefreshBtn" class="topbar-icon-btn" title="{{ t('profile.common.refresh') }}">
+                                            <i data-lucide="refresh-cw"></i>
+                                        </button>
+                                        <button type="button" id="groupsMembershipsLeaveBtn" class="topbar-icon-btn" title="{{ t('profile.groups.memberships.leave_title') }}">
+                                            <i data-lucide="trash-2"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="groups-students-table" id="groupsMembershipsTable"></div>
+                            </div>
+
+                            <div class="groups-students" style="margin-top: 16px;">
+                                <div class="groups-toolbar groups-students-toolbar">
+                                    <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.invites.title') }}</div>
+                                    <div class="groups-toolbar-actions">
+                                        <button type="button" id="groupsMyInvitesRefreshBtn" class="topbar-icon-btn" title="{{ t('profile.common.refresh') }}">
+                                            <i data-lucide="refresh-cw"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="groups-students-table" id="groupsMyInvitesTable"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="groupModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 640px;">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+            <h3 id="groupModalTitle" style="margin: 0;">{{ t('profile.groups.modal.title') }}</h3>
+            <button type="button" id="groupModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0 16px 16px 16px;">
+            <div class="form-row" style="margin-top: 6px;">
+                <label for="groupModalTitleInput">{{ t('profile.groups.modal.name') }}</label>
+                <input type="text" id="groupModalTitleInput" maxlength="255">
+            </div>
+            <div class="form-row" style="margin-top: 12px;">
+                <label for="groupModalDescriptionInput">{{ t('profile.groups.modal.description') }}</label>
+                <input type="text" id="groupModalDescriptionInput">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+            <button type="button" id="groupModalSave" class="button-color-yellow">
+                <i data-lucide="save"></i>
+                {{ t('profile.common.save') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="groupRestoreModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+            <h3 style="margin: 0;">{{ t('profile.groups.modal.title') }}</h3>
+            <button type="button" id="groupRestoreModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0 16px 16px 16px;">
+            <div id="groupRestoreModalText" style="margin-top: 6px;">{{ t('profile.groups.restore.confirm') }}</div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+            <button type="button" id="groupRestoreModalYes" class="button-color-yellow">{{ t('profile.common.yes') }}</button>
+        </div>
+    </div>
+</div>
+
+<div id="groupEmailInviteModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 560px;">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
+            <h3 style="margin: 0;">{{ t('profile.groups.invite_email.modal_title') }}</h3>
+            <button type="button" id="groupEmailInviteModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 0 16px 16px 16px;">
+            <div class="form-row" style="margin-top: 6px;">
+                <label for="groupEmailInviteInput">{{ t('profile.groups.invite_email.email_label') }}</label>
+                <input type="email" id="groupEmailInviteInput" maxlength="255" autocomplete="email">
+            </div>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+            <button type="button" id="groupEmailInviteModalCancel" class="button-secondary">{{ t('profile.common.cancel') }}</button>
+            <button type="button" id="groupEmailInviteModalSend" class="button-color-yellow">{{ t('profile.groups.invite_email.send') }}</button>
+        </div>
+    </div>
+</div>

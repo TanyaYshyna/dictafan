@@ -12,6 +12,10 @@
     <link rel="stylesheet" href="/static/css/desktop_confirm_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/plan_tasks_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/style_dictations_reports.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/user_profile_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
 {% endblock %}
 
 {% block body_attrs %}class="page-index"{% endblock %}
@@ -105,6 +109,8 @@
     {% include 'partials/private_library_modal.html' %}
     {% include 'partials/global_library_modal.html' %}
 
+    {% include 'partials/user_profile_modal.html' %}
+
     {% include 'partials/desktop_confirm_modal.html' %}
 {% endblock %}
 
@@ -118,5 +124,28 @@
     <script defer src="/static/js/book_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/private_library_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/global_library_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script type="module" id="transformers-loader">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            if (args[0] && typeof args[0] === 'string' && args[0].includes('CleanUnusedInitializersAndNodeArgs')) {
+                return;
+            }
+            originalWarn.apply(console, args);
+        };
+
+        env.allowLocalModels = false;
+        env.allowRemoteModels = true;
+
+        window.pipeline = pipeline;
+        window.transformers = { pipeline, env };
+
+        window.dispatchEvent(new CustomEvent('transformers-ready'));
+    </script>
+    <script defer src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/script_user_profile.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}
