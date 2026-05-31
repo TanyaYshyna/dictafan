@@ -612,72 +612,25 @@ def api_get_dictation_book(dictation_id: int):
                 book_id = row["book_id"]
                 logger.info("✅ Найден book_id %s для диктанта %s", book_id, dictation_id)
                 
-                # Проверяем, является ли это корневой книгой (parent_id IS NULL)
-                cur.execute("""
-                    SELECT id, parent_id, title 
-                    FROM books 
-                    WHERE id = %s
-                """, (book_id,))
-                book_row = cur.fetchone()
-                
-                if not book_row:
-                    logger.warning("⚠️ Книга/раздел %s не найдена в БД", book_id)
-                    return jsonify({"success": False, "book_id": None, "root_book_id": None})
-                
-                logger.info("📖 Книга/раздел %s: title='%s', parent_id=%s", 
-                          book_id, book_row.get("title"), book_row["parent_id"])
-                
                 # Всегда возвращаем прямой book_id (книга или раздел)
                 direct_book_id = book_id
 
-                # Если это уже корневая книга (parent_id IS NULL), возвращаем и как root
-                if book_row["parent_id"] is None:
-                    logger.info("✅ Найдена корневая книга %s для диктанта %s", book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": direct_book_id})
-                
-                # Иначе ищем корневую книгу, идя вверх по иерархии
-                # Используем рекурсивный CTE для поиска корневой книги
-                cur.execute("""
-                    WITH RECURSIVE book_hierarchy AS (
-                        -- Начальный уровень: текущая книга/раздел
-                        SELECT id, parent_id, 0 as level
-                        FROM books
-                        WHERE id = %s
-                        
-                        UNION ALL
-                        
-                        -- Рекурсивный уровень: родительская книга
-                        SELECT b.id, b.parent_id, bh.level + 1
-                        FROM books b
-                        INNER JOIN book_hierarchy bh ON b.id = bh.parent_id
-                        WHERE bh.parent_id IS NOT NULL
-                    )
-                    SELECT id 
-                    FROM book_hierarchy 
-                    WHERE parent_id IS NULL 
-                    LIMIT 1
-                """, (book_id,))
-                
-                root_book_row = cur.fetchone()
-                if root_book_row:
-                    root_book_id = root_book_row["id"]
-                    logger.info("✅ Найдена корневая книга %s (через раздел %s) для диктанта %s", 
-                              root_book_id, book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": root_book_id})
-                else:
-                    logger.warning("⚠️ Не удалось найти корневую книгу для раздела %s (диктант %s)", 
-                                 book_id, dictation_id)
-                    # Проверяем всю иерархию для отладки
-                    cur.execute("""
-                        SELECT id, parent_id, title 
-                        FROM books 
-                        WHERE id = %s OR parent_id = %s
-                    """, (book_id, book_id))
-                    all_related = cur.fetchall()
-                    logger.info("🔍 Всего связанных книг/разделов: %s", len(all_related))
-                    for r in all_related:
-                        logger.info("  - id=%s, parent_id=%s, title='%s'", r["id"], r["parent_id"], r.get("title"))
+                # С root_book_id можем определить корневую книгу одним запросом (без рекурсии)
+                cur.execute(
+                    """
+                    SELECT root_book_id
+                    FROM books
+                    WHERE id = %s
+                    """,
+                    (book_id,),
+                )
+                book_row = cur.fetchone()
+                if not book_row:
+                    logger.warning("⚠️ Книга/раздел %s не найдена в БД", book_id)
                     return jsonify({"success": False, "book_id": None, "root_book_id": None})
+
+                root_book_id = book_row.get("root_book_id") or direct_book_id
+                return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": root_book_id})
         finally:
             conn.close()
     except Exception as exc:

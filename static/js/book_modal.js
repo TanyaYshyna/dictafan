@@ -1315,22 +1315,65 @@
       if (!isWorkbook && sList.length) {
         const wrap = document.createElement('div');
         wrap.className = 'book-structure-list';
-        for (const section of sList) {
-          const sectionNumber = section && section.order_index ? `§ ${section.order_index}. ` : '§ ';
+
+        const byParent = new Map();
+        for (const s of sList) {
+          if (!s || s.id == null) continue;
+          const p = (s.parent_id == null) ? null : Number(s.parent_id);
+          const key = String(p);
+          if (!byParent.has(key)) byParent.set(key, []);
+          byParent.get(key).push(s);
+        }
+
+        const sortSections = (arr) => (arr || []).slice().sort((a, b) => {
+          const ao = (a && a.order_index != null) ? Number(a.order_index) : 0;
+          const bo = (b && b.order_index != null) ? Number(b.order_index) : 0;
+          if (ao !== bo) return ao - bo;
+          const ai = (a && a.id != null) ? Number(a.id) : 0;
+          const bi = (b && b.id != null) ? Number(b.id) : 0;
+          return ai - bi;
+        });
+
+        const buildSectionNode = (section, level) => {
+          const id = Number(section.id);
           const div = document.createElement('div');
           div.className = 'structure-item structure-section';
-          div.setAttribute('data-section-id', String(section.id));
+          div.setAttribute('data-section-id', String(id));
+          div.setAttribute('data-level', String(level || 0));
+          div.style.paddingLeft = `${Math.max(0, level || 0) * 14}px`;
+
+          const sectionNumber = section && section.order_index ? `§ ${section.order_index}. ` : '§ ';
+
           div.innerHTML = `
             <div class="structure-item-header">
-              <button class="structure-item-toggle" data-section-id="${escapeHtml(String(section.id))}" type="button" title="Развернуть/свернуть">
+              <button class="structure-item-toggle" data-section-id="${escapeHtml(String(id))}" type="button" title="Развернуть/свернуть">
                 <i data-lucide="chevron-right"></i>
               </button>
               <span class="structure-item-title">${escapeHtml(sectionNumber)}${escapeHtml(String(section.title || ''))}</span>
             </div>
-            <div class="structure-item-content" data-section-content-id="${escapeHtml(String(section.id))}" style="display: none;"></div>
+            <div class="structure-item-content" data-section-content-id="${escapeHtml(String(id))}" style="display: none;">
+              <div class="structure-children" data-section-children-id="${escapeHtml(String(id))}"></div>
+              <div class="structure-dictations" data-section-dictations-id="${escapeHtml(String(id))}"></div>
+            </div>
           `;
-          wrap.appendChild(div);
+
+          const childWrap = div.querySelector(`.structure-children[data-section-children-id="${CSS.escape(String(id))}"]`);
+          const children = sortSections(byParent.get(String(id)) || []);
+          if (childWrap && children.length) {
+            for (const ch of children) {
+              childWrap.appendChild(buildSectionNode(ch, (level || 0) + 1));
+            }
+          }
+
+          return div;
+        };
+
+        const rootId = (state && state.bookViewActiveBookId != null) ? Number(state.bookViewActiveBookId) : null;
+        const topLevel = sortSections(byParent.get(String(rootId)) || []);
+        for (const section of topLevel) {
+          wrap.appendChild(buildSectionNode(section, 0));
         }
+
         frag.appendChild(wrap);
       }
 
@@ -1391,16 +1434,19 @@
             btn.classList.add('expanded');
             content.style.display = 'block';
 
-            if (content.dataset.loaded === '1') return;
-            content.dataset.loaded = '1';
-            content.innerHTML = '<div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>';
+            const dictationsContainer = content.querySelector(`.structure-dictations[data-section-dictations-id="${CSS.escape(String(id))}"]`);
+            if (!dictationsContainer) return;
+
+            if (dictationsContainer.dataset.loaded === '1') return;
+            dictationsContainer.dataset.loaded = '1';
+            dictationsContainer.innerHTML = '<div class="section-dictations-loading" style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Загрузка...</div>';
 
             try {
               const dictationsData = await apiRequest(`/library/api/book/${encodeURIComponent(String(id))}/dictations`);
               const dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
-              renderBookContentTo(content, [], dictations, true);
+              renderBookContentTo(dictationsContainer, [], dictations, true);
             } catch (err) {
-              content.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки</div>';
+              dictationsContainer.innerHTML = '<div style="padding: 10px; text-align: center; color: var(--color-text-secondary);">Ошибка загрузки</div>';
             }
           });
         });
@@ -1439,10 +1485,10 @@
         let sections = [];
         let dictations = [];
         if (isWorkbook) {
-          const orphanData = await apiRequest('/library/api/orphan-dictations');
-          dictations = orphanData && orphanData.success ? (orphanData.dictations || []) : [];
+          const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
+          dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
         } else {
-          const sectionsData = await apiRequest(`/library/api/book/${idNum}/sections`);
+          const sectionsData = await apiRequest(`/library/api/book/${idNum}/sections-tree`);
           const dictationsData = await apiRequest(`/library/api/book/${idNum}/dictations`);
           sections = sectionsData && sectionsData.success ? (sectionsData.sections || []) : [];
           dictations = dictationsData && dictationsData.success ? (dictationsData.dictations || []) : [];
