@@ -128,6 +128,225 @@
   flex-direction: column;
 }
 
+ #book-edit-modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: none;
+  background: var(--color-hover, #f8f9fa);
+  border-radius: 12px 12px 0 0;
+ }
+
+ .book-edit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+ }
+
+ #book-edit-unsaved-star {
+  margin-left: 6px;
+  font-weight: 900;
+  color: var(--color-button-text-yellow, #f9c609);
+ }
+
+ #book-edit-modal .modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+ }
+
+ #book-edit-modal .modal-close {
+  background: none;
+  border: none;
+  color: var(--color-text, #1f2933);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+  line-height: 1;
+ }
+
+ #book-edit-modal .modal-close i {
+  width: 18px;
+  height: 18px;
+ }
+
+ #book-edit-modal .modal-close:hover {
+  background: var(--color-panel-bg, #fff);
+ }
+
+ .book-edit-modal-body {
+  padding: 0 !important;
+ }
+
+ #book-edit-modal .form-row {
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+ }
+
+ #book-edit-modal .form-row.form-row-textarea {
+  flex-direction: column;
+  align-items: flex-start;
+ }
+
+ #book-edit-modal .form-row label {
+  flex: 0 0 200px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  margin: 0;
+ }
+
+ #book-edit-modal .form-row.form-row-textarea label {
+  flex: none;
+  margin-bottom: 8px;
+ }
+
+ #book-edit-modal .form-row input[type="text"],
+ #book-edit-modal .form-row input[type="url"],
+ #book-edit-modal .form-row textarea,
+ #book-edit-modal .form-row select {
+  flex: 1;
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 1px solid var(--color-border-light, #dee2e6);
+  border-radius: 8px;
+  background-color: var(--color-panel-bg, #fff);
+  color: var(--color-text, #1f2933);
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+ }
+
+ #book-edit-modal .form-row textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+ }
+
+ #book-edit-modal .form-row select {
+  height: 44px;
+ }
+
+ #book-edit-modal .form-row #book-visibility-input {
+  height: 44px;
+ }
+
+ #book-edit-modal .language-selector-wrapper {
+  flex: 0 0 200px;
+  width: 200px;
+ }
+
+ #book-edit-modal .form-row input[type="text"]:focus,
+ #book-edit-modal .form-row input[type="url"]:focus,
+ #book-edit-modal .form-row textarea:focus,
+ #book-edit-modal .form-row select:focus {
+  outline: none;
+  border-color: var(--color-button-text-yellow, #f9c609);
+ }
+
+ .book-edit-form-container {
+  display: flex;
+  gap: 24px;
+  padding: 24px;
+ }
+
+ .book-edit-form-left {
+  flex: 0 0 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+ }
+
+ .book-edit-form-right {
+  flex: 1;
+  min-width: 0;
+ }
+
+ .book-cover-upload-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+ }
+
+ .book-cover-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text, #1f2933);
+ }
+
+ .book-cover-preview-wrapper {
+  width: 200px;
+  height: 200px;
+  border: 2px dashed var(--color-border, #dee2e6);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  background: var(--color-hover, #f8f9fa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+ }
+
+ .book-cover-preview-wrapper:hover {
+  border-color: var(--color-primary, #2563eb);
+ }
+
+ .book-cover-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+ }
+
+ .book-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-text-secondary, #6b7280);
+ }
+
+ .book-cover-placeholder i {
+  width: 48px;
+  height: 48px;
+ }
+
+ .book-cover-placeholder span {
+  font-size: 12px;
+ }
+
+ .book-edit-footer-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 24px 24px;
+ }
+
+ @media (max-width: 768px) {
+  .book-edit-form-container {
+    flex-direction: column;
+  }
+
+  .book-edit-form-left {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  .book-edit-form-right {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+ }
+
 #book-edit-unsaved-star {
   display: none;
 }
