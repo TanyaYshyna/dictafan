@@ -240,7 +240,7 @@
           if (opt && !(opt.textContent || '').trim()) opt.textContent = 'Выберите книгу';
         } catch (e) {
         }
-        setTextIfEmpty('.move-dictation-submit', 'Выбрать');
+        setTextIfEmpty('.move-dictation-submit', 'Переместить');
 
         setTextIfEmptyById('crop-cancel', 'Отмена');
         setTextIfEmptyById('crop-confirm', 'Обрезать');
@@ -412,6 +412,71 @@
       }
     }
 
+    function renderMoveSectionsRoot({ sections, container, bookId, bookTitle }) {
+      if (!container) return;
+      const sList = Array.isArray(sections) ? sections : [];
+
+      const rootItem = document.createElement('div');
+      rootItem.className = 'move-dictation-section-item move-dictation-section-item--root selected';
+      rootItem.setAttribute('data-level', '0');
+      rootItem.setAttribute('data-section-id', '');
+      rootItem.setAttribute('data-book-id', String(bookId));
+
+      rootItem.innerHTML = `
+        <div class="move-dictation-section-toggle expanded" data-section-id="root">
+          <i data-lucide="chevron-right"></i>
+        </div>
+        <span class="move-dictation-section-title">${escapeHtml(String(bookTitle || 'Книга'))}</span>
+      `;
+
+      rootItem.addEventListener('click', (e) => {
+        if (e.target && e.target.closest && e.target.closest('.move-dictation-section-toggle')) {
+          e.stopPropagation();
+          const childrenContainer = rootItem.nextElementSibling;
+          const toggle = rootItem.querySelector('.move-dictation-section-toggle');
+          if (!childrenContainer || !childrenContainer.classList.contains('move-dictation-section-children')) return;
+          const isExpanded = childrenContainer.classList.contains('expanded');
+          if (isExpanded) {
+            childrenContainer.classList.remove('expanded');
+            if (toggle) toggle.classList.remove('expanded');
+          } else {
+            childrenContainer.classList.add('expanded');
+            if (toggle) toggle.classList.add('expanded');
+          }
+          try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons();
+          } catch (e2) {
+          }
+          return;
+        }
+
+        try {
+          document.querySelectorAll('.move-dictation-section-item').forEach((el) => el.classList.remove('selected'));
+        } catch (e2) {
+        }
+        rootItem.classList.add('selected');
+
+        const sectionInput = document.getElementById('move-target-section');
+        if (sectionInput) sectionInput.value = '';
+      });
+
+      container.appendChild(rootItem);
+
+      const childrenContainer = document.createElement('div');
+      childrenContainer.className = 'move-dictation-section-children expanded';
+      childrenContainer.setAttribute('data-parent-id', String(bookId));
+      container.appendChild(childrenContainer);
+
+      renderMoveSectionsTree(sList, childrenContainer, bookId, bookId, 1);
+
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          setTimeout(() => window.lucide.createIcons(), 0);
+        }
+      } catch (e) {
+      }
+    }
+
     async function openMoveDictationModal(dictationId) {
       const modal = document.getElementById('move-dictation-modal');
       const dictIdInput = document.getElementById('move-dictation-id');
@@ -459,17 +524,26 @@
 
           showLoadingIndicator('Загрузка разделов...');
           try {
-            const data = await apiRequest(`/library/api/book/${encodeURIComponent(String(selectedBookIdInt))}/sections`);
+            const data = await apiRequest(`/library/api/book/${encodeURIComponent(String(selectedBookIdInt))}/sections-tree`);
             const sections = (data && data.success) ? (data.sections || []) : [];
-            if (Array.isArray(sections) && sections.length > 0) {
-              if (sectionsContainer) sectionsContainer.style.display = 'block';
-              if (sectionsList) {
-                sectionsList.innerHTML = '';
-                renderMoveSectionsTree(sections, sectionsList, selectedBookIdInt, selectedBookIdInt, 0);
-              }
-            } else {
-              if (sectionsContainer) sectionsContainer.style.display = 'none';
-              if (sectionsList) sectionsList.innerHTML = '';
+
+            if (sectionsContainer) sectionsContainer.style.display = 'block';
+            if (sectionsList) {
+              sectionsList.innerHTML = '';
+              const title = (() => {
+                try {
+                  const opt = bookSelect.selectedOptions && bookSelect.selectedOptions[0];
+                  return opt ? String(opt.textContent || '').trim() : '';
+                } catch (e0) {
+                  return '';
+                }
+              })();
+              renderMoveSectionsRoot({
+                sections,
+                container: sectionsList,
+                bookId: selectedBookIdInt,
+                bookTitle: title || 'Книга диктантов',
+              });
             }
           } finally {
             hideLoadingIndicator();
@@ -743,6 +817,7 @@
 
         const modal = document.getElementById('book-edit-modal');
         const titleEl = document.getElementById('book-edit-title');
+        const devIdEl = document.getElementById('book-edit-dev-id');
         const idInput = document.getElementById('book-id-input');
         const titleInput = document.getElementById('book-title-input');
         const authorInput = document.getElementById('book-author-text-input');
@@ -765,6 +840,7 @@
         if (book) {
           if (titleEl) titleEl.textContent = 'Редактирование книги';
           if (idInput) idInput.value = book.id;
+          if (devIdEl) devIdEl.textContent = book.id != null ? `ID: ${String(book.id)}` : '';
           if (titleInput) titleInput.value = book.title || '';
           if (authorInput) authorInput.value = book.author_text || '';
           if (themeInput) themeInput.value = book.theme || '';
@@ -785,6 +861,7 @@
         } else {
           if (titleEl) titleEl.textContent = 'Новая книга';
           if (idInput) idInput.value = '';
+          if (devIdEl) devIdEl.textContent = '';
           if (titleInput) titleInput.value = '';
           if (authorInput) authorInput.value = '';
           if (themeInput) themeInput.value = '';

@@ -195,6 +195,19 @@ def api_book_sections(book_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@library_bp.route("/api/book/<int:book_id>/sections-tree", methods=["GET"])
+@jwt_required()
+def api_book_sections_tree(book_id: int):
+    """Возвращает плоский список всех разделов книги (дерево) для UI перемещения диктанта."""
+    try:
+        from helpers.db_books import get_book_sections_tree
+        sections = get_book_sections_tree(book_id)
+        return jsonify({"success": True, "sections": sections})
+    except Exception as exc:
+        logger.error("Ошибка получения дерева разделов книги %s: %s", book_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @library_bp.route("/api/book/<int:book_id>/add-to-my", methods=["POST"])
 @jwt_required()
 def api_add_book_to_my_library(book_id: int):
@@ -513,22 +526,15 @@ def api_get_user_books():
     try:
         own_books, shelf_books = get_user_library_books(user["id"])
 
-        # Workbook must exist for every user (even when there are no orphan dictations).
-        orphan_dictations = get_orphan_dictations(user["id"]) or []
-        workbook = get_or_create_workbook(user["id"])
-
-        # Ensure workbook is present, first, and has flags.
-        workbook_index = next((i for i, book in enumerate(own_books) if book["id"] == workbook["id"]), None)
-        if workbook_index is not None:
-            own_books[workbook_index]["is_workbook"] = True
-            own_books[workbook_index]["orphan_count"] = len(orphan_dictations)
-            if workbook_index > 0:
-                workbook_data = own_books.pop(workbook_index)
-                own_books.insert(0, workbook_data)
-        else:
-            workbook["is_workbook"] = True
-            workbook["orphan_count"] = len(orphan_dictations)
-            own_books = [workbook] + own_books
+        # Safety fallback: workbook is expected to exist for every user.
+        # If missing (old DB / manual modifications), create it.
+        if not any(bool(b.get("is_workbook")) for b in (own_books or [])):
+            workbook = get_or_create_workbook(user["id"])
+            try:
+                workbook["is_workbook"] = True
+            except Exception:
+                pass
+            own_books = [workbook] + (own_books or [])
 
         return jsonify({
             "success": True,
@@ -699,7 +705,8 @@ def api_move_dictation_to_book(dictation_id: int):
         return jsonify({"success": False, "error": "book_id is required"}), 400
 
     try:
-        add_dictation_to_book(dictation_id, book_id)
+        from helpers.db_books import move_dictation_to_book
+        move_dictation_to_book(dictation_id, book_id)
         return jsonify({"success": True})
     except Exception as exc:
         logger.error("Ошибка перемещения диктанта %s в книгу %s: %s", dictation_id, book_id, exc)

@@ -87,6 +87,115 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
         conn.close()
 
 
+def move_dictation_to_book(dictation_id: int, book_id: int, order_index: int = 0) -> bool:
+    """Перемещает диктант в книгу/раздел.
+
+    Канонизирует связи в book_dictations так, чтобы для dictation_id оставалась
+    ровно одна запись:
+
+    - если запись уже есть: обновляем book_id (и order_index)
+    - если записей несколько: оставляем первую, остальные удаляем
+    - если записей нет: вставляем новую
+    """
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id
+            FROM book_dictations
+            WHERE dictation_id = %s
+            ORDER BY id ASC
+            """,
+            (int(dictation_id),),
+        )
+        rows = cur.fetchall() or []
+
+        if not rows:
+            cur.execute(
+                """
+                INSERT INTO book_dictations (book_id, dictation_id, order_index)
+                VALUES (%s, %s, %s)
+                """,
+                (int(book_id), int(dictation_id), int(order_index)),
+            )
+            conn.commit()
+            return True
+
+        keep_id = rows[0]["id"]
+
+        cur.execute(
+            """
+            UPDATE book_dictations
+            SET book_id = %s, order_index = %s
+            WHERE id = %s
+            """,
+            (int(book_id), int(order_index), int(keep_id)),
+        )
+
+        extra_ids = [int(r["id"]) for r in rows[1:]]
+        if extra_ids:
+            cur.execute(
+                """
+                DELETE FROM book_dictations
+                WHERE id = ANY(%s)
+                """,
+                (extra_ids,),
+            )
+
+        conn.commit()
+        return True
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_book_sections_tree(root_book_id: int) -> List[Dict[str, Any]]:
+    """
+    Возвращает плоский список всех разделов (books) внутри книги root_book_id
+    (включая подразделы любого уровня).
+
+    Возвращаемые элементы совместимы с UI-деревом: нужны id/title/parent_id/order_index.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        query = """
+            SELECT
+                id,
+                title,
+                parent_id,
+                order_index,
+                created_at,
+                updated_at
+            FROM books
+            WHERE root_book_id = %s
+              AND id <> %s
+            ORDER BY
+                COALESCE(parent_id, 0) ASC,
+                COALESCE(order_index, 0) ASC,
+                id ASC
+        """
+
+        cur.execute(query, (int(root_book_id), int(root_book_id)))
+        rows = cur.fetchall()
+        return [
+            {
+                "id": row["id"],
+                "title": row["title"],
+                "parent_id": row["parent_id"],
+                "order_index": row["order_index"],
+                "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+                "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            }
+            for row in rows
+        ]
+    finally:
+        cur.close()
+        conn.close()
+
+
 def add_dictation_to_group_desks(
     *,
     teacher_user_id: int,
@@ -382,6 +491,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -401,6 +511,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -426,6 +537,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                         "original_language": row["original_language"],
                         "visibility": row["visibility"],
                         "theme": row["theme"],
+                        "is_workbook": bool(row.get("is_workbook")),
                         "parent_id": row.get("parent_id"),
                         "order_index": row.get("order_index", 0),
                         "created_at": row["created_at"].isoformat()
@@ -454,6 +566,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -479,6 +592,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -507,6 +621,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                     "original_language": row["original_language"],
                     "visibility": row["visibility"],
                     "theme": row["theme"],
+                    "is_workbook": bool(row.get("is_workbook")),
                     "parent_id": row.get("parent_id"),
                     "order_index": row.get("order_index", 0),
                     "created_at": row["created_at"].isoformat()

@@ -142,6 +142,13 @@
   gap: 10px;
  }
 
+ .book-edit-dev-id {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+ }
+
  #book-edit-unsaved-star {
   margin-left: 6px;
   font-weight: 900;
@@ -487,7 +494,6 @@
 
  #move-dictation-modal .move-dictation-modal-content {
   position: relative;
-  z-index: 100249;
   margin: auto;
   max-width: 800px;
   width: 90%;
@@ -500,7 +506,7 @@
  #move-dictation-modal .modal-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 20px 24px;
   border-bottom: 1px solid var(--color-border-light, #dee2e6);
   background: var(--color-hover, #f8f9fa);
@@ -513,7 +519,7 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text, #1f2933);
-  text-align: center;
+  text-align: left;
  }
 
  #move-dictation-modal .modal-close {
