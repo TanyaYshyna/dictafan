@@ -3,7 +3,6 @@
         <div class="modal-header">
             <div class="user-profile-topbar-left">
                 <img src="/static/icons/logo.svg" class="user-profile-topbar-logo" onclick="window.location.href='/'" alt="Logo">
-                <div class="user-profile-topbar-title">{{ t('profile.header') }} <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span></div>
             </div>
             <div class="user-profile-topbar-actions">
                 <button id="saveButton" class="topbar-icon-btn" type="button" title="{{ t('profile.topbar.save') }}" disabled>
@@ -16,6 +15,7 @@
         </div>
 
         <div class="modal-body">
+            <div class="user-profile-page-title">{{ t('profile.header') }} <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span></div>
             <div class="profile-container">
                 <!-- Основная информация и аватар в двухпанельной структуре -->
                 <div class="form-section">

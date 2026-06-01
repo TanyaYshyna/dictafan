@@ -114,6 +114,14 @@
   overflow: auto;
 }
 
+#user-profile-modal .user-profile-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  padding: 18px 20px 0;
+  color: var(--color-text, #1f2933);
+}
+
 #user-profile-modal .profile-container {
   height: auto;
   padding: 20px;
