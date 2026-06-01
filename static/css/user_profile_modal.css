@@ -112,7 +112,9 @@
 
 #user-profile-modal .modal-body {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 #user-profile-modal .user-profile-page-title {
@@ -124,12 +126,153 @@
 }
 
 #user-profile-modal .profile-container {
+  flex: 1;
+  min-height: 0;
   height: auto;
   padding: 20px;
   padding-left: 5vw;
   padding-right: 5vw;
   box-sizing: border-box;
-  overflow: visible;
+  overflow: auto;
+}
+
+#user-profile-modal .profile-lang-panels {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+#user-profile-modal .profile-lang-panel-left,
+#user-profile-modal .profile-lang-panel-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 0 0 200px;
+  max-width: 100%;
+}
+
+#user-profile-modal .profile-lang-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+#user-profile-modal .profile-lang-row label {
+  margin: 0;
+}
+
+#user-profile-modal .profile-lang-control {
+  width: 100%;
+}
+
+#user-profile-modal .profile-hidden-input {
+  display: none;
+}
+
+#user-profile-modal .unsaved-star {
+  display: none;
+}
+
+#user-profile-modal .profile-activity-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+#user-profile-modal .profile-activity-goal-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+#user-profile-modal .profile-activity-goal-input {
+  height: 40px;
+  width: 180px;
+  flex: 0 0 180px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(0,0,0,0.16);
+}
+
+#user-profile-modal .profile-activity-goal-help {
+  margin-top: 8px;
+  font-size: 12px;
+  color: rgba(0,0,0,0.55);
+}
+
+#user-profile-modal #activityGoalSection,
+#user-profile-modal #languageSelectorModelsContainer,
+#user-profile-modal #userAudioSettingsContainer,
+#user-profile-modal #telegramSection,
+#user-profile-modal #groupsSection {
+  display: none;
+}
+
+#user-profile-modal #groupModal,
+#user-profile-modal #groupRestoreModal,
+#user-profile-modal #groupEmailInviteModal {
+  display: none;
+}
+
+#user-profile-modal .telegram-link-code-input {
+  flex: 1;
+}
+
+#user-profile-modal .groups-students-mt20 {
+  margin-top: 20px;
+}
+
+#user-profile-modal .groups-students-mt16 {
+  margin-top: 16px;
+}
+
+#user-profile-modal .group-modal-content-640 {
+  max-width: 640px;
+}
+
+#user-profile-modal .group-modal-content-560 {
+  max-width: 560px;
+}
+
+#user-profile-modal .group-modal-content-520 {
+  max-width: 520px;
+}
+
+#user-profile-modal .group-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 16px 12px 16px;
+}
+
+#user-profile-modal .group-modal-title {
+  margin: 0;
+}
+
+#user-profile-modal .group-modal-body {
+  padding: 0 16px 16px 16px;
+}
+
+#user-profile-modal .group-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 16px 16px 16px;
+}
+
+#user-profile-modal .group-modal-row-mt6 {
+  margin-top: 6px;
+}
+
+#user-profile-modal .group-modal-row-mt12 {
+  margin-top: 12px;
+}
+
+#user-profile-modal .group-modal-restore-text {
+  margin-top: 6px;
 }
 
 #user-profile-modal .form-section {

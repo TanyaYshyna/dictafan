@@ -15,7 +15,7 @@
         </div>
 
         <div class="modal-body">
-            <div class="user-profile-page-title">{{ t('profile.header') }} <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span></div>
+            <div class="user-profile-page-title">{{ t('profile.header') }} <span id="unsavedStar" class="unsaved-star">*</span></div>
             <div class="profile-container">
                 <!-- Основная информация и аватар в двухпанельной структуре -->
                 <div class="form-section">
@@ -28,7 +28,7 @@
                                     <img id="avatarSmall" src="" alt="{{ t('profile.avatar.alt') }}" class="avatar-small">
                                 </div>
                                 <div class="avatar-upload">
-                                    <input type="file" id="avatarUpload" accept="image/*" style="display: none;">
+                                    <input type="file" id="avatarUpload" accept="image/*" class="profile-hidden-input">
                                     <button type="button" id="avatarUploadButton" class="topbar-icon-btn">
                                         <i data-lucide="download"></i>
                                         {{ t('profile.avatar.upload') }}
@@ -59,28 +59,28 @@
                                     </div>
                                 </div>
 
-                                <div class="profile-lang-panels" style="display:flex; flex-wrap: wrap; align-items:flex-start; gap: 16px;">
-                                    <div class="profile-lang-panel-left" style="display:flex; flex-direction: column; gap: 12px; flex: 0 0 360px; max-width: 100%;">
-                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
-                                            <label style="margin:0;">{{ t('profile.native_language.label') }}</label>
-                                            <div id="nativeLanguageSelectorContainer" style="width: 100%;"></div>
+                                <div class="profile-lang-panels">
+                                    <div class="profile-lang-panel-left">
+                                        <div class="form-row profile-lang-row">
+                                            <label>{{ t('profile.native_language.label') }}</label>
+                                            <div id="nativeLanguageSelectorContainer" class="profile-lang-control"></div>
                                         </div>
 
-                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
-                                            <label style="margin:0;">{{ t('profile.ui_language.label_inline') }}</label>
-                                            <div id="uiLangSelectorContainer" style="width: 100%;"></div>
+                                        <div class="form-row profile-lang-row">
+                                            <label>{{ t('profile.ui_language.label_inline') }}</label>
+                                            <div id="uiLangSelectorContainer" class="profile-lang-control"></div>
                                         </div>
                                     </div>
 
-                                    <div class="profile-lang-panel-right" style="display:flex; flex-direction: column; gap: 12px; flex: 0 0 360px; max-width: 100%;">
-                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
-                                            <label style="margin:0;">{{ t('profile.learning_languages.label') }}</label>
-                                            <div id="learningLanguagesListContainer" style="width: 100%;"></div>
+                                    <div class="profile-lang-panel-right">
+                                        <div class="form-row profile-lang-row">
+                                            <label>{{ t('profile.learning_languages.label') }}</label>
+                                            <div id="learningLanguagesListContainer" class="profile-lang-control"></div>
                                         </div>
 
-                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
-                                            <label style="margin:0;">{{ t('profile.learning_language.label') }}</label>
-                                            <div id="learningLanguageSelectorContainer" style="width: 100%;"></div>
+                                        <div class="form-row profile-lang-row">
+                                            <label>{{ t('profile.learning_language.label') }}</label>
+                                            <div id="learningLanguageSelectorContainer" class="profile-lang-control"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -96,13 +96,13 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="activityGoalSection" class="profile-panel" style="display: none;">
+                    <div id="activityGoalSection" class="profile-panel">
                         <div class="panel-content">
-                            <div class="form-row" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
-                                <label for="dailyActivityGoal" style="margin:0; white-space:nowrap;">{{ t('profile.activity_goal.label') }}</label>
-                                <input id="dailyActivityGoal" type="number" min="0" step="1" style="height:40px; width: 180px; flex: 0 0 180px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);" />
+                            <div class="form-row profile-activity-goal-row">
+                                <label for="dailyActivityGoal" class="profile-activity-goal-label">{{ t('profile.activity_goal.label') }}</label>
+                                <input id="dailyActivityGoal" type="number" min="0" step="1" class="profile-activity-goal-input" />
                             </div>
-                            <div style="margin-top:8px; font-size:12px; color: rgba(0,0,0,0.55);">
+                            <div class="profile-activity-goal-help">
                                 {{ t('profile.activity_goal.help') }}
                             </div>
                         </div>
@@ -117,7 +117,7 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="languageSelectorModelsContainer" style="display: none;"></div>
+                    <div id="languageSelectorModelsContainer"></div>
                 </div>
 
                 <!-- Настройки для диктантов -->
@@ -128,7 +128,7 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="userAudioSettingsContainer" style="display: none;"></div>
+                    <div id="userAudioSettingsContainer"></div>
                 </div>
 
                 <div class="form-section">
@@ -138,7 +138,7 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="telegramSection" class="profile-panel" style="display: none;">
+                    <div id="telegramSection" class="profile-panel">
                         <div class="panel-content">
                             <div class="telegram-panels">
                                 <div class="telegram-left-panel">
@@ -184,7 +184,7 @@
                                                 <i data-lucide="key"></i>
                                                 {{ t('profile.telegram.link.get_code') }}
                                             </button>
-                                            <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" style="flex: 1;">
+                                            <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" class="telegram-link-code-input">
                                             <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
                                                 <i data-lucide="copy"></i>
                                             </button>
@@ -206,7 +206,7 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="groupsSection" class="profile-panel" style="display: none;">
+                    <div id="groupsSection" class="profile-panel">
                         <div class="panel-content">
                             <div class="groups-layout">
                                 <div class="groups-left">
@@ -275,7 +275,7 @@
                                 </div>
                             </div>
 
-                            <div class="groups-students" style="margin-top: 20px;">
+                            <div class="groups-students groups-students-mt20">
                                 <div class="groups-toolbar groups-students-toolbar">
                                     <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.memberships.title') }}</div>
                                     <div class="groups-toolbar-actions">
@@ -290,7 +290,7 @@
                                 <div class="groups-students-table" id="groupsMembershipsTable"></div>
                             </div>
 
-                            <div class="groups-students" style="margin-top: 16px;">
+                            <div class="groups-students groups-students-mt16">
                                 <div class="groups-toolbar groups-students-toolbar">
                                     <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.invites.title') }}</div>
                                     <div class="groups-toolbar-actions">
@@ -310,25 +310,25 @@
     </div>
 </div>
 
-<div id="groupModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 640px;">
-        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
-            <h3 id="groupModalTitle" style="margin: 0;">{{ t('profile.groups.modal.title') }}</h3>
+<div id="groupModal" class="modal">
+    <div class="modal-content group-modal-content group-modal-content-640">
+        <div class="modal-header group-modal-header">
+            <h3 id="groupModalTitle" class="group-modal-title">{{ t('profile.groups.modal.title') }}</h3>
             <button type="button" id="groupModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
                 <i data-lucide="x"></i>
             </button>
         </div>
-        <div class="modal-body" style="padding: 0 16px 16px 16px;">
-            <div class="form-row" style="margin-top: 6px;">
+        <div class="modal-body group-modal-body">
+            <div class="form-row group-modal-row group-modal-row-mt6">
                 <label for="groupModalTitleInput">{{ t('profile.groups.modal.name') }}</label>
                 <input type="text" id="groupModalTitleInput" maxlength="255">
             </div>
-            <div class="form-row" style="margin-top: 12px;">
+            <div class="form-row group-modal-row group-modal-row-mt12">
                 <label for="groupModalDescriptionInput">{{ t('profile.groups.modal.description') }}</label>
                 <input type="text" id="groupModalDescriptionInput">
             </div>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+        <div class="modal-footer group-modal-footer">
             <button type="button" id="groupModalSave" class="button-color-yellow">
                 <i data-lucide="save"></i>
                 {{ t('profile.common.save') }}
@@ -337,38 +337,38 @@
     </div>
 </div>
 
-<div id="groupRestoreModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 520px;">
-        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
-            <h3 style="margin: 0;">{{ t('profile.groups.modal.title') }}</h3>
+<div id="groupRestoreModal" class="modal">
+    <div class="modal-content group-modal-content group-modal-content-520">
+        <div class="modal-header group-modal-header">
+            <h3 class="group-modal-title">{{ t('profile.groups.modal.title') }}</h3>
             <button type="button" id="groupRestoreModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
                 <i data-lucide="x"></i>
             </button>
         </div>
-        <div class="modal-body" style="padding: 0 16px 16px 16px;">
-            <div id="groupRestoreModalText" style="margin-top: 6px;">{{ t('profile.groups.restore.confirm') }}</div>
+        <div class="modal-body group-modal-body">
+            <div id="groupRestoreModalText" class="group-modal-restore-text">{{ t('profile.groups.restore.confirm') }}</div>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+        <div class="modal-footer group-modal-footer">
             <button type="button" id="groupRestoreModalYes" class="button-color-yellow">{{ t('profile.common.yes') }}</button>
         </div>
     </div>
 </div>
 
-<div id="groupEmailInviteModal" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 560px;">
-        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 12px 16px;">
-            <h3 style="margin: 0;">{{ t('profile.groups.invite_email.modal_title') }}</h3>
+<div id="groupEmailInviteModal" class="modal">
+    <div class="modal-content group-modal-content group-modal-content-560">
+        <div class="modal-header group-modal-header">
+            <h3 class="group-modal-title">{{ t('profile.groups.invite_email.modal_title') }}</h3>
             <button type="button" id="groupEmailInviteModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
                 <i data-lucide="x"></i>
             </button>
         </div>
-        <div class="modal-body" style="padding: 0 16px 16px 16px;">
-            <div class="form-row" style="margin-top: 6px;">
+        <div class="modal-body group-modal-body">
+            <div class="form-row group-modal-row group-modal-row-mt6">
                 <label for="groupEmailInviteInput">{{ t('profile.groups.invite_email.email_label') }}</label>
                 <input type="email" id="groupEmailInviteInput" maxlength="255" autocomplete="email">
             </div>
         </div>
-        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 12px; padding: 0 16px 16px 16px;">
+        <div class="modal-footer group-modal-footer">
             <button type="button" id="groupEmailInviteModalCancel" class="button-secondary">{{ t('profile.common.cancel') }}</button>
             <button type="button" id="groupEmailInviteModalSend" class="button-color-yellow">{{ t('profile.groups.invite_email.send') }}</button>
         </div>
