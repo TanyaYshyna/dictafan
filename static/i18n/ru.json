@@ -219,6 +219,11 @@
     "models": {
       "all_models": "Все модели",
       "languages": "Языки",
+      "method_google": "Google сервисы",
+      "method_server_whisper_tiny": "На сервере Whisper Tiny",
+      "method_device_whisper_tiny": "На устройстве Whisper Tiny",
+      "method_device_whisper_base": "На устройстве Whisper Base",
+      "method_device_whisper_small": "На устройстве Whisper Small",
       "browser_storage": "Хранилище браузера:",
       "loading_info": "Загрузка информации...",
       "calculating_storage": "Рассчитываем использование памяти...",

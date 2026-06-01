@@ -215,6 +215,11 @@
     "models": {
       "all_models": "جميع النماذج",
       "languages": "اللغات",
+      "method_google": "خدمات Google",
+      "method_server_whisper_tiny": "Whisper Tiny على الخادم",
+      "method_device_whisper_tiny": "Whisper Tiny على الجهاز",
+      "method_device_whisper_base": "Whisper Base على الجهاز",
+      "method_device_whisper_small": "Whisper Small على الجهاز",
       "browser_storage": "تخزين المتصفح:",
       "loading_info": "جارٍ تحميل المعلومات...",
       "calculating_storage": "جارٍ حساب استخدام التخزين...",

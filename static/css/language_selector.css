@@ -121,6 +121,19 @@
     text-align: center;
 }
 
+.models-centric-method-radio {
+    display: none;
+}
+
+.models-centric-radio-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .models-centric-td-icon {
     width: 34px;
     text-align: center;

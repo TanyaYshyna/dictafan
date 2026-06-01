@@ -219,6 +219,11 @@
     "models": {
       "all_models": "All models",
       "languages": "Languages",
+      "method_google": "Google services",
+      "method_server_whisper_tiny": "Whisper Tiny on server",
+      "method_device_whisper_tiny": "Whisper Tiny on device",
+      "method_device_whisper_base": "Whisper Base on device",
+      "method_device_whisper_small": "Whisper Small on device",
       "browser_storage": "Browser storage:",
       "loading_info": "Loading info...",
       "calculating_storage": "Calculating storage usage...",

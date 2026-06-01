@@ -219,6 +219,11 @@
     "models": {
       "all_models": "Усі моделі",
       "languages": "Мови",
+      "method_google": "Google сервіси",
+      "method_server_whisper_tiny": "На сервері Whisper Tiny",
+      "method_device_whisper_tiny": "На пристрої Whisper Tiny",
+      "method_device_whisper_base": "На пристрої Whisper Base",
+      "method_device_whisper_small": "На пристрої Whisper Small",
       "browser_storage": "Сховище браузера:",
       "loading_info": "Завантажуємо інформацію...",
       "calculating_storage": "Розраховуємо використання пам’яті...",

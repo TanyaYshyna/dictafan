@@ -76,6 +76,24 @@ class LanguageSelector {
         }
     }
 
+    _renderLucideRadioButton(btn, checked, disabled) {
+        try {
+            if (!btn) return;
+            btn.dataset.checked = checked ? '1' : '0';
+            btn.dataset.disabled = disabled ? '1' : '0';
+            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+            btn.disabled = Boolean(disabled);
+            btn.innerHTML = `<i data-lucide="${checked ? 'circle-dot' : 'circle'}"></i>`;
+            try {
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons({ root: btn });
+                }
+            } catch (e) {
+            }
+        } catch (e) {
+        }
+    }
+
     async init() {
         try {
             if (this.options.mode === 'models-centric') {
@@ -242,21 +260,33 @@ class LanguageSelector {
         }
 
         const rows = root.querySelectorAll('.models-centric-tr');
+        let anyChecked = false;
         rows.forEach((tr) => {
             try {
                 const method = String(tr.dataset.method || '');
                 const size = String(tr.dataset.modelSize || '');
 
                 const radio = tr.querySelector('.models-centric-method-radio');
+                const radioBtn = tr.querySelector('.models-centric-radio-btn');
                 const sizeEl = tr.querySelector('[data-role="model-size"]');
                 const toggle = tr.querySelector('.model-download-toggle-v2');
 
                 if (method === 'route') {
-                    if (radio) radio.checked = currentMode === 'route';
+                    if (radio) {
+                        radio.checked = currentMode === 'route';
+                        anyChecked = anyChecked || radio.checked;
+                        radio.style.display = 'none';
+                    }
+                    this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), false);
                     return;
                 }
                 if (method === 'route-server') {
-                    if (radio) radio.checked = currentMode === 'route-server';
+                    if (radio) {
+                        radio.checked = currentMode === 'route-server';
+                        anyChecked = anyChecked || radio.checked;
+                        radio.style.display = 'none';
+                    }
+                    this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), false);
                     return;
                 }
 
@@ -265,11 +295,13 @@ class LanguageSelector {
                     const mk = model && model.modelKey ? String(model.modelKey) : '';
                     const mSize = model && model.size ? String(model.size) : '';
 
+                    const isDownloaded = !!(mk && downloadedKeys.has(mk));
+
                     if (sizeEl) sizeEl.textContent = mSize ? `· ${mSize}` : '';
 
                     if (radio) {
                         radio.value = mk ? `route-off|${mk}` : 'route-off|';
-                        radio.disabled = !mk;
+                        radio.disabled = !mk || !isDownloaded;
                         if (currentMode === 'route-off') {
                             radio.checked = !!(mk && selectedModelKey && String(selectedModelKey) === String(mk));
                             if (!selectedModelKey && mk && size === 'base') {
@@ -278,6 +310,20 @@ class LanguageSelector {
                         } else {
                             radio.checked = false;
                         }
+                        anyChecked = anyChecked || radio.checked;
+                        radio.style.display = 'none';
+                    }
+
+                    // Пока модель не загружена — выбор метода (radio) не имеет смысла
+                    if (radioBtn) {
+                        if (!isDownloaded) {
+                            radioBtn.style.visibility = 'hidden';
+                            radioBtn.disabled = true;
+                        } else {
+                            radioBtn.style.visibility = 'visible';
+                            radioBtn.disabled = false;
+                        }
+                        this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), !!(radio && radio.disabled));
                     }
 
                     if (toggle) {
@@ -290,6 +336,19 @@ class LanguageSelector {
             } catch (eRow) {
             }
         });
+
+        if (!anyChecked) {
+            try {
+                const routeRow = root.querySelector('.models-centric-tr[data-method="route"]');
+                const routeRadio = routeRow ? routeRow.querySelector('.models-centric-method-radio') : null;
+                const routeBtn = routeRow ? routeRow.querySelector('.models-centric-radio-btn') : null;
+                if (routeRadio) {
+                    routeRadio.checked = true;
+                    this._renderLucideRadioButton(routeBtn, true, false);
+                }
+            } catch (eFix) {
+            }
+        }
     }
 
     createLearningFlags() {
@@ -521,6 +580,29 @@ class LanguageSelector {
                     }));
                 } catch (e2) {
                 }
+
+                try {
+                    this.hydrateModelsCentricUI();
+                } catch (e3) {
+                }
+            }
+        });
+
+        this.options.container.addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest ? e.target.closest('.models-centric-radio-btn') : null;
+            if (!btn) return;
+
+            const cell = btn.closest('td');
+            const radio = cell ? cell.querySelector('.models-centric-method-radio') : null;
+            if (!radio || radio.disabled) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            radio.checked = true;
+            try {
+                radio.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e2) {
             }
         });
 
