@@ -294,6 +294,11 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+#user-profile-modal .profile-panel.profile-panel-flat-top {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
 #user-profile-modal .profile-panel .panel-content {
   margin-top: 15px;
 }
