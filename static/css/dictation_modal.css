@@ -1,0 +1,104 @@
+@import url('/static/css/style_dictation.css');
+
+#dictationModal.dictation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: none;
+  background: rgba(17, 24, 39, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+#dictationModal .dictation-modal__content {
+  position: absolute;
+  inset: 12px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg, #ffffff);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+#dictationModal .dictation-modal__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-bg, #ffffff);
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+#dictationModal .dictation-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+#dictationModal .dictation-modal__logo {
+  height: 26px;
+  width: auto;
+  cursor: pointer;
+}
+
+#dictationModal .dictation-modal__logo--min {
+  display: none;
+}
+
+#dictationModal .dictation-modal__user {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+#dictationModal .dictation-modal__username {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40vw;
+}
+
+#dictationModal .dictation-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+#dictationModal .dictation-modal__body {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+#dictationModal .dictation-modal__body .panel {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+@media (max-width: 680px) {
+  #dictationModal .dictation-modal__content {
+    inset: 0;
+    border-radius: 0;
+  }
+
+  #dictationModal .dictation-modal__logo--full {
+    display: none;
+  }
+
+  #dictationModal .dictation-modal__logo--min {
+    display: inline-block;
+  }
+
+  #dictationModal .dictation-modal__username {
+    max-width: 34vw;
+  }
+}

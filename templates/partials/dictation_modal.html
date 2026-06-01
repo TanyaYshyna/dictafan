@@ -1,0 +1,416 @@
+<div id="dictationModal" class="dictation-modal" style="display:none;">
+  <div class="dictation-modal__content" role="dialog" aria-modal="true" aria-label="Dictation">
+    <div class="dictation-modal__header">
+      <div class="dictation-modal__header-left">
+        <img src="/static/icons/logo.svg" class="dictation-modal__logo dictation-modal__logo--full" alt="DictaFan" onclick="window.location.href='/'" />
+        <img src="/static/icons/logo_min.svg" class="dictation-modal__logo dictation-modal__logo--min" alt="DictaFan" onclick="window.location.href='/'" />
+        <div class="dictation-modal__user">
+          <span id="dictationModalUsername" class="dictation-modal__username"></span>
+        </div>
+      </div>
+
+      <div class="dictation-modal__header-actions">
+        <button id="openDictationSettingsBtn" class="topbar-icon-btn" type="button" title="Настройки" aria-label="Настройки">
+          <i data-lucide="settings"></i>
+        </button>
+        <button id="saveBtn" class="topbar-icon-btn save-status-clean" type="button" title="Сохранить" aria-label="Сохранить">
+          <i data-lucide="save"></i>
+        </button>
+        <button id="dictationModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="dictationModalBody" class="dictation-modal__body">
+      <div class="panel">
+        <!-- Счетчик предложений -->
+        <div class="panel-tablo">
+          <!-- Строка с панелями навигации и результатов -->
+          <div class="panels-row">
+            <table class="sentence-nav-table" role="presentation">
+              <tr class="sentence-nav-top-row">
+                <td class="sentence-nav-cell">
+                  <div class="sentence-nav-top-inner">
+                    <div id="dictationLangPair" class="dictation-langpair"></div>
+                    <h2 class="dictation-title" id="dictationTitle"></h2>
+                  </div>
+                </td>
+              </tr>
+              <tr class="sentence-nav-bottom-row">
+                <td class="sentence-nav-cell">
+                  <div class="sentence-nav-bottom-inner">
+                    <button id="checkPrevios" class="button-color-transparent" onclick="previousSentence()" title="Ctrl+3">
+                      <i data-lucide="arrow-left"></i>
+                    </button>
+
+                    <div class="sentence-counter" id="sentenceCounter">
+                      <div class="sentence-counter-simple">
+                        <button id="sentenceCurrentNumber" class="sentence-current-number">1</button>
+                        <span id="sentenceTotalNumber" class="sentence-total-number">/ 0</span>
+                      </div>
+                    </div>
+
+                    <button id="checkNext" class="button-color-transparent" onclick="nextSentence()" title="Ctrl+4">
+                      <i data-lucide="arrow-right"></i>
+                    </button>
+
+                    <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()" title="Ctrl+0">
+                      <i data-lucide="file-text"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </table>
+            <div class="dictation-meta-hidden" style="display:none;">
+              <span id="dictationIdDisplay" class="dictation-id"></span>
+              <span id="unsavedStar" class="unsaved-star" title="Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)" style="display:none">*</span>
+            </div>
+            <div class="dictation-top-progress-wrap">
+              <!-- Контейнер для рендера прогресс-панели (страница) -->
+              <div id="progressPanelContainer" class="progress-panel-modal-r"></div>
+              <div id="dictationTaskProgress" class="dictation-task-progress" aria-hidden="true">
+                <div class="dictation-task-progress-bar">
+                  <div id="dictationTaskProgressFill" class="dictation-task-progress-fill"></div>
+                </div>
+                <div id="dictationTaskProgressLabel" class="dictation-task-progress-label"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="audio-players-wrapper">
+          <!-- Плеер оригинал (через AudioPlayerVisual) -->
+          <div id="originalAudioPlayer" class="custom-audio-player" data-audio-id="audio1"></div>
+
+          <!-- Кнопка перевода (простая play/pause) -->
+          <div class="translation-audio-button-wrapper">
+            <span class="language" id="dictationTranslationLanguage"></span>
+            <button id="translationPlayButton" class="play-btn-translation" title="Ctrl+2">
+              <i data-lucide="play"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="speaker-tablo-overlay">
+          <div id="speaker">
+            <span id="speakerSentenceNumber"></span>
+            <span id="speakerText">Tanya: </span>
+          </div>
+          <div id="tablo_result">
+            <div id="tablo_result_star">
+              <i data-lucide="star"></i>
+            </div>
+            <div id="tablo_result_star_half">
+              <i data-lucide="star-half"></i>
+              <i data-lucide="star-half"></i>
+              <i data-lucide="star-half"></i>
+            </div>
+            <div id="tablo_result_mic">
+              <i data-lucide="mic"></i>
+            </div>
+          </div>
+        </div>
+        <div id="userInput" tabindex="0" contenteditable="true" class="text-input" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" aria-autocomplete="none" data-gramm="false" data-enable-grammarly="false"></div>
+        <div id="userInputNotice" class="user-input-notice" style="display:none;"></div>
+        <div class="result-panel">
+          <div class="text-column">
+            <div id="correctAnswer" class="word-correct">...</div>
+          </div>
+
+          <div class="check-group">
+            <i data-lucide="bug" class="error-count-label"></i>
+            <span id="errorCountLabel" class="error-count-label"></span>
+            <button id="checkBtn" class="button-color-yellow" onclick="checkText()" title="Нажмите Enter/Return когда закончили ввод текста">
+              <i data-lucide="corner-down-left"></i>
+              <span id="checkBtnLabel"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="virtual-keyboard-container">
+          <label class="vk-toggle" for="virtualKeyboardToggle" title="Ctrl+5">
+            <input type="checkbox" id="virtualKeyboardToggle">
+            <span class="vk-toggle-icon" aria-hidden="true">
+              <i class="vk-toggle-icon-off" data-lucide="circle"></i>
+              <i class="vk-toggle-icon-on" data-lucide="check-circle"></i>
+            </span>
+            <span id="virtualKeyboardToggleLabel">Показать клавиатуру</span>
+          </label>
+          <div id="virtualKeyboard" hidden></div>
+        </div>
+
+        <div class="audio-user-panel">
+          <div class="audio-user-content-buttons">
+            <table class="audio-user-table" role="presentation">
+              <colgroup>
+                <col class="audio-user-col audio-user-col-1">
+                <col class="audio-user-col audio-user-col-2">
+                <col class="audio-user-col audio-user-col-3">
+                <col class="audio-user-col audio-user-col-4">
+                <col class="audio-user-col audio-user-col-5">
+              </colgroup>
+              <tr class="audio-user-top-row">
+                <td class="audio-user-cell audio-user-tablo" colspan="4">
+                  <div id="userAudioTablo">
+                    <i data-lucide="mic"></i>
+                    <i data-lucide="mic"></i>
+                    <i data-lucide="mic-off"></i>
+                    <i data-lucide="mic-off"></i>
+                    <i data-lucide="mic-off"></i>
+                  </div>
+                </td>
+                <td class="audio-user-cell audio-user-mode">
+                  <span id="recognitionModeIcon" class="recognition-mode-icon" title="Режим распознавания речи">
+                    <i data-lucide="route"></i>
+                  </span>
+                  <span id="whisperModelReadyBadge" style="display:none; margin-left: 8px; font-size: 12px; color: var(--color-button-purple); white-space: nowrap;"></span>
+                </td>
+              </tr>
+              <tr class="audio-user-bottom-row">
+                <td class="audio-user-cell audio-user-percent">
+                  <button id="word_percent" disabled>
+                    <i data-lucide="percent"></i>
+                  </button>
+                </td>
+                <td class="audio-user-cell audio-user-percent-count">
+                  <button id="btn-count-percent" disabled>
+                    <span id="count_percent">100</span>
+                  </button>
+                </td>
+                <td class="audio-user-cell audio-user-indicator">
+                  <button id="recordingIndicator" class="recording-indicator-btn" disabled title="Индикатор записи">
+                    <i data-lucide="circle"></i>
+                  </button>
+                </td>
+                <td class="audio-user-cell audio-user-visualizer">
+                  <canvas id="audioVisualizer" class="audio-visualizer"></canvas>
+                </td>
+                <td class="audio-user-cell audio-user-record">
+                  <button id="recordButton" class="button-color-purple">
+                    <i data-lucide="mic"></i>
+                    <span id="recordStateIcon" class="state-icon"></span>
+                  </button>
+                </td>
+              </tr>
+            </table>
+
+            <div id="userAudioAnswer"></div>
+          </div>
+        </div>
+
+        <div class="dictation-next-row">
+          <button id="resultNextBtn" class="button-color-yellow" type="button">
+            <i data-lucide="arrow-right"></i>
+            <span id="resultNextBtnLabel">Далее</span>
+          </button>
+        </div>
+      </div>
+
+      <audio id="successSound" preload="auto">
+        <source src="/static/sounds/success.mp3" type="audio/mpeg">
+        <source src="/static/sounds/success.ogg" type="audio/ogg">
+      </audio>
+
+      <!-- Передаем только метаданные диктанта (предложения загружаются через API) -->
+      <div id="dictation-data" data-language-original="" data-language-translation="" data-lang-notice="" data-title-orig="" data-dictation-id="" data-is-dialog="false" data-speakers='[]' style="display: none;">
+      </div>
+    </div>
+  </div>
+
+  <div id="clearSentenceProgressModal" class="modal">
+    <div class="modal-content" style="max-width: 420px;">
+      <div class="start-modal-title-row" style="margin-bottom: 10px;">
+        <h2 id="clearSentenceProgressTitle" style="text-align:left;">Очистить прогрес по предложению?</h2>
+        <div class="start-modal-header-actions">
+          <button id="clearSentenceProgressCloseBtn" class="start-modal-close-btn" title="Закрыть" type="button">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button id="clearSentenceProgressConfirmBtn" class="button-color-red" type="button">Очистить</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="start-modal" class="modal">
+    <div class="modal-content">
+      <div class="start-modal-header">
+        <div class="start-modal-header-main">
+          <div class="start-modal-title-row">
+            <span class="dikt-number-badge" id="startModalDiktNumber"></span>
+            <h2 id="title-diktation"></h2>
+            <div class="start-modal-header-actions">
+              <button id="startModalSendInterimReportBtn" class="start-modal-settings-btn" title="Отправить промежуточный отчет">
+                <i data-lucide="send-horizontal"></i>
+              </button>
+              <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
+                <i data-lucide="settings"></i>
+              </button>
+              <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
+                <i data-lucide="log-out"></i>
+              </button>
+              <button id="btnBackToList" onclick="clickBtnBackToList()" class="start-modal-close-btn" title="Закрыть">
+                <i data-lucide="x"></i>
+              </button>
+            </div>
+          </div>
+          <div id="progressPanelModalContainer" class="progress-panel-modal-r"></div>
+        </div>
+      </div>
+
+      <div class="start-progress-wrap">
+        <button id="confirmStartBtn" tabindex="0" onclick="startGame()">
+          S T A R T
+        </button>
+        <div id="startProgressLabel" class="start-progress-label" aria-hidden="true"></div>
+      </div>
+
+      <div class="start-modal-controls">
+        <div class="all-checkbox-container" style="display:flex; align-items:center; gap:10px;">
+          <button id="toggleProgressColumnsBtn" class="all-checkbox-btn" type="button" title="Прогрес">
+            <i class="sentence-col-flag-icon" data-lucide="circle"></i>
+            <i data-lucide="activity"></i>
+          </button>
+          <button id="toggleOriginalColumnBtn" class="all-checkbox-btn" type="button" title="Оригинал">
+            <i class="sentence-col-flag-icon" data-lucide="circle"></i>
+            <span class="sentence-col-flag-letter" aria-hidden="true">o</span>
+          </button>
+          <button id="toggleTranslationColumnBtn" class="all-checkbox-btn" type="button" title="Перевод">
+            <i class="sentence-col-flag-icon" data-lucide="circle"></i>
+            <span class="sentence-col-flag-letter" aria-hidden="true">t</span>
+          </button>
+        </div>
+
+        <div class="all-checkbox-container" style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+          <button id="mixControl" class="all-checkbox-btn">
+            <i data-lucide="move-right"></i>
+            <span></span>
+          </button>
+          <button id="resetProgressBtn" class="all-checkbox-btn">
+            <i data-lucide="rotate-ccw"></i>
+            <span></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table id="sentences-table">
+          <colgroup>
+            <col class="col-rownum">
+            <col class="col-choice">
+            <col class="col-progress">
+            <col class="col-progress">
+            <col class="col-progress">
+            <col class="col-progress">
+            <col class="col-text-original">
+            <col class="col-text-translation">
+            <col class="col-code">
+          </colgroup>
+          <thead>
+            <tr>
+              <th id="thSentenceRowNumber" data-keep-empty="true">№</th>
+              <th id="thSentenceChoice">
+                <button id="allCheckbox" class="all-checkbox-btn" type="button" title="Отметить все" aria-label="Отметить все">
+                  <i data-lucide="circle"></i>
+                </button>
+              </th>
+              <th class="col-progress"></th>
+              <th class="col-progress"></th>
+              <th class="col-progress"></th>
+              <th class="col-progress" title="попытки/ошибки">m</th>
+              <th id="thSentenceOriginal">Оригинал</th>
+              <th id="thSentenceTranslation">Перевод</th>
+              <th class="hidden-column">Код</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="pauseModal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <h2 id="pauseModalTitle">Пауза (control + esk)</h2>
+      <div class="pause-timer">
+        <i data-lucide="clock"></i>
+        <span id="pauseTimer">00:00:00</span>
+      </div>
+      <button id="resumeBtn" class="button-color-green" onclick="resumeGame()">
+        <i data-lucide="play"></i>
+        <span id="resumeBtnLabel">Продолжить</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="audioSettingsModal" class="modal" style="display: none;">
+    <div class="modal-content audio-settings-modal-content">
+      <div class="modal-header">
+        <h2 id="audioSettingsModalTitle">Настройки</h2>
+        <button class="modal-close" id="closeAudioSettingsModal" title="Закрыть">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="audio-settings-modal-two-panels">
+        <div class="audio-settings-modal-panel audio-settings-modal-panel-left">
+          <div id="audioSettingsModalContainer" class="audio-settings-modal-body"></div>
+        </div>
+        <div class="audio-settings-modal-panel audio-settings-modal-panel-right">
+          <div id="teacherReportRecipientsSection">
+            <div style="display:flex; align-items:center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+              <div style="display:flex; align-items:center; gap: 8px; font-weight: 700;">
+                <i data-lucide="send"></i>
+                <span id="teacherReportTitle">Отчет в Telegram</span>
+              </div>
+            </div>
+            <div id="teacherReportDesc" style="font-size: 13px; opacity: 0.9; margin-bottom: 8px;">Кому отправлять отчет после завершения диктанта</div>
+            <div id="teacherReportRecipientsList" style="display:flex; flex-direction: column; gap: 8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="completionModal" class="modal" style="display: none;">
+    <div class="modal-content completion-modal-content">
+      <div class="completion-header">
+        <div class="completion-medal-row">
+          <i id="completionRewardIcon" data-lucide="award" class="completion-icon"></i>
+          <span id="completionMedalCount" class="completion-medal-count" style="display:none;">0</span>
+          <span id="completionAssignmentPositions" class="completion-medal-count" style="display:none; margin-left:10px; font-weight:700; font-size:18px; opacity:0.9;"></span>
+        </div>
+        <h2 id="completionTitle">Поздравляем!</h2>
+      </div>
+      <p id="completionMessage" class="completion-message">Вы успешно завершили диктант!</p>
+      <div class="completion-buttons">
+        <button id="completionResultsBtn" class="completion-transparent-btn" title="Посмотреть результаты">
+          <i data-lucide="list-check"></i>
+          <span id="completionResultsBtnLabel">Посмотреть результаты</span>
+        </button>
+        <button id="completionExitBtn" class="button-color-yellow">
+          <i data-lucide="log-out"></i>
+          <span id="completionExitBtnLabel">Выйти</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="noSelectionModal" class="modal" style="display: none;">
+    <div class="modal-content warning-modal-content">
+      <div class="warning-header">
+        <i data-lucide="alert-circle" class="warning-icon"></i>
+        <h2 id="noSelectionTitle">Внимание! У нас проблема!</h2>
+      </div>
+      <p id="noSelectionMessage" class="warning-message">Пожалуйста, отметьте предложения для работы в таблице выше.</p>
+      <div class="warning-buttons">
+        <button id="noSelectionOkBtn" class="button-color-green">
+          <i data-lucide="check"></i>
+          <span id="noSelectionOkLabel">Понятно</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
