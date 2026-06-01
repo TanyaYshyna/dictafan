@@ -2132,8 +2132,23 @@ function initializeLanguageSelector() {
                 learningLanguages: originalData.learning_languages,
                 currentLearning: originalData.current_learning,
                 languageData: languageData,
-                onLanguageChange: function () {
-                    try { refreshLearningDropdownAvailable(); } catch (e) {}
+                onLanguageChange: function (changeData) {
+                    try {
+                        const langs = changeData && Array.isArray(changeData.learningLanguages) ? changeData.learningLanguages : null;
+                        if (langs && learningSelector && learningSelector.options) {
+                            learningSelector.options.learningAvailableLanguages = langs;
+                            learningSelector.options.learningLanguages = langs;
+                            if (changeData && changeData.currentLearning) {
+                                learningSelector.options.currentLearning = changeData.currentLearning;
+                            }
+                            learningSelector.render();
+                            if (window.lucide) window.lucide.createIcons();
+                        } else {
+                            try { refreshLearningDropdownAvailable(); } catch (e2) {}
+                        }
+                    } catch (e) {
+                        try { refreshLearningDropdownAvailable(); } catch (e2) {}
+                    }
                     checkForChanges();
                 }
             });
