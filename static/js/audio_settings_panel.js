@@ -403,10 +403,6 @@ class AudioSettingsPanel {
             const repeatsLabel = this._t('profile.audio.repeats.label', null, 'Повторы аудио:');
             const onlyAudioLabel = this._t('profile.audio.only_audio.label', null, 'Только аудио (без ввода текста):');
             const showHintLabel = this._t('profile.audio.show_hint.label', null, 'Показывать подсказку:');
-            const speechRecLabel = this._t('profile.audio.speech_recognition.label', null, 'Распознавание речи:');
-            const testRecLabel = this._t('profile.audio.test_recording.label', null, 'Тест записи:');
-            const recordBtnText = this._t('profile.audio.test_recording.record', null, 'Записать');
-            const testRecPlaceholder = this._t('profile.audio.test_recording.placeholder', null, 'Распознанный текст появится тут');
 
             const explanationValues = {
                 'o': this._t('profile.audio.explanations.o', null, this.explanations['o']),
@@ -563,33 +559,6 @@ class AudioSettingsPanel {
                                                     title="${showHintTitle}">
                                                 <i data-lucide="${this.settings.show_text ? 'circle-check-big' : 'circle'}"></i>
                                             </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="audio-settings-label">
-                                            <label>${speechRecLabel}</label>
-                                        </td>
-                                        <td class="audio-settings-input">
-                                            <div class="speech-recognition-toggle-button" 
-                                                 data-prefix="${prefix}"
-                                                 data-mode="${this.settings.speech_recognition_mode}">
-                                                <i data-lucide="${this.getSpeechRecognitionIcon(this.settings.speech_recognition_mode)}" class="speech-recognition-icon"></i>
-                                                <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="audio-settings-label">
-                                            <label>${testRecLabel}</label>
-                                        </td>
-                                        <td class="audio-settings-input">
-                                            <div style="display:flex; flex-direction:column; gap:8px;">
-                                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                                    <button type="button" id="profileTestRecordingBtn" class="button-color-yellow" style="height: 34px; padding: 0 12px;">${recordBtnText}</button>
-                                                    <span id="profileTestRecordingStatus" style="font-size: 12px; color: #666;"></span>
-                                                </div>
-                                                <textarea id="profileTestRecordingResult" rows="2" style="width: min(520px, 100%); resize: vertical;" placeholder="${testRecPlaceholder}" readonly></textarea>
-                                            </div>
                                         </td>
                                     </tr>
                                 </table>

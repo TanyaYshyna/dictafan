@@ -211,6 +211,19 @@
                                 </tbody>
                             </table>
 
+                            <div class="models-centric-test-recording" data-role="models-centric-test-recording">
+                                <div class="models-centric-test-recording-left">
+                                    <button type="button" id="profileTestRecordingBtn" class="button-color-purple">
+                                        <i data-lucide="mic"></i>
+                                        {{ t('profile.audio.test_recording.record') }}
+                                    </button>
+                                    <span id="profileTestRecordingStatus"></span>
+                                </div>
+                                <div class="models-centric-test-recording-right">
+                                    <textarea id="profileTestRecordingResult" rows="2" placeholder="{{ t('profile.audio.test_recording.placeholder') }}" readonly></textarea>
+                                </div>
+                            </div>
+
                             <div class="storage-info-full models-centric-storage">
                                 <div class="storage-info-head">
                                     <span class="storage-info-title">{{ t('profile.models.browser_storage') }}</span>
