@@ -126,10 +126,19 @@
 }
 
 .models-centric-radio-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.models-centric-radio-btn i,
+.models-centric-radio-btn svg {
+    width: 24px;
+    height: 24px;
+    display: flex;
     align-items: center;
     justify-content: center;
 }
