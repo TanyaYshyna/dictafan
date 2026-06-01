@@ -327,9 +327,7 @@
   overflow: hidden;
 }
 
-#user-profile-modal .groups-table,
-#user-profile-modal .groups-students-table,
-#user-profile-modal .groups-details {
+#groups-right {
   border-top-left-radius: 0;
 }
 
