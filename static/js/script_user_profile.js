@@ -2317,6 +2317,28 @@ async function initializeAudioSettings() {
 
         audioSettingsPanel.init(userSettings);
 
+        try {
+            if (!window.__profileSpeechRecModeBound) {
+                window.__profileSpeechRecModeBound = true;
+                window.addEventListener('profile-speech-recognition-mode-selected', (ev) => {
+                    try {
+                        const detail = ev && ev.detail ? ev.detail : null;
+                        const mode = detail && detail.mode ? String(detail.mode) : '';
+                        if (!mode) return;
+                        if (audioSettingsPanel && typeof audioSettingsPanel._updateSetting === 'function') {
+                            audioSettingsPanel._updateSetting('speech_recognition_mode', mode);
+                            if (typeof audioSettingsPanel.triggerChange === 'function') {
+                                audioSettingsPanel.triggerChange();
+                            }
+                        }
+                        checkForChanges();
+                    } catch (e2) {
+                    }
+                });
+            }
+        } catch (e) {
+        }
+
         // Bind test recording widget (rendered inside AudioSettingsPanel in user-settings mode)
         setTimeout(() => {
             try {

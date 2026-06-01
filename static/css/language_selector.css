@@ -7,6 +7,97 @@
     background-color: var(--color-button-yellow) !important;
 }
 
+.model-switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}
+
+.model-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.model-switch .model-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .2s;
+    border-radius: 20px;
+}
+
+.model-switch .model-slider-circle {
+    position: absolute;
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+}
+
+.model-switch input:checked + .model-slider {
+    background-color: #8B4513;
+}
+
+.model-switch input:checked + .model-slider .model-slider-circle {
+    transform: translateX(20px);
+}
+
+.model-switch input:disabled + .model-slider {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.models-centric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.models-centric-row:last-child {
+    border-bottom: none;
+}
+
+.models-centric-method {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.models-centric-method-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.models-centric-right {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+}
+
+.models-centric-size {
+    font-size: 12px;
+    color: #666;
+    min-width: 64px;
+    text-align: right;
+}
+
 .model-dropdown-item {
     background-color: white;
     transition: background-color 0.2s ease;

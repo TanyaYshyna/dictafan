@@ -208,46 +208,125 @@ class LanguageSelector {
         const downloaded = this._getDownloadedModelsV2();
         const downloadedKeys = new Set(Object.keys(downloaded || {}));
 
-        const primaryKey = this._getPrimaryModelKeyV2();
-        const whisperModels = models.filter(m => m.modelType === 'whisper');
+        const currentLang = String(this.options.currentLearning || this.options.nativeLanguage || 'en')
+            .trim()
+            .toLowerCase()
+            .split('-')[0] || 'en';
 
-        const ensurePrimaryValid = () => {
-            try {
-                const current = this._getPrimaryModelKeyV2();
-                if (current && downloadedKeys.has(current)) return;
-                const firstDownloaded = whisperModels.find(m => downloadedKeys.has(String(m.modelKey)));
-                if (firstDownloaded) {
-                    this._setPrimaryModelKeyV2(String(firstDownloaded.modelKey));
-                } else {
-                    this._setPrimaryModelKeyV2('');
-                }
-            } catch (e) {
+        const selectedModelKey = this._getSelectedModelKeyV2(currentLang);
+
+        const whisperTiny = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-tiny')) || null;
+        const whisperBase = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-base')) || null;
+        const whisperSmall = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-small')) || null;
+
+        const methodItems = [
+            {
+                id: 'route',
+                mode: 'route',
+                title: this._t('profile.models.method_google', null, 'Google сервисы'),
+                sub: '',
+                kind: 'service',
+                canDownload: false,
+            },
+            {
+                id: 'route-server',
+                mode: 'route-server',
+                title: this._t('profile.models.method_server_whisper_tiny', null, 'На сервере Whisper Tiny'),
+                sub: '',
+                kind: 'server',
+                canDownload: false,
+            },
+            ...(whisperTiny ? [{
+                id: 'device:' + whisperTiny.modelKey,
+                mode: 'route-off',
+                modelKey: String(whisperTiny.modelKey),
+                title: this._t('profile.models.method_device_whisper_tiny', null, 'На устройстве Whisper Tiny'),
+                sub: whisperTiny.size ? String(whisperTiny.size) : '',
+                kind: 'device',
+                canDownload: true,
+                modelType: 'whisper',
+            }] : []),
+            ...(whisperBase ? [{
+                id: 'device:' + whisperBase.modelKey,
+                mode: 'route-off',
+                modelKey: String(whisperBase.modelKey),
+                title: this._t('profile.models.method_device_whisper_base', null, 'На устройстве Whisper Base'),
+                sub: whisperBase.size ? String(whisperBase.size) : '',
+                kind: 'device',
+                canDownload: true,
+                modelType: 'whisper',
+            }] : []),
+            ...(whisperSmall ? [{
+                id: 'device:' + whisperSmall.modelKey,
+                mode: 'route-off',
+                modelKey: String(whisperSmall.modelKey),
+                title: this._t('profile.models.method_device_whisper_small', null, 'На устройстве Whisper Small'),
+                sub: whisperSmall.size ? String(whisperSmall.size) : '',
+                kind: 'device',
+                canDownload: true,
+                modelType: 'whisper',
+            }] : []),
+        ];
+
+        let currentMode = 'route';
+        try {
+            if (window.__PROFILE_SPEECH_REC_MODE) {
+                currentMode = String(window.__PROFILE_SPEECH_REC_MODE);
+            } else if (window.UM && UM.userData && UM.userData.speech_recognition_mode) {
+                currentMode = String(UM.userData.speech_recognition_mode);
             }
-        };
-        ensurePrimaryValid();
+        } catch (e) {
+        }
+
+        const selectedRadioId = (() => {
+            if (currentMode === 'route-server') return 'route-server';
+            if (currentMode === 'route-off') {
+                if (selectedModelKey) return 'device:' + selectedModelKey;
+                if (whisperBase) return 'device:' + whisperBase.modelKey;
+                if (whisperTiny) return 'device:' + whisperTiny.modelKey;
+                if (whisperSmall) return 'device:' + whisperSmall.modelKey;
+                return 'route-off';
+            }
+            return 'route';
+        })();
 
         return `
             <div class="models-centric">
-                <div class="models-centric-note">${this._t('profile.models.note_global', null, 'Модели применяются ко всем языкам. Можно скачать несколько, а "главную" выбрать радиокнопкой.')}</div>
                 <div class="models-centric-list" role="list">
-                    ${models.map(m => {
-                        const isDownloaded = downloadedKeys.has(m.modelKey);
-                        const isWhisper = m.modelType === 'whisper';
-                        const radioDisabled = !isWhisper || !isDownloaded;
-                        const effectivePrimary = this._getPrimaryModelKeyV2();
-                        const isPrimary = !!effectivePrimary && String(effectivePrimary) === String(m.modelKey);
+                    ${methodItems.map(item => {
+                        const isDevice = item.kind === 'device';
+                        const mk = item.modelKey ? String(item.modelKey) : '';
+                        const isDownloaded = !!(mk && downloadedKeys.has(mk));
+                        const isBusy = !!(mk && this._modelsCentricDownloadsInFlight && this._modelsCentricDownloadsInFlight.has(mk));
+                        const sliderDisabled = !item.canDownload || isBusy;
+
+                        const radioValue = isDevice
+                            ? `route-off|${mk}`
+                            : String(item.mode);
+
+                        const isChecked = String(selectedRadioId) === String(item.id);
+
                         return `
                             <div class="models-centric-row" role="listitem">
-                                <button type="button" class="topbar-icon-btn models-centric-check-btn" data-model-key="${m.modelKey}" data-model-type="${m.modelType}" aria-label="${this._t('profile.models.download_toggle', null, 'Загрузить/удалить модель')}"></button>
-                                <div class="models-centric-main">
-                                    <div class="models-centric-title">${m.name}</div>
-                                    <div class="models-centric-sub">${m.modelType === 'whisper' ? 'Whisper' : 'ASR'}${m.size ? ` · ${m.size}` : ''}</div>
-                                </div>
-                                <div class="models-centric-primary">
-                                    <label class="models-centric-radio">
-                                        <input type="radio" name="primaryModelV2" class="models-centric-primary-radio" value="${m.modelKey}" ${isPrimary ? 'checked' : ''} ${radioDisabled ? 'disabled' : ''} />
-                                        <span>${this._t('profile.models.primary', null, 'главная')}</span>
-                                    </label>
+                                <label class="models-centric-method">
+                                    <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio" value="${radioValue}" ${isChecked ? 'checked' : ''} />
+                                    <span class="models-centric-method-text">${item.title}</span>
+                                </label>
+                                <div class="models-centric-right">
+                                    ${item.sub ? `<span class="models-centric-size">${item.sub}</span>` : ''}
+                                    ${item.canDownload ? `
+                                        <label class="model-switch" aria-label="${this._t('profile.models.download_toggle', null, 'Загрузить/удалить модель')}">
+                                            <input type="checkbox"
+                                                   class="model-download-toggle-v2"
+                                                   ${isDownloaded ? 'checked' : ''}
+                                                   ${sliderDisabled ? 'disabled' : ''}
+                                                   data-model-key="${mk}"
+                                                   data-model-type="${item.modelType || ''}" />
+                                            <span class="model-slider ${isDownloaded ? 'downloaded' : ''}">
+                                                <span class="model-slider-circle"></span>
+                                            </span>
+                                        </label>
+                                    ` : ''}
                                 </div>
                             </div>
                         `;
@@ -451,26 +530,53 @@ class LanguageSelector {
             this.render();
         };
 
-        this.options.container.addEventListener('click', async (e) => {
-            const btn = e.target && e.target.closest ? e.target.closest('.models-centric-check-btn') : null;
-            if (!btn) return;
-            const modelKey = btn.dataset.modelKey;
-            const modelType = btn.dataset.modelType;
-            const downloaded = this._getDownloadedModelsV2();
-            const isDownloaded = !!(downloaded && downloaded[modelKey]);
-            await handleDownloadToggle(modelKey, modelType, !isDownloaded);
-        });
-
         this.options.container.addEventListener('change', async (e) => {
-            const radio = e.target && e.target.classList && e.target.classList.contains('models-centric-primary-radio') ? e.target : null;
-            if (radio) {
-                const modelKey = String(radio.value || '');
-                const downloaded = this._getDownloadedModelsV2();
-                if (downloaded && downloaded[modelKey]) {
-                    this._setPrimaryModelKeyV2(modelKey);
-                }
-                this.render();
+            const toggle = e.target && e.target.classList && e.target.classList.contains('model-download-toggle-v2') ? e.target : null;
+            if (toggle) {
+                const modelKey = String(toggle.dataset.modelKey || '');
+                const modelType = String(toggle.dataset.modelType || '');
+                const shouldDownload = !!toggle.checked;
+                await handleDownloadToggle(modelKey, modelType, shouldDownload);
                 return;
+            }
+
+            const methodRadio = e.target && e.target.classList && e.target.classList.contains('models-centric-method-radio') ? e.target : null;
+            if (methodRadio) {
+                const val = String(methodRadio.value || 'route');
+                let mode = val;
+                let modelKey = '';
+                if (val.startsWith('route-off|')) {
+                    mode = 'route-off';
+                    modelKey = val.split('|').slice(1).join('|');
+                }
+
+                try {
+                    window.__PROFILE_SPEECH_REC_MODE = mode;
+                } catch (e0) {
+                }
+
+                const currentLang = String(this.options.currentLearning || this.options.nativeLanguage || 'en')
+                    .trim()
+                    .toLowerCase()
+                    .split('-')[0] || 'en';
+
+                try {
+                    if (mode === 'route-off' && modelKey) {
+                        this._setSelectedModelKeyV2(currentLang, modelKey);
+                    }
+                } catch (e1) {
+                }
+
+                try {
+                    window.dispatchEvent(new CustomEvent('profile-speech-recognition-mode-selected', {
+                        detail: {
+                            mode,
+                            lang: currentLang,
+                            modelKey: modelKey || null,
+                        }
+                    }));
+                } catch (e2) {
+                }
             }
         });
 
@@ -1665,22 +1771,6 @@ class LanguageSelector {
         }
 
         if (this.options.mode === 'models-centric') {
-            try {
-                const downloaded = this._getDownloadedModelsV2();
-                const btns = this.options.container.querySelectorAll('.models-centric-check-btn');
-                btns.forEach((btn) => {
-                    try {
-                        const modelKey = btn.dataset ? btn.dataset.modelKey : '';
-                        const modelType = btn.dataset ? btn.dataset.modelType : '';
-                        const isDownloaded = !!(downloaded && modelKey && downloaded[modelKey]);
-                        const isBusy = !!(modelKey && this._modelsCentricDownloadsInFlight && this._modelsCentricDownloadsInFlight.has(modelKey));
-                        const disabled = isBusy || String(modelType) !== 'whisper';
-                        this._renderLucideCheckboxButton(btn, isDownloaded, disabled);
-                    } catch (eBtn) {
-                    }
-                });
-            } catch (e0) {
-            }
             setTimeout(() => {
                 this.updateStorageInfoV2();
             }, 100);
