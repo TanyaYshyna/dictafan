@@ -59,8 +59,8 @@
                                     </div>
                                 </div>
 
-                                <div class="profile-lang-panels" style="display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px;">
-                                    <div class="profile-lang-panel-left" style="display:flex; flex-direction: column; gap: 12px;">
+                                <div class="profile-lang-panels" style="display:flex; flex-wrap: wrap; align-items:flex-start; gap: 16px;">
+                                    <div class="profile-lang-panel-left" style="display:flex; flex-direction: column; gap: 12px; flex: 0 0 360px; max-width: 100%;">
                                         <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
                                             <label style="margin:0;">{{ t('profile.native_language.label') }}</label>
                                             <div id="nativeLanguageSelectorContainer" style="width: 100%;"></div>
@@ -72,15 +72,15 @@
                                         </div>
                                     </div>
 
-                                    <div class="profile-lang-panel-right" style="display:flex; flex-direction: column; gap: 12px;">
-                                        <div class="form-row" style="display:flex; align-items:flex-start; gap: 14px; flex-wrap: wrap;">
-                                            <label style="margin:0; white-space:nowrap; padding-top: 10px;">{{ t('profile.learning_languages.label') }}</label>
-                                            <div id="learningLanguagesListContainer" style="flex: 1; min-width: 280px;"></div>
+                                    <div class="profile-lang-panel-right" style="display:flex; flex-direction: column; gap: 12px; flex: 0 0 360px; max-width: 100%;">
+                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
+                                            <label style="margin:0;">{{ t('profile.learning_languages.label') }}</label>
+                                            <div id="learningLanguagesListContainer" style="width: 100%;"></div>
                                         </div>
 
-                                        <div class="form-row" style="display:flex; align-items:center; gap: 14px; flex-wrap: wrap;">
-                                            <label style="margin:0; white-space:nowrap;">{{ t('profile.learning_language.label', null, 'Сейчас учу') }}</label>
-                                            <div id="learningLanguageSelectorContainer" style="flex: 1; min-width: 280px;"></div>
+                                        <div class="form-row" style="display:flex; flex-direction: column; align-items: stretch; gap: 6px;">
+                                            <label style="margin:0;">{{ t('profile.learning_language.label') }}</label>
+                                            <div id="learningLanguageSelectorContainer" style="width: 100%;"></div>
                                         </div>
                                     </div>
                                 </div>
