@@ -1624,7 +1624,7 @@ function bindProfileTestRecording() {
     };
 
     const setResult = (text) => {
-        resultEl.value = text || '';
+        resultEl.textContent = text || '';
     };
 
     const getCurrentMode = () => {

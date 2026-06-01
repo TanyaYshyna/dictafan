@@ -220,7 +220,7 @@
                                     <span id="profileTestRecordingStatus"></span>
                                 </div>
                                 <div class="models-centric-test-recording-right">
-                                    <textarea id="profileTestRecordingResult" rows="2" placeholder="{{ t('profile.audio.test_recording.placeholder') }}" readonly></textarea>
+                                    <div id="profileTestRecordingResult" class="models-centric-test-recording-result">{{ t('profile.audio.test_recording.placeholder') }}</div>
                                 </div>
                             </div>
 
@@ -357,17 +357,19 @@
                                 </div>
                             </div>
 
-                            <div class="telegram-bot-username">@dictafan_user_bot</div>
                             <div class="telegram-link-and-qr">
-                                <div class="telegram-link-controls">
-                                    <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
-                                        <i data-lucide="key"></i>
-                                        {{ t('profile.telegram.link.get_code') }}
-                                    </button>
-                                    <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
-                                        <i data-lucide="copy"></i>
-                                    </button>
-                                    <div id="telegramLinkCodeLabel" class="telegram-link-code-label"></div>
+                                <div class="telegram-link-left">
+                                    <div class="telegram-bot-username">@dictafan_user_bot</div>
+                                    <div class="telegram-link-controls">
+                                        <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
+                                            <i data-lucide="key"></i>
+                                            {{ t('profile.telegram.link.get_code') }}
+                                        </button>
+                                        <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
+                                            <i data-lucide="copy"></i>
+                                        </button>
+                                        <div id="telegramLinkCodeLabel" class="telegram-link-code-label"></div>
+                                    </div>
                                 </div>
 
                                 <div class="telegram-qr-panel">

@@ -111,6 +111,31 @@ def create_user(
             )
         user_row = cur.fetchone()
 
+        # Telegram notifications defaults for new users
+        try:
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='users'
+                  AND column_name IN ('telegram_enabled', 'telegram_self_reports_enabled')
+                """
+            )
+            rows = cur.fetchall() or []
+            cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+            if 'telegram_enabled' in cols:
+                cur.execute(
+                    "UPDATE users SET telegram_enabled = TRUE WHERE id = %s",
+                    (user_row["id"],),
+                )
+            if 'telegram_self_reports_enabled' in cols:
+                cur.execute(
+                    "UPDATE users SET telegram_self_reports_enabled = TRUE WHERE id = %s",
+                    (user_row["id"],),
+                )
+        except Exception:
+            pass
+
         # Очищаем и заполняем user_learning_languages
         cur.execute(
             "DELETE FROM user_learning_languages WHERE user_id = %s",
