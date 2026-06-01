@@ -117,7 +117,108 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="languageSelectorModelsContainer" class="profile-panel profile-panel-flat-top"></div>
+                    <div id="languageSelectorModelsContainer" class="profile-panel profile-panel-flat-top">
+                        <div class="models-centric" data-role="models-centric-root">
+                            <table class="models-centric-table" data-role="models-centric-table">
+                                <tbody>
+                                    <tr class="models-centric-tr" data-method="route">
+                                        <td class="models-centric-td-select">
+                                            <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio" value="route" />
+                                        </td>
+                                        <td class="models-centric-td-icon">
+                                            <i data-lucide="route" class="models-centric-method-icon"></i>
+                                        </td>
+                                        <td class="models-centric-td-title">
+                                            <span class="models-centric-method-text">{{ t('profile.models.method_google') }}</span>
+                                        </td>
+                                        <td class="models-centric-td-toggle"></td>
+                                    </tr>
+
+                                    <tr class="models-centric-tr" data-method="route-server">
+                                        <td class="models-centric-td-select">
+                                            <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio" value="route-server" />
+                                        </td>
+                                        <td class="models-centric-td-icon">
+                                            <i data-lucide="server" class="models-centric-method-icon"></i>
+                                        </td>
+                                        <td class="models-centric-td-title">
+                                            <span class="models-centric-method-text">{{ t('profile.models.method_server_whisper_tiny') }}</span>
+                                        </td>
+                                        <td class="models-centric-td-toggle"></td>
+                                    </tr>
+
+                                    <tr class="models-centric-tr" data-method="route-off" data-model-size="tiny">
+                                        <td class="models-centric-td-select">
+                                            <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio models-centric-method-radio-device" value="route-off|" data-model-size="tiny" />
+                                        </td>
+                                        <td class="models-centric-td-icon">
+                                            <i data-lucide="route-off" class="models-centric-method-icon"></i>
+                                        </td>
+                                        <td class="models-centric-td-title">
+                                            <span class="models-centric-method-text">{{ t('profile.models.method_device_whisper_tiny') }}</span>
+                                            <span class="models-centric-size" data-role="model-size"></span>
+                                        </td>
+                                        <td class="models-centric-td-toggle">
+                                            <label class="model-switch">
+                                                <input type="checkbox" class="model-download-toggle-v2" data-model-type="whisper" data-model-size="tiny" />
+                                                <span class="model-slider"><span class="model-slider-circle"></span></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="models-centric-tr" data-method="route-off" data-model-size="base">
+                                        <td class="models-centric-td-select">
+                                            <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio models-centric-method-radio-device" value="route-off|" data-model-size="base" />
+                                        </td>
+                                        <td class="models-centric-td-icon">
+                                            <i data-lucide="route-off" class="models-centric-method-icon"></i>
+                                        </td>
+                                        <td class="models-centric-td-title">
+                                            <span class="models-centric-method-text">{{ t('profile.models.method_device_whisper_base') }}</span>
+                                            <span class="models-centric-size" data-role="model-size"></span>
+                                        </td>
+                                        <td class="models-centric-td-toggle">
+                                            <label class="model-switch">
+                                                <input type="checkbox" class="model-download-toggle-v2" data-model-type="whisper" data-model-size="base" />
+                                                <span class="model-slider"><span class="model-slider-circle"></span></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+
+                                    <tr class="models-centric-tr" data-method="route-off" data-model-size="small">
+                                        <td class="models-centric-td-select">
+                                            <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio models-centric-method-radio-device" value="route-off|" data-model-size="small" />
+                                        </td>
+                                        <td class="models-centric-td-icon">
+                                            <i data-lucide="route-off" class="models-centric-method-icon"></i>
+                                        </td>
+                                        <td class="models-centric-td-title">
+                                            <span class="models-centric-method-text">{{ t('profile.models.method_device_whisper_small') }}</span>
+                                            <span class="models-centric-size" data-role="model-size"></span>
+                                        </td>
+                                        <td class="models-centric-td-toggle">
+                                            <label class="model-switch">
+                                                <input type="checkbox" class="model-download-toggle-v2" data-model-type="whisper" data-model-size="small" />
+                                                <span class="model-slider"><span class="model-slider-circle"></span></span>
+                                            </label>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <div class="storage-info-full models-centric-storage">
+                                <div class="storage-info-head">
+                                    <span class="storage-info-title">{{ t('profile.models.browser_storage') }}</span>
+                                    <span id="storage-stats-text">{{ t('profile.models.loading_info') }}</span>
+                                </div>
+                                <div class="storage-progress-full">
+                                    <div class="storage-progress-fill-full" id="storage-progress-fill"></div>
+                                    <div class="storage-progress-text-full" id="storage-progress-text">0%</div>
+                                </div>
+                                <div id="storage-details" class="storage-details">{{ t('profile.models.calculating_storage') }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Настройки для диктантов -->

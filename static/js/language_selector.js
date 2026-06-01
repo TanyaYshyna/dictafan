@@ -204,7 +204,24 @@ class LanguageSelector {
     }
 
     createModelsCentricUI() {
+        // В профиле таблица моделей задается статически в HTML (skeleton),
+        // а JS только "оживляет" её. Поэтому тут возвращаем пустую строку.
+        return '';
+    }
+
+    hydrateModelsCentricUI() {
+        const root = this.options.container;
+        if (!root) return;
+        const table = root.querySelector('[data-role="models-centric-table"]');
+        if (!table) return;
+
         const models = this._collectGlobalModels();
+        const bySize = {
+            tiny: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-tiny')) || null,
+            base: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-base')) || null,
+            small: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-small')) || null,
+        };
+
         const downloaded = this._getDownloadedModelsV2();
         const downloadedKeys = new Set(Object.keys(downloaded || {}));
 
@@ -212,61 +229,7 @@ class LanguageSelector {
             .trim()
             .toLowerCase()
             .split('-')[0] || 'en';
-
         const selectedModelKey = this._getSelectedModelKeyV2(currentLang);
-
-        const whisperTiny = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-tiny')) || null;
-        const whisperBase = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-base')) || null;
-        const whisperSmall = models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-small')) || null;
-
-        const methodItems = [
-            {
-                id: 'route',
-                mode: 'route',
-                title: this._t('profile.models.method_google', null, 'Google сервисы'),
-                sub: '',
-                kind: 'service',
-                canDownload: false,
-            },
-            {
-                id: 'route-server',
-                mode: 'route-server',
-                title: this._t('profile.models.method_server_whisper_tiny', null, 'На сервере Whisper Tiny'),
-                sub: '',
-                kind: 'server',
-                canDownload: false,
-            },
-            ...(whisperTiny ? [{
-                id: 'device:' + whisperTiny.modelKey,
-                mode: 'route-off',
-                modelKey: String(whisperTiny.modelKey),
-                title: this._t('profile.models.method_device_whisper_tiny', null, 'На устройстве Whisper Tiny'),
-                sub: whisperTiny.size ? String(whisperTiny.size) : '',
-                kind: 'device',
-                canDownload: true,
-                modelType: 'whisper',
-            }] : []),
-            ...(whisperBase ? [{
-                id: 'device:' + whisperBase.modelKey,
-                mode: 'route-off',
-                modelKey: String(whisperBase.modelKey),
-                title: this._t('profile.models.method_device_whisper_base', null, 'На устройстве Whisper Base'),
-                sub: whisperBase.size ? String(whisperBase.size) : '',
-                kind: 'device',
-                canDownload: true,
-                modelType: 'whisper',
-            }] : []),
-            ...(whisperSmall ? [{
-                id: 'device:' + whisperSmall.modelKey,
-                mode: 'route-off',
-                modelKey: String(whisperSmall.modelKey),
-                title: this._t('profile.models.method_device_whisper_small', null, 'На устройстве Whisper Small'),
-                sub: whisperSmall.size ? String(whisperSmall.size) : '',
-                kind: 'device',
-                canDownload: true,
-                modelType: 'whisper',
-            }] : []),
-        ];
 
         let currentMode = 'route';
         try {
@@ -278,74 +241,55 @@ class LanguageSelector {
         } catch (e) {
         }
 
-        const selectedRadioId = (() => {
-            if (currentMode === 'route-server') return 'route-server';
-            if (currentMode === 'route-off') {
-                if (selectedModelKey) return 'device:' + selectedModelKey;
-                if (whisperBase) return 'device:' + whisperBase.modelKey;
-                if (whisperTiny) return 'device:' + whisperTiny.modelKey;
-                if (whisperSmall) return 'device:' + whisperSmall.modelKey;
-                return 'route-off';
+        const rows = root.querySelectorAll('.models-centric-tr');
+        rows.forEach((tr) => {
+            try {
+                const method = String(tr.dataset.method || '');
+                const size = String(tr.dataset.modelSize || '');
+
+                const radio = tr.querySelector('.models-centric-method-radio');
+                const sizeEl = tr.querySelector('[data-role="model-size"]');
+                const toggle = tr.querySelector('.model-download-toggle-v2');
+
+                if (method === 'route') {
+                    if (radio) radio.checked = currentMode === 'route';
+                    return;
+                }
+                if (method === 'route-server') {
+                    if (radio) radio.checked = currentMode === 'route-server';
+                    return;
+                }
+
+                if (method === 'route-off' && (size === 'tiny' || size === 'base' || size === 'small')) {
+                    const model = bySize[size] || null;
+                    const mk = model && model.modelKey ? String(model.modelKey) : '';
+                    const mSize = model && model.size ? String(model.size) : '';
+
+                    if (sizeEl) sizeEl.textContent = mSize ? `· ${mSize}` : '';
+
+                    if (radio) {
+                        radio.value = mk ? `route-off|${mk}` : 'route-off|';
+                        radio.disabled = !mk;
+                        if (currentMode === 'route-off') {
+                            radio.checked = !!(mk && selectedModelKey && String(selectedModelKey) === String(mk));
+                            if (!selectedModelKey && mk && size === 'base') {
+                                radio.checked = true;
+                            }
+                        } else {
+                            radio.checked = false;
+                        }
+                    }
+
+                    if (toggle) {
+                        toggle.dataset.modelKey = mk;
+                        toggle.checked = !!(mk && downloadedKeys.has(mk));
+                        const busy = !!(mk && this._modelsCentricDownloadsInFlight && this._modelsCentricDownloadsInFlight.has(mk));
+                        toggle.disabled = !mk || busy;
+                    }
+                }
+            } catch (eRow) {
             }
-            return 'route';
-        })();
-
-        return `
-            <div class="models-centric">
-                <div class="models-centric-list" role="list">
-                    ${methodItems.map(item => {
-                        const isDevice = item.kind === 'device';
-                        const mk = item.modelKey ? String(item.modelKey) : '';
-                        const isDownloaded = !!(mk && downloadedKeys.has(mk));
-                        const isBusy = !!(mk && this._modelsCentricDownloadsInFlight && this._modelsCentricDownloadsInFlight.has(mk));
-                        const sliderDisabled = !item.canDownload || isBusy;
-
-                        const radioValue = isDevice
-                            ? `route-off|${mk}`
-                            : String(item.mode);
-
-                        const isChecked = String(selectedRadioId) === String(item.id);
-
-                        return `
-                            <div class="models-centric-row" role="listitem">
-                                <label class="models-centric-method">
-                                    <input type="radio" name="speechRecognitionMethod" class="models-centric-method-radio" value="${radioValue}" ${isChecked ? 'checked' : ''} />
-                                    <span class="models-centric-method-text">${item.title}</span>
-                                </label>
-                                <div class="models-centric-right">
-                                    ${item.sub ? `<span class="models-centric-size">${item.sub}</span>` : ''}
-                                    ${item.canDownload ? `
-                                        <label class="model-switch" aria-label="${this._t('profile.models.download_toggle', null, 'Загрузить/удалить модель')}">
-                                            <input type="checkbox"
-                                                   class="model-download-toggle-v2"
-                                                   ${isDownloaded ? 'checked' : ''}
-                                                   ${sliderDisabled ? 'disabled' : ''}
-                                                   data-model-key="${mk}"
-                                                   data-model-type="${item.modelType || ''}" />
-                                            <span class="model-slider ${isDownloaded ? 'downloaded' : ''}">
-                                                <span class="model-slider-circle"></span>
-                                            </span>
-                                        </label>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-
-                <div class="storage-info-full">
-                    <div class="storage-info-head">
-                        <span class="storage-info-title">${this._t('profile.models.browser_storage', null, 'Хранилище браузера:')}</span>
-                        <span id="storage-stats-text">${this._t('profile.models.loading_info', null, 'Загрузка информации...')}</span>
-                    </div>
-                    <div class="storage-progress-full">
-                        <div class="storage-progress-fill-full" id="storage-progress-fill"></div>
-                        <div class="storage-progress-text-full" id="storage-progress-text">0%</div>
-                    </div>
-                    <div id="storage-details" class="storage-details">${this._t('profile.models.calculating_storage', null, 'Рассчитываем использование памяти...')} ${this._t('profile.models.storage.includes_all', null, '(включая кеши страниц и диктантов)')}</div>
-                </div>
-            </div>
-        `;
+        });
     }
 
     createLearningFlags() {
@@ -670,22 +614,45 @@ class LanguageSelector {
             if (browserQuota && displayUsage != null && browserAvailable != null) {
                 const displayUsageMB = displayUsage / (1024 * 1024);
                 const displayAvailableMB = browserAvailable / (1024 * 1024);
-                const modelsInfo = storageInfo.downloadedCount > 0
-                    ? ` | <strong>${this._t('profile.models.storage.models', null, 'Модели:')}</strong> ${this._t(
+                const modelsValue = storageInfo.downloadedCount > 0
+                    ? this._t(
                         'profile.models.storage.models_count',
                         { count: storageInfo.downloadedCount, size: this.formatSize(storageInfo.downloadedSizeMB) },
                         `${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSizeMB)})`
-                    )}`
-                    : '';
+                    )
+                    : this._t('profile.models.storage.none', null, 'нет');
                 detailsText.innerHTML = `
-                    <strong>${this._t('profile.models.storage.used', null, 'Использовано:')}</strong> ${this.formatSize(displayUsageMB)} |
-                    <strong>${this._t('profile.models.storage.available', null, 'Доступно:')}</strong> ${this.formatSize(displayAvailableMB)} |
-                    <strong>${this._t('profile.models.storage.total', null, 'Всего:')}</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
+                    <table class="storage-summary-table">
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.used', null, 'Использовано')}</td>
+                            <td class="storage-summary-v">${this.formatSize(displayUsageMB)}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.available', null, 'Доступно')}</td>
+                            <td class="storage-summary-v">${this.formatSize(displayAvailableMB)}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.total', null, 'Всего')}</td>
+                            <td class="storage-summary-v">${this.formatSize(browserQuota / (1024 * 1024))}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.models', null, 'Модели')}</td>
+                            <td class="storage-summary-v">${modelsValue}</td>
+                        </tr>
+                    </table>
                 `;
             } else {
                 detailsText.innerHTML = `
-                    <strong>${this._t('profile.models.storage.downloaded_models', null, 'Загружено моделей:')}</strong> ${storageInfo.downloadedCount} |
-                    <strong>${this._t('profile.models.storage.models_size', null, 'Размер моделей:')}</strong> ${this.formatSize(storageInfo.downloadedSizeMB)}
+                    <table class="storage-summary-table">
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.downloaded_models', null, 'Загружено моделей')}</td>
+                            <td class="storage-summary-v">${storageInfo.downloadedCount}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.models_size', null, 'Размер моделей')}</td>
+                            <td class="storage-summary-v">${this.formatSize(storageInfo.downloadedSizeMB)}</td>
+                        </tr>
+                    </table>
                 `;
             }
         }
@@ -1699,6 +1666,25 @@ class LanguageSelector {
         }
 
         let html = '';
+
+        if (this.options.mode === 'models-centric') {
+            try {
+                const hasSkeleton = !!this.options.container.querySelector('[data-role="models-centric-table"]');
+                if (hasSkeleton) {
+                    this.bindEvents();
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                    try { this.hydrateModelsCentricUI(); } catch (e0) {}
+                    setTimeout(() => {
+                        this.updateStorageInfoV2();
+                    }, 100);
+                    return;
+                }
+            } catch (e) {
+            }
+        }
+
         switch (this.options.mode) {
             case 'native-selector':
                 html = this.createNativeSelector();

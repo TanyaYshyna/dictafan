@@ -98,6 +98,83 @@
     text-align: right;
 }
 
+.models-centric-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.models-centric-tr {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.models-centric-tr:last-child {
+    border-bottom: none;
+}
+
+.models-centric-table td {
+    padding: 10px 8px;
+    vertical-align: middle;
+}
+
+.models-centric-td-select {
+    width: 32px;
+    text-align: center;
+}
+
+.models-centric-td-icon {
+    width: 34px;
+    text-align: center;
+    color: #666;
+}
+
+.models-centric-method-icon {
+    width: 18px;
+    height: 18px;
+}
+
+.models-centric-td-title {
+    width: auto;
+    min-width: 0;
+}
+
+.models-centric-td-toggle {
+    width: 90px;
+    text-align: right;
+}
+
+.models-centric-method-text {
+    font-size: 14px;
+    color: #222;
+}
+
+.models-centric-storage {
+    margin-top: 16px;
+}
+
+.storage-summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.storage-summary-table td {
+    padding: 2px 0;
+    vertical-align: top;
+}
+
+.storage-summary-k {
+    color: #666;
+    padding-right: 10px;
+    white-space: nowrap;
+}
+
+.storage-summary-v {
+    color: #222;
+    text-align: right;
+    width: 100%;
+}
+
 .model-dropdown-item {
     background-color: white;
     transition: background-color 0.2s ease;
