@@ -1662,11 +1662,8 @@ function bindProfileTestRecording() {
 
     const getCurrentMode = () => {
         try {
-            // Prefer current UI value from AudioSettingsPanel
-            if (audioSettingsPanel && typeof audioSettingsPanel.getSettings === 'function') {
-                const s = audioSettingsPanel.getSettings();
-                if (s && s.speech_recognition_mode) return s.speech_recognition_mode;
-            }
+            const m = getProfileSpeechRecognitionModeFromModelsTable();
+            if (m) return m;
         } catch (e) {
         }
         // Fallback to UM.userData
@@ -2021,6 +2018,8 @@ function loadUserData() {
         audio_repeats: userData.audio_repeats || 3,
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
         speech_recognition_mode: userData.speech_recognition_mode || 'route',
+        without_entering_text: Boolean(userData.without_entering_text),
+        show_text: Boolean(userData.show_text),
         assignment_history_retention_days: assignmentHistoryRetentionDays,
         daily_activity_goal: (() => {
             try {
@@ -2240,6 +2239,86 @@ function initializeLanguageModelsSelector() {
 // Инициализация панели настроек аудио
 let audioSettingsPanel = null;
 
+function getProfileSpeechRecognitionModeFromModelsTable() {
+    try {
+        const root = document.getElementById('languageSelectorModelsContainer');
+        if (!root) return '';
+        const checked = root.querySelector('input[name="speechRecognitionMethod"]:checked');
+        const raw = checked ? String(checked.value || '') : '';
+        if (!raw) return '';
+        return raw.split('|')[0];
+    } catch (e) {
+        return '';
+    }
+}
+
+function renderProfileLucideCheckbox(btn, checked, disabled) {
+    try {
+        if (!btn) return;
+        btn.dataset.checked = checked ? '1' : '0';
+        btn.dataset.disabled = disabled ? '1' : '0';
+        btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+        btn.disabled = Boolean(disabled);
+        btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: btn });
+            }
+        } catch (e) {
+        }
+    } catch (e) {
+    }
+}
+
+function getAudioSettingsFromDom() {
+    const startEl = document.getElementById('playSequenceStart');
+    const typoEl = document.getElementById('playSequenceTypo');
+    const successEl = document.getElementById('playSequenceSuccess');
+    const repeatsEl = document.getElementById('audioRepeatsInput');
+    const starHalfEl = document.getElementById('requiredPassedStarHalfInput');
+    const onlyAudioBtn = document.getElementById('withoutEnteringTextButton');
+
+    const repeats = (() => {
+        try {
+            const n = Number(repeatsEl ? repeatsEl.value : 3);
+            if (!Number.isFinite(n)) return 3;
+            return Math.min(5, Math.max(0, Math.floor(n)));
+        } catch (e) {
+            return 3;
+        }
+    })();
+
+    const requiredHalf = (() => {
+        try {
+            const n = Number(starHalfEl ? starHalfEl.value : 3);
+            if (!Number.isFinite(n)) return 3;
+            return Math.min(9, Math.max(3, Math.floor(n)));
+        } catch (e) {
+            return 3;
+        }
+    })();
+
+    const onlyAudio = (() => {
+        try {
+            if (!onlyAudioBtn) return false;
+            return String(onlyAudioBtn.dataset.checked || '') === '1';
+        } catch (e) {
+            return false;
+        }
+    })();
+
+    return {
+        start: startEl ? String(startEl.value || '') : '',
+        typo: typoEl ? String(typoEl.value || '') : '',
+        success: successEl ? String(successEl.value || '') : '',
+        repeats,
+        required_passed_star_half: requiredHalf,
+        without_entering_text: onlyAudio,
+        show_text: false,
+        speech_recognition_mode: getProfileSpeechRecognitionModeFromModelsTable() || (UM && UM.userData && UM.userData.speech_recognition_mode ? UM.userData.speech_recognition_mode : 'route'),
+    };
+}
+
 async function initializeAudioSettings() {
     const container = document.getElementById('userAudioSettingsContainer');
     
@@ -2258,13 +2337,12 @@ async function initializeAudioSettings() {
 
         // Загружаем настройки пользователя из settings_json (приоритет) или из отдельных полей
         let userSettings = {};
-        
+
         if (UM.userData.settings_json) {
             try {
                 const settings = JSON.parse(UM.userData.settings_json);
                 const audioSettings = settings.audio || {};
                 userSettings = {
-                    settings_json: UM.userData.settings_json,
                     audio_start: audioSettings.start,
                     audio_typo: audioSettings.typo,
                     audio_success: audioSettings.success,
@@ -2272,74 +2350,84 @@ async function initializeAudioSettings() {
                     audio_required_passed_star_half: audioSettings.required_passed_star_half,
                     without_entering_text: audioSettings.without_entering_text,
                     show_text: audioSettings.show_text,
-                    speech_recognition_mode: audioSettings.speech_recognition_mode
                 };
             } catch (e) {
                 console.warn('Ошибка парсинга settings_json:', e);
-                // Fallback на отдельные поля
                 userSettings = {
                     audio_start: UM.userData.audio_start,
                     audio_typo: UM.userData.audio_typo,
                     audio_success: UM.userData.audio_success,
                     audio_repeats: UM.userData.audio_repeats,
                     audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
-                    speech_recognition_mode: UM.userData.speech_recognition_mode
+                    without_entering_text: false,
+                    show_text: false,
                 };
             }
         } else {
-            // Используем отдельные поля (обратная совместимость)
             userSettings = {
                 audio_start: UM.userData.audio_start,
                 audio_typo: UM.userData.audio_typo,
                 audio_success: UM.userData.audio_success,
                 audio_repeats: UM.userData.audio_repeats,
                 audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
-                speech_recognition_mode: UM.userData.speech_recognition_mode
+                without_entering_text: false,
+                show_text: false,
             };
         }
 
-        if (!userSettings.settings_json && UM.userData.settings_json) {
-            userSettings.settings_json = UM.userData.settings_json;
-        }
-
-        if (!userSettings.audio_settings_json && UM.userData.audio_settings_json) {
-            userSettings.audio_settings_json = UM.userData.audio_settings_json;
-        }
-
-        audioSettingsPanel = new AudioSettingsPanel({
-            container: container,
-            mode: 'user-settings',
-            showExplanations: true,
-            onSettingsChange: (settings) => {
-                checkForChanges();
-            }
-        });
-
-        audioSettingsPanel.init(userSettings);
+        audioSettingsPanel = null;
 
         try {
-            if (!window.__profileSpeechRecModeBound) {
-                window.__profileSpeechRecModeBound = true;
-                window.addEventListener('profile-speech-recognition-mode-selected', (ev) => {
-                    try {
-                        const detail = ev && ev.detail ? ev.detail : null;
-                        const mode = detail && detail.mode ? String(detail.mode) : '';
-                        if (!mode) return;
-                        if (audioSettingsPanel && typeof audioSettingsPanel._updateSetting === 'function') {
-                            audioSettingsPanel._updateSetting('speech_recognition_mode', mode);
-                            if (typeof audioSettingsPanel.triggerChange === 'function') {
-                                audioSettingsPanel.triggerChange();
-                            }
-                        }
-                        checkForChanges();
-                    } catch (e2) {
-                    }
-                });
+            const startEl = document.getElementById('playSequenceStart');
+            const typoEl = document.getElementById('playSequenceTypo');
+            const successEl = document.getElementById('playSequenceSuccess');
+            const repeatsEl = document.getElementById('audioRepeatsInput');
+            const starHalfEl = document.getElementById('requiredPassedStarHalfInput');
+
+            if (startEl) startEl.value = userSettings.audio_start || '';
+            if (typoEl) typoEl.value = userSettings.audio_typo || '';
+            if (successEl) successEl.value = (userSettings.audio_success !== undefined && userSettings.audio_success !== null) ? userSettings.audio_success : '';
+            if (repeatsEl) repeatsEl.value = String(userSettings.audio_repeats !== undefined ? userSettings.audio_repeats : 3);
+            if (starHalfEl) starHalfEl.value = String(userSettings.audio_required_passed_star_half !== undefined ? userSettings.audio_required_passed_star_half : 3);
+        } catch (e) {
+        }
+
+        try {
+            const onlyAudioBtn = document.getElementById('withoutEnteringTextButton');
+            if (onlyAudioBtn) {
+                const checked = Boolean(userSettings.without_entering_text);
+                renderProfileLucideCheckbox(onlyAudioBtn, checked, false);
+                onlyAudioBtn.onclick = () => {
+                    const next = !(String(onlyAudioBtn.dataset.checked || '') === '1');
+                    renderProfileLucideCheckbox(onlyAudioBtn, next, false);
+                    checkForChanges();
+                };
             }
         } catch (e) {
         }
 
-        // Bind test recording widget (rendered inside AudioSettingsPanel in user-settings mode)
+        try {
+            const bindInput = (id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('input', () => checkForChanges());
+                el.addEventListener('change', () => checkForChanges());
+            };
+            bindInput('playSequenceStart');
+            bindInput('playSequenceTypo');
+            bindInput('playSequenceSuccess');
+            bindInput('audioRepeatsInput');
+            bindInput('requiredPassedStarHalfInput');
+        } catch (e) {
+        }
+
+        try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: container });
+            }
+        } catch (e) {
+        }
+
         setTimeout(() => {
             try {
                 bindProfileTestRecording();
@@ -2527,6 +2615,8 @@ function checkForChanges() {
         audio_repeats: currentValues.audio_repeats !== (originalData.audio_repeats || 3),
         audio_required_passed_star_half: currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3),
         speech_recognition_mode: currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route'),
+        without_entering_text: Boolean(currentValues.without_entering_text) !== Boolean(originalData.without_entering_text),
+        show_text: Boolean(currentValues.show_text) !== Boolean(originalData.show_text),
         assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
         daily_activity_goal: currentValues.daily_activity_goal !== (originalData.daily_activity_goal ?? 100),
     };
@@ -2573,25 +2663,17 @@ function getCurrentFormValues() {
         currentLearning: originalData.current_learning
     };
 
-    // Получаем настройки аудио из панели
-    let audioSettings = {
-        audio_start: '',
-        audio_typo: '',
-        audio_success: '',
-        audio_repeats: 3,
-        audio_required_passed_star_half: 3,
-        speech_recognition_mode: 'route'
+    const settings = getAudioSettingsFromDom();
+    const audioSettings = {
+        audio_start: settings.start || '',
+        audio_typo: settings.typo || '',
+        audio_success: settings.success || '',
+        audio_repeats: settings.repeats || 3,
+        audio_required_passed_star_half: settings.required_passed_star_half || 3,
+        speech_recognition_mode: settings.speech_recognition_mode || 'route',
+        without_entering_text: Boolean(settings.without_entering_text),
+        show_text: Boolean(settings.show_text),
     };
-    
-    if (audioSettingsPanel) {
-        const settings = audioSettingsPanel.getSettings();
-        audioSettings.audio_start = settings.start || '';
-        audioSettings.audio_typo = settings.typo || '';
-        audioSettings.audio_success = settings.success || '';
-        audioSettings.audio_repeats = settings.repeats || 3;
-        audioSettings.audio_required_passed_star_half = settings.required_passed_star_half || 3;
-        audioSettings.speech_recognition_mode = settings.speech_recognition_mode || 'route';
-    }
 
     return {
         username: document.getElementById('username').value,
@@ -2605,6 +2687,8 @@ function getCurrentFormValues() {
         audio_repeats: audioSettings.audio_repeats,
         audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
         speech_recognition_mode: audioSettings.speech_recognition_mode,
+        without_entering_text: audioSettings.without_entering_text,
+        show_text: audioSettings.show_text,
         assignment_history_retention_days: (() => {
             try {
                 const el = document.getElementById('assignmentHistoryRetentionDays');
@@ -2739,7 +2823,7 @@ async function saveProfile(options = {}) {
         updateData.daily_activity_goal = formValues.daily_activity_goal;
 
         // audio остаётся в settings_json
-        if (audioSettingsPanel) {
+        {
             let merged = {};
             try {
                 const raw = (UM && UM.userData && UM.userData.settings_json) ? UM.userData.settings_json : '';
@@ -2752,7 +2836,7 @@ async function saveProfile(options = {}) {
             } catch (e) {
             }
 
-            const settings = audioSettingsPanel.getSettings();
+            const settings = getAudioSettingsFromDom();
             try {
                 if (!merged.audio || typeof merged.audio !== 'object') {
                     merged.audio = {};

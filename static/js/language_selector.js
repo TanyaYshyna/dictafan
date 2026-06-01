@@ -83,7 +83,7 @@ class LanguageSelector {
             btn.dataset.disabled = disabled ? '1' : '0';
             btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
             btn.disabled = Boolean(disabled);
-            btn.innerHTML = `<i data-lucide="${checked ? 'circle-dot' : 'circle'}"></i>`;
+            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
             try {
                 if (window.lucide && typeof window.lucide.createIcons === 'function') {
                     window.lucide.createIcons({ root: btn });

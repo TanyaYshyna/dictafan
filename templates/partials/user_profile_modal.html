@@ -247,7 +247,79 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="userAudioSettingsContainer"></div>
+                    <div id="userAudioSettingsContainer" class="profile-panel profile-panel-flat-top dictation-settings-panel">
+                        <div class="dictation-settings-grid">
+                            <div class="dictation-settings-card dictation-settings-card-order">
+                                <div class="dictation-settings-title">{{ t('profile.audio.play_audio.order_title') }}</div>
+                                <table class="dictation-settings-table">
+                                    <tr>
+                                        <td class="dictation-settings-td-label"><label for="playSequenceStart">{{ t('profile.audio.play_audio.on_start') }}</label></td>
+                                        <td class="dictation-settings-td-input">
+                                            <input type="text" id="playSequenceStart" class="play-sequence-input" maxlength="5" placeholder="oto" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dictation-settings-td-label"><label for="playSequenceTypo">{{ t('profile.audio.play_audio.on_typo') }}</label></td>
+                                        <td class="dictation-settings-td-input">
+                                            <input type="text" id="playSequenceTypo" class="play-sequence-input" maxlength="5" placeholder="o" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dictation-settings-td-label"><label for="playSequenceSuccess">{{ t('profile.audio.play_audio.on_success') }}</label></td>
+                                        <td class="dictation-settings-td-input">
+                                            <input type="text" id="playSequenceSuccess" class="play-sequence-input" maxlength="5" placeholder="ot" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class="dictation-settings-card dictation-settings-card-legend">
+                                <div class="dictation-settings-title">{{ t('profile.audio.explanations.label') }}</div>
+                                <div class="dictation-settings-legend">
+                                    <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }}</div>
+                                    <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }}</div>
+                                </div>
+                            </div>
+
+                            <div class="dictation-settings-card dictation-settings-card-params">
+                                <table class="dictation-settings-table">
+                                    <tr>
+                                        <td class="dictation-settings-td-label">
+                                            <div class="dictation-settings-icon-label">
+                                                <i data-lucide="star"></i>
+                                                <span>=</span>
+                                            </div>
+                                        </td>
+                                        <td class="dictation-settings-td-input">
+                                            <div class="dictation-settings-inline">
+                                                <input type="number" id="requiredPassedStarHalfInput" class="play-sequence-input" min="3" max="9" />
+                                                <i data-lucide="star-half"></i>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dictation-settings-td-label">
+                                            <div class="dictation-settings-icon-label">
+                                                <i data-lucide="mic"></i>
+                                                <span>=</span>
+                                            </div>
+                                        </td>
+                                        <td class="dictation-settings-td-input">
+                                            <input type="number" id="audioRepeatsInput" class="play-sequence-input" min="0" max="5" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="dictation-settings-td-label">
+                                            <label>{{ t('profile.audio.only_audio.label') }}</label>
+                                        </td>
+                                        <td class="dictation-settings-td-input">
+                                            <button type="button" id="withoutEnteringTextButton" class="audio-setting-checkbox-btn" data-checked="false" title="{{ t('profile.audio.only_audio.title') }}"></button>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-section">

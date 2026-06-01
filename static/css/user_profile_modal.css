@@ -433,6 +433,105 @@
   height: 22px;
 }
 
+#user-profile-modal .dictation-settings-panel {
+  background: #ffffff;
+}
+
+#user-profile-modal .dictation-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas:
+    "order params"
+    "legend params";
+  gap: 16px;
+}
+
+#user-profile-modal .dictation-settings-card-order {
+  grid-area: order;
+}
+
+#user-profile-modal .dictation-settings-card-legend {
+  grid-area: legend;
+}
+
+#user-profile-modal .dictation-settings-card-params {
+  grid-area: params;
+}
+
+#user-profile-modal .dictation-settings-card {
+  border: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+#user-profile-modal .dictation-settings-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal table.dictation-settings-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 10px 10px !important;
+  table-layout: auto !important;
+}
+
+#user-profile-modal .dictation-settings-table td {
+  border: none;
+  padding: 0;
+  vertical-align: middle;
+}
+
+#user-profile-modal .dictation-settings-td-label {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-text, #1f2933);
+  font-weight: 600;
+  width: 1%;
+}
+
+#user-profile-modal .dictation-settings-td-input {
+  width: auto;
+}
+
+#user-profile-modal .dictation-settings-icon-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#user-profile-modal .dictation-settings-icon-label i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#user-profile-modal .dictation-settings-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .dictation-settings-inline i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#user-profile-modal .dictation-settings-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .dictation-settings-legend-row strong {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+}
+
 @media (max-width: 900px) {
   #user-profile-modal .profile-panels-container {
     grid-template-columns: 1fr;

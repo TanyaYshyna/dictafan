@@ -166,8 +166,9 @@
 }
 
 .models-centric-test-recording #profileTestRecordingBtn {
-    height: 38px;
-    padding: 0 14px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 16px;
     display: inline-flex;
     align-items: center;
     gap: 8px;

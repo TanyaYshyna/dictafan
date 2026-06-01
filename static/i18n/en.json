@@ -74,6 +74,7 @@
       },
       "play_audio": {
         "title": "Play audio:",
+        "order_title": "Audio playback order within a sentence",
         "on_start": "on start:",
         "on_typo": "on mistake:",
         "on_success": "on success:",
