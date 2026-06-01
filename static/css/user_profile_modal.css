@@ -228,6 +228,316 @@
   margin-top: 16px;
 }
 
+#user-profile-modal .groups-layout {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (max-width: 920px) {
+  #user-profile-modal .groups-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+#user-profile-modal .groups-left,
+#user-profile-modal .groups-right {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#user-profile-modal .groups-right {
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#user-profile-modal .groups-toolbar-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#user-profile-modal .groups-toolbar-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#user-profile-modal .groups-toolbar-title {
+  font-weight: 700;
+}
+
+#user-profile-modal .groups-toolbar-actions {
+  display: inline-flex;
+  gap: 10px;
+}
+
+#user-profile-modal .groups-right .groups-toolbar-actions button {
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-toolbar-actions button {
+  min-width: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+#user-profile-modal .groups-toolbar-actions i[data-lucide] {
+  width: 20px;
+  height: 20px;
+}
+
+#user-profile-modal .groups-filter-select {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-light, #e9ecef);
+  padding: 0 10px;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-table,
+#user-profile-modal .groups-students-table {
+  border: 1px solid var(--color-border-light, #e9ecef);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+#user-profile-modal .groups-table-header,
+#user-profile-modal .groups-table-row {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 54px;
+  gap: 10px;
+  padding: 10px 12px;
+  align-items: center;
+}
+
+#user-profile-modal .groups-table-header {
+  background: var(--color-hover-panel, #f7f6f5);
+  font-weight: 700;
+}
+
+#user-profile-modal .groups-table-row {
+  cursor: pointer;
+  border-top: 1px solid var(--color-border-light, #e9ecef);
+  background: #fff;
+}
+
+#user-profile-modal .groups-table-row.archived {
+  opacity: 0.65;
+}
+
+#user-profile-modal .groups-table-actions-cell {
+  display: flex;
+  justify-content: flex-end;
+}
+
+#user-profile-modal .groups-row-restore-btn {
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+}
+
+#user-profile-modal .groups-table-row.selected {
+  background: rgba(255, 236, 153, 0.6);
+}
+
+#user-profile-modal .groups-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#user-profile-modal .groups-details-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+#user-profile-modal .groups-details-row.no-label {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#user-profile-modal .groups-details-label {
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-details-row .groups-details-label {
+  white-space: nowrap;
+}
+
+#user-profile-modal .groups-details-value {
+  color: var(--color-text, #1f2933);
+  word-break: break-word;
+}
+
+#user-profile-modal #groupsDetailsTitle {
+  font-weight: 700;
+}
+
+#user-profile-modal #groupsDetailsTitle,
+#user-profile-modal #groupsDetailsDescription {
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-details-row.invite-row {
+  align-items: center;
+}
+
+#user-profile-modal .groups-details-row.invite-row .groups-details-label {
+  font-weight: 400;
+}
+
+#user-profile-modal .groups-students-title {
+  font-weight: 400;
+  margin-top: 6px;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-invite {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+#user-profile-modal .groups-invite-input {
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 16px;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-invite button {
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-students {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#user-profile-modal .groups-students-table-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 140px 70px;
+  gap: 12px;
+  padding: 10px 12px;
+  align-items: center;
+  border-top: 1px solid var(--color-border-light, #e9ecef);
+  cursor: pointer;
+  background: #fff;
+}
+
+#user-profile-modal .groups-memberships-table-row {
+  grid-template-columns: minmax(0, 1fr) 140px 220px;
+}
+
+#user-profile-modal .groups-memberships-table-row .groups-student-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#user-profile-modal .groups-memberships-teacher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+#user-profile-modal .groups-memberships-teacher .groups-student-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+}
+
+#user-profile-modal .groups-students-table-row.selected {
+  background: rgba(255, 236, 153, 0.6);
+}
+
+#user-profile-modal .groups-student-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e9ecef;
+  object-fit: cover;
+}
+
+#user-profile-modal .groups-student-name {
+  font-weight: 600;
+}
+
+#user-profile-modal .groups-student-status {
+  color: #666;
+  text-align: right;
+}
+
+#user-profile-modal .groups-student-notify {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#user-profile-modal .groups-student-notify-spacer {
+  width: 28px;
+  height: 28px;
+}
+
+#user-profile-modal .groups-student-notify-label {
+  font-size: 12px;
+  color: #666;
+}
+
+#user-profile-modal .groups-lucide-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: none;
+  outline: none;
+}
+
+#user-profile-modal .groups-lucide-toggle:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+#user-profile-modal .groups-lucide-toggle:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#user-profile-modal .groups-lucide-toggle i[data-lucide] {
+  width: 16px;
+  height: 16px;
+}
+
 #user-profile-modal .group-modal-content-640 {
   max-width: 640px;
 }
