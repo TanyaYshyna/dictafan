@@ -865,7 +865,7 @@ function renderTelegramSection() {
 
     if (qrImg) {
         if (codeVal) {
-            qrImg.style.display = '';
+            qrImg.style.display = 'block';
             qrImg.src = `/user/api/telegram/qr?code=${encodeURIComponent(codeVal)}&r=${Date.now()}`;
         } else {
             qrImg.style.display = 'none';
