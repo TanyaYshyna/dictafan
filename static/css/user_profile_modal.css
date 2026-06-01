@@ -228,6 +228,16 @@
   margin-top: 16px;
 }
 
+#user-profile-modal .groups-subsection-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+#user-profile-modal .groups-subsection-title {
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+}
+
 #user-profile-modal .groups-layout {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
@@ -256,6 +266,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+#user-profile-modal .groups-students-toolbar {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
 }
 
 #user-profile-modal .groups-toolbar-left {
@@ -312,6 +327,12 @@
   overflow: hidden;
 }
 
+#user-profile-modal .groups-table,
+#user-profile-modal .groups-students-table,
+#user-profile-modal .groups-details {
+  border-top-left-radius: 0;
+}
+
 #user-profile-modal .groups-table-header,
 #user-profile-modal .groups-table-row {
   display: grid;
@@ -359,6 +380,13 @@
   gap: 12px;
 }
 
+#user-profile-modal .groups-details {
+  border: 1px solid var(--color-border-light, #e9ecef);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+}
+
 #user-profile-modal .groups-details-row {
   display: grid;
   grid-template-columns: 110px minmax(0, 1fr);
@@ -397,6 +425,10 @@
   align-items: center;
 }
 
+#user-profile-modal .groups-details-row.invite-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 #user-profile-modal .groups-details-row.invite-row .groups-details-label {
   font-weight: 400;
 }
@@ -407,10 +439,39 @@
   color: var(--color-text, #1f2933);
 }
 
+#user-profile-modal .groups-students-title-strong {
+  font-weight: 700;
+}
+
 #user-profile-modal .groups-invite {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+#user-profile-modal #groupsInviteCopyBtn {
+  height: 44px;
+  min-width: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border-light, #e9ecef);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal #groupsInviteCopyBtn .groups-invite-btn-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #1f2933);
+  white-space: nowrap;
+}
+
+#user-profile-modal #groupsInviteCopyBtn i[data-lucide] {
+  width: 18px;
+  height: 18px;
 }
 
 #user-profile-modal .groups-invite-input {
@@ -420,6 +481,10 @@
   border-radius: 8px;
   font-size: 16px;
   color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal .groups-invite-input {
+  height: 44px;
 }
 
 #user-profile-modal .groups-invite button {

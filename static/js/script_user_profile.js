@@ -772,7 +772,12 @@ function updateInviteCopyButtonIcon() {
         btn.title = hasLink
             ? profileT('profile.groups.invite_link.copy', null, 'Скопировать')
             : profileT('profile.groups.invite_link.create', null, 'Создать инвайт');
-        btn.innerHTML = `<i data-lucide="${hasLink ? 'copy' : 'plus'}"></i>`;
+        if (hasLink) {
+            btn.innerHTML = `<i data-lucide="copy"></i>`;
+        } else {
+            const text = profileT('profile.groups.invite_link.create_button', null, 'Приглашение');
+            btn.innerHTML = `<i data-lucide="plus"></i><span class="groups-invite-btn-text">${text}</span>`;
+        }
         if (window.lucide) {
             window.lucide.createIcons({ root: btn });
         }

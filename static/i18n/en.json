@@ -153,6 +153,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "My groups"
+      },
       "table": {
         "id": "ID",
         "name": "Name"
@@ -177,6 +180,9 @@
       },
       "invite_link": {
         "label": "Invite link",
+        "copy": "Copy",
+        "create": "Create invite",
+        "create_button": "Invitation",
         "errors": {
           "get_failed": "Failed to get link"
         }

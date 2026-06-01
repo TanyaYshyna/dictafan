@@ -399,6 +399,9 @@
                         <div class="panel-content">
                             <div class="groups-layout">
                                 <div class="groups-left">
+                                    <div class="groups-subsection-header">
+                                        <div class="groups-subsection-title">{{ t('profile.groups.my_groups.title') }}</div>
+                                    </div>
                                     <div class="groups-toolbar">
                                         <div class="groups-toolbar-left">
                                             <select id="groupsFilterSelect" class="groups-filter-select" title="{{ t('profile.groups.filter.title') }}">
@@ -431,12 +434,11 @@
                                         </div>
 
                                         <div class="groups-details-row invite-row">
-                                            <div class="groups-details-label">{{ t('profile.groups.invite_link.label') }}</div>
                                             <div class="groups-invite">
-                                                <input type="text" id="groupsInviteLink" class="groups-invite-input" readonly value="">
                                                 <button type="button" id="groupsInviteCopyBtn" class="topbar-icon-btn" title="{{ t('profile.common.copy') }}">
                                                     <i data-lucide="copy"></i>
                                                 </button>
+                                                <input type="text" id="groupsInviteLink" class="groups-invite-input" readonly value="">
                                             </div>
                                         </div>
 
@@ -466,7 +468,7 @@
 
                             <div class="groups-students groups-students-mt20">
                                 <div class="groups-toolbar groups-students-toolbar">
-                                    <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.memberships.title') }}</div>
+                                    <div class="groups-toolbar-title groups-students-title groups-students-title-strong">{{ t('profile.groups.memberships.title') }}</div>
                                     <div class="groups-toolbar-actions">
                                         <button type="button" id="groupsMembershipsRefreshBtn" class="topbar-icon-btn" title="{{ t('profile.common.refresh') }}">
                                             <i data-lucide="refresh-cw"></i>
@@ -481,7 +483,7 @@
 
                             <div class="groups-students groups-students-mt16">
                                 <div class="groups-toolbar groups-students-toolbar">
-                                    <div class="groups-toolbar-title groups-students-title">{{ t('profile.groups.invites.title') }}</div>
+                                    <div class="groups-toolbar-title groups-students-title groups-students-title-strong">{{ t('profile.groups.invites.title') }}</div>
                                     <div class="groups-toolbar-actions">
                                         <button type="button" id="groupsMyInvitesRefreshBtn" class="topbar-icon-btn" title="{{ t('profile.common.refresh') }}">
                                             <i data-lucide="refresh-cw"></i>

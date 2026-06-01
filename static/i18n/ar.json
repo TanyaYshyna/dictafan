@@ -149,6 +149,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "مجموعاتي"
+      },
       "table": {
         "id": "ID",
         "name": "الاسم"
@@ -173,6 +176,9 @@
       },
       "invite_link": {
         "label": "رابط الدعوة",
+        "copy": "نسخ",
+        "create": "إنشاء دعوة",
+        "create_button": "دعوة",
         "errors": {
           "get_failed": "تعذر الحصول على الرابط"
         }
