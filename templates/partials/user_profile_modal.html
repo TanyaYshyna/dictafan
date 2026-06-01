@@ -358,19 +358,21 @@
                             </div>
 
                             <div class="telegram-bot-username">@dictafan_user_bot</div>
-                            <div class="telegram-link-controls">
-                                <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
-                                    <i data-lucide="key"></i>
-                                    {{ t('profile.telegram.link.get_code') }}
-                                </button>
-                                <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
-                                    <i data-lucide="copy"></i>
-                                </button>
-                                <div id="telegramLinkCodeLabel" class="telegram-link-code-label"></div>
-                            </div>
+                            <div class="telegram-link-and-qr">
+                                <div class="telegram-link-controls">
+                                    <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
+                                        <i data-lucide="key"></i>
+                                        {{ t('profile.telegram.link.get_code') }}
+                                    </button>
+                                    <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
+                                        <i data-lucide="copy"></i>
+                                    </button>
+                                    <div id="telegramLinkCodeLabel" class="telegram-link-code-label"></div>
+                                </div>
 
-                            <div class="telegram-qr-row">
-                                <img id="telegramQrImg" class="telegram-qr-img" alt="QR">
+                                <div class="telegram-qr-panel">
+                                    <img id="telegramQrImg" class="telegram-qr-img" alt="QR">
+                                </div>
                             </div>
                         </div>
                     </div>
