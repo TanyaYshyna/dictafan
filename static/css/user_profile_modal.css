@@ -228,6 +228,21 @@
   margin-bottom: 12px;
 }
 
+#user-profile-modal .form-row.telegram-toggle-row {
+  grid-template-columns: 1fr;
+}
+
+#user-profile-modal .telegram-toggle-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+#user-profile-modal .telegram-toggle-label span {
+  display: block;
+  min-width: 0;
+}
+
 #user-profile-modal .telegram-open-bot-btn {
   height: 44px;
   padding: 0 12px;
@@ -253,11 +268,17 @@
 }
 
 #user-profile-modal .telegram-link-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content 44px minmax(220px, 1fr);
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
   margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  #user-profile-modal .telegram-link-controls {
+    grid-template-columns: 1fr 44px;
+  }
 }
 
 #user-profile-modal .telegram-link-controls #telegramGetCodeBtn {
@@ -268,6 +289,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  white-space: nowrap;
 }
 
 #user-profile-modal .telegram-link-controls #telegramGetCodeBtn i[data-lucide] {
@@ -283,8 +305,21 @@
   justify-content: center;
 }
 
-#user-profile-modal .telegram-link-controls #telegramLinkCodeInput {
+#user-profile-modal .telegram-link-code-label {
   height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid #ced4da;
+  background: #f5f5f5;
+  color: #1f2933;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  user-select: text;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #user-profile-modal .telegram-bot-username {

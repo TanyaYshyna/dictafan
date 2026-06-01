@@ -813,7 +813,7 @@ async function telegramApiRequest(path, options = {}) {
 
 function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
-    const codeInput = document.getElementById('telegramLinkCodeInput');
+    const codeLabel = document.getElementById('telegramLinkCodeLabel');
     const qrImg = document.getElementById('telegramQrImg');
     const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
     const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
@@ -822,7 +822,7 @@ function renderTelegramSection() {
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
 
-    if (!statusEl || !codeInput || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
+    if (!statusEl || !codeLabel || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
     const user = (UM && UM.userData) ? UM.userData : {};
     const chatId = user.telegram_chat_id;
@@ -860,8 +860,9 @@ function renderTelegramSection() {
     _setBtnState(enabledToggleBtn, enabled);
     _setBtnState(selfReportsToggleBtn, selfReportsEnabled);
 
-    const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
-    codeInput.value = codeVal;
+    const codeVal = String(user.telegram_link_code || codeLabel.dataset.code || '').trim();
+    codeLabel.dataset.code = codeVal;
+    codeLabel.textContent = codeVal || profileT('profile.telegram.link.code_placeholder', null, 'код');
 
     if (qrImg) {
         if (codeVal) {
@@ -875,7 +876,7 @@ function renderTelegramSection() {
 
     try {
         getCodeBtn.disabled = false;
-        copyBtn.disabled = !codeInput.value;
+        copyBtn.disabled = !codeVal;
     } catch (e) {
     }
 
@@ -886,7 +887,8 @@ function renderTelegramSection() {
             if (!data || !data.success || !data.code) {
                 throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
             }
-            codeInput.value = String(data.code);
+            codeLabel.dataset.code = String(data.code);
+            codeLabel.textContent = String(data.code);
             if (UM && UM.userData) {
                 UM.userData.telegram_link_code = String(data.code);
             }
@@ -914,14 +916,15 @@ function renderTelegramSection() {
                     return;
                 }
 
-                let code = String(codeInput.value || '').trim();
+                let code = String(codeLabel.dataset.code || '').trim();
                 if (!code) {
                     const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
                     if (!data || !data.success || !data.code) {
                         throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
                     }
                     code = String(data.code).trim();
-                    codeInput.value = code;
+                    codeLabel.dataset.code = code;
+                    codeLabel.textContent = code;
                     if (UM && UM.userData) {
                         UM.userData.telegram_link_code = code;
                     }
@@ -963,7 +966,7 @@ function renderTelegramSection() {
     };
 
     copyBtn.onclick = async () => {
-        const code = String(codeInput.value || '').trim();
+        const code = String(codeLabel.dataset.code || '').trim();
         if (!code) {
             showInfo(profileT('profile.telegram.link.get_code_first', null, 'Сначала получи код'));
             return;
