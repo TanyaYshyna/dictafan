@@ -436,8 +436,20 @@ function initializeProfileSectionToggles() {
             const target = document.querySelector(targetSelector);
             if (!target) return;
 
-            const isCollapsed = target.style.display === 'none';
-            target.style.display = isCollapsed ? '' : 'none';
+            const isCollapsed = (() => {
+                try {
+                    if (target.style && target.style.display) {
+                        return target.style.display === 'none';
+                    }
+                    const cs = window.getComputedStyle ? window.getComputedStyle(target) : null;
+                    return !!cs && cs.display === 'none';
+                } catch (e2) {
+                    return target.style.display === 'none';
+                }
+            })();
+
+            // Важно: секции могут быть скрыты через CSS (display:none). Тогда пустая строка не раскроет.
+            target.style.display = isCollapsed ? 'block' : 'none';
 
             const icon = btn.querySelector('i[data-lucide]');
             if (icon) {
