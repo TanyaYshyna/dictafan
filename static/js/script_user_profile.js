@@ -813,7 +813,6 @@ async function telegramApiRequest(path, options = {}) {
 
 function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
-    const helpEl = document.getElementById('telegramHelpText');
     const codeInput = document.getElementById('telegramLinkCodeInput');
     const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
     const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
@@ -821,10 +820,8 @@ function renderTelegramSection() {
     const openBotBtn = document.getElementById('telegramOpenBotBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
-    const collapseBtn = document.getElementById('telegramLinkCollapseBtn');
-    const linkBody = document.getElementById('telegramLinkBody');
 
-    if (!statusEl || !helpEl || !codeInput || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
+    if (!statusEl || !codeInput || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
     const user = (UM && UM.userData) ? UM.userData : {};
     const chatId = user.telegram_chat_id;
@@ -844,37 +841,7 @@ function renderTelegramSection() {
         return String(key || '');
     };
 
-    statusEl.textContent = linked
-        ? t('profile.telegram.status.linked', { chat_id: chatId }, `привязан (chat_id: ${chatId})`)
-        : t('profile.telegram.status.not_linked', null, 'не привязан');
-
-    const _setLinkCollapsed = (collapsed) => {
-        if (!collapseBtn || !linkBody) return;
-        collapseBtn.dataset.collapsed = collapsed ? '1' : '0';
-        linkBody.style.display = collapsed ? 'none' : '';
-        collapseBtn.innerHTML = `<i data-lucide="${collapsed ? 'chevrons-down' : 'chevrons-up'}"></i>`;
-        try {
-            if (window.lucide) {
-                window.lucide.createIcons({ root: collapseBtn });
-            }
-        } catch (e) {
-        }
-    };
-
-    if (collapseBtn && linkBody) {
-        if (!collapseBtn.dataset._bound) {
-            collapseBtn.dataset._bound = '1';
-            collapseBtn.onclick = () => {
-                const nextCollapsed = !(collapseBtn.dataset.collapsed === '1');
-                _setLinkCollapsed(nextCollapsed);
-            };
-        }
-        if (collapseBtn.dataset.collapsed !== '1' && collapseBtn.dataset.collapsed !== '0') {
-            _setLinkCollapsed(false);
-        } else {
-            _setLinkCollapsed(collapseBtn.dataset.collapsed === '1');
-        }
-    }
+    statusEl.textContent = linked ? `chat_id: ${chatId}` : '';
 
     const _setBtnState = (btn, value) => {
         if (!btn) return;
@@ -894,27 +861,6 @@ function renderTelegramSection() {
 
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
-
-    const helpPrefix = linked
-        ? t('profile.telegram.help.prefix_other', null, 'Чтобы привязать другой аккаунт:')
-        : t('profile.telegram.help.prefix', null, 'Чтобы привязать Telegram:');
-    const helpStep1 = t(
-        'profile.telegram.help.step1',
-        null,
-        '-  нажми «<span class="telegram-inline-icon"><i data-lucide="key"></i></span> Получить код»,'
-    );
-    const helpStep2 = t(
-        'profile.telegram.help.step2',
-        null,
-        '- затем отправь в Telegram команду из кнопки <span class="telegram-inline-icon"><i data-lucide="copy"></i></span>'
-    );
-    helpEl.innerHTML = `
-        <div>${helpPrefix}</div>
-        <div class="telegram-help-bullets">
-            <div>${helpStep1}</div>
-            <div>${helpStep2}</div>
-        </div>
-    `;
 
     try {
         getCodeBtn.disabled = false;

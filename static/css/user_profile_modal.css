@@ -220,6 +220,62 @@
   flex: 1;
 }
 
+#user-profile-modal .telegram-top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+#user-profile-modal .telegram-open-bot-btn {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border-light, #e9ecef);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .telegram-open-bot-btn i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#user-profile-modal .telegram-chat-id {
+  margin-left: auto;
+  color: rgba(0, 0, 0, 0.65);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#user-profile-modal .telegram-link-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+#user-profile-modal .telegram-link-controls #telegramGetCodeBtn {
+  height: 44px;
+}
+
+#user-profile-modal .telegram-link-controls #telegramCopyStartCmdBtn {
+  height: 44px;
+  min-width: 44px;
+  width: 44px;
+  padding: 0;
+  justify-content: center;
+}
+
+#user-profile-modal .telegram-link-controls #telegramLinkCodeInput {
+  height: 44px;
+}
+
 #user-profile-modal .groups-students-mt20 {
   margin-top: 20px;
 }
@@ -247,6 +303,7 @@
 @media (max-width: 920px) {
   #user-profile-modal .groups-layout {
     grid-template-columns: minmax(0, 1fr);
+    margin: 10px;
   }
 }
 
@@ -327,9 +384,6 @@
   overflow: hidden;
 }
 
-#groups-right {
-  border-top-left-radius: 0;
-}
 
 #user-profile-modal .groups-table-header,
 #user-profile-modal .groups-table-row {
@@ -380,7 +434,7 @@
 
 #user-profile-modal .groups-details {
   border: 1px solid var(--color-border-light, #e9ecef);
-  border-radius: 12px;
+  border-radius: 0 12px 12px 12px;
   padding: 12px;
   background: #fff;
 }

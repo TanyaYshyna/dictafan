@@ -327,62 +327,45 @@
                             <i data-lucide="chevrons-down"></i>
                         </button>
                     </h3>
-                    <div id="telegramSection" class="profile-panel">
+                    <div id="telegramSection" class="profile-panel profile-panel-flat-top">
                         <div class="panel-content">
-                            <div class="telegram-panels">
-                                <div class="telegram-left-panel">
-                                    <div class="telegram-status-row">
-                                        <div class="telegram-bot-name">@dictafan_user_bot</div>
-                                        <div id="telegramStatusText" class="telegram-status-text">—</div>
-                                    </div>
+                            <div class="telegram-top-row">
+                                <button type="button" id="telegramOpenBotBtn" class="telegram-open-bot-btn" title="{{ t('profile.telegram.link.open_bot_title') }}">
+                                    <i data-lucide="send"></i>
+                                    {{ t('profile.telegram.link.open_bot') }}
+                                </button>
+                                <button type="button" id="telegramRefreshStatusBtn" class="topbar-icon-btn" title="{{ t('profile.telegram.link.refresh_status_title') }}">
+                                    <i data-lucide="refresh-cw"></i>
+                                </button>
+                                <div id="telegramStatusText" class="telegram-chat-id"></div>
+                            </div>
 
-                                    <div class="form-row telegram-toggle-row">
-                                        <div class="telegram-toggle-label">
-                                            <button type="button" id="telegramEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.teacher_notifications.title') }}">
-                                                <i data-lucide="circle"></i>
-                                            </button>
-                                            <span>{{ t('profile.telegram.teacher_notifications.label') }}</span>
-                                        </div>
-                                    </div>
-                                    <div class="form-row telegram-toggle-row">
-                                        <div class="telegram-toggle-label">
-                                            <button type="button" id="telegramSelfReportsEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.self_reports.title') }}">
-                                                <i data-lucide="circle"></i>
-                                            </button>
-                                            <span>{{ t('profile.telegram.self_reports.label_html') | safe }}</span>
-                                        </div>
-                                    </div>
-                                    <button type="button" id="telegramOpenBotBtn" class="button-secondary" title="{{ t('profile.telegram.link.open_bot_title') }}">
-                                        <i data-lucide="send"></i>
-                                        {{ t('profile.telegram.link.open_bot') }}
+                            <div class="form-row telegram-toggle-row">
+                                <div class="telegram-toggle-label">
+                                    <button type="button" id="telegramEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.teacher_notifications.title') }}">
+                                        <i data-lucide="circle"></i>
                                     </button>
+                                    <span>{{ t('profile.telegram.teacher_notifications.label') }}</span>
                                 </div>
-
-                                <div class="telegram-right-panel">
-                                    <div class="telegram-link-header">
-                                        <div class="telegram-link-title">{{ t('profile.telegram.link.title') }}</div>
-                                        <button type="button" id="telegramLinkCollapseBtn" class="topbar-icon-btn" aria-label="{{ t('profile.telegram.link.toggle_aria') }}">
-                                            <i data-lucide="chevrons-down"></i>
-                                        </button>
-                                    </div>
-
-                                    <div id="telegramLinkBody" class="telegram-link-body">
-                                        <div id="telegramHelpText" class="telegram-help-text"></div>
-                                        <div class="telegram-link-controls">
-                                            <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
-                                                <i data-lucide="key"></i>
-                                                {{ t('profile.telegram.link.get_code') }}
-                                            </button>
-                                            <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" class="telegram-link-code-input">
-                                            <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
-                                                <i data-lucide="copy"></i>
-                                            </button>
-                                            <button type="button" id="telegramRefreshStatusBtn" class="topbar-icon-btn" title="{{ t('profile.telegram.link.refresh_status_title') }}">
-                                                <i data-lucide="refresh-cw"></i>
-                                            </button>
-                                        </div>
-                                    </div>
+                            </div>
+                            <div class="form-row telegram-toggle-row">
+                                <div class="telegram-toggle-label">
+                                    <button type="button" id="telegramSelfReportsEnabledToggleBtn" class="telegram-lucide-toggle" aria-pressed="false" title="{{ t('profile.telegram.self_reports.title') }}">
+                                        <i data-lucide="circle"></i>
+                                    </button>
+                                    <span>{{ t('profile.telegram.self_reports.label_html') | safe }}</span>
                                 </div>
+                            </div>
+
+                            <div class="telegram-link-controls">
+                                <button type="button" id="telegramGetCodeBtn" class="button-color-yellow">
+                                    <i data-lucide="key"></i>
+                                    {{ t('profile.telegram.link.get_code') }}
+                                </button>
+                                <input type="text" id="telegramLinkCodeInput" readonly placeholder="{{ t('profile.telegram.link.code_placeholder') }}" class="telegram-link-code-input">
+                                <button type="button" id="telegramCopyStartCmdBtn" class="button-secondary" title="{{ t('profile.telegram.link.copy_start_cmd_title') }}">
+                                    <i data-lucide="copy"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
