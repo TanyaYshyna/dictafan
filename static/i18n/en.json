@@ -57,7 +57,7 @@
     "sections": {
       "languages": "Languages",
       "activity_goal": "Daily Activity Goal",
-      "local_models": "Offline language models settings",
+      "local_models": "Speech recognition types",
       "dictation_settings": "Dictation settings",
       "assignment_history": "Assignment history",
       "groups": "Groups"

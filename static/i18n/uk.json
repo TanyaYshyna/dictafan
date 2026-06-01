@@ -57,7 +57,7 @@
     "sections": {
       "languages": "Мови",
       "activity_goal": "План активності",
-      "local_models": "Локальні моделі",
+      "local_models": "Види розпізнавання мовлення",
       "dictation_settings": "Налаштування диктантів",
       "assignment_history": "Історія завдань",
       "groups": "Групи"

@@ -440,18 +440,12 @@
 #user-profile-modal .dictation-settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas:
-    "order params"
-    "legend params";
+  grid-template-areas: "order params";
   gap: 16px;
 }
 
 #user-profile-modal .dictation-settings-card-order {
   grid-area: order;
-}
-
-#user-profile-modal .dictation-settings-card-legend {
-  grid-area: legend;
 }
 
 #user-profile-modal .dictation-settings-card-params {
@@ -530,6 +524,15 @@
   display: inline-block;
   width: 14px;
   text-align: center;
+}
+
+@media (max-width: 780px) {
+  #user-profile-modal .dictation-settings-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "order"
+      "params";
+  }
 }
 
 @media (max-width: 900px) {

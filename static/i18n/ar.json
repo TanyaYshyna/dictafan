@@ -53,7 +53,7 @@
     "sections": {
       "languages": "اللغات",
       "activity_goal": "هدف النشاط اليومي",
-      "local_models": "نماذج محلية",
+      "local_models": "أنواع التعرف على الكلام",
       "dictation_settings": "إعدادات الإملاء",
       "assignment_history": "سجل الواجبات",
       "groups": "المجموعات"

@@ -57,7 +57,7 @@
     "sections": {
       "languages": "Языки",
       "activity_goal": "План активности",
-      "local_models": "Локальные модели",
+      "local_models": "Виды распознавания речи",
       "dictation_settings": "Настройки диктантов",
       "assignment_history": "История заданий",
       "groups": "Группы"
