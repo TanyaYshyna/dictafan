@@ -262,6 +262,17 @@
 
 #user-profile-modal .telegram-link-controls #telegramGetCodeBtn {
   height: 44px;
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border-light, #e9ecef);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .telegram-link-controls #telegramGetCodeBtn i[data-lucide] {
+  width: 18px;
+  height: 18px;
 }
 
 #user-profile-modal .telegram-link-controls #telegramCopyStartCmdBtn {
@@ -274,6 +285,24 @@
 
 #user-profile-modal .telegram-link-controls #telegramLinkCodeInput {
   height: 44px;
+}
+
+#user-profile-modal .telegram-bot-username {
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+#user-profile-modal .telegram-qr-row {
+  margin-top: 12px;
+}
+
+#user-profile-modal .telegram-qr-img {
+  width: 120px;
+  height: 120px;
+  border: 1px solid var(--color-border-light, #e9ecef);
+  border-radius: 12px;
+  background: #fff;
+  display: none;
 }
 
 #user-profile-modal .groups-students-mt20 {

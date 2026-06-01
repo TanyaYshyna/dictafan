@@ -7,7 +7,7 @@ import json
 import shutil
 from datetime import datetime
 import uuid
-from flask import Blueprint, jsonify, render_template, request, redirect, make_response, send_file
+from flask import Blueprint, Response, jsonify, render_template, request, redirect, make_response, send_file
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 import secrets
 import requests
 from flask import render_template_string
+import qrcode
 
 # Импортируем из helpers
 from helpers.language_data import load_language_data
@@ -724,6 +725,32 @@ def api_telegram_link_code():
         return jsonify({'success': True, 'code': code})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/qr', methods=['GET'])
+@jwt_required()
+def api_telegram_qr():
+    code = (request.args.get('code') or '').strip()
+    if not code:
+        return jsonify({'success': False, 'error': 'Code is required'}), 400
+
+    bot_username = 'dictafan_user_bot'
+    url = f"https://t.me/{bot_username}?start={code}"
+
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype='image/png')
 
 
 @user_bp.route('/api/telegram/enabled', methods=['POST'])

@@ -814,6 +814,7 @@ async function telegramApiRequest(path, options = {}) {
 function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
     const codeInput = document.getElementById('telegramLinkCodeInput');
+    const qrImg = document.getElementById('telegramQrImg');
     const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
     const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
@@ -862,6 +863,16 @@ function renderTelegramSection() {
     const codeVal = String(user.telegram_link_code || codeInput.value || '').trim();
     codeInput.value = codeVal;
 
+    if (qrImg) {
+        if (codeVal) {
+            qrImg.style.display = '';
+            qrImg.src = `/user/api/telegram/qr?code=${encodeURIComponent(codeVal)}&r=${Date.now()}`;
+        } else {
+            qrImg.style.display = 'none';
+            qrImg.removeAttribute('src');
+        }
+    }
+
     try {
         getCodeBtn.disabled = false;
         copyBtn.disabled = !codeInput.value;
@@ -880,6 +891,7 @@ function renderTelegramSection() {
                 UM.userData.telegram_link_code = String(data.code);
             }
             copyBtn.disabled = false;
+            renderTelegramSection();
             showSuccess(profileT('profile.telegram.link.code_received', null, 'Код получен'));
         } catch (e) {
             showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
@@ -914,6 +926,7 @@ function renderTelegramSection() {
                         UM.userData.telegram_link_code = code;
                     }
                     try { copyBtn.disabled = false; } catch (e2) {}
+                    renderTelegramSection();
                 }
 
                 const url = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(code)}`;
