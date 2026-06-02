@@ -239,6 +239,14 @@
   z-index: 100249;
 }
 
+#dictationModal {
+  z-index: 100249;
+}
+
+#exitModal {
+  z-index: 100260 !important;
+}
+
 #crop-modal {
   z-index: 100280;
 }

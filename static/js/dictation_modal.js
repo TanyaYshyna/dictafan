@@ -169,6 +169,134 @@
     }
   }
 
+  function hideStartModal() {
+    try {
+      const startModal = document.getElementById('start-modal');
+      if (!startModal) return;
+      startModal.style.display = 'none';
+    } catch (e) {
+    }
+  }
+
+  async function hasUnsavedProgress() {
+    try {
+      const panel = window.progressPanel;
+      const hasPanelPending = panel && typeof panel.hasPending === 'function' ? !!panel.hasPending() : false;
+      if (hasPanelPending) return true;
+    } catch (e) {
+    }
+
+    try {
+      if (typeof window.hasLocalPendingDraft === 'function') {
+        return !!(await window.hasLocalPendingDraft());
+      }
+    } catch (e) {
+    }
+
+    return false;
+  }
+
+  async function exitDictationFromStartModal() {
+    const doClose = () => {
+      try { hideStartModal(); } catch (e0) {}
+      try { close(); } catch (e1) {}
+    };
+
+    try {
+      const pending = await hasUnsavedProgress();
+      if (!pending) {
+        doClose();
+        return;
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (typeof window.showExitModal === 'function') {
+        await window.showExitModal(() => doClose());
+        return;
+      }
+    } catch (e) {
+    }
+
+    // Fallback: close without confirmation
+    doClose();
+  }
+
+  function openAudioSettingsModal(sourceLabel = 'unknown') {
+    try {
+      if (typeof window.initAudioSettingsModal === 'function') {
+        window.initAudioSettingsModal();
+      }
+    } catch (e) {
+    }
+
+    try {
+      const m = document.getElementById('audioSettingsModal');
+      if (!m) return;
+      m.style.display = 'flex';
+      renderLucide(m);
+    } catch (e) {
+    }
+  }
+
+  function bindStartModalControls() {
+    try {
+      const closeBtn = document.getElementById('btnBackToList');
+      if (closeBtn && closeBtn.dataset.boundDictationModal !== '1') {
+        closeBtn.dataset.boundDictationModal = '1';
+        closeBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          hideStartModal();
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const doorBtn = document.getElementById('startModalExitToIndexBtn');
+      if (doorBtn && doorBtn.dataset.boundDictationModal !== '1') {
+        doorBtn.dataset.boundDictationModal = '1';
+        doorBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          await exitDictationFromStartModal();
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const settingsBtn = document.getElementById('startModalOpenSettingsBtn');
+      if (settingsBtn && settingsBtn.dataset.boundDictationModal !== '1') {
+        settingsBtn.dataset.boundDictationModal = '1';
+        settingsBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openAudioSettingsModal('start-modal-gear');
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const startModal = document.getElementById('start-modal');
+      if (startModal && startModal.dataset.boundDictationModalBackdrop !== '1') {
+        startModal.dataset.boundDictationModalBackdrop = '1';
+        startModal.addEventListener('click', (e) => {
+          try {
+            if (e && e.target === startModal) {
+              hideStartModal();
+            }
+          } catch (e2) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+  }
+
   async function ensureDictationDepsLoaded() {
     if (state.depsLoaded) return;
     for (const src of DICTATION_SCRIPT_DEPS) {
@@ -253,6 +381,11 @@
 
       await ensureDictationDepsLoaded();
 
+      try {
+        bindStartModalControls();
+      } catch (e) {
+      }
+
       // Dictation page normally initializes on DOMContentLoaded.
       // Here we call the exported init function after content is mounted.
       try {
@@ -267,10 +400,24 @@
       try {
         setTimeout(() => {
           try {
+            bindStartModalControls();
             showStartModal();
           } catch (e) {
           }
         }, 50);
+      } catch (e) {
+      }
+
+      try {
+        const topSettings = document.getElementById('openDictationSettingsBtn');
+        if (topSettings && topSettings.dataset.boundDictationModal !== '1') {
+          topSettings.dataset.boundDictationModal = '1';
+          topSettings.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openAudioSettingsModal('topbar-gear');
+          });
+        }
       } catch (e) {
       }
 
