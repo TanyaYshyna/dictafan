@@ -189,13 +189,30 @@
   function ensureScript(src) {
     return new Promise((resolve, reject) => {
       try {
-        if (
-          document.querySelector('script[data-dictation-dep="' + src + '"]') ||
-          document.querySelector('script[src^="' + src + '"]')
-        ) {
+        if (document.querySelector('script[data-dictation-dep="' + src + '"]')) {
           resolve();
           return;
         }
+
+        try {
+          const scripts = Array.from(document.scripts || []);
+          for (const s of scripts) {
+            const raw = s && s.src ? String(s.src) : '';
+            if (!raw) continue;
+            try {
+              const u = new URL(raw, window.location.origin);
+              if (u && u.pathname === src) {
+                resolve();
+                return;
+              }
+            } catch (e0) {
+              // ignore
+            }
+          }
+        } catch (e1) {
+          // ignore
+        }
+
         const s = document.createElement('script');
         s.src = src + (window.__APP_CACHE_REVISION ? ('?v=' + window.__APP_CACHE_REVISION) : '');
         s.async = false;
