@@ -28,6 +28,17 @@
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
 }
 
+#dictationModal #audioSettingsModal .audio-settings-modal-panel {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-panel-left {
+  border: none;
+  padding: 0;
+}
+
 #audioSettingsModal .dictation-settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

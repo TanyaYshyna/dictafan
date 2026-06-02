@@ -443,23 +443,13 @@
       // Here we call the exported init function after content is mounted.
       try {
         if (typeof window.onloadInitializeDictation === 'function') {
-          window.onloadInitializeDictation();
+          await window.onloadInitializeDictation();
         }
       } catch (e) {
       }
 
-      // First user step is the sentence selection modal.
-      // Open it explicitly after initialization to make the flow predictable.
-      try {
-        setTimeout(() => {
-          try {
-            bindStartModalControls();
-            showStartModal();
-          } catch (e) {
-          }
-        }, 50);
-      } catch (e) {
-      }
+      // Важно: start-modal открывается внутри initializeDictation после загрузки данных и рендера таблицы.
+      // Здесь дополнительно не открываем, чтобы не показывать пустую таблицу до загрузки.
 
       try {
         const topSettings = document.getElementById('openDictationSettingsBtn');

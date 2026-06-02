@@ -59,7 +59,7 @@
                       <i data-lucide="arrow-right"></i>
                     </button>
 
-                    <button id="btn-new-circle" class="button-32-32" onclick="checkIfAllCompleted()" title="Ctrl+0">
+                    <button id="btn-new-circle" class="button-32-32" onclick="try { const m = document.getElementById('start-modal'); if (m) m.style.display = 'flex'; if (window.lucide && typeof window.lucide.createIcons === 'function') window.lucide.createIcons(); } catch (e) {}" title="Ctrl+0">
                       <i data-lucide="file-text"></i>
                     </button>
                   </div>
