@@ -159,6 +159,16 @@
     });
   }
 
+  function showStartModal() {
+    try {
+      const startModal = document.getElementById('start-modal');
+      if (!startModal) return;
+      startModal.style.display = 'block';
+      renderLucide(startModal);
+    } catch (e) {
+    }
+  }
+
   async function ensureDictationDepsLoaded() {
     if (state.depsLoaded) return;
     for (const src of DICTATION_SCRIPT_DEPS) {
@@ -249,6 +259,18 @@
         if (typeof window.onloadInitializeDictation === 'function') {
           window.onloadInitializeDictation();
         }
+      } catch (e) {
+      }
+
+      // First user step is the sentence selection modal.
+      // Open it explicitly after initialization to make the flow predictable.
+      try {
+        setTimeout(() => {
+          try {
+            showStartModal();
+          } catch (e) {
+          }
+        }, 50);
       } catch (e) {
       }
 
