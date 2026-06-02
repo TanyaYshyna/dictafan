@@ -39,6 +39,10 @@
   padding: 0;
 }
 
+#dictationModal #audioSettingsModal .audio-settings-modal-two-panels {
+  grid-template-columns: 1fr;
+}
+
 #audioSettingsModal .dictation-settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

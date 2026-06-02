@@ -189,7 +189,10 @@
   function ensureScript(src) {
     return new Promise((resolve, reject) => {
       try {
-        if (document.querySelector('script[data-dictation-dep="' + src + '"]')) {
+        if (
+          document.querySelector('script[data-dictation-dep="' + src + '"]') ||
+          document.querySelector('script[src^="' + src + '"]')
+        ) {
           resolve();
           return;
         }
