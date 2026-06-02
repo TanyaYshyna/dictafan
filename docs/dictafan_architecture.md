@@ -11,6 +11,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `templates/private_library.html`
 - `static/js/private_library.js`
 - `static/css/style_private_library.css`
+- `static/css/style_dictation.css`
 - `routes/user_routes.py` → `GET /user/profile` (страница профиля; заменить на модалку на `/desktop`)
 - `templates/user_profile_jwt.html`
 - `assignments`

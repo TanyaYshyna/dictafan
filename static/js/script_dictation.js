@@ -26,233 +26,6 @@ function escapeHtml(str) {
         .replaceAll("'", '&#39;');
 }
 
-let teacherReportRecipientsState = {
-    loaded: false,
-    recipients: [],
-    selectedTeacherUserIds: new Set(),
-    sendToSelf: true,
-    sending: false,
-};
-
-function getTeacherReportLocalStorageKey(dictationIdForDb) {
-    return `teacher_report_recipients_selected_dict_${String(dictationIdForDb || '')}`;
-}
-
-function hasTeacherReportSelectionInLocalStorage(dictationIdForDb) {
-    try {
-        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
-        return localStorage.getItem(key) != null;
-    } catch (e) {
-        return false;
-    }
-}
-
-function loadTeacherReportSelectionFromLocalStorage(dictationIdForDb) {
-    try {
-        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
-        const raw = localStorage.getItem(key);
-        if (!raw) return false;
-        const parsed = JSON.parse(raw);
-        teacherReportRecipientsState.sendToSelf = Boolean(parsed && parsed.send_to_self);
-        teacherReportRecipientsState.selectedTeacherUserIds = new Set(
-            Array.isArray(parsed && parsed.teacher_user_ids)
-                ? parsed.teacher_user_ids
-                    .map((x) => Number(x))
-                    .filter((x) => Number.isFinite(x) && x > 0)
-                : []
-        );
-        return true;
-    } catch (e) {
-        return false;
-    }
-}
-
-function saveTeacherReportSelectionToLocalStorage(dictationIdForDb) {
-    try {
-        const key = getTeacherReportLocalStorageKey(dictationIdForDb);
-        localStorage.setItem(
-            key,
-            JSON.stringify({
-                send_to_self: Boolean(teacherReportRecipientsState.sendToSelf),
-                teacher_user_ids: Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []),
-            })
-        );
-    } catch (e) {
-    }
-}
-
-function renderTeacherReportRecipientsSettings() {
-    const list = document.getElementById('teacherReportRecipientsList');
-    if (!list) return;
-
-    const dictationIdForDb = getCurrentDictationIdForDb();
-    if (!dictationIdForDb) {
-        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.no_dictation_data', 'Нет данных о диктанте'))}</div>`;
-        return;
-    }
-
-    if (!teacherReportRecipientsState.loaded) {
-        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.loading', 'Загрузка…'))}</div>`;
-        return;
-    }
-
-    const recips = Array.isArray(teacherReportRecipientsState.recipients) ? teacherReportRecipientsState.recipients : [];
-    if (!recips.length) {
-        list.innerHTML = `<div style="font-size: 13px; opacity: 0.8;">${escapeHtml(dictationT('teacher_report.no_recipients', 'Нет доступных получателей'))}</div>`;
-        return;
-    }
-
-    const rows = [];
-    for (const r of recips) {
-        const type = String(r && r.type ? r.type : '').toLowerCase();
-        if (type === 'self') {
-            const checked = Boolean(teacherReportRecipientsState.sendToSelf);
-            const label = String(r && r.label ? r.label : dictationT('teacher_report.self_label', 'Я'));
-            let avatarHtml = '';
-            try {
-                const uid = window.UM && typeof window.UM.getCurrentUser === 'function'
-                    ? Number(window.UM.getCurrentUser()?.id)
-                    : 0;
-                if (uid) {
-                    avatarHtml = `<img class="teacher-report-recipient-avatar" src="/user/api/avatar?user_id=${uid}&size=small" alt="">`;
-                }
-            } catch (e) {
-            }
-            rows.push(
-                `<button class="all-checkbox-btn" data-recipient-type="self" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
-                    <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
-                    ${avatarHtml}
-                    <span>${escapeHtml(label)}</span>
-                </button>`
-            );
-            continue;
-        }
-
-        const teacherId = Number(r && r.teacher_user_id);
-        if (!teacherId) continue;
-        const checked = teacherReportRecipientsState.selectedTeacherUserIds.has(teacherId);
-        const label = String(
-            r && r.label
-                ? r.label
-                : (r && r.teacher_username ? r.teacher_username : dictationT('teacher_report.teacher_fallback', `Учитель #${teacherId}`, { id: teacherId }))
-        );
-        rows.push(
-            `<button class="all-checkbox-btn" data-recipient-type="teacher" data-teacher-user-id="${teacherId}" data-checked="${checked ? 'true' : 'false'}" style="justify-content:flex-start; gap: 10px;">
-                <i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>
-                <img class="teacher-report-recipient-avatar" src="/user/api/avatar?user_id=${teacherId}&size=small" alt="">
-                <span>${escapeHtml(label)}</span>
-            </button>`
-        );
-    }
-
-    list.innerHTML = rows.join('');
-
-    for (const btn of list.querySelectorAll('button[data-recipient-type]')) {
-        btn.addEventListener('click', () => {
-            const t = String(btn.getAttribute('data-recipient-type') || '').toLowerCase();
-            if (t === 'self') {
-                teacherReportRecipientsState.sendToSelf = !teacherReportRecipientsState.sendToSelf;
-                saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
-                renderTeacherReportRecipientsSettings();
-                try {
-                    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                        window.lucide.createIcons({ root: list });
-                    }
-                } catch (e) {
-                }
-                return;
-            }
-
-            const tid = Number(btn.getAttribute('data-teacher-user-id'));
-            if (!tid) return;
-            if (teacherReportRecipientsState.selectedTeacherUserIds.has(tid)) {
-                teacherReportRecipientsState.selectedTeacherUserIds.delete(tid);
-            } else {
-                teacherReportRecipientsState.selectedTeacherUserIds.add(tid);
-            }
-            saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
-            renderTeacherReportRecipientsSettings();
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons({ root: list });
-                }
-            } catch (e) {
-            }
-        });
-    }
-
-    try {
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
-            window.lucide.createIcons({ root: list });
-        }
-    } catch (e) {
-    }
-}
-
-async function fetchTeacherReportRecipientsInBackground() {
-    const token = window.UM?.token || localStorage.getItem('jwt_token');
-    if (!token) return;
-
-    const dictationIdForDb = getCurrentDictationIdForDb();
-    if (!dictationIdForDb) return;
-
-    if (teacherReportRecipientsState.loaded) return;
-
-    const hadSelection = hasTeacherReportSelectionInLocalStorage(dictationIdForDb);
-    if (hadSelection) {
-        loadTeacherReportSelectionFromLocalStorage(dictationIdForDb);
-    }
-
-    let res = null;
-    try {
-        res = await fetch('/api/statistics/teacher_report/recipients_auto', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ dictation_id: dictationIdForDb })
-        });
-    } catch (e) {
-        return;
-    }
-
-    let js = null;
-    try {
-        js = await res.json();
-    } catch (e) {
-        js = null;
-    }
-    if (!(res && res.ok && js && js.success)) return;
-
-    teacherReportRecipientsState.loaded = true;
-    teacherReportRecipientsState.recipients = Array.isArray(js.recipients) ? js.recipients : [];
-
-    const hasSelf = teacherReportRecipientsState.recipients.some((r) => String(r && r.type ? r.type : '').toLowerCase() === 'self');
-    if (!hasSelf) {
-        teacherReportRecipientsState.sendToSelf = false;
-    }
-
-    const teacherIdsAllowed = new Set(
-        teacherReportRecipientsState.recipients
-            .filter((r) => String(r && r.type ? r.type : '').toLowerCase() === 'teacher')
-            .map((r) => Number(r && r.teacher_user_id))
-            .filter((x) => Number.isFinite(x) && x > 0)
-    );
-
-    if (!hadSelection) {
-        teacherReportRecipientsState.selectedTeacherUserIds = new Set(Array.from(teacherIdsAllowed));
-        teacherReportRecipientsState.sendToSelf = hasSelf;
-    } else {
-        teacherReportRecipientsState.selectedTeacherUserIds = new Set(
-            Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []).filter((x) => teacherIdsAllowed.has(Number(x)))
-        );
-    }
-
-    saveTeacherReportSelectionToLocalStorage(dictationIdForDb);
-    renderTeacherReportRecipientsSettings();
-}
-
 async function autoSendTeacherReportAfterSuccess({
     completionCountAfter,
     errorWords,
@@ -268,7 +41,6 @@ async function autoSendTeacherReportAfterSuccess({
     settingsJson,
     reportHeaderMode,
 }) {
-    if (teacherReportRecipientsState.sending) return;
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
 
@@ -384,16 +156,6 @@ async function autoSendTeacherReportAfterSuccess({
     }
 
     try {
-        await fetchTeacherReportRecipientsInBackground();
-    } catch (e) {
-    }
-
-    const teacher_user_ids = Array.from(teacherReportRecipientsState.selectedTeacherUserIds || []);
-    const send_to_self = Boolean(teacherReportRecipientsState.sendToSelf);
-    if (!teacher_user_ids.length && !send_to_self) return;
-
-    teacherReportRecipientsState.sending = true;
-    try {
         const finalCompletionCountAfter = completionCountAfter != null ? completionCountAfter : (snapshot ? snapshot.completionCountAfter : null);
         const finalErrorWords = (typeof errorWords === 'object' && errorWords) ? errorWords : (snapshot ? snapshot.errorWords : null);
         const finalPerfect = perfectCount != null ? perfectCount : (snapshot ? snapshot.perfectCount : null);
@@ -406,6 +168,19 @@ async function autoSendTeacherReportAfterSuccess({
         const finalCompletedAtTzOffsetMin = completedAtTzOffsetMin != null ? completedAtTzOffsetMin : (snapshot ? snapshot.completedAtTzOffsetMin : null);
         const finalSentencesData = Array.isArray(sentencesData) ? sentencesData : (snapshot ? snapshot.sentencesData : null);
         const finalSettingsJson = settingsJson != null ? settingsJson : (snapshot ? snapshot.settingsJson : null);
+
+        // Больше не даём ученикам выбирать получателей отчёта (Telegram/self).
+        // Отправляем авто-отчёт только текущему учителю, если его id доступен.
+        let teacher_user_ids = [];
+        try {
+            const tid = Number(currentDictation && currentDictation.teacher_user_id != null ? currentDictation.teacher_user_id : 0);
+            if (Number.isFinite(tid) && tid > 0) teacher_user_ids = [tid];
+        } catch (e) {
+            teacher_user_ids = [];
+        }
+
+        if (!teacher_user_ids.length) return;
+        const send_to_self = false;
 
         await fetch('/api/statistics/teacher_report/send_auto', {
             method: 'POST',
@@ -433,8 +208,6 @@ async function autoSendTeacherReportAfterSuccess({
             })
         });
     } catch (e) {
-    } finally {
-        teacherReportRecipientsState.sending = false;
     }
 }
 
@@ -4069,7 +3842,6 @@ async function transcribeOnServer(audioBlob, langCode) {
     return t.trim();
 }
 let audioSettingsPanel = null;
-let audioSettingsModalPanel = null;  // Панель настроек в модальном окне
 
 // Инициализация глобального хранилища моделей Whisper
 if (typeof window !== 'undefined' && !window.WhisperModels) {
@@ -9732,23 +9504,7 @@ async function initializeDictation() {
     const hasDraft = await loadAndApplyDraft();
     hasDraftLoaded = hasDraft; // Сохраняем флаг в глобальной переменной для использования в startGame()
 
-    // После загрузки профиля + возможного черновика синхронизируем модалку настроек,
-    // чтобы она не показывала дефолты, если реальные настройки пришли позже.
-    try {
-        if (audioSettingsModalPanel) {
-            audioSettingsModalPanel.setSettings({
-                start: playSequenceStart,
-                typo: playSequenceTypo,
-                success: playSequenceSuccess,
-                repeats: REQUIRED_PASSED_COUNT,
-                required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
-                without_entering_text: window.audioSettingsWithoutEnteringText || false,
-                show_text: window.audioSettingsShowText || false,
-                speech_recognition_mode: speechRecognitionMode
-            });
-        }
-    } catch (e) {
-    }
+    // no-op
 
     // Всегда включаем периодическое автосохранение: даже если черновика не было,
     // прогресс должен сохраняться локально без Ctrl+S.
@@ -13061,17 +12817,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-document.addEventListener('DOMContentLoaded', () => {
-    try {
-        setTimeout(() => {
-            try {
-                fetchTeacherReportRecipientsInBackground();
-            } catch (e) {
-            }
-        }, 30);
-    } catch (e) {
-    }
-});
+
 
 // Инициализация модального окна настроек аудио
 function initAudioSettingsModal() {
@@ -13142,104 +12888,157 @@ function initAudioSettingsModal() {
     }
     audioSettingsModal.dataset.initialized = 'true';
 
-    // Инициализируем панель настроек в модальном окне
-    audioSettingsModalPanel = new AudioSettingsPanel({
-        container: modalContainer,
-        mode: 'modal',
-        showExplanations: true,
-        onSettingsChange: async (settings) => {
-            // Обновляем глобальные переменные
-            playSequenceStart = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
-            playSequenceTypo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
-            playSequenceSuccess = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
-            const oldValue = REQUIRED_PASSED_COUNT;
-            REQUIRED_PASSED_COUNT = (settings.repeats !== undefined && settings.repeats !== null) ? settings.repeats : 3;
-            if (settings.required_passed_star_half !== undefined && settings.required_passed_star_half !== null) {
-                REQUIRED_PASSED_STAR_HALF = settings.required_passed_star_half;
-            }
+    const initStaticModalMarkup = () => {
+        const prefix = 'modal-';
+        const startInput = document.getElementById(`${prefix}playSequenceStart`);
+        const typoInput = document.getElementById(`${prefix}playSequenceTypo`);
+        const successInput = document.getElementById(`${prefix}playSequenceSuccess`);
+        const repeatsInput = document.getElementById(`${prefix}audioRepeatsInput`);
+        const requiredPassedStarHalfInput = document.getElementById(`${prefix}requiredPassedStarHalfInput`);
+        const withoutEnteringTextButton = document.getElementById(`${prefix}withoutEnteringTextButton`);
 
-            window.audioSettingsWithoutEnteringText = Boolean(settings.without_entering_text);
-            window.audioSettingsShowText = Boolean(settings.show_text);
+        const applyValuesToUI = () => {
+            try { if (startInput) startInput.value = (playSequenceStart !== undefined && playSequenceStart !== null) ? playSequenceStart : 'oto'; } catch (e) {}
+            try { if (typoInput) typoInput.value = (playSequenceTypo !== undefined && playSequenceTypo !== null) ? playSequenceTypo : 'o'; } catch (e) {}
+            try { if (successInput) successInput.value = (playSequenceSuccess !== undefined && playSequenceSuccess !== null) ? playSequenceSuccess : 'ot'; } catch (e) {}
+            try { if (repeatsInput) repeatsInput.value = (REQUIRED_PASSED_COUNT !== undefined && REQUIRED_PASSED_COUNT !== null) ? REQUIRED_PASSED_COUNT : 3; } catch (e) {}
+            try { if (requiredPassedStarHalfInput) requiredPassedStarHalfInput.value = (REQUIRED_PASSED_STAR_HALF !== undefined && REQUIRED_PASSED_STAR_HALF !== null) ? REQUIRED_PASSED_STAR_HALF : 3; } catch (e) {}
 
-            // Обновляем метод распознавания речи
-            if (settings.speech_recognition_mode) {
-                console.log(`🔄 [onSettingsChange] Изменяем режим распознавания: ${speechRecognitionMode} -> ${settings.speech_recognition_mode}`);
-                const oldMode = speechRecognitionMode;
-                speechRecognitionMode = settings.speech_recognition_mode;
-
-                setCachedDictationSpeechRecognitionMode(speechRecognitionMode);
-                
-                // Если режим изменился, останавливаем старый движок и сбрасываем unifiedSpeechRecognizer,
-                // чтобы он пересоздался с новым режимом.
-                if (oldMode !== speechRecognitionMode && unifiedSpeechRecognizer) {
-                    console.log(`🔄 [onSettingsChange] Режим изменился, останавливаем и сбрасываем unifiedSpeechRecognizer для пересоздания с новым режимом`);
-                    try {
-                        if (typeof unifiedSpeechRecognizer.cleanup === 'function') {
-                            unifiedSpeechRecognizer.cleanup();
-                        }
-                    } catch (e) {
-                        console.warn('⚠️ Ошибка cleanup UnifiedSpeechRecognition при смене режима:', e);
+            try {
+                if (withoutEnteringTextButton) {
+                    const checked = Boolean(window.audioSettingsWithoutEnteringText);
+                    withoutEnteringTextButton.dataset.checked = String(checked);
+                    const iconEl = withoutEnteringTextButton.querySelector('i[data-lucide]');
+                    if (iconEl) iconEl.setAttribute('data-lucide', checked ? 'circle-check-big' : 'circle');
+                    if (window.lucide && window.lucide.createIcons) {
+                        window.lucide.createIcons({ root: withoutEnteringTextButton });
                     }
-
-                    unifiedSpeechRecognizer = null;
                 }
-                
-                // Обновляем иконку режима распознавания сразу после изменения режима
-                console.log(`🔄 [onSettingsChange] Вызываем updateRecognitionModeIcon() с режимом: ${speechRecognitionMode}`);
-                updateRecognitionModeIcon();
-
-                try {
-                    preloadWhisperModelIfNeeded('mode_switch').catch(() => { });
-                } catch (e) {
-                }
+            } catch (e) {
             }
+        };
 
-            // Сохраняем настройки в БД
+        const filterSeq = (v) => {
+            try {
+                const value = (v || '').toString().toLowerCase();
+                return value.split('').filter(ch => ch === 't' || ch === 'o').join('');
+            } catch (e) {
+                return '';
+            }
+        };
+
+        const clampRepeats = (raw) => {
+            const value = parseInt(raw, 10);
+            if (isNaN(value)) return 3;
+            return Math.min(5, Math.max(0, value));
+        };
+
+        const clampStarHalf = (raw) => {
+            const value = parseInt(raw, 10);
+            if (isNaN(value)) return 3;
+            return Math.min(9, Math.max(3, value));
+        };
+
+        const persist = async () => {
             setAudioSettingsBusy(true);
             try {
-                const settingsToSave = { ...(settings || {}) };
-                delete settingsToSave.speech_recognition_mode;
-                await saveAudioSettingsToUser(settingsToSave);
+                await saveAudioSettingsToUser({
+                    start: playSequenceStart,
+                    typo: playSequenceTypo,
+                    success: playSequenceSuccess,
+                    repeats: REQUIRED_PASSED_COUNT,
+                    required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
+                    without_entering_text: Boolean(window.audioSettingsWithoutEnteringText)
+                });
             } finally {
                 setAudioSettingsBusy(false);
             }
+        };
 
-            // Пересчитываем доступность кнопок записи
-            if (oldValue !== REQUIRED_PASSED_COUNT) {
-                recalculateAudioAvailabilityForAllSentences();
-            }
+        const onAnyChange = async () => {
+            try { await persist(); } catch (e) {}
+            try { applyAudioSettingsToUI(); } catch (e) {}
+            try { updateStartModalProgressUi(); } catch (e) {}
+        };
 
-            // Применяем настройки к текущему предложению
-            // ВАЖНО: applyAudioSettingsToUI() также вызывает updateRecognitionModeIcon(),
-            // но это нормально - это гарантирует, что иконка будет обновлена
-            console.log(`🔄 [onSettingsChange] Вызываем applyAudioSettingsToUI() после изменения настроек`);
-            applyAudioSettingsToUI();
-
+        const bindOnce = (el, key, fn) => {
             try {
-                updateStartModalProgressUi();
+                if (!el) return;
+                if (el.dataset && el.dataset[key] === '1') return;
+                if (el.dataset) el.dataset[key] = '1';
+                el.addEventListener('input', fn);
+                el.addEventListener('change', fn);
             } catch (e) {
             }
-        }
-    });
-    audioSettingsPanel = audioSettingsModalPanel;
+        };
 
-    // Инициализируем панель сразу текущими значениями.
-    // Актуализация делается каждый раз при открытии модалки (openModal),
-    // чтобы учесть настройки из черновика/профиля, которые могли прийти позже.
-    try {
-        audioSettingsModalPanel.setSettings({
-            start: playSequenceStart,
-            typo: playSequenceTypo,
-            success: playSequenceSuccess,
-            repeats: REQUIRED_PASSED_COUNT,
-            required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
-            without_entering_text: window.audioSettingsWithoutEnteringText || false,
-            show_text: window.audioSettingsShowText || false,
-            speech_recognition_mode: speechRecognitionMode
+        bindOnce(startInput, 'boundAudioSettingsStatic', async (e) => {
+            const filtered = filterSeq(e.target.value);
+            if (filtered !== e.target.value) e.target.value = filtered;
+            playSequenceStart = filtered;
+            await onAnyChange();
         });
-        audioSettingsModalPanel.init();
-    } catch (e) {
-    }
+        bindOnce(typoInput, 'boundAudioSettingsStatic', async (e) => {
+            const filtered = filterSeq(e.target.value);
+            if (filtered !== e.target.value) e.target.value = filtered;
+            playSequenceTypo = filtered;
+            await onAnyChange();
+        });
+        bindOnce(successInput, 'boundAudioSettingsStatic', async (e) => {
+            const filtered = filterSeq(e.target.value);
+            if (filtered !== e.target.value) e.target.value = filtered;
+            playSequenceSuccess = filtered;
+            await onAnyChange();
+        });
+
+        bindOnce(repeatsInput, 'boundAudioSettingsStatic', async (e) => {
+            const v = clampRepeats(e.target.value);
+            e.target.value = v;
+            REQUIRED_PASSED_COUNT = v;
+            await onAnyChange();
+        });
+
+        bindOnce(requiredPassedStarHalfInput, 'boundAudioSettingsStatic', async (e) => {
+            const v = clampStarHalf(e.target.value);
+            e.target.value = v;
+            REQUIRED_PASSED_STAR_HALF = v;
+            await onAnyChange();
+        });
+
+        try {
+            if (withoutEnteringTextButton && withoutEnteringTextButton.dataset.boundAudioSettingsStaticClick !== '1') {
+                withoutEnteringTextButton.dataset.boundAudioSettingsStaticClick = '1';
+                withoutEnteringTextButton.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const currentChecked = withoutEnteringTextButton.dataset.checked === 'true';
+                    const checked = !currentChecked;
+                    withoutEnteringTextButton.dataset.checked = String(checked);
+                    window.audioSettingsWithoutEnteringText = checked;
+                    const iconEl = withoutEnteringTextButton.querySelector('i[data-lucide]');
+                    if (iconEl) iconEl.setAttribute('data-lucide', checked ? 'circle-check-big' : 'circle');
+                    if (window.lucide && window.lucide.createIcons) {
+                        window.lucide.createIcons({ root: withoutEnteringTextButton });
+                    }
+                    await onAnyChange();
+                });
+            }
+        } catch (e) {
+        }
+
+        applyValuesToUI();
+
+        try {
+            if (window.lucide && window.lucide.createIcons) {
+                window.lucide.createIcons({ root: audioSettingsModal });
+            }
+        } catch (e) {
+        }
+    };
+
+    // Используем статическую разметку в контейнере; не строим HTML через JS.
+    // Просто привязываем обработчики и сохраняем настройки.
+    initStaticModalMarkup();
 
     const openModal = (sourceLabel = 'unknown', event = null) => {
         try {
@@ -13269,35 +13068,11 @@ function initAudioSettingsModal() {
 
         // Перед показом модалки всегда синхронизируем UI с текущими глобальными настройками
         // (они могли быть обновлены из профиля или из черновика после первой инициализации).
-        try {
-            if (audioSettingsModalPanel) {
-                audioSettingsModalPanel.setSettings({
-                    start: playSequenceStart,
-                    typo: playSequenceTypo,
-                    success: playSequenceSuccess,
-                    repeats: REQUIRED_PASSED_COUNT,
-                    required_passed_star_half: REQUIRED_PASSED_STAR_HALF,
-                    without_entering_text: window.audioSettingsWithoutEnteringText || false,
-                    show_text: window.audioSettingsShowText || false,
-                    speech_recognition_mode: speechRecognitionMode
-                });
-            }
-        } catch (e) {
-        }
+        // no-op
 
         audioSettingsModal.style.display = 'flex';
         if (window.lucide && window.lucide.createIcons) {
             window.lucide.createIcons();
-        }
-
-        try {
-            renderTeacherReportRecipientsSettings();
-        } catch (e) {
-        }
-
-        try {
-            fetchTeacherReportRecipientsInBackground();
-        } catch (e) {
         }
 
         try {

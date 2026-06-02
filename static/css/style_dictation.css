@@ -5026,15 +5026,6 @@ html[dir="rtl"] .audio-players-wrapper {
   padding-left: 18px;
 }
 
-.teacher-report-recipient-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  object-fit: cover;
-  border: 1px solid var(--color-border-light);
-  flex: 0 0 auto;
-}
-
 .audio-settings-modal-body .audio-settings-bottom-panel .play-sequence-item {
   margin-top: 8px;
 }

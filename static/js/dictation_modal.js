@@ -36,6 +36,54 @@
     }
   }
 
+  function bindAudioSettingsModalControls() {
+    try {
+      const m = document.getElementById('audioSettingsModal');
+      if (!m) return;
+
+      const closeBtn = document.getElementById('closeAudioSettingsModal');
+      if (closeBtn && closeBtn.dataset.boundDictationModal !== '1') {
+        closeBtn.dataset.boundDictationModal = '1';
+        closeBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            m.style.display = 'none';
+          } catch (e1) {
+          }
+          try {
+            if (typeof window.updateRecognitionModeIcon === 'function') {
+              window.updateRecognitionModeIcon();
+            }
+          } catch (e2) {
+          }
+        });
+      }
+
+      if (m.dataset.boundDictationModalBackdrop !== '1') {
+        m.dataset.boundDictationModalBackdrop = '1';
+        m.addEventListener('click', (e) => {
+          try {
+            if (e && e.target === m) {
+              m.style.display = 'none';
+              try {
+                if (typeof window.updateRecognitionModeIcon === 'function') {
+                  window.updateRecognitionModeIcon();
+                }
+              } catch (e3) {
+              }
+            }
+          } catch (e2) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+  }
+
   function setAvatar() {
     try {
       const target = document.getElementById('dictationModalAvatar');
@@ -224,6 +272,11 @@
   }
 
   function openAudioSettingsModal(sourceLabel = 'unknown') {
+    try {
+      bindAudioSettingsModalControls();
+    } catch (e) {
+    }
+
     try {
       if (typeof window.initAudioSettingsModal === 'function') {
         window.initAudioSettingsModal();
@@ -514,6 +567,7 @@
     patchDictationCardOpenHandler();
     bindHeaderButtons();
     bindOverlayClose();
+    bindAudioSettingsModalControls();
   }
 
   window.DictationModal = { open, close, init };
