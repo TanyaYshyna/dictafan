@@ -4,21 +4,25 @@
       <div class="dictation-modal__header-left">
         <img src="/static/icons/logo.svg" class="dictation-modal__logo dictation-modal__logo--full" alt="DictaFan" onclick="window.location.href='/'" />
         <img src="/static/icons/logo_min.svg" class="dictation-modal__logo dictation-modal__logo--min" alt="DictaFan" onclick="window.location.href='/'" />
-        <div class="dictation-modal__user">
-          <span id="dictationModalUsername" class="dictation-modal__username"></span>
-        </div>
       </div>
 
-      <div class="dictation-modal__header-actions">
-        <button id="openDictationSettingsBtn" class="topbar-icon-btn" type="button" title="Настройки" aria-label="Настройки">
-          <i data-lucide="settings"></i>
-        </button>
-        <button id="saveBtn" class="topbar-icon-btn save-status-clean" type="button" title="Сохранить" aria-label="Сохранить">
-          <i data-lucide="save"></i>
-        </button>
-        <button id="dictationModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
-          <i data-lucide="x"></i>
-        </button>
+      <div class="dictation-modal__header-right">
+        <div class="dictation-modal__user" aria-hidden="true">
+          <span id="dictationModalAvatar" class="user-avatar-small"></span>
+          <span id="dictationModalUsername" class="dictation-modal__username"></span>
+        </div>
+
+        <div class="dictation-modal__header-actions">
+          <button id="openDictationSettingsBtn" class="topbar-icon-btn" type="button" title="Настройки" aria-label="Настройки">
+            <i data-lucide="settings"></i>
+          </button>
+          <button id="saveBtn" class="topbar-icon-btn save-status-clean" type="button" title="Сохранить" aria-label="Сохранить">
+            <i data-lucide="save"></i>
+          </button>
+          <button id="dictationModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
     </div>
 

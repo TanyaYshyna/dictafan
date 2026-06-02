@@ -36,6 +36,24 @@
     }
   }
 
+  function setAvatar() {
+    try {
+      const target = document.getElementById('dictationModalAvatar');
+      if (!target) return;
+
+      const source = document.querySelector('.user-avatar-small');
+      if (!source) return;
+
+      // Copy inline styles (background-image is usually there)
+      target.style.cssText = source.style.cssText || '';
+
+      // Copy classes that may affect avatar rendering
+      target.className = source.className;
+      target.id = 'dictationModalAvatar';
+    } catch (e) {
+    }
+  }
+
   function renderLucide(root) {
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -207,6 +225,7 @@
       if (!modal) return;
 
       setUsername();
+      setAvatar();
       bindHeaderButtons();
       bindOverlayClose();
 
