@@ -49,6 +49,14 @@
   margin-top: 6px;
 }
 
+#dictationModal .custom-audio-player .progress-bar::-webkit-slider-thumb {
+  margin-top: -8px;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-range-thumb {
+  transform: translateY(-8px);
+}
+
 #dictationModal #audioSettingsModal .audio-settings-modal-panel {
   border: none;
   padding: 0;

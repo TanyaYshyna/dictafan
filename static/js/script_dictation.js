@@ -9994,16 +9994,6 @@ async function onloadInitializeDictation() {
             }
         });
 
-        originalAudioVisual.setOnAudioTypeChange((type, path) => {
-            if (window.AudioManager && window.AudioManager.isPlaying()) {
-                window.AudioManager.stop();
-                if (blockAudioPlaybackIfRecording()) {
-                    return;
-                }
-                window.AudioManager.play(originalAudioVisual.playButton, path);
-            }
-        });
-
         originalAudioVisual.setOnSpeedChange((rate) => {
             if (window.AudioManager) {
                 window.AudioManager.setPlaybackRate(rate);
