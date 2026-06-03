@@ -1,4 +1,3 @@
-(function () {
   const MODAL_ID = 'dictationModal';
   const BODY_ID = 'dictationModalBody';
 
@@ -68,6 +67,159 @@
     if (typeof window.checkText !== 'function') window.checkText = () => {};
     if (typeof window.resumeGame !== 'function') window.resumeGame = () => {};
   } catch (e) {
+  }
+
+  function getCurrentSentenceViewFromSession(session) {
+    try {
+      if (!session || !Array.isArray(session.selectedKeys) || session.selectedKeys.length === 0) return null;
+      const idx = Number(session.currentSelectedIndex) || 0;
+      const key = session.selectedKeys[Math.max(0, Math.min(session.selectedKeys.length - 1, idx))];
+      return session.getSentenceView ? session.getSentenceView(key) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function resolveAudioToUrl(rawValue, dictId, lang) {
+    try {
+      const am = window.AudioManager;
+      const v = String(rawValue || '').trim();
+      if (!v) return '';
+      if (v.startsWith('blob:')) return v;
+      if (v.startsWith('/api/') || v.startsWith('http://') || v.startsWith('https://')) {
+        if (am && typeof am.normalizeMediaUrl === 'function') return am.normalizeMediaUrl(v);
+        return v;
+      }
+      const name = v.split('?', 1)[0].split('/').pop();
+      if (!name) return '';
+      if (am && typeof am.buildDictationAudioUrl === 'function') {
+        return am.buildDictationAudioUrl(dictId, String(lang), name);
+      }
+      return '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getPlaySequenceStartValue() {
+    try {
+      const el = document.getElementById('playSequenceStart');
+      const v = el && el.value != null ? String(el.value) : '';
+      if (v.trim()) return v.trim();
+    } catch (e) {
+    }
+    try {
+      const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
+      if (v.trim()) return v.trim();
+    } catch (e) {
+    }
+    return 'oto';
+  }
+
+  function playAudioSequence(sequence, { originalUrl, translationUrl }) {
+    try {
+      const am = window.AudioManager;
+      if (!am || typeof am.play !== 'function') return;
+      const seq = String(sequence || '').trim().toLowerCase();
+      if (!seq) return;
+
+      const steps = [];
+      for (const ch of seq) {
+        if (ch === 'o' && originalUrl) steps.push({ url: originalUrl, button: null });
+        if (ch === 't' && translationUrl) steps.push({ url: translationUrl, button: document.getElementById('translationPlayButton') });
+      }
+      if (!steps.length) return;
+
+      let i = 0;
+      const runNext = () => {
+        try {
+          const step = steps[i++];
+          if (!step) return;
+          am.play(step.button || null, step.url, () => {
+            runNext();
+          });
+        } catch (e) {
+        }
+      };
+      runNext();
+    } catch (e) {
+    }
+  }
+
+  function updateAudioPlayersFromSession(session) {
+    try {
+      const startModal = document.getElementById('start-modal');
+      if (startModal && (startModal.style.display === 'flex' || startModal.style.display === 'block')) {
+        return;
+      }
+    } catch (e0) {
+    }
+
+    const view = getCurrentSentenceViewFromSession(session);
+    if (!view) return;
+
+    let dictId = '';
+    let langOrig = '';
+    let langTr = '';
+    try {
+      const dictationData = document.getElementById('dictation-data');
+      dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
+      langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
+      langTr = dictationData ? String(dictationData.getAttribute('data-language-translation') || '').trim() : '';
+    } catch (e1) {
+    }
+
+    const originalUrl = resolveAudioToUrl(view.audio, dictId, langOrig);
+    const translationUrl = resolveAudioToUrl(view.audio_tr, dictId, langTr);
+
+    try {
+      const visual = window.__dictationModalOriginalAudioVisual;
+      if (visual && typeof visual.setAudioPaths === 'function') {
+        visual.setAudioPaths({ audio: originalUrl || null, audio_a: null, audio_f: null, audio_m: null });
+      }
+    } catch (e2) {
+    }
+
+    try {
+      const btn = document.getElementById('translationPlayButton');
+      if (btn) {
+        btn.dataset.audioUrl = translationUrl || '';
+        if (btn.dataset.boundDictationModal !== '1') {
+          btn.dataset.boundDictationModal = '1';
+          btn.addEventListener('click', (e) => {
+            try {
+              e.preventDefault();
+              e.stopPropagation();
+            } catch (e0) {
+            }
+            try {
+              const u = String(btn.dataset.audioUrl || '').trim();
+              if (!u) return;
+              if (window.AudioManager && typeof window.AudioManager.play === 'function') {
+                window.AudioManager.play(btn, u);
+              }
+            } catch (e1) {
+            }
+          });
+        }
+      }
+    } catch (e3) {
+    }
+
+    try {
+      clearTimeout(state._startSequenceTimer);
+    } catch (e4) {
+    }
+    try {
+      state._startSequenceTimer = setTimeout(() => {
+        try {
+          const seq = getPlaySequenceStartValue();
+          playAudioSequence(seq, { originalUrl, translationUrl });
+        } catch (e0) {
+        }
+      }, 300);
+    } catch (e5) {
+    }
   }
 
   function initModalOriginalAudioPlayer(parsed) {
@@ -885,6 +1037,11 @@
       if (curEl) curEl.textContent = String(cur || 0);
     } catch (e) {
     }
+
+    try {
+      updateAudioPlayersFromSession(session);
+    } catch (e) {
+    }
   }
 
   function applyDictationMetaFromCard({ href, cardEl }) {
@@ -989,7 +1146,7 @@
     try {
       const startModal = document.getElementById('start-modal');
       if (!startModal) return;
-      startModal.style.display = 'block';
+      startModal.style.display = 'flex';
       renderLucide(startModal);
 
       try {
@@ -1477,4 +1634,4 @@
     document.addEventListener('DOMContentLoaded', () => init());
   } catch (e) {
   }
-})();
+

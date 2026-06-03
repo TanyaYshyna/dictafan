@@ -35,6 +35,20 @@
   min-width: 320px;
 }
 
+#dictationModal #start-modal {
+  position: fixed;
+  inset: 0;
+}
+
+#dictationModal .audio-players-wrapper {
+  margin-top: 8px;
+}
+
+#dictationModal #originalAudioPlayer,
+#dictationModal .translation-audio-button-wrapper {
+  margin-top: 6px;
+}
+
 #dictationModal #audioSettingsModal .audio-settings-modal-panel {
   border: none;
   padding: 0;
