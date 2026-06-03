@@ -49,16 +49,17 @@
               resetInactivityTimer();
             } catch (e2) {
             }
+
+            try {
+              const m = document.getElementById('start-modal');
+              if (m) m.style.display = 'none';
+            } catch (e3) {
+            }
             session.ensureDefaultSelection();
             session.currentSelectedIndex = 0;
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
-        }
-        try {
-          const m = document.getElementById('start-modal');
-          if (m) m.style.display = 'none';
-        } catch (e) {
         }
       };
     }
@@ -1737,6 +1738,18 @@
       if (!modal) return;
 
       try {
+        const prev = getProgressPanelInstance();
+        if (prev && typeof prev.stopTimer === 'function') {
+          prev.stopTimer();
+        }
+      } catch (e00) {
+      }
+      try {
+        window.progressPanel = null;
+      } catch (e01) {
+      }
+
+      try {
         state.dictationStarted = false;
       } catch (e0) {
       }
@@ -1870,6 +1883,20 @@
     try {
       modal.classList.remove('show');
     } catch (e) {
+    }
+
+    try {
+      const p = getProgressPanelInstance();
+      if (p && typeof p.stopTimer === 'function') {
+        p.stopTimer();
+      } else if (p && typeof p.pauseTimer === 'function') {
+        p.pauseTimer();
+      }
+    } catch (e00) {
+    }
+    try {
+      window.progressPanel = null;
+    } catch (e01) {
     }
 
     try {
