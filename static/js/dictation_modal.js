@@ -21,7 +21,11 @@
     currentUrl: null,
     depsLoaded: false,
     opening: false,
+    dictationStarted: false,
   };
+
+  const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута
+  const INACTIVITY_TIMEOUT_RECORDING = 10 * 60 * 1000; // 10 минут
 
   try {
     if (typeof window.startGame !== 'function') {
@@ -29,6 +33,22 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (session) {
+            try {
+              state.dictationStarted = true;
+            } catch (e0) {
+            }
+
+            try {
+              const p = getProgressPanelInstance();
+              if (p && typeof p.startTimer === 'function') {
+                p.startTimer();
+              }
+            } catch (e1) {
+            }
+            try {
+              resetInactivityTimer();
+            } catch (e2) {
+            }
             session.ensureDefaultSelection();
             session.currentSelectedIndex = 0;
             updateNavigatorFromSession(session);
@@ -65,7 +85,183 @@
       };
     }
     if (typeof window.checkText !== 'function') window.checkText = () => {};
-    if (typeof window.resumeGame !== 'function') window.resumeGame = () => {};
+  } catch (e) {
+  }
+
+  function getProgressPanelInstance() {
+    try {
+      const p = window.progressPanel;
+      if (p && typeof p.getTimerSnapshot === 'function') return p;
+    } catch (e) {
+    }
+    return null;
+  }
+
+  function getProgressTimerSnapshot() {
+    try {
+      const p = getProgressPanelInstance();
+      if (p) return p.getTimerSnapshot();
+    } catch (e) {
+    }
+    return { mode: 'clock', isRunning: false, elapsedMs: 0, countdownRemainingMs: 0, accumulatedMs: 0 };
+  }
+
+  function formatHhMmSs(ms) {
+    try {
+      const totalSec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+      const h = Math.floor(totalSec / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } catch (e) {
+      return '00:00:00';
+    }
+  }
+
+  function getTimerDisplayMs(snapshot = getProgressTimerSnapshot()) {
+    try {
+      if (snapshot && snapshot.mode === 'countdown') {
+        return Number(snapshot.countdownRemainingMs) || 0;
+      }
+      return Number(snapshot.elapsedMs) || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function stopAllAudios() {
+    try {
+      const am = window.AudioManager;
+      if (am && typeof am.stop === 'function') {
+        am.stop();
+      } else if (am && typeof am.pause === 'function') {
+        am.pause();
+      }
+    } catch (e) {
+    }
+  }
+
+  function isStartModalOpen() {
+    try {
+      const m = document.getElementById('start-modal');
+      return !!(m && (m.style.display === 'flex' || m.style.display === 'block'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isPauseModalOpen() {
+    try {
+      const m = document.getElementById('pauseModal');
+      return !!(m && (m.style.display === 'flex' || m.style.display === 'block'));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function clearInactivityTimer() {
+    try {
+      if (state._inactivityTimer) clearTimeout(state._inactivityTimer);
+    } catch (e) {
+    }
+    state._inactivityTimer = null;
+  }
+
+  function resetInactivityTimer() {
+    try {
+      if (!state.dictationStarted) return;
+      const snap = getProgressTimerSnapshot();
+      if (!snap || !snap.isRunning) {
+        clearInactivityTimer();
+        return;
+      }
+      clearInactivityTimer();
+      if (isPauseModalOpen() || isStartModalOpen()) return;
+      const timeout = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+      state._inactivityTimer = setTimeout(() => {
+        try {
+          pauseGame(true);
+        } catch (e) {
+        }
+      }, timeout);
+    } catch (e) {
+    }
+  }
+
+  function pauseGame(isInactivityPause = false) {
+    try {
+      if (!state.dictationStarted) return;
+      const pauseModal = document.getElementById('pauseModal');
+      if (!pauseModal) return;
+      if (pauseModal.style.display === 'flex') return;
+
+      const snap = getProgressTimerSnapshot();
+      if (!snap || !snap.isRunning) return;
+
+      const p = getProgressPanelInstance();
+      if (p && typeof p.pauseTimer === 'function') {
+        p.pauseTimer();
+      }
+
+      if (isInactivityPause) {
+        try {
+          const inactivityTime = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+          if (p && p.timerState) {
+            p.timerState.dictationAccumulatedMs = Math.max(0, (Number(p.timerState.dictationAccumulatedMs) || 0) - inactivityTime);
+          }
+        } catch (e) {
+        }
+      }
+
+      clearInactivityTimer();
+      stopAllAudios();
+
+      try {
+        const el = document.getElementById('pauseTimer');
+        if (el) el.textContent = formatHhMmSs(getTimerDisplayMs(getProgressTimerSnapshot()));
+      } catch (e) {
+      }
+
+      pauseModal.style.display = 'flex';
+      try {
+        const resumeBtn = document.getElementById('resumeBtn');
+        if (resumeBtn) resumeBtn.focus();
+      } catch (e) {
+      }
+    } catch (e) {
+    }
+  }
+
+  function resumeGame() {
+    try {
+      const pauseModal = document.getElementById('pauseModal');
+      if (pauseModal) pauseModal.style.display = 'none';
+    } catch (e) {
+    }
+
+    try {
+      const p = getProgressPanelInstance();
+      if (p && typeof p.resumeTimer === 'function') {
+        p.resumeTimer();
+      }
+    } catch (e) {
+    }
+
+    try {
+      resetInactivityTimer();
+    } catch (e) {
+    }
+
+    try {
+      const input = document.getElementById('userInput');
+      if (input && typeof input.focus === 'function') input.focus();
+    } catch (e) {
+    }
+  }
+
+  try {
+    if (typeof window.pauseGame !== 'function') window.pauseGame = pauseGame;
+    if (typeof window.resumeGame !== 'function') window.resumeGame = resumeGame;
   } catch (e) {
   }
 
@@ -82,13 +278,21 @@
         if (!event || !event.ctrlKey) return;
 
         switch (event.code) {
+          case 'Escape': {
+            if (!state.dictationStarted) return;
+            pauseGame(false);
+            event.preventDefault();
+            break;
+          }
           case 'Digit1': {
+            if (!state.dictationStarted) return;
             const visual = window.__dictationModalOriginalAudioVisual;
             if (visual && visual.playButton) visual.playButton.click();
             event.preventDefault();
             break;
           }
           case 'Digit2': {
+            if (!state.dictationStarted) return;
             const btn = document.getElementById('translationPlayButton');
             if (btn) btn.click();
             event.preventDefault();
@@ -110,6 +314,46 @@
       } catch (e) {
       }
     });
+  }
+
+  function bindInactivityWatchers() {
+    try {
+      if (document.body.dataset.boundDictationModalInactivity === '1') return;
+      document.body.dataset.boundDictationModalInactivity = '1';
+    } catch (e) {
+    }
+
+    const bump = () => {
+      try {
+        resetInactivityTimer();
+      } catch (e) {
+      }
+    };
+
+    try {
+      document.addEventListener('keydown', bump, true);
+      document.addEventListener('mousemove', bump, true);
+      document.addEventListener('mousedown', bump, true);
+      document.addEventListener('touchstart', bump, true);
+      document.addEventListener('scroll', bump, true);
+    } catch (e) {
+    }
+
+    try {
+      if (!window.__DICTATION_MODAL_VISIBILITY_PAUSE_BOUND) {
+        window.__DICTATION_MODAL_VISIBILITY_PAUSE_BOUND = true;
+        document.addEventListener('visibilitychange', () => {
+          try {
+            if (!state.dictationStarted) return;
+            if (!document.hidden) return;
+            if (isPauseModalOpen() || isStartModalOpen()) return;
+            pauseGame(true);
+          } catch (e) {
+          }
+        }, true);
+      }
+    } catch (e) {
+    }
   }
 
   function getCurrentSentenceViewFromSession(session) {
@@ -190,6 +434,7 @@
   }
 
   function updateAudioPlayersFromSession(session) {
+    const started = !!state.dictationStarted;
     try {
       const startModal = document.getElementById('start-modal');
       if (startModal && (startModal.style.display === 'flex' || startModal.style.display === 'block')) {
@@ -236,6 +481,7 @@
             } catch (e0) {
             }
             try {
+              if (!state.dictationStarted) return;
               const u = String(btn.dataset.audioUrl || '').trim();
               if (!u) return;
               if (window.AudioManager && typeof window.AudioManager.play === 'function') {
@@ -254,13 +500,15 @@
     } catch (e4) {
     }
     try {
-      state._startSequenceTimer = setTimeout(() => {
-        try {
-          const seq = getPlaySequenceStartValue();
-          playAudioSequence(seq, { originalUrl, translationUrl });
-        } catch (e0) {
-        }
-      }, 300);
+      if (started) {
+        state._startSequenceTimer = setTimeout(() => {
+          try {
+            const seq = getPlaySequenceStartValue();
+            playAudioSequence(seq, { originalUrl, translationUrl });
+          } catch (e0) {
+          }
+        }, 300);
+      }
     } catch (e5) {
     }
   }
@@ -280,6 +528,7 @@
 
       visual.setOnPlayClick(() => {
         try {
+          if (!state.dictationStarted) return;
           const audioPath = visual.getCurrentAudioPath();
           if (!audioPath) return;
           if (window.AudioManager && typeof window.AudioManager.play === 'function') {
@@ -1487,6 +1736,11 @@
       const modal = getModal();
       if (!modal) return;
 
+      try {
+        state.dictationStarted = false;
+      } catch (e0) {
+      }
+
       const parsed = parseDictationHref(dictationUrl);
 
       setUsername();
@@ -1532,8 +1786,8 @@
           } catch (e0) {
           }
           renderStartModalSentencesTable(session);
-          updateNavigatorFromSession(session);
           showStartModal();
+          updateNavigatorFromSession(session);
 
           const startBtn = document.getElementById('confirmStartBtn');
           if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
@@ -1618,6 +1872,16 @@
     } catch (e) {
     }
 
+    try {
+      clearInactivityTimer();
+    } catch (e0) {
+    }
+    try {
+      const pm = document.getElementById('pauseModal');
+      if (pm) pm.style.display = 'none';
+    } catch (e1) {
+    }
+
     state.isOpen = false;
   }
 
@@ -1670,6 +1934,7 @@
     bindOverlayClose();
     bindAudioSettingsModalControls();
     bindDictationModalHotkeys();
+    bindInactivityWatchers();
   }
 
   window.DictationModal = { open, close, init };
