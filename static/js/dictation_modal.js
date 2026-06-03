@@ -183,6 +183,13 @@
       } catch (e0) {
         src = '';
       }
+
+      try {
+        if (src && window.maybeCacheBustDictationCover) {
+          src = window.maybeCacheBustDictationCover(src);
+        }
+      } catch (e1) {
+      }
       img.src = src || '/static/data/covers/cover_en.webp';
       img.onerror = () => {
         try { img.onerror = null; } catch (e1) {}
@@ -1370,7 +1377,7 @@
       // Some dictation UI bits are usually set in inline script in dictation.html.
       // We replicate the minimal critical part: create ProgressPanel if needed.
       try {
-        if (window.ProgressPanel && window.UserActivityHistory) {
+        if (typeof ProgressPanel !== 'undefined' && typeof UserActivityHistory !== 'undefined') {
           try {
             if (!window.activityHistory) {
               window.activityHistory = new UserActivityHistory('/user/api');

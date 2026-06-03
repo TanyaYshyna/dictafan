@@ -173,11 +173,12 @@
 }
 
 #dictationModal .dictation-modal__cover {
-  width: 56px;
-  height: 40px;
+  width: 96px;
+  height: 64px;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
+  flex: 0 0 auto;
 }
 
 #dictationModal .dictation-modal__header-right {
