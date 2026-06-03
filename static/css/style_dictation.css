@@ -2585,6 +2585,24 @@ html[dir="rtl"] .audio-players-wrapper {
   width: auto;
 }
 
+#sentences-table.hide-progress col.col-progress,
+#sentences-table.hide-progress th.col-progress,
+#sentences-table.hide-progress td.col-progress {
+  display: none !important;
+}
+
+#sentences-table.hide-original col.col-text-original,
+#sentences-table.hide-original th.col-text-original,
+#sentences-table.hide-original td.col-text-original {
+  display: none !important;
+}
+
+#sentences-table.hide-translation col.col-text-translation,
+#sentences-table.hide-translation th.col-text-translation,
+#sentences-table.hide-translation td.col-text-translation {
+  display: none !important;
+}
+
 #sentences-table th,
 #final-sentences-table th,
 #sentences-table td,

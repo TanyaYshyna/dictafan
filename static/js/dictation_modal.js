@@ -81,6 +81,81 @@
     }
   }
 
+  function setColumnsVisibilityByClass({ className, visible }) {
+    try {
+      const table = document.getElementById('sentences-table');
+      if (!table) return;
+      const cls = String(className || '').trim();
+      if (!cls) return;
+      const map = {
+        'col-progress': 'hide-progress',
+        'col-text-original': 'hide-original',
+        'col-text-translation': 'hide-translation',
+      };
+      const hideClass = map[cls];
+      if (!hideClass) return;
+      table.classList.toggle(hideClass, !visible);
+    } catch (e) {
+    }
+  }
+
+  function updateColumnToggleButtonIcon(buttonId, checked) {
+    try {
+      const btn = document.getElementById(buttonId);
+      if (!btn) return;
+      const icon = btn.querySelector('.sentence-col-flag-icon');
+      if (!icon) return;
+      icon.setAttribute('data-lucide', checked ? 'circle-check-big' : 'circle');
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons({ root: btn });
+        }
+      } catch (e1) {
+      }
+    } catch (e) {
+    }
+  }
+
+  function applyStartModalColumnsPreset(preset) {
+    const p = preset && typeof preset === 'object' ? preset : {};
+    const showProgress = Boolean(p.progress);
+    const showOrig = Boolean(p.original);
+    const showTr = Boolean(p.translation);
+
+    setColumnsVisibilityByClass({ className: 'col-progress', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-text-original', visible: showOrig });
+    setColumnsVisibilityByClass({ className: 'col-text-translation', visible: showTr });
+
+    updateColumnToggleButtonIcon('toggleProgressColumnsBtn', showProgress);
+    updateColumnToggleButtonIcon('toggleOriginalColumnBtn', showOrig);
+    updateColumnToggleButtonIcon('toggleTranslationColumnBtn', showTr);
+
+    try {
+      window.__dictationStartModalColumnPrefs = { progress: showProgress, original: showOrig, translation: showTr };
+    } catch (e) {
+    }
+  }
+
+  function renderLucideTriStateCheckboxButton(btn, state, disabled) {
+    if (!btn) return;
+    const s = String(state || 'unchecked');
+    const isChecked = s === 'checked';
+    const isMixed = s === 'mixed';
+    btn.dataset.checked = isChecked ? '1' : '0';
+    btn.dataset.mixed = isMixed ? '1' : '0';
+    btn.dataset.disabled = disabled ? '1' : '0';
+    btn.setAttribute('aria-pressed', isChecked ? 'true' : 'false');
+    btn.disabled = Boolean(disabled);
+    const icon = isMixed ? 'circle-alert' : (isChecked ? 'circle-check-big' : 'circle');
+    btn.innerHTML = `<i data-lucide="${icon}"></i>`;
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons({ root: btn });
+      }
+    } catch (e) {
+    }
+  }
+
   function getModal() {
     return document.getElementById(MODAL_ID);
   }
@@ -535,9 +610,11 @@
         };
 
         const tdOrig = document.createElement('td');
+        tdOrig.className = 'col-text-original';
         tdOrig.textContent = String(view.text_original || '');
 
         const tdTr = document.createElement('td');
+        tdTr.className = 'col-text-translation';
         tdTr.textContent = String(view.text_translation || '');
 
         tr.appendChild(tdNum);
@@ -590,12 +667,36 @@
     }
   }
 
+  function computeAllCheckboxTriState(session) {
+    try {
+      const keys = session && session.activeKeys ? session.activeKeys : [];
+      const list = Array.isArray(keys) ? keys : [];
+      let eligible = 0;
+      let checked = 0;
+      let unchecked = 0;
+      for (const k of list) {
+        const st = session.getState(k);
+        if (isHeaderToggleProtectedState(st)) continue;
+        eligible += 1;
+        const cur = st && st.selection_state ? String(st.selection_state) : 'unchecked';
+        if (cur === 'checked') checked += 1;
+        else unchecked += 1;
+      }
+      if (!eligible) return 'unchecked';
+      if (checked === eligible) return 'checked';
+      if (unchecked === eligible) return 'unchecked';
+      return 'mixed';
+    } catch (e) {
+      return 'unchecked';
+    }
+  }
+
   function updateAllCheckboxButtonFromSession(session) {
     try {
       const btn = document.getElementById('allCheckbox');
       if (!btn) return;
-      const checked = computeAllCheckboxCheckedState(session);
-      renderLucideCheckboxButton(btn, checked, false);
+      const state = computeAllCheckboxTriState(session);
+      renderLucideTriStateCheckboxButton(btn, state, false);
     } catch (e) {
     }
   }
@@ -772,6 +873,16 @@
       if (!startModal) return;
       startModal.style.display = 'block';
       renderLucide(startModal);
+
+      try {
+        const prefs = window.__dictationStartModalColumnPrefs;
+        if (prefs && typeof prefs === 'object') {
+          applyStartModalColumnsPreset(prefs);
+        } else {
+          applyStartModalColumnsPreset({ progress: true, original: false, translation: false });
+        }
+      } catch (e1) {
+      }
     } catch (e) {
     }
   }
@@ -880,9 +991,69 @@
           try {
             const session = window.__dictationModalActiveSession;
             if (!session) return;
-            const allChecked = computeAllCheckboxCheckedState(session);
-            const next = allChecked ? 'unchecked' : 'checked';
+            const curState = computeAllCheckboxTriState(session);
+            const next = (curState === 'checked') ? 'unchecked' : 'checked';
             applyHeaderToggleToRows(session, next);
+          } catch (e1) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const btn = document.getElementById('toggleProgressColumnsBtn');
+      if (btn && btn.dataset.boundDictationModal !== '1') {
+        btn.dataset.boundDictationModal = '1';
+        btn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const prefs = window.__dictationStartModalColumnPrefs || { progress: true, original: false, translation: false };
+            applyStartModalColumnsPreset({ ...prefs, progress: !prefs.progress });
+          } catch (e1) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const btn = document.getElementById('toggleOriginalColumnBtn');
+      if (btn && btn.dataset.boundDictationModal !== '1') {
+        btn.dataset.boundDictationModal = '1';
+        btn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const prefs = window.__dictationStartModalColumnPrefs || { progress: true, original: false, translation: false };
+            applyStartModalColumnsPreset({ ...prefs, original: !prefs.original });
+          } catch (e1) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const btn = document.getElementById('toggleTranslationColumnBtn');
+      if (btn && btn.dataset.boundDictationModal !== '1') {
+        btn.dataset.boundDictationModal = '1';
+        btn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const prefs = window.__dictationStartModalColumnPrefs || { progress: true, original: false, translation: false };
+            applyStartModalColumnsPreset({ ...prefs, translation: !prefs.translation });
           } catch (e1) {
           }
         });
