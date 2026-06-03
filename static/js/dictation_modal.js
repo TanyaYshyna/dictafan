@@ -24,17 +24,61 @@
     if (typeof window.startGame !== 'function') {
       window.startGame = () => {
         try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            session.ensureDefaultSelection();
+            session.currentSelectedIndex = 0;
+            updateNavigatorFromSession(session);
+          }
+        } catch (e0) {
+        }
+        try {
           const m = document.getElementById('start-modal');
           if (m) m.style.display = 'none';
         } catch (e) {
         }
       };
     }
-    if (typeof window.nextSentence !== 'function') window.nextSentence = () => {};
-    if (typeof window.previousSentence !== 'function') window.previousSentence = () => {};
+    if (typeof window.nextSentence !== 'function') {
+      window.nextSentence = () => {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (!session) return;
+          session.goNext();
+          updateNavigatorFromSession(session);
+        } catch (e) {
+        }
+      };
+    }
+    if (typeof window.previousSentence !== 'function') {
+      window.previousSentence = () => {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (!session) return;
+          session.goPrev();
+          updateNavigatorFromSession(session);
+        } catch (e) {
+        }
+      };
+    }
     if (typeof window.checkText !== 'function') window.checkText = () => {};
     if (typeof window.resumeGame !== 'function') window.resumeGame = () => {};
   } catch (e) {
+  }
+
+  function renderLucideCheckboxButton(btn, checked, disabled) {
+    if (!btn) return;
+    btn.dataset.checked = checked ? '1' : '0';
+    btn.dataset.disabled = disabled ? '1' : '0';
+    btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+    btn.disabled = Boolean(disabled);
+    btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons({ root: btn });
+      }
+    } catch (e) {
+    }
   }
 
   function getModal() {
@@ -455,9 +499,7 @@
         btn.className = 'all-checkbox-btn';
         btn.setAttribute('aria-label', 'Выбрать предложение');
 
-        const icon = document.createElement('i');
-        icon.setAttribute('data-lucide', view.selection_state === 'checked' ? 'check-circle' : 'circle');
-        btn.appendChild(icon);
+        renderLucideCheckboxButton(btn, view.selection_state === 'checked', false);
 
         btn.addEventListener('click', (e) => {
           try {
@@ -467,12 +509,14 @@
           }
 
           try {
-            const next = (view.selection_state === 'checked') ? 'unchecked' : 'checked';
+            const st = session.getState(view.key);
+            const cur = st && st.selection_state ? String(st.selection_state) : 'unchecked';
+            const next = (cur === 'checked') ? 'unchecked' : 'checked';
             session.setSelectionState(view.key, next);
+            session.ensureDefaultSelection();
             const updated = session.getSentenceView(view.key);
-            icon.setAttribute('data-lucide', updated && updated.selection_state === 'checked' ? 'check-circle' : 'circle');
-            renderLucide(btn);
-            refreshSelectedCounters(session);
+            renderLucideCheckboxButton(btn, updated && updated.selection_state === 'checked', false);
+            updateNavigatorFromSession(session);
           } catch (e1) {
           }
         });
@@ -523,6 +567,20 @@
     try {
       const curEl = document.getElementById('sentenceCurrentNumber');
       if (curEl) curEl.textContent = '1';
+    } catch (e) {
+    }
+  }
+
+  function updateNavigatorFromSession(session) {
+    try {
+      const totalEl = document.getElementById('sentenceTotalNumber');
+      if (totalEl) totalEl.textContent = `/ ${session && Array.isArray(session.selectedKeys) ? session.selectedKeys.length : 0}`;
+    } catch (e) {
+    }
+    try {
+      const curEl = document.getElementById('sentenceCurrentNumber');
+      const cur = session && session.selectedKeys && session.selectedKeys.length ? (session.currentSelectedIndex + 1) : 0;
+      if (curEl) curEl.textContent = String(cur || 0);
     } catch (e) {
     }
   }
@@ -864,8 +922,12 @@
       try {
         const session = parsed ? getOrCreateDefaultSessionFromParsed(parsed) : null;
         if (session) {
+          try {
+            window.__dictationModalActiveSession = session;
+          } catch (e0) {
+          }
           renderStartModalSentencesTable(session);
-          refreshSelectedCounters(session);
+          updateNavigatorFromSession(session);
           showStartModal();
 
           const startBtn = document.getElementById('confirmStartBtn');
