@@ -5,6 +5,10 @@
   const DICTATION_SCRIPT_DEPS = [
     '/static/js/idb_manager.js',
     '/static/js/desktop_confirm_modal.js',
+    '/static/js/language_manager.js',
+    '/static/js/language_selector.js',
+    '/static/js/cover_manager.js',
+    '/static/js/audio_manager.js',
     '/static/js/audio_player_visual.js',
     '/static/js/user_activity_history.js',
     '/static/js/dictation_statistics.js',
@@ -66,6 +70,64 @@
   } catch (e) {
   }
 
+  function initModalOriginalAudioPlayer(parsed) {
+    try {
+      const container = document.getElementById('originalAudioPlayer');
+      if (!container) return;
+      if (!window.AudioPlayerVisual) return;
+      if (container.dataset.boundAudioVisual === '1') return;
+
+      const visual = new AudioPlayerVisual(container);
+      try {
+        visual.setLanguage(String(parsed && parsed.langOriginal ? parsed.langOriginal : '').trim().toLowerCase());
+      } catch (e0) {
+      }
+
+      visual.setOnPlayClick(() => {
+        try {
+          const audioPath = visual.getCurrentAudioPath();
+          if (!audioPath) return;
+          if (window.AudioManager && typeof window.AudioManager.play === 'function') {
+            window.AudioManager.play(visual.playButton || null, audioPath);
+          }
+        } catch (e) {
+        }
+      });
+
+      visual.setOnSpeedChange((rate) => {
+        try {
+          if (window.AudioManager && typeof window.AudioManager.setPlaybackRate === 'function') {
+            window.AudioManager.setPlaybackRate(rate);
+          }
+        } catch (e) {
+        }
+      });
+
+      visual.setOnProgressSeek((progressPercent) => {
+        try {
+          if (!window.AudioManager || typeof window.AudioManager.seekToPercent !== 'function') return;
+          window.AudioManager.seekToPercent(progressPercent);
+        } catch (e) {
+        }
+      });
+
+      try {
+        if (window.AudioManager && typeof window.AudioManager.setAudioPlayerVisual === 'function') {
+          window.AudioManager.setAudioPlayerVisual(visual);
+        }
+      } catch (e1) {
+      }
+
+      try {
+        window.__dictationModalOriginalAudioVisual = visual;
+      } catch (e2) {
+      }
+
+      container.dataset.boundAudioVisual = '1';
+    } catch (e) {
+    }
+  }
+
   function renderLucideCheckboxButton(btn, checked, disabled) {
     if (!btn) return;
     btn.dataset.checked = checked ? '1' : '0';
@@ -77,6 +139,55 @@
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons({ root: btn });
       }
+    } catch (e) {
+    }
+  }
+
+  function renderModalLangPair(parsed) {
+    try {
+      const pairContainer = document.getElementById('dictationLangPair');
+      if (!pairContainer) return;
+      if (!window.LanguageManager || typeof window.initLanguageSelector !== 'function') {
+        pairContainer.textContent = String(parsed && parsed.langOriginal ? parsed.langOriginal : '');
+        return;
+      }
+      const languageData = window.LanguageManager.getLanguageData && window.LanguageManager.getLanguageData();
+      if (!languageData) {
+        pairContainer.textContent = String(parsed && parsed.langOriginal ? parsed.langOriginal : '');
+        return;
+      }
+      pairContainer.innerHTML = '';
+      window.initLanguageSelector('dictationLangPair', {
+        mode: 'flag-pair-fixed',
+        currentLearning: String(parsed && parsed.langOriginal ? parsed.langOriginal : '').trim().toLowerCase(),
+        nativeLanguage: String(parsed && parsed.langTranslation ? parsed.langTranslation : '').trim().toLowerCase(),
+        languageData,
+      });
+    } catch (e) {
+    }
+  }
+
+  function renderModalCover(parsed) {
+    try {
+      const img = document.getElementById('dictationModalCover');
+      if (!img) return;
+      const dictId = parsed && parsed.dictationIdFormatted ? String(parsed.dictationIdFormatted) : '';
+      const lang = parsed && parsed.langOriginal ? String(parsed.langOriginal) : '';
+      let src = '';
+      try {
+        if (window.CoverManager && typeof window.CoverManager.getCoverUrl === 'function') {
+          src = window.CoverManager.getCoverUrl(dictId, lang);
+        } else if (window.ImageManager && typeof window.ImageManager.getCoverUrl === 'function') {
+          src = window.ImageManager.getCoverUrl(dictId, lang);
+        }
+      } catch (e0) {
+        src = '';
+      }
+      img.src = src || '/static/data/covers/cover_en.webp';
+      img.onerror = () => {
+        try { img.onerror = null; } catch (e1) {}
+        img.src = '/static/data/covers/cover_en.webp';
+      };
     } catch (e) {
     }
   }
@@ -804,7 +915,7 @@
 
     try {
       const langPair = document.getElementById('dictationLangPair');
-      if (langPair) langPair.textContent = parsed.langOriginal;
+      if (langPair) langPair.textContent = '';
       const tr = document.getElementById('dictationTranslationLanguage');
       if (tr) tr.textContent = parsed.langTranslation;
     } catch (e) {
@@ -1192,6 +1303,15 @@
 
       try {
         if (parsed) {
+          renderModalLangPair(parsed);
+          renderModalCover(parsed);
+          initModalOriginalAudioPlayer(parsed);
+        }
+      } catch (e) {
+      }
+
+      try {
+        if (parsed) {
           await ensureDictationContentLoadedToRuntime(parsed);
         }
       } catch (e) {
@@ -1250,15 +1370,16 @@
       // Some dictation UI bits are usually set in inline script in dictation.html.
       // We replicate the minimal critical part: create ProgressPanel if needed.
       try {
-        if (!window.UM) {
-          window.UM = new UserManager({ apiBase: '/user/api' });
-        }
-      } catch (e) {
-      }
+        if (window.ProgressPanel && window.UserActivityHistory) {
+          try {
+            if (!window.activityHistory) {
+              window.activityHistory = new UserActivityHistory('/user/api');
+            }
+          } catch (e0) {
+          }
 
-      try {
-        if (window.ProgressPanel && window.UM) {
-          window.progressPanel = new ProgressPanel(window.UM, { apiBase: '/user/api', saveInterval: 5 });
+          const history = window.activityHistory;
+          window.progressPanel = new ProgressPanel(history, { saveInterval: 5 });
           const inlineContainer = document.getElementById('progressPanelContainer');
           const modalContainer = document.getElementById('progressPanelModalContainer');
           if (inlineContainer) {
