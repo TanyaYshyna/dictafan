@@ -3,12 +3,14 @@
   const BODY_ID = 'dictationModalBody';
 
   const DICTATION_SCRIPT_DEPS = [
+    '/static/js/idb_manager.js',
+    '/static/js/desktop_confirm_modal.js',
     '/static/js/audio_player_visual.js',
     '/static/js/user_activity_history.js',
     '/static/js/dictation_statistics.js',
     '/static/js/progress_panel.js',
     '/static/js/speech_recognition_unified.js',
-    '/static/js/script_dictation.js',
+    '/static/js/dictation_runtime/dictation_store.js',
   ];
 
   const state = {
@@ -17,6 +19,23 @@
     depsLoaded: false,
     opening: false,
   };
+
+  try {
+    if (typeof window.startGame !== 'function') {
+      window.startGame = () => {
+        try {
+          const m = document.getElementById('start-modal');
+          if (m) m.style.display = 'none';
+        } catch (e) {
+        }
+      };
+    }
+    if (typeof window.nextSentence !== 'function') window.nextSentence = () => {};
+    if (typeof window.previousSentence !== 'function') window.previousSentence = () => {};
+    if (typeof window.checkText !== 'function') window.checkText = () => {};
+    if (typeof window.resumeGame !== 'function') window.resumeGame = () => {};
+  } catch (e) {
+  }
 
   function getModal() {
     return document.getElementById(MODAL_ID);
@@ -126,6 +145,385 @@
       };
     } catch (e) {
       return null;
+    }
+  }
+
+  function getDraftUserIdForKey() {
+    try {
+      const um = window.UM;
+      const id = um?.userData?.id;
+      if (id != null && String(id).trim()) return String(id).trim();
+    } catch (e) {
+    }
+    return 'anon';
+  }
+
+  function getRuntimeStore() {
+    try {
+      if (window.__dictationRuntimeStore) return window.__dictationRuntimeStore;
+      if (!window.DictationRuntime || !window.DictationRuntime.DictationSessionsStore) return null;
+      window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
+        maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
+      });
+      return window.__dictationRuntimeStore;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function loadSentencesFromIndexedDb({ dictationId, langOrig, langTr }) {
+    try {
+      const idb = window.IdbManager;
+      if (!idb || typeof idb.idbGet !== 'function' || typeof idb.openDraftDb !== 'function') return null;
+
+      const dictId = String(dictationId || '').trim();
+      const lo = String(langOrig || '').trim();
+      const lt = String(langTr || '').trim();
+      if (!dictId || !lo || !lt) return null;
+
+      const rawUserId = String(getDraftUserIdForKey());
+      const candidateKeys = [];
+      candidateKeys.push(`${rawUserId}:${dictId}:${lo}:${lt}`);
+      try {
+        const numericId = parseInt(dictId.replace(/^dict_/, ''), 10);
+        if (Number.isFinite(numericId)) {
+          candidateKeys.push(`${rawUserId}:${numericId}:${lo}:${lt}`);
+          candidateKeys.push(`${rawUserId}:dict_${numericId}:${lo}:${lt}`);
+          candidateKeys.push(`anon:dict_${numericId}:${lo}:${lt}`);
+        }
+      } catch (e) {
+      }
+
+      let cached = null;
+      for (const key of candidateKeys) {
+        cached = await idb.idbGet('dictations', key);
+        const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
+        if (sentences.length) break;
+        cached = null;
+      }
+
+      if (!cached) {
+        const db = await idb.openDraftDb();
+        try {
+          cached = await new Promise((resolve) => {
+            const tx = db.transaction('dictations', 'readonly');
+            const store = tx.objectStore('dictations');
+            const req = store.openCursor();
+            req.onsuccess = () => {
+              const cursor = req.result;
+              if (!cursor) return resolve(null);
+              const v = cursor.value;
+              if (v && v.dictationId === dictId && v.langOrig === lo && v.langTr === lt) {
+                return resolve(v);
+              }
+              cursor.continue();
+            };
+            req.onerror = () => resolve(null);
+          });
+        } finally {
+          try {
+            db.close();
+          } catch (e) {
+          }
+        }
+      }
+
+      const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
+      if (!sentences.length) return null;
+      return sentences;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function fetchSentencesFromServerAndCache({ dictationId, langOrig, langTr }) {
+    const dictId = String(dictationId || '').trim();
+    const lo = String(langOrig || '').trim();
+    const lt = String(langTr || '').trim();
+    if (!dictId || !lo || !lt) {
+      throw new Error('missing_dictation_params');
+    }
+
+    const url = `/api/dictation/${encodeURIComponent(dictId)}/${encodeURIComponent(lo)}/${encodeURIComponent(lt)}/sentences`;
+    const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`fetch_sentences_failed_${response.status}_${text}`);
+    }
+    const data = await response.json();
+    const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
+    if (!sentences.length) {
+      throw new Error('empty_sentences');
+    }
+
+    sentences.sort((a, b) => {
+      const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
+      const bp = (b && b.position !== undefined && b.position !== null && isFinite(Number(b.position))) ? Number(b.position) : null;
+      if (ap !== null && bp !== null) return ap - bp;
+      if (ap !== null) return -1;
+      if (bp !== null) return 1;
+      const ak = a && a.key ? String(a.key) : '';
+      const bk = b && b.key ? String(b.key) : '';
+      return ak.localeCompare(bk);
+    });
+
+    const idb = window.IdbManager;
+    if (idb && typeof idb.idbPut === 'function') {
+      const userId = String(getDraftUserIdForKey());
+      const key = `${userId}:${dictId}:${lo}:${lt}`;
+      await idb.idbPut('dictations', {
+        key,
+        dictationId: dictId,
+        langOrig: lo,
+        langTr: lt,
+        sentences,
+        updatedAt: Date.now(),
+      });
+    }
+
+    try {
+      setTimeout(() => {
+        try {
+          const am = window.AudioManager;
+          if (!am || typeof am.normalizeMediaUrl !== 'function' || typeof am.buildDictationAudioUrl !== 'function' || typeof am.prefetchMediaUrls !== 'function') return;
+          const audioUrls = [];
+          const resolveAudioToUrl = (rawValue, lang) => {
+            const v = String(rawValue || '').trim();
+            if (!v) return null;
+            if (v.startsWith('blob:')) return v;
+            if (v.startsWith('/api/')) return am.normalizeMediaUrl(v);
+            if (v.startsWith('http://') || v.startsWith('https://')) return am.normalizeMediaUrl(v);
+            const name = v.split('?', 1)[0].split('/').pop();
+            if (!name) return null;
+            return am.buildDictationAudioUrl(dictId, String(lang), name);
+          };
+          for (const s of sentences) {
+            if (!s || typeof s !== 'object') continue;
+            const u1 = resolveAudioToUrl(s.audio, lo);
+            const u2 = resolveAudioToUrl(s.audio_tr, lt);
+            if (u1) audioUrls.push(u1);
+            if (u2) audioUrls.push(u2);
+          }
+          const unique = Array.from(new Set(audioUrls.filter(Boolean)));
+          if (unique.length) {
+            am.prefetchMediaUrls(unique, { concurrency: 4 }).catch(() => {});
+          }
+        } catch (e) {
+        }
+      }, 0);
+    } catch (e) {
+    }
+
+    return sentences;
+  }
+
+  async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted, langOriginal, langTranslation }) {
+    const store = getRuntimeStore();
+    if (!store) throw new Error('DictationRuntime_not_loaded');
+
+    const dictationId = String(dictationIdFormatted || '').trim();
+    const langOrig = String(langOriginal || '').trim();
+    const langTr = String(langTranslation || '').trim();
+    if (!dictationId || !langOrig || !langTr) throw new Error('missing_dictation_params');
+
+    let sentences = await loadSentencesFromIndexedDb({ dictationId, langOrig, langTr });
+    if (!Array.isArray(sentences) || sentences.length === 0) {
+      try {
+        if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
+          window.DesktopToast.show('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
+        } else if (typeof window.showSaveToast === 'function') {
+          window.showSaveToast('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
+        }
+      } catch (e) {
+      }
+
+      try {
+        if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.show === 'function') {
+          window.DesktopLoadingModal.show('Загрузка диктанта в кеш…');
+        } else if (typeof window.showDictationCacheFetchOverlay === 'function') {
+          window.showDictationCacheFetchOverlay('Загрузка диктанта в кеш…');
+        }
+      } catch (e) {
+      }
+
+      try {
+        await fetchSentencesFromServerAndCache({ dictationId, langOrig, langTr });
+      } catch (e) {
+        try {
+          if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+            window.DesktopLoadingModal.hide();
+          } else if (typeof window.hideDictationCacheFetchOverlay === 'function') {
+            window.hideDictationCacheFetchOverlay();
+          }
+        } catch (e0) {
+        }
+
+        try {
+          const raw = e && e.message ? String(e.message) : String(e);
+          const isStorage = raw.includes('fetch_sentences_failed_503')
+            || raw.includes('fetch_sentences_failed_502')
+            || raw.includes('_503_')
+            || raw.includes('_502_');
+          if (typeof window.showNoSelectionModal === 'function') {
+            if (isStorage) {
+              window.showNoSelectionModal('Хранилище временно недоступно. Попробуй ещё раз позже.');
+            } else {
+              window.showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
+            }
+          }
+        } catch (e1) {
+        }
+
+        throw e;
+      }
+
+      sentences = await loadSentencesFromIndexedDb({ dictationId, langOrig, langTr });
+      try {
+        if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
+          window.DesktopLoadingModal.hide();
+        } else if (typeof window.hideDictationCacheFetchOverlay === 'function') {
+          window.hideDictationCacheFetchOverlay();
+        }
+      } catch (e) {
+      }
+    }
+    if (!Array.isArray(sentences) || sentences.length === 0) {
+      try {
+        if (typeof window.showNoSelectionModal === 'function') {
+          window.showNoSelectionModal('Не удалось сохранить диктант в кеш. Обнови страницу.');
+        }
+      } catch (e) {
+      }
+      throw new Error('empty_sentences');
+    }
+
+    store.setContentSentences({ dictationId, langTr, sentences });
+    return true;
+  }
+
+  function getOrCreateDefaultSessionFromParsed(parsed) {
+    const store = getRuntimeStore();
+    if (!store) return null;
+
+    const dictationId = String(parsed?.dictationIdFormatted || '').trim();
+    const langTr = String(parsed?.langTranslation || '').trim();
+    if (!dictationId || !langTr) return null;
+
+    const session = store.getOrCreateSession({
+      dictationId,
+      langTr,
+      exerciseId: null,
+      subsetPositions: null,
+      subsetSignature: null,
+    });
+
+    try {
+      const content = store.getContent({ dictationId, langTr });
+      const keys = content ? content.getAllKeys() : [];
+      session.setActiveSubsetByKeys(keys);
+      session.ensureDefaultSelection();
+    } catch (e) {
+    }
+
+    return session;
+  }
+
+  function renderStartModalSentencesTable(session) {
+    try {
+      const table = document.getElementById('sentences-table');
+      if (!table) return;
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const keys = session && session.activeKeys ? session.activeKeys : (session && session.content ? session.content.getAllKeys() : []);
+      const list = Array.isArray(keys) ? keys : [];
+
+      list.forEach((key, idx) => {
+        const view = session.getSentenceView(key);
+        if (!view) return;
+
+        const tr = document.createElement('tr');
+        tr.dataset.sentenceKey = String(view.key);
+
+        const tdNum = document.createElement('td');
+        tdNum.textContent = String(idx + 1);
+
+        const tdChoice = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'all-checkbox-btn';
+        btn.setAttribute('aria-label', 'Выбрать предложение');
+
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', view.selection_state === 'checked' ? 'check-circle' : 'circle');
+        btn.appendChild(icon);
+
+        btn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+
+          try {
+            const next = (view.selection_state === 'checked') ? 'unchecked' : 'checked';
+            session.setSelectionState(view.key, next);
+            const updated = session.getSentenceView(view.key);
+            icon.setAttribute('data-lucide', updated && updated.selection_state === 'checked' ? 'check-circle' : 'circle');
+            renderLucide(btn);
+            refreshSelectedCounters(session);
+          } catch (e1) {
+          }
+        });
+
+        tdChoice.appendChild(btn);
+
+        const emptyProgress = () => {
+          const td = document.createElement('td');
+          td.className = 'col-progress';
+          td.textContent = '';
+          return td;
+        };
+
+        const tdOrig = document.createElement('td');
+        tdOrig.textContent = String(view.text_original || '');
+
+        const tdTr = document.createElement('td');
+        tdTr.textContent = String(view.text_translation || '');
+
+        const tdCode = document.createElement('td');
+        tdCode.className = 'hidden-column';
+        tdCode.textContent = String(view.key || '');
+
+        tr.appendChild(tdNum);
+        tr.appendChild(tdChoice);
+        tr.appendChild(emptyProgress());
+        tr.appendChild(emptyProgress());
+        tr.appendChild(emptyProgress());
+        tr.appendChild(emptyProgress());
+        tr.appendChild(tdOrig);
+        tr.appendChild(tdTr);
+        tr.appendChild(tdCode);
+
+        tbody.appendChild(tr);
+      });
+
+      renderLucide(table);
+    } catch (e) {
+    }
+  }
+
+  function refreshSelectedCounters(session) {
+    try {
+      const totalEl = document.getElementById('sentenceTotalNumber');
+      if (totalEl) totalEl.textContent = `/ ${session && Array.isArray(session.selectedKeys) ? session.selectedKeys.length : 0}`;
+    } catch (e) {
+    }
+    try {
+      const curEl = document.getElementById('sentenceCurrentNumber');
+      if (curEl) curEl.textContent = '1';
+    } catch (e) {
     }
   }
 
@@ -435,6 +833,8 @@
       const modal = getModal();
       if (!modal) return;
 
+      const parsed = parseDictationHref(dictationUrl);
+
       setUsername();
       setAvatar();
       bindHeaderButtons();
@@ -455,21 +855,44 @@
       await ensureDictationDepsLoaded();
 
       try {
-        bindStartModalControls();
-      } catch (e) {
-      }
-
-      // Dictation page normally initializes on DOMContentLoaded.
-      // Here we call the exported init function after content is mounted.
-      try {
-        if (typeof window.onloadInitializeDictation === 'function') {
-          await window.onloadInitializeDictation();
+        if (parsed) {
+          await ensureDictationContentLoadedToRuntime(parsed);
         }
       } catch (e) {
       }
 
-      // Важно: start-modal открывается внутри initializeDictation после загрузки данных и рендера таблицы.
-      // Здесь дополнительно не открываем, чтобы не показывать пустую таблицу до загрузки.
+      try {
+        const session = parsed ? getOrCreateDefaultSessionFromParsed(parsed) : null;
+        if (session) {
+          renderStartModalSentencesTable(session);
+          refreshSelectedCounters(session);
+          showStartModal();
+
+          const startBtn = document.getElementById('confirmStartBtn');
+          if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
+            startBtn.dataset.boundDictationRuntime = '1';
+            startBtn.addEventListener('click', (e) => {
+              try {
+                e.preventDefault();
+                e.stopPropagation();
+              } catch (e0) {
+              }
+              try {
+                hideStartModal();
+              } catch (e1) {
+              }
+            });
+          }
+        }
+      } catch (e) {
+      }
+
+      try {
+        bindStartModalControls();
+      } catch (e) {
+      }
+
+      // Legacy dictation runtime (script_dictation.js) intentionally not used here.
 
       try {
         const topSettings = document.getElementById('openDictationSettingsBtn');

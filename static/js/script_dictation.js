@@ -1776,6 +1776,7 @@ if (inputField) {
 }
 
 function showSaveToast(message, type = 'info', duration = 2500) {
+    // LEGACY: не использовать в новом десктоп-слое. Новый общий тост живёт в DesktopToast (desktop_confirm_modal.js).
     const toast = document.createElement('div');
     toast.className = `toast-notice ${type}`;
     toast.textContent = message;

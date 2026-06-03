@@ -188,6 +188,58 @@
       };
     } catch (e) {
     }
+
+    try {
+      const toastState = {
+        container: null,
+      };
+
+      function _ensureToastContainer() {
+        if (toastState.container && document.body.contains(toastState.container)) return toastState.container;
+        const el = document.createElement('div');
+        el.id = 'desktopToastContainer';
+        el.style.position = 'fixed';
+        el.style.top = '16px';
+        el.style.right = '16px';
+        el.style.zIndex = '2147483647';
+        el.style.display = 'flex';
+        el.style.flexDirection = 'column';
+        el.style.gap = '10px';
+        el.style.pointerEvents = 'none';
+        document.body.appendChild(el);
+        toastState.container = el;
+        return el;
+      }
+
+      function show(message, type = 'info', duration = 2500) {
+        const container = _ensureToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast-notice ${String(type || 'info')}`;
+        toast.textContent = String(message || '');
+        toast.style.pointerEvents = 'auto';
+        container.appendChild(toast);
+
+        const ms = Math.max(300, Number(duration) || 2500);
+        setTimeout(() => {
+          try {
+            toast.style.opacity = '0';
+            toast.style.transition = 'opacity 250ms ease';
+          } catch (e) {
+          }
+          setTimeout(() => {
+            try {
+              if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+            } catch (e2) {
+            }
+          }, 280);
+        }, ms);
+      }
+
+      window.DesktopToast = window.DesktopToast || {
+        show,
+      };
+    } catch (e) {
+    }
   } catch (e) {
   }
 })();
