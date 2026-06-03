@@ -74,7 +74,7 @@
     try {
       const container = document.getElementById('originalAudioPlayer');
       if (!container) return;
-      if (!window.AudioPlayerVisual) return;
+      if (typeof AudioPlayerVisual === 'undefined') return;
       if (container.dataset.boundAudioVisual === '1') return;
 
       const visual = new AudioPlayerVisual(container);
@@ -1212,7 +1212,7 @@
         startModal.addEventListener('click', (e) => {
           try {
             if (e && e.target === startModal) {
-              hideStartModal();
+              return;
             }
           } catch (e2) {
           }
