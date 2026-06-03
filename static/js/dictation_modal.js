@@ -516,6 +516,10 @@
             session.ensureDefaultSelection();
             const updated = session.getSentenceView(view.key);
             renderLucideCheckboxButton(btn, updated && updated.selection_state === 'checked', false);
+            try {
+              updateAllCheckboxButtonFromSession(session);
+            } catch (e2) {
+            }
             updateNavigatorFromSession(session);
           } catch (e1) {
           }
@@ -536,10 +540,6 @@
         const tdTr = document.createElement('td');
         tdTr.textContent = String(view.text_translation || '');
 
-        const tdCode = document.createElement('td');
-        tdCode.className = 'hidden-column';
-        tdCode.textContent = String(view.key || '');
-
         tr.appendChild(tdNum);
         tr.appendChild(tdChoice);
         tr.appendChild(emptyProgress());
@@ -548,12 +548,95 @@
         tr.appendChild(emptyProgress());
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);
-        tr.appendChild(tdCode);
 
         tbody.appendChild(tr);
       });
 
       renderLucide(table);
+
+      try {
+        updateAllCheckboxButtonFromSession(session);
+      } catch (e1) {
+      }
+    } catch (e) {
+    }
+  }
+
+  function isHeaderToggleProtectedState(state) {
+    try {
+      const s = state && state.selection_state ? String(state.selection_state) : '';
+      return s === 'completed';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function computeAllCheckboxCheckedState(session) {
+    try {
+      const keys = session && session.activeKeys ? session.activeKeys : [];
+      const list = Array.isArray(keys) ? keys : [];
+      let eligible = 0;
+      let checked = 0;
+      for (const k of list) {
+        const st = session.getState(k);
+        if (isHeaderToggleProtectedState(st)) continue;
+        eligible += 1;
+        if (st && String(st.selection_state) === 'checked') checked += 1;
+      }
+      if (!eligible) return false;
+      return checked === eligible;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function updateAllCheckboxButtonFromSession(session) {
+    try {
+      const btn = document.getElementById('allCheckbox');
+      if (!btn) return;
+      const checked = computeAllCheckboxCheckedState(session);
+      renderLucideCheckboxButton(btn, checked, false);
+    } catch (e) {
+    }
+  }
+
+  function applyHeaderToggleToRows(session, targetState) {
+    try {
+      const table = document.getElementById('sentences-table');
+      if (!table) return;
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+      const rows = Array.from(tbody.querySelectorAll('tr'));
+
+      for (const tr of rows) {
+        const key = tr && tr.dataset ? String(tr.dataset.sentenceKey || '') : '';
+        if (!key) continue;
+        const st = session.getState(key);
+        if (isHeaderToggleProtectedState(st)) continue;
+        session.setSelectionState(key, targetState);
+      }
+
+      for (const tr of rows) {
+        const key = tr && tr.dataset ? String(tr.dataset.sentenceKey || '') : '';
+        if (!key) continue;
+        const btn = tr.querySelector('button.all-checkbox-btn');
+        if (!btn) continue;
+        const st = session.getState(key);
+        const isCompleted = isHeaderToggleProtectedState(st);
+        const isChecked = st && String(st.selection_state) === 'checked';
+        renderLucideCheckboxButton(btn, isChecked, false);
+        try {
+          if (isCompleted) {
+            btn.title = 'Выполнено';
+          } else {
+            btn.title = 'Выбрать предложение';
+          }
+        } catch (e0) {
+        }
+      }
+
+      updateAllCheckboxButtonFromSession(session);
+      updateNavigatorFromSession(session);
     } catch (e) {
     }
   }
@@ -778,6 +861,30 @@
           e.preventDefault();
           e.stopPropagation();
           hideStartModal();
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      const allBtn = document.getElementById('allCheckbox');
+      if (allBtn && allBtn.dataset.boundDictationModal !== '1') {
+        allBtn.dataset.boundDictationModal = '1';
+        allBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (!session) return;
+            const allChecked = computeAllCheckboxCheckedState(session);
+            const next = allChecked ? 'unchecked' : 'checked';
+            applyHeaderToggleToRows(session, next);
+          } catch (e1) {
+          }
         });
       }
     } catch (e) {
