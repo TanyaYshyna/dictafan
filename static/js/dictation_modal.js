@@ -69,6 +69,49 @@
   } catch (e) {
   }
 
+  function bindDictationModalHotkeys() {
+    try {
+      if (document.body.dataset.boundDictationModalHotkeys === '1') return;
+      document.body.dataset.boundDictationModalHotkeys = '1';
+    } catch (e0) {
+    }
+
+    document.addEventListener('keydown', (event) => {
+      try {
+        if (!state.isOpen) return;
+        if (!event || !event.ctrlKey) return;
+
+        switch (event.code) {
+          case 'Digit1': {
+            const visual = window.__dictationModalOriginalAudioVisual;
+            if (visual && visual.playButton) visual.playButton.click();
+            event.preventDefault();
+            break;
+          }
+          case 'Digit2': {
+            const btn = document.getElementById('translationPlayButton');
+            if (btn) btn.click();
+            event.preventDefault();
+            break;
+          }
+          case 'Digit3': {
+            if (typeof window.previousSentence === 'function') window.previousSentence();
+            event.preventDefault();
+            break;
+          }
+          case 'Digit4': {
+            if (typeof window.nextSentence === 'function') window.nextSentence();
+            event.preventDefault();
+            break;
+          }
+          default:
+            break;
+        }
+      } catch (e) {
+      }
+    });
+  }
+
   function getCurrentSentenceViewFromSession(session) {
     try {
       if (!session || !Array.isArray(session.selectedKeys) || session.selectedKeys.length === 0) return null;
@@ -169,8 +212,8 @@
     } catch (e1) {
     }
 
-    const originalUrl = resolveAudioToUrl(view.audio, dictId, langOrig);
-    const translationUrl = resolveAudioToUrl(view.audio_tr, dictId, langTr);
+    const originalUrl = resolveAudioToUrl((view.audio_original != null ? view.audio_original : view.audio), dictId, langOrig);
+    const translationUrl = resolveAudioToUrl((view.audio_translation != null ? view.audio_translation : view.audio_tr), dictId, langTr);
 
     try {
       const visual = window.__dictationModalOriginalAudioVisual;
@@ -1626,6 +1669,7 @@
     bindHeaderButtons();
     bindOverlayClose();
     bindAudioSettingsModalControls();
+    bindDictationModalHotkeys();
   }
 
   window.DictationModal = { open, close, init };

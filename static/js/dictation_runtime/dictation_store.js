@@ -56,7 +56,11 @@
           text_original: raw.text_original != null ? String(raw.text_original) : (raw.text != null ? String(raw.text) : ''),
           text_translation: raw.text_translation != null ? String(raw.text_translation) : (raw.translation != null ? String(raw.translation) : ''),
           audio_original: raw.audio_original != null ? String(raw.audio_original) : (raw.audio != null ? String(raw.audio) : ''),
-          audio_translation: raw.audio_translation != null ? String(raw.audio_translation) : (raw.audio_translation_url != null ? String(raw.audio_translation_url) : ''),
+          audio_translation: raw.audio_translation != null
+            ? String(raw.audio_translation)
+            : (raw.audio_tr != null
+              ? String(raw.audio_tr)
+              : (raw.audio_translation_url != null ? String(raw.audio_translation_url) : '')),
         };
 
         this._byKey.set(key, core);
