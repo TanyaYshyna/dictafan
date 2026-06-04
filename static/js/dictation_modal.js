@@ -16,6 +16,7 @@
     '/static/js/dictation_runtime/dictation_store.js',
     '/static/js/dictation_runtime/proverka_na_oshibki.js',
     '/static/js/dictation_runtime/proverka_renderer.js',
+    '/static/js/dictation_runtime/speech_recognition_panel.js',
   ];
 
   const state = {
@@ -1038,6 +1039,82 @@
     }
   }
 
+  function ensureSpeechPanel(session, parsed) {
+    try {
+      if (!window.DictationSpeechRecognitionPanel) return null;
+    } catch (e0) {
+      return null;
+    }
+
+    let panel = null;
+    try {
+      panel = state._speechPanel;
+    } catch (e1) {
+    }
+    if (panel) return panel;
+
+    try {
+      panel = new window.DictationSpeechRecognitionPanel({
+        minMatchPercent: 80,
+        onRecognitionComplete: async ({ ok }) => {
+          try {
+            if (!ok) {
+              try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
+              updateNextButtonVisibilityFromSession(session);
+              return;
+            }
+
+            const view = getCurrentSentenceViewFromSession(session);
+            if (!view || view.key == null) return;
+            const st = session.getState(String(view.key));
+            const next = (Number(st.number_of_audio) || 0) + 1;
+            st.number_of_audio = next;
+
+            updateSentenceTabloFromSession(session);
+            updateTaskProgressFromSession(session);
+            updateNextButtonVisibilityFromSession(session);
+
+            try {
+              const btn = document.getElementById('resultNextBtn');
+              if (btn && btn.style.display !== 'none' && typeof btn.focus === 'function') btn.focus();
+            } catch (e0) {
+            }
+          } catch (e) {
+          }
+        },
+      });
+      state._speechPanel = panel;
+    } catch (e2) {
+      return null;
+    }
+
+    try {
+      let langOrig = '';
+      if (parsed && parsed.langOriginal) {
+        langOrig = String(parsed.langOriginal);
+      } else {
+        const dictationData = document.getElementById('dictation-data');
+        langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '') : '';
+      }
+      if (langOrig) panel.setLanguage(langOrig);
+    } catch (e3) {
+    }
+
+    try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (view) panel.setExpectedText(String(view.text_original != null ? view.text_original : (view.text != null ? view.text : '')));
+    } catch (e4) {
+    }
+
+    try {
+      const enabled = getRequiredAudioRepeatsValue() > 0;
+      panel.setEnabled(enabled);
+    } catch (e5) {
+    }
+
+    return panel;
+  }
+
   function initModalOriginalAudioPlayer(parsed) {
     try {
       const container = document.getElementById('originalAudioPlayer');
@@ -1861,6 +1938,16 @@
     }
 
     try {
+      const panel = ensureSpeechPanel(session);
+      const view = getCurrentSentenceViewFromSession(session);
+      if (panel && view) {
+        panel.setExpectedText(String(view.text_original != null ? view.text_original : (view.text != null ? view.text : '')));
+        panel.setEnabled(getRequiredAudioRepeatsValue() > 0);
+      }
+    } catch (e00) {
+    }
+
+    try {
       updateTaskProgressFromSession(session);
     } catch (e0) {
     }
@@ -2388,6 +2475,11 @@
           renderStartModalSentencesTable(session);
           showStartModal();
           updateNavigatorFromSession(session);
+
+          try {
+            ensureSpeechPanel(session, parsed);
+          } catch (e0) {
+          }
 
           const startBtn = document.getElementById('confirmStartBtn');
           if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
