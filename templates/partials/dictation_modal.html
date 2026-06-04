@@ -152,26 +152,28 @@
                 <col class="audio-user-col audio-user-col-1">
                 <col class="audio-user-col audio-user-col-2">
                 <col class="audio-user-col audio-user-col-3">
-                <col class="audio-user-col audio-user-col-4">
-                <col class="audio-user-col audio-user-col-5">
-              </colgroup>
+               </colgroup>
               <tr class="audio-user-top-row">
-                <td class="audio-user-cell audio-user-mode" colspan="5">
+                <td class="audio-user-cell audio-user-mode">
                   <span id="recordingIndicator" class="recording-indicator-btn" disabled title="Индикатор записи">
                     <i data-lucide="circle"></i>
                   </span>
+                </td>
+                <td class="audio-user-cell audio-user-mode">
                   <span class="audio-user-top-percent" title="Процент совпадения">
                     <i data-lucide="percent"></i>
                     <span id="count_percent">100</span>
                   </span>
-                  <span id="recognitionModeIcon" class="recognition-mode-icon" title="Режим распознавания речи">
+                </td>
+                <td class="audio-user-cell audio-user-mode">
+                <span id="recognitionModeIcon" class="recognition-mode-icon" title="Режим распознавания речи">
                     <i data-lucide="route"></i>
                   </span>
                   <span id="whisperModelReadyBadge" style="display:none; margin-left: 8px; font-size: 12px; color: var(--color-button-purple); white-space: nowrap;"></span>
                 </td>
               </tr>
               <tr class="audio-user-bottom-row">
-                <td class="audio-user-cell audio-user-visualizer" colspan="4">
+                <td class="audio-user-cell audio-user-visualizer" colspan="2">
                   <canvas id="audioVisualizer" class="audio-visualizer"></canvas>
                 </td>
                 <td class="audio-user-cell audio-user-record">
