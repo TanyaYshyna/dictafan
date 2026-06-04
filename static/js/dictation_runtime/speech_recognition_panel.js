@@ -104,6 +104,14 @@
             e.stopPropagation();
           } catch (e0) {
           }
+          try {
+            if (rb.disabled) return;
+          } catch (e1) {
+          }
+          try {
+            console.debug('[DictationSpeechRecognitionPanel] record click');
+          } catch (e2) {
+          }
           this.toggleRecording().catch(() => { });
         });
       }
@@ -186,6 +194,10 @@
       if (this._isProcessing) return;
       const rec = this._ensureRecognizer();
       if (!rec) return;
+      try {
+        console.debug('[DictationSpeechRecognitionPanel] startRecording');
+      } catch (e0) {
+      }
       await rec.startRecording();
     }
 
@@ -196,6 +208,10 @@
 
       this._isProcessing = true;
       try {
+        try {
+          console.debug('[DictationSpeechRecognitionPanel] stopRecording', cause);
+        } catch (e0) {
+        }
         const result = await rec.stopRecording(cause);
         const text = String(result && result.text ? result.text : '').trim();
         const percent = this._computeMatchPercentASR(this._expectedText, text);
