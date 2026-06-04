@@ -50,11 +50,12 @@
 }
 
 #dictationModal .custom-audio-player .progress-bar::-webkit-slider-thumb {
-  margin-top: -8px;
+  margin-top: 0;
+  transform: translateY(-10px);
 }
 
 #dictationModal .custom-audio-player .progress-bar::-moz-range-thumb {
-  transform: translateY(-8px);
+  transform: translateY(-10px);
 }
 
 #dictationModal #audioSettingsModal .audio-settings-modal-panel {
