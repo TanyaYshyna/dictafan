@@ -16,14 +16,14 @@ class ProgressPanel {
         // Элементы DOM для статистики
         this.elements = {
             timer: document.getElementById('timer'),
-            timerSettings: document.getElementById('btn-timer-settings'),
+            errors: document.getElementById('count-errors'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             // Модальные элементы
             modalTimer: document.getElementById('modal_timer'),
-            modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
+            modalErrors: document.getElementById('modal-count-errors'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -34,6 +34,7 @@ class ProgressPanel {
         this.stats = {
             timer: 0, // секунды
             circleNumber: 0,
+            errors: 0,
             perfect: 0,
             corrected: 0,
             audio: 0,
@@ -90,8 +91,8 @@ class ProgressPanel {
     _generateHTML(variant = 'inline') {
         const prefix = variant === 'modal' ? 'modal-' : '';
         const timerId = variant === 'modal' ? 'modal_timer' : 'timer';
-        const timerBtnId = variant === 'modal' ? 'btn-modal-timer' : 'btn-timer';
-        const timerSettingsId = variant === 'modal' ? 'btn-modal-timer-settings' : 'btn-timer-settings';
+        const clockBtnId = variant === 'modal' ? 'btn-modal-timer' : 'btn-timer';
+        const clockInteractiveAttr = variant === 'inline' ? ' data-interactive="true"' : '';
         
         return `
             <table class="table-progress">
@@ -102,18 +103,17 @@ class ProgressPanel {
                     <col class="progress-col">
                 </colgroup>
                 <tr>
-                    <td colspan="2">
-                        <button id="${timerSettingsId}" class="pp-timer-settings" title="Время работы над диктантом">
+                    <td colspan="3">
+                        <button id="${clockBtnId}" class="pp-clock" title="Время работы над диктантом"${clockInteractiveAttr}>
                             <i data-lucide="clock"></i>
                             <span id="${timerId}" class="timer-value">00:00:00</span>
                         </button>
                     </td>
-                    <td colspan="2">
-                        <button id="${timerBtnId}" class="pp-timer" disabled title="Таймер">
-                            <span class="timer-label">Таймер</span>
-                            <span class="timer-value" hidden>00:00:00</span>
-                            <i data-lucide="timer"></i>
-                        </button>
+                    <td>
+                        <span class="pp-errors" title="Общее количество ошибок">
+                            <i data-lucide="bug"></i>
+                            <span id="${prefix}count-errors">0</span>
+                        </span>
                     </td>
                 </tr>
                 <tr>
@@ -164,13 +164,13 @@ class ProgressPanel {
         // перенастроим элементы после рендера
         this.elements = {
             timer: document.getElementById('timer'),
-            timerSettings: document.getElementById('btn-timer-settings'),
+            errors: document.getElementById('count-errors'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             modalTimer: document.getElementById('modal_timer'),
-            modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
+            modalErrors: document.getElementById('modal-count-errors'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -183,12 +183,6 @@ class ProgressPanel {
         // Убеждаемся, что таймер показывает 00:00:00 при первом рендере
         this.stats.timer = 0;
         this.updateTimer();
-        this._loadTimerPreference();
-        this._initTimerControls();
-        // Загружаем список звуков таймера
-        this._loadTimerSounds();
-        // Загружаем список звуков победы
-        this._loadVictorySounds();
         
         // Обновим глобальные переменные для совместимости со старым кодом
         if (typeof window !== 'undefined') {
@@ -608,7 +602,7 @@ class ProgressPanel {
             const num = Number(value);
             return Number.isFinite(num) ? num : 0;
         };
-        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.circleNumber, this.stats.timer);
+        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s errors=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.errors, this.stats.circleNumber, this.stats.timer);
 
         // Обновляем основной UI
         if (this.elements.perfect) {
@@ -623,6 +617,9 @@ class ProgressPanel {
         if (this.elements.total) {
             this.elements.total.textContent = safe(this.stats.total);
         }
+        if (this.elements.errors) {
+            this.elements.errors.textContent = safe(this.stats.errors);
+        }
 
         // Обновляем модальный UI
         if (this.elements.modalPerfect) {
@@ -636,6 +633,9 @@ class ProgressPanel {
         }
         if (this.elements.modalTotal) {
             this.elements.modalTotal.textContent = safe(this.stats.total);
+        }
+        if (this.elements.modalErrors) {
+            this.elements.modalErrors.textContent = safe(this.stats.errors);
         }
 
         // Обновляем таймер

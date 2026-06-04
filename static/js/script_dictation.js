@@ -6310,11 +6310,13 @@ function updateStats(circle = null) {
     let totalPerfect = 0;
     let totalCorrected = 0;
     let totalAudio = 0;
+    let totalErrors = 0;
 
     allSentences.forEach(s => {
         const perfect = Number(s.number_of_perfect) || 0;
         const corrected = Number(s.number_of_corrected) || 0;
         const audio = Number(s.number_of_audio) || 0;
+        const errors = Number(s.error_count) || 0;
 
         // Учитываем предложение как perfect, если есть хотя бы один perfect (1 предложение = 1 звезда)
         if (perfect > 0) {
@@ -6328,9 +6330,12 @@ function updateStats(circle = null) {
         }
         // Аудио уже хранится как счётчик и суммируется по всем предложениям
         totalAudio += audio;
+
+        // Сумма ошибок по всем предложениям (колонка с ошибками в прогресс-табло)
+        totalErrors += errors;
     });
 
-    console.log('[updateStats] Итого: perfect=', totalPerfect, 'corrected=', totalCorrected, 'audio=', totalAudio);
+    console.log('[updateStats] Итого: perfect=', totalPerfect, 'corrected=', totalCorrected, 'audio=', totalAudio, 'errors=', totalErrors);
 
     // Синхронизируем глобальные переменные с вычисленными значениями
     number_of_perfect = totalPerfect;
@@ -6344,12 +6349,14 @@ function updateStats(circle = null) {
     setText('count-corrected', totalCorrected);
     setText('count-audio', totalAudio);
     setText('count-total', totalTotal);
+    setText('count-errors', totalErrors);
 
     // в модалке
     setText('modal-count-perfect', totalPerfect);
     setText('modal-count-corrected', totalCorrected);
     setText('modal-count-audio', totalAudio);
     setText('modal-count-total', totalTotal);
+    setText('modal-count-errors', totalErrors);
 
     // Обновляем статистику в новой системе (ProgressPanel)
     if (panel) {
@@ -6357,6 +6364,7 @@ function updateStats(circle = null) {
         panel.setStat('corrected', totalCorrected);
         panel.setStat('audio', totalAudio);
         panel.setStat('total', totalTotal);
+        panel.setStat('errors', totalErrors);
         panel.setStat('circleNumber', circle_number);
     }
 
@@ -10240,8 +10248,8 @@ async function onloadInitializeDictation() {
 
     initPlaySequenceInputs();
 
-    // Обработчик клика на таймер для паузы (привязка по id, без зависимости от классов)
-    const timerButton = document.getElementById('btn-timer') || document.getElementById('btn-modal-timer');
+    // Обработчик клика на часы для паузы (в start-modal часы не интерактивные)
+    const timerButton = document.getElementById('btn-timer');
     if (timerButton) {
         timerButton.addEventListener('click', function () {
             if (pauseModal.style.display === 'flex') {
@@ -12732,8 +12740,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 // обработчики событий для отслеживания активности:-----------------------------------------------
 document.addEventListener('DOMContentLoaded', function () {
 
-    // Обработчик клика на таймер для паузы (привязка по id, без зависимости от классов)
-    const timerButton = document.getElementById('btn-timer') || document.getElementById('btn-modal-timer');
+    // Обработчик клика на часы для паузы (в start-modal часы не интерактивные)
+    const timerButton = document.getElementById('btn-timer');
     if (timerButton) {
         timerButton.addEventListener('click', function () {
             if (pauseModal.style.display === 'flex') {
