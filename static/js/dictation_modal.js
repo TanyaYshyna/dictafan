@@ -252,6 +252,26 @@
         }
 
         try {
+          updateNextButtonVisibilityFromSession(session);
+        } catch (e10) {
+        }
+
+        try {
+          if (res.allCorrect) {
+            const st = getCurrentSentenceStateFromSession(session);
+            const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
+            if (textOk && !audioOk && requiresAudio > 0) {
+              const rb = document.getElementById('recordButton');
+              if (rb && typeof rb.focus === 'function') rb.focus();
+            } else if (textOk && audioOk) {
+              const nb = document.getElementById('resultNextBtn');
+              if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') nb.focus();
+            }
+          }
+        } catch (e11) {
+        }
+
+        try {
           updateNavigatorFromSession(session);
         } catch (e9) {
         }
@@ -469,6 +489,17 @@
       } catch (e) {
       }
     });
+
+    input.addEventListener('paste', (event) => {
+      try {
+        if (!state.dictationStarted) return;
+        if (event) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      } catch (e) {
+      }
+    }, true);
   }
 
   function isStartModalOpen() {
@@ -605,7 +636,19 @@
     document.addEventListener('keydown', (event) => {
       try {
         if (!state.isOpen) return;
-        if (!event || !event.ctrlKey) return;
+        if (!event) return;
+
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'V' || event.code === 'KeyV')) {
+          const active = document.activeElement;
+          const isUserInput = active && (active.id === 'userInput' || (active.closest && active.closest('#userInput')));
+          if (isUserInput && state.dictationStarted) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+        }
+
+        if (!event.ctrlKey) return;
 
         switch (event.code) {
           case 'Escape': {
@@ -718,6 +761,51 @@
     } catch (e) {
     }
     return 3;
+  }
+
+  function getRequiredAudioRepeatsValue() {
+    try {
+      const el = document.getElementById('modal-audioRepeatsInput');
+      if (el && el.value != null && String(el.value).trim()) {
+        const n = Number(el.value);
+        if (Number.isFinite(n) && n >= 0) return n;
+      }
+    } catch (e) {
+    }
+    return 0;
+  }
+
+  function focusUserInput() {
+    try {
+      const input = document.getElementById('userInput');
+      if (input && typeof input.focus === 'function') input.focus();
+    } catch (e) {
+    }
+  }
+
+  function computeSentenceCompletionState(st) {
+    const perfect = Number(st && st.number_of_perfect) || 0;
+    const corrected = Number(st && st.number_of_corrected) || 0;
+    const audioDone = Number(st && st.number_of_audio) || 0;
+    const requiresAudio = getRequiredAudioRepeatsValue();
+    const textOk = perfect >= 1 || corrected > 0;
+    const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
+    return { textOk, audioOk, requiresAudio };
+  }
+
+  function updateNextButtonVisibilityFromSession(session) {
+    try {
+      const btn = document.getElementById('resultNextBtn');
+      if (!btn) return;
+      const st = getCurrentSentenceStateFromSession(session);
+      if (!st) {
+        btn.style.display = 'none';
+        return;
+      }
+      const { textOk, audioOk } = computeSentenceCompletionState(st);
+      btn.style.display = (textOk && audioOk) ? 'inline-flex' : 'none';
+    } catch (e) {
+    }
   }
 
   function updateSentenceTabloFromSession(session) {
@@ -1780,6 +1868,60 @@
       updateSentenceTabloFromSession(session);
     } catch (e1) {
     }
+
+    try {
+      updateNextButtonVisibilityFromSession(session);
+    } catch (e2) {
+    }
+
+    try {
+      if (state.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
+        focusUserInput();
+      }
+    } catch (e3) {
+    }
+  }
+
+  function bindEnterToCheck() {
+    try {
+      const input = document.getElementById('userInput');
+      if (!input || input.dataset.boundEnterToCheck === '1') return;
+      input.dataset.boundEnterToCheck = '1';
+      input.addEventListener('keydown', (e) => {
+        try {
+          if (!state.isOpen) return;
+          if (!state.dictationStarted) return;
+          if (!e) return;
+          if (e.key !== 'Enter') return;
+          if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (typeof window.checkText === 'function') window.checkText();
+        } catch (e0) {
+        }
+      }, true);
+    } catch (e) {
+    }
+  }
+
+  function bindNextButton() {
+    try {
+      const btn = document.getElementById('resultNextBtn');
+      if (!btn || btn.dataset.boundDictationModal === '1') return;
+      btn.dataset.boundDictationModal = '1';
+      btn.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        try {
+          if (typeof window.nextSentence === 'function') window.nextSentence();
+        } catch (e1) {
+        }
+      });
+    } catch (e) {
+    }
   }
 
   function applyDictationMetaFromCard({ href, cardEl }) {
@@ -2408,6 +2550,8 @@
     bindDictationModalHotkeys();
     bindInactivityWatchers();
     bindUserInputScriptGuards();
+    bindEnterToCheck();
+    bindNextButton();
   }
 
   window.DictationModal = { open, close, init };
