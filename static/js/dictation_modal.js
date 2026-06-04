@@ -15,6 +15,7 @@
     '/static/js/speech_recognition_unified.js',
     '/static/js/dictation_runtime/dictation_store.js',
     '/static/js/dictation_runtime/proverka_na_oshibki.js',
+    '/static/js/dictation_runtime/proverka_renderer.js',
   ];
 
   const state = {
@@ -126,6 +127,21 @@
         }
         if (!checker || typeof checker.analyze !== 'function') return;
 
+        let renderer = null;
+        try {
+          renderer = state._typoRenderer;
+        } catch (e10) {
+        }
+        if (!renderer) {
+          try {
+            if (window.РендерПроверки) {
+              renderer = new window.РендерПроверки(checker);
+              state._typoRenderer = renderer;
+            }
+          } catch (e11) {
+          }
+        }
+
         const prevPerfect = Number(view.number_of_perfect) || 0;
         const prevCorrected = Number(view.number_of_corrected) || 0;
 
@@ -165,6 +181,22 @@
         if (!res || res.okToCheck === false) return;
 
         try {
+          const inputField = document.getElementById('userInput');
+          if (renderer && typeof renderer.renderToEditable === 'function' && inputField) {
+            renderer.renderToEditable(res.verified, inputField);
+          }
+        } catch (e12) {
+        }
+
+        try {
+          const correctAnswerDiv = document.getElementById('correctAnswer');
+          if (renderer && typeof renderer.renderResult === 'function' && correctAnswerDiv) {
+            renderer.renderResult(originalText, res.verified, correctAnswerDiv);
+          }
+        } catch (e13) {
+        }
+
+        try {
           const failedChecks = Number(view.error_count) || 0;
           const nextFailed = res.allCorrect ? failedChecks : (failedChecks + 1);
           view.error_count = nextFailed;
@@ -174,9 +206,34 @@
         }
 
         try {
+          if (!res.allCorrect) {
+            view._textAttemptCount = (Number(view._textAttemptCount) || 0) + 1;
+          }
+        } catch (e14) {
+        }
+
+        try {
           view.number_of_perfect = res.nextPerfect;
           view.number_of_corrected = res.nextCorrected;
         } catch (e7) {
+        }
+
+        try {
+          const key = view && view.key != null ? String(view.key) : '';
+          if (key && session && typeof session.getState === 'function') {
+            const st = session.getState(key);
+            st.number_of_perfect = res.nextPerfect;
+            st.number_of_corrected = res.nextCorrected;
+            try {
+              if (view && view.error_count != null) st.error_count = view.error_count;
+            } catch (e0) {
+            }
+            try {
+              if (view && view._textAttemptCount != null) st._textAttemptCount = view._textAttemptCount;
+            } catch (e1) {
+            }
+          }
+        } catch (e15) {
         }
 
         try {
@@ -185,6 +242,10 @@
             if (correctAnswerDiv) {
               correctAnswerDiv.style.display = 'block';
               correctAnswerDiv.textContent = String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : ''));
+              try {
+                correctAnswerDiv.style.color = 'var(--color-button-text-gray)';
+              } catch (e0) {
+              }
             }
           }
         } catch (e8) {
@@ -250,6 +311,164 @@
       }
     } catch (e) {
     }
+  }
+
+  function bindUserInputScriptGuards() {
+    let input = null;
+    try {
+      input = document.getElementById('userInput');
+    } catch (e0) {
+    }
+    if (!input) return;
+
+    const saveCursorPosition = (containerEl) => {
+      try {
+        const sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return null;
+        const range = sel.getRangeAt(0);
+        const preRange = range.cloneRange();
+        preRange.selectNodeContents(containerEl);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        return preRange.toString().length;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const restoreCursorPosition = (containerEl, offset) => {
+      try {
+        if (offset === null || offset === undefined) return;
+        const range = document.createRange();
+        const sel = window.getSelection();
+        if (!sel) return;
+        let currentOffset = 0;
+        const walk = (node) => {
+          if (!node) return false;
+          if (node.nodeType === Node.TEXT_NODE) {
+            const nextOffset = currentOffset + node.length;
+            if (offset <= nextOffset) {
+              range.setStart(node, Math.max(0, offset - currentOffset));
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              return true;
+            }
+            currentOffset = nextOffset;
+            return false;
+          }
+          const kids = node.childNodes || [];
+          for (let i = 0; i < kids.length; i++) {
+            if (walk(kids[i])) return true;
+          }
+          return false;
+        };
+        walk(containerEl);
+      } catch (e) {
+      }
+    };
+
+    try {
+      if (input.dataset.boundDictationModalScriptGuards === '1') return;
+      input.dataset.boundDictationModalScriptGuards = '1';
+    } catch (e1) {
+    }
+
+    const showInputScriptNoticeOnce = (script) => {
+      try {
+        const now = Date.now();
+        const last = Number(state._lastScriptHintAt || 0) || 0;
+        if (now - last < 1500) return;
+        state._lastScriptHintAt = now;
+      } catch (e0) {
+      }
+      try {
+        const notice = document.getElementById('userInputNotice');
+        if (!notice) return;
+        const hint = script === 'cyrillic' ? 'RU/UK' : (script === 'arabic' ? 'AR' : 'EN');
+        notice.textContent = `Для этого диктанта включи раскладку ${hint}`;
+        notice.style.display = 'block';
+      } catch (e1) {
+      }
+    };
+
+    const getChecker = () => {
+      try {
+        if (state._typoChecker) return state._typoChecker;
+      } catch (e0) {
+      }
+      try {
+        if (window.ПроверкаНаОшибки) {
+          state._typoChecker = new window.ПроверкаНаОшибки();
+          return state._typoChecker;
+        }
+      } catch (e1) {
+      }
+      return null;
+    };
+
+    const getScript = () => {
+      let langOrig = '';
+      try {
+        const dictationData = document.getElementById('dictation-data');
+        langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
+      } catch (e0) {
+      }
+      const checker = getChecker();
+      if (!checker || typeof checker.getDictationScript !== 'function') return 'latin';
+      return checker.getDictationScript(langOrig);
+    };
+
+    const hasDisallowedChars = (text, script) => {
+      const checker = getChecker();
+      if (!checker || typeof checker.hasDisallowedChars !== 'function') return false;
+      return checker.hasDisallowedChars(text, script);
+    };
+
+    const stripDisallowedChars = (text, script) => {
+      const checker = getChecker();
+      if (!checker || typeof checker.stripDisallowedChars !== 'function') return String(text || '');
+      return checker.stripDisallowedChars(text, script);
+    };
+
+    input.addEventListener('input', () => {
+      try {
+        resetInactivityTimer();
+      } catch (e0) {
+      }
+      try {
+        const html = input.innerHTML;
+        if (typeof html === 'string' && html.indexOf('<') !== -1) {
+          const plainText = input.textContent || '';
+          const cursorPos = saveCursorPosition(input);
+          input.textContent = plainText;
+          restoreCursorPosition(input, cursorPos);
+        }
+
+        const currentText = String(input.textContent || '');
+        const script = getScript();
+        if (hasDisallowedChars(currentText, script)) {
+          const sanitized = stripDisallowedChars(currentText, script);
+          const cursorPos = saveCursorPosition(input);
+          input.textContent = sanitized;
+          restoreCursorPosition(input, cursorPos);
+          showInputScriptNoticeOnce(script);
+        }
+      } catch (e1) {
+      }
+    });
+
+    input.addEventListener('beforeinput', (event) => {
+      try {
+        const t = event && typeof event.data === 'string' ? event.data : '';
+        if (!t) return;
+        const script = getScript();
+        if (hasDisallowedChars(t, script)) {
+          event.preventDefault();
+          showInputScriptNoticeOnce(script);
+        }
+      } catch (e) {
+      }
+    });
   }
 
   function isStartModalOpen() {
@@ -475,6 +694,106 @@
       return session.getSentenceView ? session.getSentenceView(key) : null;
     } catch (e) {
       return null;
+    }
+  }
+
+  function getCurrentSentenceStateFromSession(session) {
+    try {
+      if (!session || !Array.isArray(session.selectedKeys) || session.selectedKeys.length === 0) return null;
+      const idx = Number(session.currentSelectedIndex) || 0;
+      const key = session.selectedKeys[Math.max(0, Math.min(session.selectedKeys.length - 1, idx))];
+      return session.getState ? session.getState(key) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function getRequiredPassedStarHalfValue() {
+    try {
+      const el = document.getElementById('modal-requiredPassedStarHalfInput');
+      if (el && el.value != null && String(el.value).trim()) {
+        const n = Number(el.value);
+        if (Number.isFinite(n) && n > 0) return n;
+      }
+    } catch (e) {
+    }
+    return 3;
+  }
+
+  function updateSentenceTabloFromSession(session) {
+    const st = getCurrentSentenceStateFromSession(session);
+    if (!st) return;
+
+    const requiredHalf = getRequiredPassedStarHalfValue();
+    const perfect = Number(st.number_of_perfect) || 0;
+    const corrected = Number(st.number_of_corrected) || 0;
+    const audio = Number(st.number_of_audio) || 0;
+
+    try {
+      const starWrap = document.getElementById('tablo_result_star');
+      if (starWrap) starWrap.style.opacity = perfect >= 1 ? '1' : '0.25';
+    } catch (e) {
+    }
+
+    try {
+      const halfWrap = document.getElementById('tablo_result_star_half');
+      if (halfWrap) {
+        const icons = halfWrap.querySelectorAll('i');
+        let count = corrected;
+        if (perfect >= 1) count = 0;
+        count = Math.max(0, Math.min((Number.isFinite(requiredHalf) ? requiredHalf : 3) - 1, count));
+        for (let i = 0; i < icons.length; i++) {
+          const on = i < count;
+          icons[i].style.opacity = on ? '1' : '0.25';
+        }
+      }
+    } catch (e) {
+    }
+
+    try {
+      const micWrap = document.getElementById('tablo_result_mic');
+      if (micWrap) micWrap.style.opacity = audio > 0 ? '1' : '0.25';
+    } catch (e) {
+    }
+  }
+
+  function updateTaskProgressFromSession(session) {
+    try {
+      if (!session || !Array.isArray(session.selectedKeys)) return;
+      const keys = session.selectedKeys;
+      const total = keys.length;
+      let perfect = 0;
+      let corrected = 0;
+      let audio = 0;
+      let passed = 0;
+      for (const k of keys) {
+        const st = session.getState ? session.getState(k) : null;
+        if (!st) continue;
+        const p = Number(st.number_of_perfect) || 0;
+        const c = Number(st.number_of_corrected) || 0;
+        const a = Number(st.number_of_audio) || 0;
+        if (p >= 1) perfect += 1;
+        if (c > 0) corrected += 1;
+        if (a > 0) audio += 1;
+        if (p >= 1 || c > 0) passed += 1;
+      }
+
+      try {
+        const p = getProgressPanelInstance();
+        if (p && typeof p.update === 'function') {
+          p.update({ perfect, corrected, audio, total });
+        }
+      } catch (e0) {
+      }
+
+      try {
+        const fill = document.getElementById('dictationTaskProgressFill');
+        const label = document.getElementById('dictationTaskProgressLabel');
+        if (label) label.textContent = total > 0 ? `${passed}/${total}` : '';
+        if (fill) fill.style.width = total > 0 ? `${Math.round((passed / total) * 100)}%` : '0%';
+      } catch (e1) {
+      }
+    } catch (e) {
     }
   }
 
@@ -1452,6 +1771,15 @@
       updateAudioPlayersFromSession(session);
     } catch (e) {
     }
+
+    try {
+      updateTaskProgressFromSession(session);
+    } catch (e0) {
+    }
+    try {
+      updateSentenceTabloFromSession(session);
+    } catch (e1) {
+    }
   }
 
   function applyDictationMetaFromCard({ href, cardEl }) {
@@ -2079,6 +2407,7 @@
     bindAudioSettingsModalControls();
     bindDictationModalHotkeys();
     bindInactivityWatchers();
+    bindUserInputScriptGuards();
   }
 
   window.DictationModal = { open, close, init };
