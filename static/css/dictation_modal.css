@@ -515,6 +515,324 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   border: 1px solid var(--color-button-shadow-lightgreen);
 }
 
+#dictationModal #confirmStartBtn {
+  font-size: 30px;
+  background: var(--color-button-yellow);
+}
+
+#dictationModal #confirmStartBtn:focus {
+  outline: 2px solid var(--color-button-text-lightgreen);
+  outline-offset: 2px;
+}
+
+#dictationModal .warning-message {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin: 0 0 30px 0;
+  line-height: 1.6;
+}
+
+#dictationModal .warning-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+#dictationModal .warning-buttons button {
+  flex: 1;
+  min-width: 150px;
+  padding: 14px 24px;
+  transition: all 0.2s ease;
+}
+
+#dictationModal .warning-buttons button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#dictationModal .table-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+#dictationModal #sentences-table,
+#dictationModal #final-sentences-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  font-size: 14px;
+  table-layout: fixed;
+}
+
+#dictationModal #sentences-table col.col-rownum,
+#dictationModal #final-sentences-table col.col-rownum {
+  width: 26px;
+}
+
+#dictationModal #sentences-table col.col-choice,
+#dictationModal #final-sentences-table col.col-choice {
+  width: 26px;
+}
+
+#dictationModal #sentences-table col.col-code,
+#dictationModal #final-sentences-table col.col-code {
+  width: 0;
+}
+
+#dictationModal #sentences-table col.col-progress,
+#dictationModal #final-sentences-table col.col-progress {
+  width: 45px;
+}
+
+#dictationModal #sentences-table col.col-text-original,
+#dictationModal #final-sentences-table col.col-text-original,
+#dictationModal #sentences-table col.col-text-translation,
+#dictationModal #final-sentences-table col.col-text-translation {
+  width: auto;
+}
+
+#dictationModal #sentences-table.hide-progress col.col-progress,
+#dictationModal #sentences-table.hide-progress th.col-progress,
+#dictationModal #sentences-table.hide-progress td.col-progress {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-original col.col-text-original,
+#dictationModal #sentences-table.hide-original th.col-text-original,
+#dictationModal #sentences-table.hide-original td.col-text-original {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-translation col.col-text-translation,
+#dictationModal #sentences-table.hide-translation th.col-text-translation,
+#dictationModal #sentences-table.hide-translation td.col-text-translation {
+  display: none !important;
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th,
+#dictationModal #sentences-table td,
+#dictationModal #final-sentences-table td {
+  border: 1px solid var(--color-panel-bg);
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th {
+  background-color: var(--color-panel-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#dictationModal #sentences-table td.sentence-number-cell,
+#dictationModal #sentences-table td:nth-child(1),
+#dictationModal #final-sentences-table td:nth-child(1) {
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  text-align: center;
+  padding: 2px 4px !important;
+  overflow: visible !important;
+  font-weight: 500;
+}
+
+#dictationModal #sentences-table td:nth-child(2),
+#dictationModal #final-sentences-table td:nth-child(2) {
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  padding: 2px !important;
+  overflow: visible !important;
+  text-align: center;
+}
+
+#dictationModal #sentences-table td:nth-child(3).hidden-column,
+#dictationModal #final-sentences-table td:nth-child(3).hidden-column {
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+
+#dictationModal #sentences-table td.sentence-star-perfect,
+#dictationModal #sentences-table td.sentence-progress-cell.sentence-star-perfect,
+#dictationModal #sentences-table tbody tr td.sentence-star-perfect,
+#dictationModal #sentences-table tbody tr td:nth-child(4),
+#dictationModal #final-sentences-table td:nth-child(4) {
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  text-align: center !important;
+  padding: 2px !important;
+  overflow: visible !important;
+  position: relative !important;
+}
+
+#dictationModal #sentences-table td.sentence-star-corrected,
+#dictationModal #sentences-table td:nth-child(5),
+#dictationModal #final-sentences-table td:nth-child(5) {
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  text-align: center;
+  padding: 2px !important;
+  overflow: visible !important;
+}
+
+#dictationModal #sentences-table td:nth-child(6),
+#dictationModal #final-sentences-table td:nth-child(6) {
+  width: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  text-align: center;
+  padding: 4px !important;
+  overflow: visible !important;
+}
+
+#dictationModal #sentences-table td:last-child,
+#dictationModal #final-sentences-table td:last-child {
+  width: auto !important;
+  min-width: 200px;
+  padding: 4px 8px !important;
+  overflow: visible !important;
+}
+
+#dictationModal #sentences-table thead,
+#dictationModal #final-sentences-table thead {
+  display: table-header-group;
+}
+
+#dictationModal #sentences-table button {
+  box-shadow: none !important;
+  margin: 0;
+  padding: 0;
+}
+
+#dictationModal .sentence-check {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:hover {
+  background-color: var(--color-button-gray);
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:active {
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#dictationModal .start-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#dictationModal .dikt-number-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .all-checkbox-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text);
+  transition: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:hover {
+  background-color: var(--color-button-gray);
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:active {
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+#dictationModal #startModalOpenSettingsBtn,
+#dictationModal .start-modal-settings-btn,
+#dictationModal .start-modal-exit-btn,
+#dictationModal .start-modal-close-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  vertical-align: middle;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .start-modal-settings-btn i,
+#dictationModal .start-modal-settings-btn svg,
+#dictationModal .start-modal-exit-btn i,
+#dictationModal .start-modal-exit-btn svg,
+#dictationModal .start-modal-close-btn i,
+#dictationModal .start-modal-close-btn svg {
+  width: 25px;
+  height: 25px;
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+#dictationModal .start-modal-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 700px) {
   #dictationModal .audio-players-wrapper {
     flex-wrap: nowrap !important;
