@@ -24,7 +24,7 @@
   padding-top: 92px;
   padding-left: 12px;
   padding-right: 12px;
-  padding-bottom: 30px;
+  padding-bottom: 40px;
   box-sizing: border-box;
 }
 
@@ -36,6 +36,7 @@
   height: calc(100vh - 122px);
   max-height: calc(100vh - 122px);
   overflow: hidden;
+  padding: 10px;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -69,6 +70,153 @@
   border-radius: 0;
   overflow: hidden;
   box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+#dictationModal .panel-tablo .panels-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+#dictationModal .panel-tablo .sentence-nav-table {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#dictationModal .panel-tablo .dictation-top-progress-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 320px;
+}
+
+@media (max-width: 860px) {
+  #dictationModal .panel-tablo .panels-row {
+    flex-wrap: wrap;
+  }
+
+  #dictationModal .panel-tablo .dictation-top-progress-wrap {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-start;
+  }
+}
+
+#dictationModal .dictation-langpair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#dictationModal .dictation-langpair .flag-pair-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: default;
+}
+
+#dictationModal .dictation-langpair .flag-pair-side {
+  display: inline-flex;
+  align-items: center;
+}
+
+#dictationModal .dictation-langpair .flag-pair-combo i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+html[dir="rtl"] #dictationModal #dictationLangPair {
+  direction: ltr;
+}
+
+#dictationModal .sentence-nav-top-inner {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 8px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-top-inner #dictationLangPair {
+  flex: 0 0 auto;
+}
+
+#dictationModal .sentence-nav-bottom-inner {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 6px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-top-inner > *,
+#dictationModal .sentence-nav-bottom-inner > * {
+  flex: 0 0 auto;
+}
+
+#dictationModal .sentence-nav-bottom-inner .sentence-counter {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-bottom-inner .sentence-counter .sentence-counter-simple {
+  width: auto;
+}
+
+#dictationModal .sentence-nav-table,
+#dictationModal .sentence-nav-table tr,
+#dictationModal .sentence-nav-table td {
+  border: none;
+}
+
+#dictationModal .dictation-title {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+#dictationModal .sentence-nav-cell {
+  padding: 0;
+  vertical-align: middle;
+}
+
+#dictationModal .sentence-nav-table button {
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .sentence-nav-table .sentence-counter-simple {
+  gap: 6px;
+  justify-content: flex-start !important;
+}
+
+#dictationModal .sentence-nav-table .sentence-counter,
+#dictationModal .sentence-nav-table .sentence-counter-simple,
+#dictationModal .sentence-nav-table .sentence-current-number,
+#dictationModal .sentence-nav-table .sentence-total-number {
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
 }
 
 #dictationModal .progress-panel-modal-r .table-progress {
@@ -109,7 +257,7 @@
   height: 42px;
   padding: 0 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 1;
   cursor: default;
@@ -167,7 +315,7 @@
   border-radius: 8px;
   background: var(--color-button-pink);
   color: var(--color-button-text-pink);
-  font-size: 14px;
+  font-size: 20px;
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
@@ -664,6 +812,18 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #confirmStartBtn {
   font-size: 30px;
   background: var(--color-button-yellow);
+}
+
+#dictationModal #start-modal #confirmStartBtn {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 22px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0 auto;
 }
 
 #dictationModal #confirmStartBtn:focus {
