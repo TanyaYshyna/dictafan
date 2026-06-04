@@ -608,6 +608,19 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   table-layout: fixed;
 }
 
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th,
+#dictationModal #sentences-table td,
+#dictationModal #final-sentences-table td {
+  padding: 4px 8px;
+  line-height: 1.2;
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th {
+  font-weight: 800;
+}
+
 #dictationModal #sentences-table col.col-rownum,
 #dictationModal #final-sentences-table col.col-rownum {
   width: 26px;
@@ -625,7 +638,28 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 
 #dictationModal #sentences-table col.col-progress,
 #dictationModal #final-sentences-table col.col-progress {
-  width: 45px;
+  width: 26px;
+}
+
+/* m column (attempts/errors) is the 6th column: rownum, choice, 4x progress */
+#dictationModal #sentences-table colgroup col:nth-child(6),
+#dictationModal #final-sentences-table colgroup col:nth-child(6) {
+  width: 40px;
+}
+
+#dictationModal #sentences-table th.col-progress,
+#dictationModal #sentences-table td.col-progress {
+  text-align: center;
+}
+
+#dictationModal #sentences-table th#thSentenceRowNumber,
+#dictationModal #sentences-table th#thSentenceChoice {
+  text-align: center;
+}
+
+#dictationModal #sentences-table th#thSentenceOriginal,
+#dictationModal #sentences-table th#thSentenceTranslation {
+  text-align: left;
 }
 
 #dictationModal #sentences-table col.col-text-original,
@@ -666,81 +700,6 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   position: sticky;
   top: 0;
   z-index: 10;
-}
-
-#dictationModal #sentences-table td.sentence-number-cell,
-#dictationModal #sentences-table td:nth-child(1),
-#dictationModal #final-sentences-table td:nth-child(1) {
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
-  text-align: center;
-  padding: 2px 4px !important;
-  overflow: visible !important;
-  font-weight: 500;
-}
-
-#dictationModal #sentences-table td:nth-child(2),
-#dictationModal #final-sentences-table td:nth-child(2) {
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
-  padding: 2px !important;
-  overflow: visible !important;
-  text-align: center;
-}
-
-#dictationModal #sentences-table td:nth-child(3).hidden-column,
-#dictationModal #final-sentences-table td:nth-child(3).hidden-column {
-  width: 0 !important;
-  min-width: 0 !important;
-  max-width: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  display: none !important;
-}
-
-#dictationModal #sentences-table td.sentence-star-perfect,
-#dictationModal #sentences-table td.sentence-progress-cell.sentence-star-perfect,
-#dictationModal #sentences-table tbody tr td.sentence-star-perfect,
-#dictationModal #sentences-table tbody tr td:nth-child(4),
-#dictationModal #final-sentences-table td:nth-child(4) {
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
-  text-align: center !important;
-  padding: 2px !important;
-  overflow: visible !important;
-  position: relative !important;
-}
-
-#dictationModal #sentences-table td.sentence-star-corrected,
-#dictationModal #sentences-table td:nth-child(5),
-#dictationModal #final-sentences-table td:nth-child(5) {
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
-  text-align: center;
-  padding: 2px !important;
-  overflow: visible !important;
-}
-
-#dictationModal #sentences-table td:nth-child(6),
-#dictationModal #final-sentences-table td:nth-child(6) {
-  width: 26px !important;
-  min-width: 26px !important;
-  max-width: 26px !important;
-  text-align: center;
-  padding: 4px !important;
-  overflow: visible !important;
-}
-
-#dictationModal #sentences-table td:last-child,
-#dictationModal #final-sentences-table td:last-child {
-  width: auto !important;
-  min-width: 200px;
-  padding: 4px 8px !important;
-  overflow: visible !important;
 }
 
 #dictationModal #sentences-table thead,
@@ -790,7 +749,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   display: flex;
   gap: 10px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 #dictationModal .start-controls-row {
@@ -798,7 +757,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 #dictationModal .dikt-number-badge {
@@ -836,6 +795,119 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal .all-checkbox-btn:focus {
   outline: none;
   box-shadow: none !important;
+}
+
+#dictationModal #start-modal .start-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 12px 6px 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#dictationModal #start-modal .start-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dictationModal #start-modal .dikt-number-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#dictationModal #start-modal h2#title-diktation {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#dictationModal #start-modal .start-modal-title-row {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-header-actions {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-header-actions {
+  flex: 0 0 auto;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r {
+  display: flex;
+  flex-direction: column;
+  gap: 2px !important;
+  margin-left: auto;
+  align-items: flex-end;
+  width: fit-content;
+  text-align: right;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r .table-progress {
+  margin-left: auto !important;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r .table-progress td {
+  vertical-align: middle;
+}
+
+#dictationModal #start-modal .start-progress-wrap {
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-controls {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-controls > .all-checkbox-container {
+  flex: 0 0 auto;
+}
+
+#dictationModal #start-modal .start-modal-controls > .all-checkbox-container[style*="margin-left:auto"] {
+  margin-left: auto !important;
+}
+
+@media (max-width: 860px) {
+  #dictationModal #start-modal .start-modal-controls {
+    flex-wrap: wrap;
+  }
+}
+
+#dictationModal #start-modal .table-container {
+  padding: 0 12px 12px 12px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  #dictationModal #start-modal .start-modal-controls {
+    flex-wrap: wrap;
+  }
 }
 
 #dictationModal #startModalOpenSettingsBtn,
