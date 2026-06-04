@@ -14,6 +14,7 @@
     '/static/js/progress_panel.js',
     '/static/js/speech_recognition_unified.js',
     '/static/js/dictation_runtime/dictation_store.js',
+    '/static/js/dictation_runtime/proverka_na_oshibki.js',
   ];
 
   const state = {
@@ -85,7 +86,116 @@
         }
       };
     }
-    if (typeof window.checkText !== 'function') window.checkText = () => {};
+    if (typeof window.checkText !== 'function') {
+      window.checkText = () => {
+        try {
+          if (!state.dictationStarted) return;
+        } catch (e0) {
+        }
+
+        const session = window.__dictationModalActiveSession;
+        if (!session) return;
+
+        const view = getCurrentSentenceViewFromSession(session);
+        if (!view) return;
+
+        const originalText = String(view.text_original != null ? view.text_original : (view.text != null ? view.text : ''));
+        const userInputEl = document.getElementById('userInput');
+        const userText = userInputEl ? String(userInputEl.textContent || '') : '';
+
+        let langOrig = '';
+        try {
+          const dictationData = document.getElementById('dictation-data');
+          langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
+        } catch (e1) {
+        }
+
+        let checker = null;
+        try {
+          checker = state._typoChecker;
+        } catch (e2) {
+        }
+        if (!checker) {
+          try {
+            if (window.ПроверкаНаОшибки) {
+              checker = new window.ПроверкаНаОшибки();
+              state._typoChecker = checker;
+            }
+          } catch (e3) {
+          }
+        }
+        if (!checker || typeof checker.analyze !== 'function') return;
+
+        const prevPerfect = Number(view.number_of_perfect) || 0;
+        const prevCorrected = Number(view.number_of_corrected) || 0;
+
+        let requiredPassedStarHalf = null;
+        try {
+          const el = document.getElementById('modal-requiredPassedStarHalfInput');
+          if (el && el.value != null && String(el.value).trim()) {
+            requiredPassedStarHalf = Number(el.value);
+          }
+        } catch (e4) {
+        }
+
+        const res = checker.analyze({
+          originalText,
+          userText,
+          langOriginal: langOrig,
+          textAttemptCount: Number(view._textAttemptCount) || 0,
+          prevPerfect,
+          prevCorrected,
+          requiredPassedStarHalf,
+        });
+
+        try {
+          const notice = document.getElementById('userInputNotice');
+          if (notice) {
+            if (res && res.okToCheck === false && res.noticeMessage) {
+              notice.textContent = String(res.noticeMessage);
+              notice.style.display = 'block';
+            } else {
+              notice.textContent = '';
+              notice.style.display = 'none';
+            }
+          }
+        } catch (e5) {
+        }
+
+        if (!res || res.okToCheck === false) return;
+
+        try {
+          const failedChecks = Number(view.error_count) || 0;
+          const nextFailed = res.allCorrect ? failedChecks : (failedChecks + 1);
+          view.error_count = nextFailed;
+          const el = document.getElementById('errorCountLabel');
+          if (el) el.textContent = nextFailed > 0 ? String(nextFailed) : '';
+        } catch (e6) {
+        }
+
+        try {
+          view.number_of_perfect = res.nextPerfect;
+          view.number_of_corrected = res.nextCorrected;
+        } catch (e7) {
+        }
+
+        try {
+          if (res.allCorrect) {
+            const correctAnswerDiv = document.getElementById('correctAnswer');
+            if (correctAnswerDiv) {
+              correctAnswerDiv.style.display = 'block';
+              correctAnswerDiv.textContent = String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : ''));
+            }
+          }
+        } catch (e8) {
+        }
+
+        try {
+          updateNavigatorFromSession(session);
+        } catch (e9) {
+        }
+      };
+    }
   } catch (e) {
   }
 
@@ -411,9 +521,16 @@
       const seq = String(sequence || '').trim().toLowerCase();
       if (!seq) return;
 
+      let originalBtn = null;
+      try {
+        const v = window.__dictationModalOriginalAudioVisual;
+        if (v && v.playButton) originalBtn = v.playButton;
+      } catch (e0) {
+      }
+
       const steps = [];
       for (const ch of seq) {
-        if (ch === 'o' && originalUrl) steps.push({ url: originalUrl, button: null });
+        if (ch === 'o' && originalUrl) steps.push({ url: originalUrl, button: originalBtn });
         if (ch === 't' && translationUrl) steps.push({ url: translationUrl, button: document.getElementById('translationPlayButton') });
       }
       if (!steps.length) return;
