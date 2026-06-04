@@ -314,6 +314,14 @@
         const bufferLength = this._viz.analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
 
+        let barColor = '#8BBFFF';
+        try {
+          const cssVar = getComputedStyle(document.documentElement).getPropertyValue('--color-button-text-purple');
+          const v = String(cssVar || '').trim();
+          if (v) barColor = v;
+        } catch (e0) {
+        }
+
         const draw = () => {
           if (!this._viz.active) return;
           this._viz.raf = requestAnimationFrame(draw);
@@ -325,7 +333,7 @@
           ctx.clearRect(0, 0, w, h);
 
           const barWidth = Math.max((w / bufferLength) * 1.6, 2);
-          ctx.fillStyle = '#8BBFFF';
+          ctx.fillStyle = barColor;
 
           let x = 0;
           for (let i = 0; i < bufferLength; i++) {

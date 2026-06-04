@@ -2294,6 +2294,21 @@ html[dir="rtl"] .audio-players-wrapper {
   text-align: right;
 }
 
+.audio-user-top-row .audio-user-mode {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.audio-user-top-percent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-button-text-purple);
+  font-weight: 800;
+}
+
 .audio-user-next-row {
   display: flex;
   justify-content: flex-end;
@@ -2465,6 +2480,12 @@ html[dir="rtl"] .audio-players-wrapper {
   justify-content: center;
   min-height: 40px;
   min-width: 44px;
+}
+
+#recordButton:focus,
+#recordButton:focus-visible {
+  outline: 2px solid var(--color-button-text-purple);
+  outline-offset: 2px;
 }
 
 

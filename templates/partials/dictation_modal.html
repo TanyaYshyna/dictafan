@@ -156,16 +156,14 @@
                 <col class="audio-user-col audio-user-col-5">
               </colgroup>
               <tr class="audio-user-top-row">
-                <td class="audio-user-cell audio-user-tablo" colspan="4">
-                  <div id="userAudioTablo">
-                    <i data-lucide="mic"></i>
-                    <i data-lucide="mic"></i>
-                    <i data-lucide="mic-off"></i>
-                    <i data-lucide="mic-off"></i>
-                    <i data-lucide="mic-off"></i>
-                  </div>
-                </td>
-                <td class="audio-user-cell audio-user-mode">
+                <td class="audio-user-cell audio-user-mode" colspan="5">
+                  <span id="recordingIndicator" class="recording-indicator-btn" disabled title="Индикатор записи">
+                    <i data-lucide="circle"></i>
+                  </span>
+                  <span class="audio-user-top-percent" title="Процент совпадения">
+                    <i data-lucide="percent"></i>
+                    <span id="count_percent">100</span>
+                  </span>
                   <span id="recognitionModeIcon" class="recognition-mode-icon" title="Режим распознавания речи">
                     <i data-lucide="route"></i>
                   </span>
@@ -173,22 +171,7 @@
                 </td>
               </tr>
               <tr class="audio-user-bottom-row">
-                <td class="audio-user-cell audio-user-percent">
-                  <button id="word_percent" disabled>
-                    <i data-lucide="percent"></i>
-                  </button>
-                </td>
-                <td class="audio-user-cell audio-user-percent-count">
-                  <button id="btn-count-percent" disabled>
-                    <span id="count_percent">100</span>
-                  </button>
-                </td>
-                <td class="audio-user-cell audio-user-indicator">
-                  <button id="recordingIndicator" class="recording-indicator-btn" disabled title="Индикатор записи">
-                    <i data-lucide="circle"></i>
-                  </button>
-                </td>
-                <td class="audio-user-cell audio-user-visualizer">
+                <td class="audio-user-cell audio-user-visualizer" colspan="4">
                   <canvas id="audioVisualizer" class="audio-visualizer"></canvas>
                 </td>
                 <td class="audio-user-cell audio-user-record">
