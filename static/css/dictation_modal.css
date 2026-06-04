@@ -49,13 +49,30 @@
   margin-top: 6px;
 }
 
+#dictationModal .custom-audio-player .progress-bar {
+  height: 20px;
+  background: transparent;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #bdbdbd;
+  border-radius: 4px;
+}
+
 #dictationModal .custom-audio-player .progress-bar::-webkit-slider-thumb {
-  margin-top: 0;
-  transform: translateY(-10px);
+  transform: none;
+  margin-top: -7px;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-range-track {
+  height: 6px;
+  background: #bdbdbd;
+  border-radius: 4px;
 }
 
 #dictationModal .custom-audio-player .progress-bar::-moz-range-thumb {
-  transform: translateY(-10px);
+  transform: translateY(-7px);
 }
 
 #dictationModal #audioSettingsModal .audio-settings-modal-panel {
