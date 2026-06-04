@@ -202,6 +202,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .sentence-nav-table .sentence-counter-simple {
@@ -217,6 +218,9 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   padding-top: 0;
   padding-bottom: 0;
   line-height: 1;
+  font-weight: bold;
+  font-size: 22px;
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .progress-panel-modal-r .table-progress {
@@ -339,6 +343,135 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 #dictationModal #originalAudioPlayer,
 #dictationModal .translation-audio-button-wrapper {
   margin-top: 6px;
+}
+
+#dictationModal .custom-audio-player {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-hover-panel);
+  border-radius: 8px;
+  padding: 2px 10px;
+  margin-bottom: 0;
+  width: auto;
+  flex-shrink: 1;
+  font-family: sans-serif;
+}
+
+#dictationModal .custom-audio-player .controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px !important;
+  width: 100%;
+  justify-content: flex-start;
+  margin: 0 2px;
+}
+
+#dictationModal .custom-audio-player .controls > * {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 1px !important;
+  padding-right: 1px !important;
+  border: none !important;
+}
+
+#dictationModal .custom-audio-player .audio-player-language {
+  color: var(--color-button-text-yellow, #fbbf24);
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 40px;
+}
+
+#dictationModal .custom-audio-player .play-btn,
+#dictationModal .custom-audio-player .current-time,
+#dictationModal .custom-audio-player .total-time,
+#dictationModal .custom-audio-player .mute-btn,
+#dictationModal .custom-audio-player .custom-speed-select {
+  background: transparent;
+  font-size: 20px;
+}
+
+#dictationModal .custom-audio-player .controls > *:not(.play-btn):not(.progress-bar) {
+  font-weight: 800;
+  font-size: 20px;
+}
+
+#dictationModal .custom-audio-player .play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .custom-audio-player .play-btn svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+#dictationModal .custom-audio-player .controls .progress-bar {
+  flex: 1 1 0 !important;
+  min-width: 100px !important;
+  max-width: none !important;
+}
+
+#dictationModal .custom-audio-player .audio-type-select-wrapper,
+#dictationModal .custom-audio-player .custom-speed-select {
+  margin-left: auto !important;
+  flex-shrink: 0;
+}
+
+#dictationModal .custom-audio-player .custom-speed-select {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+#dictationModal .custom-audio-player .speed-select-button {
+  background-color: var(--color-panel-bg);
+  color: var(--color-button-text-gray);
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  padding: 3px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  outline: none;
+}
+
+#dictationModal .custom-audio-player .speed-arrow {
+  width: 16px;
+  height: 16px;
+}
+
+#dictationModal .custom-audio-player .speed-options {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 80px;
+  z-index: 100;
+}
+
+#dictationModal .custom-audio-player .custom-speed-select.open .speed-options,
+#dictationModal .custom-audio-player .custom-speed-select.is-open .speed-options,
+#dictationModal .custom-audio-player .custom-speed-select.active .speed-options {
+  display: block;
+}
+
+#dictationModal .custom-audio-player .speed-options li {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+#dictationModal .custom-audio-player .speed-options li:hover {
+  background-color: var(--color-button-gray);
 }
 
 #dictationModal .custom-audio-player .progress-bar {
