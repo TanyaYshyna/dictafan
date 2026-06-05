@@ -35,6 +35,7 @@ class ProgressPanel {
             timer: 0, // секунды
             circleNumber: 0,
             errors: 0,
+            money: 0,
             perfect: 0,
             corrected: 0,
             audio: 0,
@@ -103,17 +104,23 @@ class ProgressPanel {
                     <col class="progress-col">
                 </colgroup>
                 <tr>
-                    <td colspan="3">
+                    <td colspan="2">
                         <button id="${clockBtnId}" class="pp-clock" title="Время работы над диктантом"${clockInteractiveAttr}>
                             <i data-lucide="clock"></i>
                             <span id="${timerId}" class="timer-value">00:00:00</span>
                         </button>
                     </td>
                     <td>
-                        <span class="pp-errors" title="Общее количество ошибок">
-                            <i data-lucide="bug"></i>
-                            <span id="${prefix}count-errors">0</span>
-                        </span>
+                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Общее количество предложений">
+                            <i data-lucide="layers"></i>
+                            <span id="${prefix}count-total">0</span>
+                        </button>
+                    </td>
+                    <td>
+                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Баланс">
+                            <i data-lucide="circle-dollar-sign"></i>
+                            <span id="${prefix}count-money">0</span>
+                        </button>
                     </td>
                 </tr>
                 <tr>
@@ -136,10 +143,10 @@ class ProgressPanel {
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Общее количество предложений">
-                            <i data-lucide="layers"></i>
-                            <span id="${prefix}count-total">0</span>
-                        </button>
+                        <span class="pp-bug" title="Общее количество ошибок">
+                            <i data-lucide="bug"></i>
+                            <span id="${prefix}count-errors">0</span>
+                        </span>
                     </td>
                 </tr>
             </table>
@@ -165,12 +172,14 @@ class ProgressPanel {
         this.elements = {
             timer: document.getElementById('timer'),
             errors: document.getElementById('count-errors'),
+            money: document.getElementById('count-money'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             modalTimer: document.getElementById('modal_timer'),
             modalErrors: document.getElementById('modal-count-errors'),
+            modalMoney: document.getElementById('modal-count-money'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -602,7 +611,7 @@ class ProgressPanel {
             const num = Number(value);
             return Number.isFinite(num) ? num : 0;
         };
-        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s errors=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.errors, this.stats.circleNumber, this.stats.timer);
+        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s errors=%s money=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.errors, this.stats.money, this.stats.circleNumber, this.stats.timer);
 
         // Обновляем основной UI
         if (this.elements.perfect) {
@@ -620,6 +629,9 @@ class ProgressPanel {
         if (this.elements.errors) {
             this.elements.errors.textContent = safe(this.stats.errors);
         }
+        if (this.elements.money) {
+            this.elements.money.textContent = safe(this.stats.money);
+        }
 
         // Обновляем модальный UI
         if (this.elements.modalPerfect) {
@@ -636,6 +648,9 @@ class ProgressPanel {
         }
         if (this.elements.modalErrors) {
             this.elements.modalErrors.textContent = safe(this.stats.errors);
+        }
+        if (this.elements.modalMoney) {
+            this.elements.modalMoney.textContent = safe(this.stats.money);
         }
 
         // Обновляем таймер

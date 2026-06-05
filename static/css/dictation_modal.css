@@ -306,6 +306,29 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   color: var(--color-button-text-gray);
 }
 
+#dictationModal .table-progress .pp-money {
+  background: var(--color-button-pink);
+  color: var(--color-button-text-pink);
+}
+
+#dictationModal .table-progress .pp-bug {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 
 #dictationModal .table-progress .pp-errors {
   box-sizing: border-box;
@@ -376,10 +399,15 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 }
 
 #dictationModal .custom-audio-player .audio-player-language {
-  color: var(--color-button-text-yellow, #fbbf24);
+  color: var(--color-button-text-gray);
   font-size: 20px;
   font-weight: 800;
   min-width: 40px;
+}
+
+#dictationModal .custom-audio-player[data-audio-id="audio1"] .play-btn,
+#dictationModal .custom-audio-player[data-audio-id="audio1"] .play-btn svg {
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .custom-audio-player .play-btn,
@@ -773,13 +801,57 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal .translation-audio-button-wrapper .language {
   font-weight: 800;
   font-size: 20px;
-  color: var(--color-button-text-lightgreen);
+  color: var(--color-button-text-gray);
   margin-right: 0;
   margin-left: 8px;
   min-width: 30px;
   display: inline-block;
   vertical-align: middle;
   line-height: 1;
+}
+
+#dictationModal .speaker-tablo-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dictationModal #speaker,
+#dictationModal #tablo_result {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal #speaker [data-lucide],
+#dictationModal #tablo_result [data-lucide] {
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal #userInput.text-input,
+#dictationModal #userInput {
+  min-height: 56px;
+  height: auto;
+}
+
+#dictationModal .result-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#dictationModal .check-group {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#dictationModal .error-count-label {
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .translation-audio-button-wrapper .play-btn-translation {
@@ -836,7 +908,8 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   table-layout: fixed;
   width: 420px;
   max-width: calc(100vw - 40px);
-  margin: 0 auto;
+  margin-left: 0;
+  margin-right: auto;
 }
 
 #dictationModal .audio-user-table,
@@ -972,6 +1045,15 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   justify-content: flex-end;
   width: 100%;
   margin-top: 10px;
+  gap: 10px;
+}
+
+#dictationModal #repeatBtn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
 #dictationModal #resultNextBtn {

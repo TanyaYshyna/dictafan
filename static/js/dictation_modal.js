@@ -1213,6 +1213,32 @@
     }
   }
 
+  function bindRepeatButton() {
+    try {
+      const btn = document.getElementById('repeatBtn');
+      if (!btn || btn.dataset.boundDictationModal === '1') return;
+      btn.dataset.boundDictationModal = '1';
+      btn.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+
+        try {
+          if (!window.AudioManager || typeof window.AudioManager.play !== 'function') return;
+          const visual = window.AudioManager.audioPlayerVisual || null;
+          if (!visual || typeof visual.getCurrentAudioPath !== 'function') return;
+          const audioPath = visual.getCurrentAudioPath();
+          if (!audioPath) return;
+          window.AudioManager.play(visual.playButton || null, audioPath);
+        } catch (e1) {
+        }
+      });
+    } catch (e) {
+    }
+  }
+
   function renderModalCover(parsed) {
     try {
       const img = document.getElementById('dictationModalCover');
@@ -2643,6 +2669,7 @@
     bindInactivityWatchers();
     bindUserInputScriptGuards();
     bindEnterToCheck();
+    bindRepeatButton();
     bindNextButton();
   }
 
