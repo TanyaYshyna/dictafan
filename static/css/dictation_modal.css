@@ -394,6 +394,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 #dictationModal .custom-audio-player .controls > *:not(.play-btn):not(.progress-bar) {
   font-weight: 800;
   font-size: 20px;
+  color: var(--color-button-text-gray);
 }
 
 #dictationModal .custom-audio-player .play-btn {
@@ -477,27 +478,60 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 #dictationModal .custom-audio-player .progress-bar {
   height: 20px;
   background: transparent;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+  accent-color: var(--color-button-text-yellow, #fbbf24);
+}
+
+#dictationModal .custom-audio-player .progress-bar:focus,
+#dictationModal .custom-audio-player .progress-bar:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 #dictationModal .custom-audio-player .progress-bar::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 8px;
   background: #bdbdbd;
   border-radius: 4px;
+  border: none;
+  box-shadow: none;
 }
 
 #dictationModal .custom-audio-player .progress-bar::-webkit-slider-thumb {
-  transform: none;
-  margin-top: -7px;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: var(--color-button-text-yellow, #fbbf24);
+  margin-top: -6px;
 }
 
 #dictationModal .custom-audio-player .progress-bar::-moz-range-track {
-  height: 6px;
+  height: 8px;
   background: #bdbdbd;
   border-radius: 4px;
+  border: none;
+  box-shadow: none;
 }
 
 #dictationModal .custom-audio-player .progress-bar::-moz-range-thumb {
-  transform: translateY(-7px);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: var(--color-button-text-yellow, #fbbf24);
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-focus-outer {
+  border: 0;
 }
 
 #dictationModal #audioSettingsModal .audio-settings-modal-panel {
