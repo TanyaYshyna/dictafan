@@ -381,10 +381,25 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+#dictationModal #pauseModal #pauseTimer {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 #dictationModal #pauseModal #resumeBtn {
   align-self: flex-end;
+  min-height: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 #dictationModal .audio-players-wrapper {
@@ -959,7 +974,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .audio-user-col-3 {
-  width: 120px;
+  width: 80px;
 }
 
 #dictationModal .audio-user-top-row {
@@ -997,7 +1012,11 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .audio-user-bottom-row .audio-user-visualizer {
-  padding-right: 8px;
+  padding-right: 4px;
+}
+
+#dictationModal .audio-user-bottom-row .audio-user-record {
+  padding-left: 4px;
 }
 
 #dictationModal .audio-user-visualizer .audio-visualizer,
