@@ -359,6 +359,34 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   inset: 0;
 }
 
+#dictationModal #pauseModal {
+  position: fixed;
+  inset: 0;
+}
+
+#dictationModal #pauseModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  border: none;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#dictationModal #pauseModal .pause-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#dictationModal #pauseModal #resumeBtn {
+  align-self: flex-end;
+}
+
 #dictationModal .audio-players-wrapper {
   margin-top: 8px;
 }
@@ -768,6 +796,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   gap: 8px;
   width: 100%;
   margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 #dictationModal .audio-players-wrapper > * {
@@ -851,7 +880,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .error-count-label {
-  color: var(--color-button-text-gray);
+  color: var(--color-button-gray);
 }
 
 #dictationModal .translation-audio-button-wrapper .play-btn-translation {
@@ -946,14 +975,14 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-button-text-purple);
+  color: var(--color-button-purple);
   font-weight: 800;
   font-size: 22px;
 }
 
 #dictationModal .recognition-mode-icon,
 #dictationModal #recognitionModeIcon {
-  color: var(--color-button-text-purple);
+  color: var(--color-button-purple);
 }
 
 #dictationModal .audio-user-indicator,
@@ -982,9 +1011,30 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .audio-user-record #recordButton {
-  width: 100%;
-  min-height: 44px;
-  height: 44px;
+  width: 80px;
+  min-width: 80px;
+  min-height: 42px;
+  height: 42px;
+  border-radius: 8px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .audio-user-record {
+  text-align: right;
+}
+
+#dictationModal #repeatBtn,
+#dictationModal #checkBtn {
+  width: 80px;
+  min-width: 80px;
+  height: 42px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 0;
+  justify-content: center;
 }
 
 #dictationModal #recordButton:focus,
@@ -1007,6 +1057,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   box-sizing: border-box;
   outline: none !important;
   box-shadow: none !important;
+  margin-bottom: 8px;
 }
 
 #dictationModal .recording-indicator-btn.recording {
