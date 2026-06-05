@@ -821,11 +821,22 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   margin-top: 10px;
 }
 
+#dictationModal #checkBtn {
+  min-height: 44px;
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
 #dictationModal .audio-user-table {
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
-  width: 100%;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  margin: 0 auto;
 }
 
 #dictationModal .audio-user-table,
@@ -837,10 +848,16 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   box-shadow: none !important;
 }
 
-#dictationModal .audio-user-col-1,
-#dictationModal .audio-user-col-2,
-#dictationModal .audio-user-col-3 {
+#dictationModal .audio-user-col-1 {
   width: 44px;
+}
+
+#dictationModal .audio-user-col-2 {
+  width: auto;
+}
+
+#dictationModal .audio-user-col-3 {
+  width: 120px;
 }
 
 #dictationModal .audio-user-top-row {
@@ -858,6 +875,12 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   gap: 6px;
   color: var(--color-button-text-purple);
   font-weight: 800;
+  font-size: 22px;
+}
+
+#dictationModal .recognition-mode-icon,
+#dictationModal #recognitionModeIcon {
+  color: var(--color-button-text-purple);
 }
 
 #dictationModal .audio-user-indicator,
@@ -882,6 +905,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   height: 44px;
   border-radius: 10px;
   min-width: 140px;
+  background-color: var(--color-button-purple);
 }
 
 #dictationModal .audio-user-record #recordButton {
