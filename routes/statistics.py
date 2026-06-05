@@ -291,7 +291,7 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                     'corrected_count': _int_or_0(r.get('corrected_count')),
                     'audio_count': _int_or_0(r.get('audio_count')),
                     'attempts_total': _int_or_0(r.get('attempts_total')),
-                    'error_count': _int_or_0(r.get('error_count')),
+                    'mistake_count': _int_or_0(r.get('mistake_count') if r.get('mistake_count') is not None else r.get('error_count')),
                     'text': text_sentence,
                 }
             )
@@ -313,7 +313,7 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
     rows = rows[:35]
     for i, rr in enumerate(rows, start=1):
         stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
-        compact = f"{stars}-{rr.get('attempts_total')}-{rr.get('error_count')}"
+        compact = f"{stars}-{rr.get('attempts_total')}-{rr.get('mistake_count')}"
         sent_text = _safe_html(rr.get('text'))
         if sent_text and len(sent_text) > 120:
             sent_text = sent_text[:117] + '...'
@@ -536,6 +536,9 @@ def teacher_report_send():
     # Prefer full report when enough data is provided
     want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
     if want_full:
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count')
         text = _build_teacher_report_text_full(
             student_username=student_username,
             dictation_title=dictation_title,
@@ -548,7 +551,7 @@ def teacher_report_send():
             corrected_count=data.get('corrected_count') or 0,
             audio_count=data.get('audio_count') or 0,
             attempts_total=data.get('attempts_total') or 0,
-            error_count=data.get('error_count') or 0,
+            error_count=mistake_count or 0,
             sentences_data=data.get('sentences_data') or [],
             dictation_int=int(dictation_int),
             dictation_lang=str(dictation_lang),
@@ -772,6 +775,9 @@ def teacher_report_send_auto():
 
     want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
     if want_full:
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count')
         text = _build_teacher_report_text_full(
             student_username=student_username,
             dictation_title=dictation_title,
@@ -784,7 +790,7 @@ def teacher_report_send_auto():
             corrected_count=data.get('corrected_count') or 0,
             audio_count=data.get('audio_count') or 0,
             attempts_total=data.get('attempts_total') or 0,
-            error_count=data.get('error_count') or 0,
+            error_count=mistake_count or 0,
             sentences_data=data.get('sentences_data') or [],
             dictation_int=int(dictation_int),
             dictation_lang=str(dictation_lang),
@@ -1038,7 +1044,7 @@ def save_activity():
 
     Поддерживает:
     - legacy: {type_activity, number, lead_time_ms}
-    - bulk: {perfect_count, corrected_count, audio_count, lead_time_ms}
+    - bulk: {perfect_count, corrected_count, audio_count, money_count, mistake_count, simbols, lead_time_ms}
     """
     try:
         current_email = get_jwt_identity()
@@ -1060,12 +1066,22 @@ def save_activity():
         perfect_count = data.get('perfect_count')
         corrected_count = data.get('corrected_count')
         audio_count = data.get('audio_count')
+        money_count = data.get('money_count')
+        mistake_count = data.get('mistake_count')
+        simbols = data.get('simbols')
         
         if not dictation_id:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указан dictation_id')
             return jsonify({'error': 'Не указан dictation_id'}), 400
 
-        is_bulk = (perfect_count is not None) or (corrected_count is not None) or (audio_count is not None)
+        is_bulk = (
+            (perfect_count is not None)
+            or (corrected_count is not None)
+            or (audio_count is not None)
+            or (money_count is not None)
+            or (mistake_count is not None)
+            or (simbols is not None)
+        )
 
         if not is_bulk:
             if not type_activity:
@@ -1093,6 +1109,9 @@ def save_activity():
                 perfect_count=perfect_count or 0,
                 corrected_count=corrected_count or 0,
                 audio_count=audio_count or 0,
+                money_count=money_count or 0,
+                mistake_count=mistake_count or 0,
+                simbols=simbols or 0,
                 lead_time_ms=lead_time_ms or 0,
                 date_override=activity_date,
                 dictation_language_code=dictation_language_code,
@@ -1929,7 +1948,9 @@ def save_success():
         corrected_count = data.get('corrected_count', 0)
         audio_count = data.get('audio_count', 0)
         attempts_total = data.get('attempts_total', 0)
-        error_count = data.get('error_count', 0)
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count', 0)
         time_ms = data.get('time_ms', 0)
         source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
@@ -1984,7 +2005,7 @@ def save_success():
             audio_count,
             time_ms,
             attempts_total,
-            error_count,
+            mistake_count,
             source_group_id=source_group_id,
             selected_sentence_positions=selected_sentence_positions,
             dictation_language_code=dictation_language_code,
@@ -2152,7 +2173,7 @@ def save_success():
                                     'corrected_count': int(r.get('corrected_count') or 0),
                                     'audio_count': int(r.get('audio_count') or 0),
                                     'attempts_total': int(r.get('attempts_total') or 0),
-                                    'error_count': int(r.get('error_count') or 0),
+                                    'mistake_count': int(r.get('mistake_count') if r.get('mistake_count') is not None else r.get('error_count') or 0),
                                     'text': text_sentence,
                                 }
                             )
@@ -2180,7 +2201,7 @@ def save_success():
                         for i, rr in enumerate(rows, start=1):
                             stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
                             att = rr.get('attempts_total')
-                            err = rr.get('error_count')
+                            err = rr.get('mistake_count')
                             compact = f"{stars}-{att}-{err}"
                             sent_text = _safe(rr.get('text'))
                             if sent_text and len(sent_text) > 120:

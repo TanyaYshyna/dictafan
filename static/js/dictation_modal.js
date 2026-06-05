@@ -198,9 +198,9 @@
         }
 
         try {
-          const failedChecks = Number(view.error_count) || 0;
+          const failedChecks = Number(view.mistake_count) || 0;
           const nextFailed = res.allCorrect ? failedChecks : (failedChecks + 1);
-          view.error_count = nextFailed;
+          view.mistake_count = nextFailed;
           const el = document.getElementById('errorCountLabel');
           if (el) el.textContent = nextFailed > 0 ? String(nextFailed) : '';
         } catch (e6) {
@@ -226,7 +226,7 @@
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
             try {
-              if (view && view.error_count != null) st.error_count = view.error_count;
+              if (view && view.mistake_count != null) st.mistake_count = view.mistake_count;
             } catch (e0) {
             }
             try {
@@ -797,14 +797,19 @@
   function updateNextButtonVisibilityFromSession(session) {
     try {
       const btn = document.getElementById('resultNextBtn');
-      if (!btn) return;
+      const repeatBtn = document.getElementById('repeatBtn');
+      if (!btn && !repeatBtn) return;
       const st = getCurrentSentenceStateFromSession(session);
       if (!st) {
-        btn.style.display = 'none';
+        if (btn) btn.style.display = 'none';
+        if (repeatBtn) repeatBtn.style.display = 'none';
         return;
       }
       const { textOk, audioOk } = computeSentenceCompletionState(st);
-      btn.style.display = (textOk && audioOk) ? 'inline-flex' : 'none';
+      const mistakes = Number(st && st.mistake_count) || 0;
+      const ok = (textOk && audioOk && mistakes <= 0);
+      if (btn) btn.style.display = ok ? 'inline-flex' : 'none';
+      if (repeatBtn) repeatBtn.style.display = ok ? 'inline-flex' : 'none';
     } catch (e) {
     }
   }

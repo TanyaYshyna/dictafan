@@ -131,6 +131,7 @@
             number_of_corrected: 0,
             number_of_audio: 0,
             number_of_time: 0,
+            mistake_count: 0,
             selection_state: 'unchecked',
             all_audio_completed: false,
           });
@@ -147,6 +148,7 @@
         number_of_corrected: 0,
         number_of_audio: 0,
         number_of_time: 0,
+        mistake_count: 0,
         selection_state: 'unchecked',
         all_audio_completed: false,
       };
@@ -202,19 +204,17 @@
       if (this.selectedKeys.length > 0) return;
 
       const allKeys = this.content ? this.content.getAllKeys() : [];
+      let changed = false;
       for (const k of allKeys) {
         if (!this.isActiveKey(k)) continue;
         const st = this.getState(k);
         if (st.selection_state !== 'completed') {
           st.selection_state = 'checked';
-          this._rebuildSelectedKeysFromStates();
-          this.touch();
-          return;
+          changed = true;
         }
       }
 
-      if (allKeys.length && (!this.activeKeys || this.activeKeys.includes(allKeys[0]))) {
-        this.getState(allKeys[0]).selection_state = 'checked';
+      if (changed) {
         this._rebuildSelectedKeysFromStates();
       }
       this.touch();

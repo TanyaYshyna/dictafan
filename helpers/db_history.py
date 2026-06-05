@@ -76,6 +76,9 @@ def _upsert_history_by_day(
     perfect_delta: int = 0,
     corrected_delta: int = 0,
     audio_delta: int = 0,
+    money_delta: int = 0,
+    mistake_delta: int = 0,
+    simbols_delta: int = 0,
     lead_time_delta: int = 0,
     successes_delta: int = 0,
 ) -> None:
@@ -93,17 +96,23 @@ def _upsert_history_by_day(
             perfect_count,
             corrected_count,
             audio_count,
+            money_count,
+            mistake_count,
+            simbols,
             lead_time,
             successes,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
             corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
             audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
+            money_count = COALESCE(history_by_day.money_count, 0) + EXCLUDED.money_count,
+            mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
+            simbols = COALESCE(history_by_day.simbols, 0) + EXCLUDED.simbols,
             lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
             successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
@@ -120,6 +129,9 @@ def _upsert_history_by_day(
             int(perfect_delta or 0),
             int(corrected_delta or 0),
             int(audio_delta or 0),
+            int(money_delta or 0),
+            int(mistake_delta or 0),
+            int(simbols_delta or 0),
             int(lead_time_delta or 0),
             int(successes_delta or 0),
         ),
@@ -427,6 +439,9 @@ def add_activity_bulk(
     perfect_count=0,
     corrected_count=0,
     audio_count=0,
+    money_count=0,
+    mistake_count=0,
+    simbols=0,
     lead_time_ms=0,
     date_override=None,
     dictation_language_code=None,
@@ -485,6 +500,19 @@ def add_activity_bulk(
     except Exception:
         lead_time_ms_int = 0
 
+    try:
+        money_count_int = int(money_count or 0)
+    except Exception:
+        money_count_int = 0
+    try:
+        mistake_count_int = int(mistake_count or 0)
+    except Exception:
+        mistake_count_int = 0
+    try:
+        simbols_int = int(simbols or 0)
+    except Exception:
+        simbols_int = 0
+
     if perfect_count_int < 0:
         perfect_count_int = 0
     if corrected_count_int < 0:
@@ -493,6 +521,12 @@ def add_activity_bulk(
         audio_count_int = 0
     if lead_time_ms_int < 0:
         lead_time_ms_int = 0
+    if money_count_int < 0:
+        money_count_int = 0
+    if mistake_count_int < 0:
+        mistake_count_int = 0
+    if simbols_int < 0:
+        simbols_int = 0
 
     selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
 
@@ -542,6 +576,9 @@ def add_activity_bulk(
                     perfect_delta=int(perfect_count_int or 0),
                     corrected_delta=int(corrected_count_int or 0),
                     audio_delta=int(audio_count_int or 0),
+                    money_delta=int(money_count_int or 0),
+                    mistake_delta=int(mistake_count_int or 0),
+                    simbols_delta=int(simbols_int or 0),
                     lead_time_delta=int(lead_time_ms_int or 0),
                     successes_delta=0,
                 )
@@ -746,7 +783,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -780,7 +817,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   corrected_count: {corrected_count}')
     print(f'   audio_count: {audio_count}')
     print(f'   attempts_total: {attempts_total}')
-    print(f'   error_count: {error_count}')
+    print(f'   mistake_count: {mistake_count}')
     print(f'   time_ms: {time_ms}')
     print(f'   source_group_id: {source_group_id}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
@@ -800,7 +837,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at
-            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, None, started_at))
+            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, mistake_count, time_ms, source_group_id, None, started_at))
 
             row = cur.fetchone()
 
@@ -821,6 +858,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     perfect_delta=int(perfect_count or 0),
                     corrected_delta=int(corrected_count or 0),
                     audio_delta=int(audio_count or 0),
+                    mistake_delta=int(mistake_count or 0),
                     lead_time_delta=0,
                     successes_delta=1,
                 )
@@ -838,7 +876,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'corrected_count': row[5],
                 'audio_count': row[6],
                 'attempts_total': row[7],
-                'error_count': row[8],
+                'mistake_count': row[8],
                 'time_ms': row[9],
                 'source_group_id': row[10],
                 'selected_sentence_positions': list(row[11] or []) if row[11] is not None else None,
@@ -1164,7 +1202,7 @@ def save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sente
                         sentence.get('corrected_count', 0),
                         sentence.get('audio_count', 0),
                         sentence.get('attempts_total', 0),
-                        sentence.get('error_count', 0),
+                        sentence.get('mistake_count', sentence.get('error_count', 0)),
                         selection_state
                     ))
             
@@ -1241,7 +1279,7 @@ def get_unclosed_dictation(user_id, dictation_id):
                     'corrected_count': s_row[2],
                     'audio_count': s_row[3],
                     'attempts_total': s_row[4],
-                    'error_count': s_row[5],
+                    'mistake_count': s_row[5],
                     'selection_state': s_row[6] or 'unchecked'
                 })
             

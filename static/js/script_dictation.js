@@ -74,7 +74,7 @@ async function autoSendTeacherReportAfterSuccess({
                     const c = Number(s.number_of_corrected) || 0;
                     const a = Number(s.number_of_audio) || 0;
                     const at = Number(s.attempts_total) || 0;
-                    const er = Number(s.error_count) || 0;
+                    const er = Number(s.mistake_count) || 0;
 
                     totalPerfect += p;
                     totalCorrected += c;
@@ -89,7 +89,7 @@ async function autoSendTeacherReportAfterSuccess({
                             corrected_count: c,
                             audio_count: a,
                             attempts_total: at,
-                            error_count: er,
+                            mistake_count: er,
                             selection_state: s.selection_state || 'unchecked'
                         });
                     }
@@ -198,7 +198,7 @@ async function autoSendTeacherReportAfterSuccess({
                 corrected_count: finalCorrected,
                 audio_count: finalAudio,
                 attempts_total: finalAttempts,
-                error_count: finalErrors,
+                mistake_count: finalErrors,
                 time_ms: finalTimeMs,
                 completed_at_ms: finalCompletedAtMs,
                 completed_at_tz_offset_min: finalCompletedAtTzOffsetMin,
@@ -2244,7 +2244,7 @@ async function enqueueOfflineSuccess(payload) {
                     p.corrected_count = (Number(p.corrected_count) || 0) + (Number(row.corrected_count) || 0);
                     p.audio_count = (Number(p.audio_count) || 0) + (Number(row.audio_count) || 0);
                     p.attempts_total = (Number(p.attempts_total) || 0) + (Number(row.attempts_total) || 0);
-                    p.error_count = (Number(p.error_count) || 0) + (Number(row.error_count) || 0);
+                    p.mistake_count = (Number(p.mistake_count) || 0) + (Number(row.mistake_count) || 0);
                     map.set(row.sentence_key, p);
                 }
             }
@@ -2274,7 +2274,7 @@ async function enqueueOfflineSuccess(payload) {
             corrected_count: (Number(existing.payload.corrected_count) || 0) + (Number(payload.corrected_count) || 0),
             audio_count: (Number(existing.payload.audio_count) || 0) + (Number(payload.audio_count) || 0),
             attempts_total: (Number(existing.payload.attempts_total) || 0) + (Number(payload.attempts_total) || 0),
-            error_count: (Number(existing.payload.error_count) || 0) + (Number(payload.error_count) || 0),
+            mistake_count: (Number(existing.payload.mistake_count) || 0) + (Number(payload.mistake_count) || 0),
             time_ms: (Number(existing.payload.time_ms) || 0) + (Number(payload.time_ms) || 0),
             source_group_id: (existing.payload.source_group_id != null) ? existing.payload.source_group_id : payload.source_group_id,
             selected_sentence_positions: (existing.payload.selected_sentence_positions != null)
@@ -2366,7 +2366,7 @@ function buildDictationDraftState() {
                 number_of_corrected: s.number_of_corrected || 0,
                 number_of_audio: s.number_of_audio || 0,
                 attempts_total: Number(s.attempts_total) || 0,
-                error_count: Number(s.error_count) || 0,
+                mistake_count: Number(s.mistake_count) || 0,
                 selection_state: finalSelectionState
             };
         }
@@ -2769,7 +2769,7 @@ let currentSentence = 0;   // текущее предложение из allSent
 window.currentSentence = null;
 
 // Метрики по предложению (анти-обход): сколько раз стартовали предложение + сколько ошибок в последней проверке
-// Храним на объекте предложения (allSentences) как s.attempts_total и s.error_count
+// Храним на объекте предложения (allSentences) как s.attempts_total и s.mistake_count
 
 // Диалоговые метаданные (из info.json)
 let dictationIsDialog = false;
@@ -3139,7 +3139,7 @@ function clearSentenceProgressByKey(key) {
     s.number_of_corrected = 0;
     s.number_of_audio = 0;
     s.attempts_total = 0;
-    s.error_count = 0;
+    s.mistake_count = 0;
     s.all_audio_completed = false;
     s.selection_state = 'unchecked';
 
@@ -5257,7 +5257,7 @@ function renderSelectionTable() {
         attemptsCell.className = 'sentence-progress-cell';
         attemptsCell.dataset.progress = 'attempts';
         const attemptsTotal = Number(s.attempts_total) || 0;
-        const failedChecks = Number(s.error_count) || 0;
+        const failedChecks = Number(s.mistake_count) || 0;
         attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
 
         // Предложение (оригинал/перевод)
@@ -5616,7 +5616,7 @@ function resetDictationProgress() {
         s.number_of_corrected = 0;
         s.number_of_audio = 0;
         s.attempts_total = 0;
-        s.error_count = 0;
+        s.mistake_count = 0;
         s.all_audio_completed = false;
         // ИСПРАВЛЕНО: Убраны поля circle_number_of_* - они больше не используются
 
@@ -5837,7 +5837,7 @@ function updateTableRowStatus(s) {
 
     if (attemptsCell) {
         const attemptsTotal = Number(s.attempts_total) || 0;
-        const failedChecks = Number(s.error_count) || 0;
+        const failedChecks = Number(s.mistake_count) || 0;
         attemptsCell.textContent = (attemptsTotal > 0 || failedChecks > 0) ? `${attemptsTotal}/${failedChecks}` : '';
     }
 
@@ -6316,7 +6316,7 @@ function updateStats(circle = null) {
         const perfect = Number(s.number_of_perfect) || 0;
         const corrected = Number(s.number_of_corrected) || 0;
         const audio = Number(s.number_of_audio) || 0;
-        const errors = Number(s.error_count) || 0;
+        const errors = Number(s.mistake_count) || 0;
 
         // Учитываем предложение как perfect, если есть хотя бы один perfect (1 предложение = 1 звезда)
         if (perfect > 0) {
@@ -9646,7 +9646,7 @@ function showCurrentSentence(showTabloIndex, showSentenceIndex) {
     }
 
     // Показываем число неуспешных нажатий "Проверить" по этому предложению
-    updateErrorCountLabel(Number(currentSentence?.error_count) || 0);
+    updateErrorCountLabel(Number(currentSentence?.mistake_count) || 0);
 
     // Обновляем простой счетчик предложений
     updateSimpleSentenceCounter();
@@ -11549,12 +11549,12 @@ function checkText() {
     } catch (e) {
     }
 
-    // error_count: число неуспешных нажатий "Проверить" по предложению
+    // mistake_count: число неуспешных нажатий "Проверить" по предложению
     // Инкрементируем ТОЛЬКО когда проверка не прошла (нужно исправляться)
     if (currentSentence && !allCorrect) {
-        currentSentence.error_count = (Number(currentSentence.error_count) || 0) + 1;
+        currentSentence.mistake_count = (Number(currentSentence.mistake_count) || 0) + 1;
     }
-    const failedChecks = Number(currentSentence?.error_count) || 0;
+    const failedChecks = Number(currentSentence?.mistake_count) || 0;
     updateErrorCountLabel(failedChecks);
     scheduleDraftAutosave('checkErrorCount');
 
@@ -11791,7 +11791,7 @@ async function registerCompletedDictation() {
             const totalCorrected = s.number_of_corrected || 0;
             const totalAudio = Number(s.number_of_audio) || 0;
             const totalAttempts = Number(s.attempts_total) || 0;
-            const totalErrors = Number(s.error_count) || 0;
+            const totalErrors = Number(s.mistake_count) || 0;
 
             if (totalPerfect > 0 || totalCorrected > 0 || totalAudio > 0) {
                 sentences_data.push({
@@ -11800,7 +11800,7 @@ async function registerCompletedDictation() {
                     corrected_count: totalCorrected,
                     audio_count: totalAudio,
                     attempts_total: totalAttempts,
-                    error_count: totalErrors,
+                    mistake_count: totalErrors,
                     selection_state: s.selection_state || 'unchecked'
                 });
             }
@@ -11841,7 +11841,7 @@ async function registerCompletedDictation() {
             }
 
             const totalAttempts = allSentences.reduce((sum, s) => sum + (Number(s.attempts_total) || 0), 0);
-            const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.error_count) || 0), 0);
+            const totalErrors = allSentences.reduce((sum, s) => sum + (Number(s.mistake_count) || 0), 0);
             const completedAtMs = Date.now();
             const completedAtTzOffsetMin = -new Date().getTimezoneOffset();
 
@@ -11860,7 +11860,7 @@ async function registerCompletedDictation() {
                 corrected_count: totalCorrected,
                 audio_count: totalAudio,
                 attempts_total: totalAttempts,
-                error_count: totalErrors,
+                mistake_count: totalErrors,
                 time_ms: totalTimeMs,
                 source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                 completed_at_ms: completedAtMs,
@@ -11951,7 +11951,7 @@ async function registerCompletedDictation() {
                 corrected_count: totalCorrected,
                 audio_count: totalAudio,
                 attempts_total: totalAttempts,
-                error_count: totalErrors,
+                mistake_count: totalErrors,
                 time_ms: totalTimeMs,
                 source_group_id: (window.assignmentSourceGroupId != null && Number.isFinite(Number(window.assignmentSourceGroupId))) ? Number(window.assignmentSourceGroupId) : null,
                 completed_at_ms: completedAtMs,
@@ -12217,11 +12217,14 @@ async function loadAndApplyDraft(forceClear = false) {
                         s.attempts_total = (!isNaN(numValue) && numValue >= 0) ? numValue : 0;
                     }
 
-                    // error_count: ошибки в последней проверке
-                    if (progress.hasOwnProperty('error_count')) {
-                        const errorValue = progress.error_count;
-                        const numValue = Number(errorValue);
-                        s.error_count = (!isNaN(numValue) && numValue >= 0) ? numValue : 0;
+                    // mistake_count: ошибки в последней проверке
+                    // поддерживаем старые черновики (error_count)
+                    const rawMistakes = progress.hasOwnProperty('mistake_count')
+                        ? progress.mistake_count
+                        : (progress.hasOwnProperty('error_count') ? progress.error_count : undefined);
+                    if (rawMistakes !== undefined) {
+                        const numValue = Number(rawMistakes);
+                        s.mistake_count = (!isNaN(numValue) && numValue >= 0) ? numValue : 0;
                     }
                     // ИСПРАВЛЕНО: Убрана загрузка circle_number_of_* полей, так как логика "circle" удалена
                     // Эти поля больше не сохраняются и не должны использоваться
