@@ -381,13 +381,21 @@ class ПроверкаНаОшибки {
     const { verified, errorCount } = this.checkWords(originalText, userText);
     const allCorrect = verified.every(w => w && w.type === 'correct');
 
-    const requiredHalf = Number.isFinite(Number(requiredPassedStarHalf))
-      ? Number(requiredPassedStarHalf)
-      : Number(this.opts.requiredPassedStarHalf);
-
     let nextPerfect = Number(prevPerfect) || 0;
     let nextCorrected = Number(prevCorrected) || 0;
     let starOutcome = null;
+
+    const shouldGrantHalfStar = (textLen, mistakes) => {
+      let result = false;
+      const len = Number(textLen) || 0;
+      const err = Number(mistakes) || 0;
+      if (len <= 25) {
+        if (err === 1) result = true;
+      } else {
+        if (err <= 2) result = true;
+      }
+      return result;
+    };
 
     if (allCorrect) {
       if (nextPerfect === 1) {
@@ -397,12 +405,12 @@ class ПроверкаНаОшибки {
         nextPerfect = 1;
         starOutcome = 'perfect';
       } else {
-        nextCorrected = nextCorrected + 1;
-        if (nextCorrected >= requiredHalf) {
-          nextPerfect = 1;
-          starOutcome = 'perfect';
-        } else {
+        const originalLen = String(originalText || '').length;
+        if (shouldGrantHalfStar(originalLen, errorCount)) {
+          nextCorrected = nextCorrected + 1;
           starOutcome = 'half';
+        } else {
+          starOutcome = null;
         }
       }
     }

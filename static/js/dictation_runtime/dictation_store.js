@@ -132,6 +132,10 @@
             number_of_audio: 0,
             number_of_time: 0,
             mistake_count: 0,
+            text_coin_count: 0,
+            audio_coin_count: 0,
+            text_exchange_half_star: false,
+            audio_exchange_mic: false,
             selection_state: 'unchecked',
             all_audio_completed: false,
           });
@@ -149,6 +153,10 @@
         number_of_audio: 0,
         number_of_time: 0,
         mistake_count: 0,
+        text_coin_count: 0,
+        audio_coin_count: 0,
+        text_exchange_half_star: false,
+        audio_exchange_mic: false,
         selection_state: 'unchecked',
         all_audio_completed: false,
       };

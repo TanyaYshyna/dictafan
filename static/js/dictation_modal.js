@@ -220,6 +220,21 @@
         }
 
         try {
+          if (res && res.allCorrect) {
+            if (res.starOutcome === 'perfect') {
+              setCheckButtonState('star');
+            } else if (res.starOutcome === 'half' || res.starOutcome === 'corrected') {
+              setCheckButtonState('half');
+            } else {
+              setCheckButtonState('ready');
+            }
+          } else {
+            setCheckButtonState('ready');
+          }
+        } catch (e7b) {
+        }
+
+        try {
           const key = view && view.key != null ? String(view.key) : '';
           if (key && session && typeof session.getState === 'function') {
             const st = session.getState(key);
@@ -232,6 +247,13 @@
             try {
               if (view && view._textAttemptCount != null) st._textAttemptCount = view._textAttemptCount;
             } catch (e1) {
+            }
+
+            try {
+              if (res && res.allCorrect && !res.starOutcome) {
+                st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
+              }
+            } catch (e2) {
             }
           }
         } catch (e15) {
@@ -258,6 +280,12 @@
         }
 
         try {
+          updateSentenceTabloFromSession(session);
+          updateTaskProgressFromSession(session);
+        } catch (e10b) {
+        }
+
+        try {
           if (res.allCorrect) {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
@@ -265,8 +293,13 @@
               const rb = document.getElementById('recordButton');
               if (rb && typeof rb.focus === 'function') rb.focus();
             } else if (textOk && audioOk) {
-              const nb = document.getElementById('resultNextBtn');
-              if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') nb.focus();
+              if (res.starOutcome === 'perfect') {
+                const nb = document.getElementById('resultNextBtn');
+                if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') nb.focus();
+              } else {
+                const rb = document.getElementById('repeatBtn');
+                if (rb && rb.style.display !== 'none' && typeof rb.focus === 'function') rb.focus();
+              }
             }
           }
         } catch (e11) {
@@ -794,6 +827,67 @@
     return { textOk, audioOk, requiresAudio };
   }
 
+  function _renderCoins(container, count, colorVar) {
+    try {
+      if (!container) return;
+      const n = Math.max(0, Math.min(9, Number(count) || 0));
+      const parts = [];
+      for (let i = 0; i < n; i++) parts.push('<i data-lucide="circle-small"></i>');
+      container.innerHTML = parts.join('');
+      if (colorVar) {
+        container.style.color = `var(${colorVar})`;
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {
+    }
+  }
+
+  function _setIcon(wrap, iconName, colorVar, opacity = null) {
+    try {
+      if (!wrap) return;
+      wrap.innerHTML = `<i data-lucide="${iconName}"></i>`;
+      if (colorVar) {
+        wrap.style.color = `var(${colorVar})`;
+      }
+      if (opacity != null) {
+        wrap.style.opacity = String(opacity);
+      }
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {
+    }
+  }
+
+  function setCheckButtonState(mode) {
+    try {
+      const checkBtn = document.getElementById('checkBtn');
+      if (!checkBtn) return;
+
+      checkBtn.classList.value = '';
+      if (mode === 'ready') {
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = `<i data-lucide="corner-down-left"></i>`;
+        checkBtn.classList.add('button-color-yellow');
+      } else if (mode === 'star') {
+        checkBtn.disabled = true;
+        checkBtn.innerHTML = `<i data-lucide="star" class="check-btn-icon"></i>`;
+        checkBtn.classList.add('button-color-mint');
+      } else if (mode === 'half') {
+        checkBtn.disabled = true;
+        checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i>`;
+        checkBtn.classList.add('button-color-lightgreen');
+      }
+
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+      }
+    } catch (e) {
+    }
+  }
+
   function updateNextButtonVisibilityFromSession(session) {
     try {
       const btn = document.getElementById('resultNextBtn');
@@ -823,22 +917,18 @@
     const corrected = Number(st.number_of_corrected) || 0;
     const audio = Number(st.number_of_audio) || 0;
 
-    try {
-      const starWrap = document.getElementById('tablo_result_star');
-      if (starWrap) starWrap.style.opacity = perfect >= 1 ? '1' : '0.25';
-    } catch (e) {
-    }
+    const textCoins = Number(st.text_coin_count) || 0;
+    const audioCoins = Number(st.audio_coin_count) || 0;
 
     try {
-      const halfWrap = document.getElementById('tablo_result_star_half');
-      if (halfWrap) {
-        const icons = halfWrap.querySelectorAll('i');
-        let count = corrected;
-        if (perfect >= 1) count = 0;
-        count = Math.max(0, Math.min((Number.isFinite(requiredHalf) ? requiredHalf : 3) - 1, count));
-        for (let i = 0; i < icons.length; i++) {
-          const on = i < count;
-          icons[i].style.opacity = on ? '1' : '0.25';
+      const starWrap = document.getElementById('tablo_result_star');
+      if (starWrap) {
+        if (perfect >= 1) {
+          _setIcon(starWrap, 'star', '--color-button-mint', 1);
+        } else if (corrected > 0) {
+          _setIcon(starWrap, 'star-half', '--color-button-lightgreen', 1);
+        } else {
+          _setIcon(starWrap, 'star-off', null, 0.25);
         }
       }
     } catch (e) {
@@ -846,7 +936,172 @@
 
     try {
       const micWrap = document.getElementById('tablo_result_mic');
-      if (micWrap) micWrap.style.opacity = audio > 0 ? '1' : '0.25';
+      if (micWrap) {
+        const requiresAudio = getRequiredAudioRepeatsValue();
+        const micOk = requiresAudio <= 0 || audio >= requiresAudio;
+        if (micOk) {
+          _setIcon(micWrap, 'mic', '--color-button-purple', 1);
+        } else {
+          _setIcon(micWrap, 'mic-off', null, 0.25);
+        }
+      }
+    } catch (e) {
+    }
+
+    try {
+      const wrap = document.getElementById('tablo_result_text_coins');
+      _renderCoins(wrap, textCoins, '--color-button-lightgreen');
+      const btn = document.getElementById('btn_coin_exchange_text');
+      if (btn) btn.style.display = textCoins >= 3 ? 'inline-flex' : 'none';
+    } catch (e) {
+    }
+
+    try {
+      const wrap = document.getElementById('audio_result_coins');
+      _renderCoins(wrap, audioCoins, '--color-button-lightgreen');
+      const btn = document.getElementById('btn_coin_exchange_audio');
+      if (btn) btn.style.display = audioCoins >= 3 ? 'inline-flex' : 'none';
+    } catch (e) {
+    }
+  }
+
+  function bindCoinExchangeModal(session) {
+    try {
+      if (state._coinExchangeBound) return;
+      state._coinExchangeBound = true;
+    } catch (e0) {
+    }
+
+    const modal = document.getElementById('coinExchangeModal');
+    const title = document.getElementById('coinExchangeTitle');
+    const closeBtn = document.getElementById('coinExchangeCloseBtn');
+    const confirmBtn = document.getElementById('coinExchangeConfirmBtn');
+    const btnText = document.getElementById('btn_coin_exchange_text');
+    const btnAudio = document.getElementById('btn_coin_exchange_audio');
+
+    if (!modal || !title || !closeBtn || !confirmBtn) return;
+
+    const open = (mode) => {
+      try {
+        state._coinExchangeMode = mode;
+        if (mode === 'text') {
+          title.textContent = 'Покупешь полузвезду за 3 монеты?';
+        } else {
+          title.textContent = 'Покупешь микрофон за 3 монеты?';
+        }
+        modal.style.display = 'flex';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      } catch (e) {
+      }
+    };
+
+    const close = () => {
+      try {
+        modal.style.display = 'none';
+      } catch (e) {
+      }
+    };
+
+    try {
+      modal.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+      });
+    } catch (e) {
+    }
+
+    try {
+      closeBtn.addEventListener('click', (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        close();
+      });
+    } catch (e) {
+    }
+
+    const spendAndApply = async () => {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (!st) return;
+
+      const mode = String(state._coinExchangeMode || '');
+      if (mode !== 'text' && mode !== 'audio') return;
+
+      try {
+        const payload = {
+          cost: 3,
+          reason: mode === 'text' ? 'buy_half_star' : 'buy_mic',
+        };
+        await fetch('/api/statistics/money/spend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (e) {
+      }
+
+      if (mode === 'text') {
+        st.text_coin_count = Math.max(0, (Number(st.text_coin_count) || 0) - 3);
+        st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
+        st.text_exchange_half_star = true;
+        setCheckButtonState('half');
+      } else {
+        st.audio_coin_count = Math.max(0, (Number(st.audio_coin_count) || 0) - 3);
+        const req = getRequiredAudioRepeatsValue();
+        st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
+        st.audio_exchange_mic = true;
+      }
+
+      updateSentenceTabloFromSession(session);
+      updateTaskProgressFromSession(session);
+      updateNextButtonVisibilityFromSession(session);
+      close();
+    };
+
+    try {
+      confirmBtn.addEventListener('click', async (e) => {
+        try {
+          e.preventDefault();
+          e.stopPropagation();
+        } catch (e0) {
+        }
+        await spendAndApply();
+      });
+    } catch (e) {
+    }
+
+    try {
+      if (btnText) {
+        btnText.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          open('text');
+        });
+      }
+    } catch (e) {
+    }
+
+    try {
+      if (btnAudio) {
+        btnAudio.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          open('audio');
+        });
+      }
     } catch (e) {
     }
   }
@@ -1061,27 +1316,34 @@
     try {
       panel = new window.DictationSpeechRecognitionPanel({
         minMatchPercent: 80,
-        onRecognitionComplete: async ({ ok }) => {
+        onRecognitionComplete: async ({ ok, percent }) => {
           try {
-            if (!ok) {
-              try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
-              updateNextButtonVisibilityFromSession(session);
-              return;
-            }
-
             const view = getCurrentSentenceViewFromSession(session);
             if (!view || view.key == null) return;
             const st = session.getState(String(view.key));
-            const next = (Number(st.number_of_audio) || 0) + 1;
-            st.number_of_audio = next;
+
+            const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+            if (ok) {
+              const next = (Number(st.number_of_audio) || 0) + 1;
+              st.number_of_audio = next;
+            } else if (pct >= 50) {
+              st.audio_coin_count = (Number(st.audio_coin_count) || 0) + 1;
+            } else {
+              try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
+            }
 
             updateSentenceTabloFromSession(session);
             updateTaskProgressFromSession(session);
             updateNextButtonVisibilityFromSession(session);
 
             try {
-              const btn = document.getElementById('resultNextBtn');
-              if (btn && btn.style.display !== 'none' && typeof btn.focus === 'function') btn.focus();
+              if (ok) {
+                const btn = document.getElementById('resultNextBtn');
+                if (btn && btn.style.display !== 'none' && typeof btn.focus === 'function') btn.focus();
+              } else {
+                const rb = document.getElementById('recordButton');
+                if (rb && typeof rb.focus === 'function') rb.focus();
+              }
             } catch (e0) {
             }
           } catch (e) {
@@ -1091,6 +1353,11 @@
       state._speechPanel = panel;
     } catch (e2) {
       return null;
+    }
+
+    try {
+      bindCoinExchangeModal(session);
+    } catch (e00) {
     }
 
     try {
@@ -2510,6 +2777,11 @@
           try {
             ensureSpeechPanel(session, parsed);
           } catch (e0) {
+          }
+
+          try {
+            bindCoinExchangeModal(session);
+          } catch (e0b) {
           }
 
           const startBtn = document.getElementById('confirmStartBtn');

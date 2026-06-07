@@ -383,6 +383,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   gap: 10px;
   justify-content: center;
   width: 100%;
+  color: var(--color-button-shadow-pink);
 }
 
 #dictationModal #pauseModal #pauseTimer {
@@ -400,6 +401,8 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   justify-content: center;
   padding-top: 0;
   padding-bottom: 0;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 #dictationModal .audio-players-wrapper {
@@ -553,7 +556,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   box-shadow: none;
   -webkit-appearance: none;
   appearance: none;
-  accent-color: var(--color-button-text-yellow, #fbbf24);
+  accent-color: var(--color-button-yellow, #fccf5e);
 }
 
 #dictationModal .custom-audio-player .progress-bar:focus,

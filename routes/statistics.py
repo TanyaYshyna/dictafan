@@ -34,6 +34,83 @@ except Exception:
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
 
+@statistics_bp.route('/money/spend', methods=['POST'])
+@jwt_required()
+def api_statistics_money_spend():
+    """Spend user's money by creating a negative ledger entry and decreasing users.money_balance."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    data = request.get_json(silent=True) or {}
+    try:
+        cost = int(data.get('cost') or 0)
+    except Exception:
+        cost = 0
+    if cost <= 0:
+        return jsonify({'success': False, 'error': 'invalid_cost'}), 400
+
+    reason = (data.get('reason') or '').strip() or 'spend'
+    try:
+        dictation_id = data.get('dictation_id')
+        dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
+    except Exception:
+        dictation_id = None
+
+    try:
+        positions = data.get('positions')
+        if not isinstance(positions, list):
+            positions = []
+        pos_norm = []
+        for p in positions:
+            try:
+                v = int(p)
+                if v > 0:
+                    pos_norm.append(v)
+            except Exception:
+                continue
+        pos_norm = sorted(list(set(pos_norm)))
+    except Exception:
+        pos_norm = []
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user['id']),))
+        row = cur.fetchone()
+        current_balance = int(row[0] or 0) if row else 0
+        if current_balance < cost:
+            conn.rollback()
+            return jsonify({'success': False, 'error': 'not_enough_money', 'money_balance': current_balance}), 400
+
+        new_balance = current_balance - cost
+        cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
+        cur.execute(
+            """
+            INSERT INTO user_money_ledger (user_id, delta, reason, dictation_id, positions)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (int(user['id']), -cost, reason, dictation_id, pos_norm),
+        )
+        conn.commit()
+        return jsonify({'success': True, 'money_balance': new_balance})
+    except Exception as e:
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
 @statistics_bp.route('/telegram/send_self', methods=['POST'])
 @jwt_required()
 def api_statistics_telegram_send_self():
