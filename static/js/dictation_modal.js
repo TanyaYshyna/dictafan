@@ -41,6 +41,62 @@
             } catch (e0) {
             }
 
+  function updateAudioUserPanelVisibilityFromSession(session) {
+    try {
+      const panel = document.querySelector('#dictationModal .audio-user-panel');
+      if (!panel) return;
+      const st = getCurrentSentenceStateFromSession(session);
+      if (!st) {
+        panel.style.display = 'none';
+        return;
+      }
+      const requiresAudio = getRequiredAudioRepeatsValue();
+      const audioDone = Number(st && st.number_of_audio) || 0;
+      const shouldShow = (requiresAudio > 0) && (audioDone < requiresAudio);
+      panel.style.display = shouldShow ? '' : 'none';
+    } catch (e) {
+    }
+  }
+
+  function resetSentenceUiFromSession(session) {
+    try {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (st) st.mistake_count_current = 0;
+    } catch (e0) {
+    }
+
+    try {
+      const el = document.getElementById('errorCountLabel');
+      if (el) el.textContent = '';
+    } catch (e1) {
+    }
+
+    try {
+      setCheckButtonState('ready');
+    } catch (e2) {
+    }
+
+    try {
+      const input = document.getElementById('userInput');
+      if (input) input.textContent = '';
+    } catch (e3) {
+    }
+
+    try {
+      const correct = document.getElementById('correctAnswer');
+      if (correct) {
+        correct.textContent = '';
+        correct.style.display = 'none';
+      }
+    } catch (e4) {
+    }
+
+    try {
+      updateAudioUserPanelVisibilityFromSession(session);
+    } catch (e5) {
+    }
+  }
+
             try {
               const p = getProgressPanelInstance();
               if (p && typeof p.startTimer === 'function') {
@@ -926,7 +982,6 @@
         && (
           (corrected > 0 && perfect < 1)
           || (currentMistakes > 0)
-          || (!audioOk && requiresAudio > 0)
         )
       );
 
@@ -2256,6 +2311,11 @@
       const cur = session && session.selectedKeys && session.selectedKeys.length ? (session.currentSelectedIndex + 1) : 0;
       if (curEl) curEl.textContent = String(cur || 0);
     } catch (e) {
+    }
+
+    try {
+      resetSentenceUiFromSession(session);
+    } catch (e00) {
     }
 
     try {
