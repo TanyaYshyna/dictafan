@@ -251,7 +251,13 @@
 
         try {
           const inputField = document.getElementById('userInput');
-          if (renderer && typeof renderer.renderToEditable === 'function' && inputField) {
+          if (
+            renderer &&
+            typeof renderer.renderToEditable === 'function' &&
+            inputField &&
+            Array.isArray(res.verified) &&
+            res.verified.length
+          ) {
             renderer.renderToEditable(res.verified, inputField);
           }
         } catch (e12) {
@@ -261,6 +267,9 @@
           const correctAnswerDiv = document.getElementById('correctAnswer');
           if (renderer && typeof renderer.renderResult === 'function' && correctAnswerDiv) {
             renderer.renderResult(originalText, res.verified, correctAnswerDiv);
+            if (!res.allCorrect) {
+              correctAnswerDiv.style.display = 'block';
+            }
           }
         } catch (e13) {
         }
