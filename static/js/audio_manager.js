@@ -14,7 +14,141 @@ class AudioManagerClass {
         this._b2LedgerDbName = 'dictafan_drafts';
         this._b2LedgerStoreName = 'b2_upload_ledger';
 
+        this._micRecording = {
+            stream: null,
+            recorder: null,
+            chunks: [],
+            blob: null,
+            startedAt: 0,
+        };
+
         this._storageOutageLastShownAt = 0;
+    }
+
+    getUserRecordingStream() {
+        try {
+            return this._micRecording && this._micRecording.stream ? this._micRecording.stream : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _getSupportedMicMimeType() {
+        try {
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+            ];
+            for (const t of candidates) {
+                try {
+                    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+                        return t;
+                    }
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+        return '';
+    }
+
+    async startUserRecording({ mimeType } = {}) {
+        // Single entry-point for all microphone recordings on the page.
+        try {
+            if (this._micRecording && this._micRecording.recorder && this._micRecording.recorder.state === 'recording') {
+                return { ok: true, alreadyRecording: true, stream: this._micRecording.stream };
+            }
+        } catch (e) {
+        }
+
+        // Ensure no audio is playing while recording.
+        try {
+            this.stop();
+        } catch (e) {
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mt = String(mimeType || '').trim() || this._getSupportedMicMimeType();
+        const mr = new MediaRecorder(stream, mt ? { mimeType: mt } : undefined);
+
+        this._micRecording.stream = stream;
+        this._micRecording.recorder = mr;
+        this._micRecording.chunks = [];
+        this._micRecording.blob = null;
+        this._micRecording.startedAt = Date.now();
+
+        mr.ondataavailable = (e) => {
+            try {
+                if (e && e.data && e.data.size) this._micRecording.chunks.push(e.data);
+            } catch (e2) {
+            }
+        };
+
+        mr.start();
+        return { ok: true, stream, recorder: mr };
+    }
+
+    async stopUserRecording({ timeoutMs } = {}) {
+        const STOP_TIMEOUT_MS = Number(timeoutMs) > 0 ? Number(timeoutMs) : 4000;
+        const rec = this._micRecording || null;
+        const mr = rec ? rec.recorder : null;
+        const stream = rec ? rec.stream : null;
+
+        try {
+            if (mr && mr.state === 'recording') {
+                await Promise.race([
+                    new Promise((resolve) => {
+                        const done = () => resolve();
+                        try {
+                            mr.addEventListener('stop', done, { once: true });
+                        } catch (e) {
+                            resolve();
+                            return;
+                        }
+                        try {
+                            mr.stop();
+                        } catch (e) {
+                            resolve();
+                        }
+                    }),
+                    new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS)),
+                ]);
+            }
+        } catch (e) {
+        }
+
+        let blob = null;
+        try {
+            const chunks = rec && Array.isArray(rec.chunks) ? rec.chunks : [];
+            const mt = (mr && mr.mimeType) ? String(mr.mimeType) : '';
+            const blobType = (mt && mt.includes('mp4')) ? 'audio/mp4' : (mt || 'audio/webm');
+            blob = chunks.length ? new Blob(chunks, { type: blobType }) : null;
+            if (rec) rec.blob = blob;
+        } catch (e) {
+            blob = null;
+        }
+
+        try {
+            if (stream && stream.getTracks) {
+                for (const t of stream.getTracks()) {
+                    try { t.stop(); } catch (e) {}
+                }
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (rec) {
+                rec.stream = null;
+                rec.recorder = null;
+                rec.chunks = [];
+                rec.startedAt = 0;
+            }
+        } catch (e) {
+        }
+
+        return { ok: true, audioBlob: blob };
     }
 
     _notifyStorageOutageOnce(details = {}) {
@@ -1432,5 +1566,16 @@ class AudioManagerClass {
     }
 }
 
-const audioManager = new AudioManagerClass();
-window.AudioManager = window.AudioManager || audioManager;
+let audioManager = null;
+try {
+    audioManager = window.AudioManager || null;
+} catch (e) {
+    audioManager = null;
+}
+if (!audioManager) {
+    audioManager = new AudioManagerClass();
+}
+try {
+    window.AudioManager = audioManager;
+} catch (e) {
+}

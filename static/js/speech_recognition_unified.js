@@ -55,55 +55,35 @@
         this._ignoreResults = false;
         this._sessionId = (this._sessionId || 0) + 1;
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this._mediaStream = stream;
-
+        const am = window.AudioManager;
+        if (!am || typeof am.startUserRecording !== 'function') {
+          throw new Error('AudioManager_not_loaded');
+        }
         const mimeType = this._getSupportedMimeType();
-        const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-        this._mediaRecorder = mr;
+        const started = await am.startUserRecording({ mimeType });
+        this._mediaStream = started && started.stream ? started.stream : null;
+        this._mediaRecorder = started && started.recorder ? started.recorder : null;
 
-        mr.ondataavailable = (e) => {
-          if (e.data && e.data.size) this._audioChunks.push(e.data);
-        };
+        this.state.isRecording = true;
+        if (typeof this.callbacks.onRecordingStart === 'function') {
+          this.callbacks.onRecordingStart();
+        }
 
-        mr.onerror = (e) => {
-          this._emitError(e?.error || e);
-        };
-
-        mr.onstart = () => {
-          this.state.isRecording = true;
-          if (typeof this.callbacks.onRecordingStart === 'function') {
-            this.callbacks.onRecordingStart();
-          }
-
-          // WebSpeech on Android Chrome is sensitive to the start timing.
-          // Start it after MediaRecorder has actually started.
-          if (this.state.mode === 'online') {
-            try {
-              const delayMs = this._isAndroidChrome() ? 180 : 0;
-              setTimeout(() => {
-                try {
-                  if (this.state.mode === 'online' && this.state.isRecording) {
-                    this._initWebSpeech();
-                  }
-                } catch (e) {
+        // WebSpeech on Android Chrome is sensitive to the start timing.
+        if (this.state.mode === 'online') {
+          try {
+            const delayMs = this._isAndroidChrome() ? 180 : 0;
+            setTimeout(() => {
+              try {
+                if (this.state.mode === 'online' && this.state.isRecording) {
+                  this._initWebSpeech();
                 }
-              }, delayMs);
-            } catch (e) {
-            }
+              } catch (e) {
+              }
+            }, delayMs);
+          } catch (e) {
           }
-        };
-
-        mr.onstop = () => {
-          this.state.isRecording = false;
-          const blobType = (mr.mimeType && mr.mimeType.includes('mp4')) ? 'audio/mp4' : (mr.mimeType || 'audio/webm');
-          this._audioBlob = new Blob(this._audioChunks, { type: blobType });
-          if (typeof this.callbacks.onRecordingStop === 'function') {
-            this.callbacks.onRecordingStop();
-          }
-        };
-
-        mr.start();
+        }
       } catch (e) {
         this._emitError(e);
         throw e;
@@ -145,40 +125,18 @@
           }
         }
 
-        // MediaRecorder 'stop' event may occasionally never fire in some browsers / edge cases.
-        // We must never hang here, otherwise the UI stays on "Распознаю..." forever.
-        if (this._mediaRecorder) {
-          const mr = this._mediaRecorder;
-          const mrState = (mr && mr.state) ? String(mr.state) : '';
-          if (mrState === 'recording') {
-            const STOP_TIMEOUT_MS = 4000;
-            await Promise.race([
-              new Promise((resolve) => {
-                const done = () => resolve();
-                try {
-                  mr.addEventListener('stop', done, { once: true });
-                } catch (e) {
-                  resolve();
-                  return;
-                }
-                try {
-                  mr.stop();
-                } catch (e) {
-                  resolve();
-                }
-              }),
-              new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS)),
-            ]);
+        try {
+          const am = window.AudioManager;
+          if (am && typeof am.stopUserRecording === 'function') {
+            const stopped = await am.stopUserRecording({ timeoutMs: 4000 });
+            this._audioBlob = stopped ? stopped.audioBlob : null;
           }
+        } catch (e) {
         }
 
-        if (this._mediaStream) {
-          for (const t of this._mediaStream.getTracks()) {
-            try {
-              t.stop();
-            } catch (e) {
-            }
-          }
+        this.state.isRecording = false;
+        if (typeof this.callbacks.onRecordingStop === 'function') {
+          this.callbacks.onRecordingStop();
         }
 
         if (isOnline && rec) {

@@ -391,14 +391,32 @@
               } catch (e00) {
               }
               const rb = document.getElementById('recordButton');
-              if (rb && typeof rb.focus === 'function') rb.focus();
+              if (rb && typeof rb.focus === 'function') {
+                try {
+                  state._skipNavigatorFocusOnce = true;
+                } catch (e0x) {
+                }
+                rb.focus();
+              }
             } else if (textOk && audioOk) {
               if (res.starOutcome === 'perfect') {
                 const nb = document.getElementById('resultNextBtn');
-                if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') nb.focus();
+                if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') {
+                  try {
+                    state._skipNavigatorFocusOnce = true;
+                  } catch (e0y) {
+                  }
+                  nb.focus();
+                }
               } else {
                 const rb = document.getElementById('repeatBtn');
-                if (rb && rb.style.display !== 'none' && typeof rb.focus === 'function') rb.focus();
+                if (rb && rb.style.display !== 'none' && typeof rb.focus === 'function') {
+                  try {
+                    state._skipNavigatorFocusOnce = true;
+                  } catch (e0z) {
+                  }
+                  rb.focus();
+                }
               }
             }
           }
@@ -2373,6 +2391,13 @@
 
     try {
       if (state.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
+        try {
+          if (state._skipNavigatorFocusOnce) {
+            state._skipNavigatorFocusOnce = false;
+            return;
+          }
+        } catch (e0x) {
+        }
         focusUserInput();
       }
     } catch (e3) {
