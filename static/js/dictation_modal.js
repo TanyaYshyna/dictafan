@@ -30,17 +30,6 @@
   const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута
   const INACTIVITY_TIMEOUT_RECORDING = 10 * 60 * 1000; // 10 минут
 
-  try {
-    if (typeof window.startGame !== 'function') {
-      window.startGame = () => {
-        try {
-          const session = window.__dictationModalActiveSession;
-          if (session) {
-            try {
-              state.dictationStarted = true;
-            } catch (e0) {
-            }
-
   function updateAudioUserPanelVisibilityFromSession(session) {
     try {
       const panel = document.querySelector('#dictationModal .audio-user-panel');
@@ -96,6 +85,17 @@
     } catch (e5) {
     }
   }
+
+  try {
+    if (typeof window.startGame !== 'function') {
+      window.startGame = () => {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            try {
+              state.dictationStarted = true;
+            } catch (e0) {
+            }
 
             try {
               const p = getProgressPanelInstance();
@@ -254,11 +254,13 @@
         }
 
         try {
-          const stForErr = session && view && view.key != null ? session.getState(String(view.key)) : null;
-          const currentErrors = res && res.allCorrect ? 0 : (Number(res && res.errorCount) || 0);
-          if (stForErr) stForErr.mistake_count_current = currentErrors;
-          const el = document.getElementById('errorCountLabel');
-          if (el) el.textContent = currentErrors > 0 ? String(currentErrors) : '';
+          if (res && !res.allCorrect) {
+            const stForErr = session && view && view.key != null ? session.getState(String(view.key)) : null;
+            const currentErrors = (Number(res && res.errorCount) || 0);
+            if (stForErr) stForErr.mistake_count_current = currentErrors;
+            const el = document.getElementById('errorCountLabel');
+            if (el) el.textContent = currentErrors > 0 ? String(currentErrors) : '';
+          }
         } catch (e6) {
         }
 
@@ -302,8 +304,10 @@
             }
 
             try {
-              if (st && st.mistake_count_current != null) {
-                st.mistake_count_current = res && res.allCorrect ? 0 : (Number(res && res.errorCount) || 0);
+              if (res && !res.allCorrect) {
+                if (st && st.mistake_count_current != null) {
+                  st.mistake_count_current = (Number(res && res.errorCount) || 0);
+                }
               }
             } catch (e0b) {
             }
@@ -361,6 +365,10 @@
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
             if (textOk && !audioOk && requiresAudio > 0) {
+              try {
+                updateAudioUserPanelVisibilityFromSession(session);
+              } catch (e00) {
+              }
               const rb = document.getElementById('recordButton');
               if (rb && typeof rb.focus === 'function') rb.focus();
             } else if (textOk && audioOk) {
