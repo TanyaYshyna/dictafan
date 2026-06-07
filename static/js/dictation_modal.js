@@ -55,6 +55,18 @@
     }
 
     try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (view) view._textAttemptCount = 0;
+    } catch (e0a) {
+    }
+
+    try {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (st) st._textAttemptCount = 0;
+    } catch (e0b) {
+    }
+
+    try {
       const input = document.getElementById('userInput');
       if (input) input.setAttribute('contenteditable', 'true');
     } catch (e0x) {
@@ -1537,8 +1549,23 @@
 
             try {
               if (ok) {
-                const btn = document.getElementById('resultNextBtn');
-                if (btn && btn.style.display !== 'none' && typeof btn.focus === 'function') btn.focus();
+                const perfect = Number(st && st.number_of_perfect) || 0;
+                const corrected = Number(st && st.number_of_corrected) || 0;
+
+                const repeatBtn = document.getElementById('repeatBtn');
+                const nextBtn = document.getElementById('resultNextBtn');
+
+                const shouldFocusRepeat = (corrected > 0 && perfect < 1);
+                if (
+                  shouldFocusRepeat
+                  && repeatBtn
+                  && repeatBtn.style.display !== 'none'
+                  && typeof repeatBtn.focus === 'function'
+                ) {
+                  repeatBtn.focus();
+                } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+                  nextBtn.focus();
+                }
               } else {
                 const rb = document.getElementById('recordButton');
                 if (rb && typeof rb.focus === 'function') rb.focus();

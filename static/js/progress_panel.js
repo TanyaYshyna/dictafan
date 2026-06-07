@@ -118,7 +118,7 @@ class ProgressPanel {
                     </td>
                     <td>
                         <button id="btn-${prefix}count-money" class="pp-money" disabled title="Заработано">
-                            <i data-lucide="coins"></i>
+                            <i data-lucide="circle-dollar-sign"></i>
                             <span id="${prefix}count-money">0</span>
                         </button>
                     </td>
