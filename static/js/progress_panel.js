@@ -111,14 +111,14 @@ class ProgressPanel {
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Общее количество предложений">
-                            <i data-lucide="layers"></i>
+                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Потрачено">
+                            <i data-lucide="coins"></i>
                             <span id="${prefix}count-total">0</span>
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Баланс">
-                            <i data-lucide="circle-dollar-sign"></i>
+                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Заработано">
+                            <i data-lucide="coins"></i>
                             <span id="${prefix}count-money">0</span>
                         </button>
                     </td>
@@ -624,13 +624,15 @@ class ProgressPanel {
             this.elements.audio.textContent = safe(this.stats.audio);
         }
         if (this.elements.total) {
-            this.elements.total.textContent = safe(this.stats.total);
+            const n = safe(this.stats.total);
+            this.elements.total.textContent = n > 0 ? `-${n}` : '0';
         }
         if (this.elements.errors) {
             this.elements.errors.textContent = safe(this.stats.errors);
         }
         if (this.elements.money) {
-            this.elements.money.textContent = safe(this.stats.money);
+            const n = safe(this.stats.money);
+            this.elements.money.textContent = n > 0 ? `+${n}` : '0';
         }
 
         // Обновляем модальный UI
@@ -644,13 +646,15 @@ class ProgressPanel {
             this.elements.modalAudio.textContent = safe(this.stats.audio);
         }
         if (this.elements.modalTotal) {
-            this.elements.modalTotal.textContent = safe(this.stats.total);
+            const n = safe(this.stats.total);
+            this.elements.modalTotal.textContent = n > 0 ? `-${n}` : '0';
         }
         if (this.elements.modalErrors) {
             this.elements.modalErrors.textContent = safe(this.stats.errors);
         }
         if (this.elements.modalMoney) {
-            this.elements.modalMoney.textContent = safe(this.stats.money);
+            const n = safe(this.stats.money);
+            this.elements.modalMoney.textContent = n > 0 ? `+${n}` : '0';
         }
 
         // Обновляем таймер

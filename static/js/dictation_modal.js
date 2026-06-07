@@ -55,6 +55,12 @@
     }
 
     try {
+      const input = document.getElementById('userInput');
+      if (input) input.setAttribute('contenteditable', 'true');
+    } catch (e0x) {
+    }
+
+    try {
       const el = document.getElementById('errorCountLabel');
       if (el) el.textContent = '';
     } catch (e1) {
@@ -269,18 +275,35 @@
             renderer.renderResult(originalText, res.verified, correctAnswerDiv);
             if (!res.allCorrect) {
               correctAnswerDiv.style.display = 'block';
+              try {
+                state._hideCorrectAnswerOnNextUserInput = true;
+              } catch (e0h) {
+              }
             }
           }
         } catch (e13) {
         }
 
         try {
+          const inputField = document.getElementById('userInput');
+          if (inputField) {
+            if (res && res.allCorrect) {
+              inputField.setAttribute('contenteditable', 'false');
+            } else {
+              inputField.setAttribute('contenteditable', 'true');
+            }
+          }
+        } catch (e13b) {
+        }
+
+        try {
           if (res && !res.allCorrect) {
             const stForErr = session && view && view.key != null ? session.getState(String(view.key)) : null;
-            const currentErrors = (Number(res && res.errorCount) || 0);
-            if (stForErr) stForErr.mistake_count_current = currentErrors;
+            const prevAttemptsWithErrors = Number(stForErr && stForErr.mistake_count_current) || 0;
+            const nextAttemptsWithErrors = prevAttemptsWithErrors + 1;
+            if (stForErr) stForErr.mistake_count_current = nextAttemptsWithErrors;
             const el = document.getElementById('errorCountLabel');
-            if (el) el.textContent = currentErrors > 0 ? String(currentErrors) : '';
+            if (el) el.textContent = nextAttemptsWithErrors > 0 ? String(nextAttemptsWithErrors) : '';
           }
         } catch (e6) {
         }
@@ -327,7 +350,7 @@
             try {
               if (res && !res.allCorrect) {
                 if (st && st.mistake_count_current != null) {
-                  st.mistake_count_current = (Number(res && res.errorCount) || 0);
+                  st.mistake_count_current = (Number(st.mistake_count_current) || 0);
                 }
               }
             } catch (e0b) {
@@ -607,6 +630,19 @@
         resetInactivityTimer();
       } catch (e0) {
       }
+
+      try {
+        if (state._hideCorrectAnswerOnNextUserInput) {
+          state._hideCorrectAnswerOnNextUserInput = false;
+          const correct = document.getElementById('correctAnswer');
+          if (correct) {
+            correct.textContent = '';
+            correct.style.display = 'none';
+          }
+        }
+      } catch (e0h) {
+      }
+
       try {
         const html = input.innerHTML;
         if (typeof html === 'string' && html.indexOf('<') !== -1) {
@@ -1245,22 +1281,49 @@
       let corrected = 0;
       let audio = 0;
       let passed = 0;
+      let mistakesTotal = 0;
+      let moneyEarned = 0;
+      let moneySpent = 0;
       for (const k of keys) {
         const st = session.getState ? session.getState(k) : null;
         if (!st) continue;
         const p = Number(st.number_of_perfect) || 0;
         const c = Number(st.number_of_corrected) || 0;
         const a = Number(st.number_of_audio) || 0;
+        const m = Number(st.mistake_count) || 0;
         if (p >= 1) perfect += 1;
         if (c > 0) corrected += 1;
         if (a > 0) audio += 1;
         if (p >= 1 || c > 0) passed += 1;
+        mistakesTotal += m;
+
+        try {
+          // +1 за активность по тексту
+          const textActivityDone = (p >= 1) || (c > 0) || ((Number(st.text_coin_count) || 0) > 0);
+          if (textActivityDone) moneyEarned += 1;
+        } catch (e0) {
+        }
+
+        try {
+          // +1 за выполненный микрофон (если требуется)
+          const req = getRequiredAudioRepeatsValue();
+          const micOk = req <= 0 || a >= req;
+          if (micOk) moneyEarned += 1;
+        } catch (e1) {
+        }
+
+        try {
+          // -3 за покупки
+          if (st.text_exchange_half_star) moneySpent += 3;
+          if (st.audio_exchange_mic) moneySpent += 3;
+        } catch (e2) {
+        }
       }
 
       try {
         const p = getProgressPanelInstance();
         if (p && typeof p.update === 'function') {
-          p.update({ perfect, corrected, audio, total });
+          p.update({ perfect, corrected, audio, errors: mistakesTotal, money: moneyEarned, total: moneySpent });
         }
       } catch (e0) {
       }
@@ -1271,6 +1334,12 @@
         if (label) label.textContent = total > 0 ? `${passed}/${total}` : '';
         if (fill) fill.style.width = total > 0 ? `${Math.round((passed / total) * 100)}%` : '0%';
       } catch (e1) {
+      }
+
+      try {
+        const el = document.getElementById('tablo_result_bug_count');
+        if (el) el.textContent = mistakesTotal > 0 ? String(mistakesTotal) : '';
+      } catch (e2) {
       }
     } catch (e) {
     }
@@ -1628,12 +1697,12 @@
         }
 
         try {
-          if (!window.AudioManager || typeof window.AudioManager.play !== 'function') return;
-          const visual = window.AudioManager.audioPlayerVisual || null;
-          if (!visual || typeof visual.getCurrentAudioPath !== 'function') return;
-          const audioPath = visual.getCurrentAudioPath();
-          if (!audioPath) return;
-          window.AudioManager.play(visual.playButton || null, audioPath);
+          const session = window.__dictationModalActiveSession;
+          if (!session) return;
+
+          resetSentenceUiFromSession(session);
+          updateNextButtonVisibilityFromSession(session);
+          updateNavigatorFromSession(session);
         } catch (e1) {
         }
       });
