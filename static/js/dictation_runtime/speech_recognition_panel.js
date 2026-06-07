@@ -262,14 +262,16 @@
         const iconName = String(name || '').trim();
         if (!iconName) return;
         rb.dataset.icon = iconName;
-        const iconEl = rb.querySelector('i[data-lucide]');
-        if (iconEl) {
-          iconEl.setAttribute('data-lucide', iconName);
-        } else {
-          rb.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}"></i>`);
+
+        const wrap = rb.querySelector('#recordStateIcon') || rb;
+        try {
+          wrap.innerHTML = `<i data-lucide="${iconName}"></i>`;
+        } catch (e0) {
+          // ignore
         }
+
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
-          window.lucide.createIcons({ root: rb });
+          window.lucide.createIcons({ root: wrap });
         }
       } catch (e) {
       }
