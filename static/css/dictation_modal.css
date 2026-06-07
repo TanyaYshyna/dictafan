@@ -883,6 +883,33 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   height: auto;
 }
 
+#dictationModal .word-correct {
+  color: black;
+}
+
+#dictationModal .word-missing {
+  color: green;
+  text-decoration: underline;
+}
+
+#dictationModal .word-error {
+  border-bottom: 3px solid #ffd54f;
+  font-weight: bold;
+}
+
+#dictationModal .letter-error {
+  border-bottom: 2px solid red;
+  font-weight: bold;
+}
+
+#dictationModal .correct-line-word {
+  color: green;
+}
+
+#dictationModal .correct-line-letter {
+  text-decoration: underline green;
+}
+
 #dictationModal .result-panel {
   display: flex;
   align-items: center;
