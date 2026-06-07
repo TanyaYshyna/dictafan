@@ -198,11 +198,11 @@
         }
 
         try {
-          const failedChecks = Number(view.mistake_count) || 0;
-          const nextFailed = res.allCorrect ? failedChecks : (failedChecks + 1);
-          view.mistake_count = nextFailed;
+          const stForErr = session && view && view.key != null ? session.getState(String(view.key)) : null;
+          const currentErrors = res && res.allCorrect ? 0 : (Number(res && res.errorCount) || 0);
+          if (stForErr) stForErr.mistake_count_current = currentErrors;
           const el = document.getElementById('errorCountLabel');
-          if (el) el.textContent = nextFailed > 0 ? String(nextFailed) : '';
+          if (el) el.textContent = currentErrors > 0 ? String(currentErrors) : '';
         } catch (e6) {
         }
 
@@ -244,6 +244,13 @@
               if (view && view.mistake_count != null) st.mistake_count = view.mistake_count;
             } catch (e0) {
             }
+
+            try {
+              if (st && st.mistake_count_current != null) {
+                st.mistake_count_current = res && res.allCorrect ? 0 : (Number(res && res.errorCount) || 0);
+              }
+            } catch (e0b) {
+            }
             try {
               if (view && view._textAttemptCount != null) st._textAttemptCount = view._textAttemptCount;
             } catch (e1) {
@@ -254,6 +261,14 @@
                 st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
               }
             } catch (e2) {
+            }
+
+            try {
+              if (res && !res.allCorrect) {
+                st.mistake_count = (Number(st.mistake_count) || 0) + 1;
+                view.mistake_count = st.mistake_count;
+              }
+            } catch (e3) {
             }
           }
         } catch (e15) {
@@ -899,11 +914,24 @@
         if (repeatBtn) repeatBtn.style.display = 'none';
         return;
       }
-      const { textOk, audioOk } = computeSentenceCompletionState(st);
-      const mistakes = Number(st && st.mistake_count) || 0;
-      const ok = (textOk && audioOk && mistakes <= 0);
-      if (btn) btn.style.display = ok ? 'inline-flex' : 'none';
-      if (repeatBtn) repeatBtn.style.display = ok ? 'inline-flex' : 'none';
+      const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
+      const currentMistakes = Number(st && st.mistake_count_current) || 0;
+
+      const perfect = Number(st && st.number_of_perfect) || 0;
+      const corrected = Number(st && st.number_of_corrected) || 0;
+
+      const showNext = (textOk && audioOk && currentMistakes <= 0);
+      const showRepeat = (
+        textOk
+        && (
+          (corrected > 0 && perfect < 1)
+          || (currentMistakes > 0)
+          || (!audioOk && requiresAudio > 0)
+        )
+      );
+
+      if (btn) btn.style.display = showNext ? 'inline-flex' : 'none';
+      if (repeatBtn) repeatBtn.style.display = showRepeat ? 'inline-flex' : 'none';
     } catch (e) {
     }
   }
