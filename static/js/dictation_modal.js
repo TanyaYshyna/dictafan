@@ -116,6 +116,10 @@
             }
             session.ensureDefaultSelection();
             session.currentSelectedIndex = 0;
+            try {
+              resetSentenceUiFromSession(session);
+            } catch (e00) {
+            }
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
@@ -128,6 +132,10 @@
           const session = window.__dictationModalActiveSession;
           if (!session) return;
           session.goNext();
+          try {
+            resetSentenceUiFromSession(session);
+          } catch (e00) {
+          }
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -139,6 +147,10 @@
           const session = window.__dictationModalActiveSession;
           if (!session) return;
           session.goPrev();
+          try {
+            resetSentenceUiFromSession(session);
+          } catch (e00) {
+          }
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -2319,11 +2331,6 @@
       const cur = session && session.selectedKeys && session.selectedKeys.length ? (session.currentSelectedIndex + 1) : 0;
       if (curEl) curEl.textContent = String(cur || 0);
     } catch (e) {
-    }
-
-    try {
-      resetSentenceUiFromSession(session);
-    } catch (e00) {
     }
 
     try {
