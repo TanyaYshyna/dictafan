@@ -1023,7 +1023,7 @@
       const perfect = Number(st && st.number_of_perfect) || 0;
       const corrected = Number(st && st.number_of_corrected) || 0;
 
-      const showNext = (textOk && audioOk && currentMistakes <= 0);
+      const showNext = (textOk && audioOk);
       const showRepeat = (
         textOk
         && (

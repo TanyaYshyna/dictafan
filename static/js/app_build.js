@@ -1,6 +1,6 @@
 (function () {
   try {
-    var v = '0773';
+    var v = '0774';
     window.__APP_BUILD = v;
     window.__APP_CACHE_REVISION = v;
   } catch (e) {

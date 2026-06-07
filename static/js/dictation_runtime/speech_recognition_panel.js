@@ -8,6 +8,7 @@
       this._bound = false;
       this._expectedText = '';
       this._isProcessing = false;
+      this._isAudioComplete = false;
 
       this.MIN_MATCH_PERCENT = Number.isFinite(Number(options.minMatchPercent))
         ? Number(options.minMatchPercent)
@@ -56,6 +57,11 @@
 
     setExpectedText(text) {
       this._expectedText = String(text || '');
+      this._isAudioComplete = false;
+      try {
+        this._setRecordButtonCompleted(false);
+      } catch (e0) {
+      }
       try {
         if (this.els.countPercent) this.els.countPercent.textContent = '0';
       } catch (e) {
@@ -85,8 +91,12 @@
       try {
         const rb = this.els.recordButton;
         if (!rb) return;
-        rb.disabled = !enabled;
-        rb.classList.toggle('disabled', !enabled);
+        const dis = !enabled || !!this._isAudioComplete;
+        rb.disabled = dis;
+        rb.classList.toggle('disabled', dis);
+        if (!dis && !this._isAudioComplete) {
+          this._setRecordButtonIcon('mic');
+        }
       } catch (e) {
       }
     }
@@ -134,6 +144,7 @@
       this._rec.callbacks.onRecordingStart = () => {
         this._updateRecordingIndicator(true);
         this._setRecordButtonRecording(true);
+        this._setRecordButtonIcon('pause');
         this._setPercent(0);
         try {
           if (this.els.userAudioAnswer) this.els.userAudioAnswer.textContent = '';
@@ -151,6 +162,9 @@
       this._rec.callbacks.onRecordingStop = () => {
         this._updateRecordingIndicator(false);
         this._setRecordButtonRecording(false);
+        if (!this._isAudioComplete) {
+          this._setRecordButtonIcon('mic');
+        }
         this._stopVisualizer();
       };
 
@@ -231,8 +245,54 @@
           }
         } catch (e) {
         }
+
+        try {
+          this._setRecordButtonCompleted(!!ok);
+        } catch (e2) {
+        }
       } finally {
         this._isProcessing = false;
+      }
+    }
+
+    _setRecordButtonIcon(name) {
+      try {
+        const rb = this.els.recordButton;
+        if (!rb) return;
+        const iconName = String(name || '').trim();
+        if (!iconName) return;
+        rb.dataset.icon = iconName;
+        const iconEl = rb.querySelector('i[data-lucide]');
+        if (iconEl) {
+          iconEl.setAttribute('data-lucide', iconName);
+        } else {
+          rb.insertAdjacentHTML('afterbegin', `<i data-lucide="${iconName}"></i>`);
+        }
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons({ root: rb });
+        }
+      } catch (e) {
+      }
+    }
+
+    _setRecordButtonCompleted(isCompleted) {
+      try {
+        this._isAudioComplete = !!isCompleted;
+      } catch (e0) {
+      }
+      try {
+        const rb = this.els.recordButton;
+        if (!rb) return;
+        if (isCompleted) {
+          rb.disabled = true;
+          rb.classList.add('disabled');
+          this._setRecordButtonIcon('mic-off');
+        } else {
+          rb.disabled = false;
+          rb.classList.remove('disabled');
+          this._setRecordButtonIcon('mic');
+        }
+      } catch (e) {
       }
     }
 
