@@ -1165,7 +1165,15 @@
       const btn = document.getElementById('resultNextBtn');
       const repeatBtn = document.getElementById('repeatBtn');
       if (!btn && !repeatBtn) return;
-      const st = getCurrentSentenceStateFromSession(session);
+      let st = null;
+      try {
+        const view = getCurrentSentenceViewFromSession(session);
+        if (view && view.key != null && session && typeof session.getState === 'function') {
+          st = session.getState(String(view.key));
+        }
+      } catch (e0s) {
+      }
+      if (!st) st = getCurrentSentenceStateFromSession(session);
       if (!st) {
         if (btn) btn.style.display = 'none';
         if (repeatBtn) repeatBtn.style.display = 'none';
@@ -1191,7 +1199,15 @@
   }
 
   function updateSentenceTabloFromSession(session) {
-    const st = getCurrentSentenceStateFromSession(session);
+    let st = null;
+    try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (view && view.key != null && session && typeof session.getState === 'function') {
+        st = session.getState(String(view.key));
+      }
+    } catch (e0s) {
+    }
+    if (!st) st = getCurrentSentenceStateFromSession(session);
     if (!st) return;
 
     const requiredHalf = getRequiredPassedStarHalfValue();
@@ -1244,6 +1260,11 @@
       const btn = document.getElementById('btn_coin_exchange_audio');
       if (btn) btn.style.display = audioCoins >= 3 ? 'inline-flex' : 'none';
     } catch (e) {
+    }
+
+    try {
+      updateNextButtonVisibilityFromSession(session);
+    } catch (e1) {
     }
   }
 
