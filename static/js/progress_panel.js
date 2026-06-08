@@ -35,7 +35,10 @@ class ProgressPanel {
             timer: 0, // секунды
             circleNumber: 0,
             errors: 0,
-            money: 0,
+            chars: 0,
+            accuracyPct: 100,
+            moneyEarned: 0,
+            moneySpent: 0,
             perfect: 0,
             corrected: 0,
             audio: 0,
@@ -102,6 +105,7 @@ class ProgressPanel {
                     <col class="progress-col">
                     <col class="progress-col">
                     <col class="progress-col">
+                    <col class="progress-col">
                 </colgroup>
                 <tr>
                     <td colspan="2">
@@ -111,15 +115,15 @@ class ProgressPanel {
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Потрачено">
-                            <i data-lucide="coins"></i>
-                            <span id="${prefix}count-total">0</span>
+                        <button id="btn-${prefix}count-accuracy" class="pp-total" disabled title="Точность набора">
+                            <i data-lucide="bug"></i>
+                            <span id="${prefix}count-accuracy">100.00%</span>
                         </button>
                     </td>
-                    <td>
-                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Заработано">
+                    <td colspan="2">
+                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Деньги">
                             <i data-lucide="circle-dollar-sign"></i>
-                            <span id="${prefix}count-money">0</span>
+                            <span id="${prefix}count-money">+0 / -0</span>
                         </button>
                     </td>
                 </tr>
@@ -142,11 +146,11 @@ class ProgressPanel {
                             <span id="${prefix}count-audio">0</span>
                         </button>
                     </td>
-                    <td>
-                        <span class="pp-bug" title="Общее количество ошибок">
+                    <td colspan="2">
+                        <button id="btn-${prefix}count-errors" class="pp-total" disabled title="Ошибки / Набранные символы / % ошибок">
                             <i data-lucide="bug"></i>
-                            <span id="${prefix}count-errors">0</span>
-                        </span>
+                            <span id="${prefix}count-errors">0 / 0</span>
+                        </button>
                     </td>
                 </tr>
             </table>
@@ -172,6 +176,7 @@ class ProgressPanel {
         this.elements = {
             timer: document.getElementById('timer'),
             errors: document.getElementById('count-errors'),
+            accuracy: document.getElementById('count-accuracy'),
             money: document.getElementById('count-money'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
@@ -179,6 +184,7 @@ class ProgressPanel {
             total: document.getElementById('count-total'),
             modalTimer: document.getElementById('modal_timer'),
             modalErrors: document.getElementById('modal-count-errors'),
+            modalAccuracy: document.getElementById('modal-count-accuracy'),
             modalMoney: document.getElementById('modal-count-money'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
@@ -623,16 +629,21 @@ class ProgressPanel {
         if (this.elements.audio) {
             this.elements.audio.textContent = safe(this.stats.audio);
         }
-        if (this.elements.total) {
-            const n = safe(this.stats.total);
-            this.elements.total.textContent = n > 0 ? `-${n}` : '0';
-        }
         if (this.elements.errors) {
-            this.elements.errors.textContent = safe(this.stats.errors);
+            const e = safe(this.stats.errors);
+            const c = safe(this.stats.chars);
+            const pctErrors = c > 0 ? (e * 100) / c : 0;
+            this.elements.errors.textContent = `${e} / ${c} • ${pctErrors.toFixed(2)}%`;
+        }
+        if (this.elements.accuracy) {
+            const pct = Number(this.stats.accuracyPct);
+            const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+            this.elements.accuracy.textContent = `${v.toFixed(2)}%`;
         }
         if (this.elements.money) {
-            const n = safe(this.stats.money);
-            this.elements.money.textContent = n > 0 ? `+${n}` : '0';
+            const earned = safe(this.stats.moneyEarned);
+            const spent = safe(this.stats.moneySpent);
+            this.elements.money.textContent = `+${earned} / -${spent}`;
         }
 
         // Обновляем модальный UI
@@ -645,16 +656,21 @@ class ProgressPanel {
         if (this.elements.modalAudio) {
             this.elements.modalAudio.textContent = safe(this.stats.audio);
         }
-        if (this.elements.modalTotal) {
-            const n = safe(this.stats.total);
-            this.elements.modalTotal.textContent = n > 0 ? `-${n}` : '0';
-        }
         if (this.elements.modalErrors) {
-            this.elements.modalErrors.textContent = safe(this.stats.errors);
+            const e = safe(this.stats.errors);
+            const c = safe(this.stats.chars);
+            const pctErrors = c > 0 ? (e * 100) / c : 0;
+            this.elements.modalErrors.textContent = `${e} / ${c} • ${pctErrors.toFixed(2)}%`;
+        }
+        if (this.elements.modalAccuracy) {
+            const pct = Number(this.stats.accuracyPct);
+            const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+            this.elements.modalAccuracy.textContent = `${v.toFixed(2)}%`;
         }
         if (this.elements.modalMoney) {
-            const n = safe(this.stats.money);
-            this.elements.modalMoney.textContent = n > 0 ? `+${n}` : '0';
+            const earned = safe(this.stats.moneyEarned);
+            const spent = safe(this.stats.moneySpent);
+            this.elements.modalMoney.textContent = `+${earned} / -${spent}`;
         }
 
         // Обновляем таймер

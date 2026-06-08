@@ -67,6 +67,17 @@
     }
 
     try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (view) view._charsAddedThisAttempt = false;
+    } catch (e0c) {
+    }
+    try {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (st) st._charsAddedThisAttempt = false;
+    } catch (e0d) {
+    }
+
+    try {
       const input = document.getElementById('userInput');
       if (input) input.setAttribute('contenteditable', 'true');
     } catch (e0x) {
@@ -74,7 +85,8 @@
 
     try {
       const el = document.getElementById('errorCountLabel');
-      if (el) el.textContent = '';
+      const len = _ensureExpectedCharsLen(session);
+      if (el) el.textContent = len > 0 ? `0/${len}` : '';
     } catch (e1) {
     }
 
@@ -268,6 +280,22 @@
         if (!res || res.okToCheck === false) return;
 
         try {
+          const expectedLen = _ensureExpectedCharsLen(session);
+          if (expectedLen > 0) {
+            const stForChars = session && view && view.key != null ? session.getState(String(view.key)) : null;
+            const already = !!(view && view._charsAddedThisAttempt);
+            if (!already) {
+              view._charsAddedThisAttempt = true;
+              if (stForChars) stForChars._charsAddedThisAttempt = true;
+              if (stForChars) {
+                stForChars.chars_count = (Number(stForChars.chars_count) || 0) + expectedLen;
+              }
+            }
+          }
+        } catch (eChars) {
+        }
+
+        try {
           const inputField = document.getElementById('userInput');
           if (
             renderer &&
@@ -315,7 +343,11 @@
             const nextAttemptsWithErrors = prevAttemptsWithErrors + 1;
             if (stForErr) stForErr.mistake_count_current = nextAttemptsWithErrors;
             const el = document.getElementById('errorCountLabel');
-            if (el) el.textContent = nextAttemptsWithErrors > 0 ? String(nextAttemptsWithErrors) : '';
+            const expectedLen = _ensureExpectedCharsLen(session);
+            if (el) {
+              if (expectedLen > 0) el.textContent = `${nextAttemptsWithErrors}/${expectedLen}`;
+              else el.textContent = nextAttemptsWithErrors > 0 ? String(nextAttemptsWithErrors) : '';
+            }
           }
         } catch (e6) {
         }
@@ -385,6 +417,15 @@
                 view.mistake_count = st.mistake_count;
               }
             } catch (e3) {
+            }
+
+            try {
+              if (res && res.allCorrect) {
+                const el = document.getElementById('errorCountLabel');
+                const expectedLen = _ensureExpectedCharsLen(session);
+                if (el) el.textContent = expectedLen > 0 ? `0/${expectedLen}` : '';
+              }
+            } catch (e3b) {
             }
           }
         } catch (e15) {
@@ -983,6 +1024,53 @@
     }
   }
 
+  function _computeComparableTextForChars(raw, langOrig = '') {
+    try {
+      let s = String(raw || '');
+      // Keep spaces as characters; remove punctuation/diacritics/invisible.
+      try {
+        const checker = state && state._typoChecker;
+        if (checker && typeof checker.normalizeDictationInvisibleChars === 'function') {
+          s = checker.normalizeDictationInvisibleChars(s);
+        }
+      } catch (e0) {
+      }
+
+      // Arabic: remove harakat/diacritics
+      s = s.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+
+      // Remove common punctuation (keep spaces)
+      s = s.replace(/[.,!?:;"«»()\[\]{}—–\-]/g, '');
+
+      // Normalize whitespace but keep single spaces
+      s = s.replace(/\s+/g, ' ').trim();
+      return s;
+    } catch (e) {
+      return String(raw || '').replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  function _ensureExpectedCharsLen(session) {
+    try {
+      const view = getCurrentSentenceViewFromSession(session);
+      if (!view) return 0;
+      if (Number.isFinite(Number(view._expectedCharsLen)) && Number(view._expectedCharsLen) > 0) {
+        return Number(view._expectedCharsLen) || 0;
+      }
+      const originalText = String(view.text_original != null ? view.text_original : (view.text != null ? view.text : ''));
+      const len = _computeComparableTextForChars(originalText).length;
+      view._expectedCharsLen = len;
+      try {
+        const st = view.key != null && session && typeof session.getState === 'function' ? session.getState(String(view.key)) : null;
+        if (st) st._expectedCharsLen = len;
+      } catch (e1) {
+      }
+      return len;
+    } catch (e) {
+      return 0;
+    }
+  }
+
   function computeSentenceCompletionState(st) {
     const perfect = Number(st && st.number_of_perfect) || 0;
     const corrected = Number(st && st.number_of_corrected) || 0;
@@ -1296,6 +1384,7 @@
       let mistakesTotal = 0;
       let moneyEarned = 0;
       let moneySpent = 0;
+      let charsTotal = 0;
       for (const k of keys) {
         const st = session.getState ? session.getState(k) : null;
         if (!st) continue;
@@ -1303,11 +1392,13 @@
         const c = Number(st.number_of_corrected) || 0;
         const a = Number(st.number_of_audio) || 0;
         const m = Number(st.mistake_count) || 0;
+        const ch = Number(st.chars_count) || 0;
         if (p >= 1) perfect += 1;
         if (c > 0) corrected += 1;
         if (a > 0) audio += 1;
         if (p >= 1 || c > 0) passed += 1;
         mistakesTotal += m;
+        charsTotal += ch;
 
         try {
           // +1 за активность по тексту
@@ -1335,7 +1426,17 @@
       try {
         const p = getProgressPanelInstance();
         if (p && typeof p.update === 'function') {
-          p.update({ perfect, corrected, audio, errors: mistakesTotal, money: moneyEarned, total: moneySpent });
+          const acc = charsTotal > 0 ? Math.max(0, Math.min(100, (1 - (mistakesTotal / charsTotal)) * 100)) : 100;
+          p.update({
+            perfect,
+            corrected,
+            audio,
+            errors: mistakesTotal,
+            chars: charsTotal,
+            accuracyPct: acc,
+            moneyEarned,
+            moneySpent,
+          });
         }
       } catch (e0) {
       }
