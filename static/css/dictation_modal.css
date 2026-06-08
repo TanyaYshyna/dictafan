@@ -15,6 +15,23 @@
   z-index: 100256;
 }
 
+#dictationModal #coinExchangeModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+#dictationModal #coinExchangeModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  padding: 16px;
+}
+
 #dictationModal #start-modal.modal {
   position: fixed;
   inset: 0;
@@ -229,14 +246,18 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 
 #dictationModal .table-progress {
   width: auto;
-  table-layout: fixed;
+  table-layout: auto;
   border: 0px;
   border-collapse: separate;
   border-spacing: 4px;
 }
 
-#dictationModal .table-progress col.progress-col {
+#dictationModal .table-progress col.progress-col-fixed {
   width: 80px;
+}
+
+#dictationModal .table-progress col.progress-col-flex {
+  width: auto;
 }
 
 #dictationModal .modal-content .table-progress td,
@@ -980,7 +1001,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
-  width: 420px;
+  width: 100%;
   max-width: calc(100vw - 40px);
   margin-left: 0;
   margin-right: auto;
@@ -1004,6 +1025,10 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal .audio-user-col-3 {
+  width: 110px;
+}
+
+#dictationModal .audio-user-col-4 {
   width: 80px;
 }
 
@@ -1039,6 +1064,32 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 
 #dictationModal .audio-user-mode {
   text-align: right;
+}
+
+#dictationModal .coin_exchange {
+  white-space: nowrap;
+}
+
+#dictationModal .audio-coin_exchange {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  color: var(--color-button-purple);
+  vertical-align: middle;
+}
+
+#dictationModal #btn_coin_exchange_audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+#dictationModal #btn_coin_exchange_audio i,
+#dictationModal #btn_coin_exchange_audio svg {
+  color: var(--color-button-purple);
 }
 
 #dictationModal .audio-user-bottom-row .audio-user-visualizer {

@@ -101,11 +101,10 @@ class ProgressPanel {
         return `
             <table class="table-progress">
                 <colgroup>
-                    <col class="progress-col">
-                    <col class="progress-col">
-                    <col class="progress-col">
-                    <col class="progress-col">
-                    <col class="progress-col">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-flex">
                 </colgroup>
                 <tr>
                     <td colspan="2">
@@ -120,7 +119,7 @@ class ProgressPanel {
                             <span id="${prefix}count-accuracy">100.00%</span>
                         </button>
                     </td>
-                    <td colspan="2">
+                    <td>
                         <button id="btn-${prefix}count-money" class="pp-money" disabled title="Деньги">
                             <i data-lucide="circle-dollar-sign"></i>
                             <span id="${prefix}count-money">+0 / -0</span>
@@ -146,8 +145,8 @@ class ProgressPanel {
                             <span id="${prefix}count-audio">0</span>
                         </button>
                     </td>
-                    <td colspan="2">
-                        <button id="btn-${prefix}count-errors" class="pp-total" disabled title="Ошибки / Набранные символы / % ошибок">
+                    <td>
+                        <button id="btn-${prefix}count-errors" class="pp-total" disabled title="Ошибки / Набранные символы">
                             <i data-lucide="bug"></i>
                             <span id="${prefix}count-errors">0 / 0</span>
                         </button>
@@ -632,8 +631,7 @@ class ProgressPanel {
         if (this.elements.errors) {
             const e = safe(this.stats.errors);
             const c = safe(this.stats.chars);
-            const pctErrors = c > 0 ? (e * 100) / c : 0;
-            this.elements.errors.textContent = `${e} / ${c} • ${pctErrors.toFixed(2)}%`;
+            this.elements.errors.textContent = `${e} / ${c}`;
         }
         if (this.elements.accuracy) {
             const pct = Number(this.stats.accuracyPct);
@@ -659,8 +657,7 @@ class ProgressPanel {
         if (this.elements.modalErrors) {
             const e = safe(this.stats.errors);
             const c = safe(this.stats.chars);
-            const pctErrors = c > 0 ? (e * 100) / c : 0;
-            this.elements.modalErrors.textContent = `${e} / ${c} • ${pctErrors.toFixed(2)}%`;
+            this.elements.modalErrors.textContent = `${e} / ${c}`;
         }
         if (this.elements.modalAccuracy) {
             const pct = Number(this.stats.accuracyPct);

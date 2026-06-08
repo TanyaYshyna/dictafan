@@ -1224,7 +1224,7 @@
 
     try {
       const wrap = document.getElementById('audio_result_coins');
-      _renderCoins(wrap, audioCoins, '--color-button-lightgreen');
+      _renderCoins(wrap, audioCoins, '--color-button-purple');
       const btn = document.getElementById('btn_coin_exchange_audio');
       if (btn) btn.style.display = audioCoins >= 3 ? 'inline-flex' : 'none';
     } catch (e) {
@@ -1328,6 +1328,41 @@
       updateSentenceTabloFromSession(session);
       updateTaskProgressFromSession(session);
       updateNextButtonVisibilityFromSession(session);
+
+      try {
+        if (mode === 'audio') {
+          const rb = document.getElementById('recordButton');
+          if (rb) {
+            rb.disabled = true;
+            rb.classList.add('disabled');
+            const wrap = rb.querySelector('#recordStateIcon') || rb;
+            try {
+              wrap.innerHTML = '<i data-lucide="mic-off"></i>';
+            } catch (e0) {
+            }
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons({ root: wrap });
+            }
+          }
+
+          const perfect = Number(st && st.number_of_perfect) || 0;
+          const corrected = Number(st && st.number_of_corrected) || 0;
+          const repeatBtn = document.getElementById('repeatBtn');
+          const nextBtn = document.getElementById('resultNextBtn');
+          const shouldFocusRepeat = (corrected > 0 && perfect < 1);
+          if (
+            shouldFocusRepeat
+            && repeatBtn
+            && repeatBtn.style.display !== 'none'
+            && typeof repeatBtn.focus === 'function'
+          ) {
+            repeatBtn.focus();
+          } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+            nextBtn.focus();
+          }
+        }
+      } catch (e99) {
+      }
       close();
     };
 
