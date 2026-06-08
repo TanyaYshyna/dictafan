@@ -665,6 +665,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   width: min(980px, calc(100vw - 24px));
   max-height: calc(100vh - 64px);
   overflow: auto;
+  padding: 16px;
 }
 
 #dictationModal #audioSettingsModal .modal-header {

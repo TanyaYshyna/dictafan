@@ -532,6 +532,10 @@
               if (res && res.allCorrect && !res.starOutcome) {
                 if (!prevAllCorrect) {
                   st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
+                  try {
+                    playUiSound('coins_plus_text');
+                  } catch (e0s) {
+                  }
                 }
               }
             } catch (e2) {
@@ -680,6 +684,39 @@
       } else if (am && typeof am.pause === 'function') {
         am.pause();
       }
+    } catch (e) {
+    }
+  }
+
+  function preloadUiSounds() {
+    try {
+      if (window.__dictafanUiSounds && typeof window.__dictafanUiSounds === 'object') return;
+      window.__dictafanUiSounds = {
+        coins_minus: '/static/data/sounds/coins/coins_minus.wav',
+        coins_plus_text: '/static/data/sounds/coins/coins_plus_text.wav',
+        coins_plus_audio: '/static/data/sounds/coins/coins_plus_audio.wav',
+      };
+      for (const k of Object.keys(window.__dictafanUiSounds)) {
+        try {
+          const url = window.__dictafanUiSounds[k];
+          const a = new Audio(url);
+          a.preload = 'auto';
+          a.load();
+        } catch (e0) {
+        }
+      }
+    } catch (e) {
+    }
+  }
+
+  function playUiSound(key) {
+    try {
+      const map = window.__dictafanUiSounds;
+      const url = map && map[key] ? String(map[key]) : '';
+      if (!url) return;
+      const a = new Audio(url);
+      a.volume = 1;
+      a.play().catch(() => {});
     } catch (e) {
     }
   }
@@ -1452,6 +1489,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+
+        try {
+          playUiSound('coins_minus');
+        } catch (e0s) {
+        }
       } catch (e) {
       }
 
@@ -1721,6 +1763,14 @@
     const view = getCurrentSentenceViewFromSession(session);
     if (!view) return;
 
+    const sentenceKey = (() => {
+      try {
+        if (view && view.key != null) return String(view.key);
+      } catch (e) {
+      }
+      return '';
+    })();
+
     let dictId = '';
     let langOrig = '';
     let langTr = '';
@@ -1776,6 +1826,12 @@
     }
     try {
       if (started) {
+        const lastKey = (state && state._lastStartSequenceKey != null) ? String(state._lastStartSequenceKey) : '';
+        if (sentenceKey && sentenceKey === lastKey) {
+          return;
+        }
+        state._lastStartSequenceKey = sentenceKey;
+
         state._startSequenceTimer = setTimeout(() => {
           try {
             const seq = getPlaySequenceStartValue();
@@ -1815,6 +1871,11 @@
             if (ok) {
               const next = (Number(st.number_of_audio) || 0) + 1;
               st.number_of_audio = next;
+              try {
+                st.audio_coin_count = (Number(st.audio_coin_count) || 0) + 1;
+                playUiSound('coins_plus_audio');
+              } catch (e0s) {
+              }
             } else if (pct >= 50) {
               st.audio_coin_count = (Number(st.audio_coin_count) || 0) + 1;
             } else {
@@ -2185,27 +2246,15 @@
               },
               onSave: async () => {
                 try {
-                  const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
-                  if (saveBtn) saveBtn.click();
+                  if (typeof window.__dictafanSaveAudioSettingsModal === 'function') {
+                    await window.__dictafanSaveAudioSettingsModal();
+                  } else {
+                    const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
+                    if (saveBtn) saveBtn.click();
+                  }
                 } catch (e) {
                 }
-                // Ждём, пока UI успеет скрыть звёздочку (сохранение может быть async)
-                const startedAt = Date.now();
-                const tick = () => {
-                  try {
-                    if (!getAudioSettingsDirty()) {
-                      closeAudioSettingsModalNow();
-                      return;
-                    }
-                    if (Date.now() - startedAt > 2500) {
-                      // Если по какой-то причине сохранение не прошло/не сняло dirty — не закрываем.
-                      return;
-                    }
-                    setTimeout(tick, 60);
-                  } catch (e2) {
-                  }
-                };
-                tick();
+                closeAudioSettingsModalNow();
               },
             });
             return;
@@ -3172,6 +3221,45 @@
 
       window.__dictafanRestoreAudioSettingsModalSnapshot = restoreSnapshot;
 
+      window.__dictafanSaveAudioSettingsModal = async () => {
+        try {
+          const um = window.UM;
+          if (!um || !um.userData || typeof um.updateProfile !== 'function') return;
+
+          const settings = {
+            start: startInput ? String(startInput.value || '') : defaults.start,
+            exercise_mode: getSelectedExerciseMode(),
+          };
+
+          let merged = {};
+          try {
+            const raw = um.userData.settings_json ? String(um.userData.settings_json || '') : '';
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed && typeof parsed === 'object') merged = parsed;
+            }
+          } catch (e0) {
+          }
+
+          if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
+          merged.audio.start = settings.start || defaults.start;
+          merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
+
+          await um.updateProfile({
+            settings_json: JSON.stringify(merged),
+            audio_start: merged.audio.start,
+            audio_exercise_mode: merged.audio.exercise_mode,
+          });
+
+          try {
+            settingsState.snapshot = { start: merged.audio.start, exercise_mode: merged.audio.exercise_mode };
+          } catch (e1) {
+          }
+          setDirty(false);
+        } catch (e) {
+        }
+      };
+
       applyToUI(settingsState.snapshot);
       applyToRuntime();
       setDirty(false);
@@ -3221,39 +3309,9 @@
           saveBtn.dataset.boundDictafanAudioSettingsSave = '1';
           saveBtn.addEventListener('click', async () => {
             try {
-              const um = window.UM;
-              if (!um || !um.userData || typeof um.updateProfile !== 'function') return;
-
-              const settings = {
-                start: startInput ? String(startInput.value || '') : defaults.start,
-                exercise_mode: getSelectedExerciseMode(),
-              };
-
-              let merged = {};
-              try {
-                const raw = um.userData.settings_json ? String(um.userData.settings_json || '') : '';
-                if (raw) {
-                  const parsed = JSON.parse(raw);
-                  if (parsed && typeof parsed === 'object') merged = parsed;
-                }
-              } catch (e0) {
+              if (typeof window.__dictafanSaveAudioSettingsModal === 'function') {
+                await window.__dictafanSaveAudioSettingsModal();
               }
-
-              if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
-              merged.audio.start = settings.start || defaults.start;
-              merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
-
-              await um.updateProfile({
-                settings_json: JSON.stringify(merged),
-                audio_start: merged.audio.start,
-                audio_exercise_mode: merged.audio.exercise_mode,
-              });
-
-              try {
-                settingsState.snapshot = { start: merged.audio.start, exercise_mode: merged.audio.exercise_mode };
-              } catch (e1) {
-              }
-              setDirty(false);
             } catch (e) {
             }
           });
@@ -3727,6 +3785,7 @@
 
   function init() {
     patchDictationCardOpenHandler();
+    preloadUiSounds();
     bindHeaderButtons();
     bindOverlayClose();
     bindAudioSettingsModalControls();
