@@ -202,6 +202,23 @@
   color: rgba(0,0,0,0.55);
 }
 
+#user-profile-modal #playSequenceStart {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 20px;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+}
+
+#user-profile-modal #playSequenceStart:focus {
+  outline: none;
+  border-color: var(--color-button-text-pink);
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
 #user-profile-modal input[type="radio"][name="audioExerciseMode"] {
   appearance: none;
   -webkit-appearance: none;

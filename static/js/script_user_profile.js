@@ -1971,6 +1971,24 @@ function loadUserData() {
     } catch (e) {
     }
 
+    const initialAudioExerciseMode = (() => {
+        try {
+            if (userData && userData.settings_json) {
+                const parsed = JSON.parse(userData.settings_json);
+                const audio = parsed && parsed.audio ? parsed.audio : null;
+                const v = audio && audio.exercise_mode ? String(audio.exercise_mode || '') : '';
+                if (v) return v;
+            }
+        } catch (e) {
+        }
+        try {
+            const v2 = userData && userData.audio_exercise_mode ? String(userData.audio_exercise_mode || '') : '';
+            return v2 || 'record';
+        } catch (e2) {
+            return 'record';
+        }
+    })();
+
     originalData = {
         username: userData.username,
         email: userData.email,
@@ -1982,6 +2000,7 @@ function loadUserData() {
         audio_start: userData.audio_start || '',
         audio_typo: userData.audio_typo || '',
         audio_success: userData.audio_success || '',
+        audio_exercise_mode: initialAudioExerciseMode,
         audio_repeats: userData.audio_repeats || 3,
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
         speech_recognition_mode: userData.speech_recognition_mode || 'route',
@@ -2524,6 +2543,7 @@ function checkForChanges() {
         current_learning: currentValues.current_learning !== originalData.current_learning,
         avatar: avatarChanged,
         audio_start: currentValues.audio_start !== (originalData.audio_start || ''),
+        audio_exercise_mode: (currentValues.audio_exercise_mode || 'record') !== (originalData.audio_exercise_mode || 'record'),
         audio_typo: currentValues.audio_typo !== (originalData.audio_typo || ''),
         audio_success: currentValues.audio_success !== (originalData.audio_success || ''),
         audio_repeats: currentValues.audio_repeats !== (originalData.audio_repeats || 3),
@@ -2580,6 +2600,7 @@ function getCurrentFormValues() {
     const settings = getAudioSettingsFromDom();
     const audioSettings = {
         audio_start: settings.start || '',
+        audio_exercise_mode: settings.exercise_mode || 'record',
         audio_typo: settings.typo || '',
         audio_success: settings.success || '',
         audio_repeats: settings.repeats || 3,
@@ -2596,6 +2617,7 @@ function getCurrentFormValues() {
         learning_languages: languageValues.learningLanguages,
         current_learning: languageValues.currentLearning,
         audio_start: audioSettings.audio_start,
+        audio_exercise_mode: audioSettings.audio_exercise_mode,
         audio_typo: audioSettings.audio_typo,
         audio_success: audioSettings.audio_success,
         audio_repeats: audioSettings.audio_repeats,
@@ -2685,8 +2707,9 @@ async function saveProfile(options = {}) {
     const formValues = getCurrentFormValues();
     
     // Проверяем, есть ли изменения в настройках аудио
-    const hasAudioChanges = audioSettingsPanel && (
+    const hasAudioChanges = (
         (formValues.audio_start || '') !== (originalData.audio_start || '') ||
+        (formValues.audio_exercise_mode || 'record') !== (originalData.audio_exercise_mode || 'record') ||
         (formValues.audio_typo || '') !== (originalData.audio_typo || '') ||
         (formValues.audio_success || '') !== (originalData.audio_success || '') ||
         (formValues.audio_repeats || 3) !== (originalData.audio_repeats || 3) ||
@@ -2842,6 +2865,7 @@ async function saveProfile(options = {}) {
             learning_languages: updatedUser.learning_languages,
             current_learning: updatedUser.current_learning,
             audio_start: audioSettings.audio_start,
+            audio_exercise_mode: audioSettings.audio_exercise_mode,
             audio_typo: audioSettings.audio_typo,
             audio_success: audioSettings.audio_success,
             audio_repeats: audioSettings.audio_repeats,
@@ -2865,6 +2889,10 @@ async function saveProfile(options = {}) {
             UM.userData.native_language = updatedUser.native_language;
             UM.userData.learning_languages = updatedUser.learning_languages;
             UM.userData.current_learning = updatedUser.current_learning;
+            try {
+                UM.userData.audio_exercise_mode = audioSettings.audio_exercise_mode;
+            } catch (e) {
+            }
 
             try {
                 window.USER_LANGUAGE_DATA = {
