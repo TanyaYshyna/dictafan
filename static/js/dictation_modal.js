@@ -510,6 +510,21 @@
               view._textAllCorrect = !!(res && res.allCorrect);
             } catch (e0ac) {
             }
+
+            try {
+              if (res && res.allCorrect && res.starOutcome) {
+                const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
+                const nextOutcome = String(res.starOutcome);
+                if (nextOutcome && nextOutcome !== prevOutcome) {
+                  st._lastStarOutcome = nextOutcome;
+                  try {
+                    playUiSound('coins_plus_audio');
+                  } catch (e0sa) {
+                  }
+                }
+              }
+            } catch (e0star) {
+            }
             try {
               if (view && view.mistake_count != null) st.mistake_count = view.mistake_count;
             } catch (e0) {
@@ -533,7 +548,7 @@
                 if (!prevAllCorrect) {
                   st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
                   try {
-                    playUiSound('coins_plus_text');
+                    playUiSound('coins_plus_audio');
                   } catch (e0s) {
                   }
                 }
@@ -2060,6 +2075,23 @@
           resetSentenceUiFromSession(session);
           updateNextButtonVisibilityFromSession(session);
           updateNavigatorFromSession(session);
+
+          try {
+            if (!state.dictationStarted) return;
+            const view = getCurrentSentenceViewFromSession(session);
+            if (!view) return;
+
+            const dictationData = document.getElementById('dictation-data');
+            const dictId = dictationData ? String(dictationData.getAttribute('data-dictation-id') || '').trim() : '';
+            const langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '').trim() : '';
+            const langTr = dictationData ? String(dictationData.getAttribute('data-language-translation') || '').trim() : '';
+
+            const originalUrl = resolveAudioToUrl((view.audio_original != null ? view.audio_original : view.audio), dictId, langOrig);
+            const translationUrl = resolveAudioToUrl((view.audio_translation != null ? view.audio_translation : view.audio_tr), dictId, langTr);
+            const seq = getPlaySequenceStartValue();
+            playAudioSequence(seq, { originalUrl, translationUrl });
+          } catch (e2) {
+          }
         } catch (e1) {
         }
       });
