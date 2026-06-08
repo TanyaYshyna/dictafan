@@ -32,6 +32,17 @@
   padding: 16px;
 }
 
+#dictationModal #coinExchangeModal .start-modal-title-row {
+  position: relative;
+  padding-right: 44px;
+}
+
+#dictationModal #coinExchangeModal .start-modal-header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
 #dictationModal #start-modal.modal {
   position: fixed;
   inset: 0;
@@ -1001,7 +1012,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   border-collapse: collapse;
   border-spacing: 0;
   table-layout: fixed;
-  width: 100%;
+  width: 420px;
   max-width: calc(100vw - 40px);
   margin-left: 0;
   margin-right: auto;

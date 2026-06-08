@@ -56,6 +56,18 @@
 
     try {
       const view = getCurrentSentenceViewFromSession(session);
+      if (view) view._textAllCorrect = false;
+    } catch (e0x) {
+    }
+
+    try {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (st) st._textAllCorrect = false;
+    } catch (e0y) {
+    }
+
+    try {
+      const view = getCurrentSentenceViewFromSession(session);
       if (view) view._textAttemptCount = 0;
     } catch (e0a) {
     }
@@ -386,6 +398,12 @@
             const st = session.getState(key);
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
+
+            try {
+              st._textAllCorrect = !!(res && res.allCorrect);
+              view._textAllCorrect = !!(res && res.allCorrect);
+            } catch (e0ac) {
+            }
             try {
               if (view && view.mistake_count != null) st.mistake_count = view.mistake_count;
             } catch (e0) {
@@ -421,9 +439,6 @@
 
             try {
               if (res && res.allCorrect) {
-                const el = document.getElementById('errorCountLabel');
-                const expectedLen = _ensureExpectedCharsLen(session);
-                if (el) el.textContent = expectedLen > 0 ? `0/${expectedLen}` : '';
               }
             } catch (e3b) {
             }
@@ -1154,19 +1169,17 @@
         return;
       }
       const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-      const currentMistakes = Number(st && st.mistake_count_current) || 0;
+      const lastAllCorrect = !!(st && st._textAllCorrect);
 
       const perfect = Number(st && st.number_of_perfect) || 0;
       const corrected = Number(st && st.number_of_corrected) || 0;
 
-      const showNext = (textOk && audioOk);
-      const showRepeat = (
-        textOk
-        && (
-          (corrected > 0 && perfect < 1)
-          || (currentMistakes > 0)
-        )
-      );
+      // Next: только если получена звезда/полузвезда (textOk) и выполнен микрофон (audioOk)
+      const showNext = (!!textOk && !!audioOk);
+
+      // Repeat: если текст набран полностью правильно (allCorrect) и при этом нет perfect
+      // Важно: когда allCorrect, но звезду/полузвезду не дали (textOk=false), Repeat всё равно должен быть видимым.
+      const showRepeat = (perfect < 1) && (lastAllCorrect || corrected > 0);
 
       if (btn) btn.style.display = showNext ? 'inline-flex' : 'none';
       if (repeatBtn) repeatBtn.style.display = showRepeat ? 'inline-flex' : 'none';

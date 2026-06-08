@@ -636,7 +636,7 @@ class ProgressPanel {
         if (this.elements.accuracy) {
             const pct = Number(this.stats.accuracyPct);
             const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
-            this.elements.accuracy.textContent = `${v.toFixed(2)}%`;
+            this.elements.accuracy.textContent = (v === 100 ? '100%' : `${v.toFixed(2)}%`);
         }
         if (this.elements.money) {
             const earned = safe(this.stats.moneyEarned);
@@ -662,7 +662,7 @@ class ProgressPanel {
         if (this.elements.modalAccuracy) {
             const pct = Number(this.stats.accuracyPct);
             const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
-            this.elements.modalAccuracy.textContent = `${v.toFixed(2)}%`;
+            this.elements.modalAccuracy.textContent = (v === 100 ? '100%' : `${v.toFixed(2)}%`);
         }
         if (this.elements.modalMoney) {
             const earned = safe(this.stats.moneyEarned);
