@@ -350,10 +350,15 @@
   <div id="audioSettingsModal" class="modal" style="display: none;">
     <div class="modal-content audio-settings-modal-content">
       <div class="modal-header">
-        <h2 id="audioSettingsModalTitle">Настройки</h2>
-        <button class="modal-close" id="closeAudioSettingsModal" title="Закрыть">
-          <i data-lucide="x"></i>
-        </button>
+        <h2 id="audioSettingsModalTitle">Настройки <span id="audioSettingsDirtyStar" style="display:none;">*</span></h2>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <button id="saveAudioSettingsModalBtn" class="topbar-icon-btn" type="button" title="Сохранить" disabled>
+            <i data-lucide="save"></i>
+          </button>
+          <button class="modal-close" id="closeAudioSettingsModal" title="Закрыть">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
       </div>
       <div class="audio-settings-modal-two-panels">
         <div class="audio-settings-modal-panel audio-settings-modal-panel-left">
@@ -368,18 +373,6 @@
                       <input type="text" id="modal-playSequenceStart" class="play-sequence-input" maxlength="5" placeholder="oto" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
                     </td>
                   </tr>
-                  <tr>
-                    <td class="dictation-settings-td-label"><label for="modal-playSequenceTypo">{{ t('profile.audio.play_audio.on_typo') }}</label></td>
-                    <td class="dictation-settings-td-input">
-                      <input type="text" id="modal-playSequenceTypo" class="play-sequence-input" maxlength="5" placeholder="o" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="dictation-settings-td-label"><label for="modal-playSequenceSuccess">{{ t('profile.audio.play_audio.on_success') }}</label></td>
-                    <td class="dictation-settings-td-input">
-                      <input type="text" id="modal-playSequenceSuccess" class="play-sequence-input" maxlength="5" placeholder="ot" pattern="[to]*" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-                    </td>
-                  </tr>
                 </table>
 
                 <div class="dictation-settings-title">{{ t('profile.audio.explanations.label') }}</div>
@@ -392,38 +385,27 @@
               <div class="dictation-settings-card dictation-settings-card-params">
                 <table class="dictation-settings-table">
                   <tr>
-                    <td class="dictation-settings-td-label">
-                      <div class="dictation-settings-icon-label">
-                        <i data-lucide="star"></i>
-                        <span>=</span>
-                      </div>
-                    </td>
+                    <td class="dictation-settings-td-label"></td>
                     <td class="dictation-settings-td-input">
-                      <div class="dictation-settings-inline">
-                        <input type="number" id="modal-requiredPassedStarHalfInput" class="play-sequence-input" min="3" max="9" />
-                        <i data-lucide="star-half"></i>
+                      <div class="dictation-settings-title">Аудио</div>
+                      <div style="display:flex; flex-direction:column; gap:10px;">
+                        <label style="display:flex; align-items:center; gap:10px;">
+                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeRecord" value="record" />
+                          <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><span>записывать аудио</span></span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:10px;">
+                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeNoRecord" value="no-record" />
+                          <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><span>не записывать аудио</span></span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:10px;">
+                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
+                          <span>только аудио (без подсказки)</span>
+                        </label>
+                        <label style="display:flex; align-items:center; gap:10px;">
+                          <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyHint" value="audio-only-hint" />
+                          <span>только аудио (с подсказкой)</span>
+                        </label>
                       </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="dictation-settings-td-label">
-                      <div class="dictation-settings-icon-label">
-                        <i data-lucide="mic"></i>
-                        <span>=</span>
-                      </div>
-                    </td>
-                    <td class="dictation-settings-td-input">
-                      <input type="number" id="modal-audioRepeatsInput" class="play-sequence-input" min="0" max="5" />
-                    </td>
-                  </tr>
-                  <tr>
-                    <td class="dictation-settings-td-label">
-                      <button type="button" id="modal-withoutEnteringTextButton" class="audio-setting-checkbox-btn" data-checked="false" title="{{ t('profile.audio.only_audio.title') }}">
-                        <i data-lucide="circle"></i>
-                      </button>
-                    </td>
-                    <td class="dictation-settings-td-input">
-                      <label>{{ t('profile.audio.only_audio.label') }}</label>
                     </td>
                   </tr>
                 </table>

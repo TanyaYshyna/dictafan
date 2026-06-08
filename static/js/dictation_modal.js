@@ -39,6 +39,7 @@
         panel.style.display = 'none';
         return;
       }
+
       const requiresAudio = getRequiredAudioRepeatsValue();
       const audioDone = Number(st && st.number_of_audio) || 0;
       const shouldShow = (requiresAudio > 0) && (audioDone < requiresAudio);
@@ -2070,6 +2071,12 @@
             window.DesktopConfirmModal.open({
               showSave: true,
               onDiscard: () => {
+                try {
+                  if (typeof window.__dictafanRestoreAudioSettingsModalSnapshot === 'function') {
+                    window.__dictafanRestoreAudioSettingsModalSnapshot();
+                  }
+                } catch (e0) {
+                }
                 closeAudioSettingsModalNow();
               },
               onSave: async () => {
@@ -2947,6 +2954,215 @@
 
     // Fallback: close without confirmation
     doClose();
+  }
+
+  function initAudioSettingsModal() {
+    try {
+      const m = document.getElementById('audioSettingsModal');
+      if (!m) return;
+
+      if (m.dataset.dictafanInitAudioSettingsModal === '1') {
+        return;
+      }
+      m.dataset.dictafanInitAudioSettingsModal = '1';
+
+      const startInput = document.getElementById('modal-playSequenceStart');
+      const rbRecord = document.getElementById('modal-audioExerciseModeRecord');
+      const rbNoRecord = document.getElementById('modal-audioExerciseModeNoRecord');
+      const rbOnlyNoHint = document.getElementById('modal-audioExerciseModeOnlyNoHint');
+      const rbOnlyHint = document.getElementById('modal-audioExerciseModeOnlyHint');
+      const star = document.getElementById('audioSettingsDirtyStar');
+      const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
+
+      const defaults = {
+        start: 'oto',
+        exercise_mode: 'record',
+      };
+
+      const readFromUser = () => {
+        try {
+          const um = window.UM;
+          const raw = um && um.userData && um.userData.settings_json ? String(um.userData.settings_json || '') : '';
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
+            return {
+              start: audio.start != null ? String(audio.start || '') : defaults.start,
+              exercise_mode: audio.exercise_mode != null ? String(audio.exercise_mode || '') : defaults.exercise_mode,
+            };
+          }
+        } catch (e) {
+        }
+        return {
+          start: defaults.start,
+          exercise_mode: defaults.exercise_mode,
+        };
+      };
+
+      const settingsState = {
+        snapshot: readFromUser(),
+        dirty: false,
+      };
+
+      const setDirty = (isDirty) => {
+        settingsState.dirty = !!isDirty;
+        try {
+          if (star) star.style.display = settingsState.dirty ? 'inline-flex' : 'none';
+        } catch (e) {
+        }
+        try {
+          if (saveBtn) saveBtn.disabled = !settingsState.dirty;
+        } catch (e2) {
+        }
+      };
+
+      const getSelectedExerciseMode = () => {
+        try {
+          const el = m.querySelector('input[name="modal-audioExerciseMode"]:checked');
+          const v = el ? String(el.value || '') : '';
+          return v || defaults.exercise_mode;
+        } catch (e) {
+          return defaults.exercise_mode;
+        }
+      };
+
+      const applyToUI = (settings) => {
+        try {
+          if (startInput) startInput.value = (settings && settings.start != null) ? String(settings.start || '') : defaults.start;
+        } catch (e) {
+        }
+
+        const mode = (settings && settings.exercise_mode) ? String(settings.exercise_mode || '') : defaults.exercise_mode;
+        try {
+          if (rbRecord) rbRecord.checked = mode === 'record';
+          if (rbNoRecord) rbNoRecord.checked = mode === 'no-record';
+          if (rbOnlyNoHint) rbOnlyNoHint.checked = mode === 'audio-only-no-hint';
+          if (rbOnlyHint) rbOnlyHint.checked = mode === 'audio-only-hint';
+        } catch (e2) {
+        }
+      };
+
+      const applyToRuntime = () => {
+        try {
+          const start = startInput ? String(startInput.value || '') : defaults.start;
+          window.playSequenceStart = start || defaults.start;
+        } catch (e) {
+        }
+        try {
+          window.audioExerciseMode = getSelectedExerciseMode();
+        } catch (e2) {
+        }
+      };
+
+      const restoreSnapshot = () => {
+        try {
+          applyToUI(settingsState.snapshot);
+        } catch (e) {
+        }
+        try {
+          applyToRuntime();
+        } catch (e2) {
+        }
+        setDirty(false);
+      };
+
+      window.__dictafanRestoreAudioSettingsModalSnapshot = restoreSnapshot;
+
+      applyToUI(settingsState.snapshot);
+      applyToRuntime();
+      setDirty(false);
+
+      const filterSeq = (v) => {
+        try {
+          const value = String(v || '').toLowerCase();
+          return value.split('').filter((ch) => ch === 't' || ch === 'o').join('');
+        } catch (e) {
+          return '';
+        }
+      };
+
+      const onAnyChange = () => {
+        try {
+          applyToRuntime();
+        } catch (e) {
+        }
+        setDirty(true);
+      };
+
+      try {
+        if (startInput) {
+          startInput.addEventListener('input', (e) => {
+            try {
+              const filtered = filterSeq(e && e.target ? e.target.value : '');
+              if (e && e.target && filtered !== e.target.value) e.target.value = filtered;
+            } catch (e0) {
+            }
+            onAnyChange();
+          });
+          startInput.addEventListener('change', () => onAnyChange());
+        }
+      } catch (e) {
+      }
+
+      try {
+        [rbRecord, rbNoRecord, rbOnlyNoHint, rbOnlyHint].forEach((rb) => {
+          if (!rb) return;
+          rb.addEventListener('change', () => onAnyChange());
+        });
+      } catch (e) {
+      }
+
+      try {
+        if (saveBtn && saveBtn.dataset.boundDictafanAudioSettingsSave !== '1') {
+          saveBtn.dataset.boundDictafanAudioSettingsSave = '1';
+          saveBtn.addEventListener('click', async () => {
+            try {
+              const um = window.UM;
+              if (!um || !um.userData || typeof um.updateProfile !== 'function') return;
+
+              const settings = {
+                start: startInput ? String(startInput.value || '') : defaults.start,
+                exercise_mode: getSelectedExerciseMode(),
+              };
+
+              let merged = {};
+              try {
+                const raw = um.userData.settings_json ? String(um.userData.settings_json || '') : '';
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  if (parsed && typeof parsed === 'object') merged = parsed;
+                }
+              } catch (e0) {
+              }
+
+              if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
+              merged.audio.start = settings.start || defaults.start;
+              merged.audio.exercise_mode = settings.exercise_mode || defaults.exercise_mode;
+
+              await um.updateProfile({
+                settings_json: JSON.stringify(merged),
+                audio_start: merged.audio.start,
+                audio_exercise_mode: merged.audio.exercise_mode,
+              });
+
+              try {
+                settingsState.snapshot = { start: merged.audio.start, exercise_mode: merged.audio.exercise_mode };
+              } catch (e1) {
+              }
+              setDirty(false);
+            } catch (e) {
+            }
+          });
+        }
+      } catch (e) {
+      }
+    } catch (e) {
+    }
+  }
+
+  try {
+    window.initAudioSettingsModal = initAudioSettingsModal;
+  } catch (e) {
   }
 
   function openAudioSettingsModal(sourceLabel = 'unknown') {
