@@ -396,6 +396,7 @@
           const key = view && view.key != null ? String(view.key) : '';
           if (key && session && typeof session.getState === 'function') {
             const st = session.getState(key);
+            const prevAllCorrect = !!(st && st._textAllCorrect);
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
 
@@ -424,7 +425,9 @@
 
             try {
               if (res && res.allCorrect && !res.starOutcome) {
-                st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
+                if (!prevAllCorrect) {
+                  st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
+                }
               }
             } catch (e2) {
             }
@@ -476,7 +479,7 @@
           if (res.allCorrect) {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-            if (textOk && !audioOk && requiresAudio > 0) {
+            if (!audioOk && requiresAudio > 0) {
               try {
                 updateAudioUserPanelVisibilityFromSession(session);
               } catch (e00) {
@@ -1698,22 +1701,13 @@
 
             try {
               if (ok) {
-                const perfect = Number(st && st.number_of_perfect) || 0;
-                const corrected = Number(st && st.number_of_corrected) || 0;
-
                 const repeatBtn = document.getElementById('repeatBtn');
                 const nextBtn = document.getElementById('resultNextBtn');
 
-                const shouldFocusRepeat = (corrected > 0 && perfect < 1);
-                if (
-                  shouldFocusRepeat
-                  && repeatBtn
-                  && repeatBtn.style.display !== 'none'
-                  && typeof repeatBtn.focus === 'function'
-                ) {
-                  repeatBtn.focus();
-                } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+                if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
                   nextBtn.focus();
+                } else if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
+                  repeatBtn.focus();
                 }
               } else {
                 const rb = document.getElementById('recordButton');

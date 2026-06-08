@@ -1223,6 +1223,8 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 #dictationModal #resultNextBtn.is-last {
