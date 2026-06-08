@@ -2239,49 +2239,20 @@ function renderProfileLucideCheckbox(btn, checked, disabled) {
 
 function getAudioSettingsFromDom() {
     const startEl = document.getElementById('playSequenceStart');
-    const typoEl = document.getElementById('playSequenceTypo');
-    const successEl = document.getElementById('playSequenceSuccess');
-    const repeatsEl = document.getElementById('audioRepeatsInput');
-    const starHalfEl = document.getElementById('requiredPassedStarHalfInput');
-    const onlyAudioBtn = document.getElementById('withoutEnteringTextButton');
 
-    const repeats = (() => {
+    const exerciseMode = (() => {
         try {
-            const n = Number(repeatsEl ? repeatsEl.value : 3);
-            if (!Number.isFinite(n)) return 3;
-            return Math.min(5, Math.max(0, Math.floor(n)));
+            const el = document.querySelector('input[name="audioExerciseMode"]:checked');
+            const v = el ? String(el.value || '') : '';
+            return v || 'record';
         } catch (e) {
-            return 3;
-        }
-    })();
-
-    const requiredHalf = (() => {
-        try {
-            const n = Number(starHalfEl ? starHalfEl.value : 3);
-            if (!Number.isFinite(n)) return 3;
-            return Math.min(9, Math.max(3, Math.floor(n)));
-        } catch (e) {
-            return 3;
-        }
-    })();
-
-    const onlyAudio = (() => {
-        try {
-            if (!onlyAudioBtn) return false;
-            return String(onlyAudioBtn.dataset.checked || '') === '1';
-        } catch (e) {
-            return false;
+            return 'record';
         }
     })();
 
     return {
         start: startEl ? String(startEl.value || '') : '',
-        typo: typoEl ? String(typoEl.value || '') : '',
-        success: successEl ? String(successEl.value || '') : '',
-        repeats,
-        required_passed_star_half: requiredHalf,
-        without_entering_text: onlyAudio,
-        show_text: false,
+        exercise_mode: exerciseMode,
         speech_recognition_mode: getProfileSpeechRecognitionModeFromModelsTable() || (UM && UM.userData && UM.userData.speech_recognition_mode ? UM.userData.speech_recognition_mode : 'route'),
     };
 }
@@ -2311,34 +2282,19 @@ async function initializeAudioSettings() {
                 const audioSettings = settings.audio || {};
                 userSettings = {
                     audio_start: audioSettings.start,
-                    audio_typo: audioSettings.typo,
-                    audio_success: audioSettings.success,
-                    audio_repeats: audioSettings.repeats,
-                    audio_required_passed_star_half: audioSettings.required_passed_star_half,
-                    without_entering_text: audioSettings.without_entering_text,
-                    show_text: audioSettings.show_text,
+                    audio_exercise_mode: audioSettings.exercise_mode,
                 };
             } catch (e) {
                 console.warn('Ошибка парсинга settings_json:', e);
                 userSettings = {
                     audio_start: UM.userData.audio_start,
-                    audio_typo: UM.userData.audio_typo,
-                    audio_success: UM.userData.audio_success,
-                    audio_repeats: UM.userData.audio_repeats,
-                    audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
-                    without_entering_text: false,
-                    show_text: false,
+                    audio_exercise_mode: (UM.userData && UM.userData.audio_exercise_mode) ? UM.userData.audio_exercise_mode : 'record',
                 };
             }
         } else {
             userSettings = {
                 audio_start: UM.userData.audio_start,
-                audio_typo: UM.userData.audio_typo,
-                audio_success: UM.userData.audio_success,
-                audio_repeats: UM.userData.audio_repeats,
-                audio_required_passed_star_half: UM.userData.audio_required_passed_star_half,
-                without_entering_text: false,
-                show_text: false,
+                audio_exercise_mode: (UM.userData && UM.userData.audio_exercise_mode) ? UM.userData.audio_exercise_mode : 'record',
             };
         }
 
@@ -2346,30 +2302,20 @@ async function initializeAudioSettings() {
 
         try {
             const startEl = document.getElementById('playSequenceStart');
-            const typoEl = document.getElementById('playSequenceTypo');
-            const successEl = document.getElementById('playSequenceSuccess');
-            const repeatsEl = document.getElementById('audioRepeatsInput');
-            const starHalfEl = document.getElementById('requiredPassedStarHalfInput');
-
             if (startEl) startEl.value = userSettings.audio_start || '';
-            if (typoEl) typoEl.value = userSettings.audio_typo || '';
-            if (successEl) successEl.value = (userSettings.audio_success !== undefined && userSettings.audio_success !== null) ? userSettings.audio_success : '';
-            if (repeatsEl) repeatsEl.value = String(userSettings.audio_repeats !== undefined ? userSettings.audio_repeats : 3);
-            if (starHalfEl) starHalfEl.value = String(userSettings.audio_required_passed_star_half !== undefined ? userSettings.audio_required_passed_star_half : 3);
         } catch (e) {
         }
 
         try {
-            const onlyAudioBtn = document.getElementById('withoutEnteringTextButton');
-            if (onlyAudioBtn) {
-                const checked = Boolean(userSettings.without_entering_text);
-                renderProfileLucideCheckbox(onlyAudioBtn, checked, false);
-                onlyAudioBtn.onclick = () => {
-                    const next = !(String(onlyAudioBtn.dataset.checked || '') === '1');
-                    renderProfileLucideCheckbox(onlyAudioBtn, next, false);
-                    checkForChanges();
-                };
-            }
+            const mode = String(userSettings.audio_exercise_mode || 'record');
+            const setChecked = (id, v) => {
+                const el = document.getElementById(id);
+                if (el) el.checked = (mode === v);
+            };
+            setChecked('audioExerciseModeRecord', 'record');
+            setChecked('audioExerciseModeNoRecord', 'no-record');
+            setChecked('audioExerciseModeOnlyNoHint', 'audio-only-no-hint');
+            setChecked('audioExerciseModeOnlyHint', 'audio-only-hint');
         } catch (e) {
         }
 
@@ -2381,10 +2327,11 @@ async function initializeAudioSettings() {
                 el.addEventListener('change', () => checkForChanges());
             };
             bindInput('playSequenceStart');
-            bindInput('playSequenceTypo');
-            bindInput('playSequenceSuccess');
-            bindInput('audioRepeatsInput');
-            bindInput('requiredPassedStarHalfInput');
+            ['audioExerciseModeRecord', 'audioExerciseModeNoRecord', 'audioExerciseModeOnlyNoHint', 'audioExerciseModeOnlyHint'].forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.addEventListener('change', () => checkForChanges());
+            });
         } catch (e) {
         }
 
@@ -2809,12 +2756,7 @@ async function saveProfile(options = {}) {
                     merged.audio = {};
                 }
                 merged.audio.start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
-                merged.audio.typo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
-                merged.audio.success = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
-                merged.audio.repeats = settings.repeats !== undefined ? settings.repeats : 3;
-                merged.audio.required_passed_star_half = settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3;
-                merged.audio.without_entering_text = Boolean(settings.without_entering_text);
-                merged.audio.show_text = Boolean(settings.show_text);
+                merged.audio.exercise_mode = (settings.exercise_mode !== undefined && settings.exercise_mode !== null) ? settings.exercise_mode : 'record';
                 merged.audio.speech_recognition_mode = settings.speech_recognition_mode || 'route';
             } catch (e) {
             }
@@ -2826,10 +2768,8 @@ async function saveProfile(options = {}) {
 
             // Для обратной совместимости также отправляем отдельные поля (если бэкенд их еще использует)
             updateData.audio_start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
-            updateData.audio_typo = (settings.typo !== undefined && settings.typo !== null) ? settings.typo : 'o';
-            updateData.audio_success = (settings.success !== undefined && settings.success !== null) ? settings.success : 'ot';
-            updateData.audio_repeats = settings.repeats !== undefined ? settings.repeats : 3;
-            updateData.audio_required_passed_star_half = settings.required_passed_star_half !== undefined ? settings.required_passed_star_half : 3;
+            updateData.audio_typo = 'o';
+            updateData.audio_success = 'ot';
             updateData.speech_recognition_mode = settings.speech_recognition_mode || 'route';
         }
 
@@ -2852,10 +2792,7 @@ async function saveProfile(options = {}) {
         // Сначала пытаемся получить настройки из settings_json (новый формат)
         let audioSettings = {
             audio_start: '',
-            audio_typo: '',
-            audio_success: '',
-            audio_repeats: 3,
-            audio_required_passed_star_half: 3,
+            audio_exercise_mode: 'record',
             speech_recognition_mode: 'route'
         };
         
@@ -2865,10 +2802,7 @@ async function saveProfile(options = {}) {
                 const audio = settings.audio || {};
                 audioSettings = {
                     audio_start: audio.start || '',
-                    audio_typo: audio.typo || '',
-                    audio_success: audio.success || '',
-                    audio_repeats: audio.repeats !== undefined ? audio.repeats : 3,
-                    audio_required_passed_star_half: audio.required_passed_star_half !== undefined ? audio.required_passed_star_half : 3,
+                    audio_exercise_mode: audio.exercise_mode || 'record',
                     speech_recognition_mode: audio.speech_recognition_mode || 'route'
                 };
             } catch (e) {
@@ -2880,20 +2814,6 @@ async function saveProfile(options = {}) {
         if (!audioSettings.audio_start && updatedUser.audio_start !== undefined) {
             audioSettings.audio_start = updatedUser.audio_start;
         }
-        if (!audioSettings.audio_typo && updatedUser.audio_typo !== undefined) {
-            audioSettings.audio_typo = updatedUser.audio_typo;
-        }
-        if ((audioSettings.audio_success === undefined || audioSettings.audio_success === null) && updatedUser.audio_success !== undefined) {
-            audioSettings.audio_success = updatedUser.audio_success;
-        }
-        if (audioSettings.audio_repeats === 3 && updatedUser.audio_repeats !== undefined) {
-            audioSettings.audio_repeats = updatedUser.audio_repeats;
-        }
-
-        if (audioSettings.audio_required_passed_star_half === 3 && updatedUser.audio_required_passed_star_half !== undefined) {
-            audioSettings.audio_required_passed_star_half = updatedUser.audio_required_passed_star_half;
-        }
-
         if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updatedUser.speech_recognition_mode !== undefined) {
             audioSettings.speech_recognition_mode = updatedUser.speech_recognition_mode;
         }
@@ -2902,20 +2822,6 @@ async function saveProfile(options = {}) {
         if (!audioSettings.audio_start) {
             audioSettings.audio_start = updateData.audio_start || '';
         }
-        if (!audioSettings.audio_typo) {
-            audioSettings.audio_typo = updateData.audio_typo || '';
-        }
-        if (audioSettings.audio_success === undefined || audioSettings.audio_success === null) {
-            audioSettings.audio_success = updateData.audio_success || '';
-        }
-        if (audioSettings.audio_repeats === 3 && updateData.audio_repeats !== undefined) {
-            audioSettings.audio_repeats = updateData.audio_repeats;
-        }
-
-        if (audioSettings.audio_required_passed_star_half === 3 && updateData.audio_required_passed_star_half !== undefined) {
-            audioSettings.audio_required_passed_star_half = updateData.audio_required_passed_star_half;
-        }
-
         if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updateData.speech_recognition_mode !== undefined) {
             audioSettings.speech_recognition_mode = updateData.speech_recognition_mode;
         }

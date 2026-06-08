@@ -2031,6 +2031,92 @@
       const m = document.getElementById('audioSettingsModal');
       if (!m) return;
 
+      const getAudioSettingsDirty = () => {
+        try {
+          const star = document.getElementById('audioSettingsDirtyStar');
+          if (!star) return false;
+          const inline = (star.style && star.style.display) ? String(star.style.display) : '';
+          if (inline) return inline !== 'none';
+          // fallback: computed style
+          const computed = window.getComputedStyle ? window.getComputedStyle(star) : null;
+          if (!computed) return false;
+          return String(computed.display || '') !== 'none';
+        } catch (e) {
+          return false;
+        }
+      };
+
+      const closeAudioSettingsModalNow = () => {
+        try {
+          m.style.display = 'none';
+        } catch (e1) {
+        }
+        try {
+          if (typeof window.updateRecognitionModeIcon === 'function') {
+            window.updateRecognitionModeIcon();
+          }
+        } catch (e2) {
+        }
+      };
+
+      const closeAudioSettingsModalWithConfirm = () => {
+        try {
+          if (!getAudioSettingsDirty()) {
+            closeAudioSettingsModalNow();
+            return;
+          }
+
+          if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.open === 'function') {
+            window.DesktopConfirmModal.open({
+              showSave: true,
+              onDiscard: () => {
+                closeAudioSettingsModalNow();
+              },
+              onSave: async () => {
+                try {
+                  const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
+                  if (saveBtn) saveBtn.click();
+                } catch (e) {
+                }
+                // Ждём, пока UI успеет скрыть звёздочку (сохранение может быть async)
+                const startedAt = Date.now();
+                const tick = () => {
+                  try {
+                    if (!getAudioSettingsDirty()) {
+                      closeAudioSettingsModalNow();
+                      return;
+                    }
+                    if (Date.now() - startedAt > 2500) {
+                      // Если по какой-то причине сохранение не прошло/не сняло dirty — не закрываем.
+                      return;
+                    }
+                    setTimeout(tick, 60);
+                  } catch (e2) {
+                  }
+                };
+                tick();
+              },
+            });
+            return;
+          }
+
+          // fallback без универсальной модалки
+          const wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
+          if (wantSave) {
+            try {
+              const saveBtn = document.getElementById('saveAudioSettingsModalBtn');
+              if (saveBtn) saveBtn.click();
+            } catch (e) {
+            }
+            return;
+          }
+          const wantDiscard = window.confirm('Выйти без сохранения?');
+          if (wantDiscard) closeAudioSettingsModalNow();
+        } catch (e) {
+          closeAudioSettingsModalNow();
+        }
+      };
+
       const closeBtn = document.getElementById('closeAudioSettingsModal');
       if (closeBtn && closeBtn.dataset.boundDictationModal !== '1') {
         closeBtn.dataset.boundDictationModal = '1';
@@ -2040,16 +2126,7 @@
             e.stopPropagation();
           } catch (e0) {
           }
-          try {
-            m.style.display = 'none';
-          } catch (e1) {
-          }
-          try {
-            if (typeof window.updateRecognitionModeIcon === 'function') {
-              window.updateRecognitionModeIcon();
-            }
-          } catch (e2) {
-          }
+          closeAudioSettingsModalWithConfirm();
         });
       }
 
@@ -2058,13 +2135,7 @@
         m.addEventListener('click', (e) => {
           try {
             if (e && e.target === m) {
-              m.style.display = 'none';
-              try {
-                if (typeof window.updateRecognitionModeIcon === 'function') {
-                  window.updateRecognitionModeIcon();
-                }
-              } catch (e3) {
-              }
+              closeAudioSettingsModalWithConfirm();
             }
           } catch (e2) {
           }
