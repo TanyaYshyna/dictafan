@@ -65,13 +65,7 @@ class LanguageSelector {
             btn.dataset.disabled = disabled ? '1' : '0';
             btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
             btn.disabled = Boolean(disabled);
-            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons({ root: btn });
-                }
-            } catch (e) {
-            }
+            btn.innerHTML = `<span class="universal-choice-icon" aria-hidden="true"></span>`;
         } catch (e) {
         }
     }
@@ -83,13 +77,7 @@ class LanguageSelector {
             btn.dataset.disabled = disabled ? '1' : '0';
             btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
             btn.disabled = Boolean(disabled);
-            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
-            try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons({ root: btn });
-                }
-            } catch (e) {
-            }
+            btn.innerHTML = `<span class="universal-choice-icon universal-choice-icon--radio" aria-hidden="true"></span>`;
         } catch (e) {
         }
     }

@@ -134,6 +134,36 @@
     justify-content: center;
 }
 
+ .universal-choice-icon {
+     width: 22px;
+     height: 22px;
+     border-radius: 999px;
+     border: 2px solid rgba(17, 24, 39, 0.55);
+     display: inline-flex;
+     align-items: center;
+     justify-content: center;
+     box-sizing: border-box;
+ }
+
+ .universal-choice-icon--radio::after {
+     content: '';
+     width: 10px;
+     height: 10px;
+     border-radius: 999px;
+     background: rgba(17, 24, 39, 0.85);
+     transform: scale(0);
+     transition: transform 120ms ease;
+ }
+
+ .models-centric-radio-btn[data-checked="1"] .universal-choice-icon--radio::after {
+     transform: scale(1);
+ }
+
+ .models-centric-radio-btn[data-disabled="1"] .universal-choice-icon,
+ .models-centric-radio-btn:disabled .universal-choice-icon {
+     opacity: 0.35;
+ }
+
 .models-centric-radio-btn i[data-lucide],
 .models-centric-radio-btn svg,
 #user-profile-modal .models-centric-radio-btn i[data-lucide],
