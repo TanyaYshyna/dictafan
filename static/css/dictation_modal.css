@@ -646,6 +646,41 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   background: transparent;
 }
 
+#dictationModal #audioSettingsModal.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: rgba(17, 24, 39, 0.38);
+  backdrop-filter: blur(1px);
+}
+
+#dictationModal #audioSettingsModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+}
+
+#dictationModal #audioSettingsModal .modal-header {
+  position: relative;
+  padding-right: 92px;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 #dictationModal #audioSettingsModal .audio-settings-modal-panel-left {
   border: none;
   padding: 0;
@@ -706,6 +741,70 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 
 #audioSettingsModal .dictation-settings-td-input {
   width: auto;
+}
+
+#audioSettingsModal #modal-playSequenceStart {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 20px;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+}
+
+#audioSettingsModal #modal-playSequenceStart:focus {
+  outline: none;
+  border-color: var(--color-button-text-pink);
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:checked::after {
+  transform: scale(1);
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+#audioSettingsModal .dictation-settings-audio-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-audio-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 #audioSettingsModal .dictation-settings-icon-label {

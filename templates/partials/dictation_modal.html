@@ -351,7 +351,7 @@
     <div class="modal-content audio-settings-modal-content">
       <div class="modal-header">
         <h2 id="audioSettingsModalTitle">Настройки <span id="audioSettingsDirtyStar" style="display:none;">*</span></h2>
-        <div style="display:flex; align-items:center; gap:10px;">
+        <div class="audio-settings-modal-header-actions">
           <button id="saveAudioSettingsModalBtn" class="topbar-icon-btn" type="button" title="Сохранить" disabled>
             <i data-lucide="save"></i>
           </button>
@@ -377,8 +377,8 @@
 
                 <div class="dictation-settings-title">{{ t('profile.audio.explanations.label') }}</div>
                 <div class="dictation-settings-legend">
-                  <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }}</div>
-                  <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }}</div>
+                  <div class="dictation-settings-legend-row"><strong>o</strong> - {{ t('profile.audio.explanations.o') }} (ctrl + 1)</div>
+                  <div class="dictation-settings-legend-row"><strong>t</strong> - {{ t('profile.audio.explanations.t') }} (ctrl + 2)</div>
                 </div>
               </div>
 
@@ -388,20 +388,20 @@
                     <td class="dictation-settings-td-label"></td>
                     <td class="dictation-settings-td-input">
                       <div class="dictation-settings-title">Аудио</div>
-                      <div style="display:flex; flex-direction:column; gap:10px;">
-                        <label style="display:flex; align-items:center; gap:10px;">
+                      <div class="dictation-settings-audio-modes">
+                        <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeRecord" value="record" />
-                          <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic"></i><span>записывать аудио</span></span>
+                          <span class="dictation-settings-inline"><i data-lucide="mic"></i><span>записывать аудио</span></span>
                         </label>
-                        <label style="display:flex; align-items:center; gap:10px;">
+                        <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeNoRecord" value="no-record" />
-                          <span style="display:inline-flex; align-items:center; gap:8px;"><i data-lucide="mic-off"></i><span>не записывать аудио</span></span>
+                          <span class="dictation-settings-inline"><i data-lucide="mic-off"></i><span>не записывать аудио</span></span>
                         </label>
-                        <label style="display:flex; align-items:center; gap:10px;">
+                        <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyNoHint" value="audio-only-no-hint" />
                           <span>только аудио (без подсказки)</span>
                         </label>
-                        <label style="display:flex; align-items:center; gap:10px;">
+                        <label class="dictation-settings-audio-mode">
                           <input type="radio" name="modal-audioExerciseMode" id="modal-audioExerciseModeOnlyHint" value="audio-only-hint" />
                           <span>только аудио (с подсказкой)</span>
                         </label>
