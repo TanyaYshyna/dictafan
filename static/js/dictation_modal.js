@@ -621,9 +621,11 @@
                 const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
 
                 let reward = 0;
-                if ((Number(res.nextPerfect) || 0) > prevPerfectSt) {
+                const perfectNow = Number(st && st.number_of_perfect) || 0;
+                const correctedNow = Number(st && st.number_of_corrected) || 0;
+                if (perfectNow >= 1) {
                   reward = getPricingValue('star_reward', 3);
-                } else if ((Number(res.nextCorrected) || 0) > prevCorrectedSt) {
+                } else if (correctedNow > 0) {
                   reward = getPricingValue('half_star_reward', 2);
                 } else {
                   reward = getPricingValue('text_activity_reward', 1);
