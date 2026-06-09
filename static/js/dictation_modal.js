@@ -600,10 +600,13 @@
         try {
           if (res && res.allCorrect) {
             if (res.starOutcome === 'perfect') {
+              console.log('⭐ star');
               setCheckButtonState('star');
             } else if (res.starOutcome === 'half' || res.starOutcome === 'corrected') {
+              console.log('★  half');
               setCheckButtonState('half');
             } else {
+              console.log('🪙 ready');
               setCheckButtonState('ready');
             }
           } else {
@@ -630,6 +633,7 @@
 
             try {
               if (res && res.allCorrect) {
+                console.log('⭐⭐⭐⭐⭐');
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
@@ -640,10 +644,13 @@
                 const perfectNow = Number(st && st.number_of_perfect) || 0;
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
                 if (perfectNow >= 1) {
+                  console.log('⭐⭐⭐⭐⭐ звезда');
                   reward = getPricingValue('star_reward', 3);
                 } else if (correctedNow > 0) {
+                  console.log('★★★★★★★ пол звезды');
                   reward = getPricingValue('half_star_reward', 2);
                 } else {
+                  console.log('🪙🪙🪙🪙🪙 монетка');
                   reward = getPricingValue('text_activity_reward', 1);
                 }
 
