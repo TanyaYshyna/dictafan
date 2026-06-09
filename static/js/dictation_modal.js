@@ -648,10 +648,13 @@
         }
 
         try {
-          if (res.allCorrect) {
+          // Фокус после проверки:
+          // 1) если текст уже засчитан (звезда/полузвезда) и требуется микрофон, но он ещё не выполнен — фокус на запись.
+          // 2) если текст + микрофон выполнены — perfect => Next, иначе Repeat.
+          {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-            if (!audioOk && requiresAudio > 0) {
+            if (textOk && !audioOk && requiresAudio > 0) {
               try {
                 updateAudioUserPanelVisibilityFromSession(session);
               } catch (e00) {
@@ -665,7 +668,7 @@
                 rb.focus();
               }
             } else if (textOk && audioOk) {
-              if (res.starOutcome === 'perfect') {
+              if (res && res.starOutcome === 'perfect') {
                 const nb = document.getElementById('resultNextBtn');
                 if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') {
                   try {
