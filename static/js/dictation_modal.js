@@ -209,6 +209,56 @@
 
   function resetSentenceUiFromSession(session) {
     try {
+      // If user navigates to an already completed sentence, show it as completed instead of
+      // wiping the input/state. (Repeat button starts a new attempt and will reset anyway.)
+      const view = getCurrentSentenceViewFromSession(session);
+      const st0 = getCurrentSentenceStateFromSession(session);
+      const perfect0 = Number(st0 && st0.number_of_perfect) || 0;
+      const corrected0 = Number(st0 && st0.number_of_corrected) || 0;
+      const isCompletedText = (perfect0 >= 1) || (corrected0 > 0);
+      if (view && isCompletedText) {
+        const originalText = String(view.text_original != null ? view.text_original : (view.text != null ? view.text : ''));
+        const translationText = String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : ''));
+
+        try {
+          const input = document.getElementById('userInput');
+          if (input) {
+            input.textContent = originalText;
+            input.setAttribute('contenteditable', 'false');
+          }
+        } catch (e0c0) {
+        }
+
+        try {
+          const correct = document.getElementById('correctAnswer');
+          if (correct) {
+            correct.textContent = translationText;
+            correct.style.display = 'block';
+            try {
+              correct.style.color = 'var(--color-button-text-gray)';
+            } catch (e0c1) {
+            }
+          }
+        } catch (e0c2) {
+        }
+
+        try {
+          if (perfect0 >= 1) setCheckButtonState('star');
+          else setCheckButtonState('half');
+        } catch (e0c3) {
+        }
+
+        try {
+          updateAudioUserPanelVisibilityFromSession(session);
+        } catch (e0c4) {
+        }
+
+        return;
+      }
+    } catch (e0completed) {
+    }
+
+    try {
       const st = getCurrentSentenceStateFromSession(session);
       if (st) st.mistake_count_current = 0;
     } catch (e0) {
@@ -289,82 +339,64 @@
   }
 
   try {
-    if (typeof window.startGame !== 'function') {
+    // Wrap existing global navigation functions (if any) so reward cycles work even when
+    // legacy scripts define startGame/nextSentence/previousSentence before this file.
+    {
+      const prevStartGame = typeof window.startGame === 'function' ? window.startGame : null;
       window.startGame = () => {
+        try { startNewRewardCycle(); } catch (e00c) {}
+        if (prevStartGame) {
+          try { return prevStartGame(); } catch (e0) { return; }
+        }
         try {
           const session = window.__dictationModalActiveSession;
           if (session) {
-            try {
-              startNewRewardCycle();
-            } catch (e00c) {
-            }
-            try {
-              state.dictationStarted = true;
-            } catch (e0) {
-            }
-
+            try { state.dictationStarted = true; } catch (e0) {}
             try {
               const p = getProgressPanelInstance();
-              if (p && typeof p.startTimer === 'function') {
-                p.startTimer();
-              }
-            } catch (e1) {
-            }
-            try {
-              resetInactivityTimer();
-            } catch (e2) {
-            }
-
+              if (p && typeof p.startTimer === 'function') p.startTimer();
+            } catch (e1) {}
+            try { resetInactivityTimer(); } catch (e2) {}
             try {
               const m = document.getElementById('start-modal');
               if (m) m.style.display = 'none';
-            } catch (e3) {
-            }
+            } catch (e3) {}
             session.ensureDefaultSelection();
             session.currentSelectedIndex = 0;
-            try {
-              resetSentenceUiFromSession(session);
-            } catch (e00) {
-            }
+            try { resetSentenceUiFromSession(session); } catch (e00) {}
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
         }
       };
-    }
-    if (typeof window.nextSentence !== 'function') {
+
+      const prevNextSentence = typeof window.nextSentence === 'function' ? window.nextSentence : null;
       window.nextSentence = () => {
+        try { startNewRewardCycle(); } catch (e00c) {}
+        if (prevNextSentence) {
+          try { return prevNextSentence(); } catch (e0) { return; }
+        }
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
-          try {
-            startNewRewardCycle();
-          } catch (e00c) {
-          }
           session.goNext();
-          try {
-            resetSentenceUiFromSession(session);
-          } catch (e00) {
-          }
+          try { resetSentenceUiFromSession(session); } catch (e00) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
       };
-    }
-    if (typeof window.previousSentence !== 'function') {
+
+      const prevPrevSentence = typeof window.previousSentence === 'function' ? window.previousSentence : null;
       window.previousSentence = () => {
+        try { startNewRewardCycle(); } catch (e00c) {}
+        if (prevPrevSentence) {
+          try { return prevPrevSentence(); } catch (e0) { return; }
+        }
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
-          try {
-            startNewRewardCycle();
-          } catch (e00c) {
-          }
           session.goPrev();
-          try {
-            resetSentenceUiFromSession(session);
-          } catch (e00) {
-          }
+          try { resetSentenceUiFromSession(session); } catch (e00) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -569,6 +601,8 @@
           if (key && session && typeof session.getState === 'function') {
             const st = session.getState(key);
             const prevAllCorrect = !!(st && st._textAllCorrect);
+            const prevPerfectSt = Number(st && st.number_of_perfect) || 0;
+            const prevCorrectedSt = Number(st && st.number_of_corrected) || 0;
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
 
@@ -579,18 +613,20 @@
             }
 
             try {
-              if (res && res.allCorrect && res.starOutcome) {
+              if (res && res.allCorrect) {
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
-                const nextOutcome = String(res.starOutcome);
+                const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
                 const cycleId = Number(state.rewardCycleId) || 0;
                 const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
 
                 let reward = 0;
-                if (nextOutcome === 'perfect') {
+                if ((Number(res.nextPerfect) || 0) > prevPerfectSt) {
                   reward = getPricingValue('star_reward', 3);
-                } else if (nextOutcome === 'half' || nextOutcome === 'corrected') {
+                } else if ((Number(res.nextCorrected) || 0) > prevCorrectedSt) {
                   reward = getPricingValue('half_star_reward', 2);
+                } else {
+                  reward = getPricingValue('text_activity_reward', 1);
                 }
 
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
@@ -627,19 +663,7 @@
             }
 
             try {
-              if (res && res.allCorrect && !res.starOutcome) {
-                const cycleId = Number(state.rewardCycleId) || 0;
-                const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
-                if (cycleId > 0 && paidCycleId !== cycleId) {
-                  const add = getPricingValue('text_activity_reward', 1);
-                  st.text_coin_count = (Number(st.text_coin_count) || 0) + add;
-                  st._paidTextRewardCycleId = cycleId;
-                  try {
-                    playUiSound('coins_plus_audio');
-                  } catch (e0s) {
-                  }
-                }
-              }
+              // Rewards are paid in the block above (res.allCorrect), once per reward cycle.
             } catch (e2) {
             }
 
