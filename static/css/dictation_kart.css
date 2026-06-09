@@ -90,8 +90,11 @@
 }
 
 .page-index .desk-card .dictation-kart-launch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
   right: 0;
   left: auto;
+  z-index: 200600;
 }
 
 .page-index .short-card.dictation-kart:hover {

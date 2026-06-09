@@ -171,7 +171,7 @@
 }
 
  .create-assignment-panel--sentences .create-assignment-panel-body {
-   overflow-y: auto;
+   overflow: hidden;
  }
 
 .create-assignment-panel-body {
@@ -179,6 +179,26 @@
   min-height: 0;
   overflow: hidden;
 }
+
+ .create-assignment-sentences-scroll {
+   max-height: 420px;
+   overflow: auto;
+ }
+
+ .create-assignment-table--sentences thead th {
+   position: sticky;
+   top: 0;
+   background: #fff;
+   z-index: 1;
+ }
+
+ .create-assignment-table--sentences thead th {
+   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+ }
+
+ .create-assignment-table--sentences thead tr {
+   background: #fff;
+ }
 
 .create-assignment-panel-actions {
   display: flex;
@@ -197,6 +217,10 @@
   border-bottom: 1px solid rgba(0,0,0,0.06);
   padding: 8px 10px;
 }
+
+ .create-assignment-table .exercise-row.selected td {
+   background: rgba(255, 0, 128, 0.10);
+ }
 
 .create-assignment-table--sentences {
   width: 100%;

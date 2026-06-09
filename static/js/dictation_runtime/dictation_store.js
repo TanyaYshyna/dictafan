@@ -51,8 +51,11 @@
         const key = raw.key != null ? String(raw.key) : '';
         if (!key) continue;
 
+        const position = Number(raw.position);
+
         const core = {
           key,
+          position: Number.isFinite(position) ? position : null,
           text_original: raw.text_original != null ? String(raw.text_original) : (raw.text != null ? String(raw.text) : ''),
           text_translation: raw.text_translation != null ? String(raw.text_translation) : (raw.translation != null ? String(raw.translation) : ''),
           audio_original: raw.audio_original != null ? String(raw.audio_original) : (raw.audio != null ? String(raw.audio) : ''),
