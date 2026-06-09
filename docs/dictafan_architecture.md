@@ -211,6 +211,17 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `half_star_purchase_cost`
 - `audio_purchase_cost`
 
+Меню прайса (как показываем в UI по умолчанию на `/desktop`, `static/js/private_library.js`):
+
+- **Earn**
+  - `Star reward` (`star_reward`) = `3`
+  - `Half-star reward` (`half_star_reward`) = `2`
+  - `Text activity reward` (`text_activity_reward`) = `1`
+  - `Audio activity reward (>=80%)` (`audio_activity_reward`) = `1`
+- **Spend**
+  - `Buy half-star (cost)` (`half_star_purchase_cost`) = `3`
+  - `Buy audio (mic) (cost)` (`audio_purchase_cost`) = `3`
+
 Покупки:
 
 - Покупка «полузвезды» и «аудио (микрофон)» выполняется через `#coinExchangeModal` и списание через API `POST /api/statistics/money/spend`.

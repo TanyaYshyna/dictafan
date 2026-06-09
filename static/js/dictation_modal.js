@@ -25,7 +25,15 @@
     depsLoaded: false,
     opening: false,
     dictationStarted: false,
+    rewardCycleId: 0,
   };
+
+  function startNewRewardCycle() {
+    try {
+      state.rewardCycleId = (Number(state.rewardCycleId) || 0) + 1;
+    } catch (e) {
+    }
+  }
 
   function positionsToLabel(positions) {
     try {
@@ -287,6 +295,10 @@
           const session = window.__dictationModalActiveSession;
           if (session) {
             try {
+              startNewRewardCycle();
+            } catch (e00c) {
+            }
+            try {
               state.dictationStarted = true;
             } catch (e0) {
             }
@@ -325,6 +337,10 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
+          try {
+            startNewRewardCycle();
+          } catch (e00c) {
+          }
           session.goNext();
           try {
             resetSentenceUiFromSession(session);
@@ -340,6 +356,10 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
+          try {
+            startNewRewardCycle();
+          } catch (e00c) {
+          }
           session.goPrev();
           try {
             resetSentenceUiFromSession(session);
@@ -562,12 +582,28 @@
               if (res && res.allCorrect && res.starOutcome) {
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = String(res.starOutcome);
-                if (nextOutcome && nextOutcome !== prevOutcome) {
-                  st._lastStarOutcome = nextOutcome;
+
+                const cycleId = Number(state.rewardCycleId) || 0;
+                const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
+
+                let reward = 0;
+                if (nextOutcome === 'perfect') {
+                  reward = getPricingValue('star_reward', 3);
+                } else if (nextOutcome === 'half' || nextOutcome === 'corrected') {
+                  reward = getPricingValue('half_star_reward', 2);
+                }
+
+                if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
+                  st.text_coin_count = (Number(st.text_coin_count) || 0) + reward;
+                  st._paidTextRewardCycleId = cycleId;
                   try {
                     playUiSound('coins_plus_audio');
                   } catch (e0sa) {
                   }
+                }
+
+                if (nextOutcome && nextOutcome !== prevOutcome) {
+                  st._lastStarOutcome = nextOutcome;
                 }
               }
             } catch (e0star) {
@@ -592,9 +628,12 @@
 
             try {
               if (res && res.allCorrect && !res.starOutcome) {
-                if (!prevAllCorrect) {
+                const cycleId = Number(state.rewardCycleId) || 0;
+                const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
+                if (cycleId > 0 && paidCycleId !== cycleId) {
                   const add = getPricingValue('text_activity_reward', 1);
                   st.text_coin_count = (Number(st.text_coin_count) || 0) + add;
+                  st._paidTextRewardCycleId = cycleId;
                   try {
                     playUiSound('coins_plus_audio');
                   } catch (e0s) {
@@ -2150,6 +2189,11 @@
           const session = window.__dictationModalActiveSession;
           if (!session) return;
 
+          try {
+            startNewRewardCycle();
+          } catch (e00c) {
+          }
+
           resetSentenceUiFromSession(session);
           updateNextButtonVisibilityFromSession(session);
           updateNavigatorFromSession(session);
@@ -3057,6 +3101,10 @@
         } catch (e0) {
         }
         try {
+          try {
+            startNewRewardCycle();
+          } catch (e00c) {
+          }
           if (typeof window.nextSentence === 'function') window.nextSentence();
         } catch (e1) {
         }
@@ -3789,6 +3837,10 @@
               } catch (e0) {
               }
               try {
+                try {
+                  startNewRewardCycle();
+                } catch (e00c) {
+                }
                 hideStartModal();
               } catch (e1) {
               }
