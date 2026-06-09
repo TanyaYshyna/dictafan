@@ -644,18 +644,20 @@
                 const perfectNow = Number(st && st.number_of_perfect) || 0;
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
                 if (perfectNow >= 1) {
-                  console.log('⭐⭐⭐⭐⭐ звезда');
                   reward = getPricingValue('star_reward', 3);
+                  console.log('⭐⭐⭐⭐⭐ звезда', reward);
                 } else if (correctedNow > 0) {
-                  console.log('★★★★★★★ пол звезды');
                   reward = getPricingValue('half_star_reward', 2);
+                  console.log('★★★★★★★ пол звезды', reward);
                 } else {
-                  console.log('🪙🪙🪙🪙🪙 монетка');
                   reward = getPricingValue('text_activity_reward', 1);
+                  console.log('🪙🪙🪙🪙🪙 монетка', reward);
                 }
 
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
+                  console.log('⭐⭐⭐⭐0 text_coin_count', st.text_coin_count);
                   st.text_coin_count = (Number(st.text_coin_count) || 0) + reward;
+                  console.log('⭐⭐⭐⭐1 text_coin_count', st.text_coin_count);
                   st._paidTextRewardCycleId = cycleId;
                   try {
                     playUiSound('coins_plus_audio');
