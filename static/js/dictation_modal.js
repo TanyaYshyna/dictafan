@@ -231,7 +231,7 @@
       const st0 = getCurrentSentenceStateFromSession(session);
       const perfect0 = Number(st0 && st0.number_of_perfect) || 0;
       const corrected0 = Number(st0 && st0.number_of_corrected) || 0;
-      const isCompletedText = (perfect0 >= 1) || (corrected0 > 0);
+      const isCompletedText = (perfect0 >= 1);
       if (view && isCompletedText) {
         const originalText = String(view.text_original != null ? view.text_original : (view.text != null ? view.text : ''));
         const translationText = String(view.text_translation != null ? view.text_translation : (view.translation != null ? view.translation : ''));
@@ -259,8 +259,7 @@
         }
 
         try {
-          if (perfect0 >= 1) setCheckButtonState('star');
-          else setCheckButtonState('half');
+          setCheckButtonState('star');
         } catch (e0c3) {
         }
 
@@ -600,13 +599,10 @@
         try {
           if (res && res.allCorrect) {
             if (res.starOutcome === 'perfect') {
-              console.log('⭐ star');
               setCheckButtonState('star');
             } else if (res.starOutcome === 'half' || res.starOutcome === 'corrected') {
-              console.log('★  half');
               setCheckButtonState('half');
             } else {
-              console.log('🪙 ready');
               setCheckButtonState('ready');
             }
           } else {
@@ -633,7 +629,6 @@
 
             try {
               if (res && res.allCorrect) {
-                console.log('⭐⭐⭐⭐⭐');
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
@@ -645,13 +640,10 @@
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
                 if (perfectNow >= 1) {
                   reward = getPricingValue('star_reward', 3);
-                  console.log('⭐⭐⭐⭐⭐ звезда', reward);
                 } else if (correctedNow > 0) {
                   reward = getPricingValue('half_star_reward', 2);
-                  console.log('★★★★★★★ пол звезды', reward);
                 } else {
                   reward = getPricingValue('text_activity_reward', 1);
-                  console.log('🪙🪙🪙🪙🪙 монетка', reward);
                   try {
                     st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
                   } catch (e0ac0) {
