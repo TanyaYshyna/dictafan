@@ -750,6 +750,10 @@ body.playing-audio::after {
   z-index: 1000;
 }
 
+#completionModal {
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
 /* Progress wrapper for the big START button */
 .start-progress-wrap {
   width: 90%;
@@ -1254,6 +1258,9 @@ body.playing-audio::after {
   max-width: 500px;
   text-align: center;
   padding: 40px 30px;
+  background-color: var(--color-panel-bg, #fff);
+  border-radius: 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
 .completion-header {
@@ -1333,6 +1340,10 @@ body.playing-audio::after {
   gap: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+}
+
+#completionExitBtn {
+  padding: 14px 24px;
 }
 
 .completion-transparent-btn {

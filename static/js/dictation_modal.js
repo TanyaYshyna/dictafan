@@ -27,6 +27,42 @@
     dictationStarted: false,
   };
 
+  function positionsToLabel(positions) {
+    try {
+      const arr = Array.isArray(positions) ? positions : [];
+      const uniq = Array.from(new Set(arr.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
+      uniq.sort((a, b) => a - b);
+      if (!uniq.length) return '';
+      const ranges = [];
+      let start = uniq[0];
+      let prev = uniq[0];
+      for (let i = 1; i < uniq.length; i++) {
+        const cur = uniq[i];
+        if (cur === prev + 1) {
+          prev = cur;
+          continue;
+        }
+        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+        start = cur;
+        prev = cur;
+      }
+      ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+      return ranges.join(', ');
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function getPricingValue(key, fallback) {
+    try {
+      const v = window.DictafanPricing && window.DictafanPricing.values ? window.DictafanPricing.values[key] : undefined;
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    } catch (e) {
+    }
+    return Number(fallback);
+  }
+
   const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута
   const INACTIVITY_TIMEOUT_RECORDING = 10 * 60 * 1000; // 10 минут
 
@@ -70,6 +106,17 @@
     }
 
     try {
+      state._pauseDisabled = true;
+    } catch (e1b) {
+    }
+
+    try {
+      const pp = window.progressPanel;
+      if (pp && typeof pp.stopTimer === 'function') pp.stopTimer();
+    } catch (e1c) {
+    }
+
+    try {
       const rewardIcon = document.getElementById('completionRewardIcon');
       if (rewardIcon) rewardIcon.setAttribute('data-lucide', 'award');
     } catch (e2) {
@@ -109,7 +156,7 @@
         completionModal.addEventListener('click', (e) => {
           try {
             if (e && e.target === completionModal) {
-              hideCompletionModal();
+              return;
             }
           } catch (e2) {
           }
@@ -546,7 +593,8 @@
             try {
               if (res && res.allCorrect && !res.starOutcome) {
                 if (!prevAllCorrect) {
-                  st.text_coin_count = (Number(st.text_coin_count) || 0) + 1;
+                  const add = getPricingValue('text_activity_reward', 1);
+                  st.text_coin_count = (Number(st.text_coin_count) || 0) + add;
                   try {
                     playUiSound('coins_plus_audio');
                   } catch (e0s) {
@@ -968,6 +1016,7 @@
   function pauseGame(isInactivityPause = false) {
     try {
       if (!state.dictationStarted) return;
+      if (state._pauseDisabled) return;
       const pauseModal = document.getElementById('pauseModal');
       if (!pauseModal) return;
       if (pauseModal.style.display === 'flex') return;
@@ -1407,7 +1456,8 @@
       const wrap = document.getElementById('tablo_result_text_coins');
       _renderCoins(wrap, textCoins, '--color-button-lightgreen');
       const btn = document.getElementById('btn_coin_exchange_text');
-      if (btn) btn.style.display = textCoins >= 3 ? 'inline-flex' : 'none';
+      const cost = getPricingValue('half_star_purchase_cost', 3);
+      if (btn) btn.style.display = textCoins >= cost ? 'inline-flex' : 'none';
     } catch (e) {
     }
 
@@ -1415,7 +1465,8 @@
       const wrap = document.getElementById('audio_result_coins');
       _renderCoins(wrap, audioCoins, '--color-button-purple');
       const btn = document.getElementById('btn_coin_exchange_audio');
-      if (btn) btn.style.display = audioCoins >= 3 ? 'inline-flex' : 'none';
+      const cost = getPricingValue('audio_purchase_cost', 3);
+      if (btn) btn.style.display = audioCoins >= cost ? 'inline-flex' : 'none';
     } catch (e) {
     }
 
@@ -1444,10 +1495,13 @@
     const open = (mode) => {
       try {
         state._coinExchangeMode = mode;
+        const cost = mode === 'text'
+          ? getPricingValue('half_star_purchase_cost', 3)
+          : getPricingValue('audio_purchase_cost', 3);
         if (mode === 'text') {
-          title.textContent = 'Покупешь полузвезду за 3 монеты?';
+          title.textContent = `Покупешь полузвезду за ${cost} монеты?`;
         } else {
-          title.textContent = 'Покупешь микрофон за 3 монеты?';
+          title.textContent = `Покупешь микрофон за ${cost} монеты?`;
         }
         modal.style.display = 'flex';
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1494,9 +1548,13 @@
       const mode = String(state._coinExchangeMode || '');
       if (mode !== 'text' && mode !== 'audio') return;
 
+      const cost = mode === 'text'
+        ? getPricingValue('half_star_purchase_cost', 3)
+        : getPricingValue('audio_purchase_cost', 3);
+
       try {
         const payload = {
-          cost: 3,
+          cost,
           reason: mode === 'text' ? 'buy_half_star' : 'buy_mic',
         };
         await fetch('/api/statistics/money/spend', {
@@ -1513,12 +1571,12 @@
       }
 
       if (mode === 'text') {
-        st.text_coin_count = Math.max(0, (Number(st.text_coin_count) || 0) - 3);
+        st.text_coin_count = Math.max(0, (Number(st.text_coin_count) || 0) - cost);
         st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
         st.text_exchange_half_star = true;
         setCheckButtonState('half');
       } else {
-        st.audio_coin_count = Math.max(0, (Number(st.audio_coin_count) || 0) - 3);
+        st.audio_coin_count = Math.max(0, (Number(st.audio_coin_count) || 0) - cost);
         const req = getRequiredAudioRepeatsValue();
         st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
         st.audio_exchange_mic = true;
@@ -1548,13 +1606,10 @@
           const corrected = Number(st && st.number_of_corrected) || 0;
           const repeatBtn = document.getElementById('repeatBtn');
           const nextBtn = document.getElementById('resultNextBtn');
-          const shouldFocusRepeat = (corrected > 0 && perfect < 1);
-          if (
-            shouldFocusRepeat
-            && repeatBtn
-            && repeatBtn.style.display !== 'none'
-            && typeof repeatBtn.focus === 'function'
-          ) {
+          const shouldPreferRepeat = (corrected > 0 && perfect < 1);
+          if (shouldPreferRepeat && repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
+            repeatBtn.focus();
+          } else if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
             repeatBtn.focus();
           } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
             nextBtn.focus();
@@ -1905,12 +1960,14 @@
               const next = (Number(st.number_of_audio) || 0) + 1;
               st.number_of_audio = next;
               try {
-                st.audio_coin_count = (Number(st.audio_coin_count) || 0) + 1;
+                const add = getPricingValue('audio_activity_reward', 1);
+                st.audio_coin_count = (Number(st.audio_coin_count) || 0) + add;
                 playUiSound('coins_plus_audio');
               } catch (e0s) {
               }
             } else if (pct >= 50) {
-              st.audio_coin_count = (Number(st.audio_coin_count) || 0) + 1;
+              const add = getPricingValue('audio_activity_reward', 1);
+              st.audio_coin_count = (Number(st.audio_coin_count) || 0) + add;
             } else {
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
@@ -1924,10 +1981,10 @@
                 const repeatBtn = document.getElementById('repeatBtn');
                 const nextBtn = document.getElementById('resultNextBtn');
 
-                if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
-                  nextBtn.focus();
-                } else if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
+                if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
                   repeatBtn.focus();
+                } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+                  nextBtn.focus();
                 }
               } else {
                 const rb = document.getElementById('recordButton');
@@ -3640,6 +3697,11 @@
       } catch (e0) {
       }
 
+      try {
+        state._pauseDisabled = false;
+      } catch (e0b) {
+      }
+
       const parsed = parseDictationHref(dictationUrl);
 
       setUsername();
@@ -3656,6 +3718,21 @@
 
       try {
         applyDictationMetaFromCard({ href: dictationUrl, cardEl: opts.cardEl || null });
+      } catch (e) {
+      }
+
+      try {
+        const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
+        const label = positionsToLabel(subsetPositions);
+        if (label) {
+          const dictationData = document.getElementById('dictation-data');
+          const baseTitle = dictationData ? String(dictationData.getAttribute('data-title-orig') || '') : '';
+          const decorated = baseTitle ? `${baseTitle} (${label})` : `(${label})`;
+          const titleEl = document.getElementById('dictationTitle');
+          if (titleEl) titleEl.textContent = decorated;
+          const titleModalEl = document.getElementById('title-diktation');
+          if (titleModalEl) titleModalEl.textContent = decorated;
+        }
       } catch (e) {
       }
 
@@ -3776,6 +3853,11 @@
     try {
       modal.style.display = 'none';
     } catch (e) {
+    }
+
+    try {
+      state._pauseDisabled = false;
+    } catch (e0) {
     }
     try {
       modal.classList.remove('show');
