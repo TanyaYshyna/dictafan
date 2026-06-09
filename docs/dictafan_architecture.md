@@ -193,13 +193,13 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 - Эти параметры живут в состоянии `DictationSession` по ключу предложения:
   - `number_of_perfect`, `number_of_corrected`, `number_of_audio`
-  - `text_coin_count`, `audio_coin_count`
+  - `text_activity_count`, `audio_activity50_count`, `money_count`
 
 ### Прайс/стоимости и покупки
 
 Единая точка правды прайса:
 
-- `window.DictafanPricing.values` (инициализируется на десктоп-странице в `static/js/private_library.js`).
+- `window.DictafanPricing.values` (инициализируется на десктоп-странице в `static/js/dictation_modal.js`).
 - `dictation_modal.js` читает цены через `getPricingValue(key, fallback)`.
 
 Ключи прайса (англ):

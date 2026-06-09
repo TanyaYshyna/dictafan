@@ -652,12 +652,17 @@
                 } else {
                   reward = getPricingValue('text_activity_reward', 1);
                   console.log('🪙🪙🪙🪙🪙 монетка', reward);
+                  try {
+                    st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
+                  } catch (e0ac0) {
+                  }
                 }
 
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
-                  console.log('⭐⭐⭐⭐0 text_coin_count', st.text_coin_count);
-                  st.text_coin_count = (Number(st.text_coin_count) || 0) + reward;
-                  console.log('⭐⭐⭐⭐1 text_coin_count', st.text_coin_count);
+                  try {
+                    st.money_count = (Number(st.money_count) || 0) + reward;
+                  } catch (e0ac1) {
+                  }
                   st._paidTextRewardCycleId = cycleId;
                   try {
                     playUiSound('coins_plus_audio');
@@ -1514,8 +1519,8 @@
     const corrected = Number(st.number_of_corrected) || 0;
     const audio = Number(st.number_of_audio) || 0;
 
-    const textCoins = Number(st.text_coin_count) || 0;
-    const audioCoins = Number(st.audio_coin_count) || 0;
+    const textCoins = Number(st.text_activity_count) || 0;
+    const audioCoins = Number(st.audio_activity50_count) || 0;
 
     try {
       const starWrap = document.getElementById('tablo_result_star');
@@ -1664,12 +1669,12 @@
       }
 
       if (mode === 'text') {
-        st.text_coin_count = Math.max(0, (Number(st.text_coin_count) || 0) - cost);
+        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - cost);
         st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
         st.text_exchange_half_star = true;
         setCheckButtonState('half');
       } else {
-        st.audio_coin_count = Math.max(0, (Number(st.audio_coin_count) || 0) - cost);
+        st.audio_activity50_count = Math.max(0, (Number(st.audio_activity50_count) || 0) - cost);
         const req = getRequiredAudioRepeatsValue();
         st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
         st.audio_exchange_mic = true;
@@ -1791,18 +1796,8 @@
         }
 
         try {
-          // +1 за активность по тексту
-          const textActivityDone = (p >= 1) || (c > 0) || ((Number(st.text_coin_count) || 0) > 0);
-          if (textActivityDone) moneyEarned += 1;
+          moneyEarned += (Number(st.money_count) || 0);
         } catch (e0) {
-        }
-
-        try {
-          // +1 за выполненный микрофон (если требуется)
-          const req = getRequiredAudioRepeatsValue();
-          const micOk = req <= 0 || a >= req;
-          if (micOk) moneyEarned += 1;
-        } catch (e1) {
         }
 
         try {
@@ -2054,13 +2049,15 @@
               st.number_of_audio = next;
               try {
                 const add = getPricingValue('audio_activity_reward', 1);
-                st.audio_coin_count = (Number(st.audio_coin_count) || 0) + add;
+                st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
+                st.money_count = (Number(st.money_count) || 0) + add;
                 playUiSound('coins_plus_audio');
               } catch (e0s) {
               }
             } else if (pct >= 50) {
               const add = getPricingValue('audio_activity_reward', 1);
-              st.audio_coin_count = (Number(st.audio_coin_count) || 0) + add;
+              st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
+              st.money_count = (Number(st.money_count) || 0) + add;
             } else {
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }

@@ -130,18 +130,19 @@
       for (const k of all) {
         if (!this._stateByKey.has(k)) {
           this._stateByKey.set(k, {
-            number_of_perfect: 0,
-            number_of_corrected: 0,
-            number_of_audio: 0,
-            number_of_time: 0,
-            mistake_count: 0,
-            mistake_count_current: 0,
-            text_coin_count: 0,
-            audio_coin_count: 0,
-            text_exchange_half_star: false,
-            audio_exchange_mic: false,
-            selection_state: 'unchecked',
-            all_audio_completed: false,
+            number_of_perfect: 0, // Кол-во полученных «звёзд» за предложение (perfect)
+            number_of_corrected: 0, // Кол-во полученных «полузвёзд» за предложение (corrected)
+            number_of_audio: 0, // Кол-во успешно выполненных повторов по микрофону
+            number_of_time: 0, // Служебный счётчик времени/попыток (legacy поле)
+            mistake_count: 0, // Суммарные ошибки (накопительно)
+            mistake_count_current: 0, // Ошибки в текущей попытке/проверке
+            text_activity_count: 0,
+            audio_activity50_count: 0,
+            money_count: 0,
+            text_exchange_half_star: false, // Флаг: half-star был получен через «покупку» за text_activity_count
+            audio_exchange_mic: false, // Флаг: микрофон был получен через «покупку» за audio_activity50_count
+            selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
+            all_audio_completed: false, // Служебный флаг (legacy): микрофон полностью завершён
           });
         }
       }
@@ -152,18 +153,19 @@
       const st = this._stateByKey.get(k);
       if (st) return st;
       const init = {
-        number_of_perfect: 0,
-        number_of_corrected: 0,
-        number_of_audio: 0,
-        number_of_time: 0,
-        mistake_count: 0,
-        mistake_count_current: 0,
-        text_coin_count: 0,
-        audio_coin_count: 0,
-        text_exchange_half_star: false,
-        audio_exchange_mic: false,
-        selection_state: 'unchecked',
-        all_audio_completed: false,
+        number_of_perfect: 0, // Кол-во полученных «звёзд» за предложение (perfect)
+        number_of_corrected: 0, // Кол-во полученных «полузвёзд» за предложение (corrected)
+        number_of_audio: 0, // Кол-во успешно выполненных повторов по микрофону
+        number_of_time: 0, // Служебный счётчик времени/попыток (legacy поле)
+        mistake_count: 0, // Суммарные ошибки (накопительно)
+        mistake_count_current: 0, // Ошибки в текущей попытке/проверке
+        text_activity_count: 0,
+        audio_activity50_count: 0,
+        money_count: 0,
+        text_exchange_half_star: false, // Флаг: half-star был получен через «покупку» за text_activity_count
+        audio_exchange_mic: false, // Флаг: микрофон был получен через «покупку» за audio_activity50_count
+        selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
+        all_audio_completed: false, // Служебный флаг (legacy): микрофон полностью завершён
       };
       this._stateByKey.set(k, init);
       return init;
