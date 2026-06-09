@@ -61,6 +61,22 @@
     }
   }
 
+  try {
+    if (!window.DictafanPricing) {
+      window.DictafanPricing = {
+        values: {
+          star_reward: 3,
+          half_star_reward: 2,
+          text_activity_reward: 1,
+          audio_activity_reward: 1,
+          half_star_purchase_cost: 3,
+          audio_purchase_cost: 3,
+        },
+      };
+    }
+  } catch (e) {
+  }
+
   function getPricingValue(key, fallback) {
     try {
       const v = window.DictafanPricing && window.DictafanPricing.values ? window.DictafanPricing.values[key] : undefined;

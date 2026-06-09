@@ -16,30 +16,6 @@ function libT(key, params, fallback) {
   return String(key || '');
 }
 
-try {
-  if (!window.DictafanPricing) {
-    window.DictafanPricing = {
-      values: {
-        star_reward: 3,
-        half_star_reward: 2,
-        text_activity_reward: 1,
-        audio_activity_reward: 1,
-        half_star_purchase_cost: 3,
-        audio_purchase_cost: 3,
-      },
-      menu: [
-        { key: 'star_reward', label: 'Star reward', coins: 3, type: 'earn' },
-        { key: 'half_star_reward', label: 'Half-star reward', coins: 2, type: 'earn' },
-        { key: 'text_activity_reward', label: 'Text activity reward', coins: 1, type: 'earn' },
-        { key: 'audio_activity_reward', label: 'Audio activity reward (>=80%)', coins: 1, type: 'earn' },
-        { key: 'half_star_purchase_cost', label: 'Buy half-star (cost)', coins: 3, type: 'spend' },
-        { key: 'audio_purchase_cost', label: 'Buy audio (mic) (cost)', coins: 3, type: 'spend' },
-      ],
-    };
-  }
-} catch (e) {
-}
-
 function _getCreateAssignmentSelectedPositionsForSave(modal) {
   const st = getCreateAssignmentExercisesState(modal);
   if (st.draft && st.draft.selected === true) {
