@@ -457,8 +457,170 @@ window.DictationKart = window.DictationKart || {
       });
     }
 
+    try {
+      const launchBtn = cardEl.querySelector('[data-action="launch-assignment"]');
+      const launchMenu = cardEl.querySelector('.dictation-kart-launch-menu');
+      const closeLaunchMenu = () => {
+        try {
+          if (!launchMenu) return;
+          launchMenu.classList.remove('show');
+          launchMenu.style.display = 'none';
+        } catch (e) {
+        }
+      };
+
+      const openLaunchMenu = () => {
+        try {
+          if (!launchMenu) return;
+          document.querySelectorAll('.dictation-kart-launch-menu').forEach((m) => {
+            try {
+              if (m !== launchMenu) {
+                m.classList.remove('show');
+                m.style.display = 'none';
+              }
+            } catch (e0) {
+            }
+          });
+          launchMenu.classList.add('show');
+          launchMenu.style.display = 'block';
+          this._renderLucide(launchMenu);
+        } catch (e) {
+        }
+      };
+
+      const normalizePositions = (pos) => {
+        const arr = Array.isArray(pos) ? pos : [];
+        const uniq = Array.from(new Set(arr.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
+        uniq.sort((a, b) => a - b);
+        return uniq;
+      };
+
+      const positionsToLabel = (positions) => {
+        const arr = normalizePositions(positions);
+        if (!arr.length) return 'весь диктант';
+        const ranges = [];
+        let start = arr[0];
+        let prev = arr[0];
+        for (let i = 1; i < arr.length; i++) {
+          const cur = arr[i];
+          if (cur === prev + 1) {
+            prev = cur;
+            continue;
+          }
+          ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+          start = cur;
+          prev = cur;
+        }
+        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+        return ranges.join(', ');
+      };
+
+      const openDictationModal = (subsetPositions) => {
+        try {
+          const href = thumb ? String(thumb.getAttribute('data-href') || '').trim() : '';
+          if (!href) return;
+          if (window.DictationModal && typeof window.DictationModal.open === 'function') {
+            window.DictationModal.open(href, { cardEl, subsetPositions: subsetPositions && subsetPositions.length ? subsetPositions : null });
+            return;
+          }
+          window.location.href = href;
+        } catch (e) {
+        }
+      };
+
+      if (launchBtn && launchMenu && launchBtn.dataset.boundLaunchAssignment !== '1') {
+        launchBtn.dataset.boundLaunchAssignment = '1';
+        launchBtn.addEventListener('click', async (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+
+          const dictationId = Number(cardEl.getAttribute('data-dictation-id'));
+          if (!Number.isFinite(dictationId) || dictationId <= 0) {
+            openDictationModal(null);
+            return;
+          }
+
+          let exercises = [];
+          try {
+            const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+            const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+            const data = res && res.ok ? await res.json() : null;
+            const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
+            exercises = raw.map((x) => {
+              const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : x.positions;
+              return { id: x && x.id != null ? x.id : null, positions: normalizePositions(p) };
+            });
+          } catch (e1) {
+            exercises = [];
+          }
+
+          const visible = exercises.filter((x) => x && x.id != null);
+          const uniqueBySig = new Map();
+          for (const ex of visible) {
+            const sig = ex.positions && ex.positions.length ? ex.positions.join(',') : '';
+            if (!uniqueBySig.has(sig)) uniqueBySig.set(sig, ex);
+          }
+          const list = Array.from(uniqueBySig.values());
+
+          if (list.length <= 1) {
+            const only = list[0];
+            const pos = only && Array.isArray(only.positions) ? only.positions : [];
+            openDictationModal(pos.length ? pos : null);
+            return;
+          }
+
+          try {
+            launchMenu.innerHTML = list.map((ex) => {
+              const pos = Array.isArray(ex.positions) ? ex.positions : [];
+              const sig = pos.length ? pos.join(',') : '';
+              const label = positionsToLabel(pos);
+              return `
+                <button class="dropdown-menu-item" type="button" data-action="launch-assignment-item" data-positions="${window.escapeHtml(sig)}">
+                  <i data-lucide="play"></i>
+                  <span>${window.escapeHtml(label)}</span>
+                </button>
+              `;
+            }).join('');
+          } catch (e2) {
+          }
+
+          openLaunchMenu();
+        });
+
+        launchMenu.addEventListener('click', (e) => {
+          try {
+            const btn = e.target && e.target.closest ? e.target.closest('[data-action="launch-assignment-item"]') : null;
+            if (!btn) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const posStr = String(btn.getAttribute('data-positions') || '').trim();
+            const positions = posStr
+              ? posStr.split(',').map((x) => Number(String(x).trim())).filter((x) => Number.isFinite(x) && x > 0)
+              : [];
+            closeLaunchMenu();
+            openDictationModal(positions.length ? positions : null);
+          } catch (e3) {
+          }
+        });
+
+        document.addEventListener('click', (e) => {
+          try {
+            if (!launchMenu || !launchBtn) return;
+            if (launchMenu.contains(e.target) || launchBtn.contains(e.target)) return;
+          } catch (e4) {
+          }
+          closeLaunchMenu();
+        });
+      }
+    } catch (e) {
+    }
+
     const kebabBtn = cardEl.querySelector('[data-action="toggle-card-actions"]');
-    const menu = cardEl.querySelector('.short-card-actions-menu');
+    const menu = cardEl.querySelector('.short-card-actions-menu:not(.dictation-kart-launch-menu)');
     if (!kebabBtn || !menu) return;
 
     const closeMenu = () => {

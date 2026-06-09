@@ -75,6 +75,25 @@
   gap: 8px;
 }
 
+.page-index .desk-card .dictation-kart-launch-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.page-index .desk-card .dictation-kart-launch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.page-index .desk-card .dictation-kart-launch-menu {
+  right: 0;
+  left: auto;
+}
+
 .page-index .short-card.dictation-kart:hover {
   transform: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, .06);

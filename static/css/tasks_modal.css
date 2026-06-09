@@ -170,6 +170,10 @@
   min-width: 0;
 }
 
+ .create-assignment-panel--sentences .create-assignment-panel-body {
+   overflow-y: auto;
+ }
+
 .create-assignment-panel-body {
   padding: 10px;
   min-height: 0;

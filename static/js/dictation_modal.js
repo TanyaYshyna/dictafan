@@ -1619,6 +1619,7 @@
       let moneyEarned = 0;
       let moneySpent = 0;
       let charsTotal = 0;
+      let allCompleted = (total > 0);
       for (const k of keys) {
         const st = session.getState ? session.getState(k) : null;
         if (!st) continue;
@@ -1633,6 +1634,13 @@
         if (p >= 1 || c > 0) passed += 1;
         mistakesTotal += m;
         charsTotal += ch;
+
+        try {
+          const { textOk, audioOk } = computeSentenceCompletionState(st);
+          if (!textOk || !audioOk) allCompleted = false;
+        } catch (e3c) {
+          allCompleted = false;
+        }
 
         try {
           // +1 за активность по тексту
@@ -1687,6 +1695,16 @@
         const el = document.getElementById('tablo_result_bug_count');
         if (el) el.textContent = mistakesTotal > 0 ? String(mistakesTotal) : '';
       } catch (e2) {
+      }
+
+      try {
+        if (allCompleted && state.dictationStarted && !state._completionShown) {
+          if (!isPauseModalOpen() && !isStartModalOpen()) {
+            state._completionShown = true;
+            showCompletionModal();
+          }
+        }
+      } catch (e3) {
       }
     } catch (e) {
     }
@@ -2635,7 +2653,7 @@
     return true;
   }
 
-  function getOrCreateDefaultSessionFromParsed(parsed) {
+  function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null) {
     const store = getRuntimeStore();
     if (!store) return null;
 
@@ -2647,15 +2665,33 @@
       dictationId,
       langTr,
       exerciseId: null,
-      subsetPositions: null,
+      subsetPositions,
       subsetSignature: null,
     });
 
     try {
       const content = store.getContent({ dictationId, langTr });
-      const keys = content ? content.getAllKeys() : [];
-      session.setActiveSubsetByKeys(keys);
-      session.ensureDefaultSelection();
+      const allKeys = content ? content.getAllKeys() : [];
+      const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
+      if (!hasSubset) {
+        session.setActiveSubsetByKeys(allKeys);
+        session.ensureDefaultSelection();
+      } else {
+        const wanted = new Set(subsetPositions.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0));
+        const cores = content && typeof content.getAllSentenceCores === 'function' ? content.getAllSentenceCores() : [];
+        const subsetKeys = Array.isArray(cores)
+          ? cores
+            .filter((c) => c && wanted.has(Number(c.position)))
+            .map((c) => String(c.key))
+            .filter(Boolean)
+          : [];
+
+        session.setActiveSubsetByKeys(subsetKeys);
+        for (const k of subsetKeys) {
+          try { session.setSelectionState(k, 'checked'); } catch (e0) { }
+        }
+        session.ensureDefaultSelection();
+      }
     } catch (e) {
     }
 
@@ -3642,7 +3678,8 @@
       }
 
       try {
-        const session = parsed ? getOrCreateDefaultSessionFromParsed(parsed) : null;
+        const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
+        const session = parsed ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
         if (session) {
           try {
             window.__dictationModalActiveSession = session;
