@@ -1356,11 +1356,11 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   min-height: 54px;
   padding: 0 22px;
   border-radius: 10px;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: auto;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 
 #dictationModal #confirmStartBtn:focus {

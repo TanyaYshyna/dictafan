@@ -758,12 +758,25 @@
 
         try {
           // Фокус после проверки:
-          // 1) если текст уже засчитан (звезда/полузвезда) и требуется микрофон, но он ещё не выполнен — фокус на запись.
-          // 2) если текст + микрофон выполнены — perfect => Next, иначе Repeat.
+          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды — фокус на "Повторить"
+          // 2) если есть звезда/полузвезда (textOk) и требуется микрофон, но он ещё не выполнен — фокус на запись.
+          // 3) если текст + микрофон выполнены — perfect => Next, иначе Repeat.
           {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-            if (textOk && !audioOk && requiresAudio > 0) {
+            const allCorrect = !!(res && res.allCorrect);
+
+            // Случай: текст исправлен, но звезды/полузвезды нет — фокус на "Повторить"
+            if (allCorrect && !textOk) {
+              const repeatBtn = document.getElementById('repeatBtn');
+              if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
+                try {
+                  state._skipNavigatorFocusOnce = true;
+                } catch (e0skip) {
+                }
+                repeatBtn.focus();
+              }
+            } else if (textOk && !audioOk && requiresAudio > 0) {
               try {
                 updateAudioUserPanelVisibilityFromSession(session);
               } catch (e00) {
@@ -1798,12 +1811,12 @@
         if (p >= 1) perfect += 1;
         if (c > 0) corrected += 1;
         if (a > 0) audio += 1;
-        if (p >= 1 || c > 0) passed += 1;
         mistakesTotal += m;
         charsTotal += ch;
 
         try {
           const { textOk, audioOk } = computeSentenceCompletionState(st);
+          if (textOk && audioOk) passed += 1;
           if (!textOk || !audioOk) allCompleted = false;
         } catch (e3c) {
           allCompleted = false;
@@ -2257,7 +2270,18 @@
           }
 
           resetSentenceUiFromSession(session);
-          updateNextButtonVisibilityFromSession(session);
+          // При повторе скрываем обе кнопки ("повторить" и "далее"),
+          // как при начале прохода предложения.
+          try {
+            const rb = document.getElementById('repeatBtn');
+            if (rb) rb.style.display = 'none';
+          } catch (e0) {
+          }
+          try {
+            const nb = document.getElementById('resultNextBtn');
+            if (nb) nb.style.display = 'none';
+          } catch (e1) {
+          }
           updateNavigatorFromSession(session);
 
           try {

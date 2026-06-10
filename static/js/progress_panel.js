@@ -212,6 +212,9 @@ class ProgressPanel {
         }
 
         this.markClean({ lastSaveOk: true });
+        
+        // Инициализируем обработчики кнопок таймера после рендера
+        this._initTimerControls();
     }
 
     /**
@@ -846,24 +849,14 @@ class ProgressPanel {
      */
     _initTimerControls() {
         this._ensureTimerButtonsEnabled();
-        this._setupTimerSettingsButton(this.elements.timerSettings);
-        this._setupTimerSettingsButton(this.elements.modalTimerSettings);
-        this._setupTimerButton(document.getElementById('btn-timer'));
-        this._setupTimerButton(document.getElementById('btn-modal-timer'));
+        // Кнопка с часами переключает паузу (как в старой версии script_dictation.js)
+        this._setupTimerPauseButton(document.getElementById('btn-timer'));
+        this._setupTimerPauseButton(document.getElementById('btn-modal-timer'));
         this.updateTimerButtons();
         this._updateTimerButtonColor();
     }
 
-    _setupTimerButton(button) {
-        if (!button || button.dataset.timerSetup === '1') return;
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            this.openTimerDialog();
-        });
-        button.dataset.timerSetup = '1';
-    }
-
-    _setupTimerSettingsButton(button) {
+    _setupTimerPauseButton(button) {
         if (!button || button.dataset.timerSetup === '1') return;
         button.addEventListener('click', (event) => {
             event.preventDefault();
@@ -871,8 +864,6 @@ class ProgressPanel {
             if (event && typeof event.detail === 'number' && event.detail > 1) {
                 return;
             }
-            // Кнопка "время" (маленькая) переключает паузу (как раньше),
-            // а широкая кнопка "таймер" открывает настройки таймера.
             const pauseModal = document.getElementById('pauseModal');
             if (pauseModal && pauseModal.style.display === 'flex') {
                 if (typeof window.resumeGame === 'function') window.resumeGame();
