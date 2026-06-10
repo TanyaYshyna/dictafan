@@ -1516,12 +1516,16 @@
       const perfect = Number(st && st.number_of_perfect) || 0;
       const corrected = Number(st && st.number_of_corrected) || 0;
 
+      // Если текст сброшен (пользователь нажал "повторить"), но corrected ещё > 0 (полузвезда осталась),
+      // то это состояние "повтора" — кнопки не показываем, как при начале прохода предложения.
+      const isRepeatReset = !lastAllCorrect && corrected > 0;
+
       // Next: только если получена звезда/полузвезда (textOk) и выполнен микрофон (audioOk)
-      const showNext = (!!textOk && !!audioOk);
+      const showNext = !isRepeatReset && (!!textOk && !!audioOk);
 
       // Repeat: если текст набран полностью правильно (allCorrect) и при этом нет perfect
       // Важно: когда allCorrect, но звезду/полузвезду не дали (textOk=false), Repeat всё равно должен быть видимым.
-      const showRepeat = (perfect < 1) && (lastAllCorrect || corrected > 0);
+      const showRepeat = !isRepeatReset && (perfect < 1) && (lastAllCorrect || corrected > 0);
 
       if (btn) btn.style.display = showNext ? 'inline-flex' : 'none';
       if (repeatBtn) repeatBtn.style.display = showRepeat ? 'inline-flex' : 'none';

@@ -409,12 +409,10 @@ window.Desktop = window.Desktop || {
 
           this.renderLucide(modal);
 
+          // Инициализируем профиль при каждом открытии модалки
           try {
-            if (modal.dataset.profileInit !== '1') {
-              modal.dataset.profileInit = '1';
-              if (window.UserProfile && typeof window.UserProfile.init === 'function') {
-                window.UserProfile.init();
-              }
+            if (window.UserProfile && typeof window.UserProfile.init === 'function') {
+              window.UserProfile.init();
             }
           } catch (e4) {
           }

@@ -1851,7 +1851,13 @@ function bindProfileTestRecording() {
 }
 
 async function initUserProfilePageOrModal() {
-    UM = new UserManager();
+    // Используем глобальный UM, не создаём новый
+    if (!window.UM) {
+        console.error('[profile] window.UM не найден');
+        showError(profileT('profile.errors.load_failed', { message: 'UserManager не найден' }, 'Ошибка загрузки профиля: UserManager не найден'));
+        return;
+    }
+    UM = window.UM;
 
     try {
         // Same scheme as desk/dictation: force reload when app cache revision changes
@@ -1873,7 +1879,10 @@ async function initUserProfilePageOrModal() {
     }
 
     try {
-        await UM.init();
+        // Ждём инициализации UM, если ещё не готов
+        if (!UM.isInitialized) {
+            await UM.init();
+        }
         if (!UM.isAuthenticated()) {
             // Показываем сообщение вместо редиректа
             showError(profileT('profile.auth.please_login', null, 'Пожалуйста, войдите в систему'));
@@ -1915,20 +1924,11 @@ async function initUserProfilePageOrModal() {
     }
 }
 
+
 window.UserProfile = window.UserProfile || {};
 window.UserProfile.init = async function () {
     return initUserProfilePageOrModal();
 };
-
-// Инициализация при загрузке страницы: запускаем только если элементы профиля реально присутствуют.
-document.addEventListener('DOMContentLoaded', async function () {
-    try {
-        if (document.getElementById('user-profile-modal')) {
-            await initUserProfilePageOrModal();
-        }
-    } catch (e) {
-    }
-});
 
 function setupPasswordToggles() {
     document.addEventListener('click', (e) => {
