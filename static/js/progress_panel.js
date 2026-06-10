@@ -425,14 +425,16 @@ class ProgressPanel {
     }
 
     updateTimerButtons() {
-        const shouldShowValue = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
+        const isCountdownActive = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
         const apply = (btnId) => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
             const label = btn.querySelector('.timer-label');
             const value = btn.querySelector('.timer-value');
-            if (label) label.hidden = shouldShowValue;
-            if (value) value.hidden = !shouldShowValue;
+            // В режиме clock (countdownEnabled = false) всегда показываем время
+            // В режиме countdown: скрываем label, показываем value, если отсчёт активен
+            if (label) label.hidden = isCountdownActive;
+            if (value) value.hidden = false; // Всегда показываем время
         };
         apply('btn-timer');
         apply('btn-modal-timer');
