@@ -352,7 +352,7 @@ class ПроверкаНаОшибки {
     }
   }
 
-  analyze({ originalText, userText, langOriginal, textAttemptCount = 0, prevPerfect = 0, prevCorrected = 0, requiredPassedStarHalf } = {}) {
+  analyze({ originalText, userText, langOriginal, textAttemptCount = 0, prevPerfect = 0, prevCorrected = 0, requiredPassedStarHalf, totalMistakeCount = 0 } = {}) {
     const script = this.getDictationScript(langOriginal);
 
     const userNorm = this.normalizeForMinLength(userText);
@@ -407,13 +407,11 @@ class ПроверкаНаОшибки {
       } else {
         // Если пользователь исправил все ошибки, errorCount = 0.
         // Но для полузвезды нужно учитывать, сколько ошибок БЫЛО до исправления.
-        // Используем textAttemptCount как индикатор того, что ошибки были:
-        // если была хотя бы одна неудачная попытка, значит ошибки были.
-        // Считаем, что было 1+ ошибок (иначе не было бы неудачной попытки).
+        // Используем totalMistakeCount — общее количество ошибок за всё время прохода предложения.
         const originalLen = String(originalText || '').length;
-        // Если errorCount = 0 (всё исправлено), но textAttemptCount > 0 (были ошибки),
-        // то считаем что была минимум 1 ошибка для целей полузвезды.
-        const effectiveErrors = errorCount > 0 ? errorCount : 1;
+        // Если totalMistakeCount > 0, используем его (реальное количество ошибок).
+        // Иначе fallback на errorCount (если errorCount > 0) или 1 (если были попытки).
+        const effectiveErrors = totalMistakeCount > 0 ? totalMistakeCount : (errorCount > 0 ? errorCount : 1);
         if (shouldGrantHalfStar(originalLen, effectiveErrors)) {
           nextCorrected = nextCorrected + 1;
           starOutcome = 'half';

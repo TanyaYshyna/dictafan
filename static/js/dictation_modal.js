@@ -506,6 +506,13 @@
         } catch (e4) {
         }
 
+        let totalMistakeCount = 0;
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          if (st) totalMistakeCount = Number(st.mistake_count) || 0;
+        } catch (eMC) {
+        }
+
         const res = checker.analyze({
           originalText,
           userText,
@@ -514,6 +521,7 @@
           prevPerfect,
           prevCorrected,
           requiredPassedStarHalf,
+          totalMistakeCount,
         });
 
         try {
