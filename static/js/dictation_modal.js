@@ -348,6 +348,15 @@
     }
 
     try {
+      // Скрываем кнопку "повторить" при сбросе предложения
+      // (повтор, навигация и т.д.), чтобы пользователь не мог
+      // нажать её, не начав набирать текст заново.
+      const repeatBtn = document.getElementById('repeatBtn');
+      if (repeatBtn) repeatBtn.style.display = 'none';
+    } catch (e5a) {
+    }
+
+    try {
       updateAudioUserPanelVisibilityFromSession(session);
     } catch (e5) {
     }
