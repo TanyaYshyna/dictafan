@@ -439,6 +439,19 @@
         const view = getCurrentSentenceViewFromSession(session);
         if (!view) return;
 
+        // Если текст уже засчитан как правильный (allCorrect), не даём
+        // повторно запускать проверку — это предотвращает дублирование
+        // кружков активности (text_activity_count) при повторном нажатии Enter.
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          if (st && st._textAllCorrect) return;
+        } catch (e0pre) {
+        }
+        try {
+          if (view._textAllCorrect) return;
+        } catch (e0pre2) {
+        }
+
         const originalText = String(view.text_original != null ? view.text_original : (view.text != null ? view.text : ''));
         const userInputEl = document.getElementById('userInput');
         const userText = userInputEl ? String(userInputEl.textContent || '') : '';
