@@ -482,7 +482,25 @@
       for (let i = 0; i < need; i++) {
         const e = entries[i];
         if (!e) continue;
+        const session = e[1];
         this._sessions.delete(e[0]);
+
+        // Если после удаления сессии на контент больше нет ссылок — удаляем контент и чистим кэш
+        if (session && session.content && session.content.key) {
+          const contentKey = session.content.key;
+          const hasOtherSessions = Array.from(this._sessions.values()).some(
+            (s) => s && s.content && s.content.key === contentKey
+          );
+          if (!hasOtherSessions) {
+            const dictationId = session.content.dictationId;
+            // Удаляем контент из памяти
+            this._contents.delete(contentKey);
+            // Чистим blob URL'ы в AudioManager для этого диктанта
+            if (dictationId && window.AudioManager && typeof window.AudioManager.revokeDictationBlobUrls === 'function') {
+              window.AudioManager.revokeDictationBlobUrls(dictationId);
+            }
+          }
+        }
       }
     }
 

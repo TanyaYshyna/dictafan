@@ -1035,6 +1035,101 @@ class AudioManagerClass {
         }
     }
 
+    async deleteDictationAudioFromCache(dictationId) {
+        try {
+            const id = String(dictationId || '').trim();
+            if (!id) return { success: false, deleted: 0 };
+            const cache = await this.openMediaCache();
+            if (!cache) return { success: false, deleted: 0 };
+            const requests = await cache.keys();
+            let deleted = 0;
+            for (const request of requests) {
+                try {
+                    const url = request.url;
+                    // Ищем URL вида /api/dictations/{dictationId}/
+                    if (url.includes(`/api/dictations/${encodeURIComponent(id)}/`)) {
+                        await cache.delete(request);
+                        deleted += 1;
+                    }
+                } catch (e) {
+                    // ignore individual errors
+                }
+            }
+            return { success: true, deleted };
+        } catch (e) {
+            return { success: false, deleted: 0 };
+        }
+    }
+
+    /** Отозвать blob URL'ы для всех аудио конкретного диктанта */
+    revokeDictationBlobUrls(dictationId) {
+        try {
+            const id = String(dictationId || '').trim();
+            if (!id) return;
+            const pattern = `/api/dictations/${encodeURIComponent(id)}/`;
+            const keysToDelete = [];
+            for (const [key, value] of Object.entries(this._objectUrlByCanonicalUrl || {})) {
+                if (key.includes(pattern)) {
+                    keysToDelete.push(key);
+                }
+            }
+            for (const key of keysToDelete) {
+                try {
+                    const url = this._objectUrlByCanonicalUrl[key];
+                    if (url && typeof url === 'string' && url.startsWith('blob:')) {
+                        URL.revokeObjectURL(url);
+                    }
+                } catch (e) {
+                }
+                delete this._objectUrlByCanonicalUrl[key];
+            }
+        } catch (e) {
+        }
+    }
+
+    /** Получить список всех blob URL'ов из AudioManager */
+    getBlobEntries() {
+        try {
+            const entries = [];
+            const map = this._objectUrlByCanonicalUrl || {};
+            for (const [key, value] of Object.entries(map)) {
+                if (value && typeof value === 'string' && value.startsWith('blob:')) {
+                    // Парсим ключ для получения информации
+                    let dictationId = '';
+                    let lang = '';
+                    let filename = '';
+                    try {
+                        const urlObj = new URL(key);
+                        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+                        if (pathParts.length >= 4 && pathParts[0] === 'api' && pathParts[1] === 'dictations') {
+                            dictationId = pathParts[2];
+                            lang = pathParts[3];
+                            filename = pathParts.slice(4).join('/');
+                        }
+                    } catch (e) {
+                        filename = key;
+                    }
+                    entries.push({
+                        cacheKey: key,
+                        blobUrl: value,
+                        dictationId: dictationId,
+                        lang: lang,
+                        filename: filename,
+                    });
+                }
+            }
+            // Сортируем по dictationId + filename
+            entries.sort((a, b) => {
+                const aKey = `${a.dictationId}/${a.filename}`;
+                const bKey = `${b.dictationId}/${b.filename}`;
+                return aKey.localeCompare(bKey);
+            });
+            return entries;
+        } catch (e) {
+            return [];
+        }
+    }
+
     async ensureCachedResponse(url) {
         try {
             const u = this.normalizeMediaUrl(url);

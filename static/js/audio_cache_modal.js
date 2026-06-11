@@ -1,81 +1,25 @@
 (function () {
   'use strict';
 
-  const MEDIA_CACHE_NAME = 'dictafan-media';
-
-  let _currentAudio = null; // текущий проигрываемый Audio элемент
-  let _currentPlayingUrl = null; // URL который сейчас играет
+  let _currentAudio = null;
+  let _currentPlayingUrl = null;
   let _progressInterval = null;
 
   /**
-   * Получить все записи из CacheStorage 'dictafan-media'
+   * Получить все blob URL'ы из AudioManager
    */
-  async function getCachedAudioEntries() {
+  function getBlobEntries() {
     try {
-      const cache = await caches.open(MEDIA_CACHE_NAME);
-      const requests = await cache.keys();
-      const entries = [];
-
-      for (const request of requests) {
-        const url = request.url;
-        // Пропускаем запросы не связанные с аудио (например, настройки)
-        if (!url.includes('/api/dictations/')) continue;
-
-        try {
-          const response = await cache.match(request);
-          if (!response) continue;
-
-          const contentLength = response.headers.get('content-length');
-          const contentType = response.headers.get('content-type') || 'audio/mpeg';
-          const sizeBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-          // Парсим URL для получения информации
-          const urlObj = new URL(url);
-          const pathParts = urlObj.pathname.split('/').filter(Boolean);
-          // /api/dictations/{dictationId}/{lang}/{filename}
-          let dictationId = '';
-          let lang = '';
-          let filename = '';
-          if (pathParts.length >= 4 && pathParts[0] === 'api' && pathParts[1] === 'dictations') {
-            dictationId = pathParts[2];
-            lang = pathParts[3];
-            filename = pathParts.slice(4).join('/');
-          } else {
-            // Если не удалось распарсить, используем последний сегмент как имя
-            filename = pathParts[pathParts.length - 1] || urlObj.pathname;
-          }
-
-          entries.push({
-            url: url,
-            dictationId: dictationId,
-            lang: lang,
-            filename: filename,
-            sizeBytes: sizeBytes,
-            contentType: contentType,
-            response: response,
-          });
-        } catch (e) {
-          // Пропускаем записи которые не удалось прочитать
-          console.warn('[audioCache] error reading cache entry:', url, e);
-        }
+      if (window.AudioManager && typeof window.AudioManager.getBlobEntries === 'function') {
+        return window.AudioManager.getBlobEntries();
       }
-
-      // Сортируем по dictationId + filename
-      entries.sort((a, b) => {
-        const aKey = `${a.dictationId}/${a.filename}`;
-        const bKey = `${b.dictationId}/${b.filename}`;
-        return aKey.localeCompare(bKey);
-      });
-
-      return entries;
     } catch (e) {
-      console.error('[audioCache] error reading cache:', e);
-      return [];
     }
+    return [];
   }
 
   /**
-   * Форматировать размер в человекочитаемый вид
+   * Форматировать размер
    */
   function formatSize(bytes) {
     if (bytes === 0) return '?';
@@ -85,7 +29,7 @@
   }
 
   /**
-   * Форматировать длительность (если есть)
+   * Форматировать длительность
    */
   function formatDuration(seconds) {
     if (!seconds || isNaN(seconds)) return '';
@@ -109,21 +53,17 @@
     }
     _currentPlayingUrl = null;
 
-    // Сбросить состояние кнопок
     document.querySelectorAll('.audio-cache-item-play-btn.playing').forEach(function (btn) {
       btn.classList.remove('playing');
       const icon = btn.querySelector('i');
       if (icon) {
         icon.setAttribute('data-lucide', 'play');
-        icon.setAttribute('data-lucide-type', 'play');
       }
     });
 
-    // Скрыть прогресс-бар
     const progressEl = document.getElementById('audioCacheProgress');
     if (progressEl) progressEl.style.display = 'none';
 
-    // Обновить иконки lucide
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons({ root: document.getElementById('audioCacheModal') });
@@ -149,11 +89,10 @@
   }
 
   /**
-   * Воспроизвести аудио по URL
+   * Воспроизвести аудио по blob URL
    */
   async function playAudio(entry) {
-    // Если это же аудио уже играет — останавливаем
-    if (_currentPlayingUrl === entry.url) {
+    if (_currentPlayingUrl === entry.blobUrl) {
       stopCurrentPlayback();
       return;
     }
@@ -161,14 +100,8 @@
     stopCurrentPlayback();
 
     try {
-      // Создаём blob URL из response
-      const blob = await entry.response.clone().blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const audio = new Audio(entry.blobUrl);
 
-      const audio = new Audio();
-      audio.src = blobUrl;
-
-      // Показываем прогресс-бар
       const progressEl = document.getElementById('audioCacheProgress');
       const progressLabel = document.getElementById('audioCacheProgressLabel');
       const progressFill = document.getElementById('audioCacheProgressFill');
@@ -195,8 +128,7 @@
         stopCurrentPlayback();
       });
 
-      // Помечаем кнопку как играющую
-      const playBtn = document.querySelector('.audio-cache-item-play-btn[data-url="' + CSS.escape(entry.url) + '"]');
+      const playBtn = document.querySelector('.audio-cache-item-play-btn[data-url="' + CSS.escape(entry.blobUrl) + '"]');
       if (playBtn) {
         playBtn.classList.add('playing');
         const icon = playBtn.querySelector('i');
@@ -211,9 +143,8 @@
       }
 
       _currentAudio = audio;
-      _currentPlayingUrl = entry.url;
+      _currentPlayingUrl = entry.blobUrl;
 
-      // Запускаем интервал обновления прогресса
       _progressInterval = setInterval(updateProgress, 200);
 
       await audio.play();
@@ -224,92 +155,47 @@
   }
 
   /**
-   * Очистить весь кэш аудио
-   */
-  async function clearAudioCache() {
-    if (!confirm('Очистить все аудио из кэша (' + MEDIA_CACHE_NAME + ')? Это действие нельзя отменить.')) {
-      return;
-    }
-
-    try {
-      const cache = await caches.open(MEDIA_CACHE_NAME);
-      const requests = await cache.keys();
-      let deletedCount = 0;
-
-      for (const request of requests) {
-        const url = request.url;
-        if (url.includes('/api/dictations/')) {
-          await cache.delete(request);
-          deletedCount++;
-        }
-      }
-
-      stopCurrentPlayback();
-      await renderAudioCacheList();
-
-      // Показываем уведомление
-      const countEl = document.getElementById('audioCacheCount');
-      if (countEl) {
-        countEl.textContent = 'Очищено ' + deletedCount + ' аудио';
-        setTimeout(function () {
-          renderAudioCacheList();
-        }, 2000);
-      }
-    } catch (e) {
-      console.error('[audioCache] error clearing cache:', e);
-      alert('Ошибка при очистке кэша: ' + e.message);
-    }
-  }
-
-  /**
-   * Рендер списка аудио
+   * Рендер списка blob URL'ов
    */
   async function renderAudioCacheList() {
     const listEl = document.getElementById('audioCacheList');
     const countEl = document.getElementById('audioCacheCount');
     if (!listEl) return;
 
-    listEl.innerHTML = '<div class="audio-cache-loading">Загрузка списка аудио из кэша...</div>';
+    listEl.innerHTML = '<div class="audio-cache-loading">Загрузка списка аудио из AudioManager...</div>';
 
-    const entries = await getCachedAudioEntries();
+    const entries = getBlobEntries();
 
     if (entries.length === 0) {
-      listEl.innerHTML = '<div class="audio-cache-empty">Аудио в кэше не найдено</div>';
-      if (countEl) countEl.textContent = '0 аудио';
+      listEl.innerHTML = '<div class="audio-cache-empty">Аудио в памяти (blob URL) не найдено.<br>Откройте диктант чтобы аудио загрузились в AudioManager.</div>';
+      if (countEl) countEl.textContent = '0 аудио в памяти';
       return;
     }
 
-    // Считаем общий размер
-    let totalSize = 0;
-    for (const e of entries) {
-      totalSize += e.sizeBytes;
-    }
-
     if (countEl) {
-      countEl.textContent = entries.length + ' аудио · ' + formatSize(totalSize);
+      countEl.textContent = entries.length + ' аудио в памяти (blob URL)';
     }
 
     let html = '';
     for (const entry of entries) {
-      const sizeLabel = formatSize(entry.sizeBytes);
-      const langLabel = entry.lang || '';
       const idLabel = entry.dictationId ? '#' + escapeHtml(entry.dictationId) : '';
-      const filenameLabel = entry.filename || entry.url.split('/').pop() || '?';
+      const langLabel = entry.lang || '';
+      const filenameLabel = entry.filename || entry.cacheKey.split('/').pop() || '?';
 
       html += '<div class="audio-cache-item">';
       html += '<div class="audio-cache-item-icon"><i data-lucide="music"></i></div>';
       html += '<div class="audio-cache-item-info">';
-      html += '<div class="audio-cache-item-url" title="' + escapeHtml(entry.url) + '">';
+      html += '<div class="audio-cache-item-url" title="' + escapeHtml(entry.cacheKey) + '">';
       if (idLabel) {
         html += '<span class="audio-cache-item-id-badge">' + escapeHtml(idLabel) + '</span> ';
       }
       html += escapeHtml(filenameLabel) + '</div>';
       html += '<div class="audio-cache-item-meta">';
       if (langLabel) html += '<span>' + escapeHtml(langLabel) + '</span>';
-      html += '<span>' + escapeHtml(sizeLabel) + '</span>';
+      html += '<span>blob URL</span>';
       html += '</div>';
       html += '</div>';
-      html += '<button type="button" class="audio-cache-item-play-btn" data-url="' + escapeHtml(entry.url) + '" title="Воспроизвести">';
+      html += '<button type="button" class="audio-cache-item-play-btn" data-url="' + escapeHtml(entry.blobUrl) + '" title="Воспроизвести">';
       html += '<i data-lucide="play"></i>';
       html += '</button>';
       html += '</div>';
@@ -317,21 +203,19 @@
 
     listEl.innerHTML = html;
 
-    // Навешиваем обработчики на кнопки play
     listEl.querySelectorAll('.audio-cache-item-play-btn').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         e.stopPropagation();
         const url = btn.getAttribute('data-url');
         if (!url) return;
-        const entry = entries.find(function (e) { return e.url === url; });
+        const entry = entries.find(function (e) { return e.blobUrl === url; });
         if (entry) {
           playAudio(entry);
         }
       });
     });
 
-    // Обновляем иконки lucide
     try {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons({ root: document.getElementById('audioCacheModal') });
@@ -339,9 +223,6 @@
     } catch (e) {}
   }
 
-  /**
-   * Экранирование HTML
-   */
   function escapeHtml(str) {
     if (typeof str !== 'string') return String(str || '');
     return str
@@ -357,8 +238,6 @@
     if (!modal) return;
 
     modal.style.display = 'flex';
-
-    // Рендерим список
     renderAudioCacheList();
 
     try {
@@ -379,7 +258,6 @@
     const modal = document.getElementById('audioCacheModal');
     if (!modal) return;
 
-    // Закрытие по крестику
     const closeBtn = document.getElementById('audioCacheModalClose');
     if (closeBtn) {
       closeBtn.addEventListener('click', function (e) {
@@ -389,19 +267,16 @@
       });
     }
 
-    // Закрытие по клику на оверлей
     modal.addEventListener('click', function (e) {
       if (e && e.target === modal) closeModal();
     });
 
-    // Закрытие по Escape
     document.addEventListener('keydown', function (e) {
       if (e && e.key === 'Escape') {
         if (modal.style.display === 'flex') closeModal();
       }
     });
 
-    // Кнопка обновления
     const refreshBtn = document.getElementById('audioCacheRefreshBtn');
     if (refreshBtn) {
       refreshBtn.addEventListener('click', function (e) {
@@ -410,25 +285,14 @@
         renderAudioCacheList();
       });
     }
-
-    // Кнопка очистки кэша
-    const clearBtn = document.getElementById('audioCacheClearBtn');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        clearAudioCache();
-      });
-    }
   }
 
-  // Инициализация при загрузке DOM
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
 
-  // Экспортируем API
   window.AudioCacheModal = {
     open: openModal,
     close: closeModal,
