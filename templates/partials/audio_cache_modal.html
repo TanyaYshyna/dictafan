@@ -1,0 +1,22 @@
+<div id="audioCacheModal" class="modal" style="display: none;">
+    <div class="modal-content audio-cache-modal-content">
+        <div class="modal-header">
+            <h3>Аудио в кэше</h3>
+            <button class="modal-close" id="audioCacheModalClose" type="button" aria-label="Закрыть" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body audio-cache-modal-body">
+            <div class="audio-cache-toolbar">
+                <span class="audio-cache-count" id="audioCacheCount">Загрузка...</span>
+                <button type="button" class="audio-cache-refresh-btn" id="audioCacheRefreshBtn" title="Обновить список">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>Обновить</span>
+                </button>
+            </div>
+            <div id="audioCacheList" class="audio-cache-list">
+                <div class="audio-cache-loading">Загрузка списка аудио из кэша...</div>
+            </div>
+        </div>
+    </div>
+</div>

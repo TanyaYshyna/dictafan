@@ -433,6 +433,17 @@ window.Desktop = window.Desktop || {
         console.log('[desktop] action', name);
         return;
       }
+      if (name === 'desktop-admin-audio-cache') {
+        try {
+          if (window.AudioCacheModal && typeof window.AudioCacheModal.open === 'function') {
+            window.AudioCacheModal.open();
+            return;
+          }
+        } catch (e) {
+        }
+        console.log('[desktop] action', name);
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }

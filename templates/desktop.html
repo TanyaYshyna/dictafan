@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/static/css/user_profile_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/active_dictations_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/audio_cache_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
@@ -87,12 +88,16 @@
                 <div class="tool-palette-separator"></div>
                 <div class="dropdown-menu-wrapper" id="desktopAdminMenuWrapper">
                     <button class="tool-palette-btn" type="button" id="desktopAdminMenuToggle" title="Администрирование">
-                        <i data-lucide="a"></i>
+                        <i data-lucide="glasses"></i>
                     </button>
                     <div class="dropdown-menu" id="desktopAdminMenuDropdown" role="menu">
                         <button type="button" class="dropdown-menu-item" data-action="desktop-admin-active-dictations" role="menuitem">
                             <i data-lucide="database"></i>
                             <span>Активные диктанты</span>
+                        </button>
+                        <button type="button" class="dropdown-menu-item" data-action="desktop-admin-audio-cache" role="menuitem">
+                            <i data-lucide="music"></i>
+                            <span>Аудио в кэше</span>
                         </button>
                     </div>
                 </div>
@@ -130,6 +135,7 @@
     {% include 'partials/desktop_confirm_modal.html' %}
 
     {% include 'partials/active_dictations_modal.html' %}
+    {% include 'partials/audio_cache_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
@@ -167,5 +173,6 @@
     <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/script_user_profile.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/active_dictations_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/audio_cache_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
 {% endblock %}

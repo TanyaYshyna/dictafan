@@ -17,7 +17,7 @@
 (function () {
   if (window.OutboxBatcher) return;
 
-  const BATCH_INTERVAL_MS = 5000; // 5 секунд между батчами
+  const BATCH_INTERVAL_MS = 600000; // 600 секунд (10 минут) между батчами
   const MAX_BATCH_SIZE = 20; // макс. количество записей в одном батче
 
   const state = {
