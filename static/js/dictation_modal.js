@@ -2296,6 +2296,19 @@
           }
           updateNavigatorFromSession(session);
 
+          // При повторе принудительно скрываем кнопки "повторить" и "далее",
+          // чтобы они не оставались видимыми после updateNavigatorFromSession.
+          try {
+            const rb2 = document.getElementById('repeatBtn');
+            if (rb2) rb2.style.display = 'none';
+          } catch (e0) {
+          }
+          try {
+            const nb2 = document.getElementById('resultNextBtn');
+            if (nb2) nb2.style.display = 'none';
+          } catch (e1) {
+          }
+
           try {
             if (!state.dictationStarted) return;
             const view = getCurrentSentenceViewFromSession(session);
@@ -2320,6 +2333,7 @@
   }
 
   function renderModalCover(parsed) {
+
     try {
       const img = document.getElementById('dictationModalCover');
       if (!img) return;

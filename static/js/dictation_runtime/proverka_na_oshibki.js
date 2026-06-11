@@ -385,39 +385,19 @@ class ПроверкаНаОшибки {
     let nextCorrected = Number(prevCorrected) || 0;
     let starOutcome = null;
 
-    const shouldGrantHalfStar = (textLen, mistakes) => {
-      let result = false;
-      const len = Number(textLen) || 0;
-      const err = Number(mistakes) || 0;
-      if (len <= 25) {
-        if (err === 1) result = true;
-      } else {
-        if (err <= 2) result = true;
-      }
-      return result;
-    };
-
     if (allCorrect) {
-      if (nextPerfect === 1) {
-        nextCorrected = nextCorrected + 1;
-        starOutcome = 'corrected';
-      } else if ((Number(textAttemptCount) || 0) === 0) {
+      const attemptCount = Number(textAttemptCount) || 0;
+      if (attemptCount === 0) {
+        // Первая проверка — всё правильно с первого раза → звезда
         nextPerfect = 1;
         starOutcome = 'perfect';
+      } else if (attemptCount === 1) {
+        // Была 1 проверка с ошибками, теперь всё правильно → полузвезда
+        nextCorrected = nextCorrected + 1;
+        starOutcome = 'half';
       } else {
-        // Если пользователь исправил все ошибки, errorCount = 0.
-        // Но для полузвезды нужно учитывать, сколько ошибок БЫЛО до исправления.
-        // Используем totalMistakeCount — общее количество ошибок за всё время прохода предложения.
-        const originalLen = String(originalText || '').length;
-        // Если totalMistakeCount > 0, используем его (реальное количество ошибок).
-        // Иначе fallback на errorCount (если errorCount > 0) или 1 (если были попытки).
-        const effectiveErrors = totalMistakeCount > 0 ? totalMistakeCount : (errorCount > 0 ? errorCount : 1);
-        if (shouldGrantHalfStar(originalLen, effectiveErrors)) {
-          nextCorrected = nextCorrected + 1;
-          starOutcome = 'half';
-        } else {
-          starOutcome = null;
-        }
+        // Было 2+ проверок с ошибками, теперь всё правильно → кружочек (активность)
+        starOutcome = null;
       }
     }
 
