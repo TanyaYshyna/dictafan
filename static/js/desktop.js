@@ -422,9 +422,77 @@ window.Desktop = window.Desktop || {
           return;
         }
       }
+      if (name === 'desktop-admin-active-dictations') {
+        try {
+          if (window.ActiveDictationsModal && typeof window.ActiveDictationsModal.open === 'function') {
+            window.ActiveDictationsModal.open();
+            return;
+          }
+        } catch (e) {
+        }
+        console.log('[desktop] action', name);
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }
+  },
+
+  initAdminMenu() {
+    const toggle = document.getElementById('desktopAdminMenuToggle');
+    const dropdown = document.getElementById('desktopAdminMenuDropdown');
+    const wrapper = document.getElementById('desktopAdminMenuWrapper');
+    if (!toggle || !dropdown) return;
+
+    const close = () => {
+      try { dropdown.classList.remove('show'); } catch (e0) {}
+      try {
+        toggle.setAttribute('aria-expanded', 'false');
+      } catch (e) {
+      }
+    };
+
+    const open = () => {
+      try { dropdown.classList.add('show'); } catch (e0) {}
+      try {
+        toggle.setAttribute('aria-expanded', 'true');
+      } catch (e) {
+      }
+      this.renderLucide(dropdown);
+    };
+
+    const isOpen = () => {
+      try { return dropdown.classList.contains('show'); } catch (e) { return false; }
+    };
+
+    toggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isOpen()) close();
+      else open();
+    });
+
+    document.addEventListener('click', (e) => {
+      try {
+        if (wrapper && wrapper.contains(e.target)) return;
+      } catch (e2) {
+      }
+      close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e && e.key === 'Escape') close();
+    });
+
+    dropdown.querySelectorAll('[data-action]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const action = btn.getAttribute('data-action');
+        close();
+        this.stubAction(action);
+      });
+    });
   },
 
   initUserMenu() {
@@ -669,6 +737,7 @@ window.Desktop = window.Desktop || {
 
   init() {
     this.initUserMenu();
+    this.initAdminMenu();
     this.initToolPalette();
     this.initDeskLoad();
     this.ensureDictationKartDeps();
