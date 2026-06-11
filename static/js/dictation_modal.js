@@ -3693,6 +3693,55 @@
     }
   }
 
+  function resetDictationProgressForSession(session) {
+    try {
+      if (!session) return;
+      const keys = session.content ? session.content.getAllKeys() : [];
+      for (const key of keys) {
+        const st = session.getState(key);
+        if (!st) continue;
+        st.number_of_perfect = 0;
+        st.number_of_corrected = 0;
+        st.number_of_audio = 0;
+        st.number_of_time = 0;
+        st.mistake_count = 0;
+        st.mistake_count_current = 0;
+        st.text_activity_count = 0;
+        st.audio_activity50_count = 0;
+        st.money_count = 0;
+        st.text_exchange_half_star = false;
+        st.audio_exchange_mic = false;
+        st.all_audio_completed = false;
+        // Ставим галочку на ВСЕ строки (кроме completed — их тоже сбрасываем в checked)
+        st.selection_state = 'checked';
+      }
+      // Сбрасываем таймер сессии
+      try {
+        if (session.timer) {
+          session.stopTimer();
+          session.timer.accumulatedMs = 0;
+        }
+      } catch (e) {
+      }
+      // Перестраиваем selectedKeys
+      try {
+        session._rebuildSelectedKeysFromStates();
+      } catch (e) {
+      }
+      // Обновляем таблицу
+      try {
+        renderStartModalSentencesTable(session);
+      } catch (e) {
+      }
+      // Обновляем навигатор
+      try {
+        updateNavigatorFromSession(session);
+      } catch (e) {
+      }
+    } catch (e) {
+    }
+  }
+
   function bindStartModalControls() {
     try {
       const closeBtn = document.getElementById('btnBackToList');
@@ -3827,6 +3876,69 @@
               return;
             }
           } catch (e2) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    // mixControl — перемешивание порядка предложений
+    try {
+      const mixBtn = document.getElementById('mixControl');
+      if (mixBtn && mixBtn.dataset.boundDictationModal !== '1') {
+        mixBtn.dataset.boundDictationModal = '1';
+        mixBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (!session) return;
+            const isMixed = mixBtn.dataset.checked === 'true';
+            if (isMixed) {
+              mixBtn.dataset.checked = 'false';
+              const icon = mixBtn.querySelector('i[data-lucide]');
+              if (icon) icon.setAttribute('data-lucide', 'move-right');
+              const span = mixBtn.querySelector('span');
+              if (span) span.textContent = '';
+            } else {
+              mixBtn.dataset.checked = 'true';
+              const icon = mixBtn.querySelector('i[data-lucide]');
+              if (icon) icon.setAttribute('data-lucide', 'shuffle');
+              const span = mixBtn.querySelector('span');
+              if (span) span.textContent = 'Перемешать';
+            }
+            try {
+              if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons({ root: mixBtn });
+              }
+            } catch (e1) {
+            }
+          } catch (e1) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    // resetProgressBtn — сброс прогресса диктанта
+    try {
+      const resetBtn = document.getElementById('resetProgressBtn');
+      if (resetBtn && resetBtn.dataset.boundDictationModal !== '1') {
+        resetBtn.dataset.boundDictationModal = '1';
+        resetBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (!session) return;
+            resetDictationProgressForSession(session);
+          } catch (e1) {
           }
         });
       }
