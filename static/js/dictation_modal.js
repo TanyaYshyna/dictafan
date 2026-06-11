@@ -36,7 +36,286 @@
     }
   }
 
+  // --- Вспомогательные функции, перенесённые из script_dictation.js ---
+
+  function getCurrentDictationIdForDb() {
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && session.dictationId) {
+        const parsed = parseInt(String(session.dictationId).replace(/^dict_/, ''), 10);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    } catch (e) {
+    }
+    return null;
+  }
+
+  function escapeHtml(str) {
+    const s = String(str || '');
+    return s
+      .replaceAll('&', '&')
+      .replaceAll('<', '<')
+      .replaceAll('>', '>')
+      .replaceAll('"', '"')
+      .replaceAll("'", '&#39;');
+  }
+
+  function dictationT(key, fallback, params) {
+    try {
+      if (!window.I18n || typeof window.I18n.t !== 'function') return fallback;
+      const fullKey = key.startsWith('dictation.') ? key : `dictation.${key}`;
+      const translated = window.I18n.t(fullKey, params);
+      if (typeof translated === 'string' && translated !== fullKey) return translated;
+      if (fallback == null) return fullKey;
+      const text = String(fallback);
+      if (!params) return text;
+      return text.replace(/\{(\w+)\}/g, (m, name) => {
+        if (Object.prototype.hasOwnProperty.call(params, name)) return String(params[name]);
+        return m;
+      });
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  async function hasLocalPendingDraft() {
+    return false;
+  }
+
+  async function showExitModal(action) {
+    const exitModal = document.getElementById('exitModal');
+    if (!exitModal) return;
+
+    const panel = getProgressPanelInstance();
+    const hasPanelPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
+    const hasLocalPending = await hasLocalPendingDraft();
+    const hasPending = hasPanelPending || hasLocalPending;
+
+    window.pendingExitAction = typeof action === 'function' ? action : () => {
+      try { close(); } catch (e) {}
+    };
+
+    const messageEl = document.getElementById('exitModalMessage');
+    if (messageEl) {
+      messageEl.textContent = hasPending
+        ? dictationT('exit_modal.unsaved_progress_confirm', messageEl.textContent || '')
+        : dictationT('exit_modal.saved_progress_next', messageEl.textContent || '');
+    }
+
+    try {
+      const exitWithoutLabel = document.getElementById('exitWithoutSavingBtnLabel');
+      if (exitWithoutLabel) {
+        exitWithoutLabel.textContent = dictationT('exit_modal.exit', exitWithoutLabel.textContent || '');
+      }
+    } catch (e) {
+    }
+
+    try {
+      const exitWithLabel = document.getElementById('exitWithSavingBtnLabel');
+      if (exitWithLabel) {
+        exitWithLabel.textContent = dictationT('exit_modal.exit', exitWithLabel.textContent || '');
+      }
+    } catch (e) {
+    }
+
+    const exitWithBtn = document.getElementById('exitWithSavingBtn');
+    if (exitWithBtn) {
+      if (hasPending) {
+        exitWithBtn.style.display = '';
+        exitWithBtn.disabled = false;
+        exitWithBtn.classList.remove('disabled');
+      } else {
+        exitWithBtn.style.display = 'none';
+      }
+    }
+
+    exitModal.style.display = 'flex';
+    const stayBtn = document.getElementById('exitStayBtn');
+    if (stayBtn) stayBtn.focus();
+  }
+
+  function hideExitModal() {
+    const exitModal = document.getElementById('exitModal');
+    if (exitModal) {
+      exitModal.style.display = 'none';
+    }
+    window.pendingExitAction = null;
+  }
+
+  async function autoSendTeacherReportAfterSuccess({
+    completionCountAfter,
+    errorWords,
+    perfectCount,
+    correctedCount,
+    audioCount,
+    attemptsTotal,
+    errorCount,
+    timeMs,
+    completedAtMs,
+    completedAtTzOffsetMin,
+    sentencesData,
+    settingsJson,
+    reportHeaderMode,
+  }) {
+    const token = window.UM?.token || localStorage.getItem('jwt_token');
+    if (!token) return;
+
+    const dictationIdForDb = getCurrentDictationIdForDb();
+    if (!dictationIdForDb) return;
+
+    // Если параметры не переданы (промежуточный отчёт), собираем снапшот из сессии
+    let snapshot = null;
+    try {
+      const needSnapshot = (
+        perfectCount == null || correctedCount == null || audioCount == null ||
+        attemptsTotal == null || errorCount == null || timeMs == null ||
+        completedAtMs == null || completedAtTzOffsetMin == null ||
+        sentencesData == null || settingsJson == null || errorWords == null ||
+        completionCountAfter === undefined
+      );
+
+      if (needSnapshot) {
+        let totalPerfect = 0;
+        let totalCorrected = 0;
+        let totalAudio = 0;
+        let totalAttempts = 0;
+        let totalErrors = 0;
+
+        const sentences_data = [];
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            const allKeys = session.content ? session.content.getAllKeys() : [];
+            for (const key of allKeys) {
+              const st = session.getState(key);
+              const p = Number(st.number_of_perfect) || 0;
+              const c = Number(st.number_of_corrected) || 0;
+              const a = Number(st.number_of_audio) || 0;
+              const at = Number(st.attempts_total) || 0;
+              const er = Number(st.mistake_count) || 0;
+
+              totalPerfect += p;
+              totalCorrected += c;
+              totalAudio += a;
+              totalAttempts += at;
+              totalErrors += er;
+
+              if (p > 0 || c > 0 || a > 0) {
+                sentences_data.push({
+                  sentence_key: key,
+                  perfect_count: p,
+                  corrected_count: c,
+                  audio_count: a,
+                  attempts_total: at,
+                  mistake_count: er,
+                  selection_state: st.selection_state || 'unchecked',
+                });
+              }
+            }
+          }
+        } catch (e2) {
+        }
+
+        const timerSnapshot = getProgressTimerSnapshot();
+        const totalTimeMs = timerSnapshot.accumulatedMs || 0;
+        const nowMs = Date.now();
+        const tzOffsetMin = -new Date().getTimezoneOffset();
+
+        // Собираем настройки из DOM модального окна
+        let settings_json = null;
+        try {
+          const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : 'oto';
+          const repeatsEl = document.getElementById('modal-audioRepeatsInput');
+          const repeats = repeatsEl && repeatsEl.value != null && String(repeatsEl.value).trim() ? String(repeatsEl.value).trim() : '3';
+          settings_json = JSON.stringify({
+            audio: {
+              start: seq,
+              repeats: repeats,
+            },
+          });
+        } catch (e3) {
+          settings_json = null;
+        }
+
+        snapshot = {
+          completionCountAfter: null,
+          errorWords: null,
+          perfectCount: totalPerfect,
+          correctedCount: totalCorrected,
+          audioCount: totalAudio,
+          attemptsTotal: totalAttempts,
+          errorCount: totalErrors,
+          timeMs: totalTimeMs,
+          completedAtMs: nowMs,
+          completedAtTzOffsetMin: tzOffsetMin,
+          sentencesData: sentences_data,
+          settingsJson: settings_json,
+        };
+      }
+    } catch (e1) {
+      snapshot = null;
+    }
+
+    try {
+      const finalCompletionCountAfter = completionCountAfter != null ? completionCountAfter : (snapshot ? snapshot.completionCountAfter : null);
+      const finalErrorWords = (typeof errorWords === 'object' && errorWords) ? errorWords : (snapshot ? snapshot.errorWords : null);
+      const finalPerfect = perfectCount != null ? perfectCount : (snapshot ? snapshot.perfectCount : null);
+      const finalCorrected = correctedCount != null ? correctedCount : (snapshot ? snapshot.correctedCount : null);
+      const finalAudio = audioCount != null ? audioCount : (snapshot ? snapshot.audioCount : null);
+      const finalAttempts = attemptsTotal != null ? attemptsTotal : (snapshot ? snapshot.attemptsTotal : null);
+      const finalErrors = errorCount != null ? errorCount : (snapshot ? snapshot.errorCount : null);
+      const finalTimeMs = timeMs != null ? timeMs : (snapshot ? snapshot.timeMs : null);
+      const finalCompletedAtMs = completedAtMs != null ? completedAtMs : (snapshot ? snapshot.completedAtMs : null);
+      const finalCompletedAtTzOffsetMin = completedAtTzOffsetMin != null ? completedAtTzOffsetMin : (snapshot ? snapshot.completedAtTzOffsetMin : null);
+      const finalSentencesData = Array.isArray(sentencesData) ? sentencesData : (snapshot ? snapshot.sentencesData : null);
+      const finalSettingsJson = settingsJson != null ? settingsJson : (snapshot ? snapshot.settingsJson : null);
+
+      // Отправляем авто-отчёт только текущему учителю
+      let teacher_user_ids = [];
+      try {
+        const session = window.__dictationModalActiveSession;
+        const teacherUserId = session && session.teacherUserId ? Number(session.teacherUserId) : 0;
+        if (Number.isFinite(teacherUserId) && teacherUserId > 0) teacher_user_ids = [teacherUserId];
+      } catch (e) {
+        teacher_user_ids = [];
+      }
+
+      if (!teacher_user_ids.length) return;
+      const send_to_self = false;
+
+      await fetch('/api/statistics/teacher_report/send_auto', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dictation_id: dictationIdForDb,
+          teacher_user_ids,
+          send_to_self,
+          report_header_mode: (reportHeaderMode != null ? String(reportHeaderMode) : 'success'),
+          completion_count_after: finalCompletionCountAfter,
+          perfect_count: finalPerfect,
+          corrected_count: finalCorrected,
+          audio_count: finalAudio,
+          attempts_total: finalAttempts,
+          mistake_count: finalErrors,
+          time_ms: finalTimeMs,
+          completed_at_ms: finalCompletedAtMs,
+          completed_at_tz_offset_min: finalCompletedAtTzOffsetMin,
+          sentences_data: finalSentencesData,
+          settings_json: finalSettingsJson,
+          error_words: finalErrorWords,
+        }),
+      });
+    } catch (e) {
+    }
+  }
+
+  // --- Конец вспомогательных функций ---
+
   function positionsToLabel(positions) {
+
     try {
       const arr = Array.isArray(positions) ? positions : [];
       const uniq = Array.from(new Set(arr.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0)));
@@ -171,7 +450,7 @@
     // Автоматическая отправка отчёта в Telegram при успешном завершении диктанта
     try {
       const session = window.__dictationModalActiveSession;
-      if (session && typeof window.autoSendTeacherReportAfterSuccess === 'function') {
+      if (session && typeof autoSendTeacherReportAfterSuccess === 'function') {
         const allKeys = session.content ? session.content.getAllKeys() : [];
         let totalPerfect = 0;
         let totalCorrected = 0;
@@ -208,7 +487,23 @@
         const nowMs = Date.now();
         const tzOffsetMin = -new Date().getTimezoneOffset();
 
-        window.autoSendTeacherReportAfterSuccess({
+        // Собираем settingsJson из данных, доступных в контексте модального окна
+        let modalSettingsJson = null;
+        try {
+          const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart || 'oto');
+          const repeatsEl = document.getElementById('modal-audioRepeatsInput');
+          const repeats = repeatsEl && repeatsEl.value != null && String(repeatsEl.value).trim() ? String(repeatsEl.value).trim() : '3';
+          modalSettingsJson = JSON.stringify({
+            audio: {
+              start: seq,
+              repeats: repeats,
+            },
+          });
+        } catch (eSettings) {
+          modalSettingsJson = null;
+        }
+
+        autoSendTeacherReportAfterSuccess({
           completionCountAfter: undefined,
           errorWords: null,
           perfectCount: totalPerfect,
@@ -220,11 +515,12 @@
           completedAtMs: nowMs,
           completedAtTzOffsetMin: tzOffsetMin,
           sentencesData: sentencesData,
-          settingsJson: null,
+          settingsJson: modalSettingsJson,
         });
       }
     } catch (e6) {
     }
+
   }
 
   function setupCompletionModalHandlers() {
@@ -3497,8 +3793,8 @@
     }
 
     try {
-      if (typeof window.hasLocalPendingDraft === 'function') {
-        return !!(await window.hasLocalPendingDraft());
+      if (typeof hasLocalPendingDraft === 'function') {
+        return !!(await hasLocalPendingDraft());
       }
     } catch (e) {
     }
@@ -3522,8 +3818,8 @@
     }
 
     try {
-      if (typeof window.showExitModal === 'function') {
-        await window.showExitModal(() => doClose());
+      if (typeof showExitModal === 'function') {
+        await showExitModal(() => doClose());
         return;
       }
     } catch (e) {

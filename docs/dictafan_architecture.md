@@ -135,16 +135,9 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Глобальное состояние страницы (например `workingData`, `currentDictation`) допускается только в page-коде `script_dictation_editor.js`.
 - Все остальные классы/модули должны получать данные через параметры/явные интерфейсы и **не должны** читать/писать `window.*`.
  
-### `static/js/script_dictation.js`
 
-Роль:
 
-- Legacy page-код старой страницы диктанта (исторически: отображение предложений, прогресс, микрофон).
-- На `/desktop` и в новых потоках **не является источником правды** для диктанта в модалке.
 
-Важно:
-
-- Текущий основной UI диктанта на `/desktop` — это `static/js/dictation_modal.js` + runtime слой `static/js/dictation_runtime/*`.
 
 ### `static/js/dictation_modal.js`
 
@@ -154,6 +147,10 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Загружает зависимости рантайма диктанта (`dictation_runtime/*`, `AudioManager`, `ProgressPanel`, распознавание речи).
 - Грузит контент диктанта (предложения) в IndexedDB (через существующий слой кэша) и затем в runtime store.
 - Управляет стартовой модалкой выбора предложений (`#start-modal`), модалкой паузы (`#pauseModal`), модалкой покупок (`#coinExchangeModal`), модалкой завершения (`#completionModal`).
+
+Важно:
+
+- Текущий основной UI диктанта на `/desktop` — это `static/js/dictation_modal.js` + runtime слой `static/js/dictation_runtime/*`.
 
 Ключевая идея данных:
 
@@ -1060,7 +1057,6 @@ Many-to-many: ученик может быть в нескольких груп�
   - `static/js/audio_manager.js`
   - `static/js/cover_manager.js`
   - `static/js/idb_manager.js`
-  - `static/js/script_dictation.js`
   - `static/js/private_library.js`
 - Service Worker:
   - `sw.js`

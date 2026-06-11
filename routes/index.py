@@ -44,10 +44,10 @@ def get_app_cache_revision() -> str:
         candidates = [
             'sw.js',
             os.path.join('static', 'js', 'private_library.js'),
-            os.path.join('static', 'js', 'script_dictation.js'),
+            # os.path.join('static', 'js', 'script_dictation.js'),
             os.path.join('static', 'js', 'user_manager.js'),
             os.path.join('static', 'css', 'style_private_library.css'),
-            os.path.join('static', 'css', 'style_dictation.css'),
+            # os.path.join('static', 'css', 'style_dictation.css'),
         ]
         parts = []
         for rel in candidates:
@@ -747,15 +747,10 @@ def import_dictation():
         return jsonify({"success": False, "error": str(exc)}), 500
 @index_bp.route('/')
 def index():
-    """Главная страница - показываем приватную библиотеку (тот же шаблон, что и /library/private)
+    """Главная страница - показываем desktop
     Не требует авторизации - данные загружаются через API на фронтенде
     """
-    # Просто рендерим шаблон с пустыми данными - они загрузятся через API
-    return render_template(
-        "private_library.html",
-        own_books=[],
-        shelf_books=[],
-    )
+    return render_template("desktop.html")
 
 
 @index_bp.route('/reset-password')
