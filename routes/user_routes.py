@@ -489,6 +489,8 @@ def api_get_current_user():
     except Exception:
         pass
     
+    user_copy['telegram_bot_name'] = (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip()
+    
     return jsonify(user_copy)
 
 @user_bp.route('/api/logout', methods=['POST'])
@@ -734,7 +736,7 @@ def api_telegram_qr():
     if not code:
         return jsonify({'success': False, 'error': 'Code is required'}), 400
 
-    bot_username = 'dictafan_user_bot'
+    bot_username = (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip()
     url = f"https://t.me/{bot_username}?start={code}"
 
     qr = qrcode.QRCode(

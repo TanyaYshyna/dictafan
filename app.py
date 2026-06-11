@@ -77,6 +77,7 @@ def inject_app_cache_revision():
             'ui_lang': ui_lang,
             'ui_dir': get_ui_dir(ui_lang),
             'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
+            'telegram_bot_name': (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip(),
         }
     except Exception:
         return {
@@ -85,6 +86,7 @@ def inject_app_cache_revision():
             'ui_lang': 'en',
             'ui_dir': 'ltr',
             'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
+            'telegram_bot_name': (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip(),
         }
 
 # Нужен валидный app.static_folder для логики бэкенда, где используются пути

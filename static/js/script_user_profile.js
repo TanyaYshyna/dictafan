@@ -907,7 +907,7 @@ function renderTelegramSection() {
             try {
                 openBotBtn.disabled = true;
 
-                const botUsername = 'dictafan_user_bot';
+                const botUsername = (UM && UM.userData && UM.userData.telegram_bot_name) ? UM.userData.telegram_bot_name : 'dictafan_user_bot';
 
                 const isLinked = Boolean((UM && UM.userData) ? UM.userData.telegram_chat_id : null);
                 if (isLinked) {
