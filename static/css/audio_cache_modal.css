@@ -84,13 +84,20 @@
   gap: 12px;
 }
 
+.audio-cache-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .audio-cache-count {
   font-size: 14px;
   font-weight: 600;
   color: var(--color-text, #1f2933);
 }
 
-.audio-cache-refresh-btn {
+.audio-cache-refresh-btn,
+.audio-cache-clear-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -108,7 +115,18 @@
   background: var(--color-hover, #f8f9fa);
 }
 
-.audio-cache-refresh-btn i {
+.audio-cache-clear-btn {
+  color: var(--color-error, #dc2626);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.audio-cache-clear-btn:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: var(--color-error, #dc2626);
+}
+
+.audio-cache-refresh-btn i,
+.audio-cache-clear-btn i {
   width: 16px;
   height: 16px;
 }
@@ -175,6 +193,21 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: monospace;
+}
+
+.audio-cache-item-id-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 6px;
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: sans-serif;
+  vertical-align: middle;
+  margin-right: 2px;
 }
 
 .audio-cache-item-meta {

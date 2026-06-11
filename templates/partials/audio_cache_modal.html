@@ -9,10 +9,16 @@
         <div class="modal-body audio-cache-modal-body">
             <div class="audio-cache-toolbar">
                 <span class="audio-cache-count" id="audioCacheCount">Загрузка...</span>
-                <button type="button" class="audio-cache-refresh-btn" id="audioCacheRefreshBtn" title="Обновить список">
-                    <i data-lucide="refresh-cw"></i>
-                    <span>Обновить</span>
-                </button>
+                <div class="audio-cache-toolbar-actions">
+                    <button type="button" class="audio-cache-clear-btn" id="audioCacheClearBtn" title="Очистить все аудио из кэша">
+                        <i data-lucide="trash-2"></i>
+                        <span>Очистить</span>
+                    </button>
+                    <button type="button" class="audio-cache-refresh-btn" id="audioCacheRefreshBtn" title="Обновить список">
+                        <i data-lucide="refresh-cw"></i>
+                        <span>Обновить</span>
+                    </button>
+                </div>
             </div>
             <div id="audioCacheList" class="audio-cache-list">
                 <div class="audio-cache-loading">Загрузка списка аудио из кэша...</div>

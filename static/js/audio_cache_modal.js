@@ -224,6 +224,44 @@
   }
 
   /**
+   * Очистить весь кэш аудио
+   */
+  async function clearAudioCache() {
+    if (!confirm('Очистить все аудио из кэша (' + MEDIA_CACHE_NAME + ')? Это действие нельзя отменить.')) {
+      return;
+    }
+
+    try {
+      const cache = await caches.open(MEDIA_CACHE_NAME);
+      const requests = await cache.keys();
+      let deletedCount = 0;
+
+      for (const request of requests) {
+        const url = request.url;
+        if (url.includes('/api/dictations/')) {
+          await cache.delete(request);
+          deletedCount++;
+        }
+      }
+
+      stopCurrentPlayback();
+      await renderAudioCacheList();
+
+      // Показываем уведомление
+      const countEl = document.getElementById('audioCacheCount');
+      if (countEl) {
+        countEl.textContent = 'Очищено ' + deletedCount + ' аудио';
+        setTimeout(function () {
+          renderAudioCacheList();
+        }, 2000);
+      }
+    } catch (e) {
+      console.error('[audioCache] error clearing cache:', e);
+      alert('Ошибка при очистке кэша: ' + e.message);
+    }
+  }
+
+  /**
    * Рендер списка аудио
    */
   async function renderAudioCacheList() {
@@ -261,9 +299,12 @@
       html += '<div class="audio-cache-item">';
       html += '<div class="audio-cache-item-icon"><i data-lucide="music"></i></div>';
       html += '<div class="audio-cache-item-info">';
-      html += '<div class="audio-cache-item-url" title="' + escapeHtml(entry.url) + '">' + escapeHtml(filenameLabel) + '</div>';
+      html += '<div class="audio-cache-item-url" title="' + escapeHtml(entry.url) + '">';
+      if (idLabel) {
+        html += '<span class="audio-cache-item-id-badge">' + escapeHtml(idLabel) + '</span> ';
+      }
+      html += escapeHtml(filenameLabel) + '</div>';
       html += '<div class="audio-cache-item-meta">';
-      if (idLabel) html += '<span>' + escapeHtml(idLabel) + '</span>';
       if (langLabel) html += '<span>' + escapeHtml(langLabel) + '</span>';
       html += '<span>' + escapeHtml(sizeLabel) + '</span>';
       html += '</div>';
@@ -367,6 +408,15 @@
         e.preventDefault();
         stopCurrentPlayback();
         renderAudioCacheList();
+      });
+    }
+
+    // Кнопка очистки кэша
+    const clearBtn = document.getElementById('audioCacheClearBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        clearAudioCache();
       });
     }
   }
