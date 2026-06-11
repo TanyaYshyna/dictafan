@@ -3887,6 +3887,10 @@
       const mixBtn = document.getElementById('mixControl');
       if (mixBtn && mixBtn.dataset.boundDictationModal !== '1') {
         mixBtn.dataset.boundDictationModal = '1';
+        // Устанавливаем начальное состояние, если ещё не установлено
+        if (!mixBtn.dataset.checked) {
+          mixBtn.dataset.checked = 'false';
+        }
         mixBtn.addEventListener('click', (e) => {
           try {
             e.preventDefault();
@@ -3896,20 +3900,49 @@
           try {
             const session = window.__dictationModalActiveSession;
             if (!session) return;
-            const isMixed = mixBtn.dataset.checked === 'true';
-            if (isMixed) {
-              mixBtn.dataset.checked = 'false';
-              const icon = mixBtn.querySelector('i[data-lucide]');
-              if (icon) icon.setAttribute('data-lucide', 'move-right');
-              const span = mixBtn.querySelector('span');
-              if (span) span.textContent = '';
+            const currentState = mixBtn.dataset.checked;
+            const newState = currentState === 'true' ? 'false' : 'true';
+            mixBtn.dataset.checked = newState;
+
+            // Меняем иконку и подсказку (title)
+            const iconName = newState === 'true' ? 'shuffle' : 'move-right';
+            const textName = newState === 'true'
+              ? 'Перемешать предложения'
+              : 'Прямой порядок';
+            mixBtn.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+            mixBtn.title = textName;
+            mixBtn.setAttribute('aria-label', textName);
+
+            // Перемешиваем или восстанавливаем порядок предложений
+            const allKeys = session.content ? session.content.getAllKeys() : [];
+            if (newState === 'true') {
+              // Сохраняем оригинальный порядок при первом перемешивании
+              if (!session._originalActiveKeys) {
+                session._originalActiveKeys = session.activeKeys ? Array.from(session.activeKeys) : Array.from(allKeys);
+              }
+              // Перемешиваем activeKeys (алгоритм Фишера-Йетса)
+              const shuffled = session.activeKeys ? Array.from(session.activeKeys) : Array.from(allKeys);
+              for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+              }
+              session.activeKeys = shuffled;
             } else {
-              mixBtn.dataset.checked = 'true';
-              const icon = mixBtn.querySelector('i[data-lucide]');
-              if (icon) icon.setAttribute('data-lucide', 'shuffle');
-              const span = mixBtn.querySelector('span');
-              if (span) span.textContent = 'Перемешать';
+              // Восстанавливаем оригинальный порядок
+              if (session._originalActiveKeys) {
+                session.activeKeys = Array.from(session._originalActiveKeys);
+              } else {
+                session.activeKeys = Array.from(allKeys);
+              }
+              session._originalActiveKeys = null;
             }
+
+            // Перерисовываем таблицу
+            try {
+              renderStartModalSentencesTable(session);
+            } catch (e1) {
+            }
+
             try {
               if (window.lucide && typeof window.lucide.createIcons === 'function') {
                 window.lucide.createIcons({ root: mixBtn });
