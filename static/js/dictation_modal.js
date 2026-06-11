@@ -167,6 +167,64 @@
       if (resultsBtn && typeof resultsBtn.focus === 'function') resultsBtn.focus();
     } catch (e5) {
     }
+
+    // Автоматическая отправка отчёта в Telegram при успешном завершении диктанта
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && typeof window.autoSendTeacherReportAfterSuccess === 'function') {
+        const allKeys = session.content ? session.content.getAllKeys() : [];
+        let totalPerfect = 0;
+        let totalCorrected = 0;
+        let totalAudio = 0;
+        let totalErrors = 0;
+        const sentencesData = [];
+
+        for (const key of allKeys) {
+          const st = session.getState(key);
+          const p = Number(st.number_of_perfect) || 0;
+          const c = Number(st.number_of_corrected) || 0;
+          const a = Number(st.number_of_audio) || 0;
+          const er = Number(st.mistake_count) || 0;
+
+          totalPerfect += p;
+          totalCorrected += c;
+          totalAudio += a;
+          totalErrors += er;
+
+          if (p > 0 || c > 0 || a > 0) {
+            sentencesData.push({
+              sentence_key: key,
+              perfect_count: p,
+              corrected_count: c,
+              audio_count: a,
+              attempts_total: 0,
+              mistake_count: er,
+              selection_state: st.selection_state || 'unchecked',
+            });
+          }
+        }
+
+        const totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+        const nowMs = Date.now();
+        const tzOffsetMin = -new Date().getTimezoneOffset();
+
+        window.autoSendTeacherReportAfterSuccess({
+          completionCountAfter: undefined,
+          errorWords: null,
+          perfectCount: totalPerfect,
+          correctedCount: totalCorrected,
+          audioCount: totalAudio,
+          attemptsTotal: 0,
+          errorCount: totalErrors,
+          timeMs: totalTimeMs,
+          completedAtMs: nowMs,
+          completedAtTzOffsetMin: tzOffsetMin,
+          sentencesData: sentencesData,
+          settingsJson: null,
+        });
+      }
+    } catch (e6) {
+    }
   }
 
   function setupCompletionModalHandlers() {
@@ -859,6 +917,17 @@
       return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     } catch (e) {
       return '00:00:00';
+    }
+  }
+
+  function formatMmSs(ms) {
+    try {
+      const totalSec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+      const m = Math.floor(totalSec / 60);
+      const s = totalSec % 60;
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    } catch (e) {
+      return '00:00';
     }
   }
 
@@ -3044,12 +3113,19 @@
         tdTr.className = 'col-text-translation';
         tdTr.textContent = String(view.text_translation || '');
 
+        const tdTime = document.createElement('td');
+        tdTime.className = 'col-time';
+        const st = session.getState(view.key);
+        const timeMs = st && st.time_ms ? Number(st.time_ms) : 0;
+        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
+
         tr.appendChild(tdNum);
         tr.appendChild(tdChoice);
         tr.appendChild(emptyProgress());
         tr.appendChild(emptyProgress());
         tr.appendChild(emptyProgress());
         tr.appendChild(emptyProgress());
+        tr.appendChild(tdTime);
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);
 

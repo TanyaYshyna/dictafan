@@ -131,20 +131,21 @@
                     <div class="start-modal-title-row">
                         <span class="dikt-number-badge">{{ dikt_numer }}</span>
                         <h2 id="title-diktation">{{ title_orig }}</h2>
-                        <div class="start-modal-header-actions">
-                            <button id="startModalSendInterimReportBtn" class="start-modal-settings-btn" title="Отправить промежуточный отчет">
-                                <i data-lucide="send-horizontal"></i>
-                            </button>
-                            <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
-                                <i data-lucide="settings"></i>
-                            </button>
-                            <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
-                                <i data-lucide="log-out"></i>
-                            </button>
-                            <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
-                                <i data-lucide="x"></i>
-                            </button>
-                        </div>
+                    <div class="start-modal-header-actions">
+                        <button id="startModalOpenSettingsBtn" class="start-modal-settings-btn" title="Настройки">
+                            <i data-lucide="settings"></i>
+                        </button>
+                        <button id="startModalSendInterimReportBtn" class="start-modal-settings-btn" title="Отправить промежуточный отчет">
+                            <i data-lucide="send-horizontal"></i>
+                        </button>
+                        <button id="startModalExitToIndexBtn" class="start-modal-exit-btn" title="Выйти из диктанта" onclick="(async function(){ try { if (typeof showExitModal === 'function') { await showExitModal(function(){ window.location.href = '/'; }); return; } } catch (e) {} window.location.href = '/'; })(); return false;">
+                            <i data-lucide="log-out"></i>
+                        </button>
+                        <button id="btnBackToList" onclick=clickBtnBackToList() class="start-modal-close-btn" title="Закрыть">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+
                     </div>
                     <!-- Контейнер для рендера прогресс-панели (модал) -->
                     <div id="progressPanelModalContainer" class="progress-panel-modal-r"></div>
@@ -198,6 +199,7 @@
                         <col class="col-progress">
                         <col class="col-progress">
                         <col class="col-progress">
+                        <col class="col-time">
                         <col class="col-text-original">
                         <col class="col-text-translation">
                         <col class="col-code">
@@ -214,11 +216,13 @@
                             <th class="col-progress"></th>
                             <th class="col-progress"></th>
                             <th class="col-progress" title="попытки/ошибки">m</th>
+                            <th class="col-time" title="Время">⏱</th>
                             <th id="thSentenceOriginal">Оригинал</th>
                             <th id="thSentenceTranslation">Перевод</th>
                             <th class="hidden-column">Код</th>
                         </tr>
                     </thead>
+
                     <tbody>
                         <!-- Строки будут добавляться через JavaScript -->
                     </tbody>

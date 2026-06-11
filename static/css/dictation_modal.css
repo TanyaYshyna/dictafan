@@ -1442,6 +1442,17 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: 26px;
 }
 
+#dictationModal #sentences-table col.col-time,
+#dictationModal #final-sentences-table col.col-time {
+  width: 60px;
+}
+
+#dictationModal #sentences-table th.col-time,
+#dictationModal #sentences-table td.col-time {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* m column (attempts/errors) is the 6th column: rownum, choice, 4x progress */
 #dictationModal #sentences-table colgroup col:nth-child(6),
 #dictationModal #final-sentences-table colgroup col:nth-child(6) {

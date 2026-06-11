@@ -2610,6 +2610,17 @@ html[dir="rtl"] .audio-players-wrapper {
   width: 45px;
 }
 
+#sentences-table col.col-time,
+#final-sentences-table col.col-time {
+  width: 60px;
+}
+
+#sentences-table th.col-time,
+#sentences-table td.col-time {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 #sentences-table col.col-text-original,
 #final-sentences-table col.col-text-original,
 #sentences-table col.col-text-translation,
