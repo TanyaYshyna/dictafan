@@ -1917,15 +1917,51 @@
     try {
       const el = document.getElementById('playSequenceStart');
       const v = el && el.value != null ? String(el.value) : '';
-      if (v.trim()) return v.trim();
+      if (v.trim()) {
+        console.log('[DICTATION_MODAL] getPlaySequenceStartValue from DOM element playSequenceStart:', v.trim());
+        return v.trim();
+      }
     } catch (e) {
     }
     try {
       const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
-      if (v.trim()) return v.trim();
+      if (v.trim()) {
+        console.log('[DICTATION_MODAL] getPlaySequenceStartValue from window.playSequenceStart:', v.trim());
+        return v.trim();
+      }
     } catch (e) {
     }
+    console.log('[DICTATION_MODAL] getPlaySequenceStartValue: no value found, returning default oto');
     return 'oto';
+  }
+
+  function loadPlaySequenceStartFromUser() {
+    try {
+      const um = window.UM;
+      if (um && um.userData && um.userData.settings_json) {
+        const raw = String(um.userData.settings_json || '');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
+          if (audio.start != null && String(audio.start).trim()) {
+            window.playSequenceStart = String(audio.start).trim();
+            return;
+          }
+        }
+      }
+    } catch (e) {
+    }
+    // fallback: если settings_json нет, пробуем audio_start
+    try {
+      const um = window.UM;
+      if (um && um.userData && um.userData.audio_start) {
+        window.playSequenceStart = String(um.userData.audio_start).trim();
+        return;
+      }
+    } catch (e) {
+    }
+    // если ничего не нашли, ставим oto
+    window.playSequenceStart = 'oto';
   }
 
   function playAudioSequence(sequence, { originalUrl, translationUrl }) {
@@ -1933,7 +1969,12 @@
       const am = window.AudioManager;
       if (!am || typeof am.play !== 'function') return;
       const seq = String(sequence || '').trim().toLowerCase();
-      if (!seq) return;
+      if (!seq) {
+        console.log('[DICTATION_MODAL] playAudioSequence: empty sequence, skipping');
+        return;
+      }
+
+      console.log('[DICTATION_MODAL] playAudioSequence: sequence =', seq, 'originalUrl =', originalUrl ? originalUrl.substring(0, 50) + '...' : 'null', 'translationUrl =', translationUrl ? translationUrl.substring(0, 50) + '...' : 'null');
 
       let originalBtn = null;
       try {
@@ -1947,7 +1988,10 @@
         if (ch === 'o' && originalUrl) steps.push({ url: originalUrl, button: originalBtn });
         if (ch === 't' && translationUrl) steps.push({ url: translationUrl, button: document.getElementById('translationPlayButton') });
       }
-      if (!steps.length) return;
+      if (!steps.length) {
+        console.log('[DICTATION_MODAL] playAudioSequence: no valid steps for sequence', seq);
+        return;
+      }
 
       let i = 0;
       const runNext = () => {
@@ -2042,14 +2086,26 @@
     try {
       if (started) {
         const lastKey = (state && state._lastStartSequenceKey != null) ? String(state._lastStartSequenceKey) : '';
-        if (sentenceKey && sentenceKey === lastKey) {
-          return;
+        // Защита от повторного запуска: если ключ предложения совпадает с предыдущим — пропускаем.
+        // Если ключ пустой, используем fallback-защиту через _startSequencePlayed флаг.
+        if (sentenceKey) {
+          if (sentenceKey === lastKey) {
+            return;
+          }
+          state._lastStartSequenceKey = sentenceKey;
+          state._startSequencePlayed = false;
+        } else {
+          // Если ключ пустой, используем флаг _startSequencePlayed для защиты от повторного запуска
+          if (state._startSequencePlayed) {
+            return;
+          }
+          state._startSequencePlayed = true;
         }
-        state._lastStartSequenceKey = sentenceKey;
 
         state._startSequenceTimer = setTimeout(() => {
           try {
             const seq = getPlaySequenceStartValue();
+            console.log('[DICTATION_MODAL] updateAudioPlayersFromSession: playing sequence', seq, 'for sentenceKey', sentenceKey);
             playAudioSequence(seq, { originalUrl, translationUrl });
           } catch (e0) {
           }
@@ -3900,6 +3956,12 @@
       }
 
       await ensureDictationDepsLoaded();
+
+      // Загружаем настройки схемы пользователя при открытии модалки диктанта
+      try {
+        loadPlaySequenceStartFromUser();
+      } catch (e) {
+      }
 
       try {
         if (parsed) {
