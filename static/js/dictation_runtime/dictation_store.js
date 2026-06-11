@@ -90,6 +90,27 @@
     getAllSentenceCores() {
       return this._allKeys.map((k) => this._byKey.get(k)).filter(Boolean);
     }
+
+    /** Сериализация для сохранения в IndexedDB */
+    toJSON() {
+      return {
+        dictationId: this.dictationId,
+        langTr: this.langTr,
+        loadedAtMs: this.loadedAtMs,
+        sentences: this.getAllSentenceCores(),
+      };
+    }
+
+    /** Восстановление из сохранённого объекта */
+    static fromJSON(data) {
+      if (!data) return null;
+      const c = new DictationContent({ dictationId: data.dictationId, langTr: data.langTr });
+      if (Array.isArray(data.sentences)) {
+        c.setSentences(data.sentences);
+      }
+      c.loadedAtMs = data.loadedAtMs || 0;
+      return c;
+    }
   }
 
   class DictationSession {
@@ -314,6 +335,65 @@
       st.number_of_time = (Number(st.number_of_time) || 0) + add;
       this.touch();
     }
+
+    /** Сериализация сессии для сохранения в IndexedDB */
+    toJSON() {
+      const stateByKeyObj = {};
+      this._stateByKey.forEach((val, key) => {
+        stateByKeyObj[key] = Object.assign({}, val);
+      });
+
+      return {
+        contentKey: this.content ? this.content.key : null,
+        exerciseId: this.exerciseId,
+        subsetPositions: this.subsetPositions,
+        subsetSignature: this.subsetSignature,
+        activeKeys: this.activeKeys ? this.activeKeys.slice() : null,
+        selectedKeys: this.selectedKeys.slice(),
+        currentSelectedIndex: this.currentSelectedIndex,
+        stateByKey: stateByKeyObj,
+        timer: {
+          running: false, // не сохраняем running — восстановим как остановленный
+          startedAtMs: 0,
+          accumulatedMs: this.timer.accumulatedMs || 0,
+        },
+        lastUsedAtMs: this.lastUsedAtMs,
+      };
+    }
+
+    /** Восстановление сессии из сохранённого объекта */
+    static fromJSON(data, content) {
+      if (!data || !content) return null;
+      const s = new DictationSession({
+        content,
+        exerciseId: data.exerciseId || null,
+        subsetPositions: data.subsetPositions || null,
+      });
+
+      if (Array.isArray(data.activeKeys)) {
+        s.activeKeys = data.activeKeys.slice();
+      }
+      if (Array.isArray(data.selectedKeys)) {
+        s.selectedKeys = data.selectedKeys.slice();
+      }
+      s.currentSelectedIndex = Number(data.currentSelectedIndex) || 0;
+
+      // Восстанавливаем stateByKey
+      if (data.stateByKey && typeof data.stateByKey === 'object') {
+        Object.keys(data.stateByKey).forEach((k) => {
+          s._stateByKey.set(k, Object.assign({}, data.stateByKey[k]));
+        });
+      }
+
+      // Восстанавливаем таймер (всегда остановленный)
+      s.timer.running = false;
+      s.timer.startedAtMs = 0;
+      s.timer.accumulatedMs = Number(data.timer && data.timer.accumulatedMs) || 0;
+
+      s.lastUsedAtMs = Number(data.lastUsedAtMs) || _nowMs();
+
+      return s;
+    }
   }
 
   class DictationSessionsStore {
@@ -403,6 +483,95 @@
         const e = entries[i];
         if (!e) continue;
         this._sessions.delete(e[0]);
+      }
+    }
+
+    /** Сохранить все сессии и контенты в IndexedDB */
+    async persistToIdb() {
+      if (typeof window.IdbManager === 'undefined') return;
+
+      // Сохраняем контенты
+      const contents = Array.from(this._contents.values());
+      for (const content of contents) {
+        try {
+          await window.IdbManager.idbPut('sessions', {
+            key: 'content:' + content.key,
+            type: 'content',
+            data: content.toJSON(),
+            savedAt: _nowMs(),
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Сохраняем сессии
+      const sessions = Array.from(this._sessions.values());
+      for (const session of sessions) {
+        try {
+          await window.IdbManager.idbPut('sessions', {
+            key: 'session:' + session.key,
+            type: 'session',
+            data: session.toJSON(),
+            savedAt: _nowMs(),
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    /** Восстановить сессии и контенты из IndexedDB */
+    async restoreFromIdb() {
+      if (typeof window.IdbManager === 'undefined') return;
+
+      const allRecords = await window.IdbManager.idbGetAll('sessions');
+      if (!Array.isArray(allRecords)) return;
+
+      // Сначала восстанавливаем контенты
+      const contentRecords = allRecords.filter((r) => r && r.type === 'content');
+      for (const rec of contentRecords) {
+        try {
+          const c = DictationContent.fromJSON(rec.data);
+          if (c) {
+            this._contents.set(c.key, c);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      // Потом восстанавливаем сессии (ссылаются на контенты)
+      const sessionRecords = allRecords.filter((r) => r && r.type === 'session');
+      for (const rec of sessionRecords) {
+        try {
+          const data = rec.data;
+          if (!data || !data.contentKey) continue;
+          const content = this._contents.get(data.contentKey);
+          if (!content) continue;
+          const s = DictationSession.fromJSON(data, content);
+          if (s) {
+            this._sessions.set(s.key, s);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    /** Очистить сохранённые сессии в IndexedDB */
+    async clearIdbSessions() {
+      if (typeof window.IdbManager === 'undefined') return;
+      const allRecords = await window.IdbManager.idbGetAll('sessions');
+      if (!Array.isArray(allRecords)) return;
+      for (const rec of allRecords) {
+        try {
+          if (rec && rec.key) {
+            await window.IdbManager.idbDelete('sessions', rec.key);
+          }
+        } catch (e) {
+          // ignore
+        }
       }
     }
   }

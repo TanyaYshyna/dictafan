@@ -17,6 +17,7 @@
     '/static/js/dictation_runtime/proverka_na_oshibki.js',
     '/static/js/dictation_runtime/proverka_renderer.js',
     '/static/js/dictation_runtime/speech_recognition_panel.js',
+    '/static/js/outbox_batcher.js',
   ];
 
   const state = {
@@ -2689,6 +2690,8 @@
       window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
         maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
       });
+      // Восстанавливаем сохранённые сессии из IndexedDB
+      window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
       return window.__dictationRuntimeStore;
     } catch (e) {
       return null;
@@ -4278,6 +4281,15 @@
       const pm = document.getElementById('pauseModal');
       if (pm) pm.style.display = 'none';
     } catch (e1) {
+    }
+
+    // Сохраняем сессию в IndexedDB перед закрытием
+    try {
+      const store = getRuntimeStore();
+      if (store && typeof store.persistToIdb === 'function') {
+        store.persistToIdb().catch(function(e){});
+      }
+    } catch (e2) {
     }
 
     state.isOpen = false;

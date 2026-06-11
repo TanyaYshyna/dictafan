@@ -2220,6 +2220,10 @@ async function syncOfflineActivityOutbox() {
 
 async function enqueueOfflineSuccess(payload) {
     try {
+        if (window.OutboxBatcher && typeof window.OutboxBatcher.enqueueSuccess === 'function') {
+            return await window.OutboxBatcher.enqueueSuccess(payload);
+        }
+        // Fallback: старая логика, если OutboxBatcher не загружен
         const userId = getDraftUserIdForKey();
         if (!userId) return false;
         const rawId = String(payload?.dictation_id ?? '').trim();
@@ -9152,39 +9156,22 @@ async function saveActivityToDB(type_activity) {
 
         console.log('📤 [CLIENT] Данные для отправки:', requestData);
 
-        const response = await fetch('/api/statistics/activity', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify(requestData)
+        // Используем OutboxBatcher для отложенной отправки
+        const enqueued = await window.OutboxBatcher.enqueueActivity({
+            type: type_activity,
+            count: 1,
+            leadTimeMs: leadTimeMs,
+            dictationId: currentDictation.id,
+            date: requestData.date,
+            dictationLanguageCode: requestData.dictation_language_code,
+            selectedSentencePositions: requestData.selected_sentence_positions,
         });
 
-        if (!response.ok) {
-            console.warn(`⚠️ [CLIENT] Ошибка сохранения активности ${type_activity}:`, response.status, response.statusText);
-            const errorText = await response.text();
-            console.warn(`⚠️ [CLIENT] Текст ошибки:`, errorText);
-            await enqueueOfflineActivity(type_activity, 1, leadTimeMs);
-            try {
-                if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
-                    window.UM.incrementTodayActivityTotal(1);
-                }
-            } catch (e) {
-            }
-            // Если интернет есть, но запрос не прошёл (например, временная ошибка/401),
-            // попробуем отправить outbox сразу, чтобы активность не "застряла" до следующего события online.
-            try {
-                if (navigator.onLine) {
-                    syncOfflineActivityOutbox().catch(() => {});
-                }
-            } catch (e) {
-            }
-            return;
+        if (enqueued) {
+            console.log(`✅ [CLIENT] Активность ${type_activity} поставлена в очередь OutboxBatcher`);
+        } else {
+            console.warn(`⚠️ [CLIENT] Не удалось поставить активность ${type_activity} в очередь`);
         }
-
-        const result = await response.json();
-        console.log(`✅ [CLIENT] Активность ${type_activity} успешно сохранена в БД:`, result);
 
         try {
             if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
@@ -9203,7 +9190,12 @@ async function saveActivityToDB(type_activity) {
         } catch (e) {
             leadTimeMs = 0;
         }
-        await enqueueOfflineActivity(type_activity, 1, leadTimeMs);
+        await window.OutboxBatcher.enqueueActivity({
+            type: type_activity,
+            count: 1,
+            leadTimeMs: leadTimeMs,
+            dictationId: currentDictation.id,
+        });
         try {
             if (window.UM && typeof window.UM.incrementTodayActivityTotal === 'function') {
                 window.UM.incrementTodayActivityTotal(1);
