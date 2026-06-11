@@ -2990,7 +2990,7 @@
 
         const tdNum = document.createElement('td');
         const position = Number.isFinite(view.position) ? view.position : '';
-        tdNum.textContent = position ? (String(idx + 1) + '/' + String(position)) : String(idx + 1);
+        tdNum.textContent = position ? ((idx + 1) === position ? String(idx + 1) : (String(idx + 1) + '/' + String(position))) : String(idx + 1);
 
         const tdChoice = document.createElement('td');
         const btn = document.createElement('button');
