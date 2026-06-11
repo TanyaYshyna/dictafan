@@ -2989,7 +2989,8 @@
         tr.dataset.sentenceKey = String(view.key);
 
         const tdNum = document.createElement('td');
-        tdNum.textContent = String(idx + 1);
+        const position = Number.isFinite(view.position) ? view.position : '';
+        tdNum.textContent = position ? (String(idx + 1) + '/' + String(position)) : String(idx + 1);
 
         const tdChoice = document.createElement('td');
         const btn = document.createElement('button');
@@ -3935,6 +3936,23 @@
                 session.activeKeys = Array.from(allKeys);
               }
               session._originalActiveKeys = null;
+            }
+
+            // Перестраиваем selectedKeys в том же порядке, что и activeKeys
+            // (оставляем только checked, но сохраняем порядок из activeKeys)
+            try {
+              const newSelected = [];
+              for (const k of session.activeKeys) {
+                const st = session.getState(k);
+                if (st && st.selection_state === 'checked') {
+                  newSelected.push(k);
+                }
+              }
+              session.selectedKeys = newSelected;
+              if (session.currentSelectedIndex >= session.selectedKeys.length) {
+                session.currentSelectedIndex = Math.max(0, session.selectedKeys.length - 1);
+              }
+            } catch (eRebuild) {
             }
 
             // Перерисовываем таблицу
