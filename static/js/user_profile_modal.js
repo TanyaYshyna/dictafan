@@ -869,8 +869,8 @@ async function restoreGroupFromModal() {
 function openGroupModal(mode, group) {
     const modal = document.getElementById('groupModal');
     const titleEl = document.getElementById('groupModalTitle');
-    const nameInput = document.getElementById('groupModalName');
-    const descInput = document.getElementById('groupModalDescription');
+    const nameInput = document.getElementById('groupModalTitleInput');
+    const descInput = document.getElementById('groupModalDescriptionInput');
     if (!modal || !titleEl || !nameInput) return;
     if (mode === 'edit' && group) {
         titleEl.textContent = profileT('profile.groups.modal.edit_title', null, 'Редактировать группу');
@@ -887,8 +887,8 @@ function openGroupModal(mode, group) {
 }
 
 async function saveGroupFromModal() {
-    const nameInput = document.getElementById('groupModalName');
-    const descInput = document.getElementById('groupModalDescription');
+    const nameInput = document.getElementById('groupModalTitleInput');
+    const descInput = document.getElementById('groupModalDescriptionInput');
     if (!nameInput) return;
     const title = String(nameInput.value || '').trim();
     if (!title) { showInfo(profileT('profile.groups.errors.name_required', null, 'Введите название группы')); return; }
