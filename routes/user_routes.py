@@ -521,8 +521,8 @@ def api_set_ui_lang():
 
 @user_bp.route('/profile')
 def profile_page():
-    """Страница профиля пользователя"""
-    return render_template('user_profile_jwt.html', language_data=load_language_data())
+    """Страница профиля — перенаправляем на рабочий стол, где профиль открывается в модалке"""
+    return redirect(url_for('index.index'))
 
 @user_bp.route('/logout')
 def logout():

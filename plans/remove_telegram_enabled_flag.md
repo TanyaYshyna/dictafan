@@ -33,11 +33,11 @@
 </div>
 ```
 
-> `templates/user_profile_jwt.html` — НЕ чіпаємо, файл буде видалено окремим завданням.
+> ~~`templates/user_profile_jwt.html` — НЕ чіпаємо, файл буде видалено окремим завданням.~~ **ВИДАЛЕНО** (окремим завданням)
 
 ### 2. JS — Видалити логіку перемикача
 
-#### `static/js/script_user_profile.js`
+#### `static/js/user_profile_modal.js` (раніше `script_user_profile.js` — видалений)
 
 **a) `renderTelegramSection()` (рядки 814-1077)**
 - Видалити рядок 818: `const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');`
@@ -199,4 +199,4 @@ ALTER TABLE users DROP COLUMN IF EXISTS telegram_enabled;
 - `telegram_chat_id` **НЕ чіпаємо** — він визначає, чи підключений Telegram
 - `group_students.notify_teacher_on_success` **НЕ чіпаємо** — це пер-учнівський флаг, який залишається
 - `is_telegram_enabled()` у `helpers/telegram.py` **НЕ чіпаємо** — це перевірка наявності TELEGRAM_BOT_TOKEN, не пов'язана з users.telegram_enabled
-- `templates/user_profile_jwt.html` **НЕ чіпаємо** — буде видалено окремим завданням
+- ~~`templates/user_profile_jwt.html` **НЕ чіпаємо** — буде видалено окремим завданням~~ **ВИДАЛЕНО** (окремим завданням)
