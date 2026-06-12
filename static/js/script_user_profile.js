@@ -821,6 +821,9 @@ function renderTelegramSection() {
     const openBotBtn = document.getElementById('telegramOpenBotBtn');
     const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
     const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
+    const botUsernameLabel = document.getElementById('telegramBotUsernameLabel');
+    const testSendBtn = document.getElementById('telegramTestSendBtn');
+    const testInput = document.getElementById('telegramTestMessageInput');
 
     if (!statusEl || !codeLabel || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
@@ -843,6 +846,12 @@ function renderTelegramSection() {
     };
 
     statusEl.textContent = linked ? `chat_id: ${chatId}` : '';
+
+    // Обновляем имя бота динамически
+    const botUsername = (UM && UM.userData && UM.userData.telegram_bot_name) ? UM.userData.telegram_bot_name : 'dictafan_user_bot';
+    if (botUsernameLabel) {
+        botUsernameLabel.textContent = `@${botUsername}`;
+    }
 
     const _setBtnState = (btn, value) => {
         if (!btn) return;
@@ -903,14 +912,14 @@ function renderTelegramSection() {
     };
 
     if (openBotBtn) {
-        openBotBtn.onclick = async () => {
+        openBotBtn.onclick = async (e) => {
             try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
                 openBotBtn.disabled = true;
-
-                const botUsername = (UM && UM.userData && UM.userData.telegram_bot_name) ? UM.userData.telegram_bot_name : 'dictafan_user_bot';
-
-                const isLinked = Boolean((UM && UM.userData) ? UM.userData.telegram_chat_id : null);
-                if (isLinked) {
+                if (linked) {
                     const url = `https://t.me/${encodeURIComponent(botUsername)}`;
                     window.open(url, '_blank', 'noopener,noreferrer');
                     return;
@@ -929,7 +938,11 @@ function renderTelegramSection() {
                         UM.userData.telegram_link_code = code;
                     }
                     try { copyBtn.disabled = false; } catch (e2) {}
-                    renderTelegramSection();
+                    // Обновляем QR-код без перерисовки всей секции
+                    if (qrImg) {
+                        qrImg.style.display = 'block';
+                        qrImg.src = `/user/api/telegram/qr?code=${encodeURIComponent(code)}&r=${Date.now()}`;
+                    }
                 }
 
                 const url = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(code)}`;
@@ -1031,6 +1044,29 @@ function renderTelegramSection() {
             selfReportsToggleBtn.disabled = false;
         }
     };
+
+    // Обработчик кнопки отправки тестового сообщения
+    if (testSendBtn && testInput) {
+        testSendBtn.onclick = async () => {
+            try {
+                testSendBtn.disabled = true;
+                const text = testInput.value.trim() || 'Тест';
+                const data = await telegramApiRequest('/user/api/telegram/test_send', {
+                    method: 'POST',
+                    body: JSON.stringify({ text }),
+                });
+                if (!data || !data.success) {
+                    throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
+                }
+                const sentCount = data.sent_count || 0;
+                showSuccess(profileT('profile.telegram.test_sent', { count: sentCount }, `Тестовое сообщение отправлено (${sentCount} получателей)`));
+            } catch (e) {
+                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+            } finally {
+                testSendBtn.disabled = false;
+            }
+        };
+    }
 
     try {
         if (window.lucide) {

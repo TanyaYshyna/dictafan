@@ -39,6 +39,7 @@ from helpers.db_telegram import (
     generate_and_store_telegram_link_code,
     link_telegram_chat_by_code,
     set_user_telegram_enabled,
+    list_teacher_recipients_for_student_manual_report,
 )
 from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
 from helpers.db_groups import ensure_personal_group_for_user
@@ -791,6 +792,56 @@ def api_telegram_set_self_reports_enabled():
         return jsonify({'success': True, 'enabled': bool(updated.get('telegram_self_reports_enabled'))})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/test_send', methods=['POST'])
+@jwt_required()
+def api_telegram_test_send():
+    """Отправить тестовое сообщение в Telegram: себе (если включено) и всем учителям."""
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or 'Тест').strip()
+    if not text:
+        text = 'Тест'
+
+    sent_count = 0
+    errors = []
+
+    # Отправляем себе, если включены self_reports
+    self_reports = bool(user_db.get('telegram_self_reports_enabled'))
+    chat_id = user_db.get('telegram_chat_id')
+    if self_reports and chat_id:
+        try:
+            send_telegram_message(int(chat_id), text)
+            sent_count += 1
+        except Exception as e:
+            errors.append(f"self: {e}")
+
+    # Отправляем учителям
+    try:
+        teachers = list_teacher_recipients_for_student_manual_report(
+            int(user_db['id']),
+            dictation_language_code='',
+        )
+        for teacher in teachers:
+            t_chat_id = teacher.get('telegram_chat_id')
+            if t_chat_id:
+                try:
+                    send_telegram_message(int(t_chat_id), text)
+                    sent_count += 1
+                except Exception as e:
+                    errors.append(f"teacher {t_chat_id}: {e}")
+    except Exception as e:
+        errors.append(f"list_teachers: {e}")
+
+    if sent_count == 0 and errors:
+        return jsonify({'success': False, 'error': '; '.join(errors)}), 500
+
+    return jsonify({'success': True, 'sent_count': sent_count})
 
 
 @user_bp.route('/api/avatar', methods=['POST'])

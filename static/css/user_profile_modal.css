@@ -405,6 +405,54 @@
   white-space: nowrap;
 }
 
+#user-profile-modal .telegram-test-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+#user-profile-modal .telegram-test-input {
+  flex: 1;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-light, #e9ecef);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+#user-profile-modal .telegram-test-input:focus {
+  border-color: var(--color-primary, #6c5ce7);
+}
+
+#user-profile-modal .telegram-test-send-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--color-border-light, #e9ecef);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text, #1f2933);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#user-profile-modal .telegram-test-send-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+#user-profile-modal .telegram-test-send-btn i[data-lucide] {
+  width: 16px;
+  height: 16px;
+}
+
 #user-profile-modal .telegram-bot-username {
   font-weight: 700;
   margin-top: 0;
