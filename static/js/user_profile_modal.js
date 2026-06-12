@@ -511,7 +511,7 @@ function renderMembershipsTable() {
 
 async function refreshMemberships() {
     try {
-        const data = await groupsApiRequest('/groups/api/my-memberships', { method: 'GET' });
+        const data = await groupsApiRequest('/groups/api/memberships', { method: 'GET' });
         groupsUiState.memberships = data && Array.isArray(data.memberships) ? data.memberships : [];
         renderMembershipsTable();
     } catch (e) {
@@ -524,7 +524,7 @@ async function leaveSelectedMembershipGroup() {
     const id = groupsUiState.selectedMembershipId;
     if (!id) { showInfo(profileT('profile.groups.errors.select_membership', null, 'Выбери группу')); return; }
     try {
-        await groupsApiRequest(`/groups/api/membership/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        await groupsApiRequest(`/groups/api/memberships/${encodeURIComponent(id)}/leave`, { method: 'POST' });
         showSuccess(profileT('profile.groups.membership_left', null, 'Вы вышли из группы'));
         await refreshMemberships();
     } catch (e) { showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка')); }
@@ -897,7 +897,7 @@ async function saveGroupFromModal() {
     try {
         if (editingId) {
             await groupsApiRequest(`/groups/api/group/${editingId}`, {
-                method: 'PATCH', body: JSON.stringify({ title, description }),
+                method: 'PUT', body: JSON.stringify({ title, description }),
             });
             showSuccess(profileT('profile.groups.updated', null, 'Группа обновлена'));
         } else {
@@ -913,7 +913,7 @@ async function saveGroupFromModal() {
 
 async function refreshGroups() {
     try {
-        const data = await groupsApiRequest('/groups/api/groups', { method: 'GET' });
+        const data = await groupsApiRequest('/groups/api/my', { method: 'GET' });
         groupsUiState.groups = data && Array.isArray(data.groups) ? data.groups : [];
         renderGroupsTable();
         renderGroupsDetails();
