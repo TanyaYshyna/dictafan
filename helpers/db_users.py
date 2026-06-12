@@ -118,16 +118,11 @@ def create_user(
                 SELECT column_name
                 FROM information_schema.columns
                 WHERE table_name='users'
-                  AND column_name IN ('telegram_enabled', 'telegram_self_reports_enabled')
+                  AND column_name IN ('telegram_self_reports_enabled')
                 """
             )
             rows = cur.fetchall() or []
             cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
-            if 'telegram_enabled' in cols:
-                cur.execute(
-                    "UPDATE users SET telegram_enabled = TRUE WHERE id = %s",
-                    (user_row["id"],),
-                )
             if 'telegram_self_reports_enabled' in cols:
                 cur.execute(
                     "UPDATE users SET telegram_self_reports_enabled = TRUE WHERE id = %s",
@@ -308,15 +303,14 @@ def get_user_by_email(email: str) -> Optional[dict]:
     try:
         # Проверяем наличие колонок settings_json и audio_settings_json (для обратной совместимости)
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='users' AND column_name IN (
                 'settings_json',
                 'audio_settings_json',
                 'assignment_history_retention_days',
                 'daily_activity_goal',
                 'telegram_chat_id',
-                'telegram_enabled',
                 'telegram_link_code',
                 'telegram_self_reports_enabled'
             )
@@ -329,7 +323,6 @@ def get_user_by_email(email: str) -> Optional[dict]:
         has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
         has_daily_activity_goal = 'daily_activity_goal' in columns
         has_telegram_chat_id = 'telegram_chat_id' in columns
-        has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
 
@@ -359,8 +352,6 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.daily_activity_goal")
         if has_telegram_chat_id:
             select_fields.append("u.telegram_chat_id")
-        if has_telegram_enabled:
-            select_fields.append("u.telegram_enabled")
         if has_telegram_link_code:
             select_fields.append("u.telegram_link_code")
         if has_telegram_self_reports_enabled:
@@ -421,8 +412,6 @@ def get_user_by_email(email: str) -> Optional[dict]:
 
         if has_telegram_chat_id and "telegram_chat_id" in row:
             result["telegram_chat_id"] = row.get("telegram_chat_id")
-        if has_telegram_enabled and "telegram_enabled" in row:
-            result["telegram_enabled"] = bool(row.get("telegram_enabled"))
         if has_telegram_link_code and "telegram_link_code" in row:
             result["telegram_link_code"] = row.get("telegram_link_code")
         if has_telegram_self_reports_enabled and "telegram_self_reports_enabled" in row:

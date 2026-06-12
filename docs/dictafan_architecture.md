@@ -683,7 +683,7 @@ Email-инвайты:
   - ученик состоит в группе, статус `active`
   - `group_students.notify_teacher_on_success = TRUE`
   - у группы есть активный teacher
-  - у учителя есть `telegram_chat_id` и `telegram_enabled = TRUE`
+  - у учителя есть `telegram_chat_id`
   - существует активное assignment для этого `dictation_id` и дня
 
 Ручная отправка отчёта учителю (когда прохождение было вне плана):
@@ -698,14 +698,14 @@ Email-инвайты:
 
 - ученик должен состоять в группе (`group_students.status='active'`, `removed_at IS NULL`)
 - требуется согласие ученика на уведомления: `COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE`
-- у учителя должен быть Telegram: `telegram_chat_id IS NOT NULL` и `telegram_enabled = TRUE`
+- у учителя должен быть Telegram: `telegram_chat_id IS NOT NULL`
 - учитель фильтруется по языку диктанта (язык оригинала):
   - `users.current_learning == dictation.language_code` или
   - `user_learning_languages.language_code == dictation.language_code`
 
 2) Self-report ученику (если включено):
 
-- если у пользователя есть `telegram_chat_id` и включены флаги `telegram_enabled` и `telegram_self_reports_enabled`.
+- если у пользователя есть `telegram_chat_id` и включён флаг `telegram_self_reports_enabled`.
 
 В тексте self-report дополнительно выводится:
 

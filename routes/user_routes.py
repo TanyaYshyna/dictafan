@@ -38,7 +38,6 @@ from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_telegram import (
     generate_and_store_telegram_link_code,
     link_telegram_chat_by_code,
-    set_user_telegram_enabled,
     list_teacher_recipients_for_student_manual_report,
 )
 from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
@@ -382,8 +381,7 @@ def api_password_reset_request_telegram():
             return jsonify({'success': True})
 
         chat_id = user_db.get('telegram_chat_id')
-        telegram_enabled = bool(user_db.get('telegram_enabled'))
-        if not chat_id or not telegram_enabled:
+        if not chat_id:
             return jsonify({'success': True})
 
         token = create_password_reset_token(email)
@@ -630,8 +628,6 @@ def api_update_profile():
 
         if 'telegram_chat_id' in updated_user:
             user_response['telegram_chat_id'] = updated_user.get('telegram_chat_id')
-        if 'telegram_enabled' in updated_user:
-            user_response['telegram_enabled'] = bool(updated_user.get('telegram_enabled'))
         if 'telegram_link_code' in updated_user:
             user_response['telegram_link_code'] = updated_user.get('telegram_link_code')
         if 'telegram_self_reports_enabled' in updated_user:
@@ -696,8 +692,6 @@ def api_get_profile():
 
     if 'telegram_chat_id' in user_db:
         user_response['telegram_chat_id'] = user_db.get('telegram_chat_id')
-    if 'telegram_enabled' in user_db:
-        user_response['telegram_enabled'] = bool(user_db.get('telegram_enabled'))
     if 'telegram_link_code' in user_db:
         user_response['telegram_link_code'] = user_db.get('telegram_link_code')
     if 'telegram_self_reports_enabled' in user_db:
@@ -754,24 +748,6 @@ def api_telegram_qr():
     img.save(buf, format='PNG')
     buf.seek(0)
     return Response(buf.getvalue(), mimetype='image/png')
-
-
-@user_bp.route('/api/telegram/enabled', methods=['POST'])
-@jwt_required()
-def api_telegram_set_enabled():
-    current_email = get_jwt_identity()
-    user_db = get_user_by_email(current_email)
-    if not user_db:
-        return jsonify({'success': False, 'error': 'User not found'}), 404
-
-    data = request.get_json(silent=True) or {}
-    enabled = bool(data.get('enabled'))
-
-    try:
-        set_user_telegram_enabled(int(user_db['id']), enabled)
-        return jsonify({'success': True, 'enabled': enabled})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @user_bp.route('/api/telegram/self_reports_enabled', methods=['POST'])

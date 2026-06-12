@@ -815,7 +815,6 @@ function renderTelegramSection() {
     const statusEl = document.getElementById('telegramStatusText');
     const codeLabel = document.getElementById('telegramLinkCodeLabel');
     const qrImg = document.getElementById('telegramQrImg');
-    const enabledToggleBtn = document.getElementById('telegramEnabledToggleBtn');
     const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
     const getCodeBtn = document.getElementById('telegramGetCodeBtn');
     const openBotBtn = document.getElementById('telegramOpenBotBtn');
@@ -825,11 +824,10 @@ function renderTelegramSection() {
     const testSendBtn = document.getElementById('telegramTestSendBtn');
     const testInput = document.getElementById('telegramTestMessageInput');
 
-    if (!statusEl || !codeLabel || !enabledToggleBtn || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
+    if (!statusEl || !codeLabel || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
     const user = (UM && UM.userData) ? UM.userData : {};
     const chatId = user.telegram_chat_id;
-    const enabled = Boolean(user.telegram_enabled);
     const selfReportsEnabled = Boolean(user.telegram_self_reports_enabled);
     const linked = Boolean(chatId);
 
@@ -866,7 +864,6 @@ function renderTelegramSection() {
         }
     };
 
-    _setBtnState(enabledToggleBtn, enabled);
     _setBtnState(selfReportsToggleBtn, selfReportsEnabled);
 
     const codeVal = String(user.telegram_link_code || codeLabel.dataset.code || '').trim();
@@ -990,32 +987,6 @@ function renderTelegramSection() {
             showSuccess(profileT('profile.common.copied', null, 'Скопировано'));
         } catch (e) {
             showInfo(cmd);
-        }
-    };
-
-    enabledToggleBtn.onclick = async () => {
-        const next = !(enabledToggleBtn.dataset.checked === '1');
-        try {
-            enabledToggleBtn.disabled = true;
-            const data = await telegramApiRequest('/user/api/telegram/enabled', {
-                method: 'POST',
-                body: JSON.stringify({ enabled: next }),
-            });
-            if (!data || !data.success) {
-                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
-            }
-            if (UM && UM.userData) {
-                UM.userData.telegram_enabled = Boolean(data.enabled);
-                if (typeof UM._saveUserCache === 'function') {
-                    UM._saveUserCache(UM.userData);
-                }
-            }
-            _setBtnState(enabledToggleBtn, Boolean(data.enabled));
-            showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
-        } catch (e) {
-            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
-        } finally {
-            enabledToggleBtn.disabled = false;
         }
     };
 
