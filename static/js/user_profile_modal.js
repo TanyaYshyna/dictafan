@@ -536,50 +536,110 @@ function renderGroupsTable() {
     const table = document.getElementById('groupsTable');
     if (!table) return;
     table.innerHTML = '';
+
+    const header = document.createElement('div');
+    header.className = 'groups-table-header';
+    const h1 = document.createElement('div');
+    h1.textContent = profileT('profile.groups.table.id', null, 'ID');
+    const h2 = document.createElement('div');
+    h2.textContent = profileT('profile.groups.table.name', null, 'Название');
+    const h3 = document.createElement('div');
+    h3.textContent = '';
+    header.appendChild(h1);
+    header.appendChild(h2);
+    header.appendChild(h3);
+    table.appendChild(header);
+
     const groups = getVisibleGroups();
+    if (groups.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '12px';
+        empty.style.color = '#666';
+        empty.textContent = profileT('profile.groups.table.empty', null, 'Пока нет групп');
+        table.appendChild(empty);
+        return;
+    }
+
     groups.forEach((g) => {
         const row = document.createElement('div');
-        row.className = 'groups-table-row' + (String(g.id) === String(groupsUiState.selectedGroupId) ? ' selected' : '');
-        row.dataset.groupId = g.id;
-        const name = document.createElement('div');
-        name.className = 'groups-table-cell groups-table-cell-title';
-        name.textContent = String(g.title || '');
-        row.appendChild(name);
+        row.className = 'groups-table-row';
+        const isArchived = Boolean(g && g.archived_at);
+        if (isArchived) {
+            row.classList.add('archived');
+        }
+        if (String(g.id) === String(groupsUiState.selectedGroupId)) {
+            row.classList.add('selected');
+        }
+        row.dataset.groupId = String(g.id);
+        const c1 = document.createElement('div');
+        c1.textContent = String(g.id);
+        const c2 = document.createElement('div');
+        c2.textContent = String(g.title || '');
+        const c3 = document.createElement('div');
+        c3.className = 'groups-table-actions-cell';
+        if (isArchived) {
+            const restoreBtn = document.createElement('button');
+            restoreBtn.type = 'button';
+            restoreBtn.className = 'groups-row-restore-btn button-color-yellow';
+            restoreBtn.title = profileT('profile.groups.actions.restore_title', null, 'Снять удаление группы');
+            restoreBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+            restoreBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openGroupRestoreModal(g);
+            });
+            c3.appendChild(restoreBtn);
+        }
+        row.appendChild(c1);
+        row.appendChild(c2);
+        row.appendChild(c3);
+
         row.addEventListener('click', () => {
             setSelectedGroup(g.id);
-            document.querySelectorAll('.groups-table-row').forEach(r => r.classList.remove('selected'));
-            row.classList.add('selected');
         });
+        row.addEventListener('dblclick', () => {
+            openGroupModal('edit', g);
+        });
+
         table.appendChild(row);
     });
-    if (groups.length > 0 && !getSelectedGroup()) {
-        setSelectedGroup(groups[0].id);
-        const firstRow = table.querySelector('.groups-table-row');
-        if (firstRow) firstRow.classList.add('selected');
+
+    try {
+        if (window.lucide) {
+            window.lucide.createIcons({ root: table });
+        }
+    } catch (e) {
     }
 }
 
 function renderGroupsDetails() {
     const g = getSelectedGroup();
-    const details = document.getElementById('groupsDetails');
-    if (!details) return;
-    if (!g) {
-        details.innerHTML = `<div class="groups-details-empty">${profileT('profile.groups.no_group_selected', null, 'Группа не выбрана')}</div>`;
-        return;
+    const titleEl = document.getElementById('groupsDetailsTitle');
+    const descEl = document.getElementById('groupsDetailsDescription');
+    const inviteEl = document.getElementById('groupsInviteLink');
+    if (titleEl) titleEl.textContent = g ? (g.title || '—') : '—';
+    if (descEl) descEl.textContent = g ? (g.description || '—') : '—';
+    if (inviteEl) {
+        if (!g) {
+            inviteEl.value = '';
+        } else {
+            const map = groupsUiState._inviteLinksByGroupId || {};
+            inviteEl.value = map[String(g.id)] || '';
+        }
     }
-    details.innerHTML = `
-        <div class="groups-details-row"><strong>${profileT('profile.groups.title_label', null, 'Название')}:</strong> ${String(g.title || '')}</div>
-        <div class="groups-details-row"><strong>${profileT('profile.groups.code_label', null, 'Код')}:</strong> ${String(g.invite_code || '')}</div>
-        <div class="groups-details-row"><strong>${profileT('profile.groups.students_count', null, 'Учеников')}:</strong> ${g.student_count ?? '?'}</div>
-    `;
     updateInviteCopyButtonIcon();
 }
 
 function updateInviteCopyButtonIcon() {
-    const btn = document.getElementById('groupsInviteCopyBtn');
-    if (!btn) return;
-    btn.innerHTML = '<i data-lucide="copy"></i>';
-    if (window.lucide) window.lucide.createIcons({ root: btn });
+    try {
+        const btn = document.getElementById('groupsInviteCopyBtn');
+        if (!btn) return;
+        btn.innerHTML = '<i data-lucide="copy"></i>';
+        if (window.lucide) {
+            window.lucide.createIcons({ root: btn });
+        }
+    } catch (e) {
+    }
 }
 
 // ==================== GROUPS: INVITE LINK ====================
@@ -587,47 +647,95 @@ function updateInviteCopyButtonIcon() {
 async function refreshInviteForSelectedGroup() {
     const g = getSelectedGroup();
     if (!g) return;
+    if (g.is_personal) return;
+
     try {
-        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, { method: 'GET' });
-        if (data && data.invite_code) { g.invite_code = data.invite_code; renderGroupsDetails(); }
-    } catch (e) { }
+        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite/latest`, { method: 'GET' });
+        const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
+        const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
+        const path = joinPath || (token ? `/join-group/${token}` : null);
+        const fullUrl = path ? `${location.origin}${path}` : '';
+
+        const inviteEl = document.getElementById('groupsInviteLink');
+        if (inviteEl) inviteEl.value = fullUrl;
+        if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
+        groupsUiState._inviteLinksByGroupId[String(g.id)] = fullUrl;
+
+        updateInviteCopyButtonIcon();
+    } catch (e) {
+        // не блокируем UI если не получилось подтянуть
+    }
 }
 
 async function createInviteForSelectedGroup() {
     const g = getSelectedGroup();
-    if (!g) { showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу')); return; }
+    if (!g) {
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+        return;
+    }
+    const inviteEl = document.getElementById('groupsInviteLink');
     try {
-        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, { method: 'POST' });
-        if (data && data.invite_code) { g.invite_code = data.invite_code; renderGroupsDetails(); showSuccess(profileT('profile.groups.invite_created', null, 'Приглашение создано')); }
-    } catch (e) { showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка')); }
+        const data = await groupsApiRequest(`/groups/api/group/${g.id}/invite`, {
+            method: 'POST',
+            body: JSON.stringify({ max_uses: null }),
+        });
+        const joinPath = data && data.join_path ? String(data.join_path) : (data && data.join_path === '' ? '' : null);
+        const token = data && data.invite && data.invite.token ? String(data.invite.token) : null;
+        const path = joinPath || (token ? `/join-group/${token}` : null);
+        if (!path) throw new Error(profileT('profile.groups.invite_link.errors.get_failed', null, 'Не удалось получить ссылку'));
+        const fullUrl = `${location.origin}${path}`;
+        if (inviteEl) inviteEl.value = fullUrl;
+        if (!groupsUiState._inviteLinksByGroupId) groupsUiState._inviteLinksByGroupId = {};
+        groupsUiState._inviteLinksByGroupId[String(g.id)] = fullUrl;
+        updateInviteCopyButtonIcon();
+        return fullUrl;
+    } catch (e) {
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+        return null;
+    }
 }
 
 async function copyInviteLink() {
-    const g = getSelectedGroup();
-    if (!g) { showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу')); return; }
-    const code = g.invite_code;
-    if (!code) { showInfo(profileT('profile.groups.errors.no_invite_code', null, 'Сначала создай приглашение')); return; }
-    const link = `${window.location.origin}/join-group/${encodeURIComponent(code)}`;
+    const inviteEl = document.getElementById('groupsInviteLink');
+    const val = inviteEl ? String(inviteEl.value || '').trim() : '';
+    if (!val) {
+        // сначала пытаемся получить существующую ссылку с сервера
+        await refreshInviteForSelectedGroup();
+        const afterRefresh = inviteEl ? String(inviteEl.value || '').trim() : '';
+        if (!afterRefresh) {
+            const created = await createInviteForSelectedGroup();
+            if (!created) return;
+        }
+    }
+    const link = inviteEl ? String(inviteEl.value || '').trim() : '';
+    if (!link) return;
     try {
         await navigator.clipboard.writeText(link);
-        showSuccess(profileT('profile.groups.invite_copied', null, 'Ссылка скопирована'));
-    } catch (e) { showError(profileT('profile.groups.errors.copy_failed', null, 'Не удалось скопировать')); }
+        showSuccess(profileT('profile.common.link_copied', null, 'Ссылка скопирована'));
+    } catch (e) {
+        showInfo(profileT('profile.common.copy_manually', null, 'Скопируй ссылку вручную'));
+    }
 }
 
 // ==================== GROUPS: ARCHIVE / DELETE ====================
 
 async function archiveSelectedGroup() {
     const g = getSelectedGroup();
-    if (!g) { showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу')); return; }
+    if (!g) {
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+        return;
+    }
     try {
-        await groupsApiRequest(`/groups/api/group/${g.id}`, { method: 'DELETE' });
-        showSuccess(profileT('profile.groups.archived', null, 'Группа архивирована'));
-        groupsUiState.groups = groupsUiState.groups.filter(x => String(x.id) !== String(g.id));
+        await groupsApiRequest(`/groups/api/group/${g.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ archived_at: new Date().toISOString() }),
+        });
+        showSuccess(profileT('profile.groups.actions.archived', null, 'Группа архивирована'));
         groupsUiState.selectedGroupId = null;
-        renderGroupsTable();
-        renderGroupsDetails();
-        refreshStudents();
-    } catch (e) { showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка')); }
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+    }
 }
 
 // ==================== GROUPS: STUDENTS ====================
@@ -701,12 +809,27 @@ async function refreshSelectedGroupDetailsFromServer() {
 async function removeSelectedStudent() {
     const g = getSelectedGroup();
     const studentId = groupsUiState.selectedStudentId;
-    if (!g || !studentId) { showInfo(profileT('profile.groups.errors.select_student', null, 'Выбери ученика')); return; }
+    if (!g) {
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+        return;
+    }
+    if (!studentId) {
+        showInfo(profileT('profile.groups.students.select_student', null, 'Выбери ученика'));
+        return;
+    }
+    if (String(studentId).startsWith('email_invite:')) {
+        showInfo(profileT('profile.groups.students.cannot_remove_pending_invite', null, 'Нельзя удалить: ученик ещё не подтвердил приглашение'));
+        return;
+    }
     try {
-        await groupsApiRequest(`/groups/api/group/${g.id}/students/${encodeURIComponent(studentId)}`, { method: 'DELETE' });
-        showSuccess(profileT('profile.groups.student_removed', null, 'Ученик удалён'));
+        await groupsApiRequest(`/groups/api/group/${g.id}/students/${studentId}/remove`, { method: 'POST' });
+        showSuccess(profileT('profile.groups.students.removed', null, 'Ученик удалён'));
+        groupsUiState.selectedStudentId = null;
+        await refreshGroups();
         await refreshStudents();
-    } catch (e) { showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка')); }
+    } catch (e) {
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+    }
 }
 
 // ==================== GROUPS: MODALS ====================
@@ -955,105 +1078,244 @@ function initializeGroupsSection() {
 
 // ==================== TELEGRAM SECTION ====================
 
+function avatarUrlForUser(userId) {
+    if (!userId) return '';
+    return `/user/api/avatar?user_id=${encodeURIComponent(String(userId))}&size=small`;
+}
+
 function renderTelegramSection() {
-    const section = document.getElementById('telegramSection');
-    if (!section) return;
+    const statusEl = document.getElementById('telegramStatusText');
+    const codeLabel = document.getElementById('telegramLinkCodeLabel');
+    const qrImg = document.getElementById('telegramQrImg');
+    const selfReportsToggleBtn = document.getElementById('telegramSelfReportsEnabledToggleBtn');
+    const getCodeBtn = document.getElementById('telegramGetCodeBtn');
+    const openBotBtn = document.getElementById('telegramOpenBotBtn');
+    const copyBtn = document.getElementById('telegramCopyStartCmdBtn');
+    const refreshBtn = document.getElementById('telegramRefreshStatusBtn');
+    const botUsernameLabel = document.getElementById('telegramBotUsernameLabel');
+    const testSendBtn = document.getElementById('telegramTestSendBtn');
+    const testInput = document.getElementById('telegramTestMessageInput');
 
-    const t = (key, params, fallback) => profileT(key, params, fallback);
+    if (!statusEl || !codeLabel || !selfReportsToggleBtn || !getCodeBtn || !copyBtn || !refreshBtn) return;
 
-    const userData = UM && UM.userData ? UM.userData : {};
-    const telegramLinked = !!(userData.telegram_chat_id || userData.telegram_linked_at);
+    const user = (UM && UM.userData) ? UM.userData : {};
+    const chatId = user.telegram_chat_id;
+    const selfReportsEnabled = Boolean(user.telegram_self_reports_enabled);
+    const linked = Boolean(chatId);
+
+    const t = (key, params, fallback) => {
+        try {
+            if (window.I18n && typeof window.I18n.t === 'function') {
+                const v = window.I18n.t(key, params);
+                if (v && v !== key) return v;
+            }
+        } catch (e) {
+        }
+        if (typeof fallback === 'string') return fallback;
+        return String(key || '');
+    };
+
+    statusEl.textContent = linked ? `chat_id: ${chatId}` : '';
+
+    // Обновляем имя бота динамически
+    const botUsername = (UM && UM.userData && UM.userData.telegram_bot_name) ? UM.userData.telegram_bot_name : 'dictafan_user_bot';
+    if (botUsernameLabel) {
+        botUsernameLabel.textContent = `@${botUsername}`;
+    }
 
     const _setBtnState = (btn, value) => {
         if (!btn) return;
-        btn.disabled = !value;
-        if (value) btn.classList.remove('disabled');
-        else btn.classList.add('disabled');
+        btn.dataset.checked = value ? '1' : '0';
+        btn.setAttribute('aria-pressed', value ? 'true' : 'false');
+        btn.innerHTML = `<i data-lucide="${value ? 'circle-check-big' : 'circle'}"></i>`;
+        try {
+            if (window.lucide) {
+                window.lucide.createIcons({ root: btn });
+            }
+        } catch (e) {
+        }
     };
 
-    const openBotBtn = document.getElementById('telegramOpenBotBtn');
-    if (openBotBtn) {
-        openBotBtn.addEventListener('click', () => {
-            window.open('https://t.me/dictafan_bot', '_blank');
-        });
+    _setBtnState(selfReportsToggleBtn, selfReportsEnabled);
+
+    const codeVal = String(user.telegram_link_code || codeLabel.dataset.code || '').trim();
+    codeLabel.dataset.code = codeVal;
+    codeLabel.textContent = codeVal || profileT('profile.telegram.link.code_placeholder', null, 'код');
+
+    if (qrImg) {
+        if (codeVal) {
+            qrImg.style.display = 'block';
+            qrImg.src = `/user/api/telegram/qr?code=${encodeURIComponent(codeVal)}&r=${Date.now()}`;
+        } else {
+            qrImg.style.display = 'none';
+            qrImg.removeAttribute('src');
+        }
     }
 
-    const selfReportsToggle = document.getElementById('telegramSelfReportsToggle');
-    if (selfReportsToggle) {
-        const isEnabled = !!userData.telegram_self_reports_enabled;
-        selfReportsToggle.checked = isEnabled;
-        selfReportsToggle.addEventListener('change', async () => {
-            try {
-                const data = await telegramApiRequest('/user/api/telegram/self_reports_enabled', {
-                    method: 'POST',
-                    body: JSON.stringify({ enabled: selfReportsToggle.checked }),
-                });
-                if (data && data.success) {
-                    showSuccess(t('profile.telegram.self_reports_saved', null, 'Настройка сохранена'));
-                }
-            } catch (e) {
-                selfReportsToggle.checked = !selfReportsToggle.checked;
-                showError(e && e.message ? e.message : t('profile.common.error', null, 'Ошибка'));
+    try {
+        getCodeBtn.disabled = false;
+        copyBtn.disabled = !codeVal;
+    } catch (e) {
+    }
+
+    getCodeBtn.onclick = async () => {
+        try {
+            getCodeBtn.disabled = true;
+            const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
+            if (!data || !data.success || !data.code) {
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
             }
-        });
+            codeLabel.dataset.code = String(data.code);
+            codeLabel.textContent = String(data.code);
+            if (UM && UM.userData) {
+                UM.userData.telegram_link_code = String(data.code);
+            }
+            copyBtn.disabled = false;
+            renderTelegramSection();
+            showSuccess(profileT('profile.telegram.link.code_received', null, 'Код получен'));
+        } catch (e) {
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+        } finally {
+            getCodeBtn.disabled = false;
+        }
+    };
+
+    if (openBotBtn) {
+        openBotBtn.onclick = async (e) => {
+            try {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                openBotBtn.disabled = true;
+                if (linked) {
+                    const url = `https://t.me/${encodeURIComponent(botUsername)}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                    return;
+                }
+
+                let code = String(codeLabel.dataset.code || '').trim();
+                if (!code) {
+                    const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
+                    if (!data || !data.success || !data.code) {
+                        throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
+                    }
+                    code = String(data.code).trim();
+                    codeLabel.dataset.code = code;
+                    codeLabel.textContent = code;
+                    if (UM && UM.userData) {
+                        UM.userData.telegram_link_code = code;
+                    }
+                    try { copyBtn.disabled = false; } catch (e2) {}
+                    // Обновляем QR-код без перерисовки всей секции
+                    if (qrImg) {
+                        qrImg.style.display = 'block';
+                        qrImg.src = `/user/api/telegram/qr?code=${encodeURIComponent(code)}&r=${Date.now()}`;
+                    }
+                }
+
+                const url = `https://t.me/${encodeURIComponent(botUsername)}?start=${encodeURIComponent(code)}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            } catch (e) {
+                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+            } finally {
+                openBotBtn.disabled = false;
+            }
+        };
     }
 
-    const testSendBtn = document.getElementById('telegramTestSendBtn');
-    if (testSendBtn) {
-        _setBtnState(testSendBtn, telegramLinked);
-        testSendBtn.addEventListener('click', async () => {
+    refreshBtn.onclick = async () => {
+        try {
+            refreshBtn.disabled = true;
+            const data = await telegramApiRequest('/user/api/profile', { method: 'GET' });
+            const nextUser = data && data.user ? data.user : null;
+            if (!nextUser) {
+                throw new Error(profileT('profile.telegram.errors.profile_refresh_failed', null, 'Не удалось обновить профиль'));
+            }
+            if (UM) {
+                UM.userData = Object.assign({}, UM.userData || {}, nextUser);
+                if (typeof UM._saveUserCache === 'function') {
+                    UM._saveUserCache(UM.userData);
+                }
+            }
+            renderTelegramSection();
+            showSuccess(profileT('profile.common.updated', null, 'Обновлено'));
+        } catch (e) {
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+        } finally {
+            refreshBtn.disabled = false;
+        }
+    };
+
+    copyBtn.onclick = async () => {
+        const code = String(codeLabel.dataset.code || '').trim();
+        if (!code) {
+            showInfo(profileT('profile.telegram.link.get_code_first', null, 'Сначала получи код'));
+            return;
+        }
+        const cmd = `/start ${code}`;
+        try {
+            await navigator.clipboard.writeText(cmd);
+            showSuccess(profileT('profile.common.copied', null, 'Скопировано'));
+        } catch (e) {
+            showInfo(cmd);
+        }
+    };
+
+    selfReportsToggleBtn.onclick = async () => {
+        const next = !(selfReportsToggleBtn.dataset.checked === '1');
+        try {
+            selfReportsToggleBtn.disabled = true;
+            const data = await telegramApiRequest('/user/api/telegram/self_reports_enabled', {
+                method: 'POST',
+                body: JSON.stringify({ enabled: next }),
+            });
+            if (!data || !data.success) {
+                throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
+            }
+            if (UM && UM.userData) {
+                UM.userData.telegram_self_reports_enabled = Boolean(data.enabled);
+                if (typeof UM._saveUserCache === 'function') {
+                    UM._saveUserCache(UM.userData);
+                }
+            }
+            _setBtnState(selfReportsToggleBtn, Boolean(data.enabled));
+            showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
+        } catch (e) {
+            showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+        } finally {
+            selfReportsToggleBtn.disabled = false;
+        }
+    };
+
+    // Обработчик кнопки отправки тестового сообщения
+    if (testSendBtn && testInput) {
+        testSendBtn.onclick = async () => {
             try {
                 testSendBtn.disabled = true;
-                testSendBtn.textContent = t('profile.telegram.test_sending', null, 'Отправка…');
-                const data = await telegramApiRequest('/user/api/telegram/test_send', { method: 'POST' });
-                if (data && data.success) {
-                    showSuccess(t('profile.telegram.test_sent', null, 'Тестовое сообщение отправлено'));
-                } else {
-                    showError(data && data.error ? data.error : t('profile.common.error', null, 'Ошибка'));
+                const text = testInput.value.trim() || 'Тест';
+                const data = await telegramApiRequest('/user/api/telegram/test_send', {
+                    method: 'POST',
+                    body: JSON.stringify({ text }),
+                });
+                if (!data || !data.success) {
+                    throw new Error(data && (data.error || data.message) ? String(data.error || data.message) : profileT('profile.common.error', null, 'Ошибка'));
                 }
+                const sentCount = data.sent_count || 0;
+                showSuccess(profileT('profile.telegram.test_sent', { count: sentCount }, `Тестовое сообщение отправлено (${sentCount} получателей)`));
             } catch (e) {
-                showError(e && e.message ? e.message : t('profile.common.error', null, 'Ошибка'));
+                showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
             } finally {
                 testSendBtn.disabled = false;
-                testSendBtn.textContent = t('profile.telegram.test_send', null, 'Тест');
             }
-        });
+        };
     }
 
-    const getCodeBtn = document.getElementById('telegramGetCodeBtn');
-    if (getCodeBtn) {
-        getCodeBtn.addEventListener('click', async () => {
-            try {
-                getCodeBtn.disabled = true;
-                getCodeBtn.textContent = t('profile.telegram.getting_code', null, 'Получаю…');
-                const data = await telegramApiRequest('/user/api/telegram/link_code', { method: 'POST' });
-                if (data && data.code) {
-                    const codeDisplay = document.getElementById('telegramLinkCode');
-                    if (codeDisplay) {
-                        codeDisplay.textContent = data.code;
-                        codeDisplay.style.display = 'block';
-                    }
-                    const qrContainer = document.getElementById('telegramQrContainer');
-                    if (qrContainer) {
-                        try {
-                            const qrData = await telegramApiRequest('/user/api/telegram/qr', { method: 'GET' });
-                            if (qrData && qrData.qr_svg) {
-                                qrContainer.innerHTML = qrData.qr_svg;
-                                qrContainer.style.display = 'block';
-                            }
-                        } catch (e) { }
-                    }
-                    showSuccess(t('profile.telegram.code_received', null, 'Код получен'));
-                } else {
-                    showError(data && data.error ? data.error : t('profile.common.error', null, 'Ошибка'));
-                }
-            } catch (e) {
-                showError(e && e.message ? e.message : t('profile.common.error', null, 'Ошибка'));
-            } finally {
-                getCodeBtn.disabled = false;
-                getCodeBtn.textContent = t('profile.telegram.get_code', null, 'Получить код');
-            }
-        });
+    try {
+        if (window.lucide) {
+            window.lucide.createIcons({ root: document.getElementById('telegramSection') });
+        }
+    } catch (e) {
     }
 }
 
