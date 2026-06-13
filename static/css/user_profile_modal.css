@@ -547,7 +547,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  margin-top: 12px;
 }
 
 #user-profile-modal .telegram-test-input {
@@ -777,7 +778,7 @@
 }
 
 #user-profile-modal .groups-table-row.selected {
-  background: rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.1);
 }
 
 #user-profile-modal .groups-details {

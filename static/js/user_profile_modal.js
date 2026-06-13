@@ -1163,7 +1163,9 @@ function initializeGroupsSection() {
         filterBtn.dataset.checked = '1';
         filterBtn.setAttribute('aria-pressed', 'true');
         filterBtn.innerHTML = '<i data-lucide="circle-check-big"></i>';
-        try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+        requestAnimationFrame(() => {
+            try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+        });
 
         filterBtn.addEventListener('click', () => {
             const isActive = filterBtn.dataset.checked === '1';
@@ -1171,7 +1173,9 @@ function initializeGroupsSection() {
             filterBtn.dataset.checked = newChecked;
             filterBtn.setAttribute('aria-pressed', newChecked === '1' ? 'true' : 'false');
             filterBtn.innerHTML = `<i data-lucide="${newChecked === '1' ? 'circle-check-big' : 'circle'}"></i>`;
-            try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+            requestAnimationFrame(() => {
+                try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+            });
             groupsUiState.filterMode = newChecked === '1' ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();

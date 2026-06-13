@@ -168,7 +168,7 @@
       },
       "filter": {
         "title": "Filter",
-        "active": "show only active",
+        "active": "only active",
         "all": "show all"
       },
       "actions": {
