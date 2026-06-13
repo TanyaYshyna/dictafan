@@ -376,13 +376,15 @@
       if (!panel) return;
       const st = getCurrentSentenceStateFromSession(session);
       if (!st) {
-        panel.style.display = 'none';
+        panel.style.visibility = 'hidden';
+        panel.style.pointerEvents = 'none';
         return;
       }
       const requiresAudio = getRequiredAudioRepeatsValue();
       const audioDone = Number(st && st.number_of_audio) || 0;
       const shouldShow = (requiresAudio > 0) && (audioDone < requiresAudio);
-      panel.style.display = shouldShow ? '' : 'none';
+      panel.style.visibility = shouldShow ? 'visible' : 'hidden';
+      panel.style.pointerEvents = shouldShow ? 'auto' : 'none';
     } catch (e) {
     }
   }
@@ -703,11 +705,8 @@
     }
 
     try {
-      // Скрываем кнопку "повторить" при сбросе предложения
-      // (повтор, навигация и т.д.), чтобы пользователь не мог
-      // нажать её, не начав набирать текст заново.
-      const repeatBtn = document.getElementById('repeatBtn');
-      if (repeatBtn) repeatBtn.style.display = 'none';
+      // Сбрасываем кнопку "Проверить-повторить" в исходное состояние (ready)
+      setCheckButtonState('ready');
     } catch (e5a) {
     }
 
@@ -1120,24 +1119,24 @@
         }
 
         try {
-          // Фокус после проверки:
-          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды — фокус на "Повторить"
+          // Фокус после проверки (новый алгоритм):
+          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды (textOk=false) — фокус на checkBtn (теперь это кнопка повтора)
           // 2) если есть звезда/полузвезда (textOk) и требуется микрофон, но он ещё не выполнен — фокус на запись.
-          // 3) если текст + микрофон выполнены — perfect => Next, иначе Repeat.
+          // 3) если текст + микрофон выполнены — фокус на "Далее" (resultNextBtn)
           {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
             const allCorrect = !!(res && res.allCorrect);
 
-            // Случай: текст исправлен, но звезды/полузвезды нет — фокус на "Повторить"
+            // Случай: текст исправлен, но звезды/полузвезды нет — фокус на checkBtn (кнопка повтора)
             if (allCorrect && !textOk) {
-              const repeatBtn = document.getElementById('repeatBtn');
-              if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
+              const checkBtn = document.getElementById('checkBtn');
+              if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
                 try {
                   state._skipNavigatorFocusOnce = true;
                 } catch (e0skip) {
                 }
-                repeatBtn.focus();
+                checkBtn.focus();
               }
             } else if (textOk && !audioOk && requiresAudio > 0) {
               try {
@@ -1153,24 +1152,13 @@
                 rb.focus();
               }
             } else if (textOk && audioOk) {
-              if (res && res.starOutcome === 'perfect') {
-                const nb = document.getElementById('resultNextBtn');
-                if (nb && nb.style.display !== 'none' && typeof nb.focus === 'function') {
-                  try {
-                    state._skipNavigatorFocusOnce = true;
-                  } catch (e0y) {
-                  }
-                  nb.focus();
+              const nb = document.getElementById('resultNextBtn');
+              if (nb && !nb.disabled && typeof nb.focus === 'function') {
+                try {
+                  state._skipNavigatorFocusOnce = true;
+                } catch (e0y) {
                 }
-              } else {
-                const rb = document.getElementById('repeatBtn');
-                if (rb && rb.style.display !== 'none' && typeof rb.focus === 'function') {
-                  try {
-                    state._skipNavigatorFocusOnce = true;
-                  } catch (e0z) {
-                  }
-                  rb.focus();
-                }
+                nb.focus();
               }
             }
           }
@@ -1853,9 +1841,15 @@
         checkBtn.innerHTML = `<i data-lucide="star" class="check-btn-icon"></i>`;
         checkBtn.classList.add('button-color-mint');
       } else if (mode === 'half') {
-        checkBtn.disabled = true;
-        checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i>`;
+        // Полузвезда — кнопка зелёная, enabled, с иконками star-half + refresh-cw (повторить)
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = `<i data-lucide="star-half" class="check-btn-icon"></i><i data-lucide="refresh-cw"></i>`;
         checkBtn.classList.add('button-color-lightgreen');
+      } else if (mode === 'repeat_activity') {
+        // Активность (кружочек) — кнопка оранжевая, enabled, с иконкой refresh-cw (повторить)
+        checkBtn.disabled = false;
+        checkBtn.innerHTML = `<i data-lucide="refresh-cw"></i>`;
+        checkBtn.classList.add('button-color-orange');
       }
 
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -1868,8 +1862,7 @@
   function updateNextButtonVisibilityFromSession(session) {
     try {
       const btn = document.getElementById('resultNextBtn');
-      const repeatBtn = document.getElementById('repeatBtn');
-      if (!btn && !repeatBtn) return;
+      if (!btn) return;
       let st = null;
       try {
         const view = getCurrentSentenceViewFromSession(session);
@@ -1880,29 +1873,23 @@
       }
       if (!st) st = getCurrentSentenceStateFromSession(session);
       if (!st) {
-        if (btn) btn.style.display = 'none';
-        if (repeatBtn) repeatBtn.style.display = 'none';
+        btn.disabled = true;
+        btn.classList.remove('button-color-yellow');
+        btn.classList.add('button-color-gray');
         return;
       }
       const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-      const lastAllCorrect = !!(st && st._textAllCorrect);
 
-      const perfect = Number(st && st.number_of_perfect) || 0;
-      const corrected = Number(st && st.number_of_corrected) || 0;
+      // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
+      const canNext = !!(textOk && audioOk);
 
-      // Если текст сброшен (пользователь нажал "повторить"), но corrected ещё > 0 (полузвезда осталась),
-      // то это состояние "повтора" — кнопки не показываем, как при начале прохода предложения.
-      const isRepeatReset = !lastAllCorrect && corrected > 0;
-
-      // Next: только если получена звезда/полузвезда (textOk) и выполнен микрофон (audioOk)
-      const showNext = !isRepeatReset && (!!textOk && !!audioOk);
-
-      // Repeat: если текст набран полностью правильно (allCorrect) и при этом нет perfect
-      // Важно: когда allCorrect, но звезду/полузвезду не дали (textOk=false), Repeat всё равно должен быть видимым.
-      const showRepeat = !isRepeatReset && (perfect < 1) && (lastAllCorrect || corrected > 0);
-
-      if (btn) btn.style.display = showNext ? 'inline-flex' : 'none';
-      if (repeatBtn) repeatBtn.style.display = showRepeat ? 'inline-flex' : 'none';
+      btn.disabled = !canNext;
+      btn.classList.remove('button-color-yellow', 'button-color-gray');
+      if (canNext) {
+        btn.classList.add('button-color-yellow');
+      } else {
+        btn.classList.add('button-color-gray');
+      }
     } catch (e) {
     }
   }
@@ -1970,6 +1957,24 @@
       const btn = document.getElementById('btn_coin_exchange_audio');
       const cost = getPricingValue('audio_purchase_cost', 3);
       if (btn) btn.style.display = audioCoins >= cost ? 'inline-flex' : 'none';
+    } catch (e) {
+    }
+
+    // Обновляем состояние кнопки "Проверить-повторить" при навигации
+    try {
+      const lastAllCorrect = !!(st && st._textAllCorrect);
+      if (perfect >= 1) {
+        setCheckButtonState('star');
+      } else if (corrected > 0 && lastAllCorrect) {
+        setCheckButtonState('half');
+      } else if (corrected > 0 && !lastAllCorrect) {
+        // corrected > 0, но текст сброшен (повтор) — показываем ready
+        setCheckButtonState('ready');
+      } else if (textCoins > 0 && lastAllCorrect) {
+        setCheckButtonState('repeat_activity');
+      } else {
+        setCheckButtonState('ready');
+      }
     } catch (e) {
     }
 
@@ -2107,15 +2112,15 @@
 
           const perfect = Number(st && st.number_of_perfect) || 0;
           const corrected = Number(st && st.number_of_corrected) || 0;
-          const repeatBtn = document.getElementById('repeatBtn');
+          const checkBtn = document.getElementById('checkBtn');
           const nextBtn = document.getElementById('resultNextBtn');
           const shouldPreferRepeat = (corrected > 0 && perfect < 1);
-          if (shouldPreferRepeat && repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
-            repeatBtn.focus();
-          } else if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
-            repeatBtn.focus();
-          } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+          if (shouldPreferRepeat && checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+            checkBtn.focus();
+          } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
             nextBtn.focus();
+          } else if (checkBtn && typeof checkBtn.focus === 'function') {
+            checkBtn.focus();
           }
         }
       } catch (e99) {
@@ -2529,13 +2534,15 @@
 
             try {
               if (ok) {
-                const repeatBtn = document.getElementById('repeatBtn');
+                const checkBtn = document.getElementById('checkBtn');
                 const nextBtn = document.getElementById('resultNextBtn');
 
-                if (repeatBtn && repeatBtn.style.display !== 'none' && typeof repeatBtn.focus === 'function') {
-                  repeatBtn.focus();
-                } else if (nextBtn && nextBtn.style.display !== 'none' && typeof nextBtn.focus === 'function') {
+                if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+                  checkBtn.focus();
+                } else if (nextBtn && !nextBtn.disabled && typeof nextBtn.focus === 'function') {
                   nextBtn.focus();
+                } else if (checkBtn && typeof checkBtn.focus === 'function') {
+                  checkBtn.focus();
                 }
               } else {
                 const rb = document.getElementById('recordButton');
@@ -2682,11 +2689,11 @@
     }
   }
 
-  function bindRepeatButton() {
+  function bindCheckButtonAsRepeat() {
     try {
-      const btn = document.getElementById('repeatBtn');
-      if (!btn || btn.dataset.boundDictationModal === '1') return;
-      btn.dataset.boundDictationModal = '1';
+      const btn = document.getElementById('checkBtn');
+      if (!btn || btn.dataset.boundCheckRepeat === '1') return;
+      btn.dataset.boundCheckRepeat = '1';
       btn.addEventListener('click', (e) => {
         try {
           e.preventDefault();
@@ -2695,6 +2702,12 @@
         }
 
         try {
+          // Срабатываем только если кнопка не в режиме "ready" (проверка текста)
+          // и не disabled (режим star). Режимы повтора: half, repeat_activity
+          if (btn.disabled) return;
+          const isRepeatMode = btn.classList.contains('button-color-lightgreen') || btn.classList.contains('button-color-orange');
+          if (!isRepeatMode) return;
+
           const session = window.__dictationModalActiveSession;
           if (!session) return;
 
@@ -2704,32 +2717,17 @@
           }
 
           resetSentenceUiFromSession(session);
-          // При повторе скрываем обе кнопки ("повторить" и "далее"),
-          // как при начале прохода предложения.
-          try {
-            const rb = document.getElementById('repeatBtn');
-            if (rb) rb.style.display = 'none';
-          } catch (e0) {
-          }
+          // Сбрасываем кнопку "Далее" в disabled-состояние
           try {
             const nb = document.getElementById('resultNextBtn');
-            if (nb) nb.style.display = 'none';
+            if (nb) {
+              nb.disabled = true;
+              nb.classList.remove('button-color-yellow');
+              nb.classList.add('button-color-gray');
+            }
           } catch (e1) {
           }
           updateNavigatorFromSession(session);
-
-          // При повторе принудительно скрываем кнопки "повторить" и "далее",
-          // чтобы они не оставались видимыми после updateNavigatorFromSession.
-          try {
-            const rb2 = document.getElementById('repeatBtn');
-            if (rb2) rb2.style.display = 'none';
-          } catch (e0) {
-          }
-          try {
-            const nb2 = document.getElementById('resultNextBtn');
-            if (nb2) nb2.style.display = 'none';
-          } catch (e1) {
-          }
 
           try {
             if (!state.dictationStarted) return;
@@ -4721,7 +4719,7 @@
     bindInactivityWatchers();
     bindUserInputScriptGuards();
     bindEnterToCheck();
-    bindRepeatButton();
+    bindCheckButtonAsRepeat();
     bindNextButton();
   }
 

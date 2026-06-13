@@ -1237,15 +1237,15 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   text-align: right;
 }
 
-#dictationModal #repeatBtn,
 #dictationModal #checkBtn {
-  width: 80px;
+  width: auto;
   min-width: 80px;
   height: 42px;
   min-height: 42px;
   border-radius: 8px;
-  padding: 0;
+  padding: 0 10px;
   justify-content: center;
+  gap: 6px;
 }
 
 #dictationModal #recordButton:focus,
@@ -1308,14 +1308,7 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: 100%;
   margin-top: 10px;
   gap: 10px;
-}
-
-#dictationModal #repeatBtn {
   min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
 }
 
 #dictationModal #resultNextBtn {
@@ -1325,6 +1318,15 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   gap: 8px;
   padding-left: 10px;
   padding-right: 10px;
+}
+
+#dictationModal #resultNextBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+  border: 1px solid transparent;
 }
 
 #dictationModal #resultNextBtn.is-last {
@@ -1344,6 +1346,18 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 
 #dictationModal #resultNextBtn.is-last:active {
   border: 1px solid var(--color-button-shadow-lightgreen);
+}
+
+/* Стили для кнопки Проверить-повторить в режиме полузвезды */
+#dictationModal #checkBtn.button-color-lightgreen {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
+}
+
+/* Стили для кнопки Проверить-повторить в режиме активности (оранжевый) */
+#dictationModal #checkBtn.button-color-orange {
+  background: var(--color-button-orange);
+  color: var(--color-button-text-orange);
 }
 
 #dictationModal #confirmStartBtn {
