@@ -836,8 +836,10 @@ async function removeSelectedStudent() {
 
 function toggleGroupModal(isOpen) {
     const modal = document.getElementById('groupModal');
-    if (!modal) return;
+    console.log('[toggleGroupModal] isOpen:', isOpen, 'modal:', modal);
+    if (!modal) { console.warn('[toggleGroupModal] modal not found!'); return; }
     modal.style.display = isOpen ? 'flex' : 'none';
+    console.log('[toggleGroupModal] display set to:', modal.style.display);
     if (isOpen && window.lucide) window.lucide.createIcons({ root: modal });
 }
 
@@ -871,7 +873,8 @@ function openGroupModal(mode, group) {
     const titleEl = document.getElementById('groupModalTitle');
     const nameInput = document.getElementById('groupModalTitleInput');
     const descInput = document.getElementById('groupModalDescriptionInput');
-    if (!modal || !titleEl || !nameInput) return;
+    console.log('[openGroupModal] mode:', mode, 'modal:', !!modal, 'titleEl:', !!titleEl, 'nameInput:', !!nameInput, 'descInput:', !!descInput);
+    if (!modal || !titleEl || !nameInput) { console.warn('[openGroupModal] missing elements, aborting'); return; }
     if (mode === 'edit' && group) {
         titleEl.textContent = profileT('profile.groups.modal.edit_title', null, 'Редактировать группу');
         nameInput.value = String(group.title || '');
