@@ -374,12 +374,10 @@
 
                                     <div class="groups-toolbar">
                                         <div class="groups-toolbar-left">
-                                            <div class="groups-filter-checkbox-wrapper">
-                                                <button type="button" id="groupsFilterActiveBtn" class="groups-lucide-toggle" data-checked="1" aria-pressed="true" title="{{ t('profile.groups.filter.title') }}">
-                                                    <i data-lucide="circle-check-big"></i>
-                                                </button>
+                                            <label class="groups-filter-checkbox-wrapper">
+                                                <input type="checkbox" id="groupsFilterActiveCheckbox" checked>
                                                 <span class="groups-filter-label">{{ t('profile.groups.filter.active') }}</span>
-                                            </div>
+                                            </label>
                                         </div>
                                         <div class="groups-toolbar-right">
                                             <div class="groups-toolbar-actions">

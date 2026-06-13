@@ -1156,30 +1156,14 @@ function initializeGroupsSection() {
 
     if (!groupsTable || !createBtn || !archiveBtn || !delBtn || !modal || !modalClose || !modalSave) return;
 
-    // Чекбокс "лише активні" вместо select
-    const filterBtn = document.getElementById('groupsFilterActiveBtn');
-    if (filterBtn) {
+    // Чекбокс "лише активні" — обычный <input type="checkbox">
+    const filterCheckbox = document.getElementById('groupsFilterActiveCheckbox');
+    if (filterCheckbox) {
         groupsUiState.filterMode = 'active';
-        filterBtn.dataset.checked = '1';
-        filterBtn.setAttribute('aria-pressed', 'true');
+        filterCheckbox.checked = true;
 
-        const setFilterBtnState = (btn, checked) => {
-            btn.dataset.checked = checked ? '1' : '0';
-            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
-            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
-            try {
-                if (window.lucide) {
-                    window.lucide.createIcons({ root: btn });
-                }
-            } catch (e) { }
-        };
-
-        filterBtn.addEventListener('click', function onClick(e) {
-            e.preventDefault();
-            const isActive = filterBtn.dataset.checked === '1';
-            const newChecked = !isActive;
-            setFilterBtnState(filterBtn, newChecked);
-            
+        filterCheckbox.addEventListener('change', function onFilterChange(e) {
+            const newChecked = filterCheckbox.checked;
             groupsUiState.filterMode = newChecked ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();
