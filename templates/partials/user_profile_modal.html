@@ -385,7 +385,7 @@
                                                     <i data-lucide="plus"></i>
                                                 </button>
                                                 <button type="button" id="groupsArchiveBtn" class="topbar-icon-btn" title="{{ t('profile.groups.actions.archive_group_title') }}">
-                                                    <i data-lucide="sticky-note"></i>
+                                                    <i data-lucide="sticky-notes"></i>
                                                 </button>
                                                 <button type="button" id="groupsDeleteBtn" class="topbar-icon-btn" title="{{ t('profile.groups.actions.delete_group_title') }}">
                                                     <i data-lucide="trash-2"></i>
@@ -514,6 +514,24 @@
         </div>
         <div class="modal-footer group-modal-footer">
             <button type="button" id="groupRestoreModalYes" class="button-color-yellow">{{ t('profile.common.yes') }}</button>
+        </div>
+    </div>
+</div>
+
+<div id="groupDeleteConfirmModal" class="modal">
+    <div class="modal-content group-modal-content group-modal-content-520">
+        <div class="modal-header group-modal-header">
+            <h3 class="group-modal-title">{{ t('profile.groups.modal.delete_title', null, 'Удаление группы') }}</h3>
+            <button type="button" id="groupDeleteConfirmModalClose" class="modal-close" title="{{ t('profile.common.close') }}">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body group-modal-body">
+            <div id="groupDeleteConfirmModalText" class="group-modal-restore-text"></div>
+        </div>
+        <div class="modal-footer group-modal-footer">
+            <button type="button" id="groupDeleteConfirmModalCancel" class="button-secondary">{{ t('profile.common.cancel') }}</button>
+            <button type="button" id="groupDeleteConfirmModalYes" class="button-color-yellow">{{ t('profile.groups.actions.delete_permanently_btn', null, 'Удалить') }}</button>
         </div>
     </div>
 </div>

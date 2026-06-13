@@ -772,12 +772,13 @@ Email-инвайты:
    - `DELETE FROM groups WHERE id = ... AND teacher_id = ...`
    - Восстановление невозможно (только из бэкапа).
    - Защита: нельзя удалить личную группу (`is_personal = TRUE`).
-   - Перед удалением — confirm-диалог с предупреждением.
-   - Кнопка в UI: `trash-2` (Lucide) — «Удалить навсегда».
-   - Появляется только для архивных групп (в строке таблицы) и при выборе группы + кнопка в тулбаре.
+   - Перед удалением — модальное окно подтверждения (стилизованное, не `confirm()` браузера).
+   - Кнопка в UI: `trash-2` (Lucide) — «Удалить навсегда» — только в тулбаре (над таблицей), не в строке группы.
+   - В строке архивной группы — только кнопка восстановления `sticky-note-off`.
 
 Backend: `DELETE /groups/api/group/<group_id>` → [`helpers/db_groups.py`](helpers/db_groups.py) → `delete_group()`.
-Frontend: [`static/js/user_profile_modal.js`](static/js/user_profile_modal.js) → `deleteSelectedGroup()`.
+Frontend: [`static/js/user_profile_modal.js`](static/js/user_profile_modal.js) → `deleteSelectedGroup()` → открывает `#groupDeleteConfirmModal` → `confirmDeleteGroupFromModal()`.
+HTML: [`templates/partials/user_profile_modal.html`](templates/partials/user_profile_modal.html) → `#groupDeleteConfirmModal`.
 
 ### 2) `group_students` (Группа ↔ Ученик)
 

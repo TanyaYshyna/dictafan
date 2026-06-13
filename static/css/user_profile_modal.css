@@ -406,24 +406,6 @@
   background: rgba(0,0,0,0.05);
 }
 
-/* Кнопка полного удаления группы в строке архивной группы */
-#user-profile-modal .groups-table-row.archived .groups-row-delete-btn {
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 8px 10px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: #e74c3c;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-#user-profile-modal .groups-table-row.archived .groups-row-delete-btn:hover {
-  background: rgba(231,76,60,0.1);
-}
-
 #user-profile-modal .telegram-link-code-input {
   flex: 1;
 }
@@ -784,7 +766,7 @@
 }
 
 #user-profile-modal .groups-table-row.selected {
-  background: rgba(255, 236, 153, 0.6);
+  background: rgba(0, 0, 0, 0.06);
 }
 
 #user-profile-modal .groups-details {

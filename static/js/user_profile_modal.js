@@ -591,19 +591,6 @@ function renderGroupsTable() {
                 openGroupRestoreModal(g);
             });
             c3.appendChild(restoreBtn);
-
-            // Кнопка полного удаления (trash-2)
-            const deleteBtn = document.createElement('button');
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'groups-row-delete-btn';
-            deleteBtn.title = profileT('profile.groups.actions.delete_permanently_title', null, 'Удалить группу навсегда');
-            deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
-            deleteBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                deleteSelectedGroup(g);
-            });
-            c3.appendChild(deleteBtn);
         }
         row.appendChild(c1);
         row.appendChild(c2);
@@ -732,27 +719,54 @@ async function copyInviteLink() {
     }
 }
 
+let _deleteGroupId = null;
+
+function toggleGroupDeleteConfirmModal(isOpen) {
+    const modal = document.getElementById('groupDeleteConfirmModal');
+    if (!modal) return;
+    modal.style.display = isOpen ? 'flex' : 'none';
+}
+
+function openGroupDeleteConfirmModal(group) {
+    _deleteGroupId = group ? group.id : null;
+    const textEl = document.getElementById('groupDeleteConfirmModalText');
+    if (textEl && group) {
+        const groupName = String(group.title || group.id || '');
+        textEl.textContent = profileT(
+            'profile.groups.actions.delete_permanently_confirm',
+            { name: groupName },
+            'Точно удалить группу "' + groupName + '" навсегда? Все ученики, задания и приглашения будут безвозвратно удалены.'
+        );
+    }
+    toggleGroupDeleteConfirmModal(true);
+}
+
+async function confirmDeleteGroupFromModal() {
+    if (!_deleteGroupId) {
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+        return;
+    }
+    toggleGroupDeleteConfirmModal(false);
+    try {
+        await groupsApiRequest(`/groups/api/group/${_deleteGroupId}`, {
+            method: 'DELETE',
+        });
+        showSuccess(profileT('profile.groups.actions.deleted_permanently', null, 'Группа удалена навсегда'));
+        groupsUiState.selectedGroupId = null;
+        _deleteGroupId = null;
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+    }
+}
+
 async function deleteSelectedGroup(group) {
     const g = group || getSelectedGroup();
     if (!g) {
         showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
         return;
     }
-    const groupName = String(g.title || g.id || '');
-    const confirmed = confirm(
-        profileT('profile.groups.actions.delete_permanently_confirm', { name: groupName }, 'Точно удалить группу "' + groupName + '" навсегда? Все ученики, задания и приглашения будут безвозвратно удалены.')
-    );
-    if (!confirmed) return;
-    try {
-        await groupsApiRequest(`/groups/api/group/${g.id}`, {
-            method: 'DELETE',
-        });
-        showSuccess(profileT('profile.groups.actions.deleted_permanently', null, 'Группа удалена навсегда'));
-        groupsUiState.selectedGroupId = null;
-        await refreshGroups();
-    } catch (e) {
-        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
-    }
+    openGroupDeleteConfirmModal(g);
 }
 
 // ==================== GROUPS: ARCHIVE / DELETE ====================
@@ -1124,6 +1138,18 @@ function initializeGroupsSection() {
         restoreModalClose.addEventListener('click', () => toggleGroupRestoreModal(false));
         restoreModal.addEventListener('click', (e) => { if (e.target === restoreModal) toggleGroupRestoreModal(false); });
         restoreModalYes.addEventListener('click', () => restoreGroupFromModal());
+    }
+
+    // Модалка подтверждения полного удаления группы
+    const deleteConfirmModal = document.getElementById('groupDeleteConfirmModal');
+    const deleteConfirmModalClose = document.getElementById('groupDeleteConfirmModalClose');
+    const deleteConfirmModalCancel = document.getElementById('groupDeleteConfirmModalCancel');
+    const deleteConfirmModalYes = document.getElementById('groupDeleteConfirmModalYes');
+    if (deleteConfirmModal && deleteConfirmModalClose && deleteConfirmModalCancel && deleteConfirmModalYes) {
+        deleteConfirmModalClose.addEventListener('click', () => toggleGroupDeleteConfirmModal(false));
+        deleteConfirmModalCancel.addEventListener('click', () => toggleGroupDeleteConfirmModal(false));
+        deleteConfirmModal.addEventListener('click', (e) => { if (e.target === deleteConfirmModal) toggleGroupDeleteConfirmModal(false); });
+        deleteConfirmModalYes.addEventListener('click', () => confirmDeleteGroupFromModal());
     }
 
     refreshGroups();
