@@ -391,14 +391,6 @@
       const checkBtn = document.getElementById('checkBtn');
       const checkGroup = document.querySelector('#dictationModal .check-group');
 
-      // Обновляем видимость колонок star/mic в таблице предложений при смене режима
-      try {
-        if (typeof updateStartModalColumnsForMode === 'function') {
-          updateStartModalColumnsForMode();
-        }
-      } catch (e0) {
-      }
-
       if (mode === 'record') {
         // p1: стандартный режим — аудио по необходимости, текст доступен
         if (textBlock) textBlock.style.display = '';
@@ -1133,6 +1125,12 @@
             const prevCorrectedSt = Number(st && st.number_of_corrected) || 0;
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
+
+            // Обновляем строку в таблице стартового модального окна
+            try {
+              updateStartModalSentenceRow(session, key);
+            } catch (eRow) {
+            }
 
             try {
               st._textAllCorrect = !!(res && res.allCorrect);
@@ -2241,6 +2239,15 @@
         st.audio_exchange_mic = true;
       }
 
+      // Обновляем строку в таблице стартового модального окна
+      try {
+        const curKey = session.getCurrentKey();
+        if (curKey != null) {
+          updateStartModalSentenceRow(session, curKey);
+        }
+      } catch (eRow) {
+      }
+
       updateSentenceTabloFromSession(session);
       updateTaskProgressFromSession(session);
       updateNextButtonVisibilityFromSession(session);
@@ -2679,6 +2686,12 @@
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
 
+            // Обновляем строку в таблице стартового модального окна
+            try {
+              updateStartModalSentenceRow(session, view.key);
+            } catch (eRow) {
+            }
+
             updateSentenceTabloFromSession(session);
             updateTaskProgressFromSession(session);
             updateNextButtonVisibilityFromSession(session);
@@ -2974,6 +2987,113 @@
     }
   }
 
+  /**
+   * Обновляет одну строку в таблице стартового модального окна
+   * для указанного ключа предложения: звезда, микрофон, полузвёзды, активности, время.
+   * Если таблица не открыта — ничего не делает.
+   */
+  function updateStartModalSentenceRow(session, key) {
+    try {
+      if (!session || key == null) return;
+      const table = document.getElementById('sentences-table');
+      if (!table) return;
+      const tbody = table.querySelector('tbody');
+      if (!tbody) return;
+
+      const tr = tbody.querySelector(`tr[data-sentence-key="${CSS.escape(String(key))}"]`);
+      if (!tr) return;
+
+      const st = session.getState(key);
+      if (!st) return;
+
+      // --- Звезда / Полузвезда ---
+      const tdStar = tr.querySelector('td.col-star');
+      if (tdStar) {
+        const perfect = Number(st.number_of_perfect) || 0;
+        const corrected = Number(st.number_of_corrected) || 0;
+        let starWrap = tdStar.querySelector('.star-icon');
+        if (!starWrap) {
+          starWrap = document.createElement('span');
+          starWrap.className = 'star-icon';
+          tdStar.innerHTML = '';
+          tdStar.appendChild(starWrap);
+        }
+        starWrap.className = 'star-icon';
+        if (perfect >= 1) {
+          starWrap.classList.add('star-icon--perfect');
+          starWrap.innerHTML = '<i data-lucide="star"></i>';
+        } else if (corrected > 0) {
+          starWrap.classList.add('star-icon--half');
+          starWrap.innerHTML = '<i data-lucide="star-half"></i>';
+        } else {
+          starWrap.classList.add('star-icon--none');
+          starWrap.innerHTML = '<i data-lucide="star-off"></i>';
+        }
+      }
+
+      // --- Микрофон ---
+      const tdMic = tr.querySelector('td.col-mic');
+      if (tdMic) {
+        const audioDone = Number(st.number_of_audio) || 0;
+        let micWrap = tdMic.querySelector('.mic-icon--done, .mic-icon--none');
+        if (!micWrap) {
+          micWrap = document.createElement('span');
+          tdMic.innerHTML = '';
+          tdMic.appendChild(micWrap);
+        }
+        if (audioDone > 0) {
+          micWrap.className = 'mic-icon--done';
+          micWrap.innerHTML = '<i data-lucide="mic"></i>';
+        } else {
+          micWrap.className = 'mic-icon--none';
+          micWrap.innerHTML = '<i data-lucide="mic-off"></i>';
+        }
+      }
+
+      // --- Полузвёзды (number_of_corrected) ---
+      const tdHalfStars = tr.querySelector('td.col-half-stars');
+      if (tdHalfStars) {
+        const halfStarCount = Number(st.number_of_corrected) || 0;
+        tdHalfStars.innerHTML = '';
+        if (halfStarCount > 0) {
+          const halfSpan = document.createElement('span');
+          halfSpan.className = 'half-star-count';
+          halfSpan.innerHTML = '<i data-lucide="star-half"></i>' + String(halfStarCount);
+          tdHalfStars.appendChild(halfSpan);
+        }
+      }
+
+      // --- Активности (text_activity_count) ---
+      const tdActivities = tr.querySelector('td.col-activities');
+      if (tdActivities) {
+        const activityCount = Number(st.text_activity_count) || 0;
+        tdActivities.innerHTML = '';
+        if (activityCount > 0) {
+          const actSpan = document.createElement('span');
+          actSpan.className = 'activity-count';
+          actSpan.innerHTML = '<i data-lucide="circle"></i>' + String(activityCount);
+          tdActivities.appendChild(actSpan);
+        }
+      }
+
+      // --- Время ---
+      const tdTime = tr.querySelector('td.col-time');
+      if (tdTime) {
+        const timeMs = st.time_ms ? Number(st.time_ms) : 0;
+        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
+      }
+
+      // Обновляем lucide-иконки в этой строке
+      try {
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons({ root: tr });
+        }
+      } catch (e1) {
+      }
+    } catch (e) {
+    }
+  }
+
   function updateStartModalColumnsForMode() {
     try {
       const mode = getExerciseMode();
@@ -3004,9 +3124,6 @@
     updateColumnToggleButtonIcon('toggleProgressColumnsBtn', showProgress);
     updateColumnToggleButtonIcon('toggleOriginalColumnBtn', showOrig);
     updateColumnToggleButtonIcon('toggleTranslationColumnBtn', showTr);
-
-    // Автоматически показываем/скрываем колонки star/mic в зависимости от режима
-    updateStartModalColumnsForMode();
 
     try {
       window.__dictationStartModalColumnPrefs = { progress: showProgress, original: showOrig, translation: showTr };
