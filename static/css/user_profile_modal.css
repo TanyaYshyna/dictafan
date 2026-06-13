@@ -292,6 +292,12 @@
 #user-profile-modal #groupRestoreModal,
 #user-profile-modal #groupEmailInviteModal {
   display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10100;
+  background: rgba(0, 0, 0, 0.4);
+  justify-content: center;
+  align-items: center;
 }
 
 #user-profile-modal .telegram-link-code-input {

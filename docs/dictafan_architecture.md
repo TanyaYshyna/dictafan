@@ -284,6 +284,8 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Визуальные стили конкретных модалок (размеры, отступы, цвета, overflow/scroll и т.п.) должны оставаться в их профильных файлах (например `static/css/book_modal.css`).
 
 - `10000` — `#login-modal` (логин/регистрация)
+- `10080` — `#user-profile-modal` (профиль пользователя, группа `user_profile_modal.*`)
+- `10100` — `#user-profile-modal #groupModal`, `#user-profile-modal #groupRestoreModal`, `#user-profile-modal #groupEmailInviteModal` (внутренние модалки групп внутри профиля)
 - `10150` — `#activity-tracker-modal` (Трекер активности / отчёты)
 - `100200` — `#create-assignment-modal` (Задания → упражнения, группа `tasks_modal.*`)
 - `100200` — `#plan-tasks-modal` (План, группа `plan_tasks_modal.*`)
