@@ -288,9 +288,9 @@
   display: none;
 }
 
-#user-profile-modal #groupModal,
-#user-profile-modal #groupRestoreModal,
-#user-profile-modal #groupEmailInviteModal {
+#groupModal,
+#groupRestoreModal,
+#groupEmailInviteModal {
   display: none;
   position: fixed;
   inset: 0;
@@ -298,6 +298,66 @@
   background: rgba(0, 0, 0, 0.4);
   justify-content: center;
   align-items: center;
+}
+
+#groupModal .modal-content,
+#groupRestoreModal .modal-content,
+#groupEmailInviteModal .modal-content {
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px;
+  max-width: 90vw;
+  max-height: 90vh;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  position: relative;
+}
+
+#groupModal .modal-header,
+#groupRestoreModal .modal-header,
+#groupEmailInviteModal .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0 12px 0;
+  border-bottom: 1px solid #eee;
+  position: relative;
+}
+
+#groupModal .modal-close,
+#groupRestoreModal .modal-close,
+#groupEmailInviteModal .modal-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #666;
+}
+
+#groupModal .modal-body,
+#groupRestoreModal .modal-body,
+#groupEmailInviteModal .modal-body {
+  padding: 12px 0 0 0;
+}
+
+#groupModal .modal-footer,
+#groupRestoreModal .modal-footer,
+#groupEmailInviteModal .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 0 0 0;
+  border-top: 1px solid #eee;
+  margin-top: 12px;
+}
+
+#groupModal .modal-footer .button-color-yellow,
+#groupRestoreModal .modal-footer .button-color-yellow,
+#groupEmailInviteModal .modal-footer .button-color-yellow {
+  height: 44px;
+  padding: 0 12px;
 }
 
 #user-profile-modal .telegram-link-code-input {
