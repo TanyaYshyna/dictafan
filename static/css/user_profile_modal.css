@@ -360,6 +360,70 @@
   padding: 0 12px;
 }
 
+/* Стили полей ввода как в профиле */
+#groupModal .form-row input,
+#groupRestoreModal .form-row input,
+#groupEmailInviteModal .form-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 16px;
+  background: #fff;
+  color: #1f2933;
+  box-sizing: border-box;
+}
+
+#groupModal .form-row input:focus,
+#groupRestoreModal .form-row input:focus,
+#groupEmailInviteModal .form-row input:focus {
+  outline: none;
+  border-color: var(--color-button-text-pink, #e91e63);
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+/* Архивная группа — перечёркнутый текст */
+#user-profile-modal .groups-table-row.archived .groups-table-cell-name {
+  text-decoration: line-through;
+  color: #999;
+}
+
+/* Кнопка восстановления архивной группы — sticky-note-off */
+#user-profile-modal .groups-table-row.archived .groups-row-restore-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #999;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#user-profile-modal .groups-table-row.archived .groups-row-restore-btn:hover {
+  background: rgba(0,0,0,0.05);
+}
+
+/* Кнопка полного удаления группы в строке архивной группы */
+#user-profile-modal .groups-table-row.archived .groups-row-delete-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: #e74c3c;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#user-profile-modal .groups-table-row.archived .groups-row-delete-btn:hover {
+  background: rgba(231,76,60,0.1);
+}
+
 #user-profile-modal .telegram-link-code-input {
   flex: 1;
 }
@@ -594,6 +658,7 @@
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);
   gap: 18px;
+  margin: 10px;
 }
 
 @media (max-width: 920px) {

@@ -574,21 +574,36 @@ function renderGroupsTable() {
         const c1 = document.createElement('div');
         c1.textContent = String(g.id);
         const c2 = document.createElement('div');
+        c2.className = 'groups-table-cell-name';
         c2.textContent = String(g.title || '');
         const c3 = document.createElement('div');
         c3.className = 'groups-table-actions-cell';
         if (isArchived) {
+            // Кнопка восстановления (sticky-note-off)
             const restoreBtn = document.createElement('button');
             restoreBtn.type = 'button';
-            restoreBtn.className = 'groups-row-restore-btn button-color-yellow';
-            restoreBtn.title = profileT('profile.groups.actions.restore_title', null, 'Снять удаление группы');
-            restoreBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+            restoreBtn.className = 'groups-row-restore-btn';
+            restoreBtn.title = profileT('profile.groups.actions.restore_title', null, 'Снять архивацию группы');
+            restoreBtn.innerHTML = '<i data-lucide="sticky-note-off"></i>';
             restoreBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 openGroupRestoreModal(g);
             });
             c3.appendChild(restoreBtn);
+
+            // Кнопка полного удаления (trash-2)
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'groups-row-delete-btn';
+            deleteBtn.title = profileT('profile.groups.actions.delete_permanently_title', null, 'Удалить группу навсегда');
+            deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+            deleteBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                deleteSelectedGroup(g);
+            });
+            c3.appendChild(deleteBtn);
         }
         row.appendChild(c1);
         row.appendChild(c2);
@@ -714,6 +729,29 @@ async function copyInviteLink() {
         showSuccess(profileT('profile.common.link_copied', null, 'Ссылка скопирована'));
     } catch (e) {
         showInfo(profileT('profile.common.copy_manually', null, 'Скопируй ссылку вручную'));
+    }
+}
+
+async function deleteSelectedGroup(group) {
+    const g = group || getSelectedGroup();
+    if (!g) {
+        showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+        return;
+    }
+    const groupName = String(g.title || g.id || '');
+    const confirmed = confirm(
+        profileT('profile.groups.actions.delete_permanently_confirm', { name: groupName }, 'Точно удалить группу "' + groupName + '" навсегда? Все ученики, задания и приглашения будут безвозвратно удалены.')
+    );
+    if (!confirmed) return;
+    try {
+        await groupsApiRequest(`/groups/api/group/${g.id}`, {
+            method: 'DELETE',
+        });
+        showSuccess(profileT('profile.groups.actions.deleted_permanently', null, 'Группа удалена навсегда'));
+        groupsUiState.selectedGroupId = null;
+        await refreshGroups();
+    } catch (e) {
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
     }
 }
 
@@ -892,11 +930,13 @@ function openGroupModal(mode, group) {
 async function saveGroupFromModal() {
     const nameInput = document.getElementById('groupModalTitleInput');
     const descInput = document.getElementById('groupModalDescriptionInput');
+    const saveBtn = document.getElementById('groupModalSave');
     if (!nameInput) return;
     const title = String(nameInput.value || '').trim();
     if (!title) { showInfo(profileT('profile.groups.errors.name_required', null, 'Введите название группы')); return; }
     const description = descInput ? String(descInput.value || '').trim() : '';
     const editingId = groupsUiState.editingGroupId;
+    if (saveBtn) saveBtn.disabled = true;
     try {
         if (editingId) {
             await groupsApiRequest(`/groups/api/group/${editingId}`, {
@@ -911,7 +951,10 @@ async function saveGroupFromModal() {
         }
         toggleGroupModal(false);
         await refreshGroups();
-    } catch (e) { showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка')); }
+    } catch (e) {
+        if (saveBtn) saveBtn.disabled = false;
+        showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+    }
 }
 
 async function refreshGroups() {
@@ -977,6 +1020,7 @@ async function submitGroupEmailInviteFromModal() {
 function initializeGroupsSection() {
     const groupsTable = document.getElementById('groupsTable');
     const createBtn = document.getElementById('groupsCreateBtn');
+    const archiveBtn = document.getElementById('groupsArchiveBtn');
     const delBtn = document.getElementById('groupsDeleteBtn');
     const filterSelect = document.getElementById('groupsFilterSelect');
     const inviteCopyBtn = document.getElementById('groupsInviteCopyBtn');
@@ -1003,7 +1047,7 @@ function initializeGroupsSection() {
     const restoreModalClose = document.getElementById('groupRestoreModalClose');
     const restoreModalYes = document.getElementById('groupRestoreModalYes');
 
-    if (!groupsTable || !createBtn || !delBtn || !modal || !modalClose || !modalSave) return;
+    if (!groupsTable || !createBtn || !archiveBtn || !delBtn || !modal || !modalClose || !modalSave) return;
 
     if (filterSelect) {
         try {
@@ -1024,7 +1068,15 @@ function initializeGroupsSection() {
     }
 
     createBtn.addEventListener('click', () => openGroupModal('create'));
-    delBtn.addEventListener('click', () => archiveSelectedGroup());
+    archiveBtn.addEventListener('click', () => archiveSelectedGroup());
+    delBtn.addEventListener('click', () => {
+        const g = getSelectedGroup();
+        if (!g) {
+            showInfo(profileT('profile.groups.errors.select_group', null, 'Выбери группу'));
+            return;
+        }
+        deleteSelectedGroup(g);
+    });
     inviteCopyBtn && inviteCopyBtn.addEventListener('click', () => copyInviteLink());
     studentsRefreshBtn && studentsRefreshBtn.addEventListener('click', async () => {
         await refreshSelectedGroupDetailsFromServer();
