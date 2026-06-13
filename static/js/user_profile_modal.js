@@ -1162,28 +1162,25 @@ function initializeGroupsSection() {
         groupsUiState.filterMode = 'active';
         filterBtn.dataset.checked = '1';
         filterBtn.setAttribute('aria-pressed', 'true');
-        // Инициализация иконки через lucide (серверный HTML уже содержит <i data-lucide="circle-check-big">)
-        try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
 
-        filterBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            const isActive = filterBtn.dataset.checked === '1';
-            const newChecked = isActive ? '0' : '1';
-            filterBtn.dataset.checked = newChecked;
-            filterBtn.setAttribute('aria-pressed', newChecked === '1' ? 'true' : 'false');
-            
-            // Создаём новый <i> элемент и заменяем им всё содержимое кнопки
-            const iconName = newChecked === '1' ? 'circle-check-big' : 'circle';
-            const newIcon = document.createElement('i');
-            newIcon.setAttribute('data-lucide', iconName);
-            filterBtn.replaceChildren(newIcon);
+        const setFilterBtnState = (btn, checked) => {
+            btn.dataset.checked = checked ? '1' : '0';
+            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
             try {
-                if (window.lucide && typeof window.lucide.createIcons === 'function') {
-                    window.lucide.createIcons({ root: filterBtn });
+                if (window.lucide) {
+                    window.lucide.createIcons({ root: btn });
                 }
             } catch (e) { }
+        };
+
+        filterBtn.addEventListener('click', function onClick(e) {
+            e.preventDefault();
+            const isActive = filterBtn.dataset.checked === '1';
+            const newChecked = !isActive;
+            setFilterBtnState(filterBtn, newChecked);
             
-            groupsUiState.filterMode = newChecked === '1' ? 'active' : 'all';
+            groupsUiState.filterMode = newChecked ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();
             renderGroupsDetails();

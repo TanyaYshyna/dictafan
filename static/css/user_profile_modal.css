@@ -1005,9 +1005,10 @@
   cursor: default;
 }
 
-#user-profile-modal .groups-lucide-toggle i[data-lucide] {
+#user-profile-modal .groups-lucide-toggle svg {
   width: 16px;
   height: 16px;
+  pointer-events: none;
 }
 
 #user-profile-modal .group-modal-content-640 {
