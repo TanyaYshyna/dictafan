@@ -391,6 +391,14 @@
       const checkBtn = document.getElementById('checkBtn');
       const checkGroup = document.querySelector('#dictationModal .check-group');
 
+      // Обновляем видимость колонок star/mic в таблице предложений при смене режима
+      try {
+        if (typeof updateStartModalColumnsForMode === 'function') {
+          updateStartModalColumnsForMode();
+        }
+      } catch (e0) {
+      }
+
       if (mode === 'record') {
         // p1: стандартный режим — аудио по необходимости, текст доступен
         if (textBlock) textBlock.style.display = '';
@@ -2935,7 +2943,10 @@
       const cls = String(className || '').trim();
       if (!cls) return;
       const map = {
-        'col-progress': 'hide-progress',
+        'col-star': 'hide-star',
+        'col-mic': 'hide-mic',
+        'col-half-stars': 'hide-half-stars',
+        'col-activities': 'hide-activities',
         'col-text-original': 'hide-original',
         'col-text-translation': 'hide-translation',
       };
@@ -2963,19 +2974,39 @@
     }
   }
 
+  function updateStartModalColumnsForMode() {
+    try {
+      const mode = getExerciseMode();
+      // Режимы p1 (record) и p2 (no-record) — показываем колонку звезды, скрываем микрофон
+      // Режимы p3 (audio-only-no-hint) и p4 (audio-only-hint) — показываем колонку микрофона, скрываем звезду
+      const showStar = (mode === 'record' || mode === 'no-record');
+      const showMic = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint');
+      setColumnsVisibilityByClass({ className: 'col-star', visible: showStar });
+      setColumnsVisibilityByClass({ className: 'col-mic', visible: showMic });
+    } catch (e) {
+    }
+  }
+
   function applyStartModalColumnsPreset(preset) {
     const p = preset && typeof preset === 'object' ? preset : {};
     const showProgress = Boolean(p.progress);
     const showOrig = Boolean(p.original);
     const showTr = Boolean(p.translation);
 
-    setColumnsVisibilityByClass({ className: 'col-progress', visible: showProgress });
+    // Колонки прогресса: star, mic, half-stars, activities
+    setColumnsVisibilityByClass({ className: 'col-star', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-mic', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-half-stars', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-activities', visible: showProgress });
     setColumnsVisibilityByClass({ className: 'col-text-original', visible: showOrig });
     setColumnsVisibilityByClass({ className: 'col-text-translation', visible: showTr });
 
     updateColumnToggleButtonIcon('toggleProgressColumnsBtn', showProgress);
     updateColumnToggleButtonIcon('toggleOriginalColumnBtn', showOrig);
     updateColumnToggleButtonIcon('toggleTranslationColumnBtn', showTr);
+
+    // Автоматически показываем/скрываем колонки star/mic в зависимости от режима
+    updateStartModalColumnsForMode();
 
     try {
       window.__dictationStartModalColumnPrefs = { progress: showProgress, original: showOrig, translation: showTr };
@@ -3535,12 +3566,68 @@
 
         tdChoice.appendChild(btn);
 
-        const emptyProgress = () => {
-          const td = document.createElement('td');
-          td.className = 'col-progress';
-          td.textContent = '';
-          return td;
-        };
+        const st = session.getState(view.key);
+
+        // --- Колонка: Звезда / Полузвезда ---
+        const tdStar = document.createElement('td');
+        tdStar.className = 'col-star';
+        const perfect = Number(st && st.number_of_perfect) || 0;
+        const corrected = Number(st && st.number_of_corrected) || 0;
+        const starWrap = document.createElement('span');
+        starWrap.className = 'star-icon';
+        if (perfect >= 1) {
+          starWrap.classList.add('star-icon--perfect');
+          starWrap.innerHTML = '<i data-lucide="star"></i>';
+        } else if (corrected > 0) {
+          starWrap.classList.add('star-icon--half');
+          starWrap.innerHTML = '<i data-lucide="star-half"></i>';
+        } else {
+          starWrap.classList.add('star-icon--none');
+          starWrap.innerHTML = '<i data-lucide="star-off"></i>';
+        }
+        tdStar.appendChild(starWrap);
+
+        // --- Колонка: Микрофон ---
+        const tdMic = document.createElement('td');
+        tdMic.className = 'col-mic';
+        const audioDone = Number(st && st.number_of_audio) || 0;
+        const micWrap = document.createElement('span');
+        if (audioDone > 0) {
+          micWrap.className = 'mic-icon--done';
+          micWrap.innerHTML = '<i data-lucide="mic"></i>';
+        } else {
+          micWrap.className = 'mic-icon--none';
+          micWrap.innerHTML = '<i data-lucide="mic-off"></i>';
+        }
+        tdMic.appendChild(micWrap);
+
+        // --- Колонка: Полузвёзды (number_of_corrected) ---
+        const tdHalfStars = document.createElement('td');
+        tdHalfStars.className = 'col-half-stars';
+        const halfStarCount = Number(st && st.number_of_corrected) || 0;
+        if (halfStarCount > 0) {
+          const halfSpan = document.createElement('span');
+          halfSpan.className = 'half-star-count';
+          halfSpan.innerHTML = '<i data-lucide="star-half"></i>' + String(halfStarCount);
+          tdHalfStars.appendChild(halfSpan);
+        }
+
+        // --- Колонка: Активности (text_activity_count) ---
+        const tdActivities = document.createElement('td');
+        tdActivities.className = 'col-activities';
+        const activityCount = Number(st && st.text_activity_count) || 0;
+        if (activityCount > 0) {
+          const actSpan = document.createElement('span');
+          actSpan.className = 'activity-count';
+          actSpan.innerHTML = '<i data-lucide="circle"></i>' + String(activityCount);
+          tdActivities.appendChild(actSpan);
+        }
+
+        // --- Колонка: Время ---
+        const tdTime = document.createElement('td');
+        tdTime.className = 'col-time';
+        const timeMs = st && st.time_ms ? Number(st.time_ms) : 0;
+        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
 
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
@@ -3550,18 +3637,12 @@
         tdTr.className = 'col-text-translation';
         tdTr.textContent = String(view.text_translation || '');
 
-        const tdTime = document.createElement('td');
-        tdTime.className = 'col-time';
-        const st = session.getState(view.key);
-        const timeMs = st && st.time_ms ? Number(st.time_ms) : 0;
-        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
-
         tr.appendChild(tdNum);
         tr.appendChild(tdChoice);
-        tr.appendChild(emptyProgress());
-        tr.appendChild(emptyProgress());
-        tr.appendChild(emptyProgress());
-        tr.appendChild(emptyProgress());
+        tr.appendChild(tdStar);
+        tr.appendChild(tdMic);
+        tr.appendChild(tdHalfStars);
+        tr.appendChild(tdActivities);
         tr.appendChild(tdTime);
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);

@@ -1451,9 +1451,24 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: 0;
 }
 
-#dictationModal #sentences-table col.col-progress,
-#dictationModal #final-sentences-table col.col-progress {
-  width: 26px;
+#dictationModal #sentences-table col.col-star,
+#dictationModal #final-sentences-table col.col-star {
+  width: 32px;
+}
+
+#dictationModal #sentences-table col.col-mic,
+#dictationModal #final-sentences-table col.col-mic {
+  width: 32px;
+}
+
+#dictationModal #sentences-table col.col-half-stars,
+#dictationModal #final-sentences-table col.col-half-stars {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-activities,
+#dictationModal #final-sentences-table col.col-activities {
+  width: 50px;
 }
 
 #dictationModal #sentences-table col.col-time,
@@ -1462,20 +1477,61 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal #sentences-table th.col-time,
-#dictationModal #sentences-table td.col-time {
+#dictationModal #sentences-table td.col-time,
+#dictationModal #sentences-table th.col-star,
+#dictationModal #sentences-table td.col-star,
+#dictationModal #sentences-table th.col-mic,
+#dictationModal #sentences-table td.col-mic,
+#dictationModal #sentences-table th.col-half-stars,
+#dictationModal #sentences-table td.col-half-stars,
+#dictationModal #sentences-table th.col-activities,
+#dictationModal #sentences-table td.col-activities {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
 
-/* m column (attempts/errors) is the 6th column: rownum, choice, 4x progress */
-#dictationModal #sentences-table colgroup col:nth-child(6),
-#dictationModal #final-sentences-table colgroup col:nth-child(6) {
-  width: 40px;
+#dictationModal #sentences-table td.col-star .star-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-#dictationModal #sentences-table th.col-progress,
-#dictationModal #sentences-table td.col-progress {
-  text-align: center;
+#dictationModal #sentences-table td.col-star .star-icon--perfect {
+  color: var(--color-button-mint, #34d399);
+}
+
+#dictationModal #sentences-table td.col-star .star-icon--half {
+  color: var(--color-button-lightgreen, #4ade80);
+}
+
+#dictationModal #sentences-table td.col-star .star-icon--none {
+  color: var(--color-button-text-gray, #9ca3af);
+  opacity: 0.5;
+}
+
+#dictationModal #sentences-table td.col-mic .mic-icon--done {
+  color: var(--color-button-purple, #a78bfa);
+}
+
+#dictationModal #sentences-table td.col-mic .mic-icon--none {
+  color: var(--color-button-text-gray, #9ca3af);
+  opacity: 0.5;
+}
+
+#dictationModal #sentences-table td.col-half-stars .half-star-count,
+#dictationModal #sentences-table td.col-activities .activity-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-button-text-gray, #9ca3af);
+}
+
+#dictationModal #sentences-table td.col-half-stars .half-star-count i,
+#dictationModal #sentences-table td.col-activities .activity-count i {
+  width: 14px;
+  height: 14px;
 }
 
 #dictationModal #sentences-table th#thSentenceRowNumber,
@@ -1513,9 +1569,27 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: auto;
 }
 
-#dictationModal #sentences-table.hide-progress col.col-progress,
-#dictationModal #sentences-table.hide-progress th.col-progress,
-#dictationModal #sentences-table.hide-progress td.col-progress {
+#dictationModal #sentences-table.hide-star col.col-star,
+#dictationModal #sentences-table.hide-star th.col-star,
+#dictationModal #sentences-table.hide-star td.col-star {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-mic col.col-mic,
+#dictationModal #sentences-table.hide-mic th.col-mic,
+#dictationModal #sentences-table.hide-mic td.col-mic {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-half-stars col.col-half-stars,
+#dictationModal #sentences-table.hide-half-stars th.col-half-stars,
+#dictationModal #sentences-table.hide-half-stars td.col-half-stars {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-activities col.col-activities,
+#dictationModal #sentences-table.hide-activities th.col-activities,
+#dictationModal #sentences-table.hide-activities td.col-activities {
   display: none !important;
 }
 
