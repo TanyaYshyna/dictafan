@@ -396,15 +396,7 @@
         if (textBlock) textBlock.style.display = '';
         if (checkGroup) checkGroup.style.display = '';
         updateAudioUserPanelVisibilityFromSession(session);
-        if (input) {
-          input.setAttribute('contenteditable', 'true');
-          input.textContent = '';
-        }
-        if (correctAnswer) {
-          correctAnswer.textContent = '';
-          correctAnswer.style.display = 'none';
-        }
-        setCheckButtonState('ready');
+        // НЕ очищаем input/correctAnswer — они могут содержать результаты проверки
         return;
       }
 
@@ -416,15 +408,7 @@
         }
         if (textBlock) textBlock.style.display = '';
         if (checkGroup) checkGroup.style.display = '';
-        if (input) {
-          input.setAttribute('contenteditable', 'true');
-          input.textContent = '';
-        }
-        if (correctAnswer) {
-          correctAnswer.textContent = '';
-          correctAnswer.style.display = 'none';
-        }
-        setCheckButtonState('ready');
+        // НЕ очищаем input/correctAnswer — они могут содержать результаты проверки
         return;
       }
 
