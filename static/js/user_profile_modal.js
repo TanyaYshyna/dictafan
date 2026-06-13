@@ -1162,16 +1162,27 @@ function initializeGroupsSection() {
         groupsUiState.filterMode = 'active';
         filterBtn.dataset.checked = '1';
         filterBtn.setAttribute('aria-pressed', 'true');
-        filterBtn.innerHTML = '<i data-lucide="circle-check-big"></i>';
+        // Инициализация иконки через lucide (серверный HTML уже содержит <i data-lucide="circle-check-big">)
         try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
 
-        filterBtn.addEventListener('click', () => {
+        filterBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             const isActive = filterBtn.dataset.checked === '1';
             const newChecked = isActive ? '0' : '1';
             filterBtn.dataset.checked = newChecked;
             filterBtn.setAttribute('aria-pressed', newChecked === '1' ? 'true' : 'false');
-            filterBtn.innerHTML = `<i data-lucide="${newChecked === '1' ? 'circle-check-big' : 'circle'}"></i>`;
-            try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
+            
+            // Создаём новый <i> элемент и заменяем им всё содержимое кнопки
+            const iconName = newChecked === '1' ? 'circle-check-big' : 'circle';
+            const newIcon = document.createElement('i');
+            newIcon.setAttribute('data-lucide', iconName);
+            filterBtn.replaceChildren(newIcon);
+            try {
+                if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                    window.lucide.createIcons({ root: filterBtn });
+                }
+            } catch (e) { }
+            
             groupsUiState.filterMode = newChecked === '1' ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();
