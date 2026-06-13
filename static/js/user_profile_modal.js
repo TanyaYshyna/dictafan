@@ -1163,19 +1163,26 @@ function initializeGroupsSection() {
         filterBtn.dataset.checked = '1';
         filterBtn.setAttribute('aria-pressed', 'true');
         filterBtn.innerHTML = '<i data-lucide="circle-check-big"></i>';
-        requestAnimationFrame(() => {
-            try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
-        });
+        try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
 
         filterBtn.addEventListener('click', () => {
             const isActive = filterBtn.dataset.checked === '1';
             const newChecked = isActive ? '0' : '1';
             filterBtn.dataset.checked = newChecked;
             filterBtn.setAttribute('aria-pressed', newChecked === '1' ? 'true' : 'false');
-            filterBtn.innerHTML = `<i data-lucide="${newChecked === '1' ? 'circle-check-big' : 'circle'}"></i>`;
-            requestAnimationFrame(() => {
-                try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
-            });
+            // Меняем атрибут data-lucide у существующего <i>, а не перезаписываем innerHTML
+            const iconEl = filterBtn.querySelector('i[data-lucide], svg');
+            if (iconEl) {
+                const iconName = newChecked === '1' ? 'circle-check-big' : 'circle';
+                iconEl.setAttribute('data-lucide', iconName);
+                // Удаляем содержимое svg, чтобы lucide пересоздал
+                if (iconEl.tagName.toLowerCase() === 'svg') {
+                    iconEl.outerHTML = `<i data-lucide="${iconName}"></i>`;
+                }
+            } else {
+                filterBtn.innerHTML = `<i data-lucide="${newChecked === '1' ? 'circle-check-big' : 'circle'}"></i>`;
+            }
+            try { if (window.lucide) window.lucide.createIcons(); } catch (e) { }
             groupsUiState.filterMode = newChecked === '1' ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();
