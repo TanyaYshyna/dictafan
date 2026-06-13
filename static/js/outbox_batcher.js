@@ -103,7 +103,6 @@
 
       return true;
     } catch (e) {
-      console.error('[OutboxBatcher] enqueueActivity error:', e);
       return false;
     }
   }
@@ -120,7 +119,6 @@
       // Если не удалось отправить сразу — кладём в outbox
       return await enqueueActivity(params);
     } catch (e) {
-      console.error('[OutboxBatcher] enqueueActivityUrgent error:', e);
       return await enqueueActivity(params);
     }
   }
@@ -195,7 +193,6 @@
 
       state.pendingActivityCount = Math.max(0, state.pendingActivityCount - successCount);
     } catch (e) {
-      console.error('[OutboxBatcher] _flushActivityOutbox error:', e);
     } finally {
       state.flushing = false;
     }
@@ -234,7 +231,6 @@
 
       return true;
     } catch (e) {
-      console.error('[OutboxBatcher] enqueueSuccess error:', e);
       return false;
     }
   }
@@ -248,7 +244,6 @@
       if (sent) return true;
       return await enqueueSuccess(payload);
     } catch (e) {
-      console.error('[OutboxBatcher] enqueueSuccessUrgent error:', e);
       return await enqueueSuccess(payload);
     }
   }
@@ -311,7 +306,6 @@
 
       state.pendingSuccessCount = Math.max(0, state.pendingSuccessCount - successCount);
     } catch (e) {
-      console.error('[OutboxBatcher] _flushSuccessOutbox error:', e);
     } finally {
       state.flushing = false;
     }
@@ -520,5 +514,4 @@
     notifySwToSync,
   };
 
-  console.log('[OutboxBatcher] Инициализирован. BATCH_INTERVAL_MS=' + BATCH_INTERVAL_MS + ', MAX_BATCH_SIZE=' + MAX_BATCH_SIZE);
 })();

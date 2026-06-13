@@ -621,8 +621,7 @@ class ProgressPanel {
             const num = Number(value);
             return Number.isFinite(num) ? num : 0;
         };
-        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s errors=%s money=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.errors, this.stats.money, this.stats.circleNumber, this.stats.timer);
-
+ 
         // Обновляем основной UI
         if (this.elements.perfect) {
             this.elements.perfect.textContent = safe(this.stats.perfect);
@@ -907,7 +906,6 @@ class ProgressPanel {
         if (!overlay || !minutesInput || !secondsInput) return;
 
         const baseSeconds = (this.timerState.countdownDefaultSeconds || this.countdownDuration || 300);
-        console.log('[Timer] openTimerDialog() baseSeconds=%s countdownRemaining=%s countdownDuration=%s', baseSeconds, this.countdownRemaining, this.countdownDuration);
         minutesInput.value = Math.floor(baseSeconds / 60);
         secondsInput.value = baseSeconds % 60;
 
@@ -1034,7 +1032,6 @@ class ProgressPanel {
             this.timerDialogElements.secondsInput.value = safeSeconds;
         }
         const totalSeconds = safeMinutes * 60 + safeSeconds;
-        console.log('[Timer] _applyTimerSettings -> режим таймер: minutes=%s seconds=%s totalSeconds=%s', safeMinutes, safeSeconds, totalSeconds);
         if (totalSeconds <= 0) {
             alert('Укажите время таймера больше нуля.');
             return false;
@@ -1045,7 +1042,6 @@ class ProgressPanel {
         this._setCountdownSeconds(totalSeconds);
         // Сразу обновляем отображение установленного времени
         this.stats.timer = totalSeconds;
-        console.log('[Timer] _applyTimerSettings -> сохранено totalSeconds=%s', totalSeconds);
         this.updateTimer();
         this.updateTimerButtons();
         this._updateTimerButtonColor();
@@ -1096,8 +1092,7 @@ class ProgressPanel {
                 if (pref && Number(pref.duration) > 0) {
                     const duration = Number(pref.duration);
                     this._setCountdownSeconds(duration);
-                    console.log('[Timer] _loadTimerPreference -> duration=%s', duration);
-                }
+                 }
             }
         } catch (error) {
             console.warn('Ошибка чтения настроек таймера:', error);
@@ -1116,8 +1111,7 @@ class ProgressPanel {
             const duration = Number(this.countdownDuration || 0);
             if (!(duration > 0)) return;
             localStorage.setItem(this.timerPreferenceKey, JSON.stringify({ duration }));
-            console.log('[Timer] _saveTimerPreference -> duration=%s', duration);
-        } catch (error) {
+         } catch (error) {
             console.warn('Ошибка сохранения настроек таймера:', error);
         }
     }

@@ -1120,16 +1120,29 @@
 
         try {
           // Фокус после проверки (новый алгоритм):
-          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды (textOk=false) — фокус на checkBtn (теперь это кнопка повтора)
-          // 2) если есть звезда/полузвезда (textOk) и требуется микрофон, но он ещё не выполнен — фокус на запись.
-          // 3) если текст + микрофон выполнены — фокус на "Далее" (resultNextBtn)
+          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды (textOk=false) — фокус на checkBtn (кнопка повтора)
+          // 2) если есть полузвезда (textOk, corrected>0, perfect<1) — фокус на checkBtn (кнопка повтора в режиме half)
+          // 3) если есть звезда (textOk, perfect>=1) и требуется микрофон, но он ещё не выполнен — фокус на запись.
+          // 4) если текст + микрофон выполнены — фокус на "Далее" (resultNextBtn)
           {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
             const allCorrect = !!(res && res.allCorrect);
+            const perfect = Number(st && st.number_of_perfect) || 0;
+            const corrected = Number(st && st.number_of_corrected) || 0;
 
             // Случай: текст исправлен, но звезды/полузвезды нет — фокус на checkBtn (кнопка повтора)
             if (allCorrect && !textOk) {
+              const checkBtn = document.getElementById('checkBtn');
+              if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
+                try {
+                  state._skipNavigatorFocusOnce = true;
+                } catch (e0skip) {
+                }
+                checkBtn.focus();
+              }
+            } else if (textOk && corrected > 0 && perfect < 1) {
+              // Полузвезда — фокус на checkBtn (кнопка повтора в режиме half)
               const checkBtn = document.getElementById('checkBtn');
               if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
                 try {
@@ -2289,7 +2302,6 @@
       const el = document.getElementById('playSequenceStart');
       const v = el && el.value != null ? String(el.value) : '';
       if (v.trim()) {
-        console.log('[DICTATION_MODAL] getPlaySequenceStartValue from DOM element playSequenceStart:', v.trim());
         return v.trim();
       }
     } catch (e) {
@@ -2297,12 +2309,10 @@
     try {
       const v = window.playSequenceStart != null ? String(window.playSequenceStart) : '';
       if (v.trim()) {
-        console.log('[DICTATION_MODAL] getPlaySequenceStartValue from window.playSequenceStart:', v.trim());
-        return v.trim();
+       return v.trim();
       }
     } catch (e) {
     }
-    console.log('[DICTATION_MODAL] getPlaySequenceStartValue: no value found, returning default oto');
     return 'oto';
   }
 
@@ -2341,11 +2351,9 @@
       if (!am || typeof am.play !== 'function') return;
       const seq = String(sequence || '').trim().toLowerCase();
       if (!seq) {
-        console.log('[DICTATION_MODAL] playAudioSequence: empty sequence, skipping');
-        return;
+         return;
       }
 
-      console.log('[DICTATION_MODAL] playAudioSequence: sequence =', seq, 'originalUrl =', originalUrl ? originalUrl.substring(0, 50) + '...' : 'null', 'translationUrl =', translationUrl ? translationUrl.substring(0, 50) + '...' : 'null');
 
       let originalBtn = null;
       try {
@@ -2360,7 +2368,6 @@
         if (ch === 't' && translationUrl) steps.push({ url: translationUrl, button: document.getElementById('translationPlayButton') });
       }
       if (!steps.length) {
-        console.log('[DICTATION_MODAL] playAudioSequence: no valid steps for sequence', seq);
         return;
       }
 
@@ -2476,7 +2483,6 @@
         state._startSequenceTimer = setTimeout(() => {
           try {
             const seq = getPlaySequenceStartValue();
-            console.log('[DICTATION_MODAL] updateAudioPlayersFromSession: playing sequence', seq, 'for sentenceKey', sentenceKey);
             playAudioSequence(seq, { originalUrl, translationUrl });
           } catch (e0) {
           }
