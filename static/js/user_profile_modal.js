@@ -383,8 +383,8 @@ function getGroupsFilterMode() { return groupsUiState.filterMode || 'active'; }
 function getVisibleGroups() {
     const mode = getGroupsFilterMode();
     const all = Array.isArray(groupsUiState.groups) ? groupsUiState.groups : [];
-    if (mode === 'active') return all.filter(g => !g.archived);
-    if (mode === 'archived') return all.filter(g => !!g.archived);
+    if (mode === 'active') return all.filter(g => !g.archived_at);
+    if (mode === 'archived') return all.filter(g => !!g.archived_at);
     return all;
 }
 
