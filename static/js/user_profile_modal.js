@@ -579,12 +579,12 @@ function renderGroupsTable() {
         const c3 = document.createElement('div');
         c3.className = 'groups-table-actions-cell';
         if (isArchived) {
-            // Кнопка восстановления (sticky-note-off)
+            // Кнопка восстановления (save-off)
             const restoreBtn = document.createElement('button');
             restoreBtn.type = 'button';
             restoreBtn.className = 'groups-row-restore-btn';
             restoreBtn.title = profileT('profile.groups.actions.restore_title', null, 'Снять архивацию группы');
-            restoreBtn.innerHTML = '<i data-lucide="sticky-note-off"></i>';
+            restoreBtn.innerHTML = '<i data-lucide="save-off"></i>';
             restoreBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
