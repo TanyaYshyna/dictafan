@@ -711,13 +711,24 @@
   height: 20px;
 }
 
-#user-profile-modal .groups-filter-select {
-  height: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border-light, #e9ecef);
-  padding: 0 10px;
-  background: #fff;
+#user-profile-modal .groups-filter-checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .groups-filter-checkbox-wrapper .groups-lucide-toggle {
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
+}
+
+#user-profile-modal .groups-filter-label {
+  font-size: 14px;
   color: var(--color-text, #1f2933);
+  white-space: nowrap;
 }
 
 #user-profile-modal .groups-table,

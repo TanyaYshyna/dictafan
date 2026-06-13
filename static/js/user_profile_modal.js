@@ -796,46 +796,140 @@ function renderStudentsTable(students) {
     const table = document.getElementById('groupsStudentsTable');
     if (!table) return;
     table.innerHTML = '';
-    const list = Array.isArray(students) ? students : [];
-    list.forEach((s) => {
+
+    const currentUserId = (window.UM && window.UM.userData && window.UM.userData.id != null) ? String(window.UM.userData.id) : null;
+
+    if (!groupsUiState.selectedGroupId) {
+        const empty = document.createElement('div');
+        empty.style.padding = '12px';
+        empty.style.color = '#666';
+        empty.textContent = profileT('profile.groups.details.select_left', null, 'Выбери группу слева');
+        table.appendChild(empty);
+        return;
+    }
+
+    if (!Array.isArray(students) || students.length === 0) {
+        const empty = document.createElement('div');
+        empty.style.padding = '12px';
+        empty.style.color = '#666';
+        empty.textContent = profileT('profile.groups.students.empty', null, 'Пока нет учеников');
+        table.appendChild(empty);
+        return;
+    }
+
+    students.forEach((s) => {
         const row = document.createElement('div');
-        row.className = 'groups-students-table-row' + (String(s.id) === String(groupsUiState.selectedStudentId) ? ' selected' : '');
-        row.dataset.studentId = s.id;
+        row.className = 'groups-students-table-row';
+        row.dataset.studentId = String(s.id);
+        const isEmailInviteRow = String(s.kind || '') === 'email_invite' || String(s.id || '').startsWith('email_invite:');
+        const g = getSelectedGroup();
+        const isSelfRow = !isEmailInviteRow && currentUserId && String(s.id) === currentUserId;
+        const hideNotifyToggle = Boolean(g && g.is_personal) && isSelfRow;
+        if (!isEmailInviteRow && String(s.id) === String(groupsUiState.selectedStudentId)) {
+            row.classList.add('selected');
+        }
+
+        const avatar = document.createElement('img');
+        avatar.className = 'groups-student-avatar';
+        avatar.alt = 'avatar';
+        if (!isEmailInviteRow) {
+            avatar.src = avatarUrlForUser(s.id);
+        } else {
+            avatar.src = '';
+            avatar.style.opacity = '0.2';
+        }
+
         const name = document.createElement('div');
         name.className = 'groups-student-name';
-        name.textContent = String(s.username || s.email || '');
-        const notify = document.createElement('div');
-        notify.className = 'groups-student-notify';
-        const g = getSelectedGroup();
-        if (g) {
+        name.textContent = String((isEmailInviteRow ? (s.email || s.username) : s.username) || '');
+
+        const status = document.createElement('div');
+        status.className = 'groups-student-status';
+        const st = String(s.status || '').toLowerCase();
+        if (isEmailInviteRow) {
+            status.textContent = profileT('profile.groups.invites.pending', null, 'ожидает');
+        } else {
+            status.textContent = st === 'active' ? '' : 'не подтвердил';
+        }
+
+        const notifyWrap = document.createElement('div');
+        notifyWrap.className = 'groups-student-notify';
+
+        const notifyLabel = document.createElement('span');
+        notifyLabel.className = 'groups-student-notify-label';
+        notifyLabel.textContent = 'TG';
+
+        if (hideNotifyToggle) {
+            notifyLabel.style.visibility = 'hidden';
+            notifyWrap.appendChild(notifyLabel);
+            const spacer = document.createElement('div');
+            spacer.className = 'groups-student-notify-spacer';
+            notifyWrap.appendChild(spacer);
+        } else {
+            notifyWrap.appendChild(notifyLabel);
+            const startChecked = isEmailInviteRow ? false : (s.notify_teacher_on_success !== false);
             const notifyBtn = createLucideToggleButton({
-                checked: !!s.notify_teacher_on_success,
-                title: profileT('profile.groups.student_notify_toggle', null, 'Уведомлять об успешных диктантах'),
+                checked: startChecked,
+                title: profileT('profile.groups.students.notify_teacher_title', null, 'Уведомлять учителя о выполнении этим учеником'),
+                disabled: isEmailInviteRow,
             });
-            notifyBtn.addEventListener('click', async (e) => {
+            notifyBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const newVal = !s.notify_teacher_on_success;
-                try {
-                    await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
-                        method: 'PATCH', body: JSON.stringify({ notify_teacher_on_success: newVal }),
-                    });
-                    s.notify_teacher_on_success = newVal;
-                    notifyBtn.dataset.checked = newVal ? '1' : '0';
-                    notifyBtn.setAttribute('aria-pressed', newVal ? 'true' : 'false');
-                    notifyBtn.innerHTML = `<i data-lucide="${newVal ? 'circle-check-big' : 'circle'}"></i>`;
-                    if (window.lucide) window.lucide.createIcons({ root: notifyBtn });
-                } catch (err) { showError(err && err.message ? err.message : profileT('profile.common.error', null, 'Ошибка')); }
             });
-            notify.appendChild(notifyBtn);
+            notifyBtn.addEventListener('click', async () => {
+                if (isEmailInviteRow) return;
+                const g = getSelectedGroup();
+                if (!g) return;
+                const current = notifyBtn.dataset.checked === '1';
+                const next = !current;
+                try {
+                    notifyBtn.disabled = true;
+                    await groupsApiRequest(`/groups/api/group/${g.id}/students/${s.id}/notify_teacher_on_success`, {
+                        method: 'POST',
+                        body: JSON.stringify({ enabled: next }),
+                    });
+                    notifyBtn.dataset.checked = next ? '1' : '0';
+                    notifyBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+                    notifyBtn.innerHTML = `<i data-lucide="${next ? 'circle-check-big' : 'circle'}"></i>`;
+                    try {
+                        if (window.lucide) {
+                            window.lucide.createIcons({ root: notifyBtn });
+                        }
+                    } catch (e) {
+                    }
+
+                    const cache = Array.isArray(groupsUiState._studentsCache) ? groupsUiState._studentsCache : [];
+                    const idx = cache.findIndex((x) => String(x.id) === String(s.id));
+                    if (idx >= 0) {
+                        cache[idx] = Object.assign({}, cache[idx], { notify_teacher_on_success: next });
+                    }
+                    groupsUiState._studentsCache = cache;
+                    showSuccess(profileT('profile.common.saved', null, 'Сохранено'));
+                } catch (e) {
+                    showError(e && e.message ? e.message : profileT('profile.common.error', null, 'Ошибка'));
+                } finally {
+                    notifyBtn.disabled = false;
+                }
+            });
+
+            notifyWrap.appendChild(notifyBtn);
         }
+
+        row.appendChild(avatar);
         row.appendChild(name);
-        row.appendChild(notify);
+        row.appendChild(notifyWrap);
+        row.appendChild(status);
+
         row.addEventListener('click', () => {
+            if (isEmailInviteRow) {
+                groupsUiState.selectedStudentId = null;
+                renderStudentsTable(groupsUiState._studentsCache || []);
+                return;
+            }
             setSelectedStudent(s.id);
-            document.querySelectorAll('#groupsStudentsTable .groups-students-table-row').forEach(r => r.classList.remove('selected'));
-            row.classList.add('selected');
         });
+
         table.appendChild(row);
     });
 }
@@ -1036,7 +1130,6 @@ function initializeGroupsSection() {
     const createBtn = document.getElementById('groupsCreateBtn');
     const archiveBtn = document.getElementById('groupsArchiveBtn');
     const delBtn = document.getElementById('groupsDeleteBtn');
-    const filterSelect = document.getElementById('groupsFilterSelect');
     const inviteCopyBtn = document.getElementById('groupsInviteCopyBtn');
     const studentsRefreshBtn = document.getElementById('groupsStudentsRefreshBtn');
     const studentsInviteEmailBtn = document.getElementById('groupsStudentsInviteEmailBtn');
@@ -1063,15 +1156,23 @@ function initializeGroupsSection() {
 
     if (!groupsTable || !createBtn || !archiveBtn || !delBtn || !modal || !modalClose || !modalSave) return;
 
-    if (filterSelect) {
-        try {
-            const saved = localStorage.getItem('groups_filter_mode');
-            if (saved) groupsUiState.filterMode = saved;
-        } catch (e) { }
-        filterSelect.value = getGroupsFilterMode();
-        filterSelect.addEventListener('change', () => {
-            groupsUiState.filterMode = String(filterSelect.value || 'active');
-            try { localStorage.setItem('groups_filter_mode', getGroupsFilterMode()); } catch (e) { }
+    // Чекбокс "лише активні" вместо select
+    const filterBtn = document.getElementById('groupsFilterActiveBtn');
+    if (filterBtn) {
+        groupsUiState.filterMode = 'active';
+        filterBtn.dataset.checked = '1';
+        filterBtn.setAttribute('aria-pressed', 'true');
+        filterBtn.innerHTML = '<i data-lucide="circle-check-big"></i>';
+        try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+
+        filterBtn.addEventListener('click', () => {
+            const isActive = filterBtn.dataset.checked === '1';
+            const newChecked = isActive ? '0' : '1';
+            filterBtn.dataset.checked = newChecked;
+            filterBtn.setAttribute('aria-pressed', newChecked === '1' ? 'true' : 'false');
+            filterBtn.innerHTML = `<i data-lucide="${newChecked === '1' ? 'circle-check-big' : 'circle'}"></i>`;
+            try { if (window.lucide) window.lucide.createIcons({ root: filterBtn }); } catch (e) { }
+            groupsUiState.filterMode = newChecked === '1' ? 'active' : 'all';
             groupsUiState.selectedGroupId = null;
             renderGroupsTable();
             renderGroupsDetails();
