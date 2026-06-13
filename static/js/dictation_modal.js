@@ -370,10 +370,130 @@
   const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута
   const INACTIVITY_TIMEOUT_RECORDING = 10 * 60 * 1000; // 10 минут
 
+  function getExerciseMode() {
+    try {
+      const mode = window.audioExerciseMode || '';
+      if (mode === 'record' || mode === 'no-record' || mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+        return mode;
+      }
+    } catch (e) {
+    }
+    return 'record';
+  }
+
+  function applyExerciseMode(session) {
+    try {
+      const mode = getExerciseMode();
+      const textBlock = document.querySelector('#dictationModal .result-panel');
+      const audioPanel = document.querySelector('#dictationModal .audio-user-panel');
+      const input = document.getElementById('userInput');
+      const correctAnswer = document.getElementById('correctAnswer');
+      const checkBtn = document.getElementById('checkBtn');
+      const checkGroup = document.querySelector('#dictationModal .check-group');
+
+      if (mode === 'record') {
+        // p1: стандартный режим — аудио по необходимости, текст доступен
+        if (textBlock) textBlock.style.display = '';
+        if (checkGroup) checkGroup.style.display = '';
+        updateAudioUserPanelVisibilityFromSession(session);
+        if (input) {
+          input.setAttribute('contenteditable', 'true');
+          input.textContent = '';
+        }
+        if (correctAnswer) {
+          correctAnswer.textContent = '';
+          correctAnswer.style.display = 'none';
+        }
+        setCheckButtonState('ready');
+        return;
+      }
+
+      if (mode === 'no-record') {
+        // p2: аудио скрыто, только текст
+        if (audioPanel) {
+          audioPanel.style.visibility = 'hidden';
+          audioPanel.style.pointerEvents = 'none';
+        }
+        if (textBlock) textBlock.style.display = '';
+        if (checkGroup) checkGroup.style.display = '';
+        if (input) {
+          input.setAttribute('contenteditable', 'true');
+          input.textContent = '';
+        }
+        if (correctAnswer) {
+          correctAnswer.textContent = '';
+          correctAnswer.style.display = 'none';
+        }
+        setCheckButtonState('ready');
+        return;
+      }
+
+      if (mode === 'audio-only-no-hint') {
+        // p3: только аудио, без подсказки — текст скрыт
+        if (audioPanel) {
+          audioPanel.style.visibility = 'visible';
+          audioPanel.style.pointerEvents = 'auto';
+        }
+        if (textBlock) textBlock.style.display = 'none';
+        if (input) {
+          input.setAttribute('contenteditable', 'false');
+          input.textContent = '';
+        }
+        if (correctAnswer) {
+          correctAnswer.textContent = '';
+          correctAnswer.style.display = 'none';
+        }
+        return;
+      }
+
+      if (mode === 'audio-only-hint') {
+        // p4: только аудио, с подсказкой — текст показан, но кнопка проверки скрыта
+        if (audioPanel) {
+          audioPanel.style.visibility = 'visible';
+          audioPanel.style.pointerEvents = 'auto';
+        }
+        if (textBlock) textBlock.style.display = '';
+        if (checkGroup) checkGroup.style.display = 'none';
+
+        const view = getCurrentSentenceViewFromSession(session);
+        const originalText = String(view && view.text_original != null ? view.text_original : (view && view.text != null ? view.text : ''));
+        const translationText = String(view && view.text_translation != null ? view.text_translation : (view && view.translation != null ? view.translation : ''));
+
+        if (input) {
+          input.setAttribute('contenteditable', 'false');
+          input.textContent = originalText;
+        }
+        if (correctAnswer) {
+          correctAnswer.textContent = translationText;
+          correctAnswer.style.display = 'block';
+          try {
+            correctAnswer.style.color = 'var(--color-button-text-gray)';
+          } catch (e) {
+          }
+        }
+        return;
+      }
+    } catch (e) {
+    }
+  }
+
   function updateAudioUserPanelVisibilityFromSession(session) {
     try {
       const panel = document.querySelector('#dictationModal .audio-user-panel');
       if (!panel) return;
+      const mode = getExerciseMode();
+      // В режимах p3 и p4 аудио-панель всегда видна
+      if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+        panel.style.visibility = 'visible';
+        panel.style.pointerEvents = 'auto';
+        return;
+      }
+      // В режиме p2 аудио-панель всегда скрыта
+      if (mode === 'no-record') {
+        panel.style.visibility = 'hidden';
+        panel.style.pointerEvents = 'none';
+        return;
+      }
       const st = getCurrentSentenceStateFromSession(session);
       if (!st) {
         panel.style.visibility = 'hidden';
@@ -625,6 +745,11 @@
         } catch (e0c4) {
         }
 
+        try {
+          applyExerciseMode(session);
+        } catch (e0c5) {
+        }
+
         return;
       }
     } catch (e0completed) {
@@ -714,6 +839,11 @@
       updateAudioUserPanelVisibilityFromSession(session);
     } catch (e5) {
     }
+
+    try {
+      applyExerciseMode(session);
+    } catch (e6) {
+    }
   }
 
   try {
@@ -785,6 +915,13 @@
         try {
           if (!state.dictationStarted) return;
         } catch (e0) {
+        }
+
+        // В режимах p3 и p4 проверка текста не используется
+        try {
+          const mode = getExerciseMode();
+          if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
+        } catch (e0mode) {
         }
 
         const session = window.__dictationModalActiveSession;
@@ -1800,7 +1937,9 @@
     const corrected = Number(st && st.number_of_corrected) || 0;
     const audioDone = Number(st && st.number_of_audio) || 0;
     const requiresAudio = getRequiredAudioRepeatsValue();
-    const textOk = perfect >= 1 || corrected > 0;
+    const mode = getExerciseMode();
+    // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
+    const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
     return { textOk, audioOk, requiresAudio };
   }
@@ -1919,6 +2058,7 @@
     if (!st) st = getCurrentSentenceStateFromSession(session);
     if (!st) return;
 
+    const mode = getExerciseMode();
     const requiredHalf = getRequiredPassedStarHalfValue();
     const perfect = Number(st.number_of_perfect) || 0;
     const corrected = Number(st.number_of_corrected) || 0;
@@ -1930,7 +2070,10 @@
     try {
       const starWrap = document.getElementById('tablo_result_star');
       if (starWrap) {
-        if (perfect >= 1) {
+        // В режимах p3 и p4 текст не проверяется — показываем звезду как выполненную
+        if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+          _setIcon(starWrap, 'star', '--color-button-mint', 1);
+        } else if (perfect >= 1) {
           _setIcon(starWrap, 'star', '--color-button-mint', 1);
         } else if (corrected > 0) {
           _setIcon(starWrap, 'star-half', '--color-button-lightgreen', 1);
@@ -1975,18 +2118,21 @@
 
     // Обновляем состояние кнопки "Проверить-повторить" при навигации
     try {
-      const lastAllCorrect = !!(st && st._textAllCorrect);
-      if (perfect >= 1) {
-        setCheckButtonState('star');
-      } else if (corrected > 0 && lastAllCorrect) {
-        setCheckButtonState('half');
-      } else if (corrected > 0 && !lastAllCorrect) {
-        // corrected > 0, но текст сброшен (повтор) — показываем ready
-        setCheckButtonState('ready');
-      } else if (textCoins > 0 && lastAllCorrect) {
-        setCheckButtonState('repeat_activity');
-      } else {
-        setCheckButtonState('ready');
+      // В режимах p3 и p4 кнопка проверки скрыта, не обновляем её состояние
+      if (mode !== 'audio-only-no-hint' && mode !== 'audio-only-hint') {
+        const lastAllCorrect = !!(st && st._textAllCorrect);
+        if (perfect >= 1) {
+          setCheckButtonState('star');
+        } else if (corrected > 0 && lastAllCorrect) {
+          setCheckButtonState('half');
+        } else if (corrected > 0 && !lastAllCorrect) {
+          // corrected > 0, но текст сброшен (повтор) — показываем ready
+          setCheckButtonState('ready');
+        } else if (textCoins > 0 && lastAllCorrect) {
+          setCheckButtonState('repeat_activity');
+        } else {
+          setCheckButtonState('ready');
+        }
       }
     } catch (e) {
     }
@@ -2326,8 +2472,15 @@
           const audio = parsed && parsed.audio && typeof parsed.audio === 'object' ? parsed.audio : {};
           if (audio.start != null && String(audio.start).trim()) {
             window.playSequenceStart = String(audio.start).trim();
-            return;
           }
+          // Загружаем режим упражнения из настроек пользователя
+          if (audio.exercise_mode != null && String(audio.exercise_mode).trim()) {
+            const mode = String(audio.exercise_mode).trim();
+            if (mode === 'record' || mode === 'no-record' || mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+              window.audioExerciseMode = mode;
+            }
+          }
+          return;
         }
       }
     } catch (e) {
@@ -3601,6 +3754,11 @@
     }
 
     try {
+      applyExerciseMode(session);
+    } catch (e2b) {
+    }
+
+    try {
       if (state.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
         try {
           if (state._skipNavigatorFocusOnce) {
@@ -3609,7 +3767,17 @@
           }
         } catch (e0x) {
         }
-        focusUserInput();
+
+        // В режимах p3 и p4 фокус на кнопку записи аудио
+        const mode = getExerciseMode();
+        if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') {
+          const rb = document.getElementById('recordButton');
+          if (rb && typeof rb.focus === 'function') {
+            rb.focus();
+          }
+        } else {
+          focusUserInput();
+        }
       }
     } catch (e3) {
     }
@@ -3627,6 +3795,9 @@
           if (!e) return;
           if (e.key !== 'Enter') return;
           if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+          // В режимах p3 и p4 Enter не запускает проверку текста
+          const mode = getExerciseMode();
+          if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.checkText === 'function') window.checkText();
@@ -3928,6 +4099,14 @@
         try {
           window.audioExerciseMode = getSelectedExerciseMode();
         } catch (e2) {
+        }
+        // Применяем режим упражнения к текущему UI
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            applyExerciseMode(session);
+          }
+        } catch (e3) {
         }
       };
 
