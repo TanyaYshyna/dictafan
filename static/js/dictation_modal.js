@@ -1240,7 +1240,8 @@
         }
 
         try {
-          updateSentenceTabloFromSession(session);
+          // Передаём ключ предложения напрямую, чтобы tablo обновилось для правильного предложения
+          updateSentenceTabloFromSession(session, key);
           updateTaskProgressFromSession(session);
         } catch (e10b) {
         }
@@ -2036,14 +2037,20 @@
     }
   }
 
-  function updateSentenceTabloFromSession(session) {
+  function updateSentenceTabloFromSession(session, optKey) {
     let st = null;
-    try {
-      const view = getCurrentSentenceViewFromSession(session);
-      if (view && view.key != null && session && typeof session.getState === 'function') {
-        st = session.getState(String(view.key));
+    // Если передан конкретный ключ — используем его, иначе получаем текущее предложение
+    if (optKey != null && session && typeof session.getState === 'function') {
+      st = session.getState(String(optKey));
+    }
+    if (!st) {
+      try {
+        const view = getCurrentSentenceViewFromSession(session);
+        if (view && view.key != null && session && typeof session.getState === 'function') {
+          st = session.getState(String(view.key));
+        }
+      } catch (e0s) {
       }
-    } catch (e0s) {
     }
     if (!st) st = getCurrentSentenceStateFromSession(session);
     if (!st) return;
@@ -2077,9 +2084,8 @@
     try {
       const micWrap = document.getElementById('tablo_result_mic');
       if (micWrap) {
-        const requiresAudio = getRequiredAudioRepeatsValue();
-        const micOk = requiresAudio <= 0 || audio >= requiresAudio;
-        if (micOk) {
+        // Если audio > 0 — микрофон выполнен, иначе — не выполнен
+        if (audio > 0) {
           _setIcon(micWrap, 'mic', '--color-button-purple', 1);
         } else {
           _setIcon(micWrap, 'mic-off', null, 0.25);
@@ -2248,7 +2254,7 @@
       } catch (eRow) {
       }
 
-      updateSentenceTabloFromSession(session);
+      updateSentenceTabloFromSession(session, curKey);
       updateTaskProgressFromSession(session);
       updateNextButtonVisibilityFromSession(session);
 
@@ -2256,11 +2262,11 @@
         if (mode === 'audio') {
           const rb = document.getElementById('recordButton');
           if (rb) {
-            rb.disabled = true;
-            rb.classList.add('disabled');
+            rb.disabled = false;
+            rb.classList.remove('disabled');
             const wrap = rb.querySelector('#recordStateIcon') || rb;
             try {
-              wrap.innerHTML = '<i data-lucide="mic-off"></i>';
+              wrap.innerHTML = '<i data-lucide="mic"></i>';
             } catch (e0) {
             }
             if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -2692,7 +2698,7 @@
             } catch (eRow) {
             }
 
-            updateSentenceTabloFromSession(session);
+            updateSentenceTabloFromSession(session, view.key);
             updateTaskProgressFromSession(session);
             updateNextButtonVisibilityFromSession(session);
 
