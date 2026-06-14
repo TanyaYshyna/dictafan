@@ -1126,6 +1126,12 @@
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
 
+            // Увеличиваем счётчик активностей при каждом нажатии Enter (проверка текста)
+            try {
+              st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
+            } catch (e0acAct) {
+            }
+
             // Обновляем строку в таблице стартового модального окна
             try {
               updateStartModalSentenceRow(session, key);
@@ -1155,10 +1161,6 @@
                   reward = getPricingValue('half_star_reward', 2);
                 } else {
                   reward = getPricingValue('text_activity_reward', 1);
-                  try {
-                    st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
-                  } catch (e0ac0) {
-                  }
                 }
 
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
@@ -2096,10 +2098,24 @@
 
     try {
       const wrap = document.getElementById('tablo_result_text_coins');
-      _renderCoins(wrap, textCoins, '--color-button-lightgreen');
+      if (wrap) {
+        // Показываем кружок с цифрой (количество активностей)
+        const n = Math.max(0, Number(textCoins) || 0);
+        if (n > 0) {
+          wrap.innerHTML = '<i data-lucide="circle"></i>' + String(n);
+        } else {
+          wrap.innerHTML = '';
+        }
+        wrap.style.color = 'var(--color-button-lightgreen)';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
       const btn = document.getElementById('btn_coin_exchange_text');
       const cost = getPricingValue('half_star_purchase_cost', 3);
-      if (btn) btn.style.display = textCoins >= cost ? 'inline-flex' : 'none';
+      // Показываем кнопку покупки, если активностей >= cost и ещё не покупали
+      const alreadyBought = !!(st && st.text_exchange_half_star);
+      if (btn) btn.style.display = (textCoins >= cost && !alreadyBought) ? 'inline-flex' : 'none';
     } catch (e) {
     }
 
