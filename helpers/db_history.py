@@ -76,9 +76,8 @@ def _upsert_history_by_day(
     perfect_delta: int = 0,
     corrected_delta: int = 0,
     audio_delta: int = 0,
-    money_delta: int = 0,
     mistake_delta: int = 0,
-    simbols_delta: int = 0,
+    monenumber_of_characters_delta: int = 0,
     lead_time_delta: int = 0,
     successes_delta: int = 0,
 ) -> None:
@@ -96,23 +95,21 @@ def _upsert_history_by_day(
             perfect_count,
             corrected_count,
             audio_count,
-            money_count,
+            monenumber_of_characters,
             mistake_count,
-            simbols,
             lead_time,
             successes,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
             corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
             audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
-            money_count = COALESCE(history_by_day.money_count, 0) + EXCLUDED.money_count,
+            monenumber_of_characters = COALESCE(history_by_day.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
             mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
-            simbols = COALESCE(history_by_day.simbols, 0) + EXCLUDED.simbols,
             lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
             successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
@@ -129,9 +126,8 @@ def _upsert_history_by_day(
             int(perfect_delta or 0),
             int(corrected_delta or 0),
             int(audio_delta or 0),
-            int(money_delta or 0),
             int(mistake_delta or 0),
-            int(simbols_delta or 0),
+            int(monenumber_of_characters_delta or 0),
             int(lead_time_delta or 0),
             int(successes_delta or 0),
         ),
@@ -441,7 +437,7 @@ def add_activity_bulk(
     audio_count=0,
     money_count=0,
     mistake_count=0,
-    simbols=0,
+    monenumber_of_characters=0,
     lead_time_ms=0,
     date_override=None,
     dictation_language_code=None,
@@ -509,9 +505,9 @@ def add_activity_bulk(
     except Exception:
         mistake_count_int = 0
     try:
-        simbols_int = int(simbols or 0)
+        monenumber_of_characters_int = int(monenumber_of_characters or 0)
     except Exception:
-        simbols_int = 0
+        monenumber_of_characters_int = 0
 
     if perfect_count_int < 0:
         perfect_count_int = 0
@@ -525,8 +521,8 @@ def add_activity_bulk(
         money_count_int = 0
     if mistake_count_int < 0:
         mistake_count_int = 0
-    if simbols_int < 0:
-        simbols_int = 0
+    if monenumber_of_characters_int < 0:
+        monenumber_of_characters_int = 0
 
     selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
 
@@ -576,9 +572,8 @@ def add_activity_bulk(
                     perfect_delta=int(perfect_count_int or 0),
                     corrected_delta=int(corrected_count_int or 0),
                     audio_delta=int(audio_count_int or 0),
-                    money_delta=int(money_count_int or 0),
                     mistake_delta=int(mistake_count_int or 0),
-                    simbols_delta=int(simbols_int or 0),
+                    monenumber_of_characters_delta=int(monenumber_of_characters_int or 0),
                     lead_time_delta=int(lead_time_ms_int or 0),
                     successes_delta=0,
                 )

@@ -38,6 +38,38 @@
 
   // --- Вспомогательные функции, перенесённые из script_dictation.js ---
 
+  /** Получить язык оригинала диктанта из текущего URL */
+  function _getDictationLanguageCode() {
+    try {
+      const url = state.currentUrl;
+      if (!url) return null;
+      const parsed = parseDictationHref(url);
+      return parsed ? parsed.langOriginal : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Получить выбранные позиции предложений из активной сессии */
+  function _getSelectedSentencePositions(session) {
+    try {
+      if (!session) return null;
+      const activeKeys = session.getActiveKeys ? session.getActiveKeys() : [];
+      const content = session.content;
+      if (!content || typeof content.getSentenceCore !== 'function') return null;
+      const positions = [];
+      for (const key of activeKeys) {
+        const core = content.getSentenceCore(key);
+        if (core && core.position != null) {
+          positions.push(Number(core.position));
+        }
+      }
+      return positions.length > 0 ? positions : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function getCurrentDictationIdForDb() {
     try {
       const session = window.__dictationModalActiveSession;
@@ -639,6 +671,73 @@
     } catch (e6) {
     }
 
+    // Отправляем success в outbox_batcher (завершение диктанта)
+    try {
+      const ob = window.OutboxBatcher;
+      if (ob && typeof ob.enqueueSuccessUrgent === 'function') {
+        const session = window.__dictationModalActiveSession;
+        if (session) {
+          const allKeys = session.content ? session.content.getAllKeys() : [];
+          let totalPerfect = 0;
+          let totalCorrected = 0;
+          let totalAudio = 0;
+          let totalErrors = 0;
+          let totalAttempts = 0;
+          const sentencesData = [];
+
+          for (const key of allKeys) {
+            const st = session.getState(key);
+            const p = Number(st.number_of_perfect) || 0;
+            const c = Number(st.number_of_corrected) || 0;
+            const a = Number(st.number_of_audio) || 0;
+            const er = Number(st.mistake_count) || 0;
+            const at = Number(st.attempts_total) || 0;
+
+            totalPerfect += p;
+            totalCorrected += c;
+            totalAudio += a;
+            totalErrors += er;
+            totalAttempts += at;
+
+            if (p > 0 || c > 0 || a > 0) {
+              sentencesData.push({
+                sentence_key: key,
+                perfect_count: p,
+                corrected_count: c,
+                audio_count: a,
+                attempts_total: at,
+                mistake_count: er,
+                selection_state: st.selection_state || 'unchecked',
+              });
+            }
+          }
+
+          const totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+          const nowMs = Date.now();
+          const tzOffsetMin = -new Date().getTimezoneOffset();
+          const dictationId = getCurrentDictationIdForDb();
+          const dictationLanguageCode = _getDictationLanguageCode();
+          const selectedSentencePositions = _getSelectedSentencePositions(session);
+
+          ob.enqueueSuccessUrgent({
+            dictation_id: dictationId,
+            perfect_count: totalPerfect,
+            corrected_count: totalCorrected,
+            audio_count: totalAudio,
+            attempts_total: totalAttempts,
+            mistake_count: totalErrors,
+            time_ms: totalTimeMs,
+            dictation_language_code: dictationLanguageCode,
+            sentences_data: sentencesData,
+            completed_at_ms: nowMs,
+            completed_at_tz_offset_min: tzOffsetMin,
+            selected_sentence_positions: selectedSentencePositions,
+          });
+        }
+      }
+    } catch (e7) {
+    }
+
   }
 
   function setupCompletionModalHandlers() {
@@ -1201,6 +1300,29 @@
                     playUiSound('coins_plus_audio');
                   } catch (e0sa) {
                   }
+
+                  // Отправляем активность в outbox_batcher (только perfect/corrected — значимые для статистики)
+                  try {
+                    const ob = window.OutboxBatcher;
+                    if (ob && typeof ob.enqueueActivity === 'function') {
+                      const dictationId = getCurrentDictationIdForDb();
+                      const dictationLanguageCode = _getDictationLanguageCode();
+                      const selectedSentencePositions = _getSelectedSentencePositions(session);
+                      const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : null);
+                      if (typeActivity) {
+                        ob.enqueueActivity({
+                          type: typeActivity,
+                          count: 1,
+                          leadTimeMs: 0,
+                          dictationId,
+                          date: null,
+                          dictationLanguageCode,
+                          selectedSentencePositions,
+                        });
+                      }
+                    }
+                  } catch (e0ob) {
+                  }
                 }
 
                 if (nextOutcome && nextOutcome !== prevOutcome) {
@@ -1284,10 +1406,11 @@
 
         try {
           // Фокус после проверки (новый алгоритм):
-          // 1) если текст исправлен (allCorrect), но нет звезды/полузвезды (textOk=false) — фокус на checkBtn (кнопка повтора)
-          // 2) если есть полузвезда (textOk, corrected>0, perfect<1) — фокус на checkBtn (кнопка повтора в режиме half)
-          // 3) если есть звезда (textOk, perfect>=1) и требуется микрофон, но он ещё не выполнен — фокус на запись.
-          // 4) если текст + микрофон выполнены — фокус на "Далее" (resultNextBtn)
+          // 1) если есть ошибки (!allCorrect) — фокус на userInput (поле ввода), чтобы сразу исправить
+          // 2) если текст исправлен (allCorrect), но нет звезды/полузвезды (textOk=false) — фокус на checkBtn (кнопка повтора)
+          // 3) если есть полузвезда (textOk, corrected>0, perfect<1) — фокус на checkBtn (кнопка повтора в режиме half)
+          // 4) если есть звезда (textOk, perfect>=1) и требуется микрофон, но он ещё не выполнен — фокус на запись.
+          // 5) если текст + микрофон выполнены — фокус на "Далее" (resultNextBtn)
           {
             const st = getCurrentSentenceStateFromSession(session);
             const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
@@ -1295,8 +1418,18 @@
             const perfect = Number(st && st.number_of_perfect) || 0;
             const corrected = Number(st && st.number_of_corrected) || 0;
 
-            // Случай: текст исправлен, но звезды/полузвезды нет — фокус на checkBtn (кнопка повтора)
-            if (allCorrect && !textOk) {
+            // Случай: есть ошибки — фокус на поле ввода, чтобы пользователь мог сразу исправить
+            if (!allCorrect) {
+              const input = document.getElementById('userInput');
+              if (input && typeof input.focus === 'function') {
+                try {
+                  state._skipNavigatorFocusOnce = true;
+                } catch (e0skip) {
+                }
+                input.focus();
+              }
+            } else if (allCorrect && !textOk) {
+              // Случай: текст исправлен, но звезды/полузвезды нет — фокус на checkBtn (кнопка повтора)
               const checkBtn = document.getElementById('checkBtn');
               if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
                 try {
@@ -2831,6 +2964,25 @@
                 st.money_count = (Number(st.money_count) || 0) + add;
                 playUiSound('coins_plus_audio');
               } catch (e0s) {
+              }
+              // Отправляем аудио-активность в outbox_batcher
+              try {
+                const ob = window.OutboxBatcher;
+                if (ob && typeof ob.enqueueActivity === 'function') {
+                  const dictationId = getCurrentDictationIdForDb();
+                  const dictationLanguageCode = _getDictationLanguageCode();
+                  const selectedSentencePositions = _getSelectedSentencePositions(session);
+                  ob.enqueueActivity({
+                    type: 'audio',
+                    count: 1,
+                    leadTimeMs: 0,
+                    dictationId,
+                    date: null,
+                    dictationLanguageCode,
+                    selectedSentencePositions,
+                  });
+                }
+              } catch (e0ob) {
               }
             } else if (pct >= 50) {
               const add = getPricingValue('audio_activity_reward', 1);

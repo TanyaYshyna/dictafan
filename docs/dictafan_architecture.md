@@ -827,25 +827,142 @@ Many-to-many: ученик может быть в нескольких груп�
 
 Назначение: дневная статистика активности и выполнения планов.
 
-- `id`
-- `user_id`
+**Поля таблицы:**
+
+- `id` — SERIAL PRIMARY KEY
+- `user_id` — FK → users(id)
 - `teacher_id` — кто назначил план:
   - если назначил учитель: `teacher_id = groups.teacher_id`
   - если пользователь назначил сам себе: `teacher_id = user_id`
-- `dictation_language_code`
-- `exercise_id`
+- `dictation_language_code` — код языка диктанта
+- `dictation_id` — FK → dictations(id)
+- `positions` — `INTEGER[]` — выбранные позиции предложений (пустой массив = весь диктант)
 - `date_plan` — дата задания/плана, или дата старта (если прохождение без плана)
 - `date_fact` — дата фактической активности/завершения (в таймзоне пользователя)
-- `perfect_count`
-- `corrected_count`
-- `audio_count`
-- `lead_time`
-- `successes` — число успешных завершений за день (все звёзды + все микрофоны)
+- `perfect_count` — количество звёзд (perfect) за день
+- `corrected_count` — количество полузвёзд (corrected) за день
+- `audio_count` — количество микрофонов (audio) за день
+- `lead_time` — суммарное время выполнения в ms
+- `mistake_count` — количество ошибок за день
+- `monenumber_of_characters` — количество набранных символов за день
+- `simbols` — (устаревшее, дубль `monenumber_of_characters`)
+- `successes` — 1 в день, когда диктант полностью завершён (позволяет собрать историю успеха по виду задания)
 - `created_at`, `updated_at` (UTC)
 
-Уникальность строки истории: `user_id`, `teacher_id`, `exercise_id`, `date_plan`, `date_fact`.
+Уникальность строки истории: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`.
 
 Правило: если пользователь в один `date_fact` закрывает упражнение за разные `date_plan` (например, «за вчера» и «за сегодня»), это две отдельные строки истории.
+
+**Как данные попадают в `history_by_day` (цепочка):**
+
+Данные попадают в таблицу через два серверных endpoint'а, которые вызываются клиентом:
+
+### Endpoint A: `POST /api/statistics/activity` (активность)
+
+Назначение: сохранить факт получения звезды/полузвезды/микрофона.
+
+**Клиент → Сервер:**
+- Клиент вызывает `OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, dictationId, date, dictationLanguageCode, selectedSentencePositions })`
+- `OutboxBatcher` накапливает данные в IndexedDB (`activity_outbox`) и отправляет батчем:
+  - **deferred** (не срочно): по таймеру `BATCH_INTERVAL_MS` (константа в `outbox_batcher.js`, по умолчанию 600000 мс = 10 минут)
+  - **urgent** (срочно, при завершении диктанта): отправляется немедленно через `OutboxBatcher.enqueueActivityUrgent()`
+- `fetch POST /api/statistics/activity` с payload:
+  ```json
+  {
+    "dictation_id": 123,
+    "date": "20260614",
+    "perfect_count": 1,
+    "corrected_count": 0,
+    "audio_count": 0,
+    "lead_time_ms": 45000,
+    "dictation_language_code": "en",
+    "selected_sentence_positions": [1,2,3]
+  }
+  ```
+
+**Сервер (`routes/statistics.py`):**
+- `POST /api/statistics/activity` → функция `save_activity()`
+- Определяет режим: `is_bulk` (если есть `perfect_count`/`corrected_count`/`audio_count`) или одиночный (`type_activity`)
+- Вызывает `add_activity_bulk()` или `add_activity()` из `helpers/db_history.py`
+- Каждая из этих функций:
+  1. Пишет/обновляет запись в `history_activity` (агрегация по `user_id, dictation_id, date, selected_sentence_positions`)
+  2. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` с суммированием счётчиков
+
+### Endpoint B: `POST /api/statistics/success` (завершение диктанта)
+
+Назначение: сохранить факт полного завершения диктанта (медаль).
+
+**Клиент → Сервер:**
+- Клиент вызывает `OutboxBatcher.enqueueSuccessUrgent(payload)` при завершении диктанта
+- Отправляется немедленно (urgent):
+  ```json
+  {
+    "dictation_id": 123,
+    "perfect_count": 10,
+    "corrected_count": 2,
+    "audio_count": 8,
+    "attempts_total": 20,
+    "mistake_count": 3,
+    "time_ms": 300000,
+    "dictation_language_code": "en",
+    "sentences_data": [...],
+    "completed_at_ms": 1718389987000,
+    "completed_at_tz_offset_min": 180
+  }
+  ```
+
+**Сервер (`routes/statistics.py`):**
+- `POST /api/statistics/success` → функция `save_success()`
+- Вызывает `add_success()` из `helpers/db_history.py`
+- `add_success()`:
+  1. Создаёт запись в `history_successes` (каждое завершение — отдельная строка)
+  2. Вызывает `_upsert_history_by_day()` с `successes_delta=1` и суммированием остальных счётчиков
+
+### Внутренняя функция `_upsert_history_by_day()`
+
+Находится в `helpers/db_history.py`. Это UPSERT:
+```sql
+INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, perfect_count, corrected_count, audio_count, money_count, mistake_count, simbols, lead_time, successes, ...)
+VALUES (...)
+ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
+DO UPDATE SET
+    perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
+    corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
+    audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
+    money_count = COALESCE(history_by_day.money_count, 0) + EXCLUDED.money_count,
+    mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
+    simbols = COALESCE(history_by_day.simbols, 0) + EXCLUDED.simbols,
+    lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
+    successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+    ...
+```
+
+### Клиентский модуль `OutboxBatcher` (`static/js/outbox_batcher.js`)
+
+**Два типа очередей в IndexedDB:**
+- `activity_outbox` — накопленные активности (ключ: `${userId}:${dateId}:${dictationId}:${selPosStr}`)
+- `success_outbox` — накопленные завершения (ключ: `${userId}:${rawId}:${dateId}`)
+
+**Два режима отправки:**
+- **deferred** (не срочно): отправляется по таймеру `BATCH_INTERVAL_MS` (константа, по умолчанию 600000 мс = 10 минут) или при накоплении `MAX_BATCH_SIZE` (20) записей
+- **urgent** (срочно): отправляется немедленно, при недоступности сети падает в deferred outbox
+
+**Триггеры отправки:**
+- Таймер (каждые `BATCH_INTERVAL_MS`)
+- Достижение лимита `MAX_BATCH_SIZE`
+- Событие `window.online` (появилась сеть)
+- Явный вызов `OutboxBatcher.flushAll()` (при закрытии модалки)
+- Сигнал от Service Worker (`syncOutbox`)
+
+**Константы (для отладки):**
+- `BATCH_INTERVAL_MS = 600000` (10 минут; для отладки можно поставить 300000 = 5 минут)
+- `MAX_BATCH_SIZE = 20`
+
+### Текущее состояние (известные проблемы)
+
+1. **OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccessUrgent()` нигде не вызываются. Данные не попадают в `history_by_day`.
+2. **Не хватает вызовов** при начислении звезды/полузвезды/активности — нужно добавить `OutboxBatcher.enqueueActivity()` в момент начисления награды.
+3. **Не хватает вызова** `OutboxBatcher.enqueueSuccessUrgent()` при завершении диктанта — нужно добавить в `showCompletionModal()`.
 
 ## Механизм наполнения группы (UX)
 

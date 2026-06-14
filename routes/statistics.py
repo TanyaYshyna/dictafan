@@ -1121,7 +1121,7 @@ def save_activity():
 
     Поддерживает:
     - legacy: {type_activity, number, lead_time_ms}
-    - bulk: {perfect_count, corrected_count, audio_count, money_count, mistake_count, simbols, lead_time_ms}
+    - bulk: {perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, lead_time_ms}
     """
     try:
         current_email = get_jwt_identity()
@@ -1145,7 +1145,7 @@ def save_activity():
         audio_count = data.get('audio_count')
         money_count = data.get('money_count')
         mistake_count = data.get('mistake_count')
-        simbols = data.get('simbols')
+        monenumber_of_characters = data.get('monenumber_of_characters')
         
         if not dictation_id:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указан dictation_id')
@@ -1157,7 +1157,7 @@ def save_activity():
             or (audio_count is not None)
             or (money_count is not None)
             or (mistake_count is not None)
-            or (simbols is not None)
+            or (monenumber_of_characters is not None)
         )
 
         if not is_bulk:
@@ -1188,7 +1188,7 @@ def save_activity():
                 audio_count=audio_count or 0,
                 money_count=money_count or 0,
                 mistake_count=mistake_count or 0,
-                simbols=simbols or 0,
+                monenumber_of_characters=monenumber_of_characters or 0,
                 lead_time_ms=lead_time_ms or 0,
                 date_override=activity_date,
                 dictation_language_code=dictation_language_code,
