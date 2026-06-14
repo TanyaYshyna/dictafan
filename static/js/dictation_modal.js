@@ -505,6 +505,18 @@
     const completionModal = document.getElementById('completionModal');
     if (!completionModal) return;
 
+    // Сохраняем время текущего предложения перед показом completion modal,
+    // т.к. showCompletionModal может быть вызвана из updateTaskProgressFromSession
+    // (через checkText или onRecognitionComplete) до того, как пользователь нажмёт "Далее",
+    // и _saveSentenceTime не будет вызвана для последнего предложения.
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && typeof _saveSentenceTime === 'function') {
+        _saveSentenceTime(session);
+      }
+    } catch (e0save) {
+    }
+
     try {
       clearInactivityTimer();
     } catch (e0) {
