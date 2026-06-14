@@ -674,10 +674,55 @@ class ProgressPanel {
             this.elements.modalMoney.textContent = `+${earned} / -${spent}`;
         }
 
+        // Обновляем иконку микрофона в панели прогресса
+        // Если stats.audio > 0 — mic, иначе mic-off
+        this._updateAudioIcon();
+
         // Обновляем таймер
         this.updateTimer();
         // обновляем индикаторы несохраненного прогресса
         this.updateUnsavedIndicators();
+    }
+
+    /**
+     * Обновить иконку микрофона в панели прогресса
+     * Если выполненных аудио > 0 — mic, иначе mic-off
+     */
+    _updateAudioIcon() {
+        try {
+            const audioCount = Number(this.stats.audio) || 0;
+            const iconName = audioCount > 0 ? 'mic' : 'mic-off';
+
+            // Inline кнопка
+            const btnAudio = document.getElementById('btn-count-audio');
+            if (btnAudio) {
+                const icon = btnAudio.querySelector('i[data-lucide]');
+                if (icon) {
+                    const currentIcon = icon.getAttribute('data-lucide');
+                    if (currentIcon !== iconName) {
+                        icon.setAttribute('data-lucide', iconName);
+                    }
+                }
+            }
+
+            // Модальная кнопка
+            const btnModalAudio = document.getElementById('btn-modal-count-audio');
+            if (btnModalAudio) {
+                const icon = btnModalAudio.querySelector('i[data-lucide]');
+                if (icon) {
+                    const currentIcon = icon.getAttribute('data-lucide');
+                    if (currentIcon !== iconName) {
+                        icon.setAttribute('data-lucide', iconName);
+                    }
+                }
+            }
+
+            // Перерисовываем lucide-иконки
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        } catch (e) {
+        }
     }
 
     /**

@@ -95,7 +95,8 @@
         rb.disabled = dis;
         rb.classList.toggle('disabled', dis);
         if (!dis && !this._isAudioComplete) {
-          this._setRecordButtonIcon('mic');
+          // Кнопка активна, но аудио ещё не выполнено — показываем зачёркнутый микрофон
+          this._setRecordButtonIcon('mic-off');
         }
       } catch (e) {
       }
@@ -163,7 +164,8 @@
         this._updateRecordingIndicator(false);
         this._setRecordButtonRecording(false);
         if (!this._isAudioComplete) {
-          this._setRecordButtonIcon('mic');
+          // Аудио не выполнено — показываем зачёркнутый микрофон
+          this._setRecordButtonIcon('mic-off');
         }
         this._stopVisualizer();
       };
@@ -286,13 +288,15 @@
         const rb = this.els.recordButton;
         if (!rb) return;
         if (isCompleted) {
+          // Аудио выполнено — показываем обычный микрофон (кнопка неактивна)
           rb.disabled = true;
           rb.classList.add('disabled');
-          this._setRecordButtonIcon('mic-off');
+          this._setRecordButtonIcon('mic');
         } else {
+          // Аудио не выполнено — показываем зачёркнутый микрофон (можно попробовать снова)
           rb.disabled = false;
           rb.classList.remove('disabled');
-          this._setRecordButtonIcon('mic');
+          this._setRecordButtonIcon('mic-off');
         }
       } catch (e) {
       }
