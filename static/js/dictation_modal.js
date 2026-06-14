@@ -2279,8 +2279,9 @@
       }
 
       // Обновляем строку в таблице стартового модального окна
+      let curKey = null;
       try {
-        const curKey = session.getCurrentKey();
+        curKey = session.getCurrentKey();
         if (curKey != null) {
           updateStartModalSentenceRow(session, curKey);
         }
@@ -3110,7 +3111,7 @@
         if (activityCount > 0) {
           const actSpan = document.createElement('span');
           actSpan.className = 'activity-count';
-          actSpan.innerHTML = '<i data-lucide="circle"></i>' + String(activityCount);
+          actSpan.innerHTML = '<i data-lucide="circle-small"></i>' + String(activityCount);
           tdActivities.appendChild(actSpan);
         }
       }
@@ -3775,7 +3776,7 @@
         if (activityCount > 0) {
           const actSpan = document.createElement('span');
           actSpan.className = 'activity-count';
-          actSpan.innerHTML = '<i data-lucide="circle"></i>' + String(activityCount);
+          actSpan.innerHTML = '<i data-lucide="circle-small"></i>' + String(activityCount);
           tdActivities.appendChild(actSpan);
         }
 
