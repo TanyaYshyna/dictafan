@@ -853,9 +853,13 @@
               const m = document.getElementById('start-modal');
               if (m) m.style.display = 'none';
             } catch (e3) {}
+            // Возобновляем таймер при старте игры (кнопка Start)
+            _resumeDictationTimer();
             session.ensureDefaultSelection();
             session.currentSelectedIndex = 0;
             try { resetSentenceUiFromSession(session); } catch (e00) {}
+            // Запоминаем время старта первого предложения
+            try { _initSentenceTime(session); } catch (e0t) {}
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
@@ -871,8 +875,12 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
+          // Сохраняем время текущего предложения перед уходом
+          try { _saveSentenceTime(session); } catch (e0st) {}
           session.goNext();
           try { resetSentenceUiFromSession(session); } catch (e00) {}
+          // Запоминаем время старта нового предложения
+          try { _initSentenceTime(session); } catch (e0it) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -887,8 +895,12 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (!session) return;
+          // Сохраняем время текущего предложения перед уходом
+          try { _saveSentenceTime(session); } catch (e0st) {}
           session.goPrev();
           try { resetSentenceUiFromSession(session); } catch (e00) {}
+          // Запоминаем время старта нового предложения
+          try { _initSentenceTime(session); } catch (e0it) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -1653,13 +1665,12 @@
       const snap = getProgressTimerSnapshot();
       if (!snap || !snap.isRunning) return;
 
-      const p = getProgressPanelInstance();
-      if (p && typeof p.pauseTimer === 'function') {
-        p.pauseTimer();
-      }
+      // Останавливаем таймер через общую процедуру
+      _pauseDictationTimer();
 
       if (isInactivityPause) {
         try {
+          const p = getProgressPanelInstance();
           const inactivityTime = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
           if (p && p.timerState) {
             p.timerState.dictationAccumulatedMs = Math.max(0, (Number(p.timerState.dictationAccumulatedMs) || 0) - inactivityTime);
@@ -1694,13 +1705,8 @@
     } catch (e) {
     }
 
-    try {
-      const p = getProgressPanelInstance();
-      if (p && typeof p.resumeTimer === 'function') {
-        p.resumeTimer();
-      }
-    } catch (e) {
-    }
+    // Возобновляем таймер через общую процедуру
+    _resumeDictationTimer();
 
     try {
       resetInactivityTimer();
@@ -1842,6 +1848,81 @@
       return session.getState ? session.getState(key) : null;
     } catch (e) {
       return null;
+    }
+  }
+
+  /**
+   * Сохраняет время, проведённое в текущем предложении, в st.time_count (накопительно).
+   * Вызывается ПЕРЕД уходом с предложения (nextSentence, previousSentence).
+   */
+  function _saveSentenceTime(session) {
+    try {
+      if (!session) return;
+      const key = session.getCurrentKey();
+      if (key == null) return;
+      const st = session.getState(key);
+      if (!st) return;
+      const elapsed = session.getElapsedMs();
+      const prevAcc = Number(state._sentenceTimeAccumulatedAtStart) || 0;
+      if (elapsed > prevAcc) {
+        const delta = elapsed - prevAcc;
+        st.time_count = (Number(st.time_count) || 0) + delta;
+      }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Запоминает учтённое время диктанта на момент входа в предложение.
+   * Вызывается ПОСЛЕ входа в новое предложение (startGame, nextSentence, previousSentence).
+   */
+  function _initSentenceTime(session) {
+    try {
+      if (!session) return;
+      state._sentenceTimeAccumulatedAtStart = session.getElapsedMs();
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Останавливает таймер диктанта (сессия + прогресс-панель) без показа модалки паузы.
+   * Используется при открытии модалок (start-modal, audio settings) и в pauseGame().
+   */
+  function _pauseDictationTimer() {
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && typeof session.stopTimer === 'function') {
+        session.stopTimer();
+      }
+    } catch (e) {
+    }
+    try {
+      const p = getProgressPanelInstance();
+      if (p && typeof p.pauseTimer === 'function') {
+        p.pauseTimer();
+      }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Возобновляет таймер диктанта (сессия + прогресс-панель) без скрытия модалки паузы.
+   * Используется при закрытии модалок (start-modal, audio settings) и в resumeGame().
+   */
+  function _resumeDictationTimer() {
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && typeof session.startTimer === 'function') {
+        session.startTimer();
+      }
+    } catch (e) {
+    }
+    try {
+      const p = getProgressPanelInstance();
+      if (p && typeof p.resumeTimer === 'function') {
+        p.resumeTimer();
+      }
+    } catch (e) {
     }
   }
 
@@ -3111,10 +3192,10 @@
         }
       }
 
-      // --- Время ---
+      // --- Время (накопительное, из time_count) ---
       const tdTime = tr.querySelector('td.col-time');
       if (tdTime) {
-        const timeMs = st.time_ms ? Number(st.time_ms) : 0;
+        const timeMs = Number(st.time_count) || 0;
         tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
       }
 
@@ -3235,6 +3316,8 @@
           }
         } catch (e2) {
         }
+        // Возобновляем таймер при закрытии настроек (сохранено или без изменений)
+        _resumeDictationTimer();
       };
 
       const closeAudioSettingsModalWithConfirm = () => {
@@ -3255,6 +3338,7 @@
                 } catch (e0) {
                 }
                 closeAudioSettingsModalNow();
+                // Таймер возобновляется внутри closeAudioSettingsModalNow
               },
               onSave: async () => {
                 try {
@@ -3267,6 +3351,7 @@
                 } catch (e) {
                 }
                 closeAudioSettingsModalNow();
+                // Таймер возобновляется внутри closeAudioSettingsModalNow
               },
             });
             return;
@@ -3775,10 +3860,10 @@
           tdActivities.appendChild(actSpan);
         }
 
-        // --- Колонка: Время ---
+        // --- Колонка: Время (накопительное, из time_count) ---
         const tdTime = document.createElement('td');
         tdTime.className = 'col-time';
-        const timeMs = st && st.time_ms ? Number(st.time_ms) : 0;
+        const timeMs = st && Number(st.time_count) || 0;
         tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
 
         const tdOrig = document.createElement('td');
@@ -4165,6 +4250,9 @@
       }
     } catch (e) {
     }
+
+    // Останавливаем таймер при открытии start-modal
+    _pauseDictationTimer();
   }
 
   function hideStartModal() {
@@ -4174,6 +4262,9 @@
       startModal.style.display = 'none';
     } catch (e) {
     }
+
+    // Возобновляем таймер при закрытии start-modal (X кнопка)
+    _resumeDictationTimer();
   }
 
   async function hasUnsavedProgress() {
@@ -4467,6 +4558,9 @@
       renderLucide(m);
     } catch (e) {
     }
+
+    // Останавливаем таймер при открытии настроек аудио
+    _pauseDictationTimer();
   }
 
   function resetDictationProgressForSession(session) {

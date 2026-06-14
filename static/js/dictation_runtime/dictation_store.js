@@ -164,6 +164,7 @@
             audio_exchange_mic: false, // Флаг: микрофон был получен через «покупку» за audio_activity50_count
             selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
             all_audio_completed: false, // Служебный флаг (legacy): микрофон полностью завершён
+            time_count: 0, // Накопительное время выполнения предложения в миллисекундах
           });
         }
       }
@@ -187,6 +188,7 @@
         audio_exchange_mic: false, // Флаг: микрофон был получен через «покупку» за audio_activity50_count
         selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
         all_audio_completed: false, // Служебный флаг (legacy): микрофон полностью завершён
+        time_count: 0, // Накопительное время выполнения предложения в миллисекундах
       };
       this._stateByKey.set(k, init);
       return init;
