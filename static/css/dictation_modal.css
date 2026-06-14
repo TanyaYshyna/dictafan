@@ -1312,13 +1312,6 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   min-height: 44px;
 }
 
-#dictationModal .sentence-timer-label {
-  color: var(--color-button-text-gray);
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-  margin-right: auto;
-  white-space: nowrap;
-}
 
 #dictationModal #resultNextBtn {
   min-height: 44px;

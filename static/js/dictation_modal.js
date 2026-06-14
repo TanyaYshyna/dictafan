@@ -734,6 +734,16 @@
         } catch (e0c5) {
         }
 
+        // Если предложение полностью выполнено (звезда + аудио в зависимости от режима),
+        // останавливаем таймер — пользователь больше ничего не может сделать в этом предложении.
+        try {
+          const completion = computeSentenceCompletionState(st0);
+          if (completion.textOk && completion.audioOk) {
+            _pauseDictationTimer();
+          }
+        } catch (e0comp) {
+        }
+
         return;
       }
     } catch (e0completed) {
@@ -829,8 +839,6 @@
     } catch (e6) {
     }
 
-    // Обновляем лейбу с часами текущего предложения
-    try { updateSentenceTimerLabel(); } catch (e0tl) {}
   }
 
   try {
@@ -863,8 +871,6 @@
             try { resetSentenceUiFromSession(session); } catch (e00) {}
             // Запоминаем время старта первого предложения
             try { _initSentenceTime(session); } catch (e0t) {}
-            // Обновляем лейбу с часами текущего предложения
-            try { updateSentenceTimerLabel(); } catch (e0tl) {}
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
@@ -886,8 +892,6 @@
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
           try { _initSentenceTime(session); } catch (e0it) {}
-          // Обновляем лейбу с часами текущего предложения
-          try { updateSentenceTimerLabel(); } catch (e0tl) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -908,8 +912,6 @@
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
           try { _initSentenceTime(session); } catch (e0it) {}
-          // Обновляем лейбу с часами текущего предложения
-          try { updateSentenceTimerLabel(); } catch (e0tl) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -1375,35 +1377,6 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     } catch (e) {
       return '00:00';
-    }
-  }
-
-  /**
-   * Обновляет серую лейбу с часами слева от кнопки "Далее",
-   * показывающую время текущего предложения (mm:ss).
-   */
-  function updateSentenceTimerLabel() {
-    try {
-      const label = document.getElementById('sentenceTimerLabel');
-      if (!label) return;
-      const session = window.__dictationModalActiveSession;
-      if (!session || !state.dictationStarted) {
-        label.textContent = '';
-        return;
-      }
-      const key = session.getCurrentKey();
-      if (key == null) {
-        label.textContent = '';
-        return;
-      }
-      const st = session.getState(key);
-      if (!st) {
-        label.textContent = '';
-        return;
-      }
-      const timeMs = Number(st.time_count) || 0;
-      label.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
-    } catch (e) {
     }
   }
 
@@ -1906,8 +1879,6 @@
         const delta = elapsed - prevAcc;
         st.time_count = (Number(st.time_count) || 0) + delta;
       }
-      // Обновляем лейбу с часами после сохранения времени
-      try { updateSentenceTimerLabel(); } catch (e0tl) {}
       // Обновляем время в строке таблицы модального окна выбора предложений
       try { updateStartModalSentenceRow(session, key); } catch (e0row) {}
     } catch (e) {
@@ -2705,6 +2676,19 @@
         return;
       }
     } catch (e0) {
+    }
+
+    // Если предложение полностью выполнено (звезда + аудио в зависимости от режима),
+    // не проигрываем аудио — пользователь уже выполнил это задание.
+    try {
+      const st = getCurrentSentenceStateFromSession(session);
+      if (st) {
+        const completion = computeSentenceCompletionState(st);
+        if (completion.textOk && completion.audioOk) {
+          return;
+        }
+      }
+    } catch (e0comp) {
     }
 
     const view = getCurrentSentenceViewFromSession(session);
