@@ -1126,12 +1126,6 @@
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
 
-            // Обновляем строку в таблице стартового модального окна
-            try {
-              updateStartModalSentenceRow(session, key);
-            } catch (eRow) {
-            }
-
             try {
               st._textAllCorrect = !!(res && res.allCorrect);
               view._textAllCorrect = !!(res && res.allCorrect);
@@ -1179,6 +1173,12 @@
                 }
               }
             } catch (e0star) {
+            }
+
+            // Обновляем строку в таблице стартового модального окна (ПОСЛЕ обновления всех полей st)
+            try {
+              updateStartModalSentenceRow(session, key);
+            } catch (eRow) {
             }
             try {
               if (view && view.mistake_count != null) st.mistake_count = view.mistake_count;
@@ -2100,12 +2100,7 @@
       if (wrap) {
         // Показываем: маленький кружочек слева, справа число (как ошибки)
         const n = Math.max(0, Number(textCoins) || 0);
-        if (n > 0) {
-          wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
-        } else {
-          wrap.innerHTML = '';
-        }
-        wrap.style.color = 'var(--color-button-lightgreen)';
+        wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
         }
