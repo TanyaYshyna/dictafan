@@ -3864,7 +3864,7 @@
         const tdTime = document.createElement('td');
         tdTime.className = 'col-time';
         const timeMs = st && Number(st.time_count) || 0;
-        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
+        tdTime.textContent = formatMmSs(timeMs);
 
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
@@ -4234,6 +4234,15 @@
 
   function showStartModal() {
     try {
+      // Сохраняем время текущего предложения перед открытием таблицы
+      try {
+        const session = window.__dictationModalActiveSession;
+        if (session) {
+          _saveSentenceTime(session);
+        }
+      } catch (e0) {
+      }
+
       const startModal = document.getElementById('start-modal');
       if (!startModal) return;
       startModal.style.display = 'flex';
