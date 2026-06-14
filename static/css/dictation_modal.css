@@ -1305,10 +1305,19 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal .dictation-next-row {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   width: 100%;
   margin-top: 10px;
   gap: 10px;
   min-height: 44px;
+}
+
+#dictationModal .sentence-timer-label {
+  color: var(--color-button-text-gray);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  margin-right: auto;
+  white-space: nowrap;
 }
 
 #dictationModal #resultNextBtn {

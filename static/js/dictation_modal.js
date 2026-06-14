@@ -828,6 +828,9 @@
       applyExerciseMode(session);
     } catch (e6) {
     }
+
+    // Обновляем лейбу с часами текущего предложения
+    try { updateSentenceTimerLabel(); } catch (e0tl) {}
   }
 
   try {
@@ -860,6 +863,8 @@
             try { resetSentenceUiFromSession(session); } catch (e00) {}
             // Запоминаем время старта первого предложения
             try { _initSentenceTime(session); } catch (e0t) {}
+            // Обновляем лейбу с часами текущего предложения
+            try { updateSentenceTimerLabel(); } catch (e0tl) {}
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
@@ -881,6 +886,8 @@
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
           try { _initSentenceTime(session); } catch (e0it) {}
+          // Обновляем лейбу с часами текущего предложения
+          try { updateSentenceTimerLabel(); } catch (e0tl) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -901,6 +908,8 @@
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
           try { _initSentenceTime(session); } catch (e0it) {}
+          // Обновляем лейбу с часами текущего предложения
+          try { updateSentenceTimerLabel(); } catch (e0tl) {}
           updateNavigatorFromSession(session);
         } catch (e) {
         }
@@ -1366,6 +1375,35 @@
       return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     } catch (e) {
       return '00:00';
+    }
+  }
+
+  /**
+   * Обновляет серую лейбу с часами слева от кнопки "Далее",
+   * показывающую время текущего предложения (mm:ss).
+   */
+  function updateSentenceTimerLabel() {
+    try {
+      const label = document.getElementById('sentenceTimerLabel');
+      if (!label) return;
+      const session = window.__dictationModalActiveSession;
+      if (!session || !state.dictationStarted) {
+        label.textContent = '';
+        return;
+      }
+      const key = session.getCurrentKey();
+      if (key == null) {
+        label.textContent = '';
+        return;
+      }
+      const st = session.getState(key);
+      if (!st) {
+        label.textContent = '';
+        return;
+      }
+      const timeMs = Number(st.time_count) || 0;
+      label.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
+    } catch (e) {
     }
   }
 
@@ -1868,6 +1906,10 @@
         const delta = elapsed - prevAcc;
         st.time_count = (Number(st.time_count) || 0) + delta;
       }
+      // Обновляем лейбу с часами после сохранения времени
+      try { updateSentenceTimerLabel(); } catch (e0tl) {}
+      // Обновляем время в строке таблицы модального окна выбора предложений
+      try { updateStartModalSentenceRow(session, key); } catch (e0row) {}
     } catch (e) {
     }
   }
@@ -3864,7 +3906,7 @@
         const tdTime = document.createElement('td');
         tdTime.className = 'col-time';
         const timeMs = st && Number(st.time_count) || 0;
-        tdTime.textContent = formatMmSs(timeMs);
+        tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
 
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
@@ -4234,18 +4276,6 @@
 
   function showStartModal() {
     try {
-      // Если диктант уже запущен — фиксируем время текущего предложения
-      // перед открытием таблицы (навигация, кнопка списка предложений)
-      if (state.dictationStarted) {
-        try {
-          const session = window.__dictationModalActiveSession;
-          if (session) {
-            _saveSentenceTime(session);
-          }
-        } catch (e0) {
-        }
-      }
-
       const startModal = document.getElementById('start-modal');
       if (!startModal) return;
       startModal.style.display = 'flex';
@@ -4764,6 +4794,34 @@
               return;
             }
           } catch (e2) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    // btn-new-circle — открытие модалки выбора предложений
+    try {
+      const newCircleBtn = document.getElementById('btn-new-circle');
+      if (newCircleBtn && newCircleBtn.dataset.boundDictationModal !== '1') {
+        newCircleBtn.dataset.boundDictationModal = '1';
+        newCircleBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (!session) return;
+            // Сохраняем время текущего предложения перед открытием таблицы
+            // (updateStartModalSentenceRow вызывается внутри _saveSentenceTime)
+            if (state.dictationStarted) {
+              _saveSentenceTime(session);
+            }
+            // Показываем модалку (она сама остановит таймер)
+            showStartModal();
+          } catch (e1) {
           }
         });
       }
