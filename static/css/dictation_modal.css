@@ -1478,6 +1478,16 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: 60px;
 }
 
+#dictationModal #sentences-table col.col-characters,
+#dictationModal #final-sentences-table col.col-characters {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-mistakes,
+#dictationModal #final-sentences-table col.col-mistakes {
+  width: 50px;
+}
+
 #dictationModal #sentences-table th.col-time,
 #dictationModal #sentences-table td.col-time,
 #dictationModal #sentences-table th.col-star,
@@ -1487,7 +1497,11 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #sentences-table th.col-half-stars,
 #dictationModal #sentences-table td.col-half-stars,
 #dictationModal #sentences-table th.col-activities,
-#dictationModal #sentences-table td.col-activities {
+#dictationModal #sentences-table td.col-activities,
+#dictationModal #sentences-table th.col-characters,
+#dictationModal #sentences-table td.col-characters,
+#dictationModal #sentences-table th.col-mistakes,
+#dictationModal #sentences-table td.col-mistakes {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }

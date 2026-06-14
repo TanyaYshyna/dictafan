@@ -1047,7 +1047,7 @@
               view._charsAddedThisAttempt = true;
               if (stForChars) stForChars._charsAddedThisAttempt = true;
               if (stForChars) {
-                stForChars.chars_count = (Number(stForChars.chars_count) || 0) + expectedLen;
+                stForChars.number_of_characters = (Number(stForChars.number_of_characters) || 0) + expectedLen;
               }
             }
           }
@@ -2477,7 +2477,7 @@
         const c = Number(st.number_of_corrected) || 0;
         const a = Number(st.number_of_audio) || 0;
         const m = Number(st.mistake_count) || 0;
-        const ch = Number(st.chars_count) || 0;
+        const ch = Number(st.number_of_characters) || 0;
         if (p >= 1) perfect += 1;
         if (c > 0) corrected += 1;
         if (a > 0) audio += 1;
@@ -3225,6 +3225,20 @@
         tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
       }
 
+      // --- Символы (number_of_characters) ---
+      const tdChars = tr.querySelector('td.col-characters');
+      if (tdChars) {
+        const charsCount = Number(st.number_of_characters) || 0;
+        tdChars.textContent = charsCount > 0 ? String(charsCount) : '';
+      }
+
+      // --- Ошибки (mistake_count) ---
+      const tdMistakes = tr.querySelector('td.col-mistakes');
+      if (tdMistakes) {
+        const mistakesCount = Number(st.mistake_count) || 0;
+        tdMistakes.textContent = mistakesCount > 0 ? String(mistakesCount) : '';
+      }
+
       // Обновляем lucide-иконки в этой строке
       try {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -3892,6 +3906,18 @@
         const timeMs = st && Number(st.time_count) || 0;
         tdTime.textContent = timeMs > 0 ? formatMmSs(timeMs) : '';
 
+        // --- Колонка: Символы (number_of_characters) ---
+        const tdChars = document.createElement('td');
+        tdChars.className = 'col-characters';
+        const charsCount = Number(st && st.number_of_characters) || 0;
+        tdChars.textContent = charsCount > 0 ? String(charsCount) : '';
+
+        // --- Колонка: Ошибки (mistake_count) ---
+        const tdMistakes = document.createElement('td');
+        tdMistakes.className = 'col-mistakes';
+        const mistakesCount = Number(st && st.mistake_count) || 0;
+        tdMistakes.textContent = mistakesCount > 0 ? String(mistakesCount) : '';
+
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
         tdOrig.textContent = String(view.text_original || '');
@@ -3907,6 +3933,8 @@
         tr.appendChild(tdHalfStars);
         tr.appendChild(tdActivities);
         tr.appendChild(tdTime);
+        tr.appendChild(tdChars);
+        tr.appendChild(tdMistakes);
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);
 

@@ -165,6 +165,7 @@
             selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
             all_audio_completed: false, // Служебный флаг (legacy): микрофон полностью завершён
             time_count: 0, // Накопительное время выполнения предложения в миллисекундах
+            number_of_characters: 0, // Количество символов в предложении (без знаков препинания, с пробелами)
           });
         }
       }
@@ -184,6 +185,7 @@
         text_activity_count: 0,
         audio_activity50_count: 0,
         money_count: 0,
+        number_of_characters: 0, // Количество символов в предложении (без знаков препинания, с пробелами)
         text_exchange_half_star: false, // Флаг: half-star был получен через «покупку» за text_activity_count
         audio_exchange_mic: false, // Флаг: микрофон был получен через «покупку» за audio_activity50_count
         selection_state: 'unchecked', // unchecked | checked | completed — состояние выбора/прохождения в списке
