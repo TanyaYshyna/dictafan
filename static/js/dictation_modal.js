@@ -1126,12 +1126,6 @@
             st.number_of_perfect = res.nextPerfect;
             st.number_of_corrected = res.nextCorrected;
 
-            // Увеличиваем счётчик активностей при каждом нажатии Enter (проверка текста)
-            try {
-              st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
-            } catch (e0acAct) {
-            }
-
             // Обновляем строку в таблице стартового модального окна
             try {
               updateStartModalSentenceRow(session, key);
@@ -1160,7 +1154,12 @@
                 } else if (correctedNow > 0) {
                   reward = getPricingValue('half_star_reward', 2);
                 } else {
+                  // Активность — больше 1 ошибки, текст исправлен
                   reward = getPricingValue('text_activity_reward', 1);
+                  try {
+                    st.text_activity_count = (Number(st.text_activity_count) || 0) + 1;
+                  } catch (e0ac0) {
+                  }
                 }
 
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
@@ -2099,10 +2098,10 @@
     try {
       const wrap = document.getElementById('tablo_result_text_coins');
       if (wrap) {
-        // Показываем кружок с цифрой (количество активностей)
+        // Показываем: маленький кружочек слева, справа число (как ошибки)
         const n = Math.max(0, Number(textCoins) || 0);
         if (n > 0) {
-          wrap.innerHTML = '<i data-lucide="circle"></i>' + String(n);
+          wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
         } else {
           wrap.innerHTML = '';
         }
@@ -2121,10 +2120,28 @@
 
     try {
       const wrap = document.getElementById('audio_result_coins');
-      _renderCoins(wrap, audioCoins, '--color-button-purple');
+      const alreadyBoughtAudio = !!(st && st.audio_exchange_mic);
+      if (wrap) {
+        if (alreadyBoughtAudio) {
+          // После покупки микрофона кружочки не имеют смысла — скрываем
+          wrap.innerHTML = '';
+        } else {
+          const n = Math.max(0, Number(audioCoins) || 0);
+          if (n > 0) {
+            wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
+          } else {
+            wrap.innerHTML = '';
+          }
+        }
+        wrap.style.color = 'var(--color-button-purple)';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons();
+        }
+      }
       const btn = document.getElementById('btn_coin_exchange_audio');
       const cost = getPricingValue('audio_purchase_cost', 3);
-      if (btn) btn.style.display = audioCoins >= cost ? 'inline-flex' : 'none';
+      // Показываем кнопку покупки, если активностей >= cost и ещё не покупали
+      if (btn) btn.style.display = (audioCoins >= cost && !alreadyBoughtAudio) ? 'inline-flex' : 'none';
     } catch (e) {
     }
 
