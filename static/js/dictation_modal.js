@@ -4234,13 +4234,16 @@
 
   function showStartModal() {
     try {
-      // Сохраняем время текущего предложения перед открытием таблицы
-      try {
-        const session = window.__dictationModalActiveSession;
-        if (session) {
-          _saveSentenceTime(session);
+      // Если диктант уже запущен — фиксируем время текущего предложения
+      // перед открытием таблицы (навигация, кнопка списка предложений)
+      if (state.dictationStarted) {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            _saveSentenceTime(session);
+          }
+        } catch (e0) {
         }
-      } catch (e0) {
       }
 
       const startModal = document.getElementById('start-modal');
@@ -4274,6 +4277,12 @@
 
     // Возобновляем таймер при закрытии start-modal (X кнопка)
     _resumeDictationTimer();
+  }
+
+  try {
+    if (typeof window.showStartModal !== 'function') window.showStartModal = showStartModal;
+    if (typeof window.hideStartModal !== 'function') window.hideStartModal = hideStartModal;
+  } catch (e) {
   }
 
   async function hasUnsavedProgress() {
