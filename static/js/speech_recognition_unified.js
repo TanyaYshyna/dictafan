@@ -48,6 +48,7 @@
 
     async startRecording() {
       try {
+        try { console.log('[UnifiedSpeechRecognition] startRecording ВЫЗВАН, mode=' + this.state.mode + ', language=' + this.state.language); } catch (e) {}
         this._audioChunks = [];
         this._audioBlob = null;
         this._finalText = '';
@@ -57,10 +58,13 @@
 
         const am = window.AudioManager;
         if (!am || typeof am.startUserRecording !== 'function') {
+          try { console.log('[UnifiedSpeechRecognition] AudioManager not loaded'); } catch (e) {}
           throw new Error('AudioManager_not_loaded');
         }
         const mimeType = this._getSupportedMimeType();
+        try { console.log('[UnifiedSpeechRecognition] AudioManager.startUserRecording...'); } catch (e) {}
         const started = await am.startUserRecording({ mimeType });
+        try { console.log('[UnifiedSpeechRecognition] AudioManager вернул:', started ? 'ok' : 'null'); } catch (e) {}
         this._mediaStream = started && started.stream ? started.stream : null;
         this._mediaRecorder = started && started.recorder ? started.recorder : null;
 
@@ -285,8 +289,10 @@
       };
 
       try {
+        try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() с языком', rec.lang); } catch (e) {}
         rec.start();
       } catch (e) {
+        try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() ошибка:', e); } catch (e2) {}
         this._emitError(e);
       }
     }

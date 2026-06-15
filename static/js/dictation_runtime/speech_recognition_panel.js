@@ -200,6 +200,7 @@
     }
 
     async toggleRecording() {
+      try { console.log('[SpeechPanel] toggleRecording: _isProcessing=' + this._isProcessing); } catch (e) {}
       if (this._isProcessing) return;
 
       const rec = this._ensureRecognizer();
@@ -211,27 +212,22 @@
     }
 
     async startRecording() {
+      try { console.log('[SpeechPanel] startRecording: _isProcessing=' + this._isProcessing); } catch (e) {}
       if (this._isProcessing) return;
       const rec = this._ensureRecognizer();
-      if (!rec) return;
-      try {
-        console.debug('[DictationSpeechRecognitionPanel] startRecording');
-      } catch (e0) {
-      }
+      if (!rec) { try { console.log('[SpeechPanel] startRecording: rec=null'); } catch (e) {} return; }
+      try { console.log('[SpeechPanel] startRecording: rec.state.language=' + (rec.state ? rec.state.language : '?')); } catch (e) {}
       await rec.startRecording();
     }
 
     async stopRecording(cause = 'manual') {
+      try { console.log('[SpeechPanel] stopRecording: cause=' + cause); } catch (e) {}
       if (this._isProcessing) return;
       const rec = this._ensureRecognizer();
       if (!rec) return;
 
       this._isProcessing = true;
       try {
-        try {
-          console.debug('[DictationSpeechRecognitionPanel] stopRecording', cause);
-        } catch (e0) {
-        }
         const result = await rec.stopRecording(cause);
         const text = String(result && result.text ? result.text : '').trim();
         const percent = this._computeMatchPercentASR(this._expectedText, text);
