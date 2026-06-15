@@ -76,6 +76,7 @@
             setTimeout(() => {
               try {
                 if (this.state.mode === 'online' && this.state.isRecording) {
+                  try { console.log('[UnifiedSpeechRecognition] startRecording: вызываем _initWebSpeech, язык =', this.state.language); } catch (e) {}
                   this._initWebSpeech();
                 }
               } catch (e) {
