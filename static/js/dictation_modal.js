@@ -73,15 +73,11 @@
   function getCurrentDictationIdForDb() {
     try {
       const session = window.__dictationModalActiveSession;
-      console.log('[DictationModal] getCurrentDictationIdForDb: session=', !!session, 'dictationId=', session?.dictationId, 'typeof dictationId=', typeof session?.dictationId);
       if (session && session.dictationId) {
-        const cleaned = String(session.dictationId).replace(/^dict_/, '');
-        const parsed = parseInt(cleaned, 10);
-        console.log('[DictationModal] getCurrentDictationIdForDb: cleaned=', cleaned, 'parsed=', parsed, 'isFinite=', Number.isFinite(parsed));
+        const parsed = parseInt(String(session.dictationId).replace(/^dict_/, ''), 10);
         if (Number.isFinite(parsed)) return parsed;
       }
     } catch (e) {
-      console.warn('[DictationModal] getCurrentDictationIdForDb: ошибка', e);
     }
     return null;
   }
@@ -3046,7 +3042,6 @@
         const dictationData = document.getElementById('dictation-data');
         langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '') : '';
       }
-      console.log('[DictationModal] ensureSpeechPanel: язык диктанта', langOrig, '(parsed?.langOriginal =', parsed?.langOriginal, ')');
       if (langOrig) panel.setLanguage(langOrig);
     } catch (e3) {
     }
