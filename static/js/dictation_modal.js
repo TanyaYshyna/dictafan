@@ -4757,6 +4757,16 @@
           const speechRecMode = _getSelectedSpeechRecMode();
           _writeSpeechRecModeToLS(speechRecMode);
 
+          // Обновляем иконку режима распознавания в панели диктанта
+          try {
+            const panel = state._speechPanel;
+            if (panel && typeof panel.setMode === 'function') {
+              const normalized = speechRecMode.startsWith('route-off') ? 'route-off' : speechRecMode;
+              panel.setMode(normalized);
+            }
+          } catch (ePanel) {
+          }
+
           // Сохраняем остальные настройки на сервер
           const um = window.UM;
           if (!um || !um.userData || typeof um.updateProfile !== 'function') return;

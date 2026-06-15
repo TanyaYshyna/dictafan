@@ -637,6 +637,30 @@
   word-break: break-word;
 }
 
+#user-profile-modal .profile-speech-rec-mode-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--color-bg-secondary, #f0f2f5);
+  color: var(--color-text, #1f2933);
+  transition: background 0.15s, color 0.15s;
+  flex: 0 0 auto;
+}
+
+#user-profile-modal .profile-speech-rec-mode-icon:hover {
+  background: var(--color-bg-active, #e0e4e8);
+  color: var(--color-primary, #8B4513);
+}
+
+#user-profile-modal .profile-speech-rec-mode-icon i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
 #user-profile-modal .groups-layout {
   display: grid;
   grid-template-columns: 340px minmax(0, 1fr);

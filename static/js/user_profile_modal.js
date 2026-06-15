@@ -2258,7 +2258,94 @@ function bindProfileTestRecording() {
     const btn = document.getElementById('profileTestRecordingBtn');
     const statusEl = document.getElementById('profileTestRecordingStatus');
     const resultEl = document.getElementById('profileTestRecordingResult');
+    const modeIcon = document.getElementById('profileSpeechRecModeIcon');
     if (!btn || !statusEl || !resultEl) return;
+
+    // Маппинг режимов для переключения по кругу
+    const MODE_CYCLE = ['route', 'server', 'route-off|tiny', 'route-off|base', 'route-off|small'];
+    const MODE_ICONS = {
+        'route': 'route',
+        'server': 'server',
+        'route-off|tiny': 'house-heart',
+        'route-off|base': 'house',
+        'route-off|small': 'house-plus',
+    };
+    const MODE_LABELS = {
+        'route': 'Google Сервіси',
+        'server': 'На сервері Whisper Tiny',
+        'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
+        'route-off|base': 'На пристрої Whisper Base · 145 MB',
+        'route-off|small': 'На пристрої Whisper Small · 480 MB',
+    };
+
+    const getAvailableModes = () => {
+        // Определяем, какие device-модели скачаны
+        const downloaded = _getDownloadedWhisperSizesProfile();
+        return MODE_CYCLE.filter((m) => {
+            if (m.startsWith('route-off|')) {
+                const size = m.split('|')[1];
+                return downloaded.includes(size);
+            }
+            return true;
+        });
+    };
+
+    const _getDownloadedWhisperSizesProfile = () => {
+        try {
+            const raw = localStorage.getItem('dictafan_downloaded_models_v2');
+            if (!raw) return [];
+            const parsed = JSON.parse(raw);
+            const sizes = [];
+            for (const key of Object.keys(parsed || {})) {
+                const data = parsed[key];
+                if (data && data.size) sizes.push(String(data.size));
+            }
+            return sizes;
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const _readSpeechRecModeFromLS = () => {
+        try {
+            const v = localStorage.getItem('dictafan_speech_rec_mode');
+            if (v) return String(v);
+        } catch (e) {}
+        return 'route';
+    };
+
+    const _writeSpeechRecModeToLS = (mode) => {
+        try {
+            localStorage.setItem('dictafan_speech_rec_mode', mode);
+        } catch (e) {}
+    };
+
+    const updateModeIcon = () => {
+        if (!modeIcon) return;
+        const mode = _readSpeechRecModeFromLS();
+        const iconName = MODE_ICONS[mode] || 'route';
+        const label = MODE_LABELS[mode] || 'Google Сервіси';
+        modeIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
+        modeIcon.title = label;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
+    };
+
+    // Переключение режима по кругу при клике на иконку
+    if (modeIcon) {
+        modeIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const available = getAvailableModes();
+            if (available.length === 0) return;
+            const current = _readSpeechRecModeFromLS();
+            let idx = available.indexOf(current);
+            if (idx === -1) idx = -1;
+            const next = available[(idx + 1) % available.length];
+            _writeSpeechRecModeToLS(next);
+            updateModeIcon();
+        });
+    }
 
     const setStatus = (text, color = '#666') => {
         statusEl.textContent = text || '';
@@ -2268,12 +2355,11 @@ function bindProfileTestRecording() {
     const setResult = (text) => { resultEl.textContent = text || ''; };
 
     const getCurrentMode = () => {
-        try {
-            const m = getProfileSpeechRecognitionModeFromModelsTable();
-            if (m) return m;
-        } catch (e) { }
-        return UM && UM.userData && UM.userData.speech_recognition_mode ? UM.userData.speech_recognition_mode : 'route';
+        return _readSpeechRecModeFromLS();
     };
+
+    // Инициализируем иконку
+    updateModeIcon();
 
     const stopAndCleanup = async () => {
         try {
