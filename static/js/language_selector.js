@@ -231,54 +231,14 @@ class LanguageSelector {
         const downloaded = this._getDownloadedModelsV2();
         const downloadedKeys = new Set(Object.keys(downloaded || {}));
 
-        const currentLang = String(this.options.currentLearning || this.options.nativeLanguage || 'en')
-            .trim()
-            .toLowerCase()
-            .split('-')[0] || 'en';
-        const selectedModelKey = this._getSelectedModelKeyV2(currentLang);
-
-        let currentMode = 'route';
-        try {
-            if (window.__PROFILE_SPEECH_REC_MODE) {
-                currentMode = String(window.__PROFILE_SPEECH_REC_MODE);
-            } else if (window.UM && UM.userData && UM.userData.speech_recognition_mode) {
-                currentMode = String(UM.userData.speech_recognition_mode);
-            }
-        } catch (e) {
-        }
-
         const rows = root.querySelectorAll('.models-centric-tr');
-        let anyChecked = false;
         rows.forEach((tr) => {
             try {
-                const method = String(tr.dataset.method || '');
                 const size = String(tr.dataset.modelSize || '');
-
-                const radio = tr.querySelector('.models-centric-method-radio');
-                const radioBtn = tr.querySelector('.models-centric-radio-btn');
                 const sizeEl = tr.querySelector('[data-role="model-size"]');
                 const toggle = tr.querySelector('.model-download-toggle-v2');
 
-                if (method === 'route') {
-                    if (radio) {
-                        radio.checked = currentMode === 'route';
-                        anyChecked = anyChecked || radio.checked;
-                        radio.style.display = 'none';
-                    }
-                    this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), false);
-                    return;
-                }
-                if (method === 'route-server') {
-                    if (radio) {
-                        radio.checked = currentMode === 'route-server';
-                        anyChecked = anyChecked || radio.checked;
-                        radio.style.display = 'none';
-                    }
-                    this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), false);
-                    return;
-                }
-
-                if (method === 'route-off' && (size === 'tiny' || size === 'base' || size === 'small')) {
+                if (size === 'tiny' || size === 'base' || size === 'small') {
                     const model = bySize[size] || null;
                     const mk = model && model.modelKey ? String(model.modelKey) : '';
                     const mSize = model && model.size ? String(model.size) : '';
@@ -286,33 +246,6 @@ class LanguageSelector {
                     const isDownloaded = !!(mk && downloadedKeys.has(mk));
 
                     if (sizeEl) sizeEl.textContent = mSize ? `· ${mSize}` : '';
-
-                    if (radio) {
-                        radio.value = mk ? `route-off|${mk}` : 'route-off|';
-                        radio.disabled = !mk || !isDownloaded;
-                        if (currentMode === 'route-off') {
-                            radio.checked = !!(mk && selectedModelKey && String(selectedModelKey) === String(mk));
-                            if (!selectedModelKey && mk && size === 'base') {
-                                radio.checked = true;
-                            }
-                        } else {
-                            radio.checked = false;
-                        }
-                        anyChecked = anyChecked || radio.checked;
-                        radio.style.display = 'none';
-                    }
-
-                    // Пока модель не загружена — выбор метода (radio) не имеет смысла
-                    if (radioBtn) {
-                        if (!isDownloaded) {
-                            radioBtn.style.visibility = 'hidden';
-                            radioBtn.disabled = true;
-                        } else {
-                            radioBtn.style.visibility = 'visible';
-                            radioBtn.disabled = false;
-                        }
-                        this._renderLucideRadioButton(radioBtn, !!(radio && radio.checked), !!(radio && radio.disabled));
-                    }
 
                     if (toggle) {
                         toggle.dataset.modelKey = mk;
@@ -324,19 +257,6 @@ class LanguageSelector {
             } catch (eRow) {
             }
         });
-
-        if (!anyChecked) {
-            try {
-                const routeRow = root.querySelector('.models-centric-tr[data-method="route"]');
-                const routeRadio = routeRow ? routeRow.querySelector('.models-centric-method-radio') : null;
-                const routeBtn = routeRow ? routeRow.querySelector('.models-centric-radio-btn') : null;
-                if (routeRadio) {
-                    routeRadio.checked = true;
-                    this._renderLucideRadioButton(routeBtn, true, false);
-                }
-            } catch (eFix) {
-            }
-        }
     }
 
     createLearningFlags() {
@@ -529,68 +449,6 @@ class LanguageSelector {
                 const shouldDownload = !!toggle.checked;
                 await handleDownloadToggle(modelKey, modelType, shouldDownload);
                 return;
-            }
-
-            const methodRadio = e.target && e.target.classList && e.target.classList.contains('models-centric-method-radio') ? e.target : null;
-            if (methodRadio) {
-                const val = String(methodRadio.value || 'route');
-                let mode = val;
-                let modelKey = '';
-                if (val.startsWith('route-off|')) {
-                    mode = 'route-off';
-                    modelKey = val.split('|').slice(1).join('|');
-                }
-
-                try {
-                    window.__PROFILE_SPEECH_REC_MODE = mode;
-                } catch (e0) {
-                }
-
-                const currentLang = String(this.options.currentLearning || this.options.nativeLanguage || 'en')
-                    .trim()
-                    .toLowerCase()
-                    .split('-')[0] || 'en';
-
-                try {
-                    if (mode === 'route-off' && modelKey) {
-                        this._setSelectedModelKeyV2(currentLang, modelKey);
-                    }
-                } catch (e1) {
-                }
-
-                try {
-                    window.dispatchEvent(new CustomEvent('profile-speech-recognition-mode-selected', {
-                        detail: {
-                            mode,
-                            lang: currentLang,
-                            modelKey: modelKey || null,
-                        }
-                    }));
-                } catch (e2) {
-                }
-
-                try {
-                    this.hydrateModelsCentricUI();
-                } catch (e3) {
-                }
-            }
-        });
-
-        this.options.container.addEventListener('click', (e) => {
-            const btn = e.target && e.target.closest ? e.target.closest('.models-centric-radio-btn') : null;
-            if (!btn) return;
-
-            const cell = btn.closest('td');
-            const radio = cell ? cell.querySelector('.models-centric-method-radio') : null;
-            if (!radio || radio.disabled) return;
-
-            e.preventDefault();
-            e.stopPropagation();
-
-            radio.checked = true;
-            try {
-                radio.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (e2) {
             }
         });
 

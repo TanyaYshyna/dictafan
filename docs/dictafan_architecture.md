@@ -149,10 +149,12 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Загружает зависимости рантайма диктанта (`dictation_runtime/*`, `AudioManager`, `ProgressPanel`, распознавание речи).
 - Грузит контент диктанта (предложения) в IndexedDB (через существующий слой кэша) и затем в runtime store.
 - Управляет стартовой модалкой выбора предложений (`#start-modal`), модалкой паузы (`#pauseModal`), модалкой покупок (`#coinExchangeModal`), модалкой завершения (`#completionModal`).
+- Управляет модалкой настроек аудио (`#audioSettingsModal`), включая выбор режима распознавания речи (см. раздел «Распознавание речи: выбор режима»).
 
 Важно:
 
 - Текущий основной UI диктанта на `/desktop` — это `static/js/dictation_modal.js` + runtime слой `static/js/dictation_runtime/*`.
+- Режим распознавания речи (`speech_recognition_mode`) хранится в **localStorage** (ключ `dictafan_speech_rec_mode`), а не на сервере. Управление — через `initAudioSettingsModal()`.
 
 Ключевая идея данных:
 
@@ -960,9 +962,91 @@ DO UPDATE SET
 
 ### Текущее состояние (известные проблемы)
 
-1. **OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccessUrgent()` нигде не вызываются. Данные не попадают в `history_by_day`.
-2. **Не хватает вызовов** при начислении звезды/полузвезды/активности — нужно добавить `OutboxBatcher.enqueueActivity()` в момент начисления награды.
-3. **Не хватает вызова** `OutboxBatcher.enqueueSuccessUrgent()` при завершении диктанта — нужно добавить в `showCompletionModal()`.
+1. ~~**OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccessUrgent()` нигде не вызываются. Данные не попадают в `history_by_day`.~~ **ИСПРАВЛЕНО**: вызовы добавлены в `dictation_modal.js`.
+2. ~~**Не хватает вызовов** при начислении звезды/полузвезды/активности — нужно добавить `OutboxBatcher.enqueueActivity()` в момент начисления награды.~~ **ИСПРАВЛЕНО**.
+3. ~~**Не хватает вызова** `OutboxBatcher.enqueueSuccessUrgent()` при завершении диктанта — нужно добавить в `showCompletionModal()`.~~ **ИСПРАВЛЕНО**.
+
+### Распознавание речи: выбор режима (speech_recognition_mode)
+
+**Архитектурное решение (рефакторинг):** выбор режима распознавания речи — это **настройка устройства/браузера**, а не настройка пользователя. Поэтому:
+
+- Режим **не хранится на сервере** (не в `users.settings_json`).
+- Режим **не сохраняется через `saveProfile()`**.
+- Режим хранится в **`localStorage`** под ключом `dictafan_speech_rec_mode`.
+- Радио-кнопки выбора режима **убраны из профиля** (из таблицы моделей в `user_profile_modal.html`).
+- Радио-кнопки **перенесены в модальное окно настроек диктанта** (`#audioSettingsModal` внутри `#dictationModal`).
+
+#### Доступные режимы (5 значений)
+
+| Значение | Иконка lucide | Описание |
+|----------|---------------|----------|
+| `route` | `route` | Google Сервіси (WebSpeech API браузера) |
+| `server` | `server` | На сервері Whisper Tiny |
+| `route-off\|tiny` | `house-heart` | На пристрої Whisper Tiny · 75 MB |
+| `route-off\|base` | `house` | На пристрої Whisper Base · 145 MB |
+| `route-off\|small` | `house-plus` | На пристрої Whisper Small · 480 MB |
+
+Режимы с префиксом `route-off|` — это device-режимы (локальный Whisper через Transformers.js). Они **отображаются только если соответствующая модель скачана** в кеш браузера.
+
+#### Где живёт код
+
+1. **`templates/partials/dictation_modal.html`** — HTML радио-кнопок внутри `#audioSettingsModal`:
+   - 5 `<label>` с `<input type="radio" name="modal-speechRecMode">`
+   - Device-режимы имеют класс `dictation-settings-speech-rec-mode-device` и атрибуты `data-role="device-mode-tiny/base/small"`
+   - Видимость device-режимов управляется через JS (скрыты, если модель не скачана)
+
+2. **`static/css/dictation_modal.css`** — стили для карточки `.dictation-settings-card-speech-rec`:
+   - `grid-area: speech-rec` в `dictation-settings-grid`
+   - Кастомные радио-кнопки с иконками lucide
+   - Device-режимы с отступом слева (вложенность)
+
+3. **`static/js/dictation_modal.js`** — логика чтения/записи в `initAudioSettingsModal()`:
+   - `LS_SPEECH_REC_MODE_KEY = 'dictafan_speech_rec_mode'`
+   - `_readSpeechRecModeFromLS()` — читает из localStorage, fallback `'route'`
+   - `_writeSpeechRecModeToLS(mode)` — пишет в localStorage
+   - `_getDownloadedWhisperSizes()` — читает `dictafan_downloaded_models_v2` из localStorage
+   - `_updateDeviceModeVisibility()` — показывает/скрывает device-радио
+   - `applySpeechRecModeToUI()` — устанавливает радио из localStorage
+   - При сохранении настроек (`__dictafanSaveAudioSettingsModal`) режим пишется в localStorage
+   - При открытии диктанта (`applyToUI`) — режим читается из localStorage
+
+4. **`static/js/dictation_modal.js`** — в `ensureSpeechPanel()`:
+   - Режим читается из `localStorage.getItem('dictafan_speech_rec_mode')`
+   - Нормализация: `route-off|tiny` → `route-off` (для `speech_recognition_unified.js`)
+
+5. **`static/js/dictation_runtime/speech_recognition_panel.js`** — в `_updateRecognitionModeIcon(mode)`:
+   - Маппинг 5 режимов на 5 иконок lucide
+   - Для `route-off` читает `dictafan_speech_rec_mode` из localStorage, чтобы определить, какая именно device-модель выбрана
+
+6. **`static/js/audio_settings_panel.js`** — методы `getSpeechRecognitionIcon(mode)` и `getSpeechRecognitionLabel(mode)`:
+   - Используются в профиле для отображения текущего режима (только иконка + текст, без радио)
+
+#### Что было удалено из профиля
+
+- `templates/partials/user_profile_modal.html` — удалены все `<tr>` с радио-кнопками (`data-method="route"`, `data-method="route-server"`, `data-method="route-off"`)
+- `static/js/language_selector.js`:
+  - `hydrateModelsCentricUI()` — удалена вся логика радио (рендеринг, `__PROFILE_SPEECH_REC_MODE`, `anyChecked`)
+  - `bindModelsCentricEvents()` — удалены обработчики `change` для `models-centric-method-radio` и `click` для `models-centric-radio-btn`
+- `static/js/user_profile_modal.js`:
+  - Удалена функция `getProfileSpeechRecognitionModeFromModelsTable()`
+  - Удалён `speech_recognition_mode` из: `getAudioSettingsFromDom()`, `checkForChanges()`, `getCurrentFormValues()`, `loadUserData()`, `saveProfile()` (hasAudioChanges, settings_json, updateData, originalData, UM.userData, audioSettingsPanel.setSettings)
+
+#### Защита от кеш-коллизий
+
+Если пользователь скачал модель, выбрал device-режим, а затем кеш был очищен (или сайт открыт в другом браузере/устройстве):
+
+1. `_updateDeviceModeVisibility()` проверяет `dictafan_downloaded_models_v2` в localStorage
+2. Если device-модели нет в кеше — соответствующие радио скрываются
+3. `applySpeechRecModeToUI()` проверяет, доступен ли выбранный режим; если нет — сбрасывает на `'route'`
+4. В `ensureSpeechPanel()` — если режим `route-off`, но модель не найдена — панель не создаётся (безопасное падение)
+
+#### Иконки возле кнопки записи
+
+Иконка режима распознавания отображается:
+- В панели диктанта (рядом с кнопкой записи) — через `_updateRecognitionModeIcon()` в `speech_recognition_panel.js`
+- В профиле (в карточке аудионастроек) — через `getSpeechRecognitionIcon()` в `audio_settings_panel.js`
+
+Иконки обновляются при каждом открытии диктанта (читают текущее значение из localStorage).
 
 ## Механизм наполнения группы (UX)
 

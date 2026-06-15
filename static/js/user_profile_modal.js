@@ -1650,22 +1650,12 @@ function initializeLanguageModelsSelector() {
 
 let audioSettingsPanel = null;
 
-function getProfileSpeechRecognitionModeFromModelsTable() {
-    try {
-        const root = document.getElementById('languageSelectorModelsContainer');
-        if (!root) return '';
-        const checked = root.querySelector('input[name="speech_recognition_mode"]:checked');
-        return checked ? String(checked.value) : '';
-    } catch (e) { return ''; }
-}
-
 function getAudioSettingsFromDom() {
     const startEl = document.getElementById('playSequenceStart');
     const start = startEl ? String(startEl.value || '') : '';
     const modeRadios = document.querySelectorAll('input[name="audio_exercise_mode"]');
     let exercise_mode = 'record';
     modeRadios.forEach(r => { if (r.checked) exercise_mode = r.value; });
-    const speechRecognitionMode = getProfileSpeechRecognitionModeFromModelsTable();
     return {
         start,
         exercise_mode,
@@ -1673,7 +1663,6 @@ function getAudioSettingsFromDom() {
         success: 'ot',
         repeats: 3,
         required_passed_star_half: 3,
-        speech_recognition_mode: speechRecognitionMode || 'route',
         without_entering_text: false,
         show_text: false,
     };
@@ -1821,6 +1810,7 @@ function initializeTopbarControls() {
 // ==================== CHECK FOR CHANGES ====================
 
 function checkForChanges() {
+try { window.checkForChanges = checkForChanges; } catch (e) {}
     const currentValues = getCurrentFormValues();
 
     const avatarChanged = (() => {
@@ -1844,7 +1834,6 @@ function checkForChanges() {
         audio_success: currentValues.audio_success !== (originalData.audio_success || ''),
         audio_repeats: currentValues.audio_repeats !== (originalData.audio_repeats || 3),
         audio_required_passed_star_half: currentValues.audio_required_passed_star_half !== (originalData.audio_required_passed_star_half || 3),
-        speech_recognition_mode: currentValues.speech_recognition_mode !== (originalData.speech_recognition_mode || 'route'),
         without_entering_text: Boolean(currentValues.without_entering_text) !== Boolean(originalData.without_entering_text),
         show_text: Boolean(currentValues.show_text) !== Boolean(originalData.show_text),
         assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
@@ -1889,7 +1878,6 @@ function getCurrentFormValues() {
         audio_success: settings.success || '',
         audio_repeats: settings.repeats || 3,
         audio_required_passed_star_half: settings.required_passed_star_half || 3,
-        speech_recognition_mode: settings.speech_recognition_mode || 'route',
         without_entering_text: Boolean(settings.without_entering_text),
         show_text: Boolean(settings.show_text),
     };
@@ -1905,7 +1893,6 @@ function getCurrentFormValues() {
         audio_success: audioSettings.audio_success,
         audio_repeats: audioSettings.audio_repeats,
         audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
-        speech_recognition_mode: audioSettings.speech_recognition_mode,
         without_entering_text: audioSettings.without_entering_text,
         show_text: audioSettings.show_text,
         assignment_history_retention_days: (() => {
@@ -1967,7 +1954,6 @@ function loadUserData() {
         audio_exercise_mode: initialAudioExerciseMode,
         audio_repeats: userData.audio_repeats || 3,
         audio_required_passed_star_half: userData.audio_required_passed_star_half || 3,
-        speech_recognition_mode: userData.speech_recognition_mode || 'route',
         without_entering_text: Boolean(userData.without_entering_text),
         show_text: Boolean(userData.show_text),
         assignment_history_retention_days: assignmentHistoryRetentionDays,
@@ -2034,8 +2020,7 @@ async function saveProfile(options = {}) {
         (formValues.audio_typo || '') !== (originalData.audio_typo || '') ||
         (formValues.audio_success || '') !== (originalData.audio_success || '') ||
         (formValues.audio_repeats || 3) !== (originalData.audio_repeats || 3) ||
-        (formValues.audio_required_passed_star_half || 3) !== (originalData.audio_required_passed_star_half || 3) ||
-        (formValues.speech_recognition_mode || 'route') !== (originalData)
+        (formValues.audio_required_passed_star_half || 3) !== (originalData.audio_required_passed_star_half || 3)
         );
         
     if (!hasUnsavedChanges && !hasAudioChanges) {
@@ -2087,7 +2072,6 @@ async function saveProfile(options = {}) {
                 if (!merged.audio || typeof merged.audio !== 'object') merged.audio = {};
                 merged.audio.start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
                 merged.audio.exercise_mode = (settings.exercise_mode !== undefined && settings.exercise_mode !== null) ? settings.exercise_mode : 'record';
-                merged.audio.speech_recognition_mode = settings.speech_recognition_mode || 'route';
             } catch (e) { }
 
             try { updateData.settings_json = JSON.stringify(merged); } catch (e) { }
@@ -2095,7 +2079,6 @@ async function saveProfile(options = {}) {
             updateData.audio_start = (settings.start !== undefined && settings.start !== null) ? settings.start : 'oto';
             updateData.audio_typo = 'o';
             updateData.audio_success = 'ot';
-            updateData.speech_recognition_mode = settings.speech_recognition_mode || 'route';
         }
 
         showInfo(profileT('profile.common.saving_changes', null, 'Сохраняем изменения…'));
@@ -2107,7 +2090,7 @@ async function saveProfile(options = {}) {
             else if (UM && UM.userData && UM.userData.avatar) originalData.avatar = UM.userData.avatar;
         } catch (e) { }
 
-        let audioSettings = { audio_start: '', audio_exercise_mode: 'record', speech_recognition_mode: 'route' };
+        let audioSettings = { audio_start: '', audio_exercise_mode: 'record' };
 
         if (updatedUser.settings_json) {
             try {
@@ -2116,15 +2099,12 @@ async function saveProfile(options = {}) {
                 audioSettings = {
                     audio_start: audio.start || '',
                     audio_exercise_mode: audio.exercise_mode || 'record',
-                    speech_recognition_mode: audio.speech_recognition_mode || 'route'
                 };
             } catch (e) { }
         }
 
         if (!audioSettings.audio_start && updatedUser.audio_start !== undefined) audioSettings.audio_start = updatedUser.audio_start;
-        if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updatedUser.speech_recognition_mode !== undefined) audioSettings.speech_recognition_mode = updatedUser.speech_recognition_mode;
         if (!audioSettings.audio_start) audioSettings.audio_start = updateData.audio_start || '';
-        if ((audioSettings.speech_recognition_mode === 'route' || audioSettings.speech_recognition_mode === '') && updateData.speech_recognition_mode !== undefined) audioSettings.speech_recognition_mode = updateData.speech_recognition_mode;
 
         let assignmentHistoryRetentionDaysAfterSave = 7;
         try {
@@ -2144,7 +2124,6 @@ async function saveProfile(options = {}) {
             audio_success: audioSettings.audio_success,
             audio_repeats: audioSettings.audio_repeats,
             audio_required_passed_star_half: audioSettings.audio_required_passed_star_half,
-            speech_recognition_mode: audioSettings.speech_recognition_mode,
             assignment_history_retention_days: assignmentHistoryRetentionDaysAfterSave,
             daily_activity_goal: (() => {
                 try {
@@ -2196,7 +2175,6 @@ async function saveProfile(options = {}) {
             UM.userData.audio_success = originalData.audio_success;
             UM.userData.audio_repeats = originalData.audio_repeats;
             UM.userData.audio_required_passed_star_half = originalData.audio_required_passed_star_half;
-            UM.userData.speech_recognition_mode = originalData.speech_recognition_mode;
 
             setTimeout(() => {
                 if (UM && UM.setupAuthenticatedUser) UM.setupAuthenticatedUser(UM.userData);
@@ -2210,7 +2188,6 @@ async function saveProfile(options = {}) {
                 success: originalData.audio_success,
                 repeats: originalData.audio_repeats,
                 required_passed_star_half: originalData.audio_required_passed_star_half,
-                speech_recognition_mode: originalData.speech_recognition_mode
             };
 
             if (updatedUser.settings_json) {
@@ -2228,7 +2205,6 @@ async function saveProfile(options = {}) {
                         without_entering_text: Boolean(audio.without_entering_text),
                         show_text: Boolean(audio.show_text),
                         required_passed_star_half: audio.required_passed_star_half !== undefined ? audio.required_passed_star_half : originalData.audio_required_passed_star_half,
-                        speech_recognition_mode: audio.speech_recognition_mode || originalData.speech_recognition_mode
                     };
                 } catch (e) { }
             }

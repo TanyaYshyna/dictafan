@@ -1207,8 +1207,10 @@ class AudioSettingsPanel {
     getSpeechRecognitionIcon(mode) {
         const icons = {
             'route': 'route',
-            'route-server': 'server',
-            'route-off': 'route-off'
+            'server': 'server',
+            'route-off|tiny': 'house-heart',
+            'route-off|base': 'house',
+            'route-off|small': 'house-plus',
         };
         return icons[mode] || 'route';
     }
@@ -1218,9 +1220,14 @@ class AudioSettingsPanel {
      */
     getSpeechRecognitionLabel(mode) {
         const norm = String(mode || 'route');
-        if (norm === 'route-server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
-        if (norm === 'route-off') return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
-        return this._t('profile.audio.speech_recognition.mode_internet', null, 'интернет');
+        if (norm === 'server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
+        if (norm.startsWith('route-off')) {
+            if (norm.includes('tiny')) return this._t('profile.audio.speech_recognition.mode_local_tiny', null, 'Whisper Tiny');
+            if (norm.includes('base')) return this._t('profile.audio.speech_recognition.mode_local_base', null, 'Whisper Base');
+            if (norm.includes('small')) return this._t('profile.audio.speech_recognition.mode_local_small', null, 'Whisper Small');
+            return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
+        }
+        return this._t('profile.audio.speech_recognition.mode_internet', null, 'інтернет');
     }
 
     /**

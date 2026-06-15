@@ -694,7 +694,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
 #audioSettingsModal .dictation-settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-areas: "order params";
+  grid-template-areas: "order params" "speech-rec speech-rec";
   gap: 16px;
 }
 
@@ -849,8 +849,65 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
     grid-template-columns: 1fr;
     grid-template-areas:
       "order"
-      "params";
+      "params"
+      "speech-rec";
   }
+}
+
+#audioSettingsModal .dictation-settings-card-speech-rec {
+  grid-area: speech-rec;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]:checked::after {
+  transform: scale(1);
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode-device {
+  padding-left: 32px;
 }
 
 #dictationModal .dictation-modal__header {

@@ -74,12 +74,12 @@
         }
 
         // WebSpeech on Android Chrome is sensitive to the start timing.
-        if (this.state.mode === 'online') {
+        if (this.state.mode === 'online' || this.state.mode === 'route') {
           try {
             const delayMs = this._isAndroidChrome() ? 180 : 0;
             setTimeout(() => {
               try {
-                if (this.state.mode === 'online' && this.state.isRecording) {
+                if ((this.state.mode === 'online' || this.state.mode === 'route') && this.state.isRecording) {
                   try { console.log('[UnifiedSpeechRecognition] startRecording: вызываем _initWebSpeech, язык =', this.state.language); } catch (e) {}
                   this._initWebSpeech();
                 }
@@ -97,7 +97,7 @@
 
     async stopRecording(cause) {
       try {
-        const isOnline = this.state.mode === 'online';
+        const isOnline = this.state.mode === 'online' || this.state.mode === 'route';
         const rec = this._recognition;
         const mySessionId = this._sessionId;
 

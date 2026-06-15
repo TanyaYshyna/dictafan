@@ -338,8 +338,23 @@
       try {
         const wrap = this.els.recognitionModeIcon;
         if (!wrap) return;
-        const m = String(mode || 'online');
-        const iconName = (m === 'offline') ? 'route-off' : (m === 'server') ? 'server' : 'route';
+        const m = String(mode || 'route');
+        // Определяем иконку по режиму
+        let iconName = 'route';
+        if (m === 'server') {
+          iconName = 'server';
+        } else if (m === 'route-off') {
+          // Пытаемся определить размер модели из localStorage
+          try {
+            const lsVal = localStorage.getItem('dictafan_speech_rec_mode') || '';
+            if (lsVal.includes('|tiny')) iconName = 'house-heart';
+            else if (lsVal.includes('|base')) iconName = 'house';
+            else if (lsVal.includes('|small')) iconName = 'house-plus';
+            else iconName = 'house-heart'; // fallback
+          } catch (e) {
+            iconName = 'house-heart';
+          }
+        }
         wrap.innerHTML = `<i data-lucide="${iconName}"></i>`;
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();

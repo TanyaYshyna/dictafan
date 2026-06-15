@@ -3049,12 +3049,15 @@
     try {
       let speechRecMode = 'route';
       try {
-        if (window.UM && UM.userData && UM.userData.speech_recognition_mode) {
-          speechRecMode = String(UM.userData.speech_recognition_mode);
+        const lsVal = localStorage.getItem('dictafan_speech_rec_mode');
+        if (lsVal) {
+          speechRecMode = String(lsVal);
         }
-      } catch (eSm) {
+      } catch (eLs) {
       }
-      panel.setMode(speechRecMode);
+      // Нормализуем: route-off|tiny → route-off (для speech_recognition_unified.js)
+      const normalized = speechRecMode.startsWith('route-off') ? 'route-off' : speechRecMode;
+      panel.setMode(normalized);
     } catch (eSm2) {
     }
 
@@ -4548,6 +4551,62 @@
     doClose();
   }
 
+  const LS_SPEECH_REC_MODE_KEY = 'dictafan_speech_rec_mode';
+
+  function _readSpeechRecModeFromLS() {
+    try {
+      const v = localStorage.getItem(LS_SPEECH_REC_MODE_KEY);
+      if (v) return String(v);
+    } catch (e) {}
+    return 'route';
+  }
+
+  function _writeSpeechRecModeToLS(mode) {
+    try {
+      localStorage.setItem(LS_SPEECH_REC_MODE_KEY, String(mode || 'route'));
+    } catch (e) {}
+  }
+
+  function _getDownloadedWhisperSizes() {
+    try {
+      const raw = localStorage.getItem('dictafan_downloaded_models_v2');
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      const sizes = [];
+      for (const key of Object.keys(parsed || {})) {
+        if (key.includes('whisper-tiny')) sizes.push('tiny');
+        if (key.includes('whisper-base')) sizes.push('base');
+        if (key.includes('whisper-small')) sizes.push('small');
+      }
+      return sizes;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function _updateDeviceModeVisibility() {
+    try {
+      const downloaded = _getDownloadedWhisperSizes();
+      const labels = document.querySelectorAll('#audioSettingsModal .dictation-settings-speech-rec-mode-device');
+      labels.forEach((label) => {
+        const size = String(label.dataset.modelSize || '');
+        const isDownloaded = downloaded.includes(size);
+        label.style.display = isDownloaded ? '' : 'none';
+      });
+    } catch (e) {}
+  }
+
+  function _getSelectedSpeechRecMode() {
+    try {
+      const m = document.getElementById('audioSettingsModal');
+      if (!m) return 'route';
+      const checked = m.querySelector('input[name="modal-speechRecMode"]:checked');
+      return checked ? String(checked.value || 'route') : 'route';
+    } catch (e) {
+      return 'route';
+    }
+  }
+
   function initAudioSettingsModal() {
     try {
       const m = document.getElementById('audioSettingsModal');
@@ -4618,6 +4677,26 @@
         }
       };
 
+      const applySpeechRecModeToUI = () => {
+        try {
+          const mode = _readSpeechRecModeFromLS();
+          const radios = m.querySelectorAll('input[name="modal-speechRecMode"]');
+          let found = false;
+          radios.forEach((r) => {
+            if (String(r.value) === mode) {
+              r.checked = true;
+              found = true;
+            }
+          });
+          if (!found) {
+            // Fallback: если сохранённый режим не найден (например, модель удалена из кеша), ставим 'route'
+            const first = m.querySelector('input[name="modal-speechRecMode"][value="route"]');
+            if (first) first.checked = true;
+            _writeSpeechRecModeToLS('route');
+          }
+        } catch (e) {}
+      };
+
       const applyToUI = (settings) => {
         try {
           if (startInput) startInput.value = (settings && settings.start != null) ? String(settings.start || '') : defaults.start;
@@ -4632,6 +4711,10 @@
           if (rbOnlyHint) rbOnlyHint.checked = mode === 'audio-only-hint';
         } catch (e2) {
         }
+
+        // Применяем режим распознавания из localStorage
+        _updateDeviceModeVisibility();
+        applySpeechRecModeToUI();
       };
 
       const applyToRuntime = () => {
@@ -4670,6 +4753,11 @@
 
       window.__dictafanSaveAudioSettingsModal = async () => {
         try {
+          // Сохраняем speech_recognition_mode в localStorage
+          const speechRecMode = _getSelectedSpeechRecMode();
+          _writeSpeechRecModeToLS(speechRecMode);
+
+          // Сохраняем остальные настройки на сервер
           const um = window.UM;
           if (!um || !um.userData || typeof um.updateProfile !== 'function') return;
 
@@ -4747,6 +4835,17 @@
         [rbRecord, rbNoRecord, rbOnlyNoHint, rbOnlyHint].forEach((rb) => {
           if (!rb) return;
           rb.addEventListener('change', () => onAnyChange());
+        });
+      } catch (e) {
+      }
+
+      // Слушаем изменения радио для speech_recognition_mode
+      try {
+        const speechRecRadios = m.querySelectorAll('input[name="modal-speechRecMode"]');
+        speechRecRadios.forEach((r) => {
+          r.addEventListener('change', () => {
+            setDirty(true);
+          });
         });
       } catch (e) {
       }
