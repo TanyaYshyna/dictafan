@@ -3042,6 +3042,7 @@
         const dictationData = document.getElementById('dictation-data');
         langOrig = dictationData ? String(dictationData.getAttribute('data-language-original') || '') : '';
       }
+      console.log('[DictationModal] ensureSpeechPanel: язык диктанта', langOrig, '(parsed?.langOriginal =', parsed?.langOriginal, ')');
       if (langOrig) panel.setLanguage(langOrig);
     } catch (e3) {
     }

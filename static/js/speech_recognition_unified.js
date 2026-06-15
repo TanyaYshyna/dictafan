@@ -210,6 +210,7 @@
       this._recognition = rec;
       const mySessionId = this._sessionId;
       rec.lang = this.state.language;
+      console.log('[UnifiedSpeechRecognition] _initWebSpeech: язык распознавания', rec.lang, '(state.language =', this.state.language, ')');
       // Android Chrome often returns empty transcripts in continuous+interim mode.
       // Prefer single-utterance recognition with final results.
       rec.interimResults = !isAndroidChrome;
