@@ -116,6 +116,7 @@
   class DictationSession {
     constructor({ content, exerciseId = null, subsetPositions = null }) {
       this.content = content;
+      this.dictationId = content ? content.dictationId : null;
 
       this.exerciseId = (exerciseId != null && exerciseId !== '') ? String(exerciseId) : null;
       this.subsetPositions = _normalizeSubsetPositions(subsetPositions);
