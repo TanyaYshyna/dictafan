@@ -17,8 +17,10 @@
 (function () {
   if (window.OutboxBatcher) return;
 
-  const BATCH_INTERVAL_MS = 600000; // 600 секунд (10 минут) между батчами
+  const BATCH_INTERVAL_MS = 300000; // 300 секунд (5 минут) между батчами
   const MAX_BATCH_SIZE = 20; // макс. количество записей в одном батче
+
+  const TAG = '[OutboxBatcher]';
 
   const state = {
     activityTimerId: null,
@@ -63,7 +65,12 @@
         selectedSentencePositions,
       } = params || {};
 
-      if (!dictationId || !type) return false;
+      if (!dictationId || !type) {
+        console.warn(TAG, 'enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
+        return false;
+      }
+
+      console.log(TAG, `enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode}`);
 
       const userId = _getUserId();
       if (!userId) return false;
@@ -99,10 +106,12 @@
       await window.IdbManager.idbPut('activity_outbox', existing);
 
       state.pendingActivityCount += 1;
+      console.log(TAG, `enqueueActivity: сохранено в IndexedDB (key=${key}), pending=${state.pendingActivityCount}`);
       _scheduleActivityFlush();
 
       return true;
     } catch (e) {
+      console.warn(TAG, 'enqueueActivity: ошибка', e);
       return false;
     }
   }
@@ -140,17 +149,22 @@
   async function _flushActivityOutbox() {
     if (state.flushing) return;
     state.flushing = true;
+    console.log(TAG, '_flushActivityOutbox: начало');
     try {
       if (!_hasToken()) {
+        console.warn(TAG, '_flushActivityOutbox: нет токена');
         state.pendingActivityCount = 0;
         return;
       }
 
       const rows = await window.IdbManager.idbGetAll('activity_outbox');
       if (!rows.length) {
+        console.log(TAG, '_flushActivityOutbox: нет записей');
         state.pendingActivityCount = 0;
         return;
       }
+
+      console.log(TAG, `_flushActivityOutbox: найдено ${rows.length} записей`);
 
       const token = _getToken();
       let successCount = 0;
@@ -176,23 +190,29 @@
           });
 
           if (response.ok) {
+            console.log(TAG, `_flushActivityOutbox: отправлено успешно key=${row.key}`);
             await window.IdbManager.idbDelete('activity_outbox', row.key);
             successCount += 1;
           } else if (response.status === 401) {
+            console.warn(TAG, '_flushActivityOutbox: 401 Unauthorized');
             // Токен протух — не удаляем, ждём
             break;
           } else {
+            console.warn(TAG, `_flushActivityOutbox: ошибка ${response.status}`, row);
             // Временная ошибка — пробуем позже
             break;
           }
         } catch (e) {
+          console.warn(TAG, '_flushActivityOutbox: ошибка сети', e);
           // Ошибка сети — выходим, остальное отправится в следующий раз
           break;
         }
       }
 
+      console.log(TAG, `_flushActivityOutbox: отправлено ${successCount} из ${rows.length}`);
       state.pendingActivityCount = Math.max(0, state.pendingActivityCount - successCount);
     } catch (e) {
+      console.warn(TAG, '_flushActivityOutbox: общая ошибка', e);
     } finally {
       state.flushing = false;
     }
@@ -206,10 +226,16 @@
    */
   async function enqueueSuccess(payload) {
     try {
-      if (!payload || !payload.dictation_id) return false;
+      if (!payload || !payload.dictation_id) {
+        console.warn(TAG, 'enqueueSuccess: пропущено (нет dictation_id)', payload);
+        return false;
+      }
 
       const userId = _getUserId();
-      if (!userId) return false;
+      if (!userId) {
+        console.warn(TAG, 'enqueueSuccess: пропущено (нет userId)');
+        return false;
+      }
 
       const rawId = String(payload.dictation_id).trim();
       const dateId = payload.date || _getLocalDateId();
@@ -227,10 +253,12 @@
       });
 
       state.pendingSuccessCount += 1;
+      console.log(TAG, `enqueueSuccess: сохранено (key=${key}) perfect=${payload.perfect_count} corrected=${payload.corrected_count} audio=${payload.audio_count}`);
       _scheduleSuccessFlush();
 
       return true;
     } catch (e) {
+      console.warn(TAG, 'enqueueSuccess: ошибка', e);
       return false;
     }
   }
@@ -239,11 +267,17 @@
    * Добавить success как urgent — отправляется немедленно.
    */
   async function enqueueSuccessUrgent(payload) {
+    console.log(TAG, 'enqueueSuccessUrgent: отправка', { dictation_id: payload?.dictation_id, perfect: payload?.perfect_count, corrected: payload?.corrected_count, audio: payload?.audio_count });
     try {
       const sent = await _sendSuccessBatch([payload]);
-      if (sent) return true;
+      if (sent) {
+        console.log(TAG, 'enqueueSuccessUrgent: отправлено успешно');
+        return true;
+      }
+      console.warn(TAG, 'enqueueSuccessUrgent: не удалось, падаем в deferred outbox');
       return await enqueueSuccess(payload);
     } catch (e) {
+      console.warn(TAG, 'enqueueSuccessUrgent: ошибка, падаем в deferred outbox', e);
       return await enqueueSuccess(payload);
     }
   }
@@ -265,23 +299,29 @@
   async function _flushSuccessOutbox() {
     if (state.flushing) return;
     state.flushing = true;
+    console.log(TAG, '_flushSuccessOutbox: начало');
     try {
       if (!_hasToken()) {
+        console.warn(TAG, '_flushSuccessOutbox: нет токена');
         state.pendingSuccessCount = 0;
         return;
       }
 
       const rows = await window.IdbManager.idbGetAll('success_outbox');
       if (!rows.length) {
+        console.log(TAG, '_flushSuccessOutbox: нет записей');
         state.pendingSuccessCount = 0;
         return;
       }
+
+      console.log(TAG, `_flushSuccessOutbox: найдено ${rows.length} записей`);
 
       const token = _getToken();
       let successCount = 0;
 
       for (const row of rows) {
         try {
+          console.log(TAG, `_flushSuccessOutbox: отправка key=${row.key}`, { dictation_id: row.payload?.dictation_id });
           const response = await fetch('/api/statistics/success', {
             method: 'POST',
             headers: {
@@ -292,20 +332,26 @@
           });
 
           if (response.ok) {
+            console.log(TAG, `_flushSuccessOutbox: отправлено успешно key=${row.key}`);
             await window.IdbManager.idbDelete('success_outbox', row.key);
             successCount += 1;
           } else if (response.status === 401) {
+            console.warn(TAG, '_flushSuccessOutbox: 401 Unauthorized');
             break;
           } else {
+            console.warn(TAG, `_flushSuccessOutbox: ошибка ${response.status}`, row);
             break;
           }
         } catch (e) {
+          console.warn(TAG, '_flushSuccessOutbox: ошибка сети', e);
           break;
         }
       }
 
+      console.log(TAG, `_flushSuccessOutbox: отправлено ${successCount} из ${rows.length}`);
       state.pendingSuccessCount = Math.max(0, state.pendingSuccessCount - successCount);
     } catch (e) {
+      console.warn(TAG, '_flushSuccessOutbox: общая ошибка', e);
     } finally {
       state.flushing = false;
     }
@@ -408,7 +454,12 @@
   async function _sendActivityBatch(items) {
     try {
       const token = _getToken();
-      if (!token) return false;
+      if (!token) {
+        console.warn(TAG, '_sendActivityBatch: нет токена');
+        return false;
+      }
+
+      console.log(TAG, `_sendActivityBatch: отправка ${items.length} item(s)`, items.map(i => ({ type: i.type, count: i.count, dictationId: i.dictationId })));
 
       for (const item of items) {
         const response = await fetch('/api/statistics/activity', {
@@ -429,10 +480,16 @@
           }),
         });
 
-        if (!response.ok) return false;
+        if (response.ok) {
+          console.log(TAG, `_sendActivityBatch: успешно type=${item.type} dictationId=${item.dictationId}`);
+        } else {
+          console.warn(TAG, `_sendActivityBatch: ошибка ${response.status} type=${item.type} dictationId=${item.dictationId}`);
+          return false;
+        }
       }
       return true;
     } catch (e) {
+      console.warn(TAG, '_sendActivityBatch: ошибка сети', e);
       return false;
     }
   }
@@ -441,7 +498,12 @@
   async function _sendSuccessBatch(items) {
     try {
       const token = _getToken();
-      if (!token) return false;
+      if (!token) {
+        console.warn(TAG, '_sendSuccessBatch: нет токена');
+        return false;
+      }
+
+      console.log(TAG, `_sendSuccessBatch: отправка ${items.length} item(s)`, items.map(i => ({ dictation_id: i.dictation_id, perfect: i.perfect_count, corrected: i.corrected_count, audio: i.audio_count })));
 
       for (const item of items) {
         const response = await fetch('/api/statistics/success', {
@@ -453,10 +515,16 @@
           body: JSON.stringify(item),
         });
 
-        if (!response.ok) return false;
+        if (response.ok) {
+          console.log(TAG, `_sendSuccessBatch: успешно dictation_id=${item.dictation_id}`);
+        } else {
+          console.warn(TAG, `_sendSuccessBatch: ошибка ${response.status} dictation_id=${item.dictation_id}`);
+          return false;
+        }
       }
       return true;
     } catch (e) {
+      console.warn(TAG, '_sendSuccessBatch: ошибка сети', e);
       return false;
     }
   }

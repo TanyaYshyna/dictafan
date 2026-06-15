@@ -3047,6 +3047,18 @@
     }
 
     try {
+      let speechRecMode = 'route';
+      try {
+        if (window.UM && UM.userData && UM.userData.speech_recognition_mode) {
+          speechRecMode = String(UM.userData.speech_recognition_mode);
+        }
+      } catch (eSm) {
+      }
+      panel.setMode(speechRecMode);
+    } catch (eSm2) {
+    }
+
+    try {
       const view = getCurrentSentenceViewFromSession(session);
       if (view) panel.setExpectedText(String(view.text_original != null ? view.text_original : (view.text != null ? view.text : '')));
     } catch (e4) {

@@ -9,6 +9,8 @@
       this._expectedText = '';
       this._isProcessing = false;
       this._isAudioComplete = false;
+      this._language = 'en-US';
+      this._mode = 'online';
 
       this.MIN_MATCH_PERCENT = Number.isFinite(Number(options.minMatchPercent))
         ? Number(options.minMatchPercent)
@@ -74,6 +76,7 @@
 
     setLanguage(langCode) {
       const lc = String(langCode || '').trim() || 'en-US';
+      this._language = lc;
       if (this._rec && this._rec.state) {
         this._rec.state.language = lc;
       }
@@ -81,6 +84,7 @@
 
     setMode(mode) {
       const m = String(mode || '').trim() || 'online';
+      this._mode = m;
       if (this._rec && this._rec.state) {
         this._rec.state.mode = m;
       }
@@ -137,8 +141,8 @@
       }
 
       this._rec = new window.UnifiedSpeechRecognition({
-        language: 'en-US',
-        mode: 'online',
+        language: this._language,
+        mode: this._mode,
         transcriptContainer: this.els.userAudioAnswer,
       });
 
