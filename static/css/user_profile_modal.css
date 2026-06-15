@@ -653,8 +653,7 @@
   height: 36px;
   border-radius: 8px;
   cursor: pointer;
-  background: var(--color-bg-secondary, #f0f2f5);
-  color: var(--color-purple-text, #7b2d8e);
+  color: var(--color-button-purple);
   transition: background 0.15s, color 0.15s;
   flex: 0 0 auto;
 }

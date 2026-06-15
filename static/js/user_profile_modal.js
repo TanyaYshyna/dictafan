@@ -2334,14 +2334,19 @@ function bindProfileTestRecording() {
 
     // Переключение режима по кругу при клике на иконку
     if (modeIcon) {
+        console.log('[profile] modeIcon найден, вешаю обработчик клика');
         modeIcon.addEventListener('click', (e) => {
             e.stopPropagation();
+            console.log('[profile] modeIcon клик!');
             const available = getAvailableModes();
+            console.log('[profile] доступные режимы:', available);
             if (available.length === 0) return;
             const current = _readSpeechRecModeFromLS();
+            console.log('[profile] текущий режим:', current);
             let idx = available.indexOf(current);
             if (idx === -1) idx = -1;
             const next = available[(idx + 1) % available.length];
+            console.log('[profile] следующий режим:', next);
             _writeSpeechRecModeToLS(next);
             updateModeIcon();
         });
@@ -2393,9 +2398,10 @@ function bindProfileTestRecording() {
             return;
         }
 
-        if (mode !== 'route-off') {
+        if (!mode.startsWith('route-off')) {
             setResult('');
-            setStatus('Для теста выбери режим «локально»', '#b00020');
+            const label = MODE_LABELS[mode] || mode;
+            setStatus('Режим «' + label + '» не підтримує тест. Оберіть локальний режим (на пристрої)', '#b00020');
             return;
         }
 
