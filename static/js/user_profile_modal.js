@@ -2572,6 +2572,7 @@ async function initUserProfilePageOrModal() {
         setupFormListeners();
         initializeTopbarControls();
         setupPasswordToggles();
+        bindProfileTestRecording();
 
         try { installProfileSaveHotkey(); } catch (e) { }
 

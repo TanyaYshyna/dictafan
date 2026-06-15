@@ -637,6 +637,13 @@
   word-break: break-word;
 }
 
+#user-profile-modal .models-centric-test-recording-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
 #user-profile-modal .profile-speech-rec-mode-icon {
   display: inline-flex;
   align-items: center;
@@ -646,14 +653,14 @@
   border-radius: 8px;
   cursor: pointer;
   background: var(--color-bg-secondary, #f0f2f5);
-  color: var(--color-text, #1f2933);
+  color: var(--color-purple-text, #7b2d8e);
   transition: background 0.15s, color 0.15s;
   flex: 0 0 auto;
 }
 
 #user-profile-modal .profile-speech-rec-mode-icon:hover {
   background: var(--color-bg-active, #e0e4e8);
-  color: var(--color-primary, #8B4513);
+  color: var(--color-purple-hover-text, #9b4dae);
 }
 
 #user-profile-modal .profile-speech-rec-mode-icon i[data-lucide] {
