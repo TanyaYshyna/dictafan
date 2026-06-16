@@ -4568,7 +4568,8 @@
 
   function _getDownloadedWhisperSizes() {
     try {
-      const raw = localStorage.getItem('dictafan_downloaded_models_v2');
+      // LanguageSelector хранит downloaded_models_v2, а не dictafan_downloaded_models_v2
+      const raw = localStorage.getItem('downloaded_models_v2');
       if (!raw) return [];
       const parsed = JSON.parse(raw);
       const sizes = [];
@@ -4583,15 +4584,30 @@
     }
   }
 
-  function _updateDeviceModeVisibility() {
+  // Конфигурация device-режимов: размер → { icon, label }
+  var DEVICE_MODE_CONFIG = {
+    tiny:  { icon: 'house-heart', label: 'Whisper Tiny · 75 MB' },
+    base:  { icon: 'house',       label: 'Whisper Base · 145 MB' },
+    small: { icon: 'house-plus',  label: 'Whisper Small · 480 MB' },
+  };
+
+  function _renderDeviceModes() {
     try {
-      const downloaded = _getDownloadedWhisperSizes();
-      const labels = document.querySelectorAll('#audioSettingsModal .dictation-settings-speech-rec-mode-device');
-      labels.forEach((label) => {
-        const size = String(label.dataset.modelSize || '');
-        const isDownloaded = downloaded.includes(size);
-        label.style.display = isDownloaded ? '' : 'none';
-      });
+      var container = document.querySelector('#audioSettingsModal [data-role="device-modes-container"]');
+      if (!container) return;
+      var downloaded = _getDownloadedWhisperSizes();
+      var html = '';
+      for (var i = 0; i < downloaded.length; i++) {
+        var size = downloaded[i];
+        var cfg = DEVICE_MODE_CONFIG[size];
+        if (!cfg) continue;
+        var value = 'route-off|' + size;
+        html += '<label class="dictation-settings-speech-rec-mode dictation-settings-speech-rec-mode-device" data-mode="route-off" data-model-size="' + size + '">';
+        html += '<input type="radio" name="modal-speechRecMode" value="' + value + '" />';
+        html += '<span class="dictation-settings-inline"><i data-lucide="' + cfg.icon + '"></i><span>На пристрої ' + cfg.label + '</span></span>';
+        html += '</label>';
+      }
+      container.innerHTML = html;
     } catch (e) {}
   }
 
@@ -4712,7 +4728,7 @@
         }
 
         // Применяем режим распознавания из localStorage
-        _updateDeviceModeVisibility();
+        _renderDeviceModes();
         applySpeechRecModeToUI();
       };
 
@@ -4898,6 +4914,9 @@
     try {
       const m = document.getElementById('audioSettingsModal');
       if (!m) return;
+      // Перерендериваем device-режимы при каждом открытии (модели могли измениться)
+      _renderDeviceModes();
+      applySpeechRecModeToUI();
       m.style.display = 'flex';
       renderLucide(m);
     } catch (e) {

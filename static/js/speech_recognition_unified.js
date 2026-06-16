@@ -89,6 +89,29 @@
           } catch (e) {
           }
         }
+
+        // Offline Whisper mode: ensure model is loaded before recording ends.
+        if (this.state.mode && this.state.mode.startsWith('route-off|') && window.WhisperModelManager) {
+          try {
+            const parts = this.state.mode.split('|');
+            const modelSize = parts.length > 1 ? parts[1] : 'base';
+            const mm = new window.WhisperModelManager();
+            const modelKey = mm._getModelKey('en', modelSize);
+            const storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
+            if (!storedModel || !storedModel.recognizer) {
+              try { console.log('[UnifiedSpeechRecognition] Whisper model not in memory, loading ' + modelSize + '...'); } catch (e) {}
+              // Don't await — load in background, stopRecording() will await if needed.
+              this._whisperLoadPromise = mm.loadLanguageModel('en', modelSize);
+              this._whisperLoadPromise.then(function() {
+                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
+              }).catch(function(err) {
+                try { console.error('[UnifiedSpeechRecognition] Whisper load error:', err); } catch (e) {}
+              });
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Whisper preload error:', e); } catch (e2) {}
+          }
+        }
       } catch (e) {
         this._emitError(e);
         throw e;
@@ -98,6 +121,8 @@
     async stopRecording(cause) {
       try {
         const isOnline = this.state.mode === 'online' || this.state.mode === 'route';
+        const isServer = this.state.mode === 'server';
+        const isOffline = this.state.mode && this.state.mode.startsWith('route-off|');
         const rec = this._recognition;
         const mySessionId = this._sessionId;
 
@@ -116,7 +141,7 @@
             // If stop fails, we still proceed to stop recorder and return what we have.
           }
         } else {
-          // Offline mode does not use WebSpeech results; ignore any stale events.
+          // Offline/server mode does not use WebSpeech results; ignore any stale events.
           this._ignoreResults = true;
           if (rec) {
             try {
@@ -158,6 +183,100 @@
           if (mySessionId !== this._sessionId) {
             this._finalText = '';
             this._lastText = '';
+          }
+        }
+
+        // Server mode: send audio to server-side Whisper endpoint.
+        if (isServer && this._audioBlob) {
+          try {
+            const langCode = this.state.language ? this.state.language.split('-')[0].toLowerCase() : 'en';
+
+            if (typeof this.callbacks.onProcessingStart === 'function') {
+              this.callbacks.onProcessingStart();
+            }
+
+            const formData = new FormData();
+            formData.append('audio', this._audioBlob, 'recording.webm');
+            formData.append('lang', langCode);
+
+            const resp = await fetch('/api/speech-recognition/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!resp.ok) {
+              throw new Error('Server transcribe failed: ' + resp.status);
+            }
+
+            const data = await resp.json();
+            const transcribed = data && data.text ? String(data.text).trim() : '';
+            this._finalText = transcribed;
+            this._lastText = transcribed;
+
+            if (transcribed && typeof this.callbacks.onFinalTranscript === 'function') {
+              this.callbacks.onFinalTranscript(transcribed);
+            }
+            if (transcribed && typeof this.callbacks.onTranscript === 'function') {
+              this.callbacks.onTranscript(transcribed, true);
+            }
+
+            if (typeof this.callbacks.onProcessingEnd === 'function') {
+              this.callbacks.onProcessingEnd();
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Server transcribe error:', e); } catch (e2) {}
+            if (typeof this.callbacks.onError === 'function') {
+              this.callbacks.onError(e);
+            }
+          }
+        }
+
+        // Offline Whisper mode: transcribe the recorded audio blob locally.
+        if (isOffline && this._audioBlob) {
+          try {
+            const parts = this.state.mode.split('|');
+            const modelSize = parts.length > 1 ? parts[1] : 'base';
+            const langCode = this.state.language ? this.state.language.split('-')[0].toLowerCase() : 'en';
+
+            if (typeof this.callbacks.onProcessingStart === 'function') {
+              this.callbacks.onProcessingStart();
+            }
+
+            if (window.WhisperModelManager) {
+              const mm = new window.WhisperModelManager();
+              // Whisper is multilingual — loadLanguageModel uses 'en' as placeholder,
+              // the actual language is passed to transcribe().
+              const modelKey = mm._getModelKey('en', modelSize);
+              const storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
+              if (!storedModel || !storedModel.recognizer) {
+                // Model not loaded in memory yet — load it first.
+                try { console.log('[UnifiedSpeechRecognition] Whisper model not in memory, loading ' + modelSize + '...'); } catch (e) {}
+                await mm.loadLanguageModel('en', modelSize);
+                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
+              }
+              const result = await mm.transcribe(this._audioBlob, langCode, modelSize);
+              const transcribed = result && result.text ? String(result.text).trim() : '';
+              this._finalText = transcribed;
+              this._lastText = transcribed;
+
+              if (transcribed && typeof this.callbacks.onFinalTranscript === 'function') {
+                this.callbacks.onFinalTranscript(transcribed);
+              }
+              if (transcribed && typeof this.callbacks.onTranscript === 'function') {
+                this.callbacks.onTranscript(transcribed, true);
+              }
+            } else {
+              try { console.warn('[UnifiedSpeechRecognition] WhisperModelManager not available for offline mode'); } catch (e) {}
+            }
+
+            if (typeof this.callbacks.onProcessingEnd === 'function') {
+              this.callbacks.onProcessingEnd();
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Whisper transcribe error:', e); } catch (e2) {}
+            if (typeof this.callbacks.onError === 'function') {
+              this.callbacks.onError(e);
+            }
           }
         }
 

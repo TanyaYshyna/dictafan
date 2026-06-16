@@ -429,7 +429,7 @@
               </div>
 
               <div class="dictation-settings-card dictation-settings-card-speech-rec">
-                <div class="dictation-settings-title">Вид распознавания</div>
+                <div class="dictation-settings-title">Вид распознавання</div>
                 <div class="dictation-settings-speech-rec-modes" data-role="speech-rec-modes">
                   <label class="dictation-settings-speech-rec-mode" data-mode="route">
                     <input type="radio" name="modal-speechRecMode" value="route" />
@@ -439,18 +439,8 @@
                     <input type="radio" name="modal-speechRecMode" value="server" />
                     <span class="dictation-settings-inline"><i data-lucide="server"></i><span>На сервері Whisper Tiny</span></span>
                   </label>
-                  <label class="dictation-settings-speech-rec-mode dictation-settings-speech-rec-mode-device" data-mode="route-off" data-model-size="tiny" data-role="device-mode-tiny">
-                    <input type="radio" name="modal-speechRecMode" value="route-off|tiny" />
-                    <span class="dictation-settings-inline"><i data-lucide="house-heart"></i><span>На пристрої Whisper Tiny · 75 MB</span></span>
-                  </label>
-                  <label class="dictation-settings-speech-rec-mode dictation-settings-speech-rec-mode-device" data-mode="route-off" data-model-size="base" data-role="device-mode-base">
-                    <input type="radio" name="modal-speechRecMode" value="route-off|base" />
-                    <span class="dictation-settings-inline"><i data-lucide="house"></i><span>На пристрої Whisper Base · 145 MB</span></span>
-                  </label>
-                  <label class="dictation-settings-speech-rec-mode dictation-settings-speech-rec-mode-device" data-mode="route-off" data-model-size="small" data-role="device-mode-small">
-                    <input type="radio" name="modal-speechRecMode" value="route-off|small" />
-                    <span class="dictation-settings-inline"><i data-lucide="house-plus"></i><span>На пристрої Whisper Small · 480 MB</span></span>
-                  </label>
+                  <!-- Device-режимы (Whisper на пристрої) генеруються динамічно в JS -->
+                  <div data-role="device-modes-container"></div>
                 </div>
               </div>
             </div>
