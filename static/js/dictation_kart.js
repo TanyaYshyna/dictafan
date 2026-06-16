@@ -195,6 +195,52 @@ window.DictationKart = window.DictationKart || {
     return Array.from(new Set(urls.filter(Boolean)));
   },
 
+  async _fetchExercisesFromServer(dictationId) {
+    try {
+      const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+      const data = res && res.ok ? await res.json() : null;
+      const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
+      return raw.map((x) => {
+        const p = x && typeof x.positions === 'string'
+          ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })()
+          : (x && Array.isArray(x.positions) ? x.positions : []);
+        return { id: x && x.id != null ? x.id : null, positions: p };
+      });
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async _loadExercisesFromCache(dictationId) {
+    try {
+      const idb = window.IdbManager;
+      if (!idb || typeof idb.idbGet !== 'function') return null;
+      const cacheKey = `exercises:${String(dictationId)}`;
+      const cached = await idb.idbGet('dictations', cacheKey);
+      if (cached && Array.isArray(cached.exercises) && cached.exercises.length) {
+        return cached.exercises;
+      }
+    } catch (e) {
+    }
+    return null;
+  },
+
+  async _cacheExercises(dictationId, exercises) {
+    try {
+      const idb = window.IdbManager;
+      if (!idb || typeof idb.idbPut !== 'function') return;
+      const cacheKey = `exercises:${String(dictationId)}`;
+      await idb.idbPut('dictations', {
+        key: cacheKey,
+        dictationId: String(dictationId),
+        exercises,
+        updatedAt: Date.now(),
+      });
+    } catch (e) {
+    }
+  },
+
   async _swRequest(action, payload) {
     const p = payload && typeof payload === 'object' ? payload : {};
     if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
@@ -385,6 +431,17 @@ window.DictationKart = window.DictationKart || {
         }
       }
 
+      // Кешируем задания (exercises) для этого диктанта
+      try {
+        const numericId = String(dictationId || '').trim().replace(/^dict_/, '').trim();
+        const exercises = await this._fetchExercisesFromServer(numericId);
+        if (Array.isArray(exercises) && exercises.length) {
+          await this._cacheExercises(numericId, exercises);
+        }
+      } catch (e) {
+        // Не фатально, если не удалось закешировать задания
+      }
+
       const uniqueAudio = Array.from(new Set(allAudioUrls.filter(Boolean)));
 
       try {
@@ -545,14 +602,28 @@ window.DictationKart = window.DictationKart || {
 
           let exercises = [];
           try {
-            const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
-            const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-            const data = res && res.ok ? await res.json() : null;
-            const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
-            exercises = raw.map((x) => {
-              const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : x.positions;
-              return { id: x && x.id != null ? x.id : null, positions: normalizePositions(p) };
-            });
+            // Сначала проверяем кеш
+            const cached = await this._loadExercisesFromCache(dictationId);
+            if (Array.isArray(cached) && cached.length) {
+              exercises = cached.map((x) => ({
+                id: x && x.id != null ? x.id : null,
+                positions: normalizePositions(x && Array.isArray(x.positions) ? x.positions : []),
+              }));
+            } else {
+              // Нет в кеше — грузим с сервера и сразу кешируем
+              const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+              const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+              const data = res && res.ok ? await res.json() : null;
+              const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
+              exercises = raw.map((x) => {
+                const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : x.positions;
+                return { id: x && x.id != null ? x.id : null, positions: normalizePositions(p) };
+              });
+              // Кешируем полученные с сервера задания
+              if (Array.isArray(exercises) && exercises.length) {
+                this._cacheExercises(dictationId, exercises).catch(() => {});
+              }
+            }
           } catch (e1) {
             exercises = [];
           }
@@ -938,7 +1009,7 @@ window.DictationKart = window.DictationKart || {
           <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
           <div class="card-progress-stats"></div>
         </div>
-        <h3 class="short-title">${item.title || 'Без названия'}</h3>
+        <h3 class="short-title" title="${window.escapeHtml(item.title || 'Без названия')}">${item.title || 'Без названия'}</h3>
 
         <div class="short-meta short-meta--row">
           <div class="short-meta-left">
@@ -1098,7 +1169,10 @@ window.DictationKart = window.DictationKart || {
     }
 
     const titleSlot = node.querySelector('[data-slot="title"]');
-    if (titleSlot) titleSlot.textContent = item.title || 'Без названия';
+    if (titleSlot) {
+      titleSlot.textContent = item.title || 'Без названия';
+      titleSlot.setAttribute('title', item.title || 'Без названия');
+    }
 
     const langPairSlot = node.querySelector('[data-slot="langPair"]');
     if (langPairSlot) langPairSlot.textContent = `${langOriginal}`;

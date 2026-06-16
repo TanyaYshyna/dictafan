@@ -2,6 +2,15 @@
   display: block;
 }
 
+/* Десктопная карточка: обрезаем длинный заголовок через ellipsis */
+.page-index .desk-card .short-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+}
+
 .dictation-kart--book-row {
   width: 100%;
   min-width: 0;

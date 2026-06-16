@@ -459,6 +459,10 @@
             // Используем langTr из записи, если есть, иначе из данных сессии
             const langTr = String(rec.langTr || data.langTr || '').trim();
             const content = this.getOrCreateContent({ dictationId: dictId, langTr });
+            // Если контент пустой (нет предложений) — не восстанавливаем сессию,
+            // она будет создана заново при открытии диктанта
+            const allKeys = content ? content.getAllKeys() : [];
+            if (!allKeys.length) continue;
             const session = DictationSession.fromJSON(data, content);
             // Используем ключ из IDB записи, чтобы при повторном открытии
             // getOrCreateSession мог найти эту сессию по правильному ключу

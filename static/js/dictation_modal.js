@@ -3966,6 +3966,14 @@
     const langTr = String(parsed?.langTranslation || '').trim();
     if (!dictationId || !langTr) return null;
 
+    // Проверяем, что контент загружен и не пустой
+    const content = store.getContent({ dictationId, langTr });
+    const allKeys = content ? content.getAllKeys() : [];
+    if (!allKeys.length) {
+      // Контент не загружен — не создаём сессию с пустыми данными
+      return null;
+    }
+
     const session = store.getOrCreateSession({
       dictationId,
       langTr,
@@ -3975,8 +3983,6 @@
     });
 
     try {
-      const content = store.getContent({ dictationId, langTr });
-      const allKeys = content ? content.getAllKeys() : [];
       const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
       if (!hasSubset) {
         session.setActiveSubsetByKeys(allKeys);
@@ -5350,6 +5356,30 @@
       }
     } catch (e) {
     }
+
+    // Очищаем поля ввода от предыдущего диктанта,
+    // чтобы при закрытии start-модалки не показывался старый текст
+    try {
+      const input = document.getElementById('userInput');
+      if (input) {
+        input.textContent = '';
+        input.setAttribute('contenteditable', 'true');
+      }
+    } catch (e) {
+    }
+    try {
+      const correct = document.getElementById('correctAnswer');
+      if (correct) {
+        correct.textContent = '';
+        correct.style.display = 'none';
+      }
+    } catch (e) {
+    }
+    try {
+      const errorLabel = document.getElementById('errorCountLabel');
+      if (errorLabel) errorLabel.textContent = '';
+    } catch (e) {
+    }
   }
 
   function bindHeaderButtons() {
@@ -5468,16 +5498,27 @@
       } catch (e) {
       }
 
+      // Загружаем контент диктанта (предложения) в runtime.
+      // Если загрузка не удалась — не создаём сессию, показываем ошибку.
+      let contentLoaded = false;
       try {
         if (parsed) {
           await ensureDictationContentLoadedToRuntime(parsed);
+          contentLoaded = true;
         }
       } catch (e) {
+        contentLoaded = false;
+        try {
+          if (typeof window.showNoSelectionModal === 'function') {
+            window.showNoSelectionModal('Не удалось загрузить диктант. Проверь интернет и обнови страницу.');
+          }
+        } catch (e1) {
+        }
       }
 
       try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
-        const session = parsed ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
+        const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
         if (session) {
           try {
             window.__dictationModalActiveSession = session;
