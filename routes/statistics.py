@@ -89,10 +89,10 @@ def api_statistics_money_spend():
         cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
         cur.execute(
             """
-            INSERT INTO user_money_ledger (user_id, delta, reason, dictation_id, positions)
+            INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions)
             VALUES (%s, %s, %s, %s, %s)
             """,
-            (int(user['id']), -cost, reason, dictation_id, pos_norm),
+            (int(user['id']), cost, reason, dictation_id, pos_norm),
         )
         conn.commit()
         return jsonify({'success': True, 'money_balance': new_balance})
@@ -164,7 +164,7 @@ def api_statistics_money_earn():
         cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
         cur.execute(
             """
-            INSERT INTO user_money_ledger (user_id, delta, reason, dictation_id, positions)
+            INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions)
             VALUES (%s, %s, %s, %s, %s)
             """,
             (int(user['id']), amount, reason, dictation_id, pos_norm),
@@ -2105,13 +2105,35 @@ def save_success():
             mistake_count = data.get('error_count', 0)
         monenumber_of_characters = data.get('monenumber_of_characters', 0)
         time_ms = data.get('time_ms', 0)
+        money_earned = data.get('money_earned', 0)
+        try:
+            money_earned = int(money_earned) if money_earned else 0
+        except Exception:
+            money_earned = 0
+        date_start = data.get('date_start')
         source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         completion_count_after = data.get('completion_count_after')
-        selected_sentence_positions = data.get('selected_sentence_positions')
+        selected_sentence_positions_raw = data.get('selected_sentence_positions')
+        # Нормализуем positions для INTEGER[]
+        try:
+            if not isinstance(selected_sentence_positions_raw, list):
+                selected_sentence_positions = []
+            else:
+                pos_norm = []
+                for p in selected_sentence_positions_raw:
+                    try:
+                        v = int(p)
+                        if v > 0:
+                            pos_norm.append(v)
+                    except Exception:
+                        continue
+                selected_sentence_positions = sorted(list(set(pos_norm)))
+        except Exception:
+            selected_sentence_positions = []
         dictation_language_code = data.get('dictation_language_code')
 
         started_at = None
@@ -2164,10 +2186,63 @@ def save_success():
             selected_sentence_positions=selected_sentence_positions,
             dictation_language_code=dictation_language_code,
             started_at=started_at,
+            date_start=date_start,
         )
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
-        
+
+        # Если за диктант начислены деньги — создаём одну запись в user_money_ledger
+        if money_earned > 0:
+            try:
+                # Нормализуем dictation_id для user_money_ledger
+                try:
+                    ledger_dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
+                except Exception:
+                    ledger_dictation_id = None
+
+                conn = get_db_connection()
+                cur = conn.cursor()
+                # Блокируем строку пользователя для атомарности
+                cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user_id),))
+                row = cur.fetchone()
+                current_balance = int(row[0] or 0) if row else 0
+                new_balance = current_balance + money_earned
+                cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user_id)))
+                # date_fact для user_money_ledger — сегодняшняя дата
+                ledger_date_fact = datetime.now().date()
+                # date_start — из запроса, если есть, иначе date_fact
+                ledger_date_start = None
+                if date_start:
+                    try:
+                        if isinstance(date_start, str):
+                            ledger_date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
+                        else:
+                            ledger_date_start = date_start
+                    except Exception:
+                        ledger_date_start = ledger_date_fact
+                else:
+                    ledger_date_start = ledger_date_fact
+
+                cur.execute(
+                    """
+                    INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions, date_start, date_fact)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    """,
+                    (int(user_id), money_earned, 'task', ledger_dictation_id, selected_sentence_positions, ledger_date_start, ledger_date_fact),
+                )
+                conn.commit()
+                print(f'✅ [SAVE_SUCCESS] Начислено money_earned={money_earned}, баланс: {current_balance} -> {new_balance}')
+            except Exception as e:
+                print(f'❌ [SAVE_SUCCESS] Ошибка начисления money_earned={money_earned}: {e}')
+                import traceback
+                traceback.print_exc()
+            finally:
+                try:
+                    if conn:
+                        conn.close()
+                except Exception:
+                    pass
+
         return jsonify({
             'success': True,
             'success_data': success

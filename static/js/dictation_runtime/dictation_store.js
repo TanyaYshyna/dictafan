@@ -96,6 +96,9 @@
         accumulatedMs: 0,
       };
 
+      // Дата начала диктанта (локальная, без времени) — устанавливается при старте
+      this.dateStart = null;
+
       this.lastUsedAtMs = _nowMs();
     }
 
@@ -308,6 +311,7 @@
         selectedKeys: this.selectedKeys,
         currentSelectedIndex: this.currentSelectedIndex,
         stateByKey: stateObj,
+        dateStart: this.dateStart,
         timer: {
           running: this.timer.running,
           startedAtMs: this.timer.startedAtMs,
@@ -325,6 +329,7 @@
       s.activeKeys = data.activeKeys || null;
       s.selectedKeys = data.selectedKeys || [];
       s.currentSelectedIndex = data.currentSelectedIndex || 0;
+      s.dateStart = data.dateStart || null;
       if (data.stateByKey) {
         for (const [k, v] of Object.entries(data.stateByKey)) {
           s._stateByKey.set(k, { ...v });

@@ -438,11 +438,13 @@
       attempts_total: (Number(prev.attempts_total) || 0) + (Number(next.attempts_total) || 0),
       mistake_count: (Number(prev.mistake_count) || 0) + (Number(next.mistake_count) || 0),
       monenumber_of_characters: (Number(prev.monenumber_of_characters) || 0) + (Number(next.monenumber_of_characters) || 0),
+      money_earned: (Number(prev.money_earned) || 0) + (Number(next.money_earned) || 0),
       time_ms: (Number(prev.time_ms) || 0) + (Number(next.time_ms) || 0),
       source_group_id: (prev.source_group_id != null) ? prev.source_group_id : next.source_group_id,
       selected_sentence_positions: (prev.selected_sentence_positions != null)
         ? prev.selected_sentence_positions
         : next.selected_sentence_positions,
+      date_start: prev.date_start || next.date_start,
       sentences_data: mergeSentencesData(prev.sentences_data, next.sentences_data),
       settings_json: next.settings_json || prev.settings_json,
       error_words: mergeErrorWords(prev.error_words, next.error_words),

@@ -73,6 +73,7 @@ def _upsert_history_by_day(
     positions=None,
     date_plan,
     date_fact,
+    date_start=None,
     perfect_delta: int = 0,
     corrected_delta: int = 0,
     audio_delta: int = 0,
@@ -82,6 +83,9 @@ def _upsert_history_by_day(
     successes_delta: int = 0,
 ) -> None:
     positions_arr = _normalize_selected_sentence_positions(positions)
+    # Если date_start не передан, используем date_fact
+    if date_start is None:
+        date_start = date_fact
     cur.execute(
         """
         INSERT INTO history_by_day (
@@ -92,6 +96,7 @@ def _upsert_history_by_day(
             positions,
             date_plan,
             date_fact,
+            date_start,
             perfect_count,
             corrected_count,
             audio_count,
@@ -102,7 +107,7 @@ def _upsert_history_by_day(
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
@@ -113,6 +118,7 @@ def _upsert_history_by_day(
             lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
             successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
+            date_start = LEAST(COALESCE(history_by_day.date_start, EXCLUDED.date_start), EXCLUDED.date_start),
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -123,6 +129,7 @@ def _upsert_history_by_day(
             positions_arr,
             date_plan,
             date_fact,
+            date_start,
             int(perfect_delta or 0),
             int(corrected_delta or 0),
             int(audio_delta or 0),
@@ -778,7 +785,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -842,6 +849,18 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 date_fact = datetime.now().date()
                 date_plan = date_fact
 
+                # date_start: если передан — используем его, иначе date_fact
+                if date_start is not None:
+                    try:
+                        if isinstance(date_start, str):
+                            date_start_parsed = datetime.strptime(date_start, '%Y-%m-%d').date()
+                        else:
+                            date_start_parsed = date_start
+                    except Exception:
+                        date_start_parsed = date_fact
+                else:
+                    date_start_parsed = date_fact
+
                 _upsert_history_by_day(
                     cur,
                     user_id=int(user_id),
@@ -851,6 +870,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     positions=[],
                     date_plan=date_plan,
                     date_fact=date_fact,
+                    date_start=date_start_parsed,
                     perfect_delta=int(perfect_count or 0),
                     corrected_delta=int(corrected_count or 0),
                     audio_delta=int(audio_count or 0),

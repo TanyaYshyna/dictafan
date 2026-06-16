@@ -53,7 +53,7 @@
   function _getSelectedSentencePositions(session) {
     try {
       if (!session) return null;
-      const activeKeys = session.getActiveKeys ? session.getActiveKeys() : [];
+      const activeKeys = Array.isArray(session.activeKeys) ? session.activeKeys : [];
       const content = session.content;
       if (!content || typeof content.getSentenceCore !== 'function') return null;
       const positions = [];
@@ -66,6 +66,22 @@
       return positions.length > 0 ? positions : null;
     } catch (e) {
       return null;
+    }
+  }
+
+  /** Получить время выполнения из сессии в миллисекундах */
+  function _getSessionLeadTimeMs(session) {
+    try {
+      if (!session) return 0;
+      if (typeof session.getElapsedMs === 'function') {
+        return Math.floor(session.getElapsedMs());
+      }
+      if (session.timer && session.timer.accumulatedMs) {
+        return Math.floor(Number(session.timer.accumulatedMs) || 0);
+      }
+      return 0;
+    } catch (e) {
+      return 0;
     }
   }
 
@@ -683,6 +699,7 @@
           let totalErrors = 0;
           let totalAttempts = 0;
           let totalChars = 0;
+          let totalMoneyEarned = 0;
           const sentencesData = [];
 
           for (const key of allKeys) {
@@ -700,6 +717,7 @@
             totalErrors += er;
             totalAttempts += at;
             totalChars += ch;
+            totalMoneyEarned += (Number(st.money_earned) || 0);
 
             if (p > 0 || c > 0 || a > 0) {
               sentencesData.push({
@@ -729,12 +747,14 @@
             attempts_total: totalAttempts,
             mistake_count: totalErrors,
             monenumber_of_characters: totalChars,
+            money_earned: totalMoneyEarned,
             time_ms: totalTimeMs,
             dictation_language_code: dictationLanguageCode,
             sentences_data: sentencesData,
             completed_at_ms: nowMs,
             completed_at_tz_offset_min: tzOffsetMin,
             selected_sentence_positions: selectedSentencePositions,
+            date_start: session.dateStart,
           });
         }
       }
@@ -971,6 +991,11 @@
           const session = window.__dictationModalActiveSession;
           if (session) {
             try { state.dictationStarted = true; } catch (e0) {}
+            // Устанавливаем дату начала диктанта (локальная дата, без времени)
+            if (!session.dateStart) {
+              const d = new Date();
+              session.dateStart = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            }
             try {
               const p = getProgressPanelInstance();
               if (p && typeof p.startTimer === 'function') p.startTimer();
@@ -1307,23 +1332,6 @@
                   } catch (e0sa) {
                   }
 
-                  // Отправляем начисление денег в user_money_ledger
-                  try {
-                    const dictationId = getCurrentDictationIdForDb();
-                    const selectedSentencePositions = _getSelectedSentencePositions(session);
-                    fetch('/api/statistics/money/earn', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        amount: reward,
-                        reason: perfectNow >= 1 ? 'star_reward' : (correctedNow > 0 ? 'half_star_reward' : 'text_activity_reward'),
-                        dictation_id: dictationId,
-                        positions: selectedSentencePositions,
-                      }),
-                    });
-                  } catch (e0mn) {
-                  }
-
                   // Отправляем активность в outbox_batcher (только perfect/corrected — значимые для статистики)
                   try {
                     const ob = window.OutboxBatcher;
@@ -1336,7 +1344,7 @@
                         ob.enqueueActivity({
                           type: typeActivity,
                           count: 1,
-                          leadTimeMs: 0,
+                          leadTimeMs: _getSessionLeadTimeMs(session),
                           dictationId,
                           date: null,
                           dictationLanguageCode,
@@ -2991,22 +2999,6 @@
                 st.money_count = (Number(st.money_count) || 0) + add;
                 st.money_earned = (Number(st.money_earned) || 0) + add;
                 playUiSound('coins_plus_audio');
-                // Отправляем начисление денег в user_money_ledger
-                try {
-                  const dictationId = getCurrentDictationIdForDb();
-                  const selectedSentencePositions = _getSelectedSentencePositions(session);
-                  fetch('/api/statistics/money/earn', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      amount: add,
-                      reason: 'audio_recognition_ok',
-                      dictation_id: dictationId,
-                      positions: selectedSentencePositions,
-                    }),
-                  });
-                } catch (e0mn) {
-                }
               } catch (e0s) {
               }
               // Отправляем аудио-активность в outbox_batcher
@@ -3019,7 +3011,7 @@
                   ob.enqueueActivity({
                     type: 'audio',
                     count: 1,
-                    leadTimeMs: 0,
+                    leadTimeMs: _getSessionLeadTimeMs(session),
                     dictationId,
                     date: null,
                     dictationLanguageCode,
@@ -3033,22 +3025,6 @@
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
               st.money_count = (Number(st.money_count) || 0) + add;
               st.money_earned = (Number(st.money_earned) || 0) + add;
-              // Отправляем начисление денег в user_money_ledger
-              try {
-                const dictationId = getCurrentDictationIdForDb();
-                const selectedSentencePositions = _getSelectedSentencePositions(session);
-                fetch('/api/statistics/money/earn', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    amount: add,
-                    reason: 'audio_recognition_partial',
-                    dictation_id: dictationId,
-                    positions: selectedSentencePositions,
-                  }),
-                });
-              } catch (e0mn) {
-              }
             } else {
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
