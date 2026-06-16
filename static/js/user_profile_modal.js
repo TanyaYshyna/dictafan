@@ -2343,7 +2343,9 @@ function bindProfileTestRecording() {
 
     // Переключение режима по кругу при клике на иконку
     if (modeIcon) {
+        console.log('[profile] modeIcon НАЙДЕН, вешаю обработчик');
         modeIcon.addEventListener('click', (e) => {
+            console.log('[profile] modeIcon КЛИК!');
             e.stopPropagation();
             const available = getAvailableModes();
             if (available.length === 0) return;

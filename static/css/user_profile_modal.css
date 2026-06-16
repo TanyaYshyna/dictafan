@@ -659,8 +659,7 @@
 }
 
 #user-profile-modal .profile-speech-rec-mode-icon:hover {
-  background: var(--color-bg-active, #e0e4e8);
-  color: var(--color-purple-hover-text, #9b4dae);
+  color: var(--color-button-text-purple);
 }
 
 #user-profile-modal .profile-speech-rec-mode-icon i[data-lucide] {
