@@ -2320,26 +2320,20 @@ function bindProfileTestRecording() {
         } catch (e) {}
     };
 
-    const updateModeIcon = () => {
+    function updateModeIcon() {
+        console.log('WWWWWWWWWWWW');
         if (!modeIcon) return;
         const mode = _readSpeechRecModeFromLS();
         const iconName = MODE_ICONS[mode] || 'route';
         const label = MODE_LABELS[mode] || 'Google Сервіси';
         modeIcon.title = label;
-        // Обновляем существующий элемент i, а не пересоздаём innerHTML
-        let iconEl = modeIcon.querySelector('i[data-lucide]');
-        if (iconEl) {
-            iconEl.setAttribute('data-lucide', iconName);
-        } else {
-            modeIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
-            iconEl = modeIcon.querySelector('i[data-lucide]');
-        }
-        if (iconEl && window.lucide && typeof window.lucide.replaceElement === 'function') {
-            window.lucide.replaceElement(iconEl);
-        } else if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+        console.log('WWWWWWWWWWWW iconName', iconName);
+
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
-    };
+    }
 
     // Переключение режима по кругу при клике на иконку
     if (modeIcon) {
