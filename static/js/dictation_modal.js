@@ -55,12 +55,12 @@
       if (!session) return null;
       const activeKeys = Array.isArray(session.activeKeys) ? session.activeKeys : [];
       const content = session.content;
-      if (!content || typeof content.getSentenceCore !== 'function') return null;
+      if (!content || typeof content.getSentence !== 'function') return null;
       const positions = [];
       for (const key of activeKeys) {
-        const core = content.getSentenceCore(key);
-        if (core && core.position != null) {
-          positions.push(Number(core.position));
+        const sentence = content.getSentence(key);
+        if (sentence && sentence.position != null) {
+          positions.push(Number(sentence.position));
         }
       }
       return positions.length > 0 ? positions : null;
