@@ -2325,28 +2325,32 @@ function bindProfileTestRecording() {
         const mode = _readSpeechRecModeFromLS();
         const iconName = MODE_ICONS[mode] || 'route';
         const label = MODE_LABELS[mode] || 'Google Сервіси';
-        modeIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
         modeIcon.title = label;
-        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        // Обновляем существующий элемент i, а не пересоздаём innerHTML
+        let iconEl = modeIcon.querySelector('i[data-lucide]');
+        if (iconEl) {
+            iconEl.setAttribute('data-lucide', iconName);
+        } else {
+            modeIcon.innerHTML = `<i data-lucide="${iconName}"></i>`;
+            iconEl = modeIcon.querySelector('i[data-lucide]');
+        }
+        if (iconEl && window.lucide && typeof window.lucide.replaceElement === 'function') {
+            window.lucide.replaceElement(iconEl);
+        } else if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
     };
 
     // Переключение режима по кругу при клике на иконку
     if (modeIcon) {
-        console.log('[profile] modeIcon найден, вешаю обработчик клика');
         modeIcon.addEventListener('click', (e) => {
             e.stopPropagation();
-            console.log('[profile] modeIcon клик!');
             const available = getAvailableModes();
-            console.log('[profile] доступные режимы:', available);
             if (available.length === 0) return;
             const current = _readSpeechRecModeFromLS();
-            console.log('[profile] текущий режим:', current);
             let idx = available.indexOf(current);
             if (idx === -1) idx = -1;
             const next = available[(idx + 1) % available.length];
-            console.log('[profile] следующий режим:', next);
             _writeSpeechRecModeToLS(next);
             updateModeIcon();
         });
