@@ -2305,10 +2305,10 @@ function cycleSpeechRecMode() {
 }
 
 function bindProfileTestRecording() {
-    const btn = document.getElementById('profileTestRecordingBtn');
-    const statusEl = document.getElementById('profileTestRecordingStatus');
-    const resultEl = document.getElementById('profileTestRecordingResult');
-    const modeIcon = document.getElementById('profileSpeechRecModeIcon');
+    var btn = document.getElementById('profileTestRecordingBtn');
+    var statusEl = document.getElementById('profileTestRecordingStatus');
+    var resultEl = document.getElementById('profileTestRecordingResult');
+    var modeIcon = document.getElementById('profileSpeechRecModeIcon');
     if (!btn || !statusEl || !resultEl) return;
 
     var MODE_LABELS = {
@@ -2325,6 +2325,13 @@ function bindProfileTestRecording() {
             if (v) return String(v);
         } catch (e) {}
         return 'route';
+    }
+
+    function getLearningLang() {
+        try {
+            if (originalData && originalData.current_learning) return String(originalData.current_learning);
+        } catch (e) {}
+        return 'en';
     }
 
     // Инициализируем иконку при загрузке
@@ -2353,169 +2360,116 @@ function bindProfileTestRecording() {
 
     var setResult = function(text) { resultEl.textContent = text || ''; };
 
-    var getCurrentMode = function() {
-        return readMode();
-    };
+    var profileTestRec = null;
+    var profileTestIsRecording = false;
+    var profileTestTimerId = null;
+    var profileTestAutoStopId = null;
 
-    const stopAndCleanup = async () => {
-        try {
-            if (profileTestTimerId) { clearInterval(profileTestTimerId); profileTestTimerId = null; }
-            if (profileTestAutoStopId) { clearTimeout(profileTestAutoStopId); profileTestAutoStopId = null; }
-        } catch (e) { }
-        try {
-            if (profileTestRecorder && profileTestRecorder.state !== 'inactive') profileTestRecorder.stop();
-        } catch (e) { }
-        try {
-            if (profileTestMediaStream) profileTestMediaStream.getTracks().forEach(t => { try { t.stop(); } catch (e) { } });
-        } catch (e) { }
-        profileTestRecorder = null;
-        profileTestMediaStream = null;
-        profileTestChunks = [];
+    var stopAndCleanup = function() {
+        if (profileTestTimerId) { clearInterval(profileTestTimerId); profileTestTimerId = null; }
+        if (profileTestAutoStopId) { clearTimeout(profileTestAutoStopId); profileTestAutoStopId = null; }
+        profileTestRec = null;
         profileTestIsRecording = false;
         btn.textContent = 'Записать';
     };
 
-    btn.onclick = async () => {
-        const mode = getCurrentMode();
+    btn.onclick = async function() {
+        var mode = readMode();
+        var lang = getLearningLang();
 
         if (profileTestIsRecording) {
             setStatus('Останавливаю…');
             try {
-                if (profileTestRecorder && profileTestRecorder.state !== 'inactive') profileTestRecorder.stop();
+                if (profileTestRec) {
+                    var res = await profileTestRec.stopRecording('manual');
+                    if (res && res.text) {
+                        setResult(res.text);
+                        setStatus('Готово', '#1b7f3a');
+                    } else {
+                        setResult('');
+                        setStatus('Пустой результат', '#b00020');
+                    }
+                }
             } catch (e) {
-                await stopAndCleanup();
                 setStatus('Не удалось остановить запись', '#b00020');
             }
+            stopAndCleanup();
             return;
         }
 
-        if (!mode.startsWith('route-off')) {
-            setResult('');
-            const label = MODE_LABELS[mode] || mode;
-            setStatus('Режим «' + label + '» не підтримує тест. Оберіть локальний режим (на пристрої)', '#b00020');
-            return;
-        }
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            setStatus('Браузер не поддерживает запись с микрофона', '#b00020');
+        if (!window.UnifiedSpeechRecognition) {
+            setStatus('UnifiedSpeechRecognition не загружен', '#b00020');
             return;
         }
 
         setResult('');
-        setStatus('Запрашиваю доступ к микрофону…');
-
-        try { profileTestMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-        catch (e) { setStatus('Нет доступа к микрофону', '#b00020'); return; }
+        setStatus(lang + ': говоріть уголос…');
 
         try {
-            profileTestChunks = [];
-            profileTestRecorder = new MediaRecorder(profileTestMediaStream);
+            profileTestRec = new window.UnifiedSpeechRecognition({
+                language: lang,
+                mode: mode,
+            });
+
+            profileTestRec.callbacks.onTranscript = function(text) {
+                try {
+                    if (text) setResult(text);
+                } catch (e) {}
+            };
+
+            profileTestRec.callbacks.onFinalTranscript = function(text) {
+                try {
+                    if (text) setResult(text);
+                } catch (e) {}
+            };
+
+            profileTestRec.callbacks.onError = function(err) {
+                try {
+                    var msg = (err && err.message) ? String(err.message) : (err && err.error) ? String(err.error) : 'Помилка розпізнавання';
+                    setStatus(msg, '#b00020');
+                } catch (e) {}
+                stopAndCleanup();
+            };
+
+            profileTestRec.callbacks.onRecordingStart = function() {
+                profileTestIsRecording = true;
+                btn.textContent = 'Стоп';
+                var startAt = Date.now();
+                var maxSeconds = 12;
+
+                profileTestTimerId = setInterval(function() {
+                    try {
+                        var s = Math.floor((Date.now() - startAt) / 1000);
+                        setStatus(lang + ': говоріть уголос… ' + s + 'с');
+                    } catch (e) {}
+                }, 500);
+
+                profileTestAutoStopId = setTimeout(function() {
+                    try {
+                        if (profileTestIsRecording && profileTestRec) {
+                            setStatus('Авто-стоп…');
+                            profileTestRec.stopRecording('timeout').then(function(res) {
+                                if (res && res.text) {
+                                    setResult(res.text);
+                                    setStatus('Готово', '#1b7f3a');
+                                } else {
+                                    setResult('');
+                                    setStatus('Пустой результат', '#b00020');
+                                }
+                                stopAndCleanup();
+                            }).catch(function() {
+                                stopAndCleanup();
+                            });
+                        }
+                    } catch (e) {}
+                }, maxSeconds * 1000);
+            };
+
+            await profileTestRec.startRecording();
         } catch (e) {
-            await stopAndCleanup();
-            setStatus('MediaRecorder не поддерживается', '#b00020');
-            return;
-        }
-
-        profileTestRecorder.ondataavailable = (ev) => {
-            try { if (ev && ev.data && ev.data.size > 0) profileTestChunks.push(ev.data); } catch (e) { }
-        };
-
-        profileTestRecorder.onstop = async () => {
-            try {
-                profileTestIsRecording = false;
-                btn.textContent = 'Записать';
-
-                const blob = new Blob(profileTestChunks, { type: profileTestRecorder && profileTestRecorder.mimeType ? profileTestRecorder.mimeType : 'audio/webm' });
-                await stopAndCleanup();
-
-                if (!blob || blob.size === 0) { setStatus('Пустая запись', '#b00020'); return; }
-                if (!window.WhisperModelManager) { setStatus('WhisperModelManager не загружен', '#b00020'); return; }
-
-                if (!window.__dictafanWhisperModelManager) window.__dictafanWhisperModelManager = new window.WhisperModelManager();
-                const wm = window.__dictafanWhisperModelManager;
-                const lang = (originalData && originalData.current_learning) ? String(originalData.current_learning) : 'en';
-
-                let size = 'base';
-                try {
-                    const mk = localStorage.getItem('selected_asr_model_v2_' + lang);
-                    if (mk && mk.includes('whisper-tiny')) size = 'tiny';
-                    if (mk && mk.includes('whisper-small')) size = 'small';
-                    if (mk && mk.includes('whisper-base')) size = 'base';
-                } catch (e) { }
-
-                try {
-                    const preferred = [size, 'small', 'base', 'tiny'];
-                    let picked = null;
-                    for (const s of preferred) {
-                        const k = 'whisper_model_' + s;
-                        const v = localStorage.getItem(k);
-                        if (v === 'downloaded' || v === 'ready') { picked = s; break; }
-                    }
-                    if (picked) size = picked;
-                } catch (e) { }
-
-                try {
-                    const key = (typeof wm._getModelKey === 'function') ? wm._getModelKey(lang, size) : 'whisper_model_' + size;
-                    const inMemory = window.WhisperModels && typeof window.WhisperModels.get === 'function' ? window.WhisperModels.get(key) : null;
-                    if (!inMemory || !inMemory.recognizer) {
-                        setStatus('Загружаю модель Whisper (' + size + ')…');
-                        await wm.loadLanguageModel(lang, size, (p) => {
-                            try {
-                                if (!p) return;
-                                const percent = Math.round((Number(p.progress) || 0) * 100);
-                                if (isFinite(percent) && percent > 0 && percent < 100) setStatus('Загружаю модель Whisper (' + size + ')… ' + percent + '%');
-                            } catch (e) { }
-                        });
-                    }
-                } catch (e) {
-                    setStatus(e && e.message ? String(e.message) : 'Ошибка загрузки модели', '#b00020');
-                    return;
-                }
-
-                setStatus('Распознаю…');
-                const res = await wm.transcribe(blob, lang, size, null);
-                let text = '';
-                if (res && typeof res === 'object') {
-                    if (res.text) text = String(res.text).trim();
-                    else if (Array.isArray(res) && res[0] && res[0].text) text = String(res[0].text).trim();
-                } else if (typeof res === 'string') text = res.trim();
-
-                setResult(text);
-                setStatus(text ? 'Готово' : 'Пустой результат', text ? '#1b7f3a' : '#b00020');
-            } catch (err) {
-                try { await stopAndCleanup(); } catch (e) { }
-                setResult('');
-                setStatus(err && err.message ? String(err.message) : 'Ошибка распознавания', '#b00020');
-            }
-        };
-
-        try {
-            profileTestIsRecording = true;
-            btn.textContent = 'Стоп';
-            const startAt = Date.now();
-            const maxSeconds = 12;
-            setStatus('Идёт запись… 0с');
-
-            profileTestTimerId = setInterval(() => {
-                try {
-                    const s = Math.floor((Date.now() - startAt) / 1000);
-                    setStatus('Идёт запись… ' + s + 'с');
-                } catch (e) { }
-            }, 500);
-
-            profileTestAutoStopId = setTimeout(() => {
-                try {
-                    if (profileTestIsRecording && profileTestRecorder && profileTestRecorder.state !== 'inactive') {
-                        setStatus('Авто-стоп…');
-                        profileTestRecorder.stop();
-                    }
-                } catch (e) { }
-            }, maxSeconds * 1000);
-
-            profileTestRecorder.start(1000);
-        } catch (e) {
-            await stopAndCleanup();
-            setStatus('Не удалось начать запись', '#b00020');
+            stopAndCleanup();
+            var msg = (e && e.message) ? String(e.message) : 'Не вдалося почати запис';
+            setStatus(msg, '#b00020');
         }
     };
 }
