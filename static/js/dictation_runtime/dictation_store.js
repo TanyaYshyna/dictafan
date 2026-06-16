@@ -312,6 +312,7 @@
         currentSelectedIndex: this.currentSelectedIndex,
         stateByKey: stateObj,
         dateStart: this.dateStart,
+        completed: this.completed === true ? true : undefined,
         timer: {
           running: this.timer.running,
           startedAtMs: this.timer.startedAtMs,
@@ -330,6 +331,9 @@
       s.selectedKeys = data.selectedKeys || [];
       s.currentSelectedIndex = data.currentSelectedIndex || 0;
       s.dateStart = data.dateStart || null;
+      if (data.completed === true) {
+        s.completed = true;
+      }
       if (data.stateByKey) {
         for (const [k, v] of Object.entries(data.stateByKey)) {
           s._stateByKey.set(k, { ...v });

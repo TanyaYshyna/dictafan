@@ -552,6 +552,16 @@
     const completionModal = document.getElementById('completionModal');
     if (!completionModal) return;
 
+    // Помечаем сессию как завершённую — при закрытии диктанта
+    // будет очищен кеш сессии (close(true)).
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session) {
+        session.completed = true;
+      }
+    } catch (eFlag) {
+    }
+
     // Сохраняем время текущего предложения перед показом completion modal,
     // т.к. showCompletionModal может быть вызвана из updateTaskProgressFromSession
     // (через checkText или onRecognitionComplete) до того, как пользователь нажмёт "Далее",
@@ -4431,6 +4441,39 @@
     }
   }
 
+  function _updateDictationTitle(title) {
+    // Устанавливает текст заголовка в обоих местах (модалка диктанта и start-modal)
+    // и добавляет иконку короны, если сессия завершена.
+    try {
+      const session = window.__dictationModalActiveSession;
+      const isCompleted = session && session.completed === true;
+
+      const titleEl = document.getElementById('dictationTitle');
+      const titleModalEl = document.getElementById('title-diktation');
+
+      if (titleEl) {
+        if (isCompleted) {
+          titleEl.innerHTML = '<span class="crown-icon" data-lucide="crown" style="display:inline-block;vertical-align:middle;margin-right:6px;color:#ffc107;"></span>' + escapeHtml(title);
+        } else {
+          titleEl.textContent = title;
+        }
+      }
+      if (titleModalEl) {
+        if (isCompleted) {
+          titleModalEl.innerHTML = '<span class="crown-icon" data-lucide="crown" style="display:inline-block;vertical-align:middle;margin-right:6px;color:#ffc107;"></span>' + escapeHtml(title);
+        } else {
+          titleModalEl.textContent = title;
+        }
+      }
+
+      // Рендерим иконки Lucide, если добавили data-lucide
+      if (isCompleted) {
+        try { renderLucide(document.getElementById('dictationModal')); } catch (e) {}
+      }
+    } catch (e) {
+    }
+  }
+
   function applyDictationMetaFromCard({ href, cardEl }) {
     const parsed = parseDictationHref(href);
     if (!parsed) return;
@@ -4457,10 +4500,7 @@
 
     try {
       const title = dictationData ? String(dictationData.getAttribute('data-title-orig') || '') : '';
-      const titleEl = document.getElementById('dictationTitle');
-      if (titleEl) titleEl.textContent = title;
-      const titleModalEl = document.getElementById('title-diktation');
-      if (titleModalEl) titleModalEl.textContent = title;
+      _updateDictationTitle(title);
     } catch (e) {
     }
 
@@ -4591,6 +4631,15 @@
   async function exitDictationFromStartModal() {
     const doClose = () => {
       try { hideStartModal(); } catch (e0) {}
+      // Если диктант завершён — очищаем сессию
+      try {
+        const session = window.__dictationModalActiveSession;
+        if (session && session.completed === true) {
+          close(true);
+          return;
+        }
+      } catch (eCheck) {
+      }
       try { close(); } catch (e1) {}
     };
 
@@ -4994,6 +5043,13 @@
   function resetDictationProgressForSession(session) {
     try {
       if (!session) return;
+
+      // Сбрасываем флаг завершения диктанта
+      try {
+        session.completed = false;
+      } catch (eFlag) {
+      }
+
       const keys = session.content ? session.content.getAllKeys() : [];
       for (const key of keys) {
         const st = session.getState(key);
@@ -5473,10 +5529,7 @@
           const dictationData = document.getElementById('dictation-data');
           const baseTitle = dictationData ? String(dictationData.getAttribute('data-title-orig') || '') : '';
           const decorated = baseTitle ? `${baseTitle} (${label})` : `(${label})`;
-          const titleEl = document.getElementById('dictationTitle');
-          if (titleEl) titleEl.textContent = decorated;
-          const titleModalEl = document.getElementById('title-diktation');
-          if (titleModalEl) titleModalEl.textContent = decorated;
+          _updateDictationTitle(decorated);
         }
       } catch (e) {
       }
@@ -5520,6 +5573,15 @@
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
         const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
         if (session) {
+          // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
+          // сбрасываем прогресс как при нажатии «всё по новой»
+          try {
+            if (session.completed === true) {
+              resetDictationProgressForSession(session);
+            }
+          } catch (eReset) {
+          }
+
           try {
             window.__dictationModalActiveSession = session;
           } catch (e0) {
@@ -5615,6 +5677,15 @@
   function close(clearSession = false) {
     const modal = getModal();
     if (!modal) return;
+
+    // Если диктант завершён (session.completed === true), всегда очищаем сессию
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session && session.completed === true) {
+        clearSession = true;
+      }
+    } catch (eCheck) {
+    }
 
     try {
       modal.style.display = 'none';

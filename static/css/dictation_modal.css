@@ -2019,3 +2019,11 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
     max-width: 38vw;
   }
 }
+
+/* Иконка короны для завершённого диктанта */
+#dictationModal .crown-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  color: #ffc107;
+}
