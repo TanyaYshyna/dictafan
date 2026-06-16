@@ -32,10 +32,19 @@
       if (!Array.isArray(sentences)) return;
       this._sentences = sentences.map((s, idx) => {
         const key = (s && s.key) ? String(s.key) : String(idx);
-        const orig = (s && s.original) || '';
-        const tr = (s && s.translation) || '';
-        const audio = (s && s.audio) || null;
-        return { key, original: orig, translation: tr, audio };
+        const position = (s && s.position != null) ? Number(s.position) : null;
+        const text_original = (s && s.text_original != null) ? String(s.text_original) : ((s && s.text != null) ? String(s.text) : ((s && s.original != null) ? String(s.original) : ''));
+        const text_translation = (s && s.text_translation != null) ? String(s.text_translation) : ((s && s.translation != null) ? String(s.translation) : '');
+        const audio_original = (s && s.audio_original != null) ? String(s.audio_original) : ((s && s.audio != null) ? String(s.audio) : '');
+        const audio_translation = (s && s.audio_translation != null) ? String(s.audio_translation) : ((s && s.audio_tr != null) ? String(s.audio_tr) : '');
+        return {
+          key,
+          position: Number.isFinite(position) ? position : null,
+          text_original,
+          text_translation,
+          audio_original,
+          audio_translation,
+        };
       });
     }
 
