@@ -1743,10 +1743,6 @@ async function initializeAudioSettings() {
             }
         } catch (e) { }
 
-        setTimeout(() => {
-            try { bindProfileTestRecording(); } catch (e) { }
-        }, 0);
-
     } catch (error) {
         console.error(profileT('profile.audio.errors.init_failed', null, '❌ Ошибка инициализации AudioSettingsPanel:'), error);
         container.innerHTML = '<div style="padding:20px;background:#f8f9fa;border-radius:5px;text-align:center;"><p style="color:#dc3545;">' + profileT('profile.audio.errors.load_failed', null, 'Ошибка загрузки настроек аудио') + '</p></div>';
@@ -2261,16 +2257,16 @@ function bindProfileTestRecording() {
     const modeIcon = document.getElementById('profileSpeechRecModeIcon');
     if (!btn || !statusEl || !resultEl) return;
 
-    // Маппинг режимов для переключения по кругу
-    const MODE_CYCLE = ['route', 'server', 'route-off|tiny', 'route-off|base', 'route-off|small'];
-    const MODE_ICONS = {
+    // Все 5 режимов по порядку
+    var ALL_MODES = ['route', 'server', 'route-off|tiny', 'route-off|base', 'route-off|small'];
+    var MODE_ICONS = {
         'route': 'route',
         'server': 'server',
         'route-off|tiny': 'house-heart',
         'route-off|base': 'house',
         'route-off|small': 'house-plus',
     };
-    const MODE_LABELS = {
+    var MODE_LABELS = {
         'route': 'Google Сервіси',
         'server': 'На сервері Whisper Tiny',
         'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
@@ -2278,93 +2274,65 @@ function bindProfileTestRecording() {
         'route-off|small': 'На пристрої Whisper Small · 480 MB',
     };
 
-    const getAvailableModes = () => {
-        // Определяем, какие device-модели скачаны
-        const downloaded = _getDownloadedWhisperSizesProfile();
-        return MODE_CYCLE.filter((m) => {
-            if (m.startsWith('route-off|')) {
-                const size = m.split('|')[1];
-                return downloaded.includes(size);
-            }
-            return true;
-        });
-    };
-
-    const _getDownloadedWhisperSizesProfile = () => {
+    function readMode() {
         try {
-            const raw = localStorage.getItem('dictafan_downloaded_models_v2');
-            if (!raw) return [];
-            const parsed = JSON.parse(raw);
-            const sizes = [];
-            for (const key of Object.keys(parsed || {})) {
-                const data = parsed[key];
-                if (data && data.size) sizes.push(String(data.size));
-            }
-            return sizes;
-        } catch (e) {
-            return [];
-        }
-    };
-
-    const _readSpeechRecModeFromLS = () => {
-        try {
-            const v = localStorage.getItem('dictafan_speech_rec_mode');
+            var v = localStorage.getItem('dictafan_speech_rec_mode');
             if (v) return String(v);
         } catch (e) {}
         return 'route';
-    };
+    }
 
-    const _writeSpeechRecModeToLS = (mode) => {
+    function writeMode(mode) {
         try {
             localStorage.setItem('dictafan_speech_rec_mode', mode);
         } catch (e) {}
-    };
+    }
 
-    function updateModeIcon() {
-        console.log('WWWWWWWWWWWW');
+    function updateIcon() {
         if (!modeIcon) return;
-        const mode = _readSpeechRecModeFromLS();
-        const iconName = MODE_ICONS[mode] || 'route';
-        const label = MODE_LABELS[mode] || 'Google Сервіси';
+        var mode = readMode();
+        var iconName = MODE_ICONS[mode] || 'route';
+        var label = MODE_LABELS[mode] || 'Google Сервіси';
         modeIcon.title = label;
         modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
-        console.log('WWWWWWWWWWWW iconName', iconName);
-
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
     }
 
-    // Переключение режима по кругу при клике на иконку
+    // Карусель: при клике переходим к следующему режиму по списку ALL_MODES
     if (modeIcon) {
-        console.log('[profile] modeIcon НАЙДЕН, вешаю обработчик');
-        modeIcon.addEventListener('click', (e) => {
-            console.log('[profile] modeIcon КЛИК!');
+        modeIcon.addEventListener('click', function(e) {
             e.stopPropagation();
-            const available = getAvailableModes();
-            if (available.length === 0) return;
-            const current = _readSpeechRecModeFromLS();
-            let idx = available.indexOf(current);
-            if (idx === -1) idx = -1;
-            const next = available[(idx + 1) % available.length];
-            _writeSpeechRecModeToLS(next);
-            updateModeIcon();
+            var current = readMode();
+            var idx = ALL_MODES.indexOf(current);
+            if (idx === -1 || idx >= ALL_MODES.length - 1) {
+                idx = 0;
+            } else {
+                idx = idx + 1;
+            }
+            writeMode(ALL_MODES[idx]);
+            console.log("wwwwwww ALL_MODES",ALL_MODES);
+            console.log("wwwwwww idx",idx);
+            console.log("wwwwwww ALL_MODES[idx]",ALL_MODES[idx]);
+            updateIcon();
         });
     }
 
-    const setStatus = (text, color = '#666') => {
+    var setStatus = function(text, color) {
+        if (color === undefined) color = '#666';
         statusEl.textContent = text || '';
         statusEl.style.color = color;
     };
 
-    const setResult = (text) => { resultEl.textContent = text || ''; };
+    var setResult = function(text) { resultEl.textContent = text || ''; };
 
-    const getCurrentMode = () => {
-        return _readSpeechRecModeFromLS();
+    var getCurrentMode = function() {
+        return readMode();
     };
 
     // Инициализируем иконку
-    updateModeIcon();
+    updateIcon();
 
     const stopAndCleanup = async () => {
         try {
