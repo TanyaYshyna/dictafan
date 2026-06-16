@@ -170,6 +170,7 @@
         window.dispatchEvent(new CustomEvent('transformers-ready'));
     </script>
     <script defer src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/user_profile_modal.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/active_dictations_modal.js?v={{ app_cache_revision }}"></script>

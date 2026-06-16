@@ -12,7 +12,6 @@
     '/static/js/user_activity_history.js',
     '/static/js/dictation_statistics.js',
     '/static/js/progress_panel.js',
-    '/static/js/speech_recognition_unified.js',
     '/static/js/dictation_runtime/dictation_store.js',
     '/static/js/dictation_runtime/proverka_na_oshibki.js',
     '/static/js/dictation_runtime/proverka_renderer.js',
