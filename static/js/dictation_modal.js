@@ -789,7 +789,9 @@
         exitBtn.addEventListener('click', () => {
           hideCompletionModal();
           try {
-            close();
+            // clearSession=true — удаляем сессию из store и IDB,
+            // чтобы при повторном открытии не подхватывалась старая
+            close(true);
           } catch (e0) {
           }
         });
@@ -4068,7 +4070,9 @@
         btn.className = 'all-checkbox-btn';
         btn.setAttribute('aria-label', 'Выбрать предложение');
 
-        renderLucideCheckboxButton(btn, view.selection_state === 'checked', false);
+        // selection_state хранится в сессии, а не в view (getSentenceView возвращает сырой объект предложения)
+        const initialState = session.getState(key);
+        renderLucideCheckboxButton(btn, initialState && initialState.selection_state === 'checked', false);
 
         btn.addEventListener('click', (e) => {
           try {
@@ -4083,8 +4087,8 @@
             const next = (cur === 'checked') ? 'unchecked' : 'checked';
             session.setSelectionState(view.key, next);
             session.ensureDefaultSelection();
-            const updated = session.getSentenceView(view.key);
-            renderLucideCheckboxButton(btn, updated && updated.selection_state === 'checked', false);
+            const updatedState = session.getState(view.key);
+            renderLucideCheckboxButton(btn, updatedState && updatedState.selection_state === 'checked', false);
             try {
               updateAllCheckboxButtonFromSession(session);
             } catch (e2) {
@@ -4215,7 +4219,9 @@
 
   function computeAllCheckboxCheckedState(session) {
     try {
-      const keys = session && session.activeKeys ? session.activeKeys : [];
+      // activeKeys === null означает "весь диктант", используем все ключи контента
+      const activeKeys = session && session.activeKeys;
+      const keys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session && session.content ? session.content.getAllKeys() : []);
       const list = Array.isArray(keys) ? keys : [];
       let eligible = 0;
       let checked = 0;
@@ -4234,7 +4240,9 @@
 
   function computeAllCheckboxTriState(session) {
     try {
-      const keys = session && session.activeKeys ? session.activeKeys : [];
+      // activeKeys === null означает "весь диктант", используем все ключи контента
+      const activeKeys = session && session.activeKeys;
+      const keys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session && session.content ? session.content.getAllKeys() : []);
       const list = Array.isArray(keys) ? keys : [];
       let eligible = 0;
       let checked = 0;
@@ -5017,9 +5025,13 @@
         st.text_activity_count = 0;
         st.audio_activity50_count = 0;
         st.money_count = 0;
+        st.money_earned = 0;
+        st.money_spent = 0;
         st.text_exchange_half_star = false;
         st.audio_exchange_mic = false;
         st.all_audio_completed = false;
+        st.time_count = 0;
+        st.number_of_characters = 0;
         // Ставим галочку на ВСЕ строки (кроме completed — их тоже сбрасываем в checked)
         st.selection_state = 'checked';
       }
@@ -5029,6 +5041,11 @@
           session.stopTimer();
           session.timer.accumulatedMs = 0;
         }
+      } catch (e) {
+      }
+      // Сбрасываем currentSelectedIndex
+      try {
+        session.currentSelectedIndex = 0;
       } catch (e) {
       }
       // Перестраиваем selectedKeys
@@ -5044,6 +5061,11 @@
       // Обновляем навигатор
       try {
         updateNavigatorFromSession(session);
+      } catch (e) {
+      }
+      // Явно обновляем all-checkbox
+      try {
+        updateAllCheckboxButtonFromSession(session);
       } catch (e) {
       }
     } catch (e) {
@@ -5573,7 +5595,7 @@
     }
   }
 
-  function close() {
+  function close(clearSession = false) {
     const modal = getModal();
     if (!modal) return;
 
@@ -5615,13 +5637,37 @@
     } catch (e1) {
     }
 
-    // Сохраняем сессию в IndexedDB перед закрытием
-    try {
-      const store = getRuntimeStore();
-      if (store && typeof store.persistToIdb === 'function') {
-        store.persistToIdb().catch(function(e){});
+    if (clearSession) {
+      // При выходе из завершённого диктанта удаляем сессию из store и из IDB,
+      // чтобы при повторном открытии не подхватывалась старая сессия
+      try {
+        const session = window.__dictationModalActiveSession;
+        if (session) {
+          const store = getRuntimeStore();
+          if (store) {
+            const dictationId = session.dictationId;
+            const langTr = session.content ? session.content.langTr : '';
+            const exerciseId = session.exerciseId;
+            const subsetSignature = session.subsetSignature;
+            store.removeSession({ dictationId, langTr, exerciseId, subsetSignature });
+            store.removeSessionFromIdb({ dictationId, langTr, exerciseId, subsetSignature }).catch(function(e){});
+          }
+        }
+      } catch (e) {
       }
-    } catch (e2) {
+      try {
+        window.__dictationModalActiveSession = null;
+      } catch (e) {
+      }
+    } else {
+      // Сохраняем сессию в IndexedDB перед закрытием (если не чистим)
+      try {
+        const store = getRuntimeStore();
+        if (store && typeof store.persistToIdb === 'function') {
+          store.persistToIdb().catch(function(e){});
+        }
+      } catch (e2) {
+      }
     }
 
     state.isOpen = false;

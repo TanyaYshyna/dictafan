@@ -390,6 +390,21 @@
       return this._sessions.get(key) || null;
     }
 
+    removeSession({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
+      const key = _sessionKey(dictationId, langTr, exerciseId, subsetSignature);
+      this._sessions.delete(key);
+    }
+
+    async removeSessionFromIdb({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
+      try {
+        if (!window.IdbManager || typeof window.IdbManager.idbDelete !== 'function') return;
+        const key = _sessionKey(dictationId, langTr, exerciseId, subsetSignature);
+        await window.IdbManager.idbDelete('sessions', key);
+      } catch (e) {
+        // silent
+      }
+    }
+
     closeAll() {
       this._sessions.clear();
       this._contents.clear();
