@@ -52,6 +52,10 @@
       return this._sentences.map((s) => s.key);
     }
 
+    getAllSentenceCores() {
+      return this._sentences.slice();
+    }
+
     getSentence(key) {
       const k = String(key);
       return this._sentences.find((s) => s.key === k) || null;
@@ -369,7 +373,16 @@
         this._sessions.set(key, session);
         this._evictIfNeeded(1);
       }
-      return this._sessions.get(key);
+      const session = this._sessions.get(key);
+      // Если сессия уже существовала (например, восстановлена из IDB) и у неё нет activeKeys,
+      // а мы запрашиваем с subsetPositions — обновляем activeKeys при следующем вызове ensureDefaultSelection
+      session.touch();
+      return session;
+    }
+
+    getContent({ dictationId, langTr }) {
+      const key = dictationId + '::' + langTr;
+      return this._contents.get(key) || null;
     }
 
     getSession({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
@@ -398,9 +411,12 @@
         if (!window.IdbManager || typeof window.IdbManager.idbPut !== 'function') return;
         for (const [key, session] of this._sessions) {
           const data = session.toJSON();
+          // Сохраняем langTr отдельно, чтобы при восстановлении создать правильный контент
+          const langTr = session.content ? session.content.langTr : '';
           await window.IdbManager.idbPut('sessions', {
             key,
             dictationId: session.dictationId,
+            langTr: langTr,
             data: JSON.stringify(data),
             updatedAt: Date.now(),
           });
@@ -420,8 +436,12 @@
             const data = JSON.parse(rec.data);
             const dictId = data.dictationId || rec.dictationId;
             if (!dictId) continue;
-            const content = this.getOrCreateContent({ dictationId: dictId, langTr: '' });
+            // Используем langTr из записи, если есть, иначе из данных сессии
+            const langTr = String(rec.langTr || data.langTr || '').trim();
+            const content = this.getOrCreateContent({ dictationId: dictId, langTr });
             const session = DictationSession.fromJSON(data, content);
+            // Используем ключ из IDB записи, чтобы при повторном открытии
+            // getOrCreateSession мог найти эту сессию по правильному ключу
             this._sessions.set(rec.key, session);
           } catch (e) {
             // skip corrupt record

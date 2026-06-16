@@ -4006,12 +4006,24 @@
       } else {
         const wanted = new Set(subsetPositions.map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0));
         const cores = content && typeof content.getAllSentenceCores === 'function' ? content.getAllSentenceCores() : [];
-        const subsetKeys = Array.isArray(cores)
+        let subsetKeys = Array.isArray(cores)
           ? cores
             .filter((c) => c && wanted.has(Number(c.position)))
             .map((c) => String(c.key))
             .filter(Boolean)
           : [];
+
+        // Если ни одно предложение не имеет position (все position === null),
+        // используем порядковые номера (index + 1) для фильтрации
+        if (subsetKeys.length === 0 && cores.length > 0) {
+          const hasAnyPosition = cores.some((c) => c && c.position != null);
+          if (!hasAnyPosition) {
+            subsetKeys = cores
+              .filter((c, idx) => c && wanted.has(idx + 1))
+              .map((c) => String(c.key))
+              .filter(Boolean);
+          }
+        }
 
         session.setActiveSubsetByKeys(subsetKeys);
         for (const k of subsetKeys) {
@@ -4033,7 +4045,10 @@
       if (!tbody) return;
       tbody.innerHTML = '';
 
-      const keys = session && session.activeKeys ? session.activeKeys : (session && session.content ? session.content.getAllKeys() : []);
+      // activeKeys === null означает "весь диктант", используем все ключи
+      // activeKeys === [] означает "пустой subset" — показываем все ключи как fallback
+      const activeKeys = session && session.activeKeys;
+      const keys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session && session.content ? session.content.getAllKeys() : []);
       const list = Array.isArray(keys) ? keys : [];
 
       list.forEach((key, idx) => {
