@@ -2250,14 +2250,8 @@ async function handleSave() {
 
 // ==================== BIND PROFILE TEST RECORDING ====================
 
-function bindProfileTestRecording() {
-    const btn = document.getElementById('profileTestRecordingBtn');
-    const statusEl = document.getElementById('profileTestRecordingStatus');
-    const resultEl = document.getElementById('profileTestRecordingResult');
-    const modeIcon = document.getElementById('profileSpeechRecModeIcon');
-    if (!btn || !statusEl || !resultEl) return;
-
-    // Все 5 режимов по порядку
+// Глобальная функция для карусели режимов распознавания (вызывается из HTML onclick)
+function cycleSpeechRecMode() {
     var ALL_MODES = ['route', 'server', 'route-off|tiny', 'route-off|base', 'route-off|small'];
     var MODE_ICONS = {
         'route': 'route',
@@ -2288,35 +2282,67 @@ function bindProfileTestRecording() {
         } catch (e) {}
     }
 
-    function updateIcon() {
-        if (!modeIcon) return;
-        var mode = readMode();
-        var iconName = MODE_ICONS[mode] || 'route';
-        var label = MODE_LABELS[mode] || 'Google Сервіси';
+    var current = readMode();
+    var idx = ALL_MODES.indexOf(current);
+    if (idx === -1 || idx >= ALL_MODES.length - 1) {
+        idx = 0;
+    } else {
+        idx = idx + 1;
+    }
+    writeMode(ALL_MODES[idx]);
+
+    // Обновляем иконку
+    var modeIcon = document.getElementById('profileSpeechRecModeIcon');
+    if (modeIcon) {
+        var iconName = MODE_ICONS[ALL_MODES[idx]] || 'route';
+        var label = MODE_LABELS[ALL_MODES[idx]] || 'Google Сервіси';
         modeIcon.title = label;
         modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
             window.lucide.createIcons();
         }
     }
+}
 
-    // Карусель: при клике переходим к следующему режиму по списку ALL_MODES
+function bindProfileTestRecording() {
+    const btn = document.getElementById('profileTestRecordingBtn');
+    const statusEl = document.getElementById('profileTestRecordingStatus');
+    const resultEl = document.getElementById('profileTestRecordingResult');
+    const modeIcon = document.getElementById('profileSpeechRecModeIcon');
+    if (!btn || !statusEl || !resultEl) return;
+
+    var MODE_LABELS = {
+        'route': 'Google Сервіси',
+        'server': 'На сервері Whisper Tiny',
+        'route-off|tiny': 'На пристрої Whisper Tiny · 75 MB',
+        'route-off|base': 'На пристрої Whisper Base · 145 MB',
+        'route-off|small': 'На пристрої Whisper Small · 480 MB',
+    };
+
+    function readMode() {
+        try {
+            var v = localStorage.getItem('dictafan_speech_rec_mode');
+            if (v) return String(v);
+        } catch (e) {}
+        return 'route';
+    }
+
+    // Инициализируем иконку при загрузке
     if (modeIcon) {
-        modeIcon.addEventListener('click', function(e) {
-            e.stopPropagation();
-            var current = readMode();
-            var idx = ALL_MODES.indexOf(current);
-            if (idx === -1 || idx >= ALL_MODES.length - 1) {
-                idx = 0;
-            } else {
-                idx = idx + 1;
-            }
-            writeMode(ALL_MODES[idx]);
-            console.log("wwwwwww ALL_MODES",ALL_MODES);
-            console.log("wwwwwww idx",idx);
-            console.log("wwwwwww ALL_MODES[idx]",ALL_MODES[idx]);
-            updateIcon();
-        });
+        var mode = readMode();
+        var iconName = {
+            'route': 'route',
+            'server': 'server',
+            'route-off|tiny': 'house-heart',
+            'route-off|base': 'house',
+            'route-off|small': 'house-plus',
+        }[mode] || 'route';
+        var label = MODE_LABELS[mode] || 'Google Сервіси';
+        modeIcon.title = label;
+        modeIcon.innerHTML = '<i data-lucide="' + iconName + '"></i>';
+        if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons();
+        }
     }
 
     var setStatus = function(text, color) {
@@ -2330,9 +2356,6 @@ function bindProfileTestRecording() {
     var getCurrentMode = function() {
         return readMode();
     };
-
-    // Инициализируем иконку
-    updateIcon();
 
     const stopAndCleanup = async () => {
         try {
