@@ -133,8 +133,8 @@ def _upsert_history_by_day(
             int(perfect_delta or 0),
             int(corrected_delta or 0),
             int(audio_delta or 0),
-            int(mistake_delta or 0),
             int(monenumber_of_characters_delta or 0),
+            int(mistake_delta or 0),
             int(lead_time_delta or 0),
             int(successes_delta or 0),
         ),
@@ -829,12 +829,8 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # По новой логике history_successes хранит только "полный диктант".
-            # Любые выбранные предложения (subset) запрещаем.
-            normalized_pos = _normalize_selected_sentence_positions(selected_sentence_positions)
-            if normalized_pos and len(normalized_pos) > 0:
-                raise ValueError('history_successes supports only full dictation')
-
+            # history_successes хранит только полные диктанты (без subset).
+            # selected_sentence_positions передаётся в history_by_day и user_money_ledger.
             cur.execute("""
                 INSERT INTO history_successes 
                 (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at)
@@ -861,13 +857,16 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 else:
                     date_start_parsed = date_fact
 
+                # Нормализуем selected_sentence_positions для history_by_day
+                positions_for_hbd = _normalize_selected_sentence_positions(selected_sentence_positions)
+
                 _upsert_history_by_day(
                     cur,
                     user_id=int(user_id),
                     teacher_id=int(teacher_id),
                     dictation_language_code=dictation_language_code,
                     dictation_id=int(dictation_id),
-                    positions=[],
+                    positions=positions_for_hbd,
                     date_plan=date_plan,
                     date_fact=date_fact,
                     date_start=date_start_parsed,
