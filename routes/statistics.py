@@ -111,6 +111,81 @@ def api_statistics_money_spend():
             pass
 
 
+
+@statistics_bp.route('/money/earn', methods=['POST'])
+@jwt_required()
+def api_statistics_money_earn():
+    """Earn user's money by creating a positive ledger entry and increasing users.money_balance."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = int(data.get('amount') or 0)
+    except Exception:
+        amount = 0
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'invalid_amount'}), 400
+
+    reason = (data.get('reason') or '').strip() or 'earn'
+    try:
+        dictation_id = data.get('dictation_id')
+        dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
+    except Exception:
+        dictation_id = None
+
+    try:
+        positions = data.get('positions')
+        if not isinstance(positions, list):
+            positions = []
+        pos_norm = []
+        for p in positions:
+            try:
+                v = int(p)
+                if v > 0:
+                    pos_norm.append(v)
+            except Exception:
+                continue
+        pos_norm = sorted(list(set(pos_norm)))
+    except Exception:
+        pos_norm = []
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user['id']),))
+        row = cur.fetchone()
+        current_balance = int(row[0] or 0) if row else 0
+
+        new_balance = current_balance + amount
+        cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
+        cur.execute(
+            """
+            INSERT INTO user_money_ledger (user_id, delta, reason, dictation_id, positions)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (int(user['id']), amount, reason, dictation_id, pos_norm),
+        )
+        conn.commit()
+        return jsonify({'success': True, 'money_balance': new_balance})
+    except Exception as e:
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
 @statistics_bp.route('/telegram/send_self', methods=['POST'])
 @jwt_required()
 def api_statistics_telegram_send_self():
@@ -2028,6 +2103,7 @@ def save_success():
         mistake_count = data.get('mistake_count')
         if mistake_count is None:
             mistake_count = data.get('error_count', 0)
+        monenumber_of_characters = data.get('monenumber_of_characters', 0)
         time_ms = data.get('time_ms', 0)
         source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
@@ -2083,6 +2159,7 @@ def save_success():
             time_ms,
             attempts_total,
             mistake_count,
+            monenumber_of_characters=monenumber_of_characters,
             source_group_id=source_group_id,
             selected_sentence_positions=selected_sentence_positions,
             dictation_language_code=dictation_language_code,

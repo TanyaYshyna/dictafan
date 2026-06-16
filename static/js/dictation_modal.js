@@ -682,6 +682,7 @@
           let totalAudio = 0;
           let totalErrors = 0;
           let totalAttempts = 0;
+          let totalChars = 0;
           const sentencesData = [];
 
           for (const key of allKeys) {
@@ -691,12 +692,14 @@
             const a = Number(st.number_of_audio) || 0;
             const er = Number(st.mistake_count) || 0;
             const at = Number(st.attempts_total) || 0;
+            const ch = Number(st.number_of_characters) || 0;
 
             totalPerfect += p;
             totalCorrected += c;
             totalAudio += a;
             totalErrors += er;
             totalAttempts += at;
+            totalChars += ch;
 
             if (p > 0 || c > 0 || a > 0) {
               sentencesData.push({
@@ -725,6 +728,7 @@
             audio_count: totalAudio,
             attempts_total: totalAttempts,
             mistake_count: totalErrors,
+            monenumber_of_characters: totalChars,
             time_ms: totalTimeMs,
             dictation_language_code: dictationLanguageCode,
             sentences_data: sentencesData,
@@ -1292,12 +1296,30 @@
                 if (reward > 0 && cycleId > 0 && paidCycleId !== cycleId) {
                   try {
                     st.money_count = (Number(st.money_count) || 0) + reward;
+                    st.money_earned = (Number(st.money_earned) || 0) + reward;
                   } catch (e0ac1) {
                   }
                   st._paidTextRewardCycleId = cycleId;
                   try {
                     playUiSound('coins_plus_audio');
                   } catch (e0sa) {
+                  }
+
+                  // Отправляем начисление денег в user_money_ledger
+                  try {
+                    const dictationId = getCurrentDictationIdForDb();
+                    const selectedSentencePositions = _getSelectedSentencePositions(session);
+                    fetch('/api/statistics/money/earn', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        amount: reward,
+                        reason: perfectNow >= 1 ? 'star_reward' : (correctedNow > 0 ? 'half_star_reward' : 'text_activity_reward'),
+                        dictation_id: dictationId,
+                        positions: selectedSentencePositions,
+                      }),
+                    });
+                  } catch (e0mn) {
                   }
 
                   // Отправляем активность в outbox_batcher (только perfect/corrected — значимые для статистики)
@@ -2485,6 +2507,8 @@
         const payload = {
           cost,
           reason: mode === 'text' ? 'buy_half_star' : 'buy_mic',
+          dictation_id: getCurrentDictationIdForDb(),
+          positions: _getSelectedSentencePositions(session),
         };
         await fetch('/api/statistics/money/spend', {
           method: 'POST',
@@ -2500,12 +2524,16 @@
       }
 
       if (mode === 'text') {
-        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - cost);
+        // Платим cost монет, но забираем только 1 активность,
+        // чтобы общее число действий (звезда + полузвезды + активности) не нарушалось
+        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - 1);
+        st.money_spent = (Number(st.money_spent) || 0) + cost;
         st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
         st.text_exchange_half_star = true;
         setCheckButtonState('half');
       } else {
         st.audio_activity50_count = Math.max(0, (Number(st.audio_activity50_count) || 0) - cost);
+        st.money_spent = (Number(st.money_spent) || 0) + cost;
         const req = getRequiredAudioRepeatsValue();
         st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
         st.audio_exchange_mic = true;
@@ -2637,14 +2665,12 @@
         }
 
         try {
-          moneyEarned += (Number(st.money_count) || 0);
+          moneyEarned += (Number(st.money_earned) || 0);
         } catch (e0) {
         }
 
         try {
-          // -3 за покупки
-          if (st.text_exchange_half_star) moneySpent += 3;
-          if (st.audio_exchange_mic) moneySpent += 3;
+          moneySpent += (Number(st.money_spent) || 0);
         } catch (e2) {
         }
       }
@@ -2961,7 +2987,24 @@
                 const add = getPricingValue('audio_activity_reward', 1);
                 st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
                 st.money_count = (Number(st.money_count) || 0) + add;
+                st.money_earned = (Number(st.money_earned) || 0) + add;
                 playUiSound('coins_plus_audio');
+                // Отправляем начисление денег в user_money_ledger
+                try {
+                  const dictationId = getCurrentDictationIdForDb();
+                  const selectedSentencePositions = _getSelectedSentencePositions(session);
+                  fetch('/api/statistics/money/earn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      amount: add,
+                      reason: 'audio_recognition_ok',
+                      dictation_id: dictationId,
+                      positions: selectedSentencePositions,
+                    }),
+                  });
+                } catch (e0mn) {
+                }
               } catch (e0s) {
               }
               // Отправляем аудио-активность в outbox_batcher
@@ -2987,6 +3030,23 @@
               const add = getPricingValue('audio_activity_reward', 1);
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
               st.money_count = (Number(st.money_count) || 0) + add;
+              st.money_earned = (Number(st.money_earned) || 0) + add;
+              // Отправляем начисление денег в user_money_ledger
+              try {
+                const dictationId = getCurrentDictationIdForDb();
+                const selectedSentencePositions = _getSelectedSentencePositions(session);
+                fetch('/api/statistics/money/earn', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    amount: add,
+                    reason: 'audio_recognition_partial',
+                    dictation_id: dictationId,
+                    positions: selectedSentencePositions,
+                  }),
+                });
+              } catch (e0mn) {
+              }
             } else {
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }

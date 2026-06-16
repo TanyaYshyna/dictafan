@@ -778,7 +778,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -813,6 +813,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   audio_count: {audio_count}')
     print(f'   attempts_total: {attempts_total}')
     print(f'   mistake_count: {mistake_count}')
+    print(f'   monenumber_of_characters: {monenumber_of_characters}')
     print(f'   time_ms: {time_ms}')
     print(f'   source_group_id: {source_group_id}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
@@ -854,7 +855,8 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     corrected_delta=int(corrected_count or 0),
                     audio_delta=int(audio_count or 0),
                     mistake_delta=int(mistake_count or 0),
-                    lead_time_delta=0,
+                    monenumber_of_characters_delta=int(monenumber_of_characters or 0),
+                    lead_time_delta=int(time_ms or 0),
                     successes_delta=1,
                 )
             except Exception:
