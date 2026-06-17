@@ -1,0 +1,144 @@
+/* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / ДЕНЬГИ» ==================== */
+
+.desktop-stats-panel {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    z-index: 4;
+    background: var(--color-panel-bg, #fff);
+    border: 1px solid var(--color-border, #dee2e6);
+    border-radius: 14px;
+    padding: 10px 14px;
+    min-width: 200px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+
+.desktop-stats-panel:hover {
+    background: var(--color-hover-bg, #f8f9fa);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.desktop-stats-panel:active {
+    background: var(--color-active-bg, #e9ecef);
+}
+
+/* ==================== ВИД 1: ДЕНЬ + ВСЁ ВРЕМЯ ==================== */
+
+.desktop-stats-view-default {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.desktop-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--color-text-primary, #1f2937);
+}
+
+.desktop-stats-row .stats-icon {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary, #6b7280);
+}
+
+.desktop-stats-row .stats-icon.stats-icon-fire {
+    color: #f97316;
+}
+
+.desktop-stats-row .stats-label {
+    flex: 0 0 auto;
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.desktop-stats-row .stats-value {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.desktop-stats-row .stats-value.stats-value-plan {
+    font-weight: 400;
+    color: var(--color-text-secondary, #6b7280);
+    font-size: 12px;
+}
+
+.desktop-stats-row .stats-value.stats-value-overplan {
+    color: #16a34a;
+}
+
+.desktop-stats-row .stats-value.stats-value-underplan {
+    color: #dc2626;
+}
+
+.desktop-stats-separator {
+    height: 1px;
+    background: var(--color-border, #dee2e6);
+    margin: 2px 0;
+    opacity: 0.6;
+}
+
+/* ==================== ВИД 2: НЕСГОРАЕМЫЕ ДНИ (СТРИК) ==================== */
+
+.desktop-stats-view-streak {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.desktop-stats-streak-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-primary, #1f2937);
+}
+
+.desktop-stats-streak-header .stats-icon-fire {
+    color: #f97316;
+}
+
+.desktop-stats-streak-days {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    max-width: 220px;
+}
+
+.desktop-stats-streak-day {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    background: var(--color-border, #dee2e6);
+    flex: 0 0 auto;
+}
+
+.desktop-stats-streak-day.active {
+    background: #f97316;
+}
+
+.desktop-stats-streak-day.today {
+    outline: 2px solid var(--color-text-primary, #1f2937);
+    outline-offset: 1px;
+}
+
+.desktop-stats-streak-day.empty {
+    background: transparent;
+}
+
+.desktop-stats-streak-info {
+    font-size: 11px;
+    color: var(--color-text-secondary, #6b7280);
+    margin-top: 2px;
+}

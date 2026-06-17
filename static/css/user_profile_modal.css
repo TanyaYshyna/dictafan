@@ -1670,3 +1670,81 @@
   aspect-ratio: 1 / 1;
   margin: 0 auto;
 }
+
+/* ===== План активности (Время / Деньги) ===== */
+#user-profile-modal .profile-plan-row {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+#user-profile-modal .profile-plan-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  flex: 1;
+}
+
+#user-profile-modal .profile-plan-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #333);
+}
+
+#user-profile-modal .profile-plan-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#user-profile-modal .profile-plan-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text, #333);
+  min-width: 48px;
+  text-align: center;
+}
+
+#user-profile-modal .profile-plan-unit {
+  font-size: 13px;
+  color: var(--color-text-secondary, #888);
+  margin-right: 4px;
+}
+
+#user-profile-modal .profile-plan-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+#user-profile-modal .profile-plan-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 4px;
+  background: var(--color-surface, #fff);
+  cursor: pointer;
+  color: var(--color-text, #333);
+  padding: 0;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+#user-profile-modal .profile-plan-btn:hover {
+  background: var(--color-hover, #f0f0f0);
+  border-color: var(--color-primary, #7c3aed);
+}
+
+#user-profile-modal .profile-plan-btn:active {
+  background: var(--color-primary-light, #ede9fe);
+}
+
+#user-profile-modal .profile-plan-btn i {
+  width: 14px;
+  height: 14px;
+}

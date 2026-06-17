@@ -32,7 +32,13 @@ from helpers.db_users import (
     create_password_reset_token,
     reset_password_by_token,
 )
-from helpers.db_history import calculate_streak_days, get_activity_total_for_date
+from helpers.db_history import (
+    calculate_streak_days,
+    get_activity_total_for_date,
+    get_activity_lead_time_by_day_range,
+    get_history_by_day_totals,
+    get_history_by_day_totals_for_date,
+)
 from helpers.email_sender import send_email
 from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_telegram import (
@@ -453,6 +459,11 @@ def api_get_current_user():
         user_copy['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
     except Exception:
         user_copy['today_activity_total'] = int(user_copy.get('today_activity_total') or 0)
+
+    if 'daily_time_plan' in user_data:
+        user_copy['daily_time_plan'] = user_data.get('daily_time_plan')
+    if 'daily_money_plan' in user_data:
+        user_copy['daily_money_plan'] = user_data.get('daily_money_plan')
     
     # audio_settings_json уже включен в user_data из get_user_by_email
     # и будет возвращен автоматически
@@ -588,6 +599,12 @@ def api_update_profile():
 
         if 'daily_activity_goal' in updates:
             db_updates['daily_activity_goal'] = updates['daily_activity_goal']
+
+        if 'daily_time_plan' in updates:
+            db_updates['daily_time_plan'] = updates['daily_time_plan']
+
+        if 'daily_money_plan' in updates:
+            db_updates['daily_money_plan'] = updates['daily_money_plan']
         
         # Обновляем данные в БД
         if db_updates:
@@ -625,6 +642,12 @@ def api_update_profile():
 
         if 'daily_activity_goal' in updated_user:
             user_response['daily_activity_goal'] = updated_user.get('daily_activity_goal')
+
+        if 'daily_time_plan' in updated_user:
+            user_response['daily_time_plan'] = updated_user.get('daily_time_plan')
+
+        if 'daily_money_plan' in updated_user:
+            user_response['daily_money_plan'] = updated_user.get('daily_money_plan')
 
         if 'telegram_chat_id' in updated_user:
             user_response['telegram_chat_id'] = updated_user.get('telegram_chat_id')
@@ -689,6 +712,12 @@ def api_get_profile():
 
     if 'daily_activity_goal' in user_db:
         user_response['daily_activity_goal'] = user_db.get('daily_activity_goal')
+
+    if 'daily_time_plan' in user_db:
+        user_response['daily_time_plan'] = user_db.get('daily_time_plan')
+
+    if 'daily_money_plan' in user_db:
+        user_response['daily_money_plan'] = user_db.get('daily_money_plan')
 
     if 'telegram_chat_id' in user_db:
         user_response['telegram_chat_id'] = user_db.get('telegram_chat_id')
@@ -1192,6 +1221,51 @@ def api_save_history(month_identifier):
         import traceback
         print(f"❌ [API_SAVE_HISTORY] Error saving history: {e}")
         print(f"❌ [API_SAVE_HISTORY] Traceback: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+
+@user_bp.route('/api/stats/dashboard', methods=['GET'])
+@jwt_required()
+def api_dashboard_stats():
+    """Получить статистику для панели «Время / Деньги» на рабочем столе.
+
+    Returns:
+        streak_days: int — количество дней подряд с активностью
+        today_lead_time: int — затраченное время сегодня (ms)
+        today_money: int — заработано монет сегодня
+        total_lead_time: int — общее затраченное время за всё время (ms)
+        total_money: int — всего монет за всё время
+        daily_time_plan: int — план времени (мин)
+        daily_money_plan: int — план монет
+    """
+    try:
+        current_email = get_jwt_identity()
+        user_data = get_user_by_email(current_email)
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        user_id = user_data['id']
+        today = datetime.now().date()
+
+        streak_days = calculate_streak_days(user_id, today=today)
+
+        today_stats = get_history_by_day_totals_for_date(user_id, today)
+        all_time_stats = get_history_by_day_totals(user_id)
+
+        daily_time_plan = int(user_data.get('daily_time_plan') or 10)
+        daily_money_plan = int(user_data.get('daily_money_plan') or 100)
+
+        return jsonify({
+            'streak_days': streak_days,
+            'today_lead_time': today_stats['lead_time'],
+            'today_money': today_stats['money'],
+            'total_lead_time': all_time_stats['total_lead_time'],
+            'total_money': all_time_stats['total_money'],
+            'daily_time_plan': daily_time_plan,
+            'daily_money_plan': daily_money_plan,
+        })
+    except Exception as e:
+        print(f'Error in api_dashboard_stats: {e}')
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/api/history/all', methods=['GET'])

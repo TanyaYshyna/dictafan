@@ -771,6 +771,12 @@
     } catch (e7) {
     }
 
+    // Уведомляем панель статистики «Время / Деньги» об обновлении
+    try {
+      document.dispatchEvent(new CustomEvent('dictation-completed'));
+    } catch (e8) {
+    }
+
   }
 
   function setupCompletionModalHandlers() {

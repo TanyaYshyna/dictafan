@@ -746,11 +746,32 @@ window.Desktop = window.Desktop || {
     });
   },
 
+  initStatsPanel() {
+    const tryInit = () => {
+      try {
+        if (!window.DesktopStatsPanel || typeof window.DesktopStatsPanel.init !== 'function') return false;
+        const container = document.querySelector('.desk-zone');
+        if (!container) return false;
+        window.DesktopStatsPanel.init(container);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    if (!tryInit()) {
+      const t = setInterval(() => {
+        if (tryInit()) clearInterval(t);
+      }, 200);
+    }
+  },
+
   init() {
     this.initUserMenu();
     this.initAdminMenu();
     this.initToolPalette();
     this.initDeskLoad();
+    this.initStatsPanel();
     this.ensureDictationKartDeps();
     this.renderLucide(document.body);
   },

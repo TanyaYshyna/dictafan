@@ -109,6 +109,52 @@
                     </div>
                 </div>
 
+                <!-- План активности (Время и Деньги) -->
+                <div class="form-section">
+                    <h3 class="profile-section-header">
+                        {{ t('profile.sections.activity_plan', 'План активности') }}
+                        <button type="button" class="profile-section-toggle topbar-icon-btn" data-target="#activityPlanSection" aria-label="{{ t('profile.common.toggle_section_aria') }}">
+                            <i data-lucide="chevrons-down"></i>
+                        </button>
+                    </h3>
+                    <div id="activityPlanSection" class="profile-panel profile-panel-flat-top">
+                        <div class="panel-content">
+                            <div class="profile-plan-row">
+                                <div class="profile-plan-item">
+                                    <label class="profile-plan-label">{{ t('profile.activity_plan.time', 'Время') }}</label>
+                                    <div class="profile-plan-control">
+                                        <span id="dailyTimePlanDisplay" class="profile-plan-value">10</span>
+                                        <span class="profile-plan-unit">{{ t('profile.activity_plan.minutes', 'мин') }}</span>
+                                        <div class="profile-plan-buttons">
+                                            <button type="button" class="profile-plan-btn profile-plan-btn-up" data-plan="time" data-dir="up" title="{{ t('profile.activity_plan.increase', 'Увеличить') }}">
+                                                <i data-lucide="chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="profile-plan-btn profile-plan-btn-down" data-plan="time" data-dir="down" title="{{ t('profile.activity_plan.decrease', 'Уменьшить') }}">
+                                                <i data-lucide="chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="profile-plan-item">
+                                    <label class="profile-plan-label">{{ t('profile.activity_plan.money', 'Деньги') }}</label>
+                                    <div class="profile-plan-control">
+                                        <span id="dailyMoneyPlanDisplay" class="profile-plan-value">100</span>
+                                        <span class="profile-plan-unit">{{ t('profile.activity_plan.coins', 'монет') }}</span>
+                                        <div class="profile-plan-buttons">
+                                            <button type="button" class="profile-plan-btn profile-plan-btn-up" data-plan="money" data-dir="up" title="{{ t('profile.activity_plan.increase', 'Увеличить') }}">
+                                                <i data-lucide="chevron-up"></i>
+                                            </button>
+                                            <button type="button" class="profile-plan-btn profile-plan-btn-down" data-plan="money" data-dir="down" title="{{ t('profile.activity_plan.decrease', 'Уменьшить') }}">
+                                                <i data-lucide="chevron-down"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Языковые модели -->
                 <div class="form-section">
                     <h3 class="profile-section-header">

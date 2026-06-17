@@ -1387,3 +1387,71 @@ def get_unclosed_dictation_stats(user_id, dictation_id):
         'audio': audio
     }
 
+def get_history_by_day_totals(user_id: int) -> dict:
+    """Return total lead_time (ms) and monenumber_of_characters from history_by_day for a user.
+
+    Returns:
+        dict with keys: total_lead_time (ms), total_money (coins)
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0) AS total_lead_time,
+                    COALESCE(SUM(monenumber_of_characters), 0) AS total_money
+                FROM history_by_day
+                WHERE user_id = %s
+                """,
+                (int(user_id),),
+            )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return {
+                    'total_lead_time': int(row.get('total_lead_time') or 0),
+                    'total_money': int(row.get('total_money') or 0),
+                }
+            return {
+                'total_lead_time': int(row[0] or 0) if row else 0,
+                'total_money': int(row[1] or 0) if row else 0,
+            }
+    finally:
+        conn.close()
+
+
+def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
+    """Return lead_time (ms) and monenumber_of_characters from history_by_day for a specific date.
+
+    Returns:
+        dict with keys: lead_time (ms), money (coins)
+    """
+    conn = get_db_connection()
+    try:
+        if isinstance(date_value, str):
+            date_value = datetime.fromisoformat(date_value).date()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0) AS lead_time,
+                    COALESCE(SUM(monenumber_of_characters), 0) AS money
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND date_fact = %s
+                """,
+                (int(user_id), date_value),
+            )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return {
+                    'lead_time': int(row.get('lead_time') or 0),
+                    'money': int(row.get('money') or 0),
+                }
+            return {
+                'lead_time': int(row[0] or 0) if row else 0,
+                'money': int(row[1] or 0) if row else 0,
+            }
+    finally:
+        conn.close()
+

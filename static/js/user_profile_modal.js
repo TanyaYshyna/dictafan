@@ -1834,6 +1834,8 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
         show_text: Boolean(currentValues.show_text) !== Boolean(originalData.show_text),
         assignment_history_retention_days: currentValues.assignment_history_retention_days !== (originalData.assignment_history_retention_days ?? 7),
         daily_activity_goal: currentValues.daily_activity_goal !== (originalData.daily_activity_goal ?? 100),
+        daily_time_plan: currentValues.daily_time_plan !== (originalData.daily_time_plan ?? 10),
+        daily_money_plan: currentValues.daily_money_plan !== (originalData.daily_money_plan ?? 100),
     };
 
     const hasChanges = Object.values(diffs).some(Boolean);
@@ -1906,6 +1908,20 @@ function getCurrentFormValues() {
                 return Math.floor(n);
             } catch (e) { return 100; }
         })(),
+        daily_time_plan: (() => {
+            try {
+                const el = document.getElementById('dailyTimePlanDisplay');
+                const n = Number(el ? el.textContent : 10);
+                return (Number.isFinite(n) && n >= 10) ? Math.floor(n) : 10;
+            } catch (e) { return 10; }
+        })(),
+        daily_money_plan: (() => {
+            try {
+                const el = document.getElementById('dailyMoneyPlanDisplay');
+                const n = Number(el ? el.textContent : 100);
+                return (Number.isFinite(n) && n >= 100) ? Math.floor(n) : 100;
+            } catch (e) { return 100; }
+        })(),
     };
 }
 
@@ -1959,6 +1975,18 @@ function loadUserData() {
                 return (Number.isFinite(n) && n >= 0) ? n : 100;
             } catch (e) { return 100; }
         })(),
+        daily_time_plan: (() => {
+            try {
+                const n = Number(userData.daily_time_plan);
+                return (Number.isFinite(n) && n >= 10) ? n : 10;
+            } catch (e) { return 10; }
+        })(),
+        daily_money_plan: (() => {
+            try {
+                const n = Number(userData.daily_money_plan);
+                return (Number.isFinite(n) && n >= 100) ? n : 100;
+            } catch (e) { return 100; }
+        })(),
     };
 
     try {
@@ -1996,6 +2024,20 @@ function loadUserData() {
         if (goalEl) {
             goalEl.value = String(originalData.daily_activity_goal ?? 100);
             goalEl.oninput = () => { checkForChanges(); };
+        }
+    } catch (e) { }
+
+    // План активности (Время / Деньги)
+    try {
+        const timeDisplay = document.getElementById('dailyTimePlanDisplay');
+        if (timeDisplay) {
+            timeDisplay.textContent = String(originalData.daily_time_plan ?? 10);
+        }
+    } catch (e) { }
+    try {
+        const moneyDisplay = document.getElementById('dailyMoneyPlanDisplay');
+        if (moneyDisplay) {
+            moneyDisplay.textContent = String(originalData.daily_money_plan ?? 100);
         }
     } catch (e) { }
 
@@ -2052,6 +2094,8 @@ async function saveProfile(options = {}) {
 
         updateData.assignment_history_retention_days = formValues.assignment_history_retention_days;
         updateData.daily_activity_goal = formValues.daily_activity_goal;
+        updateData.daily_time_plan = formValues.daily_time_plan;
+        updateData.daily_money_plan = formValues.daily_money_plan;
 
         {
             let merged = {};
@@ -2127,6 +2171,18 @@ async function saveProfile(options = {}) {
                     return (Number.isFinite(n) && n >= 0) ? n : (originalData.daily_activity_goal ?? 100);
                 } catch (e) { return (originalData.daily_activity_goal ?? 100); }
             })(),
+            daily_time_plan: (() => {
+                try {
+                    const n = Number(updatedUser && updatedUser.daily_time_plan);
+                    return (Number.isFinite(n) && n >= 10) ? n : (originalData.daily_time_plan ?? 10);
+                } catch (e) { return (originalData.daily_time_plan ?? 10); }
+            })(),
+            daily_money_plan: (() => {
+                try {
+                    const n = Number(updatedUser && updatedUser.daily_money_plan);
+                    return (Number.isFinite(n) && n >= 100) ? n : (originalData.daily_money_plan ?? 100);
+                } catch (e) { return (originalData.daily_money_plan ?? 100); }
+            })(),
         };
 
         if (UM && UM.userData) {
@@ -2155,10 +2211,21 @@ async function saveProfile(options = {}) {
             if (updatedUser.settings_json) UM.userData.settings_json = updatedUser.settings_json;
             if (updatedUser.assignment_history_retention_days !== undefined && updatedUser.assignment_history_retention_days !== null) UM.userData.assignment_history_retention_days = updatedUser.assignment_history_retention_days;
             if (updatedUser.daily_activity_goal !== undefined && updatedUser.daily_activity_goal !== null) UM.userData.daily_activity_goal = updatedUser.daily_activity_goal;
+            if (updatedUser.daily_time_plan !== undefined && updatedUser.daily_time_plan !== null) UM.userData.daily_time_plan = updatedUser.daily_time_plan;
+            if (updatedUser.daily_money_plan !== undefined && updatedUser.daily_money_plan !== null) UM.userData.daily_money_plan = updatedUser.daily_money_plan;
 
             try {
                 const goalEl = document.getElementById('dailyActivityGoal');
                 if (goalEl) goalEl.value = String(originalData.daily_activity_goal ?? 100);
+            } catch (e) { }
+
+            try {
+                const timeDisplay = document.getElementById('dailyTimePlanDisplay');
+                if (timeDisplay) timeDisplay.textContent = String(originalData.daily_time_plan ?? 10);
+            } catch (e) { }
+            try {
+                const moneyDisplay = document.getElementById('dailyMoneyPlanDisplay');
+                if (moneyDisplay) moneyDisplay.textContent = String(originalData.daily_money_plan ?? 100);
             } catch (e) { }
 
             try {
@@ -2476,6 +2543,45 @@ function bindProfileTestRecording() {
 
 // ==================== INIT ====================
 
+// ==================== ПЛАН АКТИВНОСТИ: КНОПКИ +/- ====================
+
+function initializeActivityPlanButtons() {
+    const section = document.getElementById('activityPlanSection');
+    if (!section) return;
+
+    section.addEventListener('click', function (e) {
+        const btn = e.target.closest('.profile-plan-btn');
+        if (!btn) return;
+
+        const planType = btn.dataset.plan; // 'time' or 'money'
+        const dir = btn.dataset.dir;       // 'up' or 'down'
+
+        if (planType === 'time') {
+            const display = document.getElementById('dailyTimePlanDisplay');
+            if (!display) return;
+            let val = Number(display.textContent) || 10;
+            if (dir === 'up') {
+                val = Math.min(val + 5, 600);
+            } else {
+                val = Math.max(val - 5, 10);
+            }
+            display.textContent = String(val);
+        } else if (planType === 'money') {
+            const display = document.getElementById('dailyMoneyPlanDisplay');
+            if (!display) return;
+            let val = Number(display.textContent) || 100;
+            if (dir === 'up') {
+                val = val + 50;
+            } else {
+                val = Math.max(val - 50, 100);
+            }
+            display.textContent = String(val);
+        }
+
+        checkForChanges();
+    });
+}
+
 async function initUserProfilePageOrModal() {
     if (!window.UM) {
         console.error('[profile] window.UM не найден');
@@ -2520,6 +2626,7 @@ async function initUserProfilePageOrModal() {
         await initializeAudioSettings();
         initializeGroupsSection();
         initializeProfileSectionToggles();
+        initializeActivityPlanButtons();
         setupFormListeners();
         initializeTopbarControls();
         setupPasswordToggles();
