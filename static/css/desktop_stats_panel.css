@@ -1,5 +1,6 @@
 /* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / ДЕНЬГИ» ==================== */
 
+/* ---- Контейнер панели (минимальный режим) ---- */
 .desktop-stats-panel {
     position: absolute;
     top: 18px;
@@ -8,11 +9,14 @@
     background: var(--color-panel-bg, #fff);
     border: 1px solid var(--color-border, #dee2e6);
     border-radius: 14px;
-    padding: 10px 14px;
-    min-width: 200px;
+    padding: 10px 14px 6px;
+    min-width: 180px;
     cursor: pointer;
     user-select: none;
     transition: background 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .desktop-stats-panel:hover {
@@ -20,18 +24,101 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.desktop-stats-panel:active {
-    background: var(--color-active-bg, #e9ecef);
+/* ---- Кольцевые диаграммы ---- */
+.desktop-stats-rings {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* ==================== ВИД 1: ДЕНЬ + ВСЁ ВРЕМЯ ==================== */
+.desktop-stats-rings svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
 
-.desktop-stats-view-default {
+.desktop-stats-rings-center {
+    position: relative;
+    z-index: 2;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
 }
 
+.desktop-stats-rings-center .stats-fire-icon {
+    color: #f97316;
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.desktop-stats-rings-center .stats-fire-icon i {
+    width: 20px;
+    height: 20px;
+}
+
+.desktop-stats-rings-center .stats-streak-number {
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--color-text-primary, #1f2937);
+    margin-top: 2px;
+}
+
+/* ---- Pull-tab (язычок) ---- */
+.desktop-stats-pull-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 4px;
+    padding: 2px 0;
+    color: var(--color-text-secondary, #6b7280);
+    cursor: pointer;
+    transition: color 0.15s;
+    border: none;
+    background: transparent;
+}
+
+.desktop-stats-pull-tab:hover {
+    color: var(--color-text-primary, #1f2937);
+}
+
+.desktop-stats-pull-tab i {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s ease;
+}
+
+.desktop-stats-pull-tab.open i {
+    transform: rotate(180deg);
+}
+
+/* ---- Расширенная панель (выезжающая) ---- */
+.desktop-stats-expanded {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding-top: 6px;
+    border-top: 1px solid var(--color-border, #dee2e6);
+    margin-top: 4px;
+}
+
+.desktop-stats-expanded.open {
+    display: flex;
+}
+
+/* Строки в расширенной панели */
 .desktop-stats-row {
     display: flex;
     align-items: center;
@@ -88,8 +175,39 @@
     opacity: 0.6;
 }
 
-/* ==================== ВИД 2: НЕСГОРАЕМЫЕ ДНИ (СТРИК) ==================== */
+/* ---- Кнопка обновить ---- */
+.desktop-stats-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-secondary, #6b7280);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    padding: 0;
+    margin-left: auto;
+}
 
+.desktop-stats-refresh-btn:hover {
+    background: var(--color-hover-bg, #e9ecef);
+    color: var(--color-text-primary, #1f2937);
+}
+
+.desktop-stats-refresh-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+.desktop-stats-refresh-btn:active i {
+    transform: rotate(90deg);
+    transition: transform 0.2s ease;
+}
+
+/* ---- Стрик-календарь (в расширенной панели) ---- */
 .desktop-stats-view-streak {
     display: flex;
     flex-direction: column;

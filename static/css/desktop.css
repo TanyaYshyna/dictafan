@@ -79,16 +79,9 @@
   z-index: 5;
 }
 
-/* Панель статистики «Время / Деньги» — слева над тул-палеткой */
-.desktop-stats-panel {
-  top: 18px;
-  left: 18px;
-  z-index: 6;
-}
-
 /* Если панель статистики есть, сдвигаем тул-палетку вниз */
 .desktop-stats-panel + .tool-palette--desk {
-  top: 230px;
+  top: 180px;
 }
 
 .tool-palette-separator {
