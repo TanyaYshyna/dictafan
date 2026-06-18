@@ -53,8 +53,6 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    /* Сдвиг вверх-влево относительно центра колец */
-    transform: translate(-3px, -6px);
 }
 
 /* ---- Огонь + число в ряд ---- */
@@ -73,6 +71,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    /* Сдвиг иконки огня вверх-влево относительно числа */
+    transform: translate(-3px, -4px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon i {
