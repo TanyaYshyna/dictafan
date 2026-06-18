@@ -315,43 +315,21 @@ def _fmt_duration(ms: int) -> str:
 
 def _build_teacher_report_text(*, student_username: str, dictation_title: str, dictation_level: str, date_iso: str,
                               completion_count_value, error_words, report_header_mode: str = 'success') -> str:
-    error_words_lines = []
-    try:
-        ew = error_words if isinstance(error_words, dict) else {}
-        items = []
-        for k, v in ew.items():
-            try:
-                w = str(k or '').strip()
-                c = int(v or 0)
-            except Exception:
-                continue
-            if not w or c <= 0:
-                continue
-            items.append((w, c))
-        items.sort(key=lambda x: (-x[1], x[0]))
-        items = items[:15]
-        for w, c in items:
-            error_words_lines.append(f"{_safe_html(w)} - {c}")
-    except Exception:
-        error_words_lines = []
-
     medals_inline = ''
     if completion_count_value is not None:
         medals_inline = f"  🥇 {completion_count_value}"
 
     mode = str(report_header_mode or 'success').strip().lower()
     if mode == 'interim':
-        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
+        first_line = f"📊 {_safe_html(student_username)}, промежуточные результаты"
     else:
-        first_line = f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант"
+        first_line = f"✅ {_safe_html(student_username)}, успешно выполненный диктант"
 
     text = (
         f"{first_line}\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
-        f"Дата: {date_iso}"
+        f"{_safe_html(dictation_title)} (уровень {_safe_html(dictation_level)}){medals_inline}\n"
+        f"{date_iso}"
     )
-    if error_words_lines:
-        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
     return text
 
 
@@ -380,22 +358,84 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                                    completed_at_ms, completed_at_tz_offset_min, time_ms,
                                    completion_count_value, perfect_count, corrected_count, audio_count,
                                    attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
-                                   settings_json, error_words, report_header_mode: str = 'success') -> str:
-    # Date line
-    success_date_iso = datetime.now().date().isoformat()
-    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
-    date_line = when_local or success_date_iso
+                                   settings_json, error_words, report_header_mode: str = 'success',
+                                   total_chars=None, money_earned=None) -> str:
+    """
+    Собирает текст отчёта для отправки в Telegram.
+    Формат (только шапка, без детализации по предложениям):
 
-    # Totals
+    ✅ TanyaYushyna, успешно выполненный диктант
+    popular (уровень A1)  🥇 4
+    2026-05-08 17:46
+    $: 154
+    🪲: 32 / 670
+    ⭐ - 20
+    ½⭐ - 59
+    о - 90
+    🎤 - 20
+    Длительность: 1:03
+    Схема аудио: oto
+    """
     def _int_or_0(x):
         try:
             return int(x or 0)
         except Exception:
             return 0
 
-    totals_compact = f"{_int_or_0(perfect_count)}-{_int_or_0(corrected_count)}-{_int_or_0(audio_count)}-{_int_or_0(attempts_total)}-{_int_or_0(error_count)}"
+    # Дата и время завершения
+    success_date_iso = datetime.now().date().isoformat()
+    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
+    date_line = when_local or success_date_iso
 
-    # Audio scheme
+    # Количество завершений (медаль)
+    medals_inline = ''
+    if completion_count_value is not None:
+        medals_inline = f"  🥇 {completion_count_value}"
+
+    # Заголовок
+    mode = str(report_header_mode or 'success').strip().lower()
+    if mode == 'interim':
+        first_line = f"📊 {_safe_html(student_username)}, промежуточные результаты"
+    else:
+        first_line = f"✅ {_safe_html(student_username)}, успешно выполненный диктант"
+
+    lines = [first_line]
+
+    # Название диктанта + уровень + медаль
+    title_line = f"{_safe_html(dictation_title)} (уровень {_safe_html(dictation_level)}){medals_inline}"
+    lines.append(title_line)
+
+    # Дата
+    lines.append(date_line)
+
+    # Деньги (заработанные за диктант)
+    me = _int_or_0(money_earned) if money_earned is not None else 0
+    lines.append(f"$: {me}")
+
+    # Ошибки / всего символов
+    err_count = _int_or_0(error_count)
+    ch_count = _int_or_0(total_chars) if total_chars is not None else 0
+    if ch_count > 0:
+        lines.append(f"🪲: {err_count} / {ch_count}")
+    else:
+        lines.append(f"🪲: {err_count}")
+
+    # ⭐ - perfect
+    lines.append(f"⭐ - {_int_or_0(perfect_count)}")
+    # ½⭐ - corrected
+    lines.append(f"½⭐ - {_int_or_0(corrected_count)}")
+    # о - audio (активности)
+    lines.append(f"о - {_int_or_0(audio_count)}")
+    # 🎤 - количество предложений с активностью
+    sentence_count = 0
+    if isinstance(sentences_data, list):
+        sentence_count = len(sentences_data)
+    lines.append(f"🎤 - {sentence_count}")
+
+    # Длительность
+    lines.append(f"Длительность: {_fmt_duration(time_ms)}")
+
+    # Схема аудио
     audio_scheme_line = ''
     try:
         sj = settings_json
@@ -408,120 +448,15 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         if isinstance(sj_obj, dict):
             audio_cfg = sj_obj.get('audio') if isinstance(sj_obj.get('audio'), dict) else {}
             start = str(audio_cfg.get('start') or '').strip()
-            typo = str(audio_cfg.get('typo') or '').strip()
-            success_scheme = str(audio_cfg.get('success') or '').strip()
-            if start or typo or success_scheme:
-                audio_scheme_line = f"Схема аудио: {start} - {typo} - {success_scheme}\n"
+            if start:
+                audio_scheme_line = f"Схема аудио: {start}"
     except Exception:
         audio_scheme_line = ''
 
-    # Per-sentence lines
-    lines = []
-    rows = []
-    if isinstance(sentences_data, list):
-        for r in sentences_data:
-            if not isinstance(r, dict):
-                continue
-            skey = r.get('sentence_key')
-            if not skey:
-                continue
-            try:
-                sentence = get_sentence_by_key(dictation_int, dictation_lang, str(skey))
-            except Exception:
-                sentence = None
-            text_sentence = ''
-            position = None
-            if isinstance(sentence, dict):
-                text_sentence = sentence.get('text') or ''
-                position = sentence.get('position')
+    if audio_scheme_line:
+        lines.append(audio_scheme_line)
 
-            rows.append(
-                {
-                    'sentence_key': str(skey),
-                    'position': position,
-                    'perfect_count': _int_or_0(r.get('perfect_count')),
-                    'corrected_count': _int_or_0(r.get('corrected_count')),
-                    'audio_count': _int_or_0(r.get('audio_count')),
-                    'attempts_total': _int_or_0(r.get('attempts_total')),
-                    'mistake_count': _int_or_0(r.get('mistake_count') if r.get('mistake_count') is not None else r.get('error_count')),
-                    'text': text_sentence,
-                }
-            )
-
-    try:
-        def _row_sort_key(x: dict):
-            p = x.get('position')
-            try:
-                if p is not None:
-                    return (0, int(p))
-            except Exception:
-                pass
-            return (1, str(x.get('sentence_key') or ''))
-
-        rows.sort(key=_row_sort_key)
-    except Exception:
-        pass
-
-    rows = rows[:35]
-    for i, rr in enumerate(rows, start=1):
-        stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
-        compact = f"{stars}-{rr.get('attempts_total')}-{rr.get('mistake_count')}"
-        sent_text = _safe_html(rr.get('text'))
-        if sent_text and len(sent_text) > 120:
-            sent_text = sent_text[:117] + '...'
-        line_num = i
-        try:
-            p = rr.get('position')
-            if p is not None:
-                line_num = int(p)
-        except Exception:
-            line_num = i
-        lines.append(f"{line_num}) {compact}   {sent_text}")
-
-    # Error words (reuse short builder logic)
-    short_part = _build_teacher_report_text(
-        student_username=student_username,
-        dictation_title=dictation_title,
-        dictation_level=dictation_level,
-        date_iso=success_date_iso,
-        completion_count_value=completion_count_value,
-        error_words=error_words,
-        report_header_mode=report_header_mode,
-    )
-
-    medals_inline = ''
-    if completion_count_value is not None:
-        medals_inline = f"  🥇 {completion_count_value}"
-
-    mode = str(report_header_mode or 'success').strip().lower()
-    if mode == 'interim':
-        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
-    else:
-        first_line = f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант"
-
-    header = (
-        f"{first_line}\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
-        f"Дата: {date_line}\n"
-        f"Длительность: {_fmt_duration(time_ms)}\n"
-        + (audio_scheme_line or '')
-        + "\n"
-        f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
-        f"Итоги: {totals_compact}"
-    )
-
-    # Extract error-words block from short_part (everything after first double newline)
-    extra = ''
-    try:
-        if '\n\n' in short_part:
-            extra = short_part.split('\n\n', 1)[1]
-            extra = '\n\n' + extra
-    except Exception:
-        extra = ''
-
-    body_lines = "\n" + "\n".join(lines) if lines else ''
-
-    return header + (extra or '') + ("\n\n" + body_lines if body_lines else '')
+    return '\n'.join(lines)
 
 
 @statistics_bp.route('/teacher_report/recipients', methods=['POST'])
@@ -710,6 +645,8 @@ def teacher_report_send():
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
             report_header_mode=report_header_mode or 'success',
+            total_chars=data.get('total_chars'),
+            money_earned=data.get('money_earned'),
         )
     else:
         today_iso = _today_iso_local()
@@ -949,6 +886,8 @@ def teacher_report_send_auto():
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
             report_header_mode=report_header_mode or 'success',
+            total_chars=data.get('total_chars'),
+            money_earned=data.get('money_earned'),
         )
     else:
         today_iso = _today_iso_local()

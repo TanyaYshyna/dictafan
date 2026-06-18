@@ -203,6 +203,8 @@
     sentencesData,
     settingsJson,
     reportHeaderMode,
+    totalChars,
+    moneyEarned,
   }) {
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
@@ -297,6 +299,8 @@
           completedAtTzOffsetMin: tzOffsetMin,
           sentencesData: sentences_data,
           settingsJson: settings_json,
+          totalChars: null,
+          moneyEarned: null,
         };
       }
     } catch (e1) {
@@ -316,6 +320,8 @@
       const finalCompletedAtTzOffsetMin = completedAtTzOffsetMin != null ? completedAtTzOffsetMin : (snapshot ? snapshot.completedAtTzOffsetMin : null);
       const finalSentencesData = Array.isArray(sentencesData) ? sentencesData : (snapshot ? snapshot.sentencesData : null);
       const finalSettingsJson = settingsJson != null ? settingsJson : (snapshot ? snapshot.settingsJson : null);
+      const finalTotalChars = totalChars != null ? totalChars : (snapshot ? snapshot.totalChars : null);
+      const finalMoneyEarned = moneyEarned != null ? moneyEarned : (snapshot ? snapshot.moneyEarned : null);
 
       // Отправляем авто-отчёт только текущему учителю
       let teacher_user_ids = [];
@@ -353,6 +359,8 @@
           sentences_data: finalSentencesData,
           settings_json: finalSettingsJson,
           error_words: finalErrorWords,
+          total_chars: finalTotalChars,
+          money_earned: finalMoneyEarned,
         }),
       });
     } catch (e) {
@@ -678,6 +686,15 @@
           modalSettingsJson = null;
         }
 
+        // Собираем totalChars и moneyEarned для отчёта
+        let totalChars = 0;
+        let totalMoneyEarned = 0;
+        for (const key of allKeys) {
+          const st = session.getState(key);
+          totalChars += Number(st.number_of_characters) || 0;
+          totalMoneyEarned += Number(st.money_earned) || 0;
+        }
+
         autoSendTeacherReportAfterSuccess({
           completionCountAfter: undefined,
           errorWords: null,
@@ -691,6 +708,8 @@
           completedAtTzOffsetMin: tzOffsetMin,
           sentencesData: sentencesData,
           settingsJson: modalSettingsJson,
+          totalChars: totalChars,
+          moneyEarned: totalMoneyEarned,
         });
       }
     } catch (e6) {
