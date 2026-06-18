@@ -1,15 +1,18 @@
 /**
  * Панель статистики «Время / Деньги» на рабочем столе.
  *
- * Минимальный режим (по умолчанию):
+ * Минимальный режим (по умолчанию, ширина 100px):
  *   — Две кольцевые SVG-диаграммы: внутренняя (жёлтая) — время, внешняя (розовая) — деньги
- *   — В центре: огонь + число несгораемых дней (без текста)
+ *   — В центре: огонь + число несгораемых дней в ряд, под ним время чч:мм
+ *   — Под диаграммой: строка с деньгами за сегодня
  *   — Внизу pull-tab (язычок) для открытия расширенной панели
  *
  * Расширенная панель (открывается по клику на pull-tab):
  *   — Все строки статистики (план/факт времени, денег, итого)
  *   — Стрик-календарь
  *   — Кнопка обновить (lucide refresh-ccw)
+ *
+ * Панель можно перетаскивать мышью или touch-ом.
  */
 
 window.DesktopStatsPanel = {
@@ -27,6 +30,11 @@ window.DesktopStatsPanel = {
 
     /** Таймер для long-press */
     _longPressTimer: null,
+
+    /** Флаг перетаскивания */
+    _dragging: false,
+    _dragOffsetX: 0,
+    _dragOffsetY: 0,
 
     // ==================== ПУБЛИЧНЫЙ API ====================
 
@@ -52,58 +60,66 @@ window.DesktopStatsPanel = {
                     '<circle id="statsRingTime" cx="50" cy="50" r="35" fill="none" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 219.91" transform="rotate(-90 50 50)" />' +
                 '</svg>' +
                 '<div class="desktop-stats-rings-center">' +
-                    '<span class="stats-fire-icon"><i data-lucide="flame" width="20" height="20"></i></span>' +
-                    '<span class="stats-streak-number" id="statsStreakNumber">—</span>' +
+                    '<div class="desktop-stats-fire-row">' +
+                        '<span class="stats-fire-icon"><i data-lucide="flame" width="16" height="16"></i></span>' +
+                        '<span class="stats-streak-number" id="statsStreakNumber">—</span>' +
+                    '</div>' +
+                    '<div class="desktop-stats-time-row" id="statsTodayTimeCompact">—</div>' +
                 '</div>' +
+            '</div>' +
+            // --- Деньги под диаграммой ---
+            '<div class="desktop-stats-money-row">' +
+                '<span class="stats-money-icon"><i data-lucide="coins" width="14" height="14"></i></span>' +
+                '<span id="statsTodayMoneyCompact">—</span>' +
             '</div>' +
             // --- Pull-tab ---
             '<button class="desktop-stats-pull-tab" id="desktopStatsPullTab" title="Подробнее">' +
-                '<i data-lucide="chevron-down" width="16" height="16"></i>' +
+                '<i data-lucide="chevron-down" width="14" height="14"></i>' +
             '</button>' +
             // --- Расширенная панель ---
             '<div class="desktop-stats-expanded" id="desktopStatsExpanded">' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="16" height="16"></i></span>' +
+                    '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsStreakDays">—</span>' +
                     '<span class="stats-label" id="statsStreakLabel">дней</span>' +
                 '</div>' +
                 '<div class="desktop-stats-separator"></div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="clock" width="16" height="16"></i></span>' +
+                    '<span class="stats-icon"><i data-lucide="clock" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTodayTime">—</span>' +
                     '<span class="stats-label">/</span>' +
                     '<span class="stats-value stats-value-plan" id="statsTodayTimePlan">—</span>' +
                 '</div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="coins" width="16" height="16"></i></span>' +
+                    '<span class="stats-icon"><i data-lucide="coins" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTodayMoney">—</span>' +
                     '<span class="stats-label">/</span>' +
                     '<span class="stats-value stats-value-plan" id="statsTodayMoneyPlan">—</span>' +
                 '</div>' +
                 '<div class="desktop-stats-separator"></div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="hourglass" width="16" height="16"></i></span>' +
+                    '<span class="stats-icon"><i data-lucide="hourglass" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTotalTime">—</span>' +
                     '<span class="stats-label">всего</span>' +
                 '</div>' +
                 '<div class="desktop-stats-row">' +
-                    '<span class="stats-icon"><i data-lucide="banknote" width="16" height="16"></i></span>' +
+                    '<span class="stats-icon"><i data-lucide="banknote" width="14" height="14"></i></span>' +
                     '<span class="stats-value" id="statsTotalMoney">—</span>' +
                     '<span class="stats-label">всего</span>' +
                 '</div>' +
                 '<div class="desktop-stats-separator"></div>' +
                 '<div class="desktop-stats-view-streak" id="desktopStatsViewStreak">' +
                     '<div class="desktop-stats-streak-header">' +
-                        '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="16" height="16"></i></span>' +
+                        '<span class="stats-icon stats-icon-fire"><i data-lucide="flame" width="14" height="14"></i></span>' +
                         '<span>Несгораемые дни</span>' +
                     '</div>' +
                     '<div class="desktop-stats-streak-days" id="statsStreakDaysGrid"></div>' +
                     '<div class="desktop-stats-streak-info" id="statsStreakInfo"></div>' +
                 '</div>' +
                 '<div class="desktop-stats-separator"></div>' +
-                '<div style="display:flex; align-items:center; justify-content:flex-end; padding-top:2px;">' +
+                '<div style="display:flex; align-items:center; justify-content:flex-end; padding-top:1px;">' +
                     '<button class="desktop-stats-refresh-btn" id="desktopStatsRefreshBtn" title="Обновить">' +
-                        '<i data-lucide="refresh-ccw" width="16" height="16"></i>' +
+                        '<i data-lucide="refresh-ccw" width="14" height="14"></i>' +
                     '</button>' +
                 '</div>' +
             '</div>';
@@ -152,6 +168,8 @@ window.DesktopStatsPanel = {
 
         // Долгое нажатие (touch) — обновить статистику на мобильных
         panel.addEventListener('touchstart', (e) => {
+            // Если это drag (одним пальцем), не запускаем long-press
+            if (e.touches.length !== 1) return;
             this._longPressTimer = setTimeout(() => {
                 this._longPressTimer = null;
                 e.preventDefault();
@@ -173,12 +191,105 @@ window.DesktopStatsPanel = {
             }
         });
 
+        // --- Drag-and-drop ---
+        this._initDrag(panel);
+
         // Загружаем данные
         this.load();
 
         // Слушаем событие завершения диктанта
         document.addEventListener('dictation-completed', () => {
             this.load();
+        });
+    },
+
+    /**
+     * Инициализировать drag-and-drop для панели.
+     * @param {HTMLElement} panel
+     */
+    _initDrag(panel) {
+        const onPointerDown = (e) => {
+            // Не перетаскивать, если клик по pull-tab, кнопке или внутри expanded
+            if (e.target.closest('button, .desktop-stats-expanded, .desktop-stats-pull-tab')) return;
+            // Только левая кнопка мыши
+            if (e.type === 'mousedown' && e.button !== 0) return;
+
+            this._dragging = true;
+            const rect = panel.getBoundingClientRect();
+            this._dragOffsetX = e.clientX - rect.left;
+            this._dragOffsetY = e.clientY - rect.top;
+            panel.style.cursor = 'grabbing';
+            panel.style.transition = 'none';
+            e.preventDefault();
+        };
+
+        const onPointerMove = (e) => {
+            if (!this._dragging) return;
+            const container = panel.parentElement;
+            if (!container) return;
+            const containerRect = container.getBoundingClientRect();
+
+            let x = e.clientX - containerRect.left - this._dragOffsetX;
+            let y = e.clientY - containerRect.top - this._dragOffsetY;
+
+            // Ограничиваем в пределах контейнера
+            x = Math.max(0, Math.min(x, containerRect.width - panel.offsetWidth));
+            y = Math.max(0, Math.min(y, containerRect.height - panel.offsetHeight));
+
+            panel.style.left = x + 'px';
+            panel.style.top = y + 'px';
+            e.preventDefault();
+        };
+
+        const onPointerUp = () => {
+            if (!this._dragging) return;
+            this._dragging = false;
+            panel.style.cursor = '';
+            panel.style.transition = '';
+        };
+
+        // Mouse
+        panel.addEventListener('mousedown', onPointerDown);
+        document.addEventListener('mousemove', onPointerMove);
+        document.addEventListener('mouseup', onPointerUp);
+
+        // Touch
+        panel.addEventListener('touchstart', (e) => {
+            if (e.target.closest('button, .desktop-stats-expanded, .desktop-stats-pull-tab')) return;
+            if (e.touches.length !== 1) return;
+            this._dragging = true;
+            const touch = e.touches[0];
+            const rect = panel.getBoundingClientRect();
+            this._dragOffsetX = touch.clientX - rect.left;
+            this._dragOffsetY = touch.clientY - rect.top;
+            panel.style.cursor = 'grabbing';
+            panel.style.transition = 'none';
+        }, { passive: false });
+
+        panel.addEventListener('touchmove', (e) => {
+            if (!this._dragging) return;
+            if (e.touches.length !== 1) return;
+            const touch = e.touches[0];
+            const container = panel.parentElement;
+            if (!container) return;
+            const containerRect = container.getBoundingClientRect();
+
+            let x = touch.clientX - containerRect.left - this._dragOffsetX;
+            let y = touch.clientY - containerRect.top - this._dragOffsetY;
+
+            x = Math.max(0, Math.min(x, containerRect.width - panel.offsetWidth));
+            y = Math.max(0, Math.min(y, containerRect.height - panel.offsetHeight));
+
+            panel.style.left = x + 'px';
+            panel.style.top = y + 'px';
+            e.preventDefault();
+        }, { passive: false });
+
+        panel.addEventListener('touchend', () => {
+            if (!this._dragging) return;
+            this._dragging = false;
+            panel.style.cursor = '';
+            panel.style.transition = '';
         });
     },
 
@@ -216,21 +327,35 @@ window.DesktopStatsPanel = {
         const d = this._data;
         if (!d) return;
 
+        const streakDays = d.streak_days ?? 0;
+        const timeFact = d.today_lead_time ?? 0;
+        const timePlan = (d.daily_time_plan ?? 10) * 60 * 1000; // план в ms
+        const moneyFact = d.today_money ?? 0;
+        const moneyPlan = d.daily_money_plan ?? 100;
+
         // --- Центр: огонь + число несгораемых дней ---
         const streakNum = document.getElementById('statsStreakNumber');
-        if (streakNum) streakNum.textContent = String(d.streak_days ?? 0);
+        if (streakNum) streakNum.textContent = String(streakDays);
+
+        // --- Время компактно (чч:мм) ---
+        const timeCompact = document.getElementById('statsTodayTimeCompact');
+        if (timeCompact) {
+            timeCompact.textContent = this._formatTimeCompact(timeFact);
+        }
+
+        // --- Деньги компактно ---
+        const moneyCompact = document.getElementById('statsTodayMoneyCompact');
+        if (moneyCompact) {
+            moneyCompact.textContent = this._formatMoney(moneyFact);
+        }
 
         // --- Кольцевые диаграммы ---
 
         // Внутреннее кольцо — время (жёлтое)
-        const timeFact = d.today_lead_time ?? 0;
-        const timePlan = (d.daily_time_plan ?? 10) * 60 * 1000; // план в ms
         const timeRatio = timePlan > 0 ? Math.min(timeFact / timePlan, 1) : 0;
         this._updateRing('statsRingTime', timeRatio, 219.91); // 2*PI*35 ≈ 219.91
 
         // Внешнее кольцо — деньги (розовое)
-        const moneyFact = d.today_money ?? 0;
-        const moneyPlan = d.daily_money_plan ?? 100;
         const moneyRatio = moneyPlan > 0 ? Math.min(moneyFact / moneyPlan, 1) : 0;
         this._updateRing('statsRingMoney', moneyRatio, 276.46); // 2*PI*44 ≈ 276.46
 
@@ -239,11 +364,10 @@ window.DesktopStatsPanel = {
         // Стрик
         const streakEl = document.getElementById('statsStreakDays');
         const streakLabel = document.getElementById('statsStreakLabel');
-        if (streakEl) streakEl.textContent = String(d.streak_days ?? 0);
+        if (streakEl) streakEl.textContent = String(streakDays);
         if (streakLabel) {
-            const days = d.streak_days ?? 0;
-            const lastDigit = days % 10;
-            const lastTwo = days % 100;
+            const lastDigit = streakDays % 10;
+            const lastTwo = streakDays % 100;
             let label = 'дней';
             if (lastTwo < 10 || lastTwo > 20) {
                 if (lastDigit === 1) label = 'день';
@@ -267,7 +391,7 @@ window.DesktopStatsPanel = {
         this._renderMoney('statsTotalMoney', d.total_money ?? 0);
 
         // Стрик-календарь
-        this._renderStreakCalendar(d.streak_days ?? 0);
+        this._renderStreakCalendar(streakDays);
     },
 
     /**
@@ -299,6 +423,19 @@ window.DesktopStatsPanel = {
         const offset = circumference * (1 - ratio);
         el.setAttribute('stroke-dasharray', circumference + ' ' + circumference);
         el.setAttribute('stroke-dashoffset', String(offset));
+    },
+
+    /**
+     * Отформатировать время в компактный вид чч:мм.
+     * @param {number} ms
+     * @returns {string}
+     */
+    _formatTimeCompact(ms) {
+        if (!ms || ms <= 0) return '0:00';
+        const totalMinutes = Math.floor(ms / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        return hours + ':' + String(minutes).padStart(2, '0');
     },
 
     /**

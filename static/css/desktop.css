@@ -81,7 +81,7 @@
 
 /* Если панель статистики есть, сдвигаем тул-палетку вниз */
 .desktop-stats-panel + .tool-palette--desk {
-  top: 180px;
+  top: 200px;
 }
 
 .tool-palette-separator {

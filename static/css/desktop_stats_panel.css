@@ -3,20 +3,22 @@
 /* ---- Контейнер панели (минимальный режим) ---- */
 .desktop-stats-panel {
     position: absolute;
+    /* По умолчанию ставим слева, но пользователь может перетащить */
     top: 18px;
     left: 18px;
-    z-index: 4;
+    z-index: 10;
     background: var(--color-panel-bg, #fff);
     border: 1px solid var(--color-border, #dee2e6);
     border-radius: 14px;
-    padding: 10px 14px 6px;
-    min-width: 180px;
+    padding: 8px;
+    width: 100px;
     cursor: pointer;
     user-select: none;
     transition: background 0.15s, box-shadow 0.15s;
     display: flex;
     flex-direction: column;
     align-items: center;
+    touch-action: none; /* важно для drag-and-drop на touch */
 }
 
 .desktop-stats-panel:hover {
@@ -27,11 +29,12 @@
 /* ---- Кольцевые диаграммы ---- */
 .desktop-stats-rings {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 84px;
+    height: 84px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
 
 .desktop-stats-rings svg {
@@ -52,26 +55,73 @@
     gap: 0;
 }
 
-.desktop-stats-rings-center .stats-fire-icon {
+/* ---- Огонь + число в ряд ---- */
+.desktop-stats-fire-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    margin-top: 2px;
+}
+
+.desktop-stats-fire-row .stats-fire-icon {
     color: #f97316;
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
-.desktop-stats-rings-center .stats-fire-icon i {
-    width: 20px;
-    height: 20px;
+.desktop-stats-fire-row .stats-fire-icon i {
+    width: 16px;
+    height: 16px;
 }
 
-.desktop-stats-rings-center .stats-streak-number {
-    font-size: 22px;
+.desktop-stats-fire-row .stats-streak-number {
+    font-size: 18px;
     font-weight: 700;
     line-height: 1;
     color: var(--color-text-primary, #1f2937);
+}
+
+/* ---- Время под центром ---- */
+.desktop-stats-time-row {
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--color-text-secondary, #6b7280);
     margin-top: 2px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* ---- Деньги под диаграммой ---- */
+.desktop-stats-money-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--color-text-primary, #1f2937);
+    white-space: nowrap;
+}
+
+.desktop-stats-money-row .stats-money-icon {
+    color: #ec4899;
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.desktop-stats-money-row .stats-money-icon i {
+    width: 14px;
+    height: 14px;
 }
 
 /* ---- Pull-tab (язычок) ---- */
@@ -80,8 +130,8 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    margin-top: 4px;
-    padding: 2px 0;
+    margin-top: 2px;
+    padding: 1px 0;
     color: var(--color-text-secondary, #6b7280);
     cursor: pointer;
     transition: color 0.15s;
@@ -94,8 +144,8 @@
 }
 
 .desktop-stats-pull-tab i {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     transition: transform 0.2s ease;
 }
 
@@ -107,11 +157,11 @@
 .desktop-stats-expanded {
     display: none;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
     width: 100%;
-    padding-top: 6px;
+    padding-top: 5px;
     border-top: 1px solid var(--color-border, #dee2e6);
-    margin-top: 4px;
+    margin-top: 3px;
 }
 
 .desktop-stats-expanded.open {
@@ -122,16 +172,16 @@
 .desktop-stats-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 12px;
     line-height: 1.3;
     color: var(--color-text-primary, #1f2937);
 }
 
 .desktop-stats-row .stats-icon {
     flex: 0 0 auto;
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -145,7 +195,7 @@
 .desktop-stats-row .stats-label {
     flex: 0 0 auto;
     color: var(--color-text-secondary, #6b7280);
-    font-size: 12px;
+    font-size: 11px;
     white-space: nowrap;
 }
 
@@ -157,7 +207,7 @@
 .desktop-stats-row .stats-value.stats-value-plan {
     font-weight: 400;
     color: var(--color-text-secondary, #6b7280);
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .desktop-stats-row .stats-value.stats-value-overplan {
@@ -180,10 +230,10 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border: none;
-    border-radius: 8px;
+    border-radius: 6px;
     background: transparent;
     color: var(--color-text-secondary, #6b7280);
     cursor: pointer;
@@ -198,8 +248,8 @@
 }
 
 .desktop-stats-refresh-btn i {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
 }
 
 .desktop-stats-refresh-btn:active i {
@@ -211,14 +261,14 @@
 .desktop-stats-view-streak {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .desktop-stats-streak-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 13px;
+    gap: 6px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--color-text-primary, #1f2937);
 }
@@ -230,14 +280,14 @@
 .desktop-stats-streak-days {
     display: flex;
     flex-wrap: wrap;
-    gap: 3px;
-    max-width: 220px;
+    gap: 2px;
+    max-width: 200px;
 }
 
 .desktop-stats-streak-day {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
     background: var(--color-border, #dee2e6);
     flex: 0 0 auto;
 }
@@ -256,7 +306,7 @@
 }
 
 .desktop-stats-streak-info {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--color-text-secondary, #6b7280);
-    margin-top: 2px;
+    margin-top: 1px;
 }
