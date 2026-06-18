@@ -69,7 +69,7 @@ window.DesktopStatsPanel = {
             '</div>' +
             // --- Деньги под диаграммой ---
             '<div class="desktop-stats-money-row">' +
-                '<span class="stats-money-icon"><i data-lucide="coins" width="14" height="14"></i></span>' +
+                '<span class="stats-money-icon"><i data-lucide="dollar-sign" width="16" height="16"></i></span>' +
                 '<span id="statsTodayMoneyCompact">—</span>' +
             '</div>' +
             // --- Pull-tab ---

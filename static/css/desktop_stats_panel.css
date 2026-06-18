@@ -53,6 +53,9 @@
     align-items: center;
     justify-content: center;
     gap: 0;
+    /* Сдвиг вверх-влево относительно центра колец */
+    margin-top: -6px;
+    margin-left: -2px;
 }
 
 /* ---- Огонь + число в ряд ---- */
@@ -80,17 +83,17 @@
 
 .desktop-stats-fire-row .stats-streak-number {
     font-size: 18px;
-    font-weight: 700;
+    font-weight: 800;
     line-height: 1;
-    color: var(--color-text-primary, #1f2937);
+    color: var(--color-button-text-gray, #1f2937);
 }
 
 /* ---- Время под центром ---- */
 .desktop-stats-time-row {
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 16px;
+    font-weight: 800;
     line-height: 1.2;
-    color: var(--color-text-secondary, #6b7280);
+    color: var(--color-button-text-gray, #6b7280);
     margin-top: 2px;
     text-align: center;
     white-space: nowrap;
@@ -103,25 +106,25 @@
     justify-content: center;
     gap: 3px;
     margin-top: 4px;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 800;
     line-height: 1.2;
-    color: var(--color-text-primary, #1f2937);
+    color: var(--color-button-text-gray, #6b7280);
     white-space: nowrap;
 }
 
 .desktop-stats-money-row .stats-money-icon {
-    color: #ec4899;
-    width: 14px;
-    height: 14px;
+    color: var(--color-button-text-gray);
+    width: 16px;
+    height: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
 .desktop-stats-money-row .stats-money-icon i {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
 }
 
 /* ---- Pull-tab (язычок) ---- */
