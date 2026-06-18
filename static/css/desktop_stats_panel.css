@@ -65,14 +65,14 @@
 }
 
 .desktop-stats-fire-row .stats-fire-icon {
-    color: #f97316;
-    width: 16px;
-    height: 16px;
+    color: var(--color-button-text-orange);
+    width: 24px;
+    height: 24px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     /* Сдвиг иконки огня вверх-влево относительно числа */
-    transform: translate(-3px, -4px);
+    transform: translate(-4px, 0px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon i {

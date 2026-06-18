@@ -31,6 +31,9 @@
   transition: none;
   overflow: visible;
   box-sizing: border-box;
+  width: 180px;
+  min-width: 180px;
+  flex: 0 0 180px;
 }
 
 .page-index .desk-card .short-thumb {
