@@ -21,12 +21,108 @@
       text: '',
     };
 
+    // Информация об очередях отправки и интернете
+    var queueInfoState = {
+      activityCount: 0,
+      successCount: 0,
+      activityTimerRemainingMs: null,
+      successTimerRemainingMs: null,
+      online: navigator.onLine,
+      updateTimerId: null,
+    };
+
     // Public page-published info shown on the right.
     // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
     var pageInfo = {
       meta: '',
       kv: {},
     };
+
+    function formatTimerRemaining(ms) {
+      try {
+        if (ms == null || ms <= 0) return '';
+        var totalSec = Math.ceil(ms / 1000);
+        var min = Math.floor(totalSec / 60);
+        var sec = totalSec % 60;
+        if (min > 0) return min + 'м ' + sec + 'с';
+        return sec + 'с';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function updateQueueInfo() {
+      try {
+        var online = navigator.onLine;
+        queueInfoState.online = online;
+
+        if (typeof window.OutboxBatcher !== 'undefined' && typeof window.OutboxBatcher.getQueueInfo === 'function') {
+          window.OutboxBatcher.getQueueInfo().then(function (info) {
+            try {
+              queueInfoState.activityCount = info.activityCount;
+              queueInfoState.successCount = info.successCount;
+              queueInfoState.activityTimerRemainingMs = info.activityTimerRemainingMs;
+              queueInfoState.successTimerRemainingMs = info.successTimerRemainingMs;
+            } catch (e) {
+            }
+            renderQueueInfo();
+          }).catch(function () {
+            renderQueueInfo();
+          });
+        } else {
+          renderQueueInfo();
+        }
+      } catch (e) {
+      }
+    }
+
+    function renderQueueInfo() {
+      try {
+        var el = document.getElementById(BAR_ID + '__queueInfo');
+        if (!el) return;
+
+        var parts = [];
+
+        // Статус интернета
+        if (queueInfoState.online) {
+          parts.push('🟢 online');
+        } else {
+          parts.push('🔴 offline');
+        }
+
+        // Activity очередь
+        var act = queueInfoState.activityCount;
+        if (act > 0) {
+          var actStr = 'act: ' + act;
+          var actTimer = formatTimerRemaining(queueInfoState.activityTimerRemainingMs);
+          if (actTimer) actStr += ' (' + actTimer + ')';
+          parts.push(actStr);
+        }
+
+        // Success очередь
+        var suc = queueInfoState.successCount;
+        if (suc > 0) {
+          var sucStr = 'ok: ' + suc;
+          var sucTimer = formatTimerRemaining(queueInfoState.successTimerRemainingMs);
+          if (sucTimer) sucStr += ' (' + sucTimer + ')';
+          parts.push(sucStr);
+        }
+
+        el.textContent = parts.join(' | ');
+      } catch (e) {
+      }
+    }
+
+    function startQueueInfoPolling() {
+      try {
+        if (queueInfoState.updateTimerId) return;
+        updateQueueInfo();
+        queueInfoState.updateTimerId = setInterval(function () {
+          updateQueueInfo();
+        }, 5000); // обновление каждые 5 секунд
+      } catch (e) {
+      }
+    }
 
     function getBuildValue() {
       try {
@@ -90,6 +186,7 @@
           "#" + BAR_ID + " .swbar-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
           "#" + BAR_ID + " .swbar-left-wrap{display:flex;align-items:center;gap:10px;min-width:0;}" +
           "#" + BAR_ID + " .swbar-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+          "#" + BAR_ID + " .swbar-queue-info{flex:0 0 auto;white-space:nowrap;opacity:0.85;}" +
           "#" + BAR_ID + " .swbar-progress{display:none;align-items:center;gap:8px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-progress.on{display:flex;}" +
           "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.06);overflow:hidden;}" +
@@ -170,8 +267,14 @@
         pct.id = BAR_ID + '__progressPct';
         pct.textContent = '';
 
+        var queueInfo = document.createElement('div');
+        queueInfo.className = 'swbar-queue-info';
+        queueInfo.id = BAR_ID + '__queueInfo';
+        queueInfo.textContent = '';
+
         leftWrap.appendChild(msg);
         leftWrap.appendChild(leftExtra);
+        leftWrap.appendChild(queueInfo);
         left.appendChild(leftWrap);
 
         var right = document.createElement('div');
@@ -517,14 +620,29 @@
           document.addEventListener('DOMContentLoaded', function () {
             ensureBar();
             hideLegacyBuildBadges();
+            startQueueInfoPolling();
           });
         } else {
           ensureBar();
           hideLegacyBuildBadges();
+          startQueueInfoPolling();
         }
       } catch (e) {
       }
       installInterceptor();
+
+      // Слушаем изменения статуса интернета
+      try {
+        window.addEventListener('online', function () {
+          queueInfoState.online = true;
+          updateQueueInfo();
+        });
+        window.addEventListener('offline', function () {
+          queueInfoState.online = false;
+          updateQueueInfo();
+        });
+      } catch (e) {
+      }
 
       try {
         if ('serviceWorker' in navigator) {

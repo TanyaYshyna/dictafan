@@ -139,8 +139,10 @@
       _flushActivityOutbox();
       return;
     }
+    state._activityTimerStartedAt = Date.now();
     state.activityTimerId = setTimeout(() => {
       state.activityTimerId = null;
+      state._activityTimerStartedAt = null;
       _flushActivityOutbox();
     }, BATCH_INTERVAL_MS);
   }
@@ -289,8 +291,10 @@
       _flushSuccessOutbox();
       return;
     }
+    state._successTimerStartedAt = Date.now();
     state.successTimerId = setTimeout(() => {
       state.successTimerId = null;
+      state._successTimerStartedAt = null;
       _flushSuccessOutbox();
     }, BATCH_INTERVAL_MS);
   }
@@ -570,6 +574,43 @@
     }
   }
 
+  /**
+   * Вернуть информацию об очередях для отображения в статус-баре.
+   * @returns {Promise<{activityCount: number, successCount: number, activityTimerRemainingMs: number|null, successTimerRemainingMs: number|null}>}
+   */
+  async function getQueueInfo() {
+    try {
+      var activityRows = await window.IdbManager.idbGetAll('activity_outbox');
+      var successRows = await window.IdbManager.idbGetAll('success_outbox');
+      var activityCount = Array.isArray(activityRows) ? activityRows.length : 0;
+      var successCount = Array.isArray(successRows) ? successRows.length : 0;
+
+      var now = Date.now();
+      var activityTimerRemainingMs = null;
+      var successTimerRemainingMs = null;
+
+      if (state.activityTimerId) {
+        // Таймер создаётся через setTimeout(fn, BATCH_INTERVAL_MS).
+        // Вычислить оставшееся время напрямую из таймера нельзя,
+        // поэтому используем приближение: если pendingActivityCount > 0, значит таймер запущен.
+        // Для точности будем хранить время запуска таймера.
+        activityTimerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state._activityTimerStartedAt || now)));
+      }
+      if (state.successTimerId) {
+        successTimerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state._successTimerStartedAt || now)));
+      }
+
+      return {
+        activityCount: activityCount,
+        successCount: successCount,
+        activityTimerRemainingMs: activityTimerRemainingMs,
+        successTimerRemainingMs: successTimerRemainingMs,
+      };
+    } catch (e) {
+      return { activityCount: 0, successCount: 0, activityTimerRemainingMs: null, successTimerRemainingMs: null };
+    }
+  }
+
   // Слушаем online-событие для автоматической синхронизации
   window.addEventListener('online', () => {
     flushAll().catch(() => {});
@@ -583,6 +624,7 @@
     enqueueSuccessUrgent,
     flushAll,
     notifySwToSync,
+    getQueueInfo,
   };
 
 })();
