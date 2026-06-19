@@ -1,13 +1,16 @@
 /**
- * OutboxBatcher — модуль для батчинга отправки данных на сервер.
+ * OutboxBatcher — модуль для накопления и отправки данных на сервер.
  *
- * Заменяет немедленные fetch-вызовы в saveActivityToDB и enqueueOfflineSuccess
- * на накопление данных в activity_outbox / success_outbox с последующей
- * периодической отправкой батчей.
+ * Единая очередь (outbox), куда попадают все действия пользователя:
+ *   - activity (perfect/corrected/audio) — каждое законченное предложение
+ *   - success (завершение диктанта) — когда юзер закончил все предложения
  *
- * Два типа заданий:
- *   urgent — отправляется немедленно (минуя таймер)
- *   deferred — отправляется по таймеру (каждые BATCH_INTERVAL_MS) или при достижении лимита
+ * Отправка происходит:
+ *   1) По таймеру (BATCH_INTERVAL_MS) — все накопленные данные
+ *   2) При завершении диктанта — принудительный flushAll()
+ *   3) При появлении интернета (online-событие)
+ *
+ * Если нет интернета — данные хранятся в IndexedDB до следующей попытки.
  *
  * Использование:
  *   OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, ... })
@@ -23,10 +26,9 @@
   const TAG = '[OutboxBatcher]';
 
   const state = {
-    activityTimerId: null,
-    successTimerId: null,
-    pendingActivityCount: 0,
-    pendingSuccessCount: 0,
+    timerId: null,
+    timerStartedAt: null,
+    pendingCount: 0,
     flushing: false,
   };
 
@@ -40,374 +42,10 @@
     return window.UM?.token || localStorage.getItem('jwt_token');
   }
 
-  // ======================== ACTIVITY OUTBOX ========================
-
-  /**
-   * Добавить активность в outbox (deferred — по таймеру).
-   * @param {Object} params
-   * @param {string} params.type - 'perfect' | 'corrected' | 'audio'
-   * @param {number} params.count - количество (обычно 1)
-   * @param {number} params.leadTimeMs - время работы над предложением
-   * @param {number} params.dictationId - ID диктанта
-   * @param {string} params.date - дата YYYYMMDD
-   * @param {string} [params.dictationLanguageCode] - код языка
-   * @param {any} [params.selectedSentencePositions] - выбранные позиции предложений
-   */
-  async function enqueueActivity(params) {
-    console.log(TAG, '[1] enqueueActivity: вход', { type: params?.type, dictationId: params?.dictationId });
-    try {
-      const {
-        type,
-        count = 1,
-        leadTimeMs = 0,
-        dictationId,
-        date,
-        dictationLanguageCode,
-        selectedSentencePositions,
-      } = params || {};
-
-      if (!dictationId || !type) {
-        console.warn(TAG, '[1a] enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
-        return false;
-      }
-
-      console.log(TAG, `[1b] enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode}`);
-
-      const userId = _getUserId();
-      if (!userId) {
-        console.warn(TAG, '[1c] enqueueActivity: пропущено (нет userId)');
-        return false;
-      }
-
-      const dateId = date || _getLocalDateId();
-      const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
-      const key = `${userId}:${dateId}:${dictationId}:${selPosStr}`;
-
-      console.log(TAG, `[1d] enqueueActivity: userId=${userId} dateId=${dateId} key=${key}`);
-
-      // Увеличиваем pending-счётчик ДО записи в IndexedDB, чтобы даже при ошибке
-      // записи счётчик был учтён в getQueueInfo(). Если запись не удалась,
-      // счётчик будет скорректирован при следующем flush.
-      state.pendingActivityCount += 1;
-      console.log(TAG, `[1e] enqueueActivity: pendingActivityCount увеличен => ${state.pendingActivityCount}`);
-
-      // Читаем существующую запись или создаём новую
-      console.log(TAG, `[1f] enqueueActivity: idbGet activity_outbox key=${key}`);
-      const existing = (await window.IdbManager.idbGet('activity_outbox', key)) || {
-        key,
-        userId,
-        date: dateId,
-        dictation_id: dictationId,
-        selected_sentence_positions: selectedSentencePositions || null,
-        perfect_count: 0,
-        corrected_count: 0,
-        audio_count: 0,
-        lead_time_ms_total: 0,
-        dictation_language_code: dictationLanguageCode || null,
-        updatedAt: 0,
-      };
-
-      const n = Number(count) || 0;
-      if (type === 'perfect') existing.perfect_count += n;
-      if (type === 'corrected') existing.corrected_count += n;
-      if (type === 'audio') existing.audio_count += n;
-
-      existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
-      existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
-      existing.updatedAt = Date.now();
-
-      console.log(TAG, `[1g] enqueueActivity: idbPut activity_outbox key=${key} perfect=${existing.perfect_count} corrected=${existing.corrected_count} audio=${existing.audio_count}`);
-      await window.IdbManager.idbPut('activity_outbox', existing);
-
-      console.log(TAG, `[1h] enqueueActivity: сохранено в IndexedDB (key=${key}), pending=${state.pendingActivityCount}`);
-      _scheduleActivityFlush();
-
-      return true;
-    } catch (e) {
-      console.warn(TAG, '[1err] enqueueActivity: ошибка', e);
-      return false;
-    }
-  }
-
-  /**
-   * Добавить активность как urgent — отправляется немедленно.
-   * Если отправка не удалась, падает в deferred outbox.
-   */
-  async function enqueueActivityUrgent(params) {
-    console.log(TAG, '[2] enqueueActivityUrgent: вход', { type: params?.type, dictationId: params?.dictationId });
-    try {
-      const sent = await _sendActivityBatch([params]);
-      if (sent) {
-        console.log(TAG, '[2a] enqueueActivityUrgent: отправлено сразу');
-        return true;
-      }
-
-      console.log(TAG, '[2b] enqueueActivityUrgent: не удалось, падаем в deferred');
-      return await enqueueActivity(params);
-    } catch (e) {
-      console.warn(TAG, '[2err] enqueueActivityUrgent: ошибка, падаем в deferred', e);
-      return await enqueueActivity(params);
-    }
-  }
-
-  /** Запланировать отправку activity outbox */
-  function _scheduleActivityFlush() {
-    console.log(TAG, `[3] _scheduleActivityFlush: pending=${state.pendingActivityCount} timerId=${state.activityTimerId}`);
-    if (state.activityTimerId) {
-      console.log(TAG, '[3a] _scheduleActivityFlush: таймер уже запущен');
-      return;
-    }
-    if (state.pendingActivityCount >= MAX_BATCH_SIZE) {
-      console.log(TAG, `[3b] _scheduleActivityFlush: превышен лимит (${state.pendingActivityCount} >= ${MAX_BATCH_SIZE}), шлём сразу`);
-      _flushActivityOutbox();
-      return;
-    }
-    state._activityTimerStartedAt = Date.now();
-    state.activityTimerId = setTimeout(() => {
-      console.log(TAG, '[3c] _scheduleActivityFlush: таймер сработал');
-      state.activityTimerId = null;
-      state._activityTimerStartedAt = null;
-      _flushActivityOutbox();
-    }, BATCH_INTERVAL_MS);
-    console.log(TAG, `[3d] _scheduleActivityFlush: таймер установлен на ${BATCH_INTERVAL_MS}ms`);
-  }
-
-  /** Отправить все накопленные activity записи */
-  async function _flushActivityOutbox() {
-    console.log(TAG, `[4] _flushActivityOutbox: вход flushing=${state.flushing} pending=${state.pendingActivityCount}`);
-    if (state.flushing) {
-      console.log(TAG, '[4a] _flushActivityOutbox: уже идёт flush');
-      return;
-    }
-    state.flushing = true;
-    try {
-      if (!_hasToken()) {
-        console.warn(TAG, '[4b] _flushActivityOutbox: нет токена — выходим');
-        return;
-      }
-
-      console.log(TAG, '[4c] _flushActivityOutbox: idbGetAll activity_outbox');
-      const rows = await window.IdbManager.idbGetAll('activity_outbox');
-      console.log(TAG, `[4d] _flushActivityOutbox: получено ${rows.length} записей из IndexedDB`);
-
-      if (!rows.length) {
-        console.log(TAG, `[4e] _flushActivityOutbox: нет записей в IndexedDB, pending=${state.pendingActivityCount}`);
-        return;
-      }
-
-      const token = _getToken();
-      let successCount = 0;
-
-      for (const row of rows) {
-        try {
-          console.log(TAG, `[4f] _flushActivityOutbox: отправка key=${row.key} perfect=${row.perfect_count} corrected=${row.corrected_count} audio=${row.audio_count}`);
-          const response = await fetch('/api/statistics/activity', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              dictation_id: row.dictation_id,
-              date: row.date,
-              perfect_count: Number(row.perfect_count) || 0,
-              corrected_count: Number(row.corrected_count) || 0,
-              audio_count: Number(row.audio_count) || 0,
-              lead_time_ms: Number(row.lead_time_ms_total) || 0,
-              dictation_language_code: row.dictation_language_code || undefined,
-              selected_sentence_positions: row.selected_sentence_positions || undefined,
-            }),
-          });
-
-          if (response.ok) {
-            console.log(TAG, `[4g] _flushActivityOutbox: успешно key=${row.key}`);
-            await window.IdbManager.idbDelete('activity_outbox', row.key);
-            successCount += 1;
-          } else if (response.status === 401) {
-            console.warn(TAG, '[4h] _flushActivityOutbox: 401 Unauthorized — прерываем');
-            break;
-          } else {
-            console.warn(TAG, `[4i] _flushActivityOutbox: ошибка ${response.status} — прерываем`);
-            break;
-          }
-        } catch (e) {
-          console.warn(TAG, '[4j] _flushActivityOutbox: ошибка сети', e);
-          break;
-        }
-      }
-
-      console.log(TAG, `[4k] _flushActivityOutbox: итог: отправлено ${successCount} из ${rows.length}, pending было ${state.pendingActivityCount}, стало ${Math.max(0, state.pendingActivityCount - successCount)}`);
-      state.pendingActivityCount = Math.max(0, state.pendingActivityCount - successCount);
-    } catch (e) {
-      console.warn(TAG, '[4err] _flushActivityOutbox: общая ошибка', e);
-    } finally {
-      state.flushing = false;
-    }
-  }
-
-  // ======================== SUCCESS OUTBOX ========================
-
-  /**
-   * Добавить success-данные в outbox (deferred — по таймеру).
-   * Автоматически мержит с существующей записью (суммирует счётчики).
-   */
-  async function enqueueSuccess(payload) {
-    console.log(TAG, '[5] enqueueSuccess: вход', { dictation_id: payload?.dictation_id });
-    try {
-      if (!payload || !payload.dictation_id) {
-        console.warn(TAG, '[5a] enqueueSuccess: пропущено (нет dictation_id)', payload);
-        return false;
-      }
-
-      const userId = _getUserId();
-      if (!userId) {
-        console.warn(TAG, '[5b] enqueueSuccess: пропущено (нет userId)');
-        return false;
-      }
-
-      const rawId = String(payload.dictation_id).trim();
-      const dateId = payload.date || _getLocalDateId();
-      const key = `${userId}:${rawId}:${dateId}`;
-
-      console.log(TAG, `[5c] enqueueSuccess: userId=${userId} dateId=${dateId} key=${key}`);
-
-      // Увеличиваем pending-счётчик ДО записи в IndexedDB
-      state.pendingSuccessCount += 1;
-      console.log(TAG, `[5d] enqueueSuccess: pendingSuccessCount увеличен => ${state.pendingSuccessCount}`);
-
-      console.log(TAG, `[5e] enqueueSuccess: idbGet success_outbox key=${key}`);
-      const existing = await window.IdbManager.idbGet('success_outbox', key);
-
-      const mergedPayload = existing?.payload ? _mergeSuccessPayloads(existing.payload, payload) : payload;
-
-      console.log(TAG, `[5f] enqueueSuccess: idbPut success_outbox key=${key}`);
-      await window.IdbManager.idbPut('success_outbox', {
-        key,
-        userId,
-        createdAt: existing?.createdAt || Date.now(),
-        payload: mergedPayload,
-      });
-
-      console.log(TAG, `[5g] enqueueSuccess: сохранено (key=${key}) perfect=${payload.perfect_count} corrected=${payload.corrected_count} audio=${payload.audio_count}`);
-      _scheduleSuccessFlush();
-
-      return true;
-    } catch (e) {
-      console.warn(TAG, '[5err] enqueueSuccess: ошибка', e);
-      return false;
-    }
-  }
-
-  /**
-   * Добавить success как urgent — отправляется немедленно.
-   */
-  async function enqueueSuccessUrgent(payload) {
-    console.log(TAG, '[6] enqueueSuccessUrgent: вход', { dictation_id: payload?.dictation_id, perfect: payload?.perfect_count, corrected: payload?.corrected_count, audio: payload?.audio_count });
-    try {
-      const sent = await _sendSuccessBatch([payload]);
-      if (sent) {
-        console.log(TAG, '[6a] enqueueSuccessUrgent: отправлено успешно');
-        return true;
-      }
-      console.warn(TAG, '[6b] enqueueSuccessUrgent: не удалось, падаем в deferred outbox');
-      return await enqueueSuccess(payload);
-    } catch (e) {
-      console.warn(TAG, '[6err] enqueueSuccessUrgent: ошибка, падаем в deferred outbox', e);
-      return await enqueueSuccess(payload);
-    }
-  }
-
-  /** Запланировать отправку success outbox */
-  function _scheduleSuccessFlush() {
-    console.log(TAG, `[7] _scheduleSuccessFlush: pending=${state.pendingSuccessCount} timerId=${state.successTimerId}`);
-    if (state.successTimerId) {
-      console.log(TAG, '[7a] _scheduleSuccessFlush: таймер уже запущен');
-      return;
-    }
-    if (state.pendingSuccessCount >= MAX_BATCH_SIZE) {
-      console.log(TAG, `[7b] _scheduleSuccessFlush: превышен лимит (${state.pendingSuccessCount} >= ${MAX_BATCH_SIZE}), шлём сразу`);
-      _flushSuccessOutbox();
-      return;
-    }
-    state._successTimerStartedAt = Date.now();
-    state.successTimerId = setTimeout(() => {
-      console.log(TAG, '[7c] _scheduleSuccessFlush: таймер сработал');
-      state.successTimerId = null;
-      state._successTimerStartedAt = null;
-      _flushSuccessOutbox();
-    }, BATCH_INTERVAL_MS);
-    console.log(TAG, `[7d] _scheduleSuccessFlush: таймер установлен на ${BATCH_INTERVAL_MS}ms`);
-  }
-
-  /** Отправить все накопленные success записи */
-  async function _flushSuccessOutbox() {
-    console.log(TAG, `[8] _flushSuccessOutbox: вход flushing=${state.flushing} pending=${state.pendingSuccessCount}`);
-    if (state.flushing) {
-      console.log(TAG, '[8a] _flushSuccessOutbox: уже идёт flush');
-      return;
-    }
-    state.flushing = true;
-    try {
-      if (!_hasToken()) {
-        console.warn(TAG, '[8b] _flushSuccessOutbox: нет токена — выходим');
-        return;
-      }
-
-      console.log(TAG, '[8c] _flushSuccessOutbox: idbGetAll success_outbox');
-      const rows = await window.IdbManager.idbGetAll('success_outbox');
-      console.log(TAG, `[8d] _flushSuccessOutbox: получено ${rows.length} записей из IndexedDB`);
-
-      if (!rows.length) {
-        console.log(TAG, `[8e] _flushSuccessOutbox: нет записей в IndexedDB, pending=${state.pendingSuccessCount}`);
-        return;
-      }
-
-      const token = _getToken();
-      let successCount = 0;
-
-      for (const row of rows) {
-        try {
-          console.log(TAG, `[8f] _flushSuccessOutbox: отправка key=${row.key}`, { dictation_id: row.payload?.dictation_id });
-          const response = await fetch('/api/statistics/success', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(row.payload),
-          });
-
-          if (response.ok) {
-            console.log(TAG, `[8g] _flushSuccessOutbox: успешно key=${row.key}`);
-            await window.IdbManager.idbDelete('success_outbox', row.key);
-            successCount += 1;
-          } else if (response.status === 401) {
-            console.warn(TAG, '[8h] _flushSuccessOutbox: 401 Unauthorized — прерываем');
-            break;
-          } else {
-            console.warn(TAG, `[8i] _flushSuccessOutbox: ошибка ${response.status} — прерываем`);
-            break;
-          }
-        } catch (e) {
-          console.warn(TAG, '[8j] _flushSuccessOutbox: ошибка сети', e);
-          break;
-        }
-      }
-
-      console.log(TAG, `[8k] _flushSuccessOutbox: итог: отправлено ${successCount} из ${rows.length}, pending было ${state.pendingSuccessCount}, стало ${Math.max(0, state.pendingSuccessCount - successCount)}`);
-      state.pendingSuccessCount = Math.max(0, state.pendingSuccessCount - successCount);
-    } catch (e) {
-      console.warn(TAG, '[8err] _flushSuccessOutbox: общая ошибка', e);
-    } finally {
-      state.flushing = false;
-    }
-  }
-
-  // ======================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================
-
   function _getUserId() {
     try {
-      return String(window.UM?.userId || window.UM?.user?.id || '').trim();
+      // UserManager хранит данные в this.userData, полученные из /user/api/me (поле id)
+      return String(window.UM?.userData?.id || window.UM?.userId || window.UM?.user?.id || '').trim();
     } catch (e) {
       return '';
     }
@@ -499,88 +137,259 @@
     };
   }
 
-  /** Отправить один activity-запрос немедленно (для urgent) */
-  async function _sendActivityBatch(items) {
-    console.log(TAG, `[9] _sendActivityBatch: вход ${items.length} item(s)`);
+  // ======================== ЕДИНАЯ ОЧЕРЕДЬ ========================
+
+  /**
+   * Добавить активность в очередь (activity — каждое действие).
+   * Данные мержатся по ключу: userId:dateId:dictationId:selPosStr
+   */
+  async function enqueueActivity(params) {
+    console.log(TAG, '[1] enqueueActivity: вход', { type: params?.type, dictationId: params?.dictationId });
     try {
-      const token = _getToken();
-      if (!token) {
-        console.warn(TAG, '[9a] _sendActivityBatch: нет токена');
+      const {
+        type,
+        count = 1,
+        leadTimeMs = 0,
+        dictationId,
+        date,
+        dictationLanguageCode,
+        selectedSentencePositions,
+      } = params || {};
+
+      if (!dictationId || !type) {
+        console.warn(TAG, '[1a] enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
         return false;
       }
 
-      console.log(TAG, `[9b] _sendActivityBatch: отправка`, items.map(i => ({ type: i.type, count: i.count, dictationId: i.dictationId })));
+      console.log(TAG, `[1b] enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode}`);
 
-      for (const item of items) {
-        console.log(TAG, `[9c] _sendActivityBatch: fetch POST /api/statistics/activity type=${item.type} dictationId=${item.dictationId}`);
-        const response = await fetch('/api/statistics/activity', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            dictation_id: item.dictationId,
-            date: item.date || _getLocalDateId(),
-            perfect_count: item.type === 'perfect' ? (Number(item.count) || 0) : 0,
-            corrected_count: item.type === 'corrected' ? (Number(item.count) || 0) : 0,
-            audio_count: item.type === 'audio' ? (Number(item.count) || 0) : 0,
-            lead_time_ms: Number(item.leadTimeMs) || 0,
-            dictation_language_code: item.dictationLanguageCode || undefined,
-            selected_sentence_positions: item.selectedSentencePositions || undefined,
-          }),
-        });
-
-        if (response.ok) {
-          console.log(TAG, `[9d] _sendActivityBatch: успешно type=${item.type} dictationId=${item.dictationId}`);
-        } else {
-          console.warn(TAG, `[9e] _sendActivityBatch: ошибка ${response.status} type=${item.type} dictationId=${item.dictationId}`);
-          return false;
-        }
+      const userId = _getUserId();
+      if (!userId) {
+        console.warn(TAG, '[1c] enqueueActivity: пропущено (нет userId)');
+        return false;
       }
-      console.log(TAG, '[9f] _sendActivityBatch: все успешно');
+
+      const dateId = date || _getLocalDateId();
+      const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
+      const key = `act:${userId}:${dateId}:${dictationId}:${selPosStr}`;
+
+      console.log(TAG, `[1d] enqueueActivity: userId=${userId} dateId=${dateId} key=${key}`);
+
+      // Увеличиваем pending-счётчик ДО записи в IndexedDB
+      state.pendingCount += 1;
+      console.log(TAG, `[1e] enqueueActivity: pendingCount увеличен => ${state.pendingCount}`);
+
+      // Читаем существующую запись или создаём новую
+      console.log(TAG, `[1f] enqueueActivity: idbGet outbox key=${key}`);
+      const existing = (await window.IdbManager.idbGet('outbox', key)) || {
+        key,
+        type: 'activity',
+        userId,
+        date: dateId,
+        dictation_id: dictationId,
+        selected_sentence_positions: selectedSentencePositions || null,
+        perfect_count: 0,
+        corrected_count: 0,
+        audio_count: 0,
+        lead_time_ms_total: 0,
+        dictation_language_code: dictationLanguageCode || null,
+        updatedAt: 0,
+      };
+
+      const n = Number(count) || 0;
+      if (type === 'perfect') existing.perfect_count += n;
+      if (type === 'corrected') existing.corrected_count += n;
+      if (type === 'audio') existing.audio_count += n;
+
+      existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
+      existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
+      existing.updatedAt = Date.now();
+
+      console.log(TAG, `[1g] enqueueActivity: idbPut outbox key=${key} perfect=${existing.perfect_count} corrected=${existing.corrected_count} audio=${existing.audio_count}`);
+      await window.IdbManager.idbPut('outbox', existing);
+
+      console.log(TAG, `[1h] enqueueActivity: сохранено в IndexedDB (key=${key}), pending=${state.pendingCount}`);
+      _scheduleFlush();
+
       return true;
     } catch (e) {
-      console.warn(TAG, '[9err] _sendActivityBatch: ошибка сети', e);
+      console.warn(TAG, '[1err] enqueueActivity: ошибка', e);
       return false;
     }
   }
 
-  /** Отправить один success-запрос немедленно (для urgent) */
-  async function _sendSuccessBatch(items) {
-    console.log(TAG, `[10] _sendSuccessBatch: вход ${items.length} item(s)`);
+  /**
+   * Добавить success-данные в очередь (завершение диктанта).
+   * Автоматически мержит с существующей записью (суммирует счётчики).
+   */
+  async function enqueueSuccess(payload) {
+    console.log(TAG, '[5] enqueueSuccess: вход', { dictation_id: payload?.dictation_id });
     try {
-      const token = _getToken();
-      if (!token) {
-        console.warn(TAG, '[10a] _sendSuccessBatch: нет токена');
+      if (!payload || !payload.dictation_id) {
+        console.warn(TAG, '[5a] enqueueSuccess: пропущено (нет dictation_id)', payload);
         return false;
       }
 
-      console.log(TAG, `[10b] _sendSuccessBatch: отправка`, items.map(i => ({ dictation_id: i.dictation_id, perfect: i.perfect_count, corrected: i.corrected_count, audio: i.audio_count })));
-
-      for (const item of items) {
-        console.log(TAG, `[10c] _sendSuccessBatch: fetch POST /api/statistics/success dictation_id=${item.dictation_id}`);
-        const response = await fetch('/api/statistics/success', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(item),
-        });
-
-        if (response.ok) {
-          console.log(TAG, `[10d] _sendSuccessBatch: успешно dictation_id=${item.dictation_id}`);
-        } else {
-          console.warn(TAG, `[10e] _sendSuccessBatch: ошибка ${response.status} dictation_id=${item.dictation_id}`);
-          return false;
-        }
+      const userId = _getUserId();
+      if (!userId) {
+        console.warn(TAG, '[5b] enqueueSuccess: пропущено (нет userId)');
+        return false;
       }
-      console.log(TAG, '[10f] _sendSuccessBatch: все успешно');
+
+      const rawId = String(payload.dictation_id).trim();
+      const dateId = payload.date || _getLocalDateId();
+      const key = `suc:${userId}:${rawId}:${dateId}`;
+
+      console.log(TAG, `[5c] enqueueSuccess: userId=${userId} dateId=${dateId} key=${key}`);
+
+      // Увеличиваем pending-счётчик ДО записи в IndexedDB
+      state.pendingCount += 1;
+      console.log(TAG, `[5d] enqueueSuccess: pendingCount увеличен => ${state.pendingCount}`);
+
+      console.log(TAG, `[5e] enqueueSuccess: idbGet outbox key=${key}`);
+      const existing = await window.IdbManager.idbGet('outbox', key);
+
+      const mergedPayload = existing?.payload ? _mergeSuccessPayloads(existing.payload, payload) : payload;
+
+      console.log(TAG, `[5f] enqueueSuccess: idbPut outbox key=${key}`);
+      await window.IdbManager.idbPut('outbox', {
+        key,
+        type: 'success',
+        userId,
+        createdAt: existing?.createdAt || Date.now(),
+        payload: mergedPayload,
+      });
+
+      console.log(TAG, `[5g] enqueueSuccess: сохранено (key=${key}) perfect=${payload.perfect_count} corrected=${payload.corrected_count} audio=${payload.audio_count}`);
+      _scheduleFlush();
+
       return true;
     } catch (e) {
-      console.warn(TAG, '[10err] _sendSuccessBatch: ошибка сети', e);
+      console.warn(TAG, '[5err] enqueueSuccess: ошибка', e);
       return false;
+    }
+  }
+
+  // ======================== ТАЙМЕР ========================
+
+  /** Запланировать отправку outbox */
+  function _scheduleFlush() {
+    console.log(TAG, `[3] _scheduleFlush: pending=${state.pendingCount} timerId=${state.timerId}`);
+    if (state.timerId) {
+      console.log(TAG, '[3a] _scheduleFlush: таймер уже запущен');
+      return;
+    }
+    if (state.pendingCount >= MAX_BATCH_SIZE) {
+      console.log(TAG, `[3b] _scheduleFlush: превышен лимит (${state.pendingCount} >= ${MAX_BATCH_SIZE}), шлём сразу`);
+      _flushOutbox();
+      return;
+    }
+    state.timerStartedAt = Date.now();
+    state.timerId = setTimeout(() => {
+      console.log(TAG, '[3c] _scheduleFlush: таймер сработал');
+      state.timerId = null;
+      state.timerStartedAt = null;
+      _flushOutbox();
+    }, BATCH_INTERVAL_MS);
+    console.log(TAG, `[3d] _scheduleFlush: таймер установлен на ${BATCH_INTERVAL_MS}ms`);
+  }
+
+  // ======================== ОТПРАВКА ========================
+
+  /** Отправить все накопленные записи из outbox */
+  async function _flushOutbox() {
+    console.log(TAG, `[4] _flushOutbox: вход flushing=${state.flushing} pending=${state.pendingCount}`);
+    if (state.flushing) {
+      console.log(TAG, '[4a] _flushOutbox: уже идёт flush');
+      return;
+    }
+    state.flushing = true;
+    try {
+      if (!_hasToken()) {
+        console.warn(TAG, '[4b] _flushOutbox: нет токена — выходим');
+        return;
+      }
+
+      console.log(TAG, '[4c] _flushOutbox: idbGetAll outbox');
+      const rows = await window.IdbManager.idbGetAll('outbox');
+      console.log(TAG, `[4d] _flushOutbox: получено ${rows.length} записей из IndexedDB`);
+
+      if (!rows.length) {
+        console.log(TAG, `[4e] _flushOutbox: нет записей в IndexedDB, pending=${state.pendingCount}`);
+        return;
+      }
+
+      const token = _getToken();
+      let successCount = 0;
+
+      for (const row of rows) {
+        try {
+          if (row.type === 'activity') {
+            console.log(TAG, `[4f] _flushOutbox: отправка activity key=${row.key} perfect=${row.perfect_count} corrected=${row.corrected_count} audio=${row.audio_count}`);
+            const response = await fetch('/api/statistics/activity', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                dictation_id: row.dictation_id,
+                date: row.date,
+                perfect_count: Number(row.perfect_count) || 0,
+                corrected_count: Number(row.corrected_count) || 0,
+                audio_count: Number(row.audio_count) || 0,
+                lead_time_ms: Number(row.lead_time_ms_total) || 0,
+                dictation_language_code: row.dictation_language_code || undefined,
+                selected_sentence_positions: row.selected_sentence_positions || undefined,
+              }),
+            });
+
+            if (response.ok) {
+              console.log(TAG, `[4g] _flushOutbox: activity успешно key=${row.key}`);
+              await window.IdbManager.idbDelete('outbox', row.key);
+              successCount += 1;
+            } else if (response.status === 401) {
+              console.warn(TAG, '[4h] _flushOutbox: 401 Unauthorized — прерываем');
+              break;
+            } else {
+              console.warn(TAG, `[4i] _flushOutbox: activity ошибка ${response.status} — прерываем`);
+              break;
+            }
+          } else if (row.type === 'success') {
+            console.log(TAG, `[4f] _flushOutbox: отправка success key=${row.key}`, { dictation_id: row.payload?.dictation_id });
+            const response = await fetch('/api/statistics/success', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(row.payload),
+            });
+
+            if (response.ok) {
+              console.log(TAG, `[4g] _flushOutbox: success успешно key=${row.key}`);
+              await window.IdbManager.idbDelete('outbox', row.key);
+              successCount += 1;
+            } else if (response.status === 401) {
+              console.warn(TAG, '[4h] _flushOutbox: 401 Unauthorized — прерываем');
+              break;
+            } else {
+              console.warn(TAG, `[4i] _flushOutbox: success ошибка ${response.status} — прерываем`);
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn(TAG, '[4j] _flushOutbox: ошибка сети', e);
+          break;
+        }
+      }
+
+      console.log(TAG, `[4k] _flushOutbox: итог: отправлено ${successCount} из ${rows.length}, pending было ${state.pendingCount}, стало ${Math.max(0, state.pendingCount - successCount)}`);
+      state.pendingCount = Math.max(0, state.pendingCount - successCount);
+    } catch (e) {
+      console.warn(TAG, '[4err] _flushOutbox: общая ошибка', e);
+    } finally {
+      state.flushing = false;
     }
   }
 
@@ -588,31 +397,23 @@
 
   /**
    * Принудительно отправить все накопленные данные.
-   * Вызывается при закрытии модалки, переходе на другую страницу и т.д.
+   * Вызывается при завершении диктанта, при появлении сети и т.д.
    */
   async function flushAll() {
-    console.log(TAG, `[11] flushAll: вход pendingAct=${state.pendingActivityCount} pendingSuc=${state.pendingSuccessCount}`);
-    if (state.activityTimerId) {
-      clearTimeout(state.activityTimerId);
-      state.activityTimerId = null;
-      console.log(TAG, '[11a] flushAll: activityTimer сброшен');
-    }
-    if (state.successTimerId) {
-      clearTimeout(state.successTimerId);
-      state.successTimerId = null;
-      console.log(TAG, '[11b] flushAll: successTimer сброшен');
+    console.log(TAG, `[11] flushAll: вход pending=${state.pendingCount}`);
+    if (state.timerId) {
+      clearTimeout(state.timerId);
+      state.timerId = null;
+      state.timerStartedAt = null;
+      console.log(TAG, '[11a] flushAll: таймер сброшен');
     }
 
-    await Promise.all([
-      _flushActivityOutbox(),
-      _flushSuccessOutbox(),
-    ]);
+    await _flushOutbox();
     console.log(TAG, '[11c] flushAll: завершён');
   }
 
   /**
    * Отправить сообщение в Service Worker для синхронизации outbox.
-   * Используется, когда SW получает сигнал о появлении сети.
    */
   async function notifySwToSync() {
     try {
@@ -627,49 +428,39 @@
   }
 
   /**
-   * Вернуть информацию об очередях для отображения в статус-баре.
-   * @returns {Promise<{activityCount: number, successCount: number, activityTimerRemainingMs: number|null, successTimerRemainingMs: number|null}>}
+   * Вернуть информацию об очереди для отображения в статус-баре.
+   * @returns {Promise<{count: number, timerRemainingMs: number|null}>}
    */
   async function getQueueInfo() {
-    console.log(TAG, `[12] getQueueInfo: вход pendingAct=${state.pendingActivityCount} pendingSuc=${state.pendingSuccessCount} timerAct=${state.activityTimerId} timerSuc=${state.successTimerId}`);
+    console.log(TAG, `[12] getQueueInfo: вход pending=${state.pendingCount} timerId=${state.timerId}`);
     try {
-      var activityRows = await window.IdbManager.idbGetAll('activity_outbox');
-      var successRows = await window.IdbManager.idbGetAll('success_outbox');
-      var activityCount = Array.isArray(activityRows) ? activityRows.length : 0;
-      var successCount = Array.isArray(successRows) ? successRows.length : 0;
+      var rows = await window.IdbManager.idbGetAll('outbox');
+      var count = Array.isArray(rows) ? rows.length : 0;
 
-      console.log(TAG, `[12a] getQueueInfo: из IndexedDB act=${activityCount} suc=${successCount}`);
+      console.log(TAG, `[12a] getQueueInfo: из IndexedDB count=${count}`);
 
-      // Учитываем также pending-счётчики (in-memory), которые ещё не попали в IndexedDB
-      // или уже отправлены, но счётчик ещё не сброшен
-      activityCount += state.pendingActivityCount;
-      successCount += state.pendingSuccessCount;
+      // Учитываем также pending-счётчик (in-memory), который ещё не попал в IndexedDB
+      count += state.pendingCount;
 
       var now = Date.now();
-      var activityTimerRemainingMs = null;
-      var successTimerRemainingMs = null;
+      var timerRemainingMs = null;
 
-      if (state.activityTimerId) {
-        activityTimerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state._activityTimerStartedAt || now)));
-      }
-      if (state.successTimerId) {
-        successTimerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state._successTimerStartedAt || now)));
+      if (state.timerId) {
+        timerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state.timerStartedAt || now)));
       }
 
-      console.log(TAG, `[12b] getQueueInfo: результат act=${activityCount} suc=${successCount} actTimer=${activityTimerRemainingMs} sucTimer=${successTimerRemainingMs}`);
+      console.log(TAG, `[12b] getQueueInfo: результат count=${count} timer=${timerRemainingMs}`);
       return {
-        activityCount: activityCount,
-        successCount: successCount,
-        activityTimerRemainingMs: activityTimerRemainingMs,
-        successTimerRemainingMs: successTimerRemainingMs,
+        count: count,
+        timerRemainingMs: timerRemainingMs,
       };
     } catch (e) {
       console.warn(TAG, '[12err] getQueueInfo: ошибка', e);
-      return { activityCount: 0, successCount: 0, activityTimerRemainingMs: null, successTimerRemainingMs: null };
+      return { count: 0, timerRemainingMs: null };
     }
   }
 
-  // Слушаем online-событие для автоматической синхронизации
+  // Слушаем online-событие для автоматической отправки
   window.addEventListener('online', () => {
     flushAll().catch(() => {});
   });
@@ -677,9 +468,7 @@
   // Экспортируем в глобальную область
   window.OutboxBatcher = {
     enqueueActivity,
-    enqueueActivityUrgent,
     enqueueSuccess,
-    enqueueSuccessUrgent,
     flushAll,
     notifySwToSync,
     getQueueInfo,

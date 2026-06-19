@@ -716,9 +716,10 @@
     }
 
     // Отправляем success в outbox_batcher (завершение диктанта)
+    // и принудительно сбрасываем всю очередь на сервер
     try {
       const ob = window.OutboxBatcher;
-      if (ob && typeof ob.enqueueSuccessUrgent === 'function') {
+      if (ob && typeof ob.enqueueSuccess === 'function') {
         const session = window.__dictationModalActiveSession;
         if (session) {
           const allKeys = session.content ? session.content.getAllKeys() : [];
@@ -768,8 +769,8 @@
           const dictationLanguageCode = _getDictationLanguageCode();
           const selectedSentencePositions = _getSelectedSentencePositions(session);
 
-          console.log('[DM:771] enqueueSuccessUrgent:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
-          ob.enqueueSuccessUrgent({
+          console.log('[DM:771] enqueueSuccess:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
+          ob.enqueueSuccess({
             dictation_id: dictationId,
             perfect_count: totalPerfect,
             corrected_count: totalCorrected,
@@ -786,6 +787,11 @@
             selected_sentence_positions: selectedSentencePositions,
             date_start: session.dateStart,
           });
+
+          // Принудительно отправляем всё накопленное (activity + success)
+          if (typeof ob.flushAll === 'function') {
+            ob.flushAll().catch(function(e){});
+          }
         }
       }
     } catch (e7) {
@@ -5587,6 +5593,17 @@
       } catch (e) {
       }
 
+      // Сбрасываем _restorePromise, чтобы restoreFromIdb() выполнился заново
+      // при каждом открытии диктанта (иначе используется зарезолвленный Promise
+      // от предыдущего открытия, и новые данные из IDB не подхватываются).
+      try {
+        const store = getRuntimeStore();
+        if (store && typeof store.restoreFromIdb === 'function') {
+          store._restorePromise = store.restoreFromIdb().catch(function(e){});
+        }
+      } catch (eReset) {
+      }
+
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
       let contentLoaded = false;
@@ -5720,7 +5737,7 @@
     }
   }
 
-  function close(clearSession = false) {
+  async function close(clearSession = false) {
     const modal = getModal();
     if (!modal) return;
 
@@ -5784,7 +5801,7 @@
             const exerciseId = session.exerciseId;
             const subsetSignature = session.subsetSignature;
             store.removeSession({ dictationId, langTr, exerciseId, subsetSignature });
-            store.removeSessionFromIdb({ dictationId, langTr, exerciseId, subsetSignature }).catch(function(e){});
+            await store.removeSessionFromIdb({ dictationId, langTr, exerciseId, subsetSignature });
           }
         }
       } catch (e) {
@@ -5798,7 +5815,7 @@
       try {
         const store = getRuntimeStore();
         if (store && typeof store.persistToIdb === 'function') {
-          store.persistToIdb().catch(function(e){});
+          await store.persistToIdb();
         }
       } catch (e2) {
       }

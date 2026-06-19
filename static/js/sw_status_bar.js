@@ -23,10 +23,9 @@
 
     // Информация об очередях отправки и интернете
     var queueInfoState = {
-      activityCount: 0,
-      successCount: 0,
-      activityTimerRemainingMs: null,
       online: navigator.onLine,
+      count: 0,
+      timerRemainingMs: null,
       updateTimerId: null,
     };
 
@@ -59,10 +58,9 @@
           console.log('[SB:53] updateQueueInfo: вызываем OutboxBatcher.getQueueInfo()');
           window.OutboxBatcher.getQueueInfo().then(function (info) {
             try {
-              console.log('[SB:53a] updateQueueInfo: получены данные', { activityCount: info.activityCount, successCount: info.successCount, activityTimerRemainingMs: info.activityTimerRemainingMs });
-              queueInfoState.activityCount = info.activityCount;
-              queueInfoState.successCount = info.successCount;
-              queueInfoState.activityTimerRemainingMs = info.activityTimerRemainingMs;
+              console.log('[SB:53a] updateQueueInfo: получены данные', { count: info.count, timerRemainingMs: info.timerRemainingMs });
+              queueInfoState.count = info.count;
+              queueInfoState.timerRemainingMs = info.timerRemainingMs;
             } catch (e) {
               console.warn('[SB:53b] updateQueueInfo: ошибка обработки', e);
             }
@@ -97,18 +95,12 @@
           parts.push('🔴 offline');
         }
 
-        // Activity очередь — показываем всегда, даже если 0
-        var act = queueInfoState.activityCount;
-        var actStr = 'act: ' + act;
-        var actTimer = formatTimerRemaining(queueInfoState.activityTimerRemainingMs);
-        if (actTimer) actStr += ' (' + actTimer + ')';
-        parts.push(actStr);
-
-        // Success очередь — показываем всегда, даже если 0.
-        // Таймер не показываем, т.к. success отправляется urgent (enqueueSuccessUrgent).
-        // Если есть записи в outbox — значит urgent не удался и данные ждут отправки.
-        var suc = queueInfoState.successCount;
-        parts.push('ok: ' + suc);
+        // Общая очередь — показываем всегда, даже если 0
+        var total = queueInfoState.count;
+        var str = 'queue: ' + total;
+        var timer = formatTimerRemaining(queueInfoState.timerRemainingMs);
+        if (timer) str += ' (' + timer + ')';
+        parts.push(str);
 
         var text = parts.join(' | ');
         console.log('[SB:77a] renderQueueInfo: текст=', text);
