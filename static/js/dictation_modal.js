@@ -1403,6 +1403,15 @@
                           numberOfCharacters: Number(st && st.number_of_characters) || 0,
                           moneyCount: Number(st && st.money_count) || 0,
                         });
+                        // Сохраняем сессию в IndexedDB после каждого действия,
+                        // чтобы при перезагрузке страницы прогресс не пропал
+                        try {
+                          var _store = getRuntimeStore();
+                          if (_store && typeof _store.persistToIdb === 'function') {
+                            _store.persistToIdb();
+                          }
+                        } catch (_ePersist) {
+                        }
                       } else {
                         console.log('[DM:1370] enqueueActivity: typeActivity=null, не отправляем');
                       }
@@ -3079,6 +3088,14 @@
                     numberOfCharacters: Number(st && st.number_of_characters) || 0,
                     moneyCount: Number(st && st.money_count) || 0,
                   });
+                  // Сохраняем сессию в IndexedDB после каждого аудио-действия
+                  try {
+                    var _store2 = getRuntimeStore();
+                    if (_store2 && typeof _store2.persistToIdb === 'function') {
+                      _store2.persistToIdb();
+                    }
+                  } catch (_ePersist2) {
+                  }
                 } else {
                   console.warn('[DM:3046] enqueueActivity: OutboxBatcher не найден');
                 }

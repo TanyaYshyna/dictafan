@@ -454,10 +454,12 @@
   async function getQueueInfo() {
     console.log(TAG, `[12] getQueueInfo: вход pending=${state.pendingCount} timerId=${state.timerId}`);
     try {
-      var rows = await window.IdbManager.idbGetAll('outbox');
-      var count = Array.isArray(rows) ? rows.length : 0;
+      // Используем pendingCount вместо количества записей в IndexedDB,
+      // потому что activity-записи мержатся по ключу (act:userId:date:dictationId:positions)
+      // и в IDB всегда может быть 1 запись, хотя enqueueActivity вызывался много раз.
+      var count = state.pendingCount;
 
-      console.log(TAG, `[12a] getQueueInfo: из IndexedDB count=${count}`);
+      console.log(TAG, `[12a] getQueueInfo: pendingCount=${count}`);
 
       var now = Date.now();
       var timerRemainingMs = null;
