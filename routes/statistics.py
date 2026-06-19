@@ -95,12 +95,13 @@ def api_statistics_money_spend():
             conn.rollback()
             return jsonify({'success': False, 'error': 'not_enough_money', 'money_balance': current_balance}), 400
 
+        today_iso = datetime.now().strftime('%Y-%m-%d')
         cur.execute(
             """
-            INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions, date_start, date_fact)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
-            (int(user['id']), cost, reason, dictation_id, pos_norm),
+            (int(user['id']), cost, reason, dictation_id, pos_norm, today_iso, today_iso),
         )
         conn.commit()
 
@@ -178,12 +179,13 @@ def api_statistics_money_earn():
         conn = get_db_connection()
         cur = conn.cursor()
 
+        today_iso = datetime.now().strftime('%Y-%m-%d')
         cur.execute(
             """
-            INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions, date_start, date_fact)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
             """,
-            (int(user['id']), amount, reason, dictation_id, pos_norm),
+            (int(user['id']), amount, reason, dictation_id, pos_norm, today_iso, today_iso),
         )
         conn.commit()
 

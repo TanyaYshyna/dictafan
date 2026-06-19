@@ -584,10 +584,10 @@ def add_activity_bulk(
                     cur.execute(
                         """
                         INSERT INTO user_money_ledger
-                        (user_id, dt, kt, reason, created_at)
-                        VALUES (%s, %s, 0, %s, CURRENT_TIMESTAMP)
+                        (user_id, dt, kt, reason, created_at, date_start, date_fact)
+                        VALUES (%s, %s, 0, %s, CURRENT_TIMESTAMP, %s, %s)
                         """,
-                        (int(user_id), money_count_int, f"dictation_activity:{dictation_id}"),
+                        (int(user_id), money_count_int, f"dictation_activity:{dictation_id}", target_date, target_date),
                     )
                 except Exception:
                     pass
