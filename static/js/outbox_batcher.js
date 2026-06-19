@@ -45,8 +45,16 @@
   function _getUserId() {
     try {
       // UserManager хранит данные в this.userData, полученные из /user/api/me (поле id)
-      return String(window.UM?.userData?.id || window.UM?.userId || window.UM?.user?.id || '').trim();
+      var uid = String(window.UM?.userData?.id || window.UM?.userId || window.UM?.user?.id || '').trim();
+      if (!uid) {
+        console.log(TAG, '[0] _getUserId: UM=', typeof window.UM, window.UM ? 'exists' : 'null',
+          'userData=', window.UM?.userData,
+          'userId=', window.UM?.userId,
+          'user=', window.UM?.user);
+      }
+      return uid;
     } catch (e) {
+      console.warn(TAG, '[0err] _getUserId: исключение', e);
       return '';
     }
   }
