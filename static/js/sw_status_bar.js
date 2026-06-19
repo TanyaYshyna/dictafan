@@ -56,28 +56,37 @@
         queueInfoState.online = online;
 
         if (typeof window.OutboxBatcher !== 'undefined' && typeof window.OutboxBatcher.getQueueInfo === 'function') {
+          console.log('[SB:53] updateQueueInfo: вызываем OutboxBatcher.getQueueInfo()');
           window.OutboxBatcher.getQueueInfo().then(function (info) {
             try {
+              console.log('[SB:53a] updateQueueInfo: получены данные', { activityCount: info.activityCount, successCount: info.successCount, activityTimerRemainingMs: info.activityTimerRemainingMs });
               queueInfoState.activityCount = info.activityCount;
               queueInfoState.successCount = info.successCount;
               queueInfoState.activityTimerRemainingMs = info.activityTimerRemainingMs;
             } catch (e) {
+              console.warn('[SB:53b] updateQueueInfo: ошибка обработки', e);
             }
             renderQueueInfo();
-          }).catch(function () {
+          }).catch(function (err) {
+            console.warn('[SB:53c] updateQueueInfo: getQueueInfo rejected', err);
             renderQueueInfo();
           });
         } else {
+          console.log('[SB:53d] updateQueueInfo: OutboxBatcher не доступен');
           renderQueueInfo();
         }
       } catch (e) {
+        console.warn('[SB:53e] updateQueueInfo: ошибка', e);
       }
     }
 
     function renderQueueInfo() {
       try {
         var el = document.getElementById(BAR_ID + '__queueInfo');
-        if (!el) return;
+        if (!el) {
+          console.warn('[SB:77] renderQueueInfo: элемент не найден');
+          return;
+        }
 
         var parts = [];
 
@@ -101,19 +110,28 @@
         var suc = queueInfoState.successCount;
         parts.push('ok: ' + suc);
 
-        el.textContent = parts.join(' | ');
+        var text = parts.join(' | ');
+        console.log('[SB:77a] renderQueueInfo: текст=', text);
+        el.textContent = text;
       } catch (e) {
+        console.warn('[SB:77err] renderQueueInfo: ошибка', e);
       }
     }
 
     function startQueueInfoPolling() {
       try {
-        if (queueInfoState.updateTimerId) return;
+        if (queueInfoState.updateTimerId) {
+          console.log('[SB:109] startQueueInfoPolling: уже запущен');
+          return;
+        }
+        console.log('[SB:109] startQueueInfoPolling: запуск');
         updateQueueInfo();
         queueInfoState.updateTimerId = setInterval(function () {
+          console.log('[SB:109a] startQueueInfoPolling: тик');
           updateQueueInfo();
         }, 5000); // обновление каждые 5 секунд
       } catch (e) {
+        console.warn('[SB:109err] startQueueInfoPolling: ошибка', e);
       }
     }
 

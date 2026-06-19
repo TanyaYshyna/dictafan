@@ -768,6 +768,7 @@
           const dictationLanguageCode = _getDictationLanguageCode();
           const selectedSentencePositions = _getSelectedSentencePositions(session);
 
+          console.log('[DM:771] enqueueSuccessUrgent:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
           ob.enqueueSuccessUrgent({
             dictation_id: dictationId,
             perfect_count: totalPerfect,
@@ -1375,6 +1376,7 @@
                       const dictationLanguageCode = _getDictationLanguageCode();
                       const selectedSentencePositions = _getSelectedSentencePositions(session);
                       const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : null);
+                      console.log('[DM:1370] enqueueActivity: rewardCycle', { cycleId, paidCycleId, reward, typeActivity, dictationId, perfectNow, correctedNow });
                       if (typeActivity) {
                         ob.enqueueActivity({
                           type: typeActivity,
@@ -1385,9 +1387,14 @@
                           dictationLanguageCode,
                           selectedSentencePositions,
                         });
+                      } else {
+                        console.log('[DM:1370] enqueueActivity: typeActivity=null, не отправляем');
                       }
+                    } else {
+                      console.warn('[DM:1370] enqueueActivity: OutboxBatcher не найден');
                     }
                   } catch (e0ob) {
+                    console.warn('[DM:1370] enqueueActivity: ошибка', e0ob);
                   }
                 }
 
@@ -3043,6 +3050,7 @@
                   const dictationId = getCurrentDictationIdForDb();
                   const dictationLanguageCode = _getDictationLanguageCode();
                   const selectedSentencePositions = _getSelectedSentencePositions(session);
+                  console.log('[DM:3046] enqueueActivity audio:', { dictationId, dictationLanguageCode, selectedSentencePositions });
                   ob.enqueueActivity({
                     type: 'audio',
                     count: 1,
@@ -3052,8 +3060,11 @@
                     dictationLanguageCode,
                     selectedSentencePositions,
                   });
+                } else {
+                  console.warn('[DM:3046] enqueueActivity: OutboxBatcher не найден');
                 }
               } catch (e0ob) {
+                console.warn('[DM:3046] enqueueActivity: ошибка', e0ob);
               }
             } else if (pct >= 50) {
               const add = getPricingValue('audio_activity_reward', 1);
