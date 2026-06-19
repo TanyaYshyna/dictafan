@@ -550,20 +550,17 @@ def add_activity_bulk(
         with conn.cursor() as cur:
             query = sql.SQL("""
                 INSERT INTO history_activity
-                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, perfect_count, corrected_count, audio_count, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, dictation_id, date, selected_sentence_positions)
                 DO UPDATE SET
                     perfect_count = COALESCE(history_activity.perfect_count, 0) + EXCLUDED.perfect_count,
                     corrected_count = COALESCE(history_activity.corrected_count, 0) + EXCLUDED.corrected_count,
                     audio_count = COALESCE(history_activity.audio_count, 0) + EXCLUDED.audio_count,
-                    money_count = COALESCE(history_activity.money_count, 0) + EXCLUDED.money_count,
-                    mistake_count = COALESCE(history_activity.mistake_count, 0) + EXCLUDED.mistake_count,
-                    monenumber_of_characters = COALESCE(history_activity.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
                     lead_time = COALESCE(history_activity.lead_time, 0) + EXCLUDED.lead_time,
                     dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, lead_time, created_at, updated_at
+                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, lead_time, created_at, updated_at
             """)
             cur.execute(
                 query,
@@ -577,9 +574,6 @@ def add_activity_bulk(
                     perfect_count_int,
                     corrected_count_int,
                     audio_count_int,
-                    money_count_int,
-                    mistake_count_int,
-                    monenumber_of_characters_int,
                 ),
             )
             row = cur.fetchone()
@@ -633,12 +627,9 @@ def add_activity_bulk(
                 'perfect_count': row[6],
                 'corrected_count': row[7],
                 'audio_count': row[8],
-                'money_count': row[9],
-                'mistake_count': row[10],
-                'monenumber_of_characters': row[11],
-                'lead_time': row[12],
-                'created_at': row[13].isoformat() if row[13] else None,
-                'updated_at': row[14].isoformat() if row[14] else None,
+                'lead_time': row[9],
+                'created_at': row[10].isoformat() if row[10] else None,
+                'updated_at': row[11].isoformat() if row[11] else None,
             }
     except Exception as e:
         conn.rollback()

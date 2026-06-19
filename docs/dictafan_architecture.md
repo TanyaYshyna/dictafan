@@ -18,7 +18,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - ~~`static/js/script_user_profile.js`~~ **УДАЛЁН** (код перенесён в `user_profile_modal.js`)
 - `assignments`
 - `assignments_by_date`
-- `history_activity`
+- ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. После миграции всех данных — удалить таблицу.
 - `history_successes`
 
 ## Принципы разделения ответственности
@@ -841,6 +841,7 @@ Many-to-many: ученик может быть в нескольких груп�
 - `positions` — `INTEGER[]` — выбранные позиции предложений (пустой массив = весь диктант)
 - `date_plan` — дата задания/плана, или дата старта (если прохождение без плана)
 - `date_fact` — дата фактической активности/завершения (в таймзоне пользователя)
+- `date_start` — дата старта диктанта (для расчёта длительности)
 - `perfect_count` — количество звёзд (perfect) за день
 - `corrected_count` — количество полузвёзд (corrected) за день
 - `audio_count` — количество микрофонов (audio) за день
@@ -848,7 +849,10 @@ Many-to-many: ученик может быть в нескольких груп�
 - `mistake_count` — количество ошибок за день
 - `monenumber_of_characters` — количество набранных символов за день
 - `simbols` — (устаревшее, дубль `monenumber_of_characters`)
-- `successes` — 1 в день, когда диктант полностью завершён (позволяет собрать историю успеха по виду задания)
+- `successes` — количество полных завершений диктанта за день
+- `activity_count` — количество действий (perfect + corrected + audio) за день
+- `money_dt_count` — сколько монет заработано (dt) за день
+- `money_kt_count` — сколько монет потрачено (kt) за день
 - `created_at`, `updated_at` (UTC)
 
 Уникальность строки истории: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`.
@@ -861,13 +865,11 @@ Many-to-many: ученик может быть в нескольких груп�
 
 ### Endpoint A: `POST /api/statistics/activity` (активность)
 
-Назначение: сохранить факт получения звезды/полузвезды/микрофона.
+Назначение: сохранить факт получения звезды/полузвезды/микрофона + сопутствующие данные (ошибки, символы, деньги).
 
 **Клиент → Сервер:**
-- Клиент вызывает `OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, dictationId, date, dictationLanguageCode, selectedSentencePositions })`
-- `OutboxBatcher` накапливает данные в IndexedDB (`activity_outbox`) и отправляет батчем:
-  - **deferred** (не срочно): по таймеру `BATCH_INTERVAL_MS` (константа в `outbox_batcher.js`, по умолчанию 600000 мс = 10 минут)
-  - **urgent** (срочно, при завершении диктанта): отправляется немедленно через `OutboxBatcher.enqueueActivityUrgent()`
+- Клиент вызывает `OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, dictationId, date, dictationLanguageCode, selectedSentencePositions, mistakeCount, numberOfCharacters, moneyCount })`
+- `OutboxBatcher` накапливает данные в IndexedDB (единая таблица `outbox`, ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`) и отправляет батчем по таймеру `BATCH_INTERVAL_MS`
 - `fetch POST /api/statistics/activity` с payload:
   ```json
   {
@@ -876,27 +878,30 @@ Many-to-many: ученик может быть в нескольких груп�
     "perfect_count": 1,
     "corrected_count": 0,
     "audio_count": 0,
+    "money_count": 3,
+    "mistake_count": 2,
+    "monenumber_of_characters": 58,
     "lead_time_ms": 45000,
     "dictation_language_code": "en",
-    "selected_sentence_positions": [1,2,3]
+    "selected_sentence_positions": null
   }
   ```
 
 **Сервер (`routes/statistics.py`):**
 - `POST /api/statistics/activity` → функция `save_activity()`
-- Определяет режим: `is_bulk` (если есть `perfect_count`/`corrected_count`/`audio_count`) или одиночный (`type_activity`)
-- Вызывает `add_activity_bulk()` или `add_activity()` из `helpers/db_history.py`
-- Каждая из этих функций:
-  1. Пишет/обновляет запись в `history_activity` (агрегация по `user_id, dictation_id, date, selected_sentence_positions`)
-  2. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` с суммированием счётчиков
+- Вызывает `add_activity_bulk()` из `helpers/db_history.py`
+- `add_activity_bulk()`:
+  1. Пишет/обновляет запись в `history_activity` (только `perfect_count`, `corrected_count`, `audio_count`, `lead_time` — старые поля)
+  2. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
+  3. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми счётчиками, включая `activity_count_delta`, `money_dt_delta`, `mistake_delta`, `monenumber_of_characters_delta`
 
 ### Endpoint B: `POST /api/statistics/success` (завершение диктанта)
 
 Назначение: сохранить факт полного завершения диктанта (медаль).
 
 **Клиент → Сервер:**
-- Клиент вызывает `OutboxBatcher.enqueueSuccessUrgent(payload)` при завершении диктанта
-- Отправляется немедленно (urgent):
+- Клиент вызывает `OutboxBatcher.enqueueSuccess(payload)` при завершении диктанта
+- Отправляется в той же очереди (тип `success`):
   ```json
   {
     "dictation_id": 123,
@@ -905,6 +910,7 @@ Many-to-many: ученик может быть в нескольких груп�
     "audio_count": 8,
     "attempts_total": 20,
     "mistake_count": 3,
+    "monenumber_of_characters": 1493,
     "time_ms": 300000,
     "dictation_language_code": "en",
     "sentences_data": [...],
@@ -918,53 +924,79 @@ Many-to-many: ученик может быть в нескольких груп�
 - Вызывает `add_success()` из `helpers/db_history.py`
 - `add_success()`:
   1. Создаёт запись в `history_successes` (каждое завершение — отдельная строка)
-  2. Вызывает `_upsert_history_by_day()` с `successes_delta=1` и суммированием остальных счётчиков
+  2. Вызывает `_upsert_history_by_day()` только с `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`
+  3. **НЕ обновляет** `perfect_count`, `corrected_count`, `audio_count`, `activity_count`, `money_dt_count` — эти поля уже обновлены в `add_activity_bulk()` во время диктанта
 
 ### Внутренняя функция `_upsert_history_by_day()`
 
 Находится в `helpers/db_history.py`. Это UPSERT:
 ```sql
-INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, perfect_count, corrected_count, audio_count, money_count, mistake_count, simbols, lead_time, successes, ...)
+INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, date_start, perfect_count, corrected_count, audio_count, lead_time, mistake_count, monenumber_of_characters, successes, activity_count, money_dt_count, money_kt_count, ...)
 VALUES (...)
 ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
 DO UPDATE SET
     perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
     corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
     audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
-    money_count = COALESCE(history_by_day.money_count, 0) + EXCLUDED.money_count,
-    mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
-    simbols = COALESCE(history_by_day.simbols, 0) + EXCLUDED.simbols,
     lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
+    mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
+    monenumber_of_characters = COALESCE(history_by_day.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
     successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+    activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
+    money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
+    money_kt_count = COALESCE(history_by_day.money_kt_count, 0) + EXCLUDED.money_kt_count,
     ...
 ```
 
 ### Клиентский модуль `OutboxBatcher` (`static/js/outbox_batcher.js`)
 
-**Два типа очередей в IndexedDB:**
-- `activity_outbox` — накопленные активности (ключ: `${userId}:${dateId}:${dictationId}:${selPosStr}`)
-- `success_outbox` — накопленные завершения (ключ: `${userId}:${rawId}:${dateId}`)
+**Единая очередь в IndexedDB (store `outbox`):**
+- Записи типа `activity` (ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`)
+- Записи типа `success` (ключ: `${userId}:${rawId}:${dateId}`)
+- Activity-записи накапливаются (мержатся при повторном вызове): суммируются `perfect_count`, `corrected_count`, `audio_count`, `money_count`, `mistake_count`, `monenumber_of_characters`, `lead_time_ms_total`
 
-**Два режима отправки:**
-- **deferred** (не срочно): отправляется по таймеру `BATCH_INTERVAL_MS` (константа, по умолчанию 600000 мс = 10 минут) или при накоплении `MAX_BATCH_SIZE` (20) записей
-- **urgent** (срочно): отправляется немедленно, при недоступности сети падает в deferred outbox
+**Режим отправки:**
+- Единый таймер `BATCH_INTERVAL_MS` (по умолчанию 600000 мс = 10 минут)
+- При срабатывании таймера отправляются **все** накопленные записи (и activity, и success)
+- После успешной отправки запись удаляется из IndexedDB
 
 **Триггеры отправки:**
 - Таймер (каждые `BATCH_INTERVAL_MS`)
-- Достижение лимита `MAX_BATCH_SIZE`
 - Событие `window.online` (появилась сеть)
-- Явный вызов `OutboxBatcher.flushAll()` (при закрытии модалки)
+- Явный вызов `OutboxBatcher.flushAll()` (при завершении диктанта)
 - Сигнал от Service Worker (`syncOutbox`)
 
 **Константы (для отладки):**
-- `BATCH_INTERVAL_MS = 600000` (10 минут; для отладки можно поставить 300000 = 5 минут)
-- `MAX_BATCH_SIZE = 20`
+- `BATCH_INTERVAL_MS = 600000` (10 минут; для отладки можно поставить 30000 = 30 секунд)
+- `MAX_BATCH_SIZE` — не используется (отправляем всё скопом)
+
+**Отображение в UI:**
+- Статус-бар (`sw_status_bar.js`) показывает `queue: N (M:M:S)` где N — количество записей в IndexedDB, а M:M:S — время до следующей отправки
+
+### Деньги: `user_money_ledger` и баланс
+
+**Начисление (dt):**
+- Происходит в `add_activity_bulk()` при каждом действии пользователя (звезда/полузвезда/микрофон)
+- `INSERT INTO user_money_ledger (user_id, dt, kt, description) VALUES (userId, moneyCount, 0, 'dictation_activity:{dictationId}')`
+- Деньги **не начисляются** в `save_success()` — это устраняет дублирование
+
+**Списание (kt):**
+- Через API `POST /api/statistics/money/spend` (покупка полузвезды или микрофона)
+- `INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions)`
+
+**Баланс:**
+- Рассчитывается на лету: `SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance FROM user_money_ledger WHERE user_id = %s`
+- Поле `users.money_balance` **удалено** (миграция `add_history_by_day_activity_money_columns_and_drop_user_balance.sql`)
+- API возвращает `money_balance` в JSON-ответе (вычисленное значение, ключ сохранён для совместимости)
 
 ### Текущее состояние (известные проблемы)
 
-1. ~~**OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccessUrgent()` нигде не вызываются. Данные не попадают в `history_by_day`.~~ **ИСПРАВЛЕНО**: вызовы добавлены в `dictation_modal.js`.
+1. ~~**OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccess()` нигде не вызываются. Данные не попадают в `history_by_day`.~~ **ИСПРАВЛЕНО**: вызовы добавлены в `dictation_modal.js`.
 2. ~~**Не хватает вызовов** при начислении звезды/полузвезды/активности — нужно добавить `OutboxBatcher.enqueueActivity()` в момент начисления награды.~~ **ИСПРАВЛЕНО**.
-3. ~~**Не хватает вызова** `OutboxBatcher.enqueueSuccessUrgent()` при завершении диктанта — нужно добавить в `showCompletionModal()`.~~ **ИСПРАВЛЕНО**.
+3. ~~**Не хватает вызова** `OutboxBatcher.enqueueSuccess()` при завершении диктанта — нужно добавить в `showCompletionModal()`.~~ **ИСПРАВЛЕНО**.
+4. ~~**Дублирование данных в `history_by_day`**: `add_success()` повторно обновляла `perfect_count`, `corrected_count`, `audio_count`, которые уже были обновлены в `add_activity_bulk()`.~~ **ИСПРАВЛЕНО**: `add_success()` теперь обновляет только `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`. Все остальные счётчики двигаются только в `add_activity_bulk()`.
+5. ~~**`money_balance` в `users` дублирует данные из `user_money_ledger`**.~~ **ИСПРАВЛЕНО**: поле удалено, баланс считается из `user_money_ledger` на лету.
+6. ~~**Деньги начислялись дважды**: в `add_activity_bulk()` и в `save_success()`.~~ **ИСПРАВЛЕНО**: начисление только в `add_activity_bulk()`.
 
 ### Распознавание речи: выбор режима (speech_recognition_mode)
 
