@@ -155,14 +155,16 @@
     try {
       if (!_hasToken()) {
         console.warn(TAG, '_flushActivityOutbox: нет токена');
-        state.pendingActivityCount = 0;
+        // Не сбрасываем pendingActivityCount — данные остаются в IndexedDB,
+        // и getQueueInfo() покажет их через чтение IndexedDB
         return;
       }
 
       const rows = await window.IdbManager.idbGetAll('activity_outbox');
       if (!rows.length) {
         console.log(TAG, '_flushActivityOutbox: нет записей');
-        state.pendingActivityCount = 0;
+        // Не сбрасываем pendingActivityCount — если есть pending, значит
+        // данные ещё пишутся в IndexedDB, и они будут учтены в getQueueInfo()
         return;
       }
 
@@ -307,14 +309,15 @@
     try {
       if (!_hasToken()) {
         console.warn(TAG, '_flushSuccessOutbox: нет токена');
-        state.pendingSuccessCount = 0;
+        // Не сбрасываем pendingSuccessCount — данные остаются в IndexedDB
         return;
       }
 
       const rows = await window.IdbManager.idbGetAll('success_outbox');
       if (!rows.length) {
         console.log(TAG, '_flushSuccessOutbox: нет записей');
-        state.pendingSuccessCount = 0;
+        // Не сбрасываем pendingSuccessCount — если есть pending, значит
+        // данные ещё пишутся в IndexedDB
         return;
       }
 
@@ -585,15 +588,16 @@
       var activityCount = Array.isArray(activityRows) ? activityRows.length : 0;
       var successCount = Array.isArray(successRows) ? successRows.length : 0;
 
+      // Учитываем также pending-счётчики (in-memory), которые ещё не попали в IndexedDB
+      // или уже отправлены, но счётчик ещё не сброшен
+      activityCount += state.pendingActivityCount;
+      successCount += state.pendingSuccessCount;
+
       var now = Date.now();
       var activityTimerRemainingMs = null;
       var successTimerRemainingMs = null;
 
       if (state.activityTimerId) {
-        // Таймер создаётся через setTimeout(fn, BATCH_INTERVAL_MS).
-        // Вычислить оставшееся время напрямую из таймера нельзя,
-        // поэтому используем приближение: если pendingActivityCount > 0, значит таймер запущен.
-        // Для точности будем хранить время запуска таймера.
         activityTimerRemainingMs = Math.max(0, BATCH_INTERVAL_MS - (now - (state._activityTimerStartedAt || now)));
       }
       if (state.successTimerId) {

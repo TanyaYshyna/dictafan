@@ -26,7 +26,6 @@
       activityCount: 0,
       successCount: 0,
       activityTimerRemainingMs: null,
-      successTimerRemainingMs: null,
       online: navigator.onLine,
       updateTimerId: null,
     };
@@ -62,7 +61,6 @@
               queueInfoState.activityCount = info.activityCount;
               queueInfoState.successCount = info.successCount;
               queueInfoState.activityTimerRemainingMs = info.activityTimerRemainingMs;
-              queueInfoState.successTimerRemainingMs = info.successTimerRemainingMs;
             } catch (e) {
             }
             renderQueueInfo();
@@ -90,23 +88,18 @@
           parts.push('🔴 offline');
         }
 
-        // Activity очередь
+        // Activity очередь — показываем всегда, даже если 0
         var act = queueInfoState.activityCount;
-        if (act > 0) {
-          var actStr = 'act: ' + act;
-          var actTimer = formatTimerRemaining(queueInfoState.activityTimerRemainingMs);
-          if (actTimer) actStr += ' (' + actTimer + ')';
-          parts.push(actStr);
-        }
+        var actStr = 'act: ' + act;
+        var actTimer = formatTimerRemaining(queueInfoState.activityTimerRemainingMs);
+        if (actTimer) actStr += ' (' + actTimer + ')';
+        parts.push(actStr);
 
-        // Success очередь
+        // Success очередь — показываем всегда, даже если 0.
+        // Таймер не показываем, т.к. success отправляется urgent (enqueueSuccessUrgent).
+        // Если есть записи в outbox — значит urgent не удался и данные ждут отправки.
         var suc = queueInfoState.successCount;
-        if (suc > 0) {
-          var sucStr = 'ok: ' + suc;
-          var sucTimer = formatTimerRemaining(queueInfoState.successTimerRemainingMs);
-          if (sucTimer) sucStr += ' (' + sucTimer + ')';
-          parts.push(sucStr);
-        }
+        parts.push('ok: ' + suc);
 
         el.textContent = parts.join(' | ');
       } catch (e) {
