@@ -73,11 +73,19 @@
       console.log(TAG, `enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode}`);
 
       const userId = _getUserId();
-      if (!userId) return false;
+      if (!userId) {
+        console.warn(TAG, 'enqueueActivity: пропущено (нет userId)');
+        return false;
+      }
 
       const dateId = date || _getLocalDateId();
       const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
       const key = `${userId}:${dateId}:${dictationId}:${selPosStr}`;
+
+      // Увеличиваем pending-счётчик ДО записи в IndexedDB, чтобы даже при ошибке
+      // записи счётчик был учтён в getQueueInfo(). Если запись не удалась,
+      // счётчик будет скорректирован при следующем flush.
+      state.pendingActivityCount += 1;
 
       // Читаем существующую запись или создаём новую
       const existing = (await window.IdbManager.idbGet('activity_outbox', key)) || {
@@ -105,7 +113,6 @@
 
       await window.IdbManager.idbPut('activity_outbox', existing);
 
-      state.pendingActivityCount += 1;
       console.log(TAG, `enqueueActivity: сохранено в IndexedDB (key=${key}), pending=${state.pendingActivityCount}`);
       _scheduleActivityFlush();
 
@@ -245,6 +252,9 @@
       const dateId = payload.date || _getLocalDateId();
       const key = `${userId}:${rawId}:${dateId}`;
 
+      // Увеличиваем pending-счётчик ДО записи в IndexedDB
+      state.pendingSuccessCount += 1;
+
       const existing = await window.IdbManager.idbGet('success_outbox', key);
 
       const mergedPayload = existing?.payload ? _mergeSuccessPayloads(existing.payload, payload) : payload;
@@ -256,7 +266,6 @@
         payload: mergedPayload,
       });
 
-      state.pendingSuccessCount += 1;
       console.log(TAG, `enqueueSuccess: сохранено (key=${key}) perfect=${payload.perfect_count} corrected=${payload.corrected_count} audio=${payload.audio_count}`);
       _scheduleSuccessFlush();
 

@@ -3755,8 +3755,8 @@
       window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
         maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
       });
-      // Восстанавливаем сохранённые сессии из IndexedDB
-      window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
+      // Запоминаем Promise восстановления, чтобы open() мог дождаться его
+      window.__dictationRuntimeStore._restorePromise = window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
       return window.__dictationRuntimeStore;
     } catch (e) {
       return null;
@@ -5592,6 +5592,16 @@
           }
         } catch (e1) {
         }
+      }
+
+      // Дожидаемся восстановления сессии из IndexedDB, чтобы не создать новую
+      // поверх уже сохранённой (гонка между restoreFromIdb и getOrCreateSession).
+      try {
+        const store = getRuntimeStore();
+        if (store && store._restorePromise) {
+          await store._restorePromise;
+        }
+      } catch (eRestore) {
       }
 
       try {
