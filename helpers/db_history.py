@@ -584,7 +584,7 @@ def add_activity_bulk(
                     cur.execute(
                         """
                         INSERT INTO user_money_ledger
-                        (user_id, dt, kt, description, created_at)
+                        (user_id, dt, kt, reason, created_at)
                         VALUES (%s, %s, 0, %s, CURRENT_TIMESTAMP)
                         """,
                         (int(user_id), money_count_int, f"dictation_activity:{dictation_id}"),
