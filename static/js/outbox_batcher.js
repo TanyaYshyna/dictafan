@@ -332,12 +332,13 @@
       console.log(TAG, `[4d] _flushOutbox: получено ${rows.length} записей из IndexedDB`);
 
       if (!rows.length) {
-        console.log(TAG, `[4e] _flushOutbox: нет записей в IndexedDB, pending=${state.pendingCount}`);
+        console.log(TAG, `[4e] _flushOutbox: нет записей в IndexedDB, сбрасываем pendingCount в 0`);
+        state.pendingCount = 0;
         return;
       }
 
       const token = _getToken();
-      let successCount = 0;
+      let allOk = true;
 
       for (const row of rows) {
         try {
@@ -367,12 +368,13 @@
             if (response.ok) {
               console.log(TAG, `[4g] _flushOutbox: activity успешно key=${row.key}`);
               await window.IdbManager.idbDelete('outbox', row.key);
-              successCount += 1;
             } else if (response.status === 401) {
               console.warn(TAG, '[4h] _flushOutbox: 401 Unauthorized — прерываем');
+              allOk = false;
               break;
             } else {
               console.warn(TAG, `[4i] _flushOutbox: activity ошибка ${response.status} — прерываем`);
+              allOk = false;
               break;
             }
           } else if (row.type === 'success') {
@@ -389,23 +391,31 @@
             if (response.ok) {
               console.log(TAG, `[4g] _flushOutbox: success успешно key=${row.key}`);
               await window.IdbManager.idbDelete('outbox', row.key);
-              successCount += 1;
             } else if (response.status === 401) {
               console.warn(TAG, '[4h] _flushOutbox: 401 Unauthorized — прерываем');
+              allOk = false;
               break;
             } else {
               console.warn(TAG, `[4i] _flushOutbox: success ошибка ${response.status} — прерываем`);
+              allOk = false;
               break;
             }
           }
         } catch (e) {
           console.warn(TAG, '[4j] _flushOutbox: ошибка сети', e);
+          allOk = false;
           break;
         }
       }
 
-      console.log(TAG, `[4k] _flushOutbox: итог: отправлено ${successCount} из ${rows.length}, pending было ${state.pendingCount}, стало ${Math.max(0, state.pendingCount - successCount)}`);
-      state.pendingCount = Math.max(0, state.pendingCount - successCount);
+      // Сбрасываем pendingCount в 0 после успешной отправки всех записей.
+      // Все данные уже ушли на сервер (даже если это была 1 merged-запись).
+      if (allOk) {
+        console.log(TAG, `[4k] _flushOutbox: все записи отправлены, сбрасываем pendingCount: ${state.pendingCount} -> 0`);
+        state.pendingCount = 0;
+      } else {
+        console.warn(TAG, `[4l] _flushOutbox: не все записи отправлены, pendingCount остаётся ${state.pendingCount}`);
+      }
     } catch (e) {
       console.warn(TAG, '[4err] _flushOutbox: общая ошибка', e);
     } finally {
