@@ -37,7 +37,7 @@ statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 @statistics_bp.route('/money/spend', methods=['POST'])
 @jwt_required()
 def api_statistics_money_spend():
-    """Spend user's money by creating a negative ledger entry and decreasing users.money_balance."""
+    """Spend user's money by creating a negative ledger entry (kt). Balance is calculated from user_money_ledger on the fly."""
     current_email = get_jwt_identity()
     user = get_user_by_email(current_email)
     if not user:
@@ -78,15 +78,23 @@ def api_statistics_money_spend():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user['id']),))
+
+        # Считаем баланс из user_money_ledger на лету
+        cur.execute(
+            """
+            SELECT
+                COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
         row = cur.fetchone()
         current_balance = int(row[0] or 0) if row else 0
         if current_balance < cost:
             conn.rollback()
             return jsonify({'success': False, 'error': 'not_enough_money', 'money_balance': current_balance}), 400
 
-        new_balance = current_balance - cost
-        cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
         cur.execute(
             """
             INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions)
@@ -95,6 +103,19 @@ def api_statistics_money_spend():
             (int(user['id']), cost, reason, dictation_id, pos_norm),
         )
         conn.commit()
+
+        # Пересчитываем баланс после списания
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
+        row = cur.fetchone()
+        new_balance = int(row[0] or 0) if row else 0
+
         return jsonify({'success': True, 'money_balance': new_balance})
     except Exception as e:
         try:
@@ -115,7 +136,7 @@ def api_statistics_money_spend():
 @statistics_bp.route('/money/earn', methods=['POST'])
 @jwt_required()
 def api_statistics_money_earn():
-    """Earn user's money by creating a positive ledger entry and increasing users.money_balance."""
+    """Earn user's money by creating a positive ledger entry (dt). Balance is calculated from user_money_ledger on the fly."""
     current_email = get_jwt_identity()
     user = get_user_by_email(current_email)
     if not user:
@@ -156,12 +177,7 @@ def api_statistics_money_earn():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user['id']),))
-        row = cur.fetchone()
-        current_balance = int(row[0] or 0) if row else 0
 
-        new_balance = current_balance + amount
-        cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user['id'])))
         cur.execute(
             """
             INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions)
@@ -170,6 +186,19 @@ def api_statistics_money_earn():
             (int(user['id']), amount, reason, dictation_id, pos_norm),
         )
         conn.commit()
+
+        # Считаем баланс из user_money_ledger на лету
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
+        row = cur.fetchone()
+        new_balance = int(row[0] or 0) if row else 0
+
         return jsonify({'success': True, 'money_balance': new_balance})
     except Exception as e:
         try:
@@ -2129,58 +2158,6 @@ def save_success():
         )
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
-
-        # Если за диктант начислены деньги — создаём одну запись в user_money_ledger
-        if money_earned > 0:
-            try:
-                # Нормализуем dictation_id для user_money_ledger
-                try:
-                    ledger_dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
-                except Exception:
-                    ledger_dictation_id = None
-
-                conn = get_db_connection()
-                cur = conn.cursor()
-                # Блокируем строку пользователя для атомарности
-                cur.execute('SELECT money_balance FROM users WHERE id = %s FOR UPDATE', (int(user_id),))
-                row = cur.fetchone()
-                current_balance = int(row[0] or 0) if row else 0
-                new_balance = current_balance + money_earned
-                cur.execute('UPDATE users SET money_balance = %s WHERE id = %s', (new_balance, int(user_id)))
-                # date_fact для user_money_ledger — сегодняшняя дата
-                ledger_date_fact = datetime.now().date()
-                # date_start — из запроса, если есть, иначе date_fact
-                ledger_date_start = None
-                if date_start:
-                    try:
-                        if isinstance(date_start, str):
-                            ledger_date_start = datetime.strptime(date_start, '%Y-%m-%d').date()
-                        else:
-                            ledger_date_start = date_start
-                    except Exception:
-                        ledger_date_start = ledger_date_fact
-                else:
-                    ledger_date_start = ledger_date_fact
-
-                cur.execute(
-                    """
-                    INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions, date_start, date_fact)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (int(user_id), money_earned, 'task', ledger_dictation_id, selected_sentence_positions, ledger_date_start, ledger_date_fact),
-                )
-                conn.commit()
-                print(f'✅ [SAVE_SUCCESS] Начислено money_earned={money_earned}, баланс: {current_balance} -> {new_balance}')
-            except Exception as e:
-                print(f'❌ [SAVE_SUCCESS] Ошибка начисления money_earned={money_earned}: {e}')
-                import traceback
-                traceback.print_exc()
-            finally:
-                try:
-                    if conn:
-                        conn.close()
-                except Exception:
-                    pass
 
         return jsonify({
             'success': True,

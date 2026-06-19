@@ -56,6 +56,13 @@
       const activeKeys = Array.isArray(session.activeKeys) ? session.activeKeys : [];
       const content = session.content;
       if (!content || typeof content.getSentence !== 'function') return null;
+
+      // Если выбраны все предложения — возвращаем null (полный диктант)
+      const allKeys = typeof content.getAllKeys === 'function' ? content.getAllKeys() : [];
+      if (allKeys.length > 0 && activeKeys.length === allKeys.length) {
+        return null;
+      }
+
       const positions = [];
       for (const key of activeKeys) {
         const sentence = content.getSentence(key);
@@ -1392,6 +1399,9 @@
                           date: null,
                           dictationLanguageCode,
                           selectedSentencePositions,
+                          mistakeCount: Number(st && st.mistake_count) || 0,
+                          numberOfCharacters: Number(st && st.number_of_characters) || 0,
+                          moneyCount: Number(st && st.money_count) || 0,
                         });
                       } else {
                         console.log('[DM:1370] enqueueActivity: typeActivity=null, не отправляем');
@@ -3065,6 +3075,9 @@
                     date: null,
                     dictationLanguageCode,
                     selectedSentencePositions,
+                    mistakeCount: Number(st && st.mistake_count) || 0,
+                    numberOfCharacters: Number(st && st.number_of_characters) || 0,
+                    moneyCount: Number(st && st.money_count) || 0,
                   });
                 } else {
                   console.warn('[DM:3046] enqueueActivity: OutboxBatcher не найден');

@@ -162,6 +162,9 @@
         date,
         dictationLanguageCode,
         selectedSentencePositions,
+        mistakeCount = 0,
+        numberOfCharacters = 0,
+        moneyCount = 0,
       } = params || {};
 
       if (!dictationId || !type) {
@@ -169,7 +172,7 @@
         return false;
       }
 
-      console.log(TAG, `[1b] enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode}`);
+      console.log(TAG, `[1b] enqueueActivity: type=${type} count=${count} dictationId=${dictationId} lang=${dictationLanguageCode} mistakeCount=${mistakeCount} numberOfCharacters=${numberOfCharacters} moneyCount=${moneyCount}`);
 
       const userId = _getUserId();
       if (!userId) {
@@ -199,6 +202,9 @@
         perfect_count: 0,
         corrected_count: 0,
         audio_count: 0,
+        money_count: 0,
+        mistake_count: 0,
+        monenumber_of_characters: 0,
         lead_time_ms_total: 0,
         dictation_language_code: dictationLanguageCode || null,
         updatedAt: 0,
@@ -209,11 +215,14 @@
       if (type === 'corrected') existing.corrected_count += n;
       if (type === 'audio') existing.audio_count += n;
 
+      existing.money_count = (Number(existing.money_count) || 0) + (Number(moneyCount) || 0);
+      existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(mistakeCount) || 0);
+      existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(numberOfCharacters) || 0);
       existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
       existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
       existing.updatedAt = Date.now();
 
-      console.log(TAG, `[1g] enqueueActivity: idbPut outbox key=${key} perfect=${existing.perfect_count} corrected=${existing.corrected_count} audio=${existing.audio_count}`);
+      console.log(TAG, `[1g] enqueueActivity: idbPut outbox key=${key} perfect=${existing.perfect_count} corrected=${existing.corrected_count} audio=${existing.audio_count} money=${existing.money_count} mistake=${existing.mistake_count} chars=${existing.monenumber_of_characters}`);
       await window.IdbManager.idbPut('outbox', existing);
 
       console.log(TAG, `[1h] enqueueActivity: сохранено в IndexedDB (key=${key}), pending=${state.pendingCount}`);
@@ -346,6 +355,9 @@
                 perfect_count: Number(row.perfect_count) || 0,
                 corrected_count: Number(row.corrected_count) || 0,
                 audio_count: Number(row.audio_count) || 0,
+                money_count: Number(row.money_count) || 0,
+                mistake_count: Number(row.mistake_count) || 0,
+                monenumber_of_characters: Number(row.monenumber_of_characters) || 0,
                 lead_time_ms: Number(row.lead_time_ms_total) || 0,
                 dictation_language_code: row.dictation_language_code || undefined,
                 selected_sentence_positions: row.selected_sentence_positions || undefined,
@@ -447,9 +459,6 @@
 
       console.log(TAG, `[12a] getQueueInfo: из IndexedDB count=${count}`);
 
-      // Учитываем также pending-счётчик (in-memory), который ещё не попал в IndexedDB
-      count += state.pendingCount;
-
       var now = Date.now();
       var timerRemainingMs = null;
 
@@ -481,5 +490,22 @@
     notifySwToSync,
     getQueueInfo,
   };
+
+  // Инициализация: если в IndexedDB есть неотправленные записи — запускаем таймер
+  // (например, после перезагрузки страницы, когда pendingCount сброшен)
+  (function init() {
+    console.log(TAG, '[init] проверяем IndexedDB на наличие неотправленных записей');
+    window.IdbManager.idbGetAll('outbox').then(function (rows) {
+      var count = Array.isArray(rows) ? rows.length : 0;
+      console.log(TAG, '[init] найдено записей в outbox:', count);
+      if (count > 0) {
+        state.pendingCount = count;
+        console.log(TAG, '[init] восстановлен pendingCount =', state.pendingCount);
+        _scheduleFlush();
+      }
+    }).catch(function (e) {
+      console.warn(TAG, '[init] ошибка чтения outbox', e);
+    });
+  })();
 
 })();

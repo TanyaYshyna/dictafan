@@ -40,10 +40,10 @@
       try {
         if (ms == null || ms <= 0) return '';
         var totalSec = Math.ceil(ms / 1000);
-        var min = Math.floor(totalSec / 60);
-        var sec = totalSec % 60;
-        if (min > 0) return min + 'м ' + sec + 'с';
-        return sec + 'с';
+        var hh = Math.floor(totalSec / 3600);
+        var mm = Math.floor((totalSec % 3600) / 60);
+        var ss = totalSec % 60;
+        return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
       } catch (e) {
         return '';
       }

@@ -81,6 +81,9 @@ def _upsert_history_by_day(
     monenumber_of_characters_delta: int = 0,
     lead_time_delta: int = 0,
     successes_delta: int = 0,
+    activity_count_delta: int = 0,
+    money_dt_delta: int = 0,
+    money_kt_delta: int = 0,
 ) -> None:
     positions_arr = _normalize_selected_sentence_positions(positions)
     # Если date_start не передан, используем date_fact
@@ -104,10 +107,13 @@ def _upsert_history_by_day(
             mistake_count,
             lead_time,
             successes,
+            activity_count,
+            money_dt_count,
+            money_kt_count,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
@@ -117,6 +123,9 @@ def _upsert_history_by_day(
             mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
             lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
             successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+            activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
+            money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
+            money_kt_count = COALESCE(history_by_day.money_kt_count, 0) + EXCLUDED.money_kt_count,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
             date_start = LEAST(COALESCE(history_by_day.date_start, EXCLUDED.date_start), EXCLUDED.date_start),
             updated_at = CURRENT_TIMESTAMP
@@ -137,6 +146,9 @@ def _upsert_history_by_day(
             int(mistake_delta or 0),
             int(lead_time_delta or 0),
             int(successes_delta or 0),
+            int(activity_count_delta or 0),
+            int(money_dt_delta or 0),
+            int(money_kt_delta or 0),
         ),
     )
 
@@ -538,17 +550,20 @@ def add_activity_bulk(
         with conn.cursor() as cur:
             query = sql.SQL("""
                 INSERT INTO history_activity
-                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, perfect_count, corrected_count, audio_count, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                (user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, lead_time, perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 ON CONFLICT (user_id, dictation_id, date, selected_sentence_positions)
                 DO UPDATE SET
                     perfect_count = COALESCE(history_activity.perfect_count, 0) + EXCLUDED.perfect_count,
                     corrected_count = COALESCE(history_activity.corrected_count, 0) + EXCLUDED.corrected_count,
                     audio_count = COALESCE(history_activity.audio_count, 0) + EXCLUDED.audio_count,
+                    money_count = COALESCE(history_activity.money_count, 0) + EXCLUDED.money_count,
+                    mistake_count = COALESCE(history_activity.mistake_count, 0) + EXCLUDED.mistake_count,
+                    monenumber_of_characters = COALESCE(history_activity.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
                     lead_time = COALESCE(history_activity.lead_time, 0) + EXCLUDED.lead_time,
                     dictation_language_code = COALESCE(history_activity.dictation_language_code, EXCLUDED.dictation_language_code),
                     updated_at = CURRENT_TIMESTAMP
-                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, lead_time, created_at, updated_at
+                RETURNING id, user_id, dictation_id, date, selected_sentence_positions, dictation_language_code, perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, lead_time, created_at, updated_at
             """)
             cur.execute(
                 query,
@@ -562,9 +577,26 @@ def add_activity_bulk(
                     perfect_count_int,
                     corrected_count_int,
                     audio_count_int,
+                    money_count_int,
+                    mistake_count_int,
+                    monenumber_of_characters_int,
                 ),
             )
             row = cur.fetchone()
+
+            # Начисление денег: каждая активность приносит money_count монет
+            if money_count_int > 0:
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO user_money_ledger
+                        (user_id, dt, kt, description, created_at)
+                        VALUES (%s, %s, 0, %s, CURRENT_TIMESTAMP)
+                        """,
+                        (int(user_id), money_count_int, f"dictation_activity:{dictation_id}"),
+                    )
+                except Exception:
+                    pass
 
             try:
                 _upsert_history_by_day(
@@ -583,6 +615,8 @@ def add_activity_bulk(
                     monenumber_of_characters_delta=int(monenumber_of_characters_int or 0),
                     lead_time_delta=int(lead_time_ms_int or 0),
                     successes_delta=0,
+                    activity_count_delta=int(perfect_count_int + corrected_count_int + audio_count_int or 0),
+                    money_dt_delta=int(money_count_int or 0),
                 )
             except Exception:
                 pass
@@ -599,9 +633,12 @@ def add_activity_bulk(
                 'perfect_count': row[6],
                 'corrected_count': row[7],
                 'audio_count': row[8],
-                'lead_time': row[9],
-                'created_at': row[10].isoformat() if row[10] else None,
-                'updated_at': row[11].isoformat() if row[11] else None,
+                'money_count': row[9],
+                'mistake_count': row[10],
+                'monenumber_of_characters': row[11],
+                'lead_time': row[12],
+                'created_at': row[13].isoformat() if row[13] else None,
+                'updated_at': row[14].isoformat() if row[14] else None,
             }
     except Exception as e:
         conn.rollback()
@@ -870,13 +907,16 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     date_plan=date_plan,
                     date_fact=date_fact,
                     date_start=date_start_parsed,
-                    perfect_delta=int(perfect_count or 0),
-                    corrected_delta=int(corrected_count or 0),
-                    audio_delta=int(audio_count or 0),
+                    # perfect/corrected/audio уже обновлены в add_activity_bulk — не дублируем
+                    perfect_delta=0,
+                    corrected_delta=0,
+                    audio_delta=0,
                     mistake_delta=int(mistake_count or 0),
                     monenumber_of_characters_delta=int(monenumber_of_characters or 0),
                     lead_time_delta=int(time_ms or 0),
                     successes_delta=1,
+                    activity_count_delta=0,
+                    money_dt_delta=0,
                 )
             except Exception:
                 pass
@@ -1388,10 +1428,11 @@ def get_unclosed_dictation_stats(user_id, dictation_id):
     }
 
 def get_history_by_day_totals(user_id: int) -> dict:
-    """Return total lead_time (ms) and monenumber_of_characters from history_by_day for a user.
+    """Return totals from history_by_day for a user.
 
     Returns:
-        dict with keys: total_lead_time (ms), total_money (coins)
+        dict with keys: total_lead_time (ms), total_money (coins), total_activity_count,
+                        total_money_dt_count, total_money_kt_count
     """
     conn = get_db_connection()
     try:
@@ -1400,7 +1441,10 @@ def get_history_by_day_totals(user_id: int) -> dict:
                 """
                 SELECT
                     COALESCE(SUM(lead_time), 0) AS total_lead_time,
-                    COALESCE(SUM(monenumber_of_characters), 0) AS total_money
+                    COALESCE(SUM(monenumber_of_characters), 0) AS total_money,
+                    COALESCE(SUM(activity_count), 0) AS total_activity_count,
+                    COALESCE(SUM(money_dt_count), 0) AS total_money_dt_count,
+                    COALESCE(SUM(money_kt_count), 0) AS total_money_kt_count
                 FROM history_by_day
                 WHERE user_id = %s
                 """,
@@ -1411,20 +1455,27 @@ def get_history_by_day_totals(user_id: int) -> dict:
                 return {
                     'total_lead_time': int(row.get('total_lead_time') or 0),
                     'total_money': int(row.get('total_money') or 0),
+                    'total_activity_count': int(row.get('total_activity_count') or 0),
+                    'total_money_dt_count': int(row.get('total_money_dt_count') or 0),
+                    'total_money_kt_count': int(row.get('total_money_kt_count') or 0),
                 }
             return {
                 'total_lead_time': int(row[0] or 0) if row else 0,
                 'total_money': int(row[1] or 0) if row else 0,
+                'total_activity_count': int(row[2] or 0) if row else 0,
+                'total_money_dt_count': int(row[3] or 0) if row else 0,
+                'total_money_kt_count': int(row[4] or 0) if row else 0,
             }
     finally:
         conn.close()
 
 
 def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
-    """Return lead_time (ms) and monenumber_of_characters from history_by_day for a specific date.
+    """Return totals from history_by_day for a specific date.
 
     Returns:
-        dict with keys: lead_time (ms), money (coins)
+        dict with keys: lead_time (ms), money (coins), activity_count,
+                        money_dt_count, money_kt_count
     """
     conn = get_db_connection()
     try:
@@ -1435,7 +1486,10 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
                 """
                 SELECT
                     COALESCE(SUM(lead_time), 0) AS lead_time,
-                    COALESCE(SUM(monenumber_of_characters), 0) AS money
+                    COALESCE(SUM(monenumber_of_characters), 0) AS money,
+                    COALESCE(SUM(activity_count), 0) AS activity_count,
+                    COALESCE(SUM(money_dt_count), 0) AS money_dt_count,
+                    COALESCE(SUM(money_kt_count), 0) AS money_kt_count
                 FROM history_by_day
                 WHERE user_id = %s
                   AND date_fact = %s
@@ -1447,10 +1501,16 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
                 return {
                     'lead_time': int(row.get('lead_time') or 0),
                     'money': int(row.get('money') or 0),
+                    'activity_count': int(row.get('activity_count') or 0),
+                    'money_dt_count': int(row.get('money_dt_count') or 0),
+                    'money_kt_count': int(row.get('money_kt_count') or 0),
                 }
             return {
                 'lead_time': int(row[0] or 0) if row else 0,
                 'money': int(row[1] or 0) if row else 0,
+                'activity_count': int(row[2] or 0) if row else 0,
+                'money_dt_count': int(row[3] or 0) if row else 0,
+                'money_kt_count': int(row[4] or 0) if row else 0,
             }
     finally:
         conn.close()
