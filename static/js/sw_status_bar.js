@@ -55,10 +55,8 @@
         queueInfoState.online = online;
 
         if (typeof window.OutboxBatcher !== 'undefined' && typeof window.OutboxBatcher.getQueueInfo === 'function') {
-          console.log('[SB:53] updateQueueInfo: вызываем OutboxBatcher.getQueueInfo()');
           window.OutboxBatcher.getQueueInfo().then(function (info) {
             try {
-              console.log('[SB:53a] updateQueueInfo: получены данные', { count: info.count, timerRemainingMs: info.timerRemainingMs });
               queueInfoState.count = info.count;
               queueInfoState.timerRemainingMs = info.timerRemainingMs;
             } catch (e) {
@@ -70,7 +68,6 @@
             renderQueueInfo();
           });
         } else {
-          console.log('[SB:53d] updateQueueInfo: OutboxBatcher не доступен');
           renderQueueInfo();
         }
       } catch (e) {
@@ -103,7 +100,6 @@
         parts.push(str);
 
         var text = parts.join(' | ');
-        console.log('[SB:77a] renderQueueInfo: текст=', text);
         el.textContent = text;
       } catch (e) {
         console.warn('[SB:77err] renderQueueInfo: ошибка', e);
@@ -113,13 +109,10 @@
     function startQueueInfoPolling() {
       try {
         if (queueInfoState.updateTimerId) {
-          console.log('[SB:109] startQueueInfoPolling: уже запущен');
           return;
         }
-        console.log('[SB:109] startQueueInfoPolling: запуск');
         updateQueueInfo();
         queueInfoState.updateTimerId = setInterval(function () {
-          console.log('[SB:109a] startQueueInfoPolling: тик');
           updateQueueInfo();
         }, 5000); // обновление каждые 5 секунд
       } catch (e) {
