@@ -83,7 +83,6 @@ def _upsert_history_by_day(
     successes_delta: int = 0,
     activity_count_delta: int = 0,
     money_dt_delta: int = 0,
-    money_kt_delta: int = 0,
 ) -> None:
     positions_arr = _normalize_selected_sentence_positions(positions)
     # Если date_start не передан, используем date_fact
@@ -109,11 +108,10 @@ def _upsert_history_by_day(
             successes,
             activity_count,
             money_dt_count,
-            money_kt_count,
             created_at,
             updated_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
@@ -125,7 +123,6 @@ def _upsert_history_by_day(
             successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
             activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
             money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
-            money_kt_count = COALESCE(history_by_day.money_kt_count, 0) + EXCLUDED.money_kt_count,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
             date_start = LEAST(COALESCE(history_by_day.date_start, EXCLUDED.date_start), EXCLUDED.date_start),
             updated_at = CURRENT_TIMESTAMP
@@ -148,7 +145,6 @@ def _upsert_history_by_day(
             int(successes_delta or 0),
             int(activity_count_delta or 0),
             int(money_dt_delta or 0),
-            int(money_kt_delta or 0),
         ),
     )
 
@@ -1430,7 +1426,7 @@ def get_history_by_day_totals(user_id: int) -> dict:
 
     Returns:
         dict with keys: total_lead_time (ms), total_money (coins), total_activity_count,
-                        total_money_dt_count, total_money_kt_count
+                        total_money_dt_count
     """
     conn = get_db_connection()
     try:
@@ -1441,8 +1437,7 @@ def get_history_by_day_totals(user_id: int) -> dict:
                     COALESCE(SUM(lead_time), 0) AS total_lead_time,
                     COALESCE(SUM(monenumber_of_characters), 0) AS total_money,
                     COALESCE(SUM(activity_count), 0) AS total_activity_count,
-                    COALESCE(SUM(money_dt_count), 0) AS total_money_dt_count,
-                    COALESCE(SUM(money_kt_count), 0) AS total_money_kt_count
+                    COALESCE(SUM(money_dt_count), 0) AS total_money_dt_count
                 FROM history_by_day
                 WHERE user_id = %s
                 """,
@@ -1455,14 +1450,12 @@ def get_history_by_day_totals(user_id: int) -> dict:
                     'total_money': int(row.get('total_money') or 0),
                     'total_activity_count': int(row.get('total_activity_count') or 0),
                     'total_money_dt_count': int(row.get('total_money_dt_count') or 0),
-                    'total_money_kt_count': int(row.get('total_money_kt_count') or 0),
                 }
             return {
                 'total_lead_time': int(row[0] or 0) if row else 0,
                 'total_money': int(row[1] or 0) if row else 0,
                 'total_activity_count': int(row[2] or 0) if row else 0,
                 'total_money_dt_count': int(row[3] or 0) if row else 0,
-                'total_money_kt_count': int(row[4] or 0) if row else 0,
             }
     finally:
         conn.close()
@@ -1473,7 +1466,7 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
 
     Returns:
         dict with keys: lead_time (ms), money (coins), activity_count,
-                        money_dt_count, money_kt_count
+                        money_dt_count
     """
     conn = get_db_connection()
     try:
@@ -1486,8 +1479,7 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
                     COALESCE(SUM(lead_time), 0) AS lead_time,
                     COALESCE(SUM(monenumber_of_characters), 0) AS money,
                     COALESCE(SUM(activity_count), 0) AS activity_count,
-                    COALESCE(SUM(money_dt_count), 0) AS money_dt_count,
-                    COALESCE(SUM(money_kt_count), 0) AS money_kt_count
+                    COALESCE(SUM(money_dt_count), 0) AS money_dt_count
                 FROM history_by_day
                 WHERE user_id = %s
                   AND date_fact = %s
@@ -1501,14 +1493,12 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
                     'money': int(row.get('money') or 0),
                     'activity_count': int(row.get('activity_count') or 0),
                     'money_dt_count': int(row.get('money_dt_count') or 0),
-                    'money_kt_count': int(row.get('money_kt_count') or 0),
                 }
             return {
                 'lead_time': int(row[0] or 0) if row else 0,
                 'money': int(row[1] or 0) if row else 0,
                 'activity_count': int(row[2] or 0) if row else 0,
                 'money_dt_count': int(row[3] or 0) if row else 0,
-                'money_kt_count': int(row[4] or 0) if row else 0,
             }
     finally:
         conn.close()

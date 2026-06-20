@@ -644,8 +644,7 @@ class ProgressPanel {
         }
         if (this.elements.money) {
             const earned = safe(this.stats.moneyEarned);
-            const spent = safe(this.stats.moneySpent);
-            this.elements.money.textContent = `+${earned} / -${spent}`;
+            this.elements.money.textContent = `+${earned}`;
         }
 
         // Обновляем модальный UI

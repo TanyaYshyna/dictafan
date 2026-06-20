@@ -1381,42 +1381,9 @@
                   } catch (e0sa) {
                   }
 
-                  // Отправляем активность в outbox_batcher
-                  try {
-                    const ob = window.OutboxBatcher;
-                    if (ob && typeof ob.enqueueActivity === 'function') {
-                      const dictationId = getCurrentDictationIdForDb();
-                      const dictationLanguageCode = _getDictationLanguageCode();
-                      const selectedSentencePositions = _getSelectedSentencePositions(session);
-                      const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
-                      if (typeActivity) {
-                        ob.enqueueActivity({
-                          type: typeActivity,
-                          count: 1,
-                          leadTimeMs: _getSessionLeadTimeMs(session),
-                          dictationId,
-                          date: null,
-                          dictationLanguageCode,
-                          selectedSentencePositions,
-                          mistakeCount: Number(st && st.mistake_count) || 0,
-                          numberOfCharacters: Number(st && st.number_of_characters) || 0,
-                          moneyCount: reward, // дельта — сколько заработано этим действием
-                        });
-                        // Сохраняем сессию в IndexedDB после каждого действия,
-                        // чтобы при перезагрузке страницы прогресс не пропал
-                        try {
-                          var _store = getRuntimeStore();
-                          if (_store && typeof _store.persistToIdb === 'function') {
-                            _store.persistToIdb();
-                          }
-                        } catch (_ePersist) {
-                        }
-                      }
-                    } else {
-                      console.warn('[DM:1370] enqueueActivity: OutboxBatcher не найден');
-                    }
-                  } catch (e0ob) {
-                    console.warn('[DM:1370] enqueueActivity: ошибка', e0ob);
+                  const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
+                  if (typeActivity) {
+                    handleActivity(typeActivity, st, key, session, reward);
                   }
                 }
 
@@ -2520,13 +2487,10 @@
     const open = (mode) => {
       try {
         state._coinExchangeMode = mode;
-        const cost = mode === 'text'
-          ? getPricingValue('half_star_purchase_cost', 3)
-          : getPricingValue('audio_purchase_cost', 3);
         if (mode === 'text') {
-          title.textContent = `Покупешь полузвезду за ${cost} монеты?`;
+          title.textContent = 'Обменять 3 текстовые активности на полузвезду?';
         } else {
-          title.textContent = `Покупешь микрофон за ${cost} монеты?`;
+          title.textContent = 'Обменять 3 аудио-попытки (50-80%) на микрофон?';
         }
         modal.style.display = 'flex';
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -2573,41 +2537,15 @@
       const mode = String(state._coinExchangeMode || '');
       if (mode !== 'text' && mode !== 'audio') return;
 
-      const cost = mode === 'text'
-        ? getPricingValue('half_star_purchase_cost', 3)
-        : getPricingValue('audio_purchase_cost', 3);
-
-      try {
-        const payload = {
-          cost,
-          reason: mode === 'text' ? 'buy_half_star' : 'buy_mic',
-          dictation_id: getCurrentDictationIdForDb(),
-          positions: _getSelectedSentencePositions(session),
-        };
-        await fetch('/api/statistics/money/spend', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        try {
-          playUiSound('coins_minus');
-        } catch (e0s) {
-        }
-      } catch (e) {
-      }
-
       if (mode === 'text') {
-        // Платим cost монет, но забираем только 1 активность,
-        // чтобы общее число действий (звезда + полузвезды + активности) не нарушалось
-        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - 1);
-        st.money_spent = (Number(st.money_spent) || 0) + cost;
+        // Бесплатный обмен: 3 текстовые активности → 1 полузвезда
+        st.text_activity_count = Math.max(0, (Number(st.text_activity_count) || 0) - 3);
         st.number_of_corrected = Math.max(Number(st.number_of_corrected) || 0, 1);
         st.text_exchange_half_star = true;
         setCheckButtonState('half');
       } else {
-        st.audio_activity50_count = Math.max(0, (Number(st.audio_activity50_count) || 0) - cost);
-        st.money_spent = (Number(st.money_spent) || 0) + cost;
+        // Бесплатный обмен: 3 аудио-попытки (50-80%) → 1 микрофон
+        st.audio_activity50_count = Math.max(0, (Number(st.audio_activity50_count) || 0) - 3);
         const req = getRequiredAudioRepeatsValue();
         st.number_of_audio = Math.max(Number(st.number_of_audio) || 0, req);
         st.audio_exchange_mic = true;
@@ -2713,7 +2651,6 @@
       let passed = 0;
       let mistakesTotal = 0;
       let moneyEarned = 0;
-      let moneySpent = 0;
       let charsTotal = 0;
       let allCompleted = (total > 0);
       for (const k of keys) {
@@ -2742,11 +2679,6 @@
           moneyEarned += (Number(st.money_earned) || 0);
         } catch (e0) {
         }
-
-        try {
-          moneySpent += (Number(st.money_spent) || 0);
-        } catch (e2) {
-        }
       }
 
       try {
@@ -2761,7 +2693,6 @@
             chars: charsTotal,
             accuracyPct: acc,
             moneyEarned,
-            moneySpent,
           });
         }
       } catch (e0) {
@@ -2791,6 +2722,82 @@
       } catch (e3) {
       }
     } catch (e) {
+    }
+  }
+
+  /**
+   * Единая функция для записи активности любого типа:
+   * - добавляет в outbox_batcher (enqueueActivity)
+   * - сохраняет сессию в IndexedDB
+   * - обновляет строку в таблице стартового модального окна
+   * - обновляет табло предложения
+   * - обновляет прогресс заданий (updateTaskProgressFromSession)
+   * - обновляет видимость кнопки "Далее"
+   *
+   * @param {string} type — тип активности: 'perfect' | 'corrected' | 'activity' | 'audio'
+   * @param {object} st — состояние предложения (session.getState)
+   * @param {string} key — ключ предложения
+   * @param {object} session — сессия диктанта
+   * @param {number} [moneyCount=0] — дельта заработанных монет (сколько заработано этим действием)
+   */
+  function handleActivity(type, st, key, session, moneyCount) {
+    try {
+      if (!type || !st || key == null || !session) return;
+      const ob = window.OutboxBatcher;
+      if (ob && typeof ob.enqueueActivity === 'function') {
+        const dictationId = getCurrentDictationIdForDb();
+        const dictationLanguageCode = _getDictationLanguageCode();
+        const selectedSentencePositions = _getSelectedSentencePositions(session);
+        ob.enqueueActivity({
+          type: type,
+          count: 1,
+          leadTimeMs: _getSessionLeadTimeMs(session),
+          dictationId,
+          date: null,
+          dictationLanguageCode,
+          selectedSentencePositions,
+          mistakeCount: Number(st && st.mistake_count) || 0,
+          numberOfCharacters: Number(st && st.number_of_characters) || 0,
+          moneyCount: Number(moneyCount) || 0,
+        });
+      } else {
+        console.warn('[DM:handleActivity] OutboxBatcher не найден');
+      }
+    } catch (e0ob) {
+      console.warn('[DM:handleActivity] enqueueActivity: ошибка', e0ob);
+    }
+
+    // Сохраняем сессию в IndexedDB после каждого действия
+    try {
+      var _store = getRuntimeStore();
+      if (_store && typeof _store.persistToIdb === 'function') {
+        _store.persistToIdb();
+      }
+    } catch (_ePersist) {
+    }
+
+    // Обновляем строку в таблице стартового модального окна
+    try {
+      updateStartModalSentenceRow(session, key);
+    } catch (eRow) {
+    }
+
+    // Обновляем табло предложения
+    try {
+      updateSentenceTabloFromSession(session, key);
+    } catch (eTablo) {
+    }
+
+    // Обновляем прогресс заданий (включает accuracy)
+    try {
+      updateTaskProgressFromSession(session);
+    } catch (eTask) {
+    }
+
+    // Обновляем видимость кнопки "Далее"
+    try {
+      updateNextButtonVisibilityFromSession(session);
+    } catch (eNext) {
     }
   }
 
@@ -3083,58 +3090,12 @@
                 playUiSound('coins_plus_audio');
               } catch (e0s) {
               }
-              // Отправляем аудио-активность в outbox_batcher
-              try {
-                const ob = window.OutboxBatcher;
-                if (ob && typeof ob.enqueueActivity === 'function') {
-                  const dictationId = getCurrentDictationIdForDb();
-                  const dictationLanguageCode = _getDictationLanguageCode();
-                  const selectedSentencePositions = _getSelectedSentencePositions(session);
-                  console.log('[DM:3046] enqueueActivity audio:', { dictationId, dictationLanguageCode, selectedSentencePositions });
-                  ob.enqueueActivity({
-                    type: 'audio',
-                    count: 1,
-                    leadTimeMs: _getSessionLeadTimeMs(session),
-                    dictationId,
-                    date: null,
-                    dictationLanguageCode,
-                    selectedSentencePositions,
-                    mistakeCount: Number(st && st.mistake_count) || 0,
-                    numberOfCharacters: Number(st && st.number_of_characters) || 0,
-                    moneyCount: add, // дельта — сколько заработано этим аудио-действием
-                  });
-                  // Сохраняем сессию в IndexedDB после каждого аудио-действия
-                  try {
-                    var _store2 = getRuntimeStore();
-                    if (_store2 && typeof _store2.persistToIdb === 'function') {
-                      _store2.persistToIdb();
-                    }
-                  } catch (_ePersist2) {
-                  }
-                } else {
-                  console.warn('[DM:3046] enqueueActivity: OutboxBatcher не найден');
-                }
-              } catch (e0ob) {
-                console.warn('[DM:3046] enqueueActivity: ошибка', e0ob);
-              }
+              handleActivity('audio', st, _key, session, add);
             } else if (pct >= 50) {
-              const add = getPricingValue('audio_activity_reward', 1);
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
-              st.money_count = (Number(st.money_count) || 0) + add;
-              st.money_earned = (Number(st.money_earned) || 0) + add;
             } else {
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
-
-            // Обновляем строку в таблице стартового модального окна
-            try {
-              updateStartModalSentenceRow(session, _key);
-            } catch (eRow) {
-            }
-
-            updateSentenceTabloFromSession(session, _key);
-            updateTaskProgressFromSession(session);
-            updateNextButtonVisibilityFromSession(session);
 
             try {
               if (ok) {
@@ -3559,13 +3520,6 @@
       if (tdMoneyDt) {
         const moneyEarned = Number(st.money_earned) || 0;
         tdMoneyDt.textContent = moneyEarned > 0 ? String(moneyEarned) : '';
-      }
-
-      // --- Кт — потрачено монет (money_spent) ---
-      const tdMoneyKt = tr.querySelector('td.col-money-kt');
-      if (tdMoneyKt) {
-        const moneySpent = Number(st.money_spent) || 0;
-        tdMoneyKt.textContent = moneySpent > 0 ? String(moneySpent) : '';
       }
 
       // Обновляем lucide-иконки в этой строке
@@ -4276,12 +4230,6 @@
         const moneyEarned = Number(st && st.money_earned) || 0;
         tdMoneyDt.textContent = moneyEarned > 0 ? String(moneyEarned) : '';
 
-        // --- Колонка: Кт — потрачено монет (money_spent) ---
-        const tdMoneyKt = document.createElement('td');
-        tdMoneyKt.className = 'col-money-kt';
-        const moneySpent = Number(st && st.money_spent) || 0;
-        tdMoneyKt.textContent = moneySpent > 0 ? String(moneySpent) : '';
-
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
         tdOrig.textContent = String(view.text_original || '');
@@ -4300,7 +4248,6 @@
         tr.appendChild(tdChars);
         tr.appendChild(tdMistakes);
         tr.appendChild(tdMoneyDt);
-        tr.appendChild(tdMoneyKt);
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);
 
@@ -5181,7 +5128,6 @@
         st.audio_activity50_count = 0;
         st.money_count = 0;
         st.money_earned = 0;
-        st.money_spent = 0;
         st.text_exchange_half_star = false;
         st.audio_exchange_mic = false;
         st.all_audio_completed = false;
