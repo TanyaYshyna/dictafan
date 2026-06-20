@@ -1108,7 +1108,7 @@
       };
     }
     if (typeof window.checkText !== 'function') {
-      window.checkText = () => {
+      window.checkText = async () => {
         try {
           if (!state.dictationStarted) return;
         } catch (e0) {
@@ -1383,7 +1383,9 @@
 
                   const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
                   if (typeActivity) {
-                    handleActivity(typeActivity, st, key, session, reward);
+                    // Дельта: символы за эту попытку, ошибок нет (текст исправлен)
+                    const charsThisAttempt = _ensureExpectedCharsLen(session);
+                    await handleActivity(typeActivity, st, key, session, reward, 0, charsThisAttempt);
                   }
                 }
 
@@ -2740,7 +2742,7 @@
    * @param {object} session — сессия диктанта
    * @param {number} [moneyCount=0] — дельта заработанных монет (сколько заработано этим действием)
    */
-  function handleActivity(type, st, key, session, moneyCount) {
+  async function handleActivity(type, st, key, session, moneyCount, mistakeCount, numberOfCharacters) {
     try {
       if (!type || !st || key == null || !session) return;
       const ob = window.OutboxBatcher;
@@ -2748,7 +2750,7 @@
         const dictationId = getCurrentDictationIdForDb();
         const dictationLanguageCode = _getDictationLanguageCode();
         const selectedSentencePositions = _getSelectedSentencePositions(session);
-        ob.enqueueActivity({
+        const enqueued = await ob.enqueueActivity({
           type: type,
           count: 1,
           leadTimeMs: _getSessionLeadTimeMs(session),
@@ -2756,10 +2758,13 @@
           date: null,
           dictationLanguageCode,
           selectedSentencePositions,
-          mistakeCount: Number(st && st.mistake_count) || 0,
-          numberOfCharacters: Number(st && st.number_of_characters) || 0,
+          mistakeCount: Number(mistakeCount) || 0,
+          numberOfCharacters: Number(numberOfCharacters) || 0,
           moneyCount: Number(moneyCount) || 0,
         });
+        if (!enqueued) {
+          console.warn('[DM:handleActivity] enqueueActivity вернул false', { type, dictationId });
+        }
       } else {
         console.warn('[DM:handleActivity] OutboxBatcher не найден');
       }
@@ -3090,7 +3095,8 @@
                 playUiSound('coins_plus_audio');
               } catch (e0s) {
               }
-              handleActivity('audio', st, _key, session, add);
+              // Аудио: символы и ошибки не добавляются (0, 0)
+              await handleActivity('audio', st, _key, session, add, 0, 0);
             } else if (pct >= 50) {
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
             } else {
