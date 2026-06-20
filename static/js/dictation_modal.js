@@ -1381,15 +1381,14 @@
                   } catch (e0sa) {
                   }
 
-                  // Отправляем активность в outbox_batcher (только perfect/corrected — значимые для статистики)
+                  // Отправляем активность в outbox_batcher
                   try {
                     const ob = window.OutboxBatcher;
                     if (ob && typeof ob.enqueueActivity === 'function') {
                       const dictationId = getCurrentDictationIdForDb();
                       const dictationLanguageCode = _getDictationLanguageCode();
                       const selectedSentencePositions = _getSelectedSentencePositions(session);
-                      const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : null);
-                      console.log('[DM:1370] enqueueActivity: rewardCycle', { cycleId, paidCycleId, reward, typeActivity, dictationId, perfectNow, correctedNow });
+                      const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
                       if (typeActivity) {
                         ob.enqueueActivity({
                           type: typeActivity,
@@ -1412,8 +1411,6 @@
                           }
                         } catch (_ePersist) {
                         }
-                      } else {
-                        console.log('[DM:1370] enqueueActivity: typeActivity=null, не отправляем');
                       }
                     } else {
                       console.warn('[DM:1370] enqueueActivity: OutboxBatcher не найден');
@@ -3400,6 +3397,8 @@
         'col-mic': 'hide-mic',
         'col-half-stars': 'hide-half-stars',
         'col-activities': 'hide-activities',
+        'col-money-dt': 'hide-money-dt',
+        'col-money-kt': 'hide-money-kt',
         'col-text-original': 'hide-original',
         'col-text-translation': 'hide-translation',
       };
@@ -3535,6 +3534,20 @@
       if (tdMistakes) {
         const mistakesCount = Number(st.mistake_count) || 0;
         tdMistakes.textContent = mistakesCount > 0 ? String(mistakesCount) : '';
+      }
+
+      // --- Дт — заработано монет (money_earned) ---
+      const tdMoneyDt = tr.querySelector('td.col-money-dt');
+      if (tdMoneyDt) {
+        const moneyEarned = Number(st.money_earned) || 0;
+        tdMoneyDt.textContent = moneyEarned > 0 ? String(moneyEarned) : '';
+      }
+
+      // --- Кт — потрачено монет (money_spent) ---
+      const tdMoneyKt = tr.querySelector('td.col-money-kt');
+      if (tdMoneyKt) {
+        const moneySpent = Number(st.money_spent) || 0;
+        tdMoneyKt.textContent = moneySpent > 0 ? String(moneySpent) : '';
       }
 
       // Обновляем lucide-иконки в этой строке
@@ -4239,6 +4252,18 @@
         const mistakesCount = Number(st && st.mistake_count) || 0;
         tdMistakes.textContent = mistakesCount > 0 ? String(mistakesCount) : '';
 
+        // --- Колонка: Дт — заработано монет (money_earned) ---
+        const tdMoneyDt = document.createElement('td');
+        tdMoneyDt.className = 'col-money-dt';
+        const moneyEarned = Number(st && st.money_earned) || 0;
+        tdMoneyDt.textContent = moneyEarned > 0 ? String(moneyEarned) : '';
+
+        // --- Колонка: Кт — потрачено монет (money_spent) ---
+        const tdMoneyKt = document.createElement('td');
+        tdMoneyKt.className = 'col-money-kt';
+        const moneySpent = Number(st && st.money_spent) || 0;
+        tdMoneyKt.textContent = moneySpent > 0 ? String(moneySpent) : '';
+
         const tdOrig = document.createElement('td');
         tdOrig.className = 'col-text-original';
         tdOrig.textContent = String(view.text_original || '');
@@ -4256,6 +4281,8 @@
         tr.appendChild(tdTime);
         tr.appendChild(tdChars);
         tr.appendChild(tdMistakes);
+        tr.appendChild(tdMoneyDt);
+        tr.appendChild(tdMoneyKt);
         tr.appendChild(tdOrig);
         tr.appendChild(tdTr);
 

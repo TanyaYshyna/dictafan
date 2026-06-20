@@ -454,6 +454,7 @@ def add_activity_bulk(
     perfect_count=0,
     corrected_count=0,
     audio_count=0,
+    activity_count=0,
     money_count=0,
     mistake_count=0,
     monenumber_of_characters=0,
@@ -516,6 +517,10 @@ def add_activity_bulk(
         lead_time_ms_int = 0
 
     try:
+        activity_count_int = int(activity_count or 0)
+    except Exception:
+        activity_count_int = 0
+    try:
         money_count_int = int(money_count or 0)
     except Exception:
         money_count_int = 0
@@ -534,6 +539,8 @@ def add_activity_bulk(
         corrected_count_int = 0
     if audio_count_int < 0:
         audio_count_int = 0
+    if activity_count_int < 0:
+        activity_count_int = 0
     if lead_time_ms_int < 0:
         lead_time_ms_int = 0
     if money_count_int < 0:
@@ -609,7 +616,7 @@ def add_activity_bulk(
                     monenumber_of_characters_delta=int(monenumber_of_characters_int or 0),
                     lead_time_delta=int(lead_time_ms_int or 0),
                     successes_delta=0,
-                    activity_count_delta=int(perfect_count_int + corrected_count_int + audio_count_int or 0),
+                    activity_count_delta=int(activity_count_int or 0),
                     money_dt_delta=int(money_count_int or 0),
                 )
             except Exception:

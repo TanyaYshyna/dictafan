@@ -1188,6 +1188,7 @@ def save_activity():
         perfect_count = data.get('perfect_count')
         corrected_count = data.get('corrected_count')
         audio_count = data.get('audio_count')
+        activity_count = data.get('activity_count')
         money_count = data.get('money_count')
         mistake_count = data.get('mistake_count')
         monenumber_of_characters = data.get('monenumber_of_characters')
@@ -1200,6 +1201,7 @@ def save_activity():
             (perfect_count is not None)
             or (corrected_count is not None)
             or (audio_count is not None)
+            or (activity_count is not None)
             or (money_count is not None)
             or (mistake_count is not None)
             or (monenumber_of_characters is not None)
@@ -1231,6 +1233,7 @@ def save_activity():
                 perfect_count=perfect_count or 0,
                 corrected_count=corrected_count or 0,
                 audio_count=audio_count or 0,
+                activity_count=activity_count or 0,
                 money_count=money_count or 0,
                 mistake_count=mistake_count or 0,
                 monenumber_of_characters=monenumber_of_characters or 0,

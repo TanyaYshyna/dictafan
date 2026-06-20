@@ -197,6 +197,7 @@
         perfect_count: 0,
         corrected_count: 0,
         audio_count: 0,
+        activity_count: 0,
         money_count: 0,
         mistake_count: 0,
         monenumber_of_characters: 0,
@@ -209,6 +210,7 @@
       if (type === 'perfect') existing.perfect_count += n;
       if (type === 'corrected') existing.corrected_count += n;
       if (type === 'audio') existing.audio_count += n;
+      if (type === 'activity') existing.activity_count += n;
 
       existing.money_count = (Number(existing.money_count) || 0) + (Number(moneyCount) || 0);
       existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(mistakeCount) || 0);
@@ -329,6 +331,7 @@
                 perfect_count: Number(row.perfect_count) || 0,
                 corrected_count: Number(row.corrected_count) || 0,
                 audio_count: Number(row.audio_count) || 0,
+                activity_count: Number(row.activity_count) || 0,
                 money_count: Number(row.money_count) || 0,
                 mistake_count: Number(row.mistake_count) || 0,
                 monenumber_of_characters: Number(row.monenumber_of_characters) || 0,

@@ -1606,6 +1606,13 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   width: 50px;
 }
 
+#dictationModal #sentences-table col.col-money-dt,
+#dictationModal #final-sentences-table col.col-money-dt,
+#dictationModal #sentences-table col.col-money-kt,
+#dictationModal #final-sentences-table col.col-money-kt {
+  width: 50px;
+}
+
 #dictationModal #sentences-table th.col-time,
 #dictationModal #sentences-table td.col-time,
 #dictationModal #sentences-table th.col-star,
@@ -1619,7 +1626,11 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #sentences-table th.col-characters,
 #dictationModal #sentences-table td.col-characters,
 #dictationModal #sentences-table th.col-mistakes,
-#dictationModal #sentences-table td.col-mistakes {
+#dictationModal #sentences-table td.col-mistakes,
+#dictationModal #sentences-table th.col-money-dt,
+#dictationModal #sentences-table td.col-money-dt,
+#dictationModal #sentences-table th.col-money-kt,
+#dictationModal #sentences-table td.col-money-kt {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
@@ -1730,6 +1741,18 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #sentences-table.hide-original col.col-text-original,
 #dictationModal #sentences-table.hide-original th.col-text-original,
 #dictationModal #sentences-table.hide-original td.col-text-original {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-money-dt col.col-money-dt,
+#dictationModal #sentences-table.hide-money-dt th.col-money-dt,
+#dictationModal #sentences-table.hide-money-dt td.col-money-dt {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-money-kt col.col-money-kt,
+#dictationModal #sentences-table.hide-money-kt th.col-money-kt,
+#dictationModal #sentences-table.hide-money-kt td.col-money-kt {
   display: none !important;
 }
 
