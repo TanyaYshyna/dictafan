@@ -908,7 +908,6 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     mistake_delta=int(mistake_count or 0),
                     monenumber_of_characters_delta=int(monenumber_of_characters or 0),
                     lead_time_delta=int(time_ms or 0),
-                    successes_delta=1,
                     successes_delta=int(completion_count or 1),
                     activity_count_delta=0,
                     money_dt_delta=0,
