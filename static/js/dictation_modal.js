@@ -1062,6 +1062,8 @@
             try { resetSentenceUiFromSession(session); } catch (e00) {}
             // Запоминаем время старта первого предложения
             try { _initSentenceTime(session); } catch (e0t) {}
+            // Обновляем информацию о диктанте (теперь известна дата старта)
+            try { updateDictationSessionInfo(session); } catch (eInfo) {}
             updateNavigatorFromSession(session);
           }
         } catch (e0) {
@@ -2808,6 +2810,39 @@
         }
       } catch (e3) {
       }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Обновляет отображение номера диктанта и даты старта внизу модалки.
+   * Показывает информацию только если диктант уже начат (есть dateStart).
+   */
+  function updateDictationSessionInfo(session) {
+    try {
+      const container = document.getElementById('dictationSessionInfo');
+      const textEl = document.getElementById('dictationSessionInfoText');
+      if (!container || !textEl) return;
+      if (!session) {
+        container.style.display = 'none';
+        return;
+      }
+      const dictId = session.dictationId || '';
+      const dateStart = session.dateStart || '';
+      let text = '';
+      if (dictId) {
+        text = 'Диктант №' + dictId;
+      }
+      if (dateStart) {
+        if (text) text += ' · ';
+        text += dateStart;
+      }
+      if (!text) {
+        container.style.display = 'none';
+        return;
+      }
+      textEl.textContent = text;
+      container.style.display = 'flex';
     } catch (e) {
     }
   }
@@ -5631,15 +5666,7 @@
     if (!modal || modal.dataset.boundOverlay === '1') return;
     modal.dataset.boundOverlay = '1';
 
-    modal.addEventListener('click', (e) => {
-      try {
-        if (e && e.target === modal) {
-          close();
-        }
-      } catch (e2) {
-      }
-    });
-
+    // Закрытие по Escape — оставляем
     document.addEventListener('keydown', (e) => {
       try {
         if (!state.isOpen) return;
@@ -5727,17 +5754,6 @@
       } catch (e) {
       }
 
-      // Сбрасываем _restorePromise, чтобы restoreFromIdb() выполнился заново
-      // при каждом открытии диктанта (иначе используется зарезолвленный Promise
-      // от предыдущего открытия, и новые данные из IDB не подхватываются).
-      try {
-        const store = getRuntimeStore();
-        if (store && typeof store.restoreFromIdb === 'function') {
-          store._restorePromise = store.restoreFromIdb().catch(function(e){});
-        }
-      } catch (eReset) {
-      }
-
       // Загружаем контент диктанта (предложения) в runtime.
       // Если загрузка не удалась — не создаём сессию, показываем ошибку.
       let contentLoaded = false;
@@ -5756,14 +5772,16 @@
         }
       }
 
-      // Дожидаемся восстановления сессии из IndexedDB, чтобы не создать новую
-      // поверх уже сохранённой (гонка между restoreFromIdb и getOrCreateSession).
+      // Восстанавливаем сессию из IndexedDB ПОСЛЕ загрузки контента,
+      // чтобы restoreFromIdb() мог сопоставить ключи предложений с контентом.
+      // Если запустить restore до загрузки контента, все сессии будут пропущены
+      // (проверка allKeys.length === 0 в restoreFromIdb).
       try {
         const store = getRuntimeStore();
-        if (store && store._restorePromise) {
-          await store._restorePromise;
+        if (store && typeof store.restoreFromIdb === 'function') {
+          await store.restoreFromIdb().catch(function(e){});
         }
-      } catch (eRestore) {
+      } catch (eReset) {
       }
 
       try {
@@ -5795,6 +5813,12 @@
           try {
             bindCoinExchangeModal(session);
           } catch (e0b) {
+          }
+
+          // Показываем номер диктанта и дату старта внизу модалки
+          try {
+            updateDictationSessionInfo(session);
+          } catch (eInfo) {
           }
 
           const startBtn = document.getElementById('confirmStartBtn');
