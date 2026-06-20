@@ -1057,7 +1057,8 @@
             // Возобновляем таймер при старте игры (кнопка Start)
             _resumeDictationTimer();
             session.ensureDefaultSelection();
-            session.currentSelectedIndex = 0;
+            // Переходим на первое предложение, которое ещё не закрыто (нет звезды или не закрыт микрофон)
+            session.currentSelectedIndex = findFirstIncompleteIndex(session);
             try { resetSentenceUiFromSession(session); } catch (e00) {}
             // Запоминаем время старта первого предложения
             try { _initSentenceTime(session); } catch (e0t) {}
@@ -1078,7 +1079,8 @@
           if (!session) return;
           // Сохраняем время текущего предложения перед уходом
           try { _saveSentenceTime(session); } catch (e0st) {}
-          session.goNext();
+          // Переходим на следующее предложение, которое ещё не закрыто (нет звезды или не закрыт микрофон)
+          goNextIncomplete(session);
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
           try { _initSentenceTime(session); } catch (e0it) {}
@@ -2239,6 +2241,87 @@
     const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
     return { textOk, audioOk, requiresAudio };
+  }
+
+  /**
+   * Проверяет, полностью ли закрыто предложение (для определения завершённости диктанта).
+   * Считается закрытым: звезда ИЛИ полузвезда (если режим без текста — то без текста)
+   * И аудио (если требуется по режиму).
+   */
+  function isSentenceCompleted(key, session) {
+    try {
+      if (!key || !session || typeof session.getState !== 'function') return false;
+      const st = session.getState(String(key));
+      if (!st) return false;
+      const { textOk, audioOk } = computeSentenceCompletionState(st);
+      return !!(textOk && audioOk);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Проверяет, достаточно ли хорошо предложение для навигации (Старт/Далее).
+   * Считается "достаточно хорошим": только звезда (полузвезда НЕ считается,
+   * пользователь может улучшить до звезды) И аудио (если требуется).
+   * Отличие от computeSentenceCompletionState: corrected (полузвезда) не учитывается.
+   */
+  function isSentenceGoodEnoughForNavigation(key, session) {
+    try {
+      if (!key || !session || typeof session.getState !== 'function') return false;
+      const st = session.getState(String(key));
+      if (!st) return false;
+      const perfect = Number(st.number_of_perfect) || 0;
+      const audioDone = Number(st.number_of_audio) || 0;
+      const requiresAudio = getRequiredAudioRepeatsValue();
+      const mode = getExerciseMode();
+      // В режимах без текста текст всегда ок
+      const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
+      const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
+      return !!(textOk && audioOk);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * Ищет первый индекс в session.selectedKeys, для которого
+   * isSentenceGoodEnoughForNavigation возвращает false.
+   * Если все "достаточно хороши" — возвращает 0.
+   */
+  function findFirstIncompleteIndex(session) {
+    try {
+      const keys = session.selectedKeys || [];
+      for (let i = 0; i < keys.length; i++) {
+        if (!isSentenceGoodEnoughForNavigation(keys[i], session)) {
+          return i;
+        }
+      }
+    } catch (e) {
+    }
+    return 0;
+  }
+
+  /**
+   * Переходит на следующее предложение, которое НЕ isSentenceGoodEnoughForNavigation
+   * (начиная от текущего индекса + 1). Если все последующие "достаточно хороши" —
+   * остаётся на текущем.
+   */
+  function goNextIncomplete(session) {
+    try {
+      const keys = session.selectedKeys || [];
+      const startIdx = session.currentSelectedIndex != null ? session.currentSelectedIndex : 0;
+      for (let i = startIdx + 1; i < keys.length; i++) {
+        if (!isSentenceGoodEnoughForNavigation(keys[i], session)) {
+          session.currentSelectedIndex = i;
+          return session.getCurrentKey();
+        }
+      }
+      // Все последующие закрыты — остаёмся на текущем
+      return session.getCurrentKey();
+    } catch (e) {
+      return session ? session.goNext() : null;
+    }
   }
 
   function _renderCoins(container, count, colorVar) {
@@ -5778,6 +5861,29 @@
           if (modalContainer) {
             window.progressPanel.render(modalContainer, 'modal');
           }
+
+          // Восстанавливаем накопленное время диктанта из сессии в ProgressPanel
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (session && window.progressPanel) {
+              const accMs = Number(session.timer && session.timer.accumulatedMs) || 0;
+              if (accMs > 0) {
+                window.progressPanel.timerState.dictationAccumulatedMs = accMs;
+                window.progressPanel.updateTimer();
+              }
+            }
+          } catch (eAcc) {
+          }
+
+          // Обновляем панель прогресса данными из сессии (т.к. при создании
+          // ProgressPanel данные могли быть ещё не готовы)
+          try {
+            const session = window.__dictationModalActiveSession;
+            if (session) {
+              updateTaskProgressFromSession(session);
+            }
+          } catch (eTask) {
+          }
         }
       } catch (e) {
       }
@@ -5862,6 +5968,15 @@
       } catch (e) {
       }
     } else {
+      // Сохраняем время текущего предложения в сессию перед закрытием
+      try {
+        const session = window.__dictationModalActiveSession;
+        if (session) {
+          _saveSentenceTime(session);
+        }
+      } catch (eTime) {
+      }
+
       // Сохраняем сессию в IndexedDB перед закрытием (если не чистим)
       try {
         const store = getRuntimeStore();
