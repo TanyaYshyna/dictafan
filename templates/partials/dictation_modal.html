@@ -482,6 +482,25 @@
     </div>
   </div>
 
+  <!-- Модальное окно выхода из диктанта -->
+  <div id="exitModal" class="modal" style="display: none;">
+    <div class="modal-content exit-modal-content">
+      <h2>Вернуться на рабочий стол?</h2>
+      <p id="exitModalMessage">Что сделать с текущими изменениями?</p>
+      <div class="exit-modal-buttons">
+        <button id="exitStayBtn" class="button-secondary">Остаться</button>
+        <button id="exitWithoutSavingBtn" class="button-color-lightgreen">
+          <i data-lucide="save-off"></i>
+          <span id="exitWithoutSavingBtnLabel">Выйти</span>
+        </button>
+        <button id="exitWithSavingBtn" class="button-color-yellow" style="display: none;">
+          <i data-lucide="save"></i>
+          <span id="exitWithSavingBtnLabel">Выйти</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div id="noSelectionModal" class="modal" style="display: none;">
     <div class="modal-content warning-modal-content">
       <div class="warning-header">

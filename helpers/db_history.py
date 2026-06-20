@@ -816,7 +816,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, completion_count=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -909,6 +909,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                     monenumber_of_characters_delta=int(monenumber_of_characters or 0),
                     lead_time_delta=int(time_ms or 0),
                     successes_delta=1,
+                    successes_delta=int(completion_count or 1),
                     activity_count_delta=0,
                     money_dt_delta=0,
                 )

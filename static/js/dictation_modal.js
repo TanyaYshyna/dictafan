@@ -26,6 +26,11 @@
     opening: false,
     dictationStarted: false,
     rewardCycleId: 0,
+    // Для корректного расчёта времени предложения при перезаходах:
+    // _sentenceTimeAccumulatedAtStart — session.getElapsedMs() на момент входа в предложение
+    // _sentencePreviousAccumulatedTime — st.time_count на момент входа в предложение
+    _sentenceTimeAccumulatedAtStart: 0,
+    _sentencePreviousAccumulatedTime: 0,
   };
 
   function startNewRewardCycle() {
@@ -787,6 +792,7 @@
             monenumber_of_characters: totalChars,
             money_earned: totalMoneyEarned,
             time_ms: totalTimeMs,
+            completion_count: 1,
             dictation_language_code: dictationLanguageCode,
             sentences_data: sentencesData,
             completed_at_ms: nowMs,
@@ -2079,7 +2085,18 @@
 
   /**
    * Сохраняет время, проведённое в текущем предложении, в st.time_count (накопительно).
-   * Вызывается ПЕРЕД уходом с предложения (nextSentence, previousSentence).
+   * Вызывается ПЕРЕД уходом с предложения (nextSentence, previousSentence, close, beforeunload).
+   *
+   * Алгоритм (с учётом перезаходов в предложение):
+   *   newTime = (elapsed - timeAccumulatedAtStart) + previousAccumulatedTime
+   * где:
+   *   elapsed — session.getElapsedMs() (текущее учтённое время диктанта в целом)
+   *   timeAccumulatedAtStart — session.getElapsedMs() на момент входа в предложение
+   *   previousAccumulatedTime — st.time_count на момент входа в предложение
+   *
+   * Это корректно учитывает паузы (разница elapsed - timeAccumulatedAtStart
+   * даёт чистое время работы в этом заходе) и перезаходы (previousAccumulatedTime
+   * хранит время, уже накопленное в предыдущих заходах).
    */
   function _saveSentenceTime(session) {
     try {
@@ -2090,9 +2107,13 @@
       if (!st) return;
       const elapsed = session.getElapsedMs();
       const prevAcc = Number(state._sentenceTimeAccumulatedAtStart) || 0;
+      const prevTimeCount = Number(state._sentencePreviousAccumulatedTime) || 0;
       if (elapsed > prevAcc) {
         const delta = elapsed - prevAcc;
-        st.time_count = (Number(st.time_count) || 0) + delta;
+        st.time_count = prevTimeCount + delta;
+      } else {
+        // Если таймер не продвинулся — оставляем предыдущее накопленное значение
+        st.time_count = prevTimeCount;
       }
       // Обновляем время в строке таблицы модального окна выбора предложений
       try { updateStartModalSentenceRow(session, key); } catch (e0row) {}
@@ -2101,13 +2122,46 @@
   }
 
   /**
-   * Запоминает учтённое время диктанта на момент входа в предложение.
+   * Запоминает учтённое время диктанта на момент входа в предложение,
+   * а также уже накопленное время для этого предложения (для корректного учёта перезаходов).
    * Вызывается ПОСЛЕ входа в новое предложение (startGame, nextSentence, previousSentence).
    */
   function _initSentenceTime(session) {
     try {
       if (!session) return;
       state._sentenceTimeAccumulatedAtStart = session.getElapsedMs();
+      // Запоминаем уже накопленное время для этого предложения (если мы уже заходили в него)
+      const key = session.getCurrentKey();
+      if (key != null) {
+        const st = session.getState(key);
+        state._sentencePreviousAccumulatedTime = Number(st && st.time_count) || 0;
+      } else {
+        state._sentencePreviousAccumulatedTime = 0;
+      }
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Сохраняет время текущего предложения и persist-ит сессию в IDB при уходе со страницы.
+   * Вызывается из beforeunload и visibilitychange (при скрытии страницы).
+   * Это гарантирует, что время не теряется, даже если пользователь не нажал "Далее".
+   */
+  function _saveSentenceTimeOnPageUnload() {
+    try {
+      if (!state.isOpen) return;
+      if (!state.dictationStarted) return;
+      const session = window.__dictationModalActiveSession;
+      if (!session) return;
+      // Сохраняем время текущего предложения
+      _saveSentenceTime(session);
+      // Persist-им сессию в IndexedDB
+      const store = getRuntimeStore();
+      if (store && typeof store.persistToIdb === 'function') {
+        // Используем synchronous-like подход: запускаем, но не ждём,
+        // т.к. beforeunload не любит асинхронность
+        store.persistToIdb().catch(function(e){});
+      }
     } catch (e) {
     }
   }
@@ -2831,7 +2885,7 @@
       const dateStart = session.dateStart || '';
       let text = '';
       if (dictId) {
-        text = 'Диктант №' + dictId;
+        text = dictId;
       }
       if (dateStart) {
         if (text) text += ' · ';
@@ -5676,6 +5730,44 @@
     });
   }
 
+  function bindExitModalControls() {
+    try {
+      const exitModal = document.getElementById('exitModal');
+      if (!exitModal) return;
+      if (exitModal.dataset.boundDictationModal === '1') return;
+      exitModal.dataset.boundDictationModal = '1';
+
+      const stayBtn = document.getElementById('exitStayBtn');
+      if (stayBtn) {
+        stayBtn.addEventListener('click', () => {
+          try { exitModal.style.display = 'none'; } catch (e) {}
+          window.pendingExitAction = null;
+        });
+      }
+
+      const withoutBtn = document.getElementById('exitWithoutSavingBtn');
+      if (withoutBtn) {
+        withoutBtn.addEventListener('click', () => {
+          try { exitModal.style.display = 'none'; } catch (e) {}
+          const action = window.pendingExitAction;
+          window.pendingExitAction = null;
+          if (typeof action === 'function') action();
+        });
+      }
+
+      const withBtn = document.getElementById('exitWithSavingBtn');
+      if (withBtn) {
+        withBtn.addEventListener('click', () => {
+          try { exitModal.style.display = 'none'; } catch (e) {}
+          const action = window.pendingExitAction;
+          window.pendingExitAction = null;
+          if (typeof action === 'function') action();
+        });
+      }
+    } catch (e) {
+    }
+  }
+
   async function open(dictationUrl, opts = {}) {
     if (state.opening) return;
     state.opening = true;
@@ -5712,10 +5804,29 @@
       setAvatar();
       bindHeaderButtons();
       bindOverlayClose();
+      bindExitModalControls();
 
       modal.style.display = 'flex';
       modal.classList.add('show');
       state.isOpen = true;
+
+      // Биндим сохранение времени предложения при закрытии/скрытии страницы
+      try {
+        if (!window.__dictationModalBeforeUnloadBound) {
+          window.__dictationModalBeforeUnloadBound = true;
+          window.addEventListener('beforeunload', () => {
+            try { _saveSentenceTimeOnPageUnload(); } catch (e) {}
+          });
+          document.addEventListener('visibilitychange', () => {
+            try {
+              if (document.hidden) {
+                _saveSentenceTimeOnPageUnload();
+              }
+            } catch (e) {}
+          });
+        }
+      } catch (e) {
+      }
 
       cleanupPreviousDictationState();
       state.currentUrl = dictationUrl;
