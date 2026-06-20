@@ -162,6 +162,14 @@
           }
         } catch (e) {
         }
+
+        // Внешний колбэк — уведомляем владельца панели о старте записи
+        try {
+          if (typeof this.options.onRecordingStart === 'function') {
+            this.options.onRecordingStart();
+          }
+        } catch (e) {
+        }
       };
 
       this._rec.callbacks.onRecordingStop = () => {

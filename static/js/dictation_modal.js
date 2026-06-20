@@ -1400,7 +1400,7 @@
                           selectedSentencePositions,
                           mistakeCount: Number(st && st.mistake_count) || 0,
                           numberOfCharacters: Number(st && st.number_of_characters) || 0,
-                          moneyCount: Number(st && st.money_count) || 0,
+                          moneyCount: reward, // дельта — сколько заработано этим действием
                         });
                         // Сохраняем сессию в IndexedDB после каждого действия,
                         // чтобы при перезагрузке страницы прогресс не пропал
@@ -3045,13 +3045,31 @@
     if (panel) return panel;
 
     try {
+      // Ключ предложения, которое было активным на момент начала записи.
+      // Захватывается в onRecordingStart, чтобы onRecognitionComplete
+      // применялся к правильному предложению, даже если пользователь
+      // переключился на другое во время записи.
+      var _recordingSentenceKey = null;
       panel = new window.DictationSpeechRecognitionPanel({
         minMatchPercent: 80,
+        onRecordingStart: function () {
+          try {
+            var _v = getCurrentSentenceViewFromSession(session);
+            _recordingSentenceKey = (_v && _v.key != null) ? String(_v.key) : null;
+          } catch (e) {
+            _recordingSentenceKey = null;
+          }
+        },
         onRecognitionComplete: async ({ ok, percent }) => {
           try {
-            const view = getCurrentSentenceViewFromSession(session);
-            if (!view || view.key == null) return;
-            const st = session.getState(String(view.key));
+            var _key = _recordingSentenceKey;
+            if (_key == null) {
+              // fallback: если ключ не был захвачен, берём текущее предложение
+              var _v = getCurrentSentenceViewFromSession(session);
+              _key = (_v && _v.key != null) ? String(_v.key) : null;
+            }
+            if (_key == null) return;
+            const st = session.getState(_key);
 
             const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
             if (ok) {
@@ -3083,7 +3101,7 @@
                     selectedSentencePositions,
                     mistakeCount: Number(st && st.mistake_count) || 0,
                     numberOfCharacters: Number(st && st.number_of_characters) || 0,
-                    moneyCount: Number(st && st.money_count) || 0,
+                    moneyCount: add, // дельта — сколько заработано этим аудио-действием
                   });
                   // Сохраняем сессию в IndexedDB после каждого аудио-действия
                   try {
@@ -3110,11 +3128,11 @@
 
             // Обновляем строку в таблице стартового модального окна
             try {
-              updateStartModalSentenceRow(session, view.key);
+              updateStartModalSentenceRow(session, _key);
             } catch (eRow) {
             }
 
-            updateSentenceTabloFromSession(session, view.key);
+            updateSentenceTabloFromSession(session, _key);
             updateTaskProgressFromSession(session);
             updateNextButtonVisibilityFromSession(session);
 
