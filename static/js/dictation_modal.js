@@ -1383,9 +1383,11 @@
 
                   const typeActivity = perfectNow >= 1 ? 'perfect' : (correctedNow > 0 ? 'corrected' : 'activity');
                   if (typeActivity) {
-                    // Дельта: символы за эту попытку, ошибок нет (текст исправлен)
+                    // Дельта: символы за эту попытку
                     const charsThisAttempt = _ensureExpectedCharsLen(session);
-                    await handleActivity(typeActivity, st, key, session, reward, 0, charsThisAttempt);
+                    // Дельта: ошибки за эту попытку (mistake_count_current сбрасывается при resetSentenceUiFromSession)
+                    const mistakesThisAttempt = Number(st && st.mistake_count_current) || 0;
+                    await handleActivity(typeActivity, st, key, session, reward, mistakesThisAttempt, charsThisAttempt);
                   }
                 }
 
