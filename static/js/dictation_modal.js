@@ -2743,13 +2743,19 @@
    * @param {number} [moneyCount=0] — дельта заработанных монет (сколько заработано этим действием)
    */
   async function handleActivity(type, st, key, session, moneyCount, mistakeCount, numberOfCharacters) {
+    console.log('[DM:handleActivity] ВХОД: type=' + type + ' key=' + key + ' moneyCount=' + moneyCount + ' mistakeCount=' + mistakeCount + ' numberOfCharacters=' + numberOfCharacters + ' st=' + (st ? 'ok' : 'null') + ' session=' + (session ? 'ok' : 'null'));
     try {
-      if (!type || !st || key == null || !session) return;
+      if (!type || !st || key == null || !session) {
+        console.log('[DM:handleActivity] return: type=' + type + ' st=' + !!st + ' key=' + key + ' session=' + !!session);
+        return;
+      }
       const ob = window.OutboxBatcher;
+      console.log('[DM:handleActivity] OutboxBatcher=' + (ob ? 'ok' : 'null') + ' enqueueActivity=' + (ob && typeof ob.enqueueActivity === 'function' ? 'function' : 'not function'));
       if (ob && typeof ob.enqueueActivity === 'function') {
         const dictationId = getCurrentDictationIdForDb();
         const dictationLanguageCode = _getDictationLanguageCode();
         const selectedSentencePositions = _getSelectedSentencePositions(session);
+        console.log('[DM:handleActivity] dictationId=' + dictationId + ' langCode=' + dictationLanguageCode + ' positions=' + JSON.stringify(selectedSentencePositions));
         const enqueued = await ob.enqueueActivity({
           type: type,
           count: 1,
@@ -2762,6 +2768,7 @@
           numberOfCharacters: Number(numberOfCharacters) || 0,
           moneyCount: Number(moneyCount) || 0,
         });
+        console.log('[DM:handleActivity] enqueueActivity вернул: ' + enqueued);
         if (!enqueued) {
           console.warn('[DM:handleActivity] enqueueActivity вернул false', { type, dictationId });
         }
@@ -3074,32 +3081,47 @@
         },
         onRecognitionComplete: async ({ ok, percent }) => {
           try {
+            console.log('[DM:onRecognitionComplete] ВЫЗОВ: ok=' + ok + ' percent=' + percent + ' _recordingSentenceKey=' + _recordingSentenceKey);
             var _key = _recordingSentenceKey;
             if (_key == null) {
               // fallback: если ключ не был захвачен, берём текущее предложение
               var _v = getCurrentSentenceViewFromSession(session);
               _key = (_v && _v.key != null) ? String(_v.key) : null;
+              console.log('[DM:onRecognitionComplete] fallback _key=' + _key);
             }
-            if (_key == null) return;
+            if (_key == null) {
+              console.log('[DM:onRecognitionComplete] _key=null, return');
+              return;
+            }
             const st = session.getState(_key);
+            console.log('[DM:onRecognitionComplete] _key=' + _key + ' ok=' + ok + ' pct=' + percent + ' st=' + (st ? JSON.stringify({number_of_audio:st.number_of_audio,number_of_perfect:st.number_of_perfect,number_of_corrected:st.number_of_corrected}) : 'null'));
 
             const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
+            console.log('[DM:onRecognitionComplete] pct=' + pct + ' ok=' + ok);
             if (ok) {
               const next = (Number(st.number_of_audio) || 0) + 1;
               st.number_of_audio = next;
+              console.log('[DM:onRecognitionComplete] st.number_of_audio установлено в ' + next);
+              var _add = 0;
               try {
-                const add = getPricingValue('audio_activity_reward', 1);
+                _add = getPricingValue('audio_activity_reward', 1);
                 st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
-                st.money_count = (Number(st.money_count) || 0) + add;
-                st.money_earned = (Number(st.money_earned) || 0) + add;
+                st.money_count = (Number(st.money_count) || 0) + _add;
+                st.money_earned = (Number(st.money_earned) || 0) + _add;
                 playUiSound('coins_plus_audio');
+                console.log('[DM:onRecognitionComplete] звук сыгран, _add=' + _add);
               } catch (e0s) {
+                console.log('[DM:onRecognitionComplete] ошибка в блоке награды', e0s);
               }
+              console.log('[DM:onRecognitionComplete] before handleActivity, _add=' + _add + ' st.money_count=' + st.money_count + ' dictationId=' + getCurrentDictationIdForDb());
               // Аудио: символы и ошибки не добавляются (0, 0)
-              await handleActivity('audio', st, _key, session, add, 0, 0);
+              const haResult = await handleActivity('audio', st, _key, session, _add, 0, 0);
+              console.log('[DM:onRecognitionComplete] after handleActivity, haResult=' + haResult);
             } else if (pct >= 50) {
+              console.log('[DM:onRecognitionComplete] else if pct>=50: pct=' + pct);
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
             } else {
+              console.log('[DM:onRecognitionComplete] else: pct=' + pct + ' < 50');
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
 

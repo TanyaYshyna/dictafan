@@ -166,6 +166,8 @@
         moneyCount = 0,
       } = params || {};
 
+      console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount });
+
       if (!dictationId || !type) {
         console.warn(TAG, '[1a] enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
         return false;
@@ -173,6 +175,7 @@
 
 
       const userId = _getUserId();
+      console.log(TAG, '[enqueueActivity] userId=' + userId);
       if (!userId) {
         console.warn(TAG, '[1c] enqueueActivity: пропущено (нет userId)');
         return false;
@@ -181,10 +184,11 @@
       const dateId = date || _getLocalDateId();
       const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
       const key = `act:${userId}:${dateId}:${dictationId}:${selPosStr}`;
-
+      console.log(TAG, '[enqueueActivity] key=' + key + ' dateId=' + dateId);
 
       // Увеличиваем pending-счётчик ДО записи в IndexedDB
       state.pendingCount += 1;
+      console.log(TAG, '[enqueueActivity] pendingCount теперь = ' + state.pendingCount);
 
       // Читаем существующую запись или создаём новую
       const existing = (await window.IdbManager.idbGet('outbox', key)) || {
@@ -219,6 +223,7 @@
       existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
       existing.updatedAt = Date.now();
 
+      console.log(TAG, '[enqueueActivity] запись в IDB:', { key, audio_count: existing.audio_count, money_count: existing.money_count });
       await window.IdbManager.idbPut('outbox', existing);
 
       _scheduleFlush();
