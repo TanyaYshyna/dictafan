@@ -2230,10 +2230,13 @@ def get_success_counts():
 @statistics_bp.route('/success/count_subset', methods=['POST'])
 @jwt_required()
 def get_success_count_subset():
-    """Return completion count for a specific assignment subset (selected_sentence_positions).
+    """Return completion count for an exercise (dictation + sentence positions).
 
-    Medals count only full dictations (selected_sentence_positions IS NULL).
-    This endpoint is for candies: it counts exact subset matches.
+    Counts sum of:
+    - full dictations (selected_sentence_positions IS NULL)
+    - exact subset matches (selected_sentence_positions = given positions)
+
+    Used for medal display in dictation header.
     """
     try:
         current_email = get_jwt_identity()
@@ -2251,8 +2254,16 @@ def get_success_count_subset():
 
         user_id = int(user['id'])
 
-        cnt = int(get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions) or 0)
-        return jsonify({'success': True, 'count': cnt})
+        # Считаем сумму: полные диктанты + точные совпадения по позициям
+        total = 0
+        full_count = int(get_success_count(user_id, dictation_id) or 0)
+        total += full_count
+
+        if selected_sentence_positions is not None:
+            subset_count = int(get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions) or 0)
+            total += subset_count
+
+        return jsonify({'success': True, 'count': total})
     except Exception as e:
         print(f'❌ [GET_SUCCESS_COUNT_SUBSET] Ошибка: {e}')
         import traceback

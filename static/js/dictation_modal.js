@@ -300,8 +300,15 @@
           settings_json = null;
         }
 
+        // Берём completionCount из сессии (если есть)
+        let snapCompletionCount = null;
+        try {
+          const s = window.__dictationModalActiveSession;
+          if (s) snapCompletionCount = Number(s.completionCount) || 0;
+        } catch (e) {
+        }
         snapshot = {
-          completionCountAfter: null,
+          completionCountAfter: snapCompletionCount,
           errorWords: null,
           perfectCount: totalPerfect,
           correctedCount: totalCorrected,
@@ -570,6 +577,60 @@
     }
   }
 
+  /**
+   * Обновить отображение медальки в шапке диктанта.
+   * @param {number} count - количество успешных завершений
+   */
+  function updateMedalDisplay(count) {
+    try {
+      const medalEl = document.getElementById('dictationModalMedal');
+      const countEl = document.getElementById('dictationModalMedalCount');
+      if (!medalEl || !countEl) return;
+      const n = Number(count) || 0;
+      countEl.textContent = String(n);
+      medalEl.style.display = n > 0 ? 'flex' : 'none';
+    } catch (e) {
+    }
+  }
+
+  /**
+   * Загрузить completionCount из БД (если есть интернет) и обновить сессию + медальку.
+   * Если интернета нет — используем то, что уже есть в сессии.
+   */
+  async function loadCompletionCount(session) {
+    if (!session) return;
+    try {
+      const dictationId = getCurrentDictationIdForDb();
+      if (!dictationId) return;
+
+      const token = window.UM?.token || localStorage.getItem('jwt_token');
+      if (!token) return;
+
+      const selectedSentencePositions = _getSelectedSentencePositions(session);
+      const body = { dictation_id: dictationId };
+      if (Array.isArray(selectedSentencePositions) && selectedSentencePositions.length > 0) {
+        body.selected_sentence_positions = selectedSentencePositions;
+      }
+
+      const resp = await fetch('/api/statistics/success/count_subset', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) return;
+
+      const data = await resp.json();
+      const count = Number(data.count) || 0;
+      session.completionCount = count;
+      updateMedalDisplay(count);
+    } catch (e) {
+      // Если нет интернета — оставляем session.completionCount как есть
+      updateMedalDisplay(session.completionCount || 0);
+    }
+  }
   function showCompletionModal() {
     const completionModal = document.getElementById('completionModal');
     if (!completionModal) return;
@@ -623,11 +684,23 @@
     } catch (e2) {
     }
 
+    // Увеличиваем completionCount в сессии и обновляем медальки
+    let completionCountAfter = 0;
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (session) {
+        session.completionCount = (Number(session.completionCount) || 0) + 1;
+        completionCountAfter = session.completionCount;
+        updateMedalDisplay(session.completionCount);
+      }
+    } catch (eCc) {
+    }
+
     try {
       const medalCount = document.getElementById('completionMedalCount');
       if (medalCount) {
-        medalCount.textContent = '0';
-        medalCount.style.display = '';
+        medalCount.textContent = String(completionCountAfter);
+        medalCount.style.display = completionCountAfter > 0 ? '' : 'none';
       }
     } catch (e3) {
     }
@@ -712,7 +785,7 @@
         }
 
         autoSendTeacherReportAfterSuccess({
-          completionCountAfter: undefined,
+          completionCountAfter: completionCountAfter,
           errorWords: null,
           perfectCount: totalPerfect,
           correctedCount: totalCorrected,
@@ -6056,6 +6129,12 @@
           try {
             updateDictationSessionInfo(session);
           } catch (eInfo) {
+          }
+
+          // Загружаем completionCount из БД и обновляем медальку в шапке
+          try {
+            loadCompletionCount(session);
+          } catch (eCc) {
           }
 
           const startBtn = document.getElementById('confirmStartBtn');

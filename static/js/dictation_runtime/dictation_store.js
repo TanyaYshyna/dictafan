@@ -99,6 +99,9 @@
       // Дата начала диктанта (локальная, без времени) — устанавливается при старте
       this.dateStart = null;
 
+      // Количество успешных завершений этого упражнения (диктант + позиции)
+      this.completionCount = 0;
+
       this.lastUsedAtMs = _nowMs();
     }
 
@@ -313,6 +316,7 @@
         stateByKey: stateObj,
         dateStart: this.dateStart,
         completed: this.completed === true ? true : undefined,
+        completionCount: Number(this.completionCount) || 0,
         timer: {
           running: this.timer.running,
           startedAtMs: this.timer.startedAtMs,
@@ -343,6 +347,9 @@
         s.timer.running = !!data.timer.running;
         s.timer.startedAtMs = Number(data.timer.startedAtMs) || 0;
         s.timer.accumulatedMs = Number(data.timer.accumulatedMs) || 0;
+      }
+      if (data.completionCount != null) {
+        s.completionCount = Number(data.completionCount) || 0;
       }
       return s;
     }
