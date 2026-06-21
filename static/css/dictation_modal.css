@@ -111,6 +111,7 @@
 #dictationModal .panel-tablo .sentence-nav-table {
   flex: 1 1 auto;
   min-width: 0;
+  overflow-x: auto;
 }
 
 #dictationModal .panel-tablo .dictation-top-progress-wrap {
@@ -231,6 +232,14 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   align-items: center;
   justify-content: center;
   color: var(--color-button-text-gray);
+}
+
+#dictationModal .sentence-nav-table button.button-color-gray {
+  color: var(--color-button-gray);
+}
+
+#dictationModal .sentence-nav-table button.button-color-yellow {
+  color: var(--color-button-yellow);
 }
 
 #dictationModal .sentence-nav-table .sentence-counter-simple {
@@ -1024,8 +1033,8 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: linear-gradient(135deg, #ffd700, #f0c000);
-  color: #fff;
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
   border-radius: 12px;
   padding: 2px 7px 2px 5px;
   font-size: 11px;

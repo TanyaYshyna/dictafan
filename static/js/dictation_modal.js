@@ -2619,9 +2619,14 @@
     try {
       const wrap = document.getElementById('tablo_result_text_coins');
       if (wrap) {
-        // Показываем: маленький кружочек слева, справа число (как ошибки)
         const n = Math.max(0, Number(textCoins) || 0);
-        wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
+        if (n > 0) {
+          wrap.innerHTML = '<i data-lucide="circle-small"></i>' + String(n);
+          wrap.style.display = '';
+        } else {
+          wrap.innerHTML = '';
+          wrap.style.display = 'none';
+        }
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
         }

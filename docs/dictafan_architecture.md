@@ -12,6 +12,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `static/js/private_library.js`
 - `static/css/style_private_library.css`
 - `static/css/style_dictation.css`
+- `static/css/style.css`
 - ~~`routes/user_routes.py` → `GET /user/profile` (страница профиля; заменить на модалку на `/desktop`)~~ **ГОТОВО**: роут перенаправляет на `index.index`
 - ~~`templates/user_profile_jwt.html`~~ **УДАЛЁН**
 - ~~`static/css/style_user_profile.css`~~ **УДАЛЁН** (стили перенесены в `user_profile_modal.css`)

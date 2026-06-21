@@ -48,6 +48,15 @@
 
 
   --color-light-blue: #cae7fb;               /* светло-голубой фон блоков */
+
+body {
+    background: var(--color-hover);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--color-text);
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+}
   --color-blue: #3498db;                     /* основной голубой */
   --color-blue-hover: #2997e0;               /* наведение на голубую кнопку */
   --color-text-secondary: #555;              /* текст-пояснение (например, перевод) */

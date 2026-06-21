@@ -122,7 +122,7 @@ class ProgressPanel {
                     <td>
                         <button id="btn-${prefix}count-money" class="pp-money" disabled title="Деньги">
                             <i data-lucide="circle-dollar-sign"></i>
-                            <span id="${prefix}count-money">+0 / -0</span>
+                            <span id="${prefix}count-money">+0</span>
                         </button>
                     </td>
                 </tr>
@@ -669,8 +669,7 @@ class ProgressPanel {
         }
         if (this.elements.modalMoney) {
             const earned = safe(this.stats.moneyEarned);
-            const spent = safe(this.stats.moneySpent);
-            this.elements.modalMoney.textContent = `+${earned} / -${spent}`;
+            this.elements.modalMoney.textContent = `+${earned}`;
         }
 
         // Обновляем иконку микрофона в панели прогресса
