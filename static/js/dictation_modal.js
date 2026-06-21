@@ -5580,7 +5580,7 @@
             console.log('📨 [TELEGRAM][INTERIM] sending test message...');
             console.log(`📨 [TELEGRAM][INTERIM] text:\n${text}`);
 
-            const resp = await fetch('/api/telegram/test_send', {
+            const resp = await fetch('/user/api/telegram/test_send', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
