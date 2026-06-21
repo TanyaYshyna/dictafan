@@ -261,6 +261,7 @@
               totalAttempts += at;
               totalErrors += er;
 
+              const tac = Number(st.text_activity_count) || 0;
               if (p > 0 || c > 0 || a > 0) {
                 sentences_data.push({
                   sentence_key: key,
@@ -269,6 +270,7 @@
                   audio_count: a,
                   attempts_total: at,
                   mistake_count: er,
+                  text_activity_count: tac,
                   selection_state: st.selection_state || 'unchecked',
                 });
               }
@@ -665,6 +667,7 @@
           totalAudio += a;
           totalErrors += er;
 
+          const tac = Number(st.text_activity_count) || 0;
           if (p > 0 || c > 0 || a > 0) {
             sentencesData.push({
               sentence_key: key,
@@ -673,6 +676,7 @@
               audio_count: a,
               attempts_total: 0,
               mistake_count: er,
+              text_activity_count: tac,
               selection_state: st.selection_state || 'unchecked',
             });
           }
@@ -5481,6 +5485,128 @@
           e.preventDefault();
           e.stopPropagation();
           await exitDictationFromStartModal();
+        });
+      }
+    } catch (e) {
+    }
+
+    // ВРЕМЕННО: кнопка самолётика отправляет тестовое сообщение в Telegram
+    try {
+      const interimBtn = document.getElementById('startModalSendInterimReportBtn');
+      if (interimBtn && interimBtn.dataset.boundDictationModal !== '1') {
+        interimBtn.dataset.boundDictationModal = '1';
+        interimBtn.addEventListener('click', async (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const token = window.UM?.token || localStorage.getItem('jwt_token');
+            if (!token) {
+              console.log('📨 [TELEGRAM][INTERIM] no token');
+              return;
+            }
+
+            // Собираем тестовую информацию из сессии
+            const session = window.__dictationModalActiveSession;
+            if (!session) {
+              console.log('📨 [TELEGRAM][INTERIM] no session');
+              return;
+            }
+
+            const dictationIdForDb = getCurrentDictationIdForDb();
+            const dictationTitle = document.getElementById('title-diktation')?.textContent || 'Диктант';
+
+            // Собираем статистику по предложениям
+            let totalPerfect = 0;
+            let totalCorrected = 0;
+            let totalAudio = 0;       // 🎤 — аудио (number_of_audio)
+            let totalTextActivity = 0; // о — текстовая активность (text_activity_count)
+            let totalAttempts = 0;
+            let totalErrors = 0;
+            let totalChars = 0;
+            let totalMoneyEarned = 0;
+
+            const allKeys = session.content ? session.content.getAllKeys() : [];
+            for (const key of allKeys) {
+              const st = session.getState(key);
+              if (!st) continue;
+              const p = Number(st.number_of_perfect) || 0;
+              const c = Number(st.number_of_corrected) || 0;
+              const a = Number(st.number_of_audio) || 0;
+              const at = Number(st.text_activity_count) || 0;
+              const aa = Number(st.audio_activity50_count) || 0;
+              const e = Number(st.mistake_count) || 0;
+              const ch = Number(st.number_of_characters) || 0;
+              const me = Number(st.money_earned) || 0;
+              totalPerfect += p;
+              totalCorrected += c;
+              totalAudio += a;
+              totalTextActivity += at;
+              totalAttempts += at + aa;
+              totalErrors += e;
+              totalChars += ch;
+              totalMoneyEarned += me;
+            }
+
+            // Время из таймера сессии
+            let timeMs = 0;
+            try {
+              if (session.timer) {
+                timeMs = session.timer.accumulatedMs || 0;
+              }
+            } catch (eTimer) {
+            }
+
+            const durationStr = timeMs > 0
+              ? `${Math.floor(timeMs / 60000)}:${String(Math.floor((timeMs % 60000) / 1000)).padStart(2, '0')}`
+              : '0:00';
+
+            const text = [
+              `✅ Тестовое сообщение из диктанта`,
+              `${dictationTitle}`,
+              ``,
+              `$: ${totalMoneyEarned}`,
+              `🪲: ${totalErrors} / ${totalChars}`,
+              `⭐ - ${totalPerfect}`,
+              `½⭐ - ${totalCorrected}`,
+              `о - ${totalTextActivity}`,
+              `🎤 - ${totalAudio}`,
+              `Длительность: ${durationStr}`,
+              `dictationId: ${dictationIdForDb}`,
+            ].join('\n');
+
+            console.log('📨 [TELEGRAM][INTERIM] sending test message...');
+            console.log(`📨 [TELEGRAM][INTERIM] text:\n${text}`);
+
+            const resp = await fetch('/api/telegram/test_send', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ text }),
+            });
+
+            const result = await resp.json();
+            console.log(`📨 [TELEGRAM][INTERIM] result:`, result);
+
+            if (result.success) {
+              // Показываем toast об успехе
+              try {
+                const toast = document.getElementById('toastMessage');
+                if (toast) {
+                  toast.textContent = `✅ Отправлено (${result.sent || 0} получателей)`;
+                  toast.style.display = 'block';
+                  setTimeout(() => { toast.style.display = 'none'; }, 3000);
+                }
+              } catch (eToast) {
+              }
+            }
+          } catch (eHandler) {
+            console.log('📨 [TELEGRAM][INTERIM] error:', eHandler);
+          }
         });
       }
     } catch (e) {

@@ -455,13 +455,14 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
     lines.append(f"⭐ - {_int_or_0(perfect_count)}")
     # ½⭐ - corrected
     lines.append(f"½⭐ - {_int_or_0(corrected_count)}")
-    # о - audio (активности)
-    lines.append(f"о - {_int_or_0(audio_count)}")
-    # 🎤 - количество предложений с активностью
-    sentence_count = 0
+    # о - текстовая активность (text_activity_count из sentences_data)
+    text_activity_total = 0
     if isinstance(sentences_data, list):
-        sentence_count = len(sentences_data)
-    lines.append(f"🎤 - {sentence_count}")
+        for sd in sentences_data:
+            text_activity_total += _int_or_0(sd.get('text_activity_count'))
+    lines.append(f"о - {text_activity_total}")
+    # 🎤 - аудио (number_of_audio)
+    lines.append(f"🎤 - {_int_or_0(audio_count)}")
 
     # Длительность
     lines.append(f"Длительность: {_fmt_duration(time_ms)}")
@@ -864,6 +865,17 @@ def teacher_report_send_auto():
             self_chat_id = int(user.get('telegram_chat_id'))
     except Exception:
         self_chat_id = None
+
+    # Логируем полный список получателей
+    try:
+        recipient_log = []
+        if self_chat_id is not None:
+            recipient_log.append(f"self(chat_id={self_chat_id})")
+        for cid in chat_ids:
+            recipient_log.append(f"teacher(chat_id={cid})")
+        print(f"📨 [TELEGRAM][SEND_AUTO] recipients_list=[{', '.join(recipient_log)}]")
+    except Exception:
+        pass
 
     if not chat_ids and self_chat_id is None:
         try:
