@@ -15,6 +15,7 @@ from helpers.db_history import (
     get_success_count_for_subset,
     get_activity_lead_time_by_day_range,
     get_activity_lead_time_year_bounds,
+    get_successes_sum_from_history_by_day,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -891,7 +892,11 @@ def teacher_report_send_auto():
         completion_count_value = None
     if completion_count_value is None:
         try:
-            completion_count_value = int(get_success_count(int(user.get('id')), int(dictation_int)) or 0)
+            # Используем history_by_day.successes (history_successes будет удалена)
+            selected_sentence_positions = data.get('selected_sentence_positions')
+            completion_count_value = get_successes_sum_from_history_by_day(
+                int(user.get('id')), int(dictation_int), selected_sentence_positions
+            )
         except Exception:
             completion_count_value = None
 
@@ -2232,11 +2237,11 @@ def get_success_counts():
 def get_success_count_subset():
     """Return completion count for an exercise (dictation + sentence positions).
 
-    Counts sum of:
-    - full dictations (selected_sentence_positions IS NULL)
-    - exact subset matches (selected_sentence_positions = given positions)
-
+    Counts sum of successes from history_by_day for this dictation_id and positions.
     Used for medal display in dictation header.
+
+    NOTE: history_successes will be removed in the future.
+    All completion counting should use history_by_day.successes.
     """
     try:
         current_email = get_jwt_identity()
@@ -2254,14 +2259,8 @@ def get_success_count_subset():
 
         user_id = int(user['id'])
 
-        # Считаем сумму: полные диктанты + точные совпадения по позициям
-        total = 0
-        full_count = int(get_success_count(user_id, dictation_id) or 0)
-        total += full_count
-
-        if selected_sentence_positions is not None:
-            subset_count = int(get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions) or 0)
-            total += subset_count
+        # Считаем сумму successes из history_by_day для этого упражнения
+        total = get_successes_sum_from_history_by_day(user_id, dictation_id, selected_sentence_positions)
 
         return jsonify({'success': True, 'count': total})
     except Exception as e:

@@ -1503,3 +1503,33 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
     finally:
         conn.close()
 
+
+def get_successes_sum_from_history_by_day(user_id: int, dictation_id: int, selected_sentence_positions=None) -> int:
+    """Return sum of successes from history_by_day for a specific exercise (dictation + positions).
+
+    Args:
+        user_id: ID пользователя
+        dictation_id: ID диктанта
+        selected_sentence_positions: список позиций (или None для полного диктанта)
+
+    Returns:
+        int: сумма successes
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(successes), 0)
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(user_id), int(dictation_id), positions_arr),
+            )
+            row = cur.fetchone()
+            return int(row[0] or 0) if row else 0
+    finally:
+        conn.close()
