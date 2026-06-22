@@ -444,6 +444,23 @@ window.Desktop = window.Desktop || {
         console.log('[desktop] action', name);
         return;
       }
+      if (name === 'desktop-menu-tracker') {
+        (async () => {
+          try {
+            if (typeof ActivityTrackerReport === 'undefined') {
+              console.warn('[desktop] ActivityTrackerReport not available');
+              return;
+            }
+            if (!window.__activityTrackerReport) {
+              window.__activityTrackerReport = new ActivityTrackerReport(null);
+            }
+            await window.__activityTrackerReport.show();
+          } catch (e) {
+            console.error('[desktop] tracker error', e);
+          }
+        })();
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }

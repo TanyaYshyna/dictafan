@@ -335,7 +335,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
 
 def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, language_code=None):
-    """Return summed lead_time (ms) and activity counters by day from history_activity for a given period.
+    """Return summed lead_time (ms) and activity counters by day from history_by_day for a given period.
 
     Returns:
         list[dict]: [{date: 'YYYY-MM-DD', lead_time: int, activity: int}, ...]
@@ -352,16 +352,16 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 cur.execute(
                     """
                     SELECT
-                        date,
+                        date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
-                    FROM history_activity
+                        COALESCE(SUM(activity_count), 0) AS activity
+                    FROM history_by_day
                     WHERE user_id = %s
-                      AND date >= %s
-                      AND date <= %s
+                      AND date_fact >= %s
+                      AND date_fact <= %s
                       AND dictation_language_code = %s
-                    GROUP BY date
-                    ORDER BY date ASC
+                    GROUP BY date_fact
+                    ORDER BY date_fact ASC
                     """,
                     (int(user_id), start_date, end_date, str(language_code).strip().lower()),
                 )
@@ -369,15 +369,15 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 cur.execute(
                     """
                     SELECT
-                        date,
+                        date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
-                    FROM history_activity
+                        COALESCE(SUM(activity_count), 0) AS activity
+                    FROM history_by_day
                     WHERE user_id = %s
-                      AND date >= %s
-                      AND date <= %s
-                    GROUP BY date
-                    ORDER BY date ASC
+                      AND date_fact >= %s
+                      AND date_fact <= %s
+                    GROUP BY date_fact
+                    ORDER BY date_fact ASC
                     """,
                     (int(user_id), start_date, end_date),
                 )
@@ -407,7 +407,7 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
 
 
 def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
-    """Return (min_year, max_year) where user has any activity rows (lead_time or counts) in history_activity."""
+    """Return (min_year, max_year) where user has any activity rows (lead_time or counts) in history_by_day."""
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
@@ -415,9 +415,9 @@ def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
                 cur.execute(
                     """
                     SELECT
-                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
-                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
-                    FROM history_activity
+                        MIN(EXTRACT(YEAR FROM date_fact))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date_fact))::int AS max_year
+                    FROM history_by_day
                     WHERE user_id = %s
                       AND dictation_language_code = %s
                     """,
@@ -427,9 +427,9 @@ def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
                 cur.execute(
                     """
                     SELECT
-                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
-                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
-                    FROM history_activity
+                        MIN(EXTRACT(YEAR FROM date_fact))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date_fact))::int AS max_year
+                    FROM history_by_day
                     WHERE user_id = %s
                     """,
                     (int(user_id),),
