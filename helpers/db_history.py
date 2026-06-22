@@ -335,10 +335,10 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
 
 def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, language_code=None):
-    """Return summed lead_time (ms) and activity counters by day from history_by_day for a given period.
+    """Return summed lead_time (ms) and counters by day from history_by_day for a given period.
 
     Returns:
-        list[dict]: [{date: 'YYYY-MM-DD', lead_time: int, activity: int}, ...]
+        list[dict]: [{date, lead_time, money_dt, mistakes, chars}, ...]
     """
     conn = get_db_connection()
     try:
@@ -354,7 +354,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                     SELECT
                         date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(activity_count), 0) AS activity
+                        COALESCE(SUM(money_dt_count), 0) AS money_dt,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS chars
                     FROM history_by_day
                     WHERE user_id = %s
                       AND date_fact >= %s
@@ -371,7 +373,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                     SELECT
                         date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(activity_count), 0) AS activity
+                        COALESCE(SUM(money_dt_count), 0) AS money_dt,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS chars
                     FROM history_by_day
                     WHERE user_id = %s
                       AND date_fact >= %s
@@ -391,7 +395,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 out.append({
                     'date': date_iso,
                     'lead_time': int(r.get('lead_time') or 0),
-                    'activity': int(r.get('activity') or 0),
+                    'money_dt': int(r.get('money_dt') or 0),
+                    'mistakes': int(r.get('mistakes') or 0),
+                    'chars': int(r.get('chars') or 0),
                 })
             else:
                 d = r[0]
@@ -399,7 +405,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 out.append({
                     'date': date_iso,
                     'lead_time': int(r[1] or 0),
-                    'activity': int(r[2] or 0) if len(r) > 2 else 0,
+                    'money_dt': int(r[2] or 0) if len(r) > 2 else 0,
+                    'mistakes': int(r[3] or 0) if len(r) > 3 else 0,
+                    'chars': int(r[4] or 0) if len(r) > 4 else 0,
                 })
         return out
     finally:

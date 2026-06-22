@@ -2843,13 +2843,22 @@ class ActivityTrackerReport {
 
         const row = (this._dataDaysByIso && this._dataDaysByIso[iso]) ? this._dataDaysByIso[iso] : null;
         const ms = row && row.ms != null ? Number(row.ms) || 0 : 0;
-        const act = row && row.activity != null ? Number(row.activity) || 0 : 0;
+        const money = row && row.money_dt != null ? Number(row.money_dt) || 0 : 0;
+        const mistakes = row && row.mistakes != null ? Number(row.mistakes) || 0 : 0;
+        const chars = row && row.chars != null ? Number(row.chars) || 0 : 0;
 
         box.innerHTML = `
             <div class="reports-tracker-details-line">${this.escapeHtml(iso)}</div>
             <div class="reports-tracker-details-line">${this.escapeHtml(this.formatDurationHMS(ms))}</div>
-            <div class="reports-tracker-details-line">активность ${this.escapeHtml(String(act))}</div>
+            <div class="reports-tracker-details-line"><span class="lucide-icon-inline" data-lucide="dollar-sign"></span> ${this.escapeHtml(String(money))}</div>
+            <div class="reports-tracker-details-line"><span class="lucide-icon-inline" data-lucide="bug"></span> ${this.escapeHtml(String(mistakes))} / ${this.escapeHtml(String(chars))}</div>
         `;
+        try {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons({ root: box });
+            }
+        } catch (e) {
+        }
     }
 
     async reloadData({ force }) {
@@ -2935,7 +2944,9 @@ class ActivityTrackerReport {
                 if (!iso) continue;
                 map[iso] = {
                     ms: Number(d.lead_time || 0) || 0,
-                    activity: Number(d.activity || 0) || 0,
+                    money_dt: Number(d.money_dt || 0) || 0,
+                    mistakes: Number(d.mistakes || 0) || 0,
+                    chars: Number(d.chars || 0) || 0,
                 };
             } catch (e) {
             }
@@ -3059,7 +3070,9 @@ class ActivityTrackerReport {
 
                 const row = (this._dataDaysByIso && this._dataDaysByIso[iso]) ? this._dataDaysByIso[iso] : null;
                 const ms = row && row.ms != null ? Number(row.ms) || 0 : 0;
-                const activity = row && row.activity != null ? Number(row.activity) || 0 : 0;
+                const money = row && row.money_dt != null ? Number(row.money_dt) || 0 : 0;
+                const mistakes = row && row.mistakes != null ? Number(row.mistakes) || 0 : 0;
+                const chars = row && row.chars != null ? Number(row.chars) || 0 : 0;
                 const minutes = ms / 60000;
                 let cls = 'reports-tracker-cell';
                 if (minutes > 0 && minutes < 15) {
@@ -3069,7 +3082,7 @@ class ActivityTrackerReport {
                     const idx = Math.min(12, Math.floor((capped - 15) / 15) + 1);
                     cls += ` reports-tracker-cell--l${idx}`;
                 }
-                const title = `${iso} ${this.formatDurationHMS(ms)} активность ${activity}`;
+                const title = `${iso} ${this.formatDurationHMS(ms)} $${money} 🐛${mistakes}/${chars}`;
                 const active = (this._selectedIso && this._selectedIso === iso) ? ' reports-tracker-cell--active' : '';
                 dayParts.push(`<div class="${cls}${active}" data-iso="${this.escapeHtml(iso)}" title="${this.escapeHtml(title)}"></div>`);
             }

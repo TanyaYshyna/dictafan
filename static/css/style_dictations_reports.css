@@ -156,6 +156,18 @@
   line-height: 1.2;
 }
 
+.reports-tracker-details-line .lucide-icon-inline {
+  display: inline-block;
+  vertical-align: middle;
+  width: 16px;
+  height: 16px;
+}
+
+.reports-tracker-details-line .lucide-icon-inline svg {
+  width: 16px;
+  height: 16px;
+}
+
 .reports-tracker-cell--white {
   background: var(--tracker-activity-white, #ffffff);
   border-color: rgba(0, 0, 0, 0.04);
