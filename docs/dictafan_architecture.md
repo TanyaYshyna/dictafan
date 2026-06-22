@@ -18,7 +18,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - ~~`static/js/script_user_profile.js`~~ **УДАЛЁН** (код перенесён в `user_profile_modal.js`)
 - `assignments`
 - `assignments_by_date`
-- ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. После миграции всех данных — удалить таблицу.
+- ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. `calculate_streak_days()` переписан на `history_by_day.activity_count` (вместо `perfect_count + corrected_count + audio_count`). После миграции всех данных — удалить таблицу.
 - ~~`history_successes`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем записи. Все завершения диктантов учитываются через `history_by_day.successes` — сумма по полю `successes` с фильтром по `dictation_id` и `positions`. После миграции всех данных — удалить таблицу.
 
 ## Принципы разделения ответственности

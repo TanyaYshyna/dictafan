@@ -439,22 +439,16 @@ window.DesktopStatsPanel = {
     },
 
     /**
-     * Отформатировать время из ms в человекочитаемый вид.
+     * Отформатировать время из ms в человекочитаемый вид (чч:мм).
      * @param {number} ms
      * @returns {string}
      */
     _formatTime(ms) {
-        if (!ms || ms <= 0) return '0 мин';
+        if (!ms || ms <= 0) return '0:00';
         const totalMinutes = Math.floor(ms / 60000);
-        if (totalMinutes < 60) {
-            return totalMinutes + ' мин';
-        }
         const hours = Math.floor(totalMinutes / 60);
         const minutes = totalMinutes % 60;
-        if (minutes === 0) {
-            return hours + ' ч';
-        }
-        return hours + ' ч ' + minutes + ' мин';
+        return hours + ':' + String(minutes).padStart(2, '0');
     },
 
     /**

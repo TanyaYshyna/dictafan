@@ -3317,15 +3317,18 @@
       panel = state._speechPanel;
     } catch (e1) {
     }
-    if (panel) return panel;
-
-    try {
-      // Ключ предложения, которое было активным на момент начала записи.
-      // Захватывается в onRecordingStart, чтобы onRecognitionComplete
-      // применялся к правильному предложению, даже если пользователь
-      // переключился на другое во время записи.
-      var _recordingSentenceKey = null;
-      panel = new window.DictationSpeechRecognitionPanel({
+    // Если панель уже существует — не создаём новую, но всё равно обновляем
+    // её параметры ниже (язык, режим, ожидаемый текст и т.д.).
+    // Ранний return убран, чтобы при смене диктанта язык распознавания
+    // обновлялся на новый (см. panel.setLanguage ниже).
+    if (!panel) {
+      try {
+        // Ключ предложения, которое было активным на момент начала записи.
+        // Захватывается в onRecordingStart, чтобы onRecognitionComplete
+        // применялся к правильному предложению, даже если пользователь
+        // переключился на другое во время записи.
+        var _recordingSentenceKey = null;
+        panel = new window.DictationSpeechRecognitionPanel({
         minMatchPercent: 80,
         onRecordingStart: function () {
           try {
@@ -3402,10 +3405,11 @@
           } catch (e) {
           }
         },
-      });
-      state._speechPanel = panel;
-    } catch (e2) {
-      return null;
+        });
+        state._speechPanel = panel;
+      } catch (e2) {
+        return null;
+      }
     }
 
     try {

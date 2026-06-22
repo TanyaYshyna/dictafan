@@ -683,9 +683,9 @@ def get_activity_total_for_date(user_id, date_value, language_code=None):
 
 
 def calculate_streak_days(user_id, today=None):
-    """Calculate consecutive active days based on history_activity.
+    """Calculate consecutive active days based on history_by_day.
 
-    A day counts as active if total(perfect+corrected+audio) > 0.
+    A day counts as active if the user earned any money (money_dt_count > 0).
     """
     if today is None:
         today = datetime.now().date()
@@ -696,12 +696,12 @@ def calculate_streak_days(user_id, today=None):
             # Pull recent active dates (descending). Limit protects from scanning huge history.
             cur.execute(
                 """
-                SELECT date
-                FROM history_activity
+                SELECT date_fact AS date
+                FROM history_by_day
                 WHERE user_id = %s
-                GROUP BY date
-                HAVING COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) > 0
-                ORDER BY date DESC
+                GROUP BY date_fact
+                HAVING COALESCE(SUM(money_dt_count), 0) > 0
+                ORDER BY date_fact DESC
                 LIMIT 400
                 """,
                 (int(user_id),),
@@ -1435,7 +1435,7 @@ def get_history_by_day_totals(user_id: int) -> dict:
                 """
                 SELECT
                     COALESCE(SUM(lead_time), 0) AS total_lead_time,
-                    COALESCE(SUM(monenumber_of_characters), 0) AS total_money,
+                    COALESCE(SUM(money_dt_count), 0) AS total_money,
                     COALESCE(SUM(activity_count), 0) AS total_activity_count,
                     COALESCE(SUM(money_dt_count), 0) AS total_money_dt_count
                 FROM history_by_day
@@ -1477,7 +1477,7 @@ def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
                 """
                 SELECT
                     COALESCE(SUM(lead_time), 0) AS lead_time,
-                    COALESCE(SUM(monenumber_of_characters), 0) AS money,
+                    COALESCE(SUM(money_dt_count), 0) AS money,
                     COALESCE(SUM(activity_count), 0) AS activity_count,
                     COALESCE(SUM(money_dt_count), 0) AS money_dt_count
                 FROM history_by_day
