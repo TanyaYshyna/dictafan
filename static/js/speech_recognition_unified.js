@@ -35,6 +35,10 @@
       this._finalizePromise = null;
       this._finalizeResolve = null;
       this._finalizeReject = null;
+
+      // Максимальная длительность записи аудио — 30 секунд
+      this._maxRecordingDurationMs = 30000;
+      this._recordingTimer = null;
     }
 
     _isAndroidChrome() {
@@ -72,6 +76,20 @@
         if (typeof this.callbacks.onRecordingStart === 'function') {
           this.callbacks.onRecordingStart();
         }
+
+        // Автоматическая остановка записи через 30 секунд
+        this._clearRecordingTimer();
+        const mySessionId = this._sessionId;
+        this._recordingTimer = setTimeout(() => {
+          try {
+            if (this.state.isRecording && mySessionId === this._sessionId) {
+              try { console.log('[UnifiedSpeechRecognition] Автостоп: запись длилась более 30с'); } catch (e) {}
+              this.stopRecording('max_duration');
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Ошибка в таймере автостопа:', e); } catch (e2) {}
+          }
+        }, this._maxRecordingDurationMs);
 
         // WebSpeech on Android Chrome is sensitive to the start timing.
         if (this.state.mode === 'online' || this.state.mode === 'route') {
@@ -120,6 +138,9 @@
 
     async stopRecording(cause) {
       try {
+        // Очищаем таймер автоматической остановки записи
+        this._clearRecordingTimer();
+
         const isOnline = this.state.mode === 'online' || this.state.mode === 'route';
         const isServer = this.state.mode === 'server';
         const isOffline = this.state.mode && this.state.mode.startsWith('route-off|');
@@ -426,6 +447,16 @@
       }
       try {
         console.error('UnifiedSpeechRecognition error:', err);
+      } catch (e) {
+      }
+    }
+
+    _clearRecordingTimer() {
+      try {
+        if (this._recordingTimer) {
+          clearTimeout(this._recordingTimer);
+          this._recordingTimer = null;
+        }
       } catch (e) {
       }
     }

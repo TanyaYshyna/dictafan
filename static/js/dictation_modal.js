@@ -443,8 +443,8 @@
     return Number(fallback);
   }
 
-  const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута
-  const INACTIVITY_TIMEOUT_RECORDING = 10 * 60 * 1000; // 10 минут
+  const INACTIVITY_TIMEOUT_DEFAULT = 60000; // 1 минута — таймер бездействия
+  const AUDIO_CHECK_TIMEOUT = 30000; // 30 секунд — таймер проверки аудио
 
   function getExerciseMode() {
     try {
@@ -1942,6 +1942,19 @@
     state._inactivityTimer = null;
   }
 
+  function clearAudioCheckTimer() {
+    try {
+      if (state._audioCheckTimer) clearTimeout(state._audioCheckTimer);
+    } catch (e) {
+    }
+    state._audioCheckTimer = null;
+  }
+
+  function clearAllRecordingTimers() {
+    clearInactivityTimer();
+    clearAudioCheckTimer();
+  }
+
   function resetInactivityTimer() {
     try {
       if (!state.dictationStarted) return;
@@ -1959,6 +1972,23 @@
         } catch (e) {
         }
       }, timeout);
+    } catch (e) {
+    }
+  }
+
+  function startAudioCheckTimer() {
+    try {
+      clearAudioCheckTimer();
+      state._audioCheckTimer = setTimeout(() => {
+        try {
+          // Таймер аудио сработал — проверяем аудио через панель распознавания
+          const panel = state._speechPanel;
+          if (panel && typeof panel.stopRecording === 'function') {
+            panel.stopRecording('audio_check');
+          }
+        } catch (e) {
+        }
+      }, AUDIO_CHECK_TIMEOUT);
     } catch (e) {
     }
   }
@@ -1988,7 +2018,7 @@
         }
       }
 
-      clearInactivityTimer();
+      clearAllRecordingTimers();
       stopAllAudios();
 
       try {
@@ -3337,8 +3367,17 @@
           } catch (e) {
             _recordingSentenceKey = null;
           }
+          // При старте записи запускаем оба таймера:
+          // - таймер аудио (30с) — проверяет аудио через 30 секунд
+          // - таймер бездействия (60с) — ставит паузу через 60 секунд бездействия
+          startAudioCheckTimer();
+          resetInactivityTimer();
         },
-        onRecognitionComplete: async ({ ok, percent }) => {
+        onRecognitionComplete: async ({ ok, percent, cause }) => {
+          // При завершении распознавания очищаем таймер аудио (он одноразовый)
+          // и сбрасываем таймер бездействия (пользователь получил результат — он активен)
+          clearAudioCheckTimer();
+          resetInactivityTimer();
           try {
             console.log('[DM:onRecognitionComplete] ВЫЗОВ: ok=' + ok + ' percent=' + percent + ' _recordingSentenceKey=' + _recordingSentenceKey);
             var _key = _recordingSentenceKey;
@@ -6284,7 +6323,7 @@
     }
 
     try {
-      clearInactivityTimer();
+      clearAllRecordingTimers();
     } catch (e0) {
     }
     try {
