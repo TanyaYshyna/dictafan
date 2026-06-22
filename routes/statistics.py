@@ -1825,7 +1825,7 @@ def api_planfact_report():
 @statistics_bp.route('/rating', methods=['POST'])
 @jwt_required()
 def api_rating_report():
-    """Рейтинг активности: агрегируем perfect/corrected/audio за период по всем пользователям."""
+    """Рейтинг активности: агрегируем данные из history_by_day за период по всем пользователям."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -1899,78 +1899,43 @@ def api_rating_report():
                 if lang:
                     cur.execute(
                         """
-                        WITH activity AS (
-                            SELECT
-                                ha.user_id,
-                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
-                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
-                                COALESCE(SUM(ha.audio_count), 0) AS audio
-                            FROM history_activity ha
-                            LEFT JOIN dictations d ON d.id = ha.dictation_id
-                            WHERE ha.date >= %s
-                              AND ha.date <= %s
-                              AND COALESCE(ha.dictation_language_code, d.language_code) = %s
-                            GROUP BY ha.user_id
-                        ),
-                        times AS (
-                            SELECT
-                                hs.user_id,
-                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
-                            FROM history_successes hs
-                            LEFT JOIN dictations d ON d.id = hs.dictation_id
-                            WHERE DATE(hs.created_at) >= %s
-                              AND DATE(hs.created_at) <= %s
-                              AND COALESCE(hs.dictation_language_code, d.language_code) = %s
-                            GROUP BY hs.user_id
-                        )
                         SELECT
-                            a.user_id,
+                            h.user_id,
                             u.username,
-                            a.perfect,
-                            a.corrected,
-                            a.audio,
-                            COALESCE(t.time_ms, 0) AS time_ms
-                        FROM activity a
-                        JOIN users u ON u.id = a.user_id
-                        LEFT JOIN times t ON t.user_id = a.user_id
+                            COALESCE(SUM(h.perfect_count), 0) AS perfect,
+                            COALESCE(SUM(h.corrected_count), 0) AS corrected,
+                            COALESCE(SUM(h.audio_count), 0) AS audio,
+                            COALESCE(SUM(h.lead_time), 0) AS lead_time,
+                            COALESCE(SUM(h.money_dt_count), 0) AS money_dt_count,
+                            COALESCE(SUM(h.monenumber_of_characters), 0) AS monenumber_of_characters
+                        FROM history_by_day h
+                        JOIN users u ON u.id = h.user_id
+                        WHERE h.date_fact >= %s
+                          AND h.date_fact <= %s
+                          AND h.dictation_language_code = %s
+                        GROUP BY h.user_id, u.username
                         """,
-                        (start_date, end_date, lang, start_date, end_date, lang),
+                        (start_date, end_date, lang),
                     )
                 else:
                     cur.execute(
                         """
-                        WITH activity AS (
-                            SELECT
-                                ha.user_id,
-                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
-                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
-                                COALESCE(SUM(ha.audio_count), 0) AS audio
-                            FROM history_activity ha
-                            WHERE ha.date >= %s
-                              AND ha.date <= %s
-                            GROUP BY ha.user_id
-                        ),
-                        times AS (
-                            SELECT
-                                hs.user_id,
-                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
-                            FROM history_successes hs
-                            WHERE DATE(hs.created_at) >= %s
-                              AND DATE(hs.created_at) <= %s
-                            GROUP BY hs.user_id
-                        )
                         SELECT
-                            a.user_id,
+                            h.user_id,
                             u.username,
-                            a.perfect,
-                            a.corrected,
-                            a.audio,
-                            COALESCE(t.time_ms, 0) AS time_ms
-                        FROM activity a
-                        JOIN users u ON u.id = a.user_id
-                        LEFT JOIN times t ON t.user_id = a.user_id
+                            COALESCE(SUM(h.perfect_count), 0) AS perfect,
+                            COALESCE(SUM(h.corrected_count), 0) AS corrected,
+                            COALESCE(SUM(h.audio_count), 0) AS audio,
+                            COALESCE(SUM(h.lead_time), 0) AS lead_time,
+                            COALESCE(SUM(h.money_dt_count), 0) AS money_dt_count,
+                            COALESCE(SUM(h.monenumber_of_characters), 0) AS monenumber_of_characters
+                        FROM history_by_day h
+                        JOIN users u ON u.id = h.user_id
+                        WHERE h.date_fact >= %s
+                          AND h.date_fact <= %s
+                        GROUP BY h.user_id, u.username
                         """,
-                        (start_date, end_date, start_date, end_date),
+                        (start_date, end_date),
                     )
 
                 rows = cur.fetchall() or []
@@ -1984,7 +1949,9 @@ def api_rating_report():
                                 'perfect': int(r.get('perfect') or 0),
                                 'corrected': int(r.get('corrected') or 0),
                                 'audio': int(r.get('audio') or 0),
-                                'time_ms': int(r.get('time_ms') or 0),
+                                'lead_time': int(r.get('lead_time') or 0),
+                                'money_dt_count': int(r.get('money_dt_count') or 0),
+                                'monenumber_of_characters': int(r.get('monenumber_of_characters') or 0),
                             }
                         )
                     else:
@@ -1996,7 +1963,9 @@ def api_rating_report():
                                 'perfect': int(r[2] or 0),
                                 'corrected': int(r[3] or 0),
                                 'audio': int(r[4] or 0),
-                                'time_ms': int(r[5] or 0),
+                                'lead_time': int(r[5] or 0),
+                                'money_dt_count': int(r[6] or 0),
+                                'monenumber_of_characters': int(r[7] or 0),
                             }
                         )
         finally:
@@ -2004,6 +1973,8 @@ def api_rating_report():
 
         total_users = len(out)
 
+        # Сортировка на сервере — по умолчанию по perfect, audio, corrected (как было)
+        # Фронтенд может пересортировать по своим правилам
         out.sort(
             key=lambda x: (
                 -int(x.get('perfect') or 0),

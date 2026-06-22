@@ -905,6 +905,12 @@ class RatingReport {
         this.customEndDate = null;
         this.selectedLanguage = 'all';
         this.topLimit = 10;
+
+        // Параметры для сравнения: порядок приоритета (индексы 0,1,2)
+        // и какие включены (чекбоксы)
+        this.priorityOrder = ['money', 'time', 'symbols'];
+        this.checkedParams = { money: true, time: false, symbols: false };
+        this._currentPriorityRow = 0;
     }
 
     getLanguageData() {
@@ -1027,6 +1033,180 @@ class RatingReport {
         this.customEndDate = String(endInput.value || '');
     }
 
+    // ====== Управление приоритетами ======
+
+    _getParamLabel(key) {
+        const labels = { time: 'Время', money: 'Деньги', symbols: 'Символы' };
+        return labels[key] || key;
+    }
+
+    _getParamIcon(key) {
+        const icons = { time: 'clock', money: 'coins', symbols: 'keyboard' };
+        return icons[key] || 'circle';
+    }
+
+    _movePriorityRow(direction) {
+        const idx = this._currentPriorityRow;
+        const newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= this.priorityOrder.length) return;
+
+        const arr = this.priorityOrder;
+        [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+        this._currentPriorityRow = newIdx;
+
+        this._renderPriorityHeader();
+        this.updateRating();
+    }
+
+    _toggleParam(paramKey) {
+        const checkedCount = Object.values(this.checkedParams).filter(Boolean).length;
+        if (this.checkedParams[paramKey] && checkedCount <= 1) {
+            return; // нельзя выключить последний
+        }
+        this.checkedParams[paramKey] = !this.checkedParams[paramKey];
+        this._renderPriorityHeader();
+        this.updateRating();
+    }
+
+    // ====== Рендер шапки с приоритетами ======
+
+    _renderPriorityHeader() {
+        const container = document.getElementById('ratingPriorityHeader');
+        if (!container) return;
+
+        const order = this.priorityOrder;
+        const currentIdx = this._currentPriorityRow;
+
+        let rowsHtml = order.map((key, idx) => {
+            const checked = this.checkedParams[key] ? 'checked' : '';
+            const isActive = idx === currentIdx;
+            const activeClass = isActive ? 'rating-priority-row--active' : '';
+            const icon = this._getParamIcon(key);
+            const label = this._getParamLabel(key);
+            return `
+                <div class="rating-priority-row ${activeClass}" data-index="${idx}">
+                    <input type="checkbox" ${checked} data-param="${key}" class="rating-priority-checkbox">
+                    <i data-lucide="${icon}" style="width: 16px; height: 16px; flex-shrink: 0;"></i>
+                    <span class="rating-priority-label">${label}</span>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = `
+            <div class="rating-priority-header-inner">
+                <div class="rating-priority-rows">
+                    ${rowsHtml}
+                </div>
+                <div class="rating-priority-arrows">
+                    <button class="rating-priority-arrow" id="priorityArrowUp" title="Переместить вверх">
+                        <i data-lucide="chevron-up" style="width: 18px; height: 18px;"></i>
+                    </button>
+                    <button class="rating-priority-arrow" id="priorityArrowDown" title="Переместить вниз">
+                        <i data-lucide="chevron-down" style="width: 18px; height: 18px;"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const checkboxes = container.querySelectorAll('.rating-priority-checkbox');
+        checkboxes.forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                const param = e.target.dataset.param;
+                this._toggleParam(param);
+            });
+        });
+
+        const rows = container.querySelectorAll('.rating-priority-row');
+        rows.forEach(row => {
+            row.addEventListener('click', (e) => {
+                if (e.target.type === 'checkbox') return;
+                const idx = parseInt(row.dataset.index, 10);
+                if (!isNaN(idx)) {
+                    this._currentPriorityRow = idx;
+                    this._renderPriorityHeader();
+                }
+            });
+        });
+
+        const arrowUp = document.getElementById('priorityArrowUp');
+        const arrowDown = document.getElementById('priorityArrowDown');
+        if (arrowUp) arrowUp.addEventListener('click', () => this._movePriorityRow(-1));
+        if (arrowDown) arrowDown.addEventListener('click', () => this._movePriorityRow(1));
+
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+
+    // ====== Сортировка рейтинга ======
+
+    _sortRating(rating) {
+        const order = this.priorityOrder;
+        const checked = this.checkedParams;
+
+        const activeParams = order.filter(key => checked[key]);
+
+        if (activeParams.length === 0) {
+            return [...rating].sort((a, b) => {
+                const aVal = Number(a.money_dt_count || 0);
+                const bVal = Number(b.money_dt_count || 0);
+                if (bVal !== aVal) return bVal - aVal;
+                return (Number(a.user_id) || 0) - (Number(b.user_id) || 0);
+            });
+        }
+
+        return [...rating].sort((a, b) => {
+            for (const key of activeParams) {
+                let aVal, bVal;
+                switch (key) {
+                    case 'time':
+                        aVal = Number(a.lead_time || 0);
+                        bVal = Number(b.lead_time || 0);
+                        break;
+                    case 'money':
+                        aVal = Number(a.money_dt_count || 0);
+                        bVal = Number(b.money_dt_count || 0);
+                        break;
+                    case 'symbols':
+                        aVal = Number(a.monenumber_of_characters || 0);
+                        bVal = Number(b.monenumber_of_characters || 0);
+                        break;
+                    default:
+                        aVal = 0;
+                        bVal = 0;
+                }
+                if (bVal !== aVal) return bVal - aVal;
+            }
+            return (Number(a.user_id) || 0) - (Number(b.user_id) || 0);
+        });
+    }
+
+    // ====== Форматирование ======
+
+    formatDurationHhMmSs(ms) {
+        try {
+            const sec = Math.max(0, Math.floor((Number(ms) || 0) / 1000));
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        } catch (e) {
+            return '00:00:00';
+        }
+    }
+
+    formatMoney(value) {
+        const v = Number(value || 0);
+        return v.toLocaleString('ru-RU');
+    }
+
+    formatSymbols(value) {
+        const v = Number(value || 0);
+        return v.toLocaleString('ru-RU');
+    }
+
+    // ====== Создание модального окна ======
+
     createModal() {
         let modal = document.getElementById('rating-modal');
         if (modal) {
@@ -1091,6 +1271,9 @@ class RatingReport {
                             <input type="date" id="ratingEndDate" class="date-input" style="width: 112px; padding-right: 18px;">
                         </div>
                     </div>
+
+                    <!-- Блок приоритетов: чекбоксы и стрелки -->
+                    <div id="ratingPriorityHeader" class="rating-priority-header" style="margin-top: 8px;"></div>
                 </div>
 
                 <div class="statistics-chart" id="ratingList" style="overflow-y:auto;">
@@ -1189,6 +1372,9 @@ class RatingReport {
         }
 
         this.applyPeriodToDateInputs();
+
+        // Рендерим шапку с приоритетами
+        this._renderPriorityHeader();
 
         try {
             const topLimitInput = document.getElementById('ratingTopLimit');
@@ -1297,13 +1483,20 @@ class RatingReport {
             rating = [];
         }
 
+        // Фильтр: оставляем тех, у кого есть хоть какие-то данные по новым полям
         try {
             rating = (Array.isArray(rating) ? rating : []).filter(r => {
-                const p = Number(r?.perfect || 0);
-                const a = Number(r?.audio || 0);
-                const c = Number(r?.corrected || 0);
-                return (p + a + c) > 0;
+                const lt = Number(r?.lead_time || 0);
+                const mn = Number(r?.money_dt_count || 0);
+                const ch = Number(r?.monenumber_of_characters || 0);
+                return (lt + mn + ch) > 0;
             });
+        } catch (e) {
+        }
+
+        // Сортировка по выбранным параметрам в порядке приоритета
+        try {
+            rating = this._sortRating(rating);
         } catch (e) {
         }
 
@@ -1354,6 +1547,9 @@ class RatingReport {
                     : top
             );
 
+        // Определяем порядок отображения колонок на основе checkedParams и priorityOrder
+        const paramKeys = this.priorityOrder.filter(k => this.checkedParams[k]);
+
         const rows = listToRender.map((r, idx) => {
             if (r && r.__ellipsis) {
                 return `
@@ -1366,10 +1562,9 @@ class RatingReport {
 
             const uid = Number(r && r.user_id);
             const name = String(r && r.username ? r.username : '');
-            const perfect = Number(r && r.perfect) || 0;
-            const corrected = Number(r && r.corrected) || 0;
-            const audio = Number(r && r.audio) || 0;
-            const timeMs = Number(r && r.time_ms) || 0;
+            const leadTime = Number(r && r.lead_time) || 0;
+            const money = Number(r && r.money_dt_count) || 0;
+            const symbols = Number(r && r.monenumber_of_characters) || 0;
             const avatar = this.avatarUrlForUser(uid);
 
             const forcedRank = r && r.__forcedRank ? Number(r.__forcedRank) : null;
@@ -1380,6 +1575,30 @@ class RatingReport {
                 : 'padding: 10px 12px;';
             const nameStyle = isSelf ? 'font-weight: 800;' : 'font-weight: 600;';
 
+            // Строим колонки параметров
+            const paramCols = paramKeys.map(k => {
+                let icon, value, color;
+                if (k === 'time') {
+                    icon = 'clock';
+                    value = this.formatDurationHhMmSs(leadTime);
+                    color = 'var(--color-button-mint, #aae7e4)';
+                } else if (k === 'money') {
+                    icon = 'coins';
+                    value = this.formatMoney(money);
+                    color = 'var(--color-button-text-yellow, rgb(255, 198, 9))';
+                } else if (k === 'symbols') {
+                    icon = 'keyboard';
+                    value = this.formatSymbols(symbols);
+                    color = 'var(--color-panel-text-purple, rgb(152, 154, 224))';
+                }
+                return `
+                    <div style="display:flex; align-items:center; gap: 6px; color: ${color};">
+                        <i data-lucide="${icon}" style="width: 18px; height: 18px;"></i>
+                        <span style="font-size: 16px; font-weight: 700; white-space: nowrap;">${value}</span>
+                    </div>
+                `;
+            }).join('');
+
             return `
                 <div class="chart-row" style="align-items:center; gap: 12px; ${rowStyle}">
                     <div style="min-width: 30px; text-align:right; font-weight: 600; color: rgba(31,41,51,0.75);">${rank}</div>
@@ -1387,22 +1606,7 @@ class RatingReport {
                     <div style="flex: 1 1 auto; min-width: 0; display:flex; align-items:center; gap: 12px;">
                         <div style="font-size: 15px; ${nameStyle} overflow:hidden; text-overflow: ellipsis; white-space: nowrap;">${this.escapeHtml(name)}</div>
                         <div style="margin-left: auto; display:flex; align-items:center; gap: 12px; flex: 0 0 auto;">
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-mint, #aae7e4);">
-                                <i data-lucide="star" style="width: 18px; height: 18px;"></i>
-                                <span style="font-size: 16px; font-weight: 700;">${perfect}</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-button-lightgreen, #bbf1ca);">
-                                <i data-lucide="star-half" style="width: 18px; height: 18px;"></i>
-                                <span style="font-size: 16px; font-weight: 700;">${corrected}</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: var(--color-panel-text-purple, rgb(152, 154, 224));">
-                                <i data-lucide="mic" style="width: 18px; height: 18px;"></i>
-                                <span style="font-size: 16px; font-weight: 700;">${audio}</span>
-                            </div>
-                            <div style="display:flex; align-items:center; gap: 6px; color: rgba(31,41,51,0.75);">
-                                <i data-lucide="clock" style="width: 18px; height: 18px;"></i>
-                                <span style="font-size: 14px; font-weight: 700;">${this.formatDurationHhMmSs(timeMs)}</span>
-                            </div>
+                            ${paramCols}
                         </div>
                     </div>
                 </div>

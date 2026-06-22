@@ -461,6 +461,20 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-menu-ratings') {
+        (async () => {
+          try {
+            if (typeof RatingReport === 'undefined') {
+              console.warn('[desktop] RatingReport not available');
+              return;
+            }
+            await RatingReport.open();
+          } catch (e) {
+            console.error('[desktop] rating error', e);
+          }
+        })();
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }
