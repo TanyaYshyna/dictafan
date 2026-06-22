@@ -1957,17 +1957,26 @@
 
   function resetInactivityTimer() {
     try {
-      if (!state.dictationStarted) return;
+      if (!state.dictationStarted) {
+        try { console.log('[DM:resetInactivityTimer] dictationStarted=false, return'); } catch (e) {}
+        return;
+      }
       const snap = getProgressTimerSnapshot();
       if (!snap || !snap.isRunning) {
+        try { console.log('[DM:resetInactivityTimer] timer not running, clear'); } catch (e) {}
         clearInactivityTimer();
         return;
       }
       clearInactivityTimer();
-      if (isPauseModalOpen() || isStartModalOpen()) return;
+      if (isPauseModalOpen() || isStartModalOpen()) {
+        try { console.log('[DM:resetInactivityTimer] pause/start modal open, return'); } catch (e) {}
+        return;
+      }
       const timeout = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+      try { console.log('[DM:resetInactivityTimer] запущен на ' + timeout + 'мс'); } catch (e) {}
       state._inactivityTimer = setTimeout(() => {
         try {
+          try { console.log('[DM:resetInactivityTimer] СРАБОТАЛ, вызываем pauseGame(true)'); } catch (e) {}
           pauseGame(true);
         } catch (e) {
         }
@@ -1979,8 +1988,10 @@
   function startAudioCheckTimer() {
     try {
       clearAudioCheckTimer();
+      try { console.log('[DM:startAudioCheckTimer] запущен на ' + AUDIO_CHECK_TIMEOUT + 'мс'); } catch (e) {}
       state._audioCheckTimer = setTimeout(() => {
         try {
+          try { console.log('[DM:startAudioCheckTimer] СРАБОТАЛ, panel=' + (!!state._speechPanel)); } catch (e) {}
           // Таймер аудио сработал — проверяем аудио через панель распознавания
           const panel = state._speechPanel;
           if (panel && typeof panel.stopRecording === 'function') {
@@ -3370,14 +3381,18 @@
           // При старте записи запускаем оба таймера:
           // - таймер аудио (30с) — проверяет аудио через 30 секунд
           // - таймер бездействия (60с) — ставит паузу через 60 секунд бездействия
+          try { console.log('[DM:onRecordingStart] dictationStarted=' + state.dictationStarted + ' isRunning=' + (getProgressTimerSnapshot() ? getProgressTimerSnapshot().isRunning : '?')); } catch (e) {}
           startAudioCheckTimer();
           resetInactivityTimer();
         },
         onRecognitionComplete: async ({ ok, percent, cause }) => {
-          // При завершении распознавания очищаем таймер аудио (он одноразовый)
-          // и сбрасываем таймер бездействия (пользователь получил результат — он активен)
+          // При завершении распознавания очищаем таймер аудио (он одноразовый).
+          // Таймер бездействия НЕ сбрасываем — он был запущен при старте записи
+          // и должен сработать через 60с после старта (если пользователь не активен).
+          // Сброс таймера бездействия происходит только от действий пользователя
+          // через bindInactivityWatchers (keydown, mousemove и т.д.).
+          try { console.log('[DM:onRecognitionComplete] cause=' + cause + ' ok=' + ok + ' percent=' + percent + ' hasInactivityTimer=' + (state._inactivityTimer ? 'yes' : 'no')); } catch (e) {}
           clearAudioCheckTimer();
-          resetInactivityTimer();
           try {
             console.log('[DM:onRecognitionComplete] ВЫЗОВ: ok=' + ok + ' percent=' + percent + ' _recordingSentenceKey=' + _recordingSentenceKey);
             var _key = _recordingSentenceKey;
