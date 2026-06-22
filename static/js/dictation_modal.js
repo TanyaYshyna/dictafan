@@ -5382,7 +5382,6 @@
       if (!m) return;
       // Перерендериваем device-режимы при каждом открытии (модели могли измениться)
       _renderDeviceModes();
-      applySpeechRecModeToUI();
       m.style.display = 'flex';
       renderLucide(m);
     } catch (e) {
