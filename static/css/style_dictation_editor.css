@@ -164,6 +164,34 @@
     margin-left: 4px;
 }
 
+/* Exercises tab: force-hide all non-essential columns in the sentences table */
+#sentences-table.state-exercises thead th,
+#sentences-table.state-exercises tbody td {
+  display: none !important;
+}
+
+#sentences-table.state-exercises thead th.col-number,
+#sentences-table.state-exercises thead th.col-checkbox-create-audio,
+#sentences-table.state-exercises thead th.col-original,
+#sentences-table.state-exercises tbody td.col-number,
+#sentences-table.state-exercises tbody td.col-checkbox-create-audio,
+#sentences-table.state-exercises tbody td.col-original {
+  display: table-cell !important;
+}
+
+#exercises-table tbody tr.exercise-row {
+    cursor: pointer;
+}
+
+#exercises-table tbody tr.exercise-row.selected {
+    background: rgba(255, 105, 180, 0.12);
+}
+
+#exercises-table tbody tr.exercise-row.selected td {
+    border-top-color: rgba(255, 105, 180, 0.25);
+    border-bottom-color: rgba(255, 105, 180, 0.25);
+}
+
 /* ------------- Стили для шапки редактора с двумя панелями ------------- */
 .editor-header {
     display: flex;

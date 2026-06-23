@@ -2,6 +2,108 @@
 description: Dictation Editor Architecture (dataflow, caching, audio)
 ---
 
+# Послание для будущих поддерживающих (в т.ч. для ИИ)
+
+Этот проект нужно развивать так, чтобы код оставался обслуживаемым и предсказуемым. Любые решения, которые делают систему «быстрее прямо сейчас», но «дороже в сопровождении потом», считаются ошибкой.
+
+## Объекты на удаление (план)
+
+- `templates/private_library.html`
+- `static/js/private_library.js`
+- `static/css/style_private_library.css`
+- `static/css/style_dictation.css`
+- ~~`routes/user_routes.py` → `GET /user/profile` (страница профиля; заменить на модалку на `/desktop`)~~ **ГОТОВО**: роут перенаправляет на `index.index`
+- ~~`templates/user_profile_jwt.html`~~ **УДАЛЁН**
+- ~~`static/css/style_user_profile.css`~~ **УДАЛЁН** (стили перенесены в `user_profile_modal.css`)
+- ~~`static/js/script_user_profile.js`~~ **УДАЛЁН** (код перенесён в `user_profile_modal.js`)
+- `assignments`
+- `assignments_by_date`
+- ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. `calculate_streak_days()` переписан на `history_by_day.activity_count` (вместо `perfect_count + corrected_count + audio_count`). После миграции всех данных — удалить таблицу.
+- ~~`history_successes`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем записи. Все завершения диктантов учитываются через `history_by_day.successes` — сумма по полю `successes` с фильтром по `dictation_id` и `positions`. После миграции всех данных — удалить таблицу.
+
+## Структура таблиц истории (актуальная на 2026-06-23)
+
+### `history_activity` — агрегированная активность по дням (готовится к удалению)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| dictation_id | integer | YES | — | ID диктанта |
+| date | date | YES | — | Дата активности |
+| perfect_count | integer | YES | 0 | Количество perfect |
+| corrected_count | integer | YES | 0 | Количество corrected |
+| audio_count | integer | YES | 0 | Количество audio |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| selected_sentence_positions | integer[] | YES | '{}' | Выбранные предложения |
+| lead_time | bigint | YES | 0 | Время в мс |
+
+Уникальный ключ: `(user_id, dictation_id, date, selected_sentence_positions)`
+
+### `history_successes` — завершённые диктанты (готовится к удалению)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| dictation_id | integer | YES | — | ID диктанта |
+| perfect_count | integer | YES | — | Число perfect |
+| corrected_count | integer | YES | — | Число corrected |
+| audio_count | integer | YES | — | Число audio |
+| time_ms | bigint | YES | — | Время в мс |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| attempts_total | integer | YES | 0 | Всего попыток |
+| error_count | integer | YES | 0 | Число ошибок |
+| source_group_id | integer | NO | — | ID группы (если из группы) |
+| selected_sentence_positions | integer[] | NO | — | Выбранные предложения |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| started_at | timestamp | NO | — | Время старта диктанта |
+
+### `history_by_day` — дневная история (целевая таблица)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| teacher_id | integer | YES | — | ID учителя |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| date_plan | date | YES | — | Плановая дата |
+| date_fact | date | YES | — | Фактическая дата |
+| perfect_count | integer | YES | 0 | Количество perfect |
+| corrected_count | integer | YES | 0 | Количество corrected |
+| audio_count | integer | YES | 0 | Количество audio |
+| lead_time | bigint | YES | 0 | Время в мс |
+| successes | integer | YES | 0 | Число завершений диктанта |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| dictation_id | integer | YES | — | ID диктанта |
+| positions | integer[] | YES | '{}' | Выбранные предложения |
+| monenumber_of_characters | integer | YES | 0 | Символов (денег) |
+| mistake_count | integer | YES | 0 | Число ошибок |
+| date_start | date | YES | — | Дата начала |
+| activity_count | integer | YES | 0 | Число активностей |
+| money_dt_count | integer | YES | 0 | Заработано монет |
+
+Уникальный ключ: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`
+## Принципы разделения ответственности
+
+- **HTML = структура**
+  - HTML отвечает за семантику и каркас страницы/компонента.
+  - В HTML должно быть **минимум форматирования** (inline `style` — только в исключительных случаях).
+  - В HTML должно быть **минимум данных**: не хранить большие JSON-структуры в `data-*`, не дублировать state в атрибутах.
+
+- **CSS = оформление**
+  - Всё визуальное (отступы, размеры, цвета, состояния, адаптив) должно жить в CSS.
+  - Инлайновые стили допускаются только как редкий, осознанный компромисс.
+
+- **JS = поведение и состояние**
+  - JS отвечает за логику, события, запросы, состояние и обновление UI.
+  - JS state хранится в JS (переменные/модули/`WeakMap` и т.п.), а не в HTML-атрибутах.
+  - Не раздувать файлы: если модуль становится слишком большим или начинает отвечать за разные задачи — **нужно заранее предупредить** и предложить вынести в отдельную группу файлов (например `*_modal.html/js/css`).
+
 # Цель документа
 
 Зафиксировать **строгую архитектуру** страниц "Редактора диктантов" и "Диктант" , чтобы любые дальнейшие изменения делались без «вольного творчества».
@@ -102,12 +204,105 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - Глобальное состояние страницы (например `workingData`, `currentDictation`) допускается только в page-коде `script_dictation_editor.js`.
 - Все остальные классы/модули должны получать данные через параметры/явные интерфейсы и **не должны** читать/писать `window.*`.
  
-### `static/js/script_dictation.js`
+
+
+
+
+### `static/js/dictation_modal.js`
 
 Роль:
 
-- UI страницы выполнения диктанта: отображение предложений, управление прогрессом, проигрывание аудио.
-- Микрофон/распознавание речи остаются в page-коде и используются только для распознавания (не для хранения/проигрывания записи пользователя).
+- Открывает диктант как модальное окно `#dictationModal`.
+- Загружает зависимости рантайма диктанта (`dictation_runtime/*`, `AudioManager`, `ProgressPanel`, распознавание речи).
+- Грузит контент диктанта (предложения) в IndexedDB (через существующий слой кэша) и затем в runtime store.
+- Управляет стартовой модалкой выбора предложений (`#start-modal`), модалкой паузы (`#pauseModal`), модалкой покупок (`#coinExchangeModal`), модалкой завершения (`#completionModal`).
+- Управляет модалкой настроек аудио (`#audioSettingsModal`), включая выбор режима распознавания речи (см. раздел «Распознавание речи: выбор режима»).
+
+Важно:
+
+- Текущий основной UI диктанта на `/desktop` — это `static/js/dictation_modal.js` + runtime слой `static/js/dictation_runtime/*`.
+- Режим распознавания речи (`speech_recognition_mode`) хранится в **localStorage** (ключ `dictafan_speech_rec_mode`), а не на сервере. Управление — через `initAudioSettingsModal()`.
+
+Ключевая идея данных:
+
+- **Контент диктанта** отделён от **прогресса/задания**.
+
+### `static/js/dictation_runtime/dictation_store.js`
+
+Роль:
+
+- `DictationContent` — «контент диктанта» (тексты, переводы, ссылки на аудио, `position`).
+- `DictationSession` — «сессия выполнения/задание»:
+  - хранит прогресс/состояние по каждому предложению
+  - хранит выбор предложений (`checked/unchecked/completed`)
+  - может быть ограничена поднабором:
+    - `subsetPositions` (позиции предложений)
+    - `activeKeys`/`selectedKeys` (конкретные ключи предложений)
+
+Это соответствует модели:
+
+- «Класс диктанта» = `DictationContent` (данные)
+- «Класс задания» = `DictationSession` (поднабор + прогресс)
+
+### Система оценивания и активностей (звезда/полузвезда/текст/аудио)
+
+Определения (на уровне одного предложения):
+
+- **Звезда (Star / perfect)**
+  - ставится, когда предложение выполнено идеально по тексту (`number_of_perfect >= 1`).
+- **Полузвезда (Half-star / corrected)**
+  - ставится, когда предложение выполнено «с подсказкой/исправлением» (`number_of_corrected > 0`), либо куплено.
+- **Активность текста (Text activity)**
+  - начисление монеты за факт доведения текста до корректного результата (в UI это «монеты текста»).
+- **Активность аудио (Audio activity)**
+  - начисление монеты за успешную попытку аудио (логика процента совпадения, в UI это «монеты аудио»).
+
+Важно:
+
+- Эти параметры живут в состоянии `DictationSession` по ключу предложения:
+  - `number_of_perfect`, `number_of_corrected`, `number_of_audio`
+  - `text_activity_count`, `audio_activity50_count`, `money_count`
+
+### Прайс/стоимости и покупки
+
+Единая точка правды прайса:
+
+- `window.DictafanPricing.values` (инициализируется на десктоп-странице в `static/js/dictation_modal.js`).
+- `dictation_modal.js` читает цены через `getPricingValue(key, fallback)`.
+
+Ключи прайса (англ):
+
+- `star_reward`
+- `half_star_reward`
+- `text_activity_reward`
+- `audio_activity_reward`
+- `half_star_purchase_cost`
+- `audio_purchase_cost`
+
+Меню прайса (как показываем в UI по умолчанию на `/desktop`, `static/js/private_library.js`):
+
+- **Earn**
+  - `Star reward` (`star_reward`) = `3`
+  - `Half-star reward` (`half_star_reward`) = `2`
+  - `Text activity reward` (`text_activity_reward`) = `1`
+  - `Audio activity reward (>=80%)` (`audio_activity_reward`) = `1`
+- **Spend**
+  - `Buy half-star (cost)` (`half_star_purchase_cost`) = `3`
+  - `Buy audio (mic) (cost)` (`audio_purchase_cost`) = `3`
+
+Покупки:
+
+- Покупка «полузвезды» и «аудио (микрофон)» выполняется через `#coinExchangeModal` и списание через API `POST /api/statistics/money/spend`.
+- При покупке мы **платим монеты** и выставляем состояние предложения (полузвезда/аудио выполнено), но **не получаем деньги**.
+
+### Учёт заданий (упражнений)
+
+На десктопе задание = «упражнение» с поднабором предложений:
+
+- В UI карточки диктанта есть кнопка запуска упражнения (меню заданий/диапазонов).
+- При запуске упражнения в `DictationModal.open(href, { subsetPositions })` передаётся `subsetPositions`.
+- `DictationModal` создаёт `DictationSession` с этим `subsetPositions` и активирует только нужные предложения.
+- В заголовке модалки диктанта показывается подпись диапазона: `Название (1-10)`.
 
 Важно:
 
@@ -147,6 +342,33 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
   - сохранять контент диктанта/предложения в `IndexedDB`
 - Добавление на рабочий стол должно работать **только с серверной БД** (быстрый запрос add/remove + sync списка).
 - Любые операции «скачать/обновить оффлайн-кеш» должны быть вынесены в отдельное явное действие (например кнопка «обновить кеш») и выполняться на странице диктанта/редактора либо в отдельном контролируемом флоу.
+
+### Модальные окна на новом рабочем столе (`/desktop`)
+
+Слои (z-index) — по возрастанию:
+
+Принцип:
+
+- Слои (иерархия `z-index`) должны быть собраны рядом и централизованы в `static/css/desktop.css`, чтобы в одном месте было видно «кто над кем» на странице `/desktop`.
+- Визуальные стили конкретных модалок (размеры, отступы, цвета, overflow/scroll и т.п.) должны оставаться в их профильных файлах (например `static/css/book_modal.css`).
+
+- `10000` — `#login-modal` (логин/регистрация)
+- `10080` — `#user-profile-modal` (профиль пользователя, группа `user_profile_modal.*`)
+- `10100` — `#user-profile-modal #groupModal`, `#user-profile-modal #groupRestoreModal`, `#user-profile-modal #groupEmailInviteModal` (внутренние модалки групп внутри профиля)
+- `10150` — `#activity-tracker-modal` (Трекер активности / отчёты)
+- `100200` — `#create-assignment-modal` (Задания → упражнения, группа `tasks_modal.*`)
+- `100200` — `#plan-tasks-modal` (План, группа `plan_tasks_modal.*`)
+- `100200` — `.desktop-right-menu` (палитра инструментов)
+- `100220` — `#book-view-modal` (просмотр книги справа, группа `book_modal.*`)
+- `100240` — `#book-edit-modal` (редактирование книги, группа `book_modal.*`)
+- `100246` — `#section-edit-modal` (создание/редактирование раздела, группа `book_modal.*`)
+- `100248` — `#move-dictation-modal` (перемещение диктанта, группа `book_modal.*`)
+- `100249` — `#dictationModal` (диктант как модальное окно, группа `dictation_modal.*`)
+- `100255` — `#dictationModal .modal` (внутренние модалки диктанта: `#start-modal`, `#pauseModal`, `#audioSettingsModal`, ...)
+- `100250` — `#desktopConfirmModal` (общее «закрыть/сохранить» для desktop-модалок на `/desktop`)
+- `100260` — `#exitModal` (универсальная модалка выхода/закрытия; должна быть выше всех)
+- `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
+- `200500` — `#auto-toast` (всплывающие уведомления)
 
 ## Service Worker
 
@@ -452,6 +674,10 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
   - создание группы (учитель)
 - `GET /groups/api/group/<group_id>` / `PUT /groups/api/group/<group_id>`
   - детали/обновление группы (учитель)
+- `DELETE /groups/api/group/<group_id>`
+  - полное удаление группы и всех связанных данных (CASCADE)
+  - защита: нельзя удалить личную группу (`is_personal = TRUE`)
+  - только для учителя-владельца группы
 
 Инвайты:
 
@@ -534,7 +760,7 @@ Email-инвайты:
   - ученик состоит в группе, статус `active`
   - `group_students.notify_teacher_on_success = TRUE`
   - у группы есть активный teacher
-  - у учителя есть `telegram_chat_id` и `telegram_enabled = TRUE`
+  - у учителя есть `telegram_chat_id`
   - существует активное assignment для этого `dictation_id` и дня
 
 Ручная отправка отчёта учителю (когда прохождение было вне плана):
@@ -549,14 +775,14 @@ Email-инвайты:
 
 - ученик должен состоять в группе (`group_students.status='active'`, `removed_at IS NULL`)
 - требуется согласие ученика на уведомления: `COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE`
-- у учителя должен быть Telegram: `telegram_chat_id IS NOT NULL` и `telegram_enabled = TRUE`
+- у учителя должен быть Telegram: `telegram_chat_id IS NOT NULL`
 - учитель фильтруется по языку диктанта (язык оригинала):
   - `users.current_learning == dictation.language_code` или
   - `user_learning_languages.language_code == dictation.language_code`
 
 2) Self-report ученику (если включено):
 
-- если у пользователя есть `telegram_chat_id` и включены флаги `telegram_enabled` и `telegram_self_reports_enabled`.
+- если у пользователя есть `telegram_chat_id` и включён флаг `telegram_self_reports_enabled`.
 
 В тексте self-report дополнительно выводится:
 
@@ -597,6 +823,31 @@ Email-инвайты:
 - `created_at`, `updated_at`
 
 Примечание: таблица `group_teachers` (Учитель ↔ Группа) считается устаревшей для текущей модели (один учитель на группу) и подлежит удалению после миграции данных в `groups.teacher_id`.
+
+#### Две стратегии удаления группы
+
+У пользователя есть две причины удалить группу, и для каждой — своя стратегия:
+
+1. **Архивация** (soft-delete) — учебный год закончился, дети ушли.
+   - Группа помечается `archived_at = NOW()` и скрывается из активного списка.
+   - Все данные (ученики, задания, история) **сохраняются**.
+   - Группу можно восстановить (снять `archived_at`).
+   - Отчёты по группе остаются доступны.
+   - Кнопка в UI: `sticky-notes` (Lucide) — «Архив».
+   - В строке архивной группы: `sticky-note-off` — восстановить.
+
+2. **Полное удаление** (hard-delete) — учитель ошибочно создал группу.
+   - Группа и все связанные записи удаляются из БД (CASCADE).
+   - `DELETE FROM groups WHERE id = ... AND teacher_id = ...`
+   - Восстановление невозможно (только из бэкапа).
+   - Защита: нельзя удалить личную группу (`is_personal = TRUE`).
+   - Перед удалением — модальное окно подтверждения (стилизованное, не `confirm()` браузера).
+   - Кнопка в UI: `trash-2` (Lucide) — «Удалить навсегда» — только в тулбаре (над таблицей), не в строке группы.
+   - В строке архивной группы — только кнопка восстановления `sticky-note-off`.
+
+Backend: `DELETE /groups/api/group/<group_id>` → [`helpers/db_groups.py`](helpers/db_groups.py) → `delete_group()`.
+Frontend: [`static/js/user_profile_modal.js`](static/js/user_profile_modal.js) → `deleteSelectedGroup()` → открывает `#groupDeleteConfirmModal` → `confirmDeleteGroupFromModal()`.
+HTML: [`templates/partials/user_profile_modal.html`](templates/partials/user_profile_modal.html) → `#groupDeleteConfirmModal`.
 
 ### 2) `group_students` (Группа ↔ Ученик)
 
@@ -645,25 +896,256 @@ Many-to-many: ученик может быть в нескольких груп�
 
 Назначение: дневная статистика активности и выполнения планов.
 
-- `id`
-- `user_id`
+**Поля таблицы:**
+
+- `id` — SERIAL PRIMARY KEY
+- `user_id` — FK → users(id)
 - `teacher_id` — кто назначил план:
   - если назначил учитель: `teacher_id = groups.teacher_id`
   - если пользователь назначил сам себе: `teacher_id = user_id`
-- `dictation_language_code`
-- `exercise_id`
+- `dictation_language_code` — код языка диктанта
+- `dictation_id` — FK → dictations(id)
+- `positions` — `INTEGER[]` — выбранные позиции предложений (пустой массив = весь диктант)
 - `date_plan` — дата задания/плана, или дата старта (если прохождение без плана)
 - `date_fact` — дата фактической активности/завершения (в таймзоне пользователя)
-- `perfect_count`
-- `corrected_count`
-- `audio_count`
-- `lead_time`
-- `successes` — число успешных завершений за день (все звёзды + все микрофоны)
+- `date_start` — дата старта диктанта (для расчёта длительности)
+- `perfect_count` — количество звёзд (perfect) за день
+- `corrected_count` — количество полузвёзд (corrected) за день
+- `audio_count` — количество микрофонов (audio) за день
+- `lead_time` — суммарное время выполнения в ms
+- `mistake_count` — количество ошибок за день
+- `monenumber_of_characters` — количество набранных символов за день
+- `simbols` — (устаревшее, дубль `monenumber_of_characters`)
+- `successes` — количество полных завершений диктанта за день
+- `activity_count` — количество действий (perfect + corrected + audio) за день
+- `money_dt_count` — сколько монет заработано (dt) за день
+- `money_kt_count` — сколько монет потрачено (kt) за день
 - `created_at`, `updated_at` (UTC)
 
-Уникальность строки истории: `user_id`, `teacher_id`, `exercise_id`, `date_plan`, `date_fact`.
+Уникальность строки истории: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`.
 
 Правило: если пользователь в один `date_fact` закрывает упражнение за разные `date_plan` (например, «за вчера» и «за сегодня»), это две отдельные строки истории.
+
+**Как данные попадают в `history_by_day` (цепочка):**
+
+Данные попадают в таблицу через два серверных endpoint'а, которые вызываются клиентом:
+
+### Endpoint A: `POST /api/statistics/activity` (активность)
+
+Назначение: сохранить факт получения звезды/полузвезды/микрофона + сопутствующие данные (ошибки, символы, деньги).
+
+**Клиент → Сервер:**
+- Клиент вызывает `OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, dictationId, date, dictationLanguageCode, selectedSentencePositions, mistakeCount, numberOfCharacters, moneyCount })`
+- `OutboxBatcher` накапливает данные в IndexedDB (единая таблица `outbox`, ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`) и отправляет батчем по таймеру `BATCH_INTERVAL_MS`
+- `fetch POST /api/statistics/activity` с payload:
+  ```json
+  {
+    "dictation_id": 123,
+    "date": "20260614",
+    "perfect_count": 1,
+    "corrected_count": 0,
+    "audio_count": 0,
+    "money_count": 3,
+    "mistake_count": 2,
+    "monenumber_of_characters": 58,
+    "lead_time_ms": 45000,
+    "dictation_language_code": "en",
+    "selected_sentence_positions": null
+  }
+  ```
+
+**Сервер (`routes/statistics.py`):**
+- `POST /api/statistics/activity` → функция `save_activity()`
+- Вызывает `add_activity_bulk()` из `helpers/db_history.py`
+- `add_activity_bulk()`:
+  1. Пишет/обновляет запись в `history_activity` (только `perfect_count`, `corrected_count`, `audio_count`, `lead_time` — старые поля)
+  2. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
+  3. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми счётчиками, включая `activity_count_delta`, `money_dt_delta`, `mistake_delta`, `monenumber_of_characters_delta`
+
+### Endpoint B: `POST /api/statistics/success` (завершение диктанта)
+
+Назначение: сохранить факт полного завершения диктанта (медаль).
+
+**Клиент → Сервер:**
+- Клиент вызывает `OutboxBatcher.enqueueSuccess(payload)` при завершении диктанта
+- Отправляется в той же очереди (тип `success`):
+  ```json
+  {
+    "dictation_id": 123,
+    "perfect_count": 10,
+    "corrected_count": 2,
+    "audio_count": 8,
+    "attempts_total": 20,
+    "mistake_count": 3,
+    "monenumber_of_characters": 1493,
+    "time_ms": 300000,
+    "dictation_language_code": "en",
+    "sentences_data": [...],
+    "completed_at_ms": 1718389987000,
+    "completed_at_tz_offset_min": 180
+  }
+  ```
+
+**Сервер (`routes/statistics.py`):**
+- `POST /api/statistics/success` → функция `save_success()`
+- Вызывает `add_success()` из `helpers/db_history.py`
+- `add_success()`:
+  1. Создаёт запись в `history_successes` (каждое завершение — отдельная строка)
+  2. Вызывает `_upsert_history_by_day()` только с `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`
+  3. **НЕ обновляет** `perfect_count`, `corrected_count`, `audio_count`, `activity_count`, `money_dt_count` — эти поля уже обновлены в `add_activity_bulk()` во время диктанта
+
+### Внутренняя функция `_upsert_history_by_day()`
+
+Находится в `helpers/db_history.py`. Это UPSERT:
+```sql
+INSERT INTO history_by_day (user_id, teacher_id, dictation_language_code, dictation_id, positions, date_plan, date_fact, date_start, perfect_count, corrected_count, audio_count, lead_time, mistake_count, monenumber_of_characters, successes, activity_count, money_dt_count, money_kt_count, ...)
+VALUES (...)
+ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
+DO UPDATE SET
+    perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
+    corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
+    audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
+    lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
+    mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
+    monenumber_of_characters = COALESCE(history_by_day.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
+    successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+    activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
+    money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
+    money_kt_count = COALESCE(history_by_day.money_kt_count, 0) + EXCLUDED.money_kt_count,
+    ...
+```
+
+### Клиентский модуль `OutboxBatcher` (`static/js/outbox_batcher.js`)
+
+**Единая очередь в IndexedDB (store `outbox`):**
+- Записи типа `activity` (ключ: `act:${userId}:${dateId}:${dictationId}:${selPosStr}`)
+- Записи типа `success` (ключ: `${userId}:${rawId}:${dateId}`)
+- Activity-записи накапливаются (мержатся при повторном вызове): суммируются `perfect_count`, `corrected_count`, `audio_count`, `money_count`, `mistake_count`, `monenumber_of_characters`, `lead_time_ms_total`
+
+**Режим отправки:**
+- Единый таймер `BATCH_INTERVAL_MS` (по умолчанию 600000 мс = 10 минут)
+- При срабатывании таймера отправляются **все** накопленные записи (и activity, и success)
+- После успешной отправки запись удаляется из IndexedDB
+
+**Триггеры отправки:**
+- Таймер (каждые `BATCH_INTERVAL_MS`)
+- Событие `window.online` (появилась сеть)
+- Явный вызов `OutboxBatcher.flushAll()` (при завершении диктанта)
+- Сигнал от Service Worker (`syncOutbox`)
+
+**Константы (для отладки):**
+- `BATCH_INTERVAL_MS = 600000` (10 минут; для отладки можно поставить 30000 = 30 секунд)
+- `MAX_BATCH_SIZE` — не используется (отправляем всё скопом)
+
+**Отображение в UI:**
+- Статус-бар (`sw_status_bar.js`) показывает `queue: N (M:M:S)` где N — количество записей в IndexedDB, а M:M:S — время до следующей отправки
+
+### Деньги: `user_money_ledger` и баланс
+
+**Начисление (dt):**
+- Происходит в `add_activity_bulk()` при каждом действии пользователя (звезда/полузвезда/микрофон)
+- `INSERT INTO user_money_ledger (user_id, dt, kt, description) VALUES (userId, moneyCount, 0, 'dictation_activity:{dictationId}')`
+- Деньги **не начисляются** в `save_success()` — это устраняет дублирование
+
+**Списание (kt):**
+- Через API `POST /api/statistics/money/spend` (покупка полузвезды или микрофона)
+- `INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions)`
+
+**Баланс:**
+- Рассчитывается на лету: `SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance FROM user_money_ledger WHERE user_id = %s`
+- Поле `users.money_balance` **удалено** (миграция `add_history_by_day_activity_money_columns_and_drop_user_balance.sql`)
+- API возвращает `money_balance` в JSON-ответе (вычисленное значение, ключ сохранён для совместимости)
+
+### Текущее состояние (известные проблемы)
+
+1. ~~**OutboxBatcher не интегрирован в `dictation_modal.js`** — модуль загружается, но его методы `enqueueActivity()` и `enqueueSuccess()` нигде не вызываются. Данные не попадают в `history_by_day`.~~ **ИСПРАВЛЕНО**: вызовы добавлены в `dictation_modal.js`.
+2. ~~**Не хватает вызовов** при начислении звезды/полузвезды/активности — нужно добавить `OutboxBatcher.enqueueActivity()` в момент начисления награды.~~ **ИСПРАВЛЕНО**.
+3. ~~**Не хватает вызова** `OutboxBatcher.enqueueSuccess()` при завершении диктанта — нужно добавить в `showCompletionModal()`.~~ **ИСПРАВЛЕНО**.
+4. ~~**Дублирование данных в `history_by_day`**: `add_success()` повторно обновляла `perfect_count`, `corrected_count`, `audio_count`, которые уже были обновлены в `add_activity_bulk()`.~~ **ИСПРАВЛЕНО**: `add_success()` теперь обновляет только `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`. Все остальные счётчики двигаются только в `add_activity_bulk()`.
+5. ~~**`money_balance` в `users` дублирует данные из `user_money_ledger`**.~~ **ИСПРАВЛЕНО**: поле удалено, баланс считается из `user_money_ledger` на лету.
+6. ~~**Деньги начислялись дважды**: в `add_activity_bulk()` и в `save_success()`.~~ **ИСПРАВЛЕНО**: начисление только в `add_activity_bulk()`.
+
+### Распознавание речи: выбор режима (speech_recognition_mode)
+
+**Архитектурное решение (рефакторинг):** выбор режима распознавания речи — это **настройка устройства/браузера**, а не настройка пользователя. Поэтому:
+
+- Режим **не хранится на сервере** (не в `users.settings_json`).
+- Режим **не сохраняется через `saveProfile()`**.
+- Режим хранится в **`localStorage`** под ключом `dictafan_speech_rec_mode`.
+- Радио-кнопки выбора режима **убраны из профиля** (из таблицы моделей в `user_profile_modal.html`).
+- Радио-кнопки **перенесены в модальное окно настроек диктанта** (`#audioSettingsModal` внутри `#dictationModal`).
+
+#### Доступные режимы (5 значений)
+
+| Значение | Иконка lucide | Описание |
+|----------|---------------|----------|
+| `route` | `route` | Google Сервіси (WebSpeech API браузера) |
+| `server` | `server` | На сервері Whisper Tiny |
+| `route-off\|tiny` | `house-heart` | На пристрої Whisper Tiny · 75 MB |
+| `route-off\|base` | `house` | На пристрої Whisper Base · 145 MB |
+| `route-off\|small` | `house-plus` | На пристрої Whisper Small · 480 MB |
+
+Режимы с префиксом `route-off|` — это device-режимы (локальный Whisper через Transformers.js). Они **отображаются только если соответствующая модель скачана** в кеш браузера.
+
+#### Где живёт код
+
+1. **`templates/partials/dictation_modal.html`** — HTML радио-кнопок внутри `#audioSettingsModal`:
+   - 5 `<label>` с `<input type="radio" name="modal-speechRecMode">`
+   - Device-режимы имеют класс `dictation-settings-speech-rec-mode-device` и атрибуты `data-role="device-mode-tiny/base/small"`
+   - Видимость device-режимов управляется через JS (скрыты, если модель не скачана)
+
+2. **`static/css/dictation_modal.css`** — стили для карточки `.dictation-settings-card-speech-rec`:
+   - `grid-area: speech-rec` в `dictation-settings-grid`
+   - Кастомные радио-кнопки с иконками lucide
+   - Device-режимы с отступом слева (вложенность)
+
+3. **`static/js/dictation_modal.js`** — логика чтения/записи в `initAudioSettingsModal()`:
+   - `LS_SPEECH_REC_MODE_KEY = 'dictafan_speech_rec_mode'`
+   - `_readSpeechRecModeFromLS()` — читает из localStorage, fallback `'route'`
+   - `_writeSpeechRecModeToLS(mode)` — пишет в localStorage
+   - `_getDownloadedWhisperSizes()` — читает `dictafan_downloaded_models_v2` из localStorage
+   - `_updateDeviceModeVisibility()` — показывает/скрывает device-радио
+   - `applySpeechRecModeToUI()` — устанавливает радио из localStorage
+   - При сохранении настроек (`__dictafanSaveAudioSettingsModal`) режим пишется в localStorage
+   - При открытии диктанта (`applyToUI`) — режим читается из localStorage
+
+4. **`static/js/dictation_modal.js`** — в `ensureSpeechPanel()`:
+   - Режим читается из `localStorage.getItem('dictafan_speech_rec_mode')`
+   - Нормализация: `route-off|tiny` → `route-off` (для `speech_recognition_unified.js`)
+
+5. **`static/js/dictation_runtime/speech_recognition_panel.js`** — в `_updateRecognitionModeIcon(mode)`:
+   - Маппинг 5 режимов на 5 иконок lucide
+   - Для `route-off` читает `dictafan_speech_rec_mode` из localStorage, чтобы определить, какая именно device-модель выбрана
+
+6. **`static/js/audio_settings_panel.js`** — методы `getSpeechRecognitionIcon(mode)` и `getSpeechRecognitionLabel(mode)`:
+   - Используются в профиле для отображения текущего режима (только иконка + текст, без радио)
+
+#### Что было удалено из профиля
+
+- `templates/partials/user_profile_modal.html` — удалены все `<tr>` с радио-кнопками (`data-method="route"`, `data-method="route-server"`, `data-method="route-off"`)
+- `static/js/language_selector.js`:
+  - `hydrateModelsCentricUI()` — удалена вся логика радио (рендеринг, `__PROFILE_SPEECH_REC_MODE`, `anyChecked`)
+  - `bindModelsCentricEvents()` — удалены обработчики `change` для `models-centric-method-radio` и `click` для `models-centric-radio-btn`
+- `static/js/user_profile_modal.js`:
+  - Удалена функция `getProfileSpeechRecognitionModeFromModelsTable()`
+  - Удалён `speech_recognition_mode` из: `getAudioSettingsFromDom()`, `checkForChanges()`, `getCurrentFormValues()`, `loadUserData()`, `saveProfile()` (hasAudioChanges, settings_json, updateData, originalData, UM.userData, audioSettingsPanel.setSettings)
+
+#### Защита от кеш-коллизий
+
+Если пользователь скачал модель, выбрал device-режим, а затем кеш был очищен (или сайт открыт в другом браузере/устройстве):
+
+1. `_updateDeviceModeVisibility()` проверяет `dictafan_downloaded_models_v2` в localStorage
+2. Если device-модели нет в кеше — соответствующие радио скрываются
+3. `applySpeechRecModeToUI()` проверяет, доступен ли выбранный режим; если нет — сбрасывает на `'route'`
+4. В `ensureSpeechPanel()` — если режим `route-off`, но модель не найдена — панель не создаётся (безопасное падение)
+
+#### Иконки возле кнопки записи
+
+Иконка режима распознавания отображается:
+- В панели диктанта (рядом с кнопкой записи) — через `_updateRecognitionModeIcon()` в `speech_recognition_panel.js`
+- В профиле (в карточке аудионастроек) — через `getSpeechRecognitionIcon()` в `audio_settings_panel.js`
+
+Иконки обновляются при каждом открытии диктанта (читают текущее значение из localStorage).
 
 ## Механизм наполнения группы (UX)
 
@@ -908,7 +1390,6 @@ Many-to-many: ученик может быть в нескольких груп�
   - `static/js/audio_manager.js`
   - `static/js/cover_manager.js`
   - `static/js/idb_manager.js`
-  - `static/js/script_dictation.js`
   - `static/js/private_library.js`
 - Service Worker:
   - `sw.js`

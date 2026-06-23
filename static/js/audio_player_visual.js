@@ -73,18 +73,6 @@ class AudioPlayerVisual {
                 </button>
                 <input type="range" class="progress-bar" min="0" max="100" value="0">
                 <span class="total-time">0:00</span>
-                <div class="audio-type-select-wrapper">
-                    <button class="audio-type-select-button" type="button">
-                        <span class="audio-type-display">o</span>
-                        <i data-lucide="chevron-down" class="audio-type-arrow"></i>
-                    </button>
-                    <ul class="audio-type-options">
-                        <li data-value="o" class="selected">o - по умолчанию</li>
-                        <li data-value="a">a - автоозвучка</li>
-                        <li data-value="f">f - из файла</li>
-                        <li data-value="m">m - запись</li>
-                    </ul>
-                </div>
                 <div class="custom-speed-select">
                     <button class="speed-select-button" type="button">
                         <span class="speed-selected">1×</span>
@@ -103,8 +91,8 @@ class AudioPlayerVisual {
         this.playButton = this.container.querySelector('.play-btn');
         this.progressBar = this.container.querySelector('.progress-bar');
         this.totalTimeElement = this.container.querySelector('.total-time');
-        this.audioTypeSelect = this.container.querySelector('.audio-type-select-wrapper');
-        this.audioTypeDisplay = this.container.querySelector('.audio-type-display');
+        this.audioTypeSelect = null;
+        this.audioTypeDisplay = null;
         this.speedSelect = this.container.querySelector('.custom-speed-select');
         this.speedDisplay = this.container.querySelector('.speed-selected');
 
@@ -138,44 +126,8 @@ class AudioPlayerVisual {
             });
         }
 
-        // Получаем ссылки на оба выпадающих списка заранее
-        const audioTypeButton = this.audioTypeSelect?.querySelector('.audio-type-select-button');
-        const audioTypeOptions = this.audioTypeSelect?.querySelector('.audio-type-options');
         const speedButton = this.speedSelect?.querySelector('.speed-select-button');
         const speedOptions = this.speedSelect?.querySelector('.speed-options');
-        
-        // Выбор типа аудио
-        if (audioTypeButton && audioTypeOptions) {
-            audioTypeButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const isOpen = this.audioTypeSelect.classList.contains('is-open');
-                this.audioTypeSelect.classList.toggle('is-open', !isOpen);
-                if (speedOptions && this.speedSelect) {
-                    this.speedSelect.classList.remove('is-open');
-                }
-            });
-
-            // Закрытие при клике вне
-            document.addEventListener('click', (e) => {
-                if (!this.audioTypeSelect.contains(e.target)) {
-                    this.audioTypeSelect.classList.remove('is-open');
-                }
-            });
-
-            audioTypeOptions.querySelectorAll('li').forEach(li => {
-                li.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const value = li.dataset.value;
-                    if (value && this.audioPaths[value]) {
-                        this.setAudioType(value);
-                        this.audioTypeSelect.classList.remove('is-open');
-                        if (this.onAudioTypeChange) {
-                            this.onAudioTypeChange(value, this.audioPaths[value]);
-                        }
-                    }
-                });
-            });
-        }
 
         // Выбор скорости
         if (speedButton && speedOptions) {
@@ -183,9 +135,6 @@ class AudioPlayerVisual {
                 e.stopPropagation();
                 const isOpen = this.speedSelect.classList.contains('is-open');
                 this.speedSelect.classList.toggle('is-open', !isOpen);
-                if (audioTypeOptions && this.audioTypeSelect) {
-                    this.audioTypeSelect.classList.remove('is-open');
-                }
             });
 
             // Закрытие при клике вне

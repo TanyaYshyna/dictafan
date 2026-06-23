@@ -28,6 +28,10 @@
     "native_language": {
       "label": "Рідна мова:"
     },
+    "learning_languages": {
+      "label": "Мови, які вивчаю:",
+      "at_least_one": "Потрібно вибрати хоча б одну мову"
+    },
     "learning_language": {
       "label": "Вивчаю мову:"
     },
@@ -53,7 +57,7 @@
     "sections": {
       "languages": "Мови",
       "activity_goal": "План активності",
-      "local_models": "Локальні моделі",
+      "local_models": "Види розпізнавання мовлення",
       "dictation_settings": "Налаштування диктантів",
       "assignment_history": "Історія завдань",
       "groups": "Групи"
@@ -70,6 +74,7 @@
       },
       "play_audio": {
         "title": "Відтворюємо аудіо:",
+        "order_title": "Порядок відтворення аудіо в реченні",
         "on_start": "на старті:",
         "on_typo": "при помилці:",
         "on_success": "при успіху:",
@@ -148,6 +153,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "Мої групи"
+      },
       "table": {
         "id": "ID",
         "name": "Назва"
@@ -160,7 +168,7 @@
       },
       "filter": {
         "title": "Фільтр",
-        "active": "показати лише активні",
+        "active": "лише активні",
         "all": "показати всі"
       },
       "actions": {
@@ -172,6 +180,9 @@
       },
       "invite_link": {
         "label": "Інвайт посилання",
+        "copy": "Копіювати",
+        "create": "Створити інвайт",
+        "create_button": "Запрошення",
         "errors": {
           "get_failed": "Не вдалося отримати посилання"
         }
@@ -215,6 +226,11 @@
     "models": {
       "all_models": "Усі моделі",
       "languages": "Мови",
+      "method_google": "Google сервіси",
+      "method_server_whisper_tiny": "На сервері Whisper Tiny",
+      "method_device_whisper_tiny": "На пристрої Whisper Tiny",
+      "method_device_whisper_base": "На пристрої Whisper Base",
+      "method_device_whisper_small": "На пристрої Whisper Small",
       "browser_storage": "Сховище браузера:",
       "loading_info": "Завантажуємо інформацію...",
       "calculating_storage": "Розраховуємо використання пам’яті...",
@@ -471,6 +487,8 @@
     },
     "assignments": {
       "max_7_days": "Максимум 7 днів",
+      "exercises_modal_title": "Всі вправи",
+      "exercises_column": "Вправи",
       "modal_title": "Завдання",
       "add_day": "Додати день",
       "text_column": "Текст",
@@ -506,7 +524,7 @@
     },
     "dictation_card_actions": {
       "title": "Дії",
-      "create_assignment_new": "Нове завдання",
+      "create_assignment_new": "Вправи",
       "cache": "Зберегти в кеш",
       "edit": "Редагувати",
       "show_in_book": "Показати в книзі",
@@ -713,6 +731,15 @@
       "saving": "Зберігаємо...",
       "logging_in": "Вхід...",
       "creating_account": "Створюємо акаунт..."
+    }
+  },
+
+  "desktop": {
+    "confirm": {
+      "title": "Зберегти зміни?",
+      "save": "Зберегти",
+      "exit": "Вийти",
+      "close": "Закрити"
     }
   },
 

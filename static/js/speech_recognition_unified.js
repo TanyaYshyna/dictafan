@@ -35,6 +35,10 @@
       this._finalizePromise = null;
       this._finalizeResolve = null;
       this._finalizeReject = null;
+
+      // Максимальная длительность записи аудио — 30 секунд
+      this._maxRecordingDurationMs = 30000;
+      this._recordingTimer = null;
     }
 
     _isAndroidChrome() {
@@ -48,6 +52,7 @@
 
     async startRecording() {
       try {
+        try { console.log('[UnifiedSpeechRecognition] startRecording ВЫЗВАН, mode=' + this.state.mode + ', language=' + this.state.language); } catch (e) {}
         this._audioChunks = [];
         this._audioBlob = null;
         this._finalText = '';
@@ -55,55 +60,76 @@
         this._ignoreResults = false;
         this._sessionId = (this._sessionId || 0) + 1;
 
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        this._mediaStream = stream;
-
+        const am = window.AudioManager;
+        if (!am || typeof am.startUserRecording !== 'function') {
+          try { console.log('[UnifiedSpeechRecognition] AudioManager not loaded'); } catch (e) {}
+          throw new Error('AudioManager_not_loaded');
+        }
         const mimeType = this._getSupportedMimeType();
-        const mr = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-        this._mediaRecorder = mr;
+        try { console.log('[UnifiedSpeechRecognition] AudioManager.startUserRecording...'); } catch (e) {}
+        const started = await am.startUserRecording({ mimeType });
+        try { console.log('[UnifiedSpeechRecognition] AudioManager вернул:', started ? 'ok' : 'null'); } catch (e) {}
+        this._mediaStream = started && started.stream ? started.stream : null;
+        this._mediaRecorder = started && started.recorder ? started.recorder : null;
 
-        mr.ondataavailable = (e) => {
-          if (e.data && e.data.size) this._audioChunks.push(e.data);
-        };
+        this.state.isRecording = true;
+        if (typeof this.callbacks.onRecordingStart === 'function') {
+          this.callbacks.onRecordingStart();
+        }
 
-        mr.onerror = (e) => {
-          this._emitError(e?.error || e);
-        };
-
-        mr.onstart = () => {
-          this.state.isRecording = true;
-          if (typeof this.callbacks.onRecordingStart === 'function') {
-            this.callbacks.onRecordingStart();
-          }
-
-          // WebSpeech on Android Chrome is sensitive to the start timing.
-          // Start it after MediaRecorder has actually started.
-          if (this.state.mode === 'online') {
-            try {
-              const delayMs = this._isAndroidChrome() ? 180 : 0;
-              setTimeout(() => {
-                try {
-                  if (this.state.mode === 'online' && this.state.isRecording) {
-                    this._initWebSpeech();
-                  }
-                } catch (e) {
-                }
-              }, delayMs);
-            } catch (e) {
+        // Автоматическая остановка записи через 30 секунд
+        this._clearRecordingTimer();
+        const mySessionId = this._sessionId;
+        this._recordingTimer = setTimeout(() => {
+          try {
+            if (this.state.isRecording && mySessionId === this._sessionId) {
+              try { console.log('[UnifiedSpeechRecognition] Автостоп: запись длилась более 30с'); } catch (e) {}
+              this.stopRecording('max_duration');
             }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Ошибка в таймере автостопа:', e); } catch (e2) {}
           }
-        };
+        }, this._maxRecordingDurationMs);
 
-        mr.onstop = () => {
-          this.state.isRecording = false;
-          const blobType = (mr.mimeType && mr.mimeType.includes('mp4')) ? 'audio/mp4' : (mr.mimeType || 'audio/webm');
-          this._audioBlob = new Blob(this._audioChunks, { type: blobType });
-          if (typeof this.callbacks.onRecordingStop === 'function') {
-            this.callbacks.onRecordingStop();
+        // WebSpeech on Android Chrome is sensitive to the start timing.
+        if (this.state.mode === 'online' || this.state.mode === 'route') {
+          try {
+            const delayMs = this._isAndroidChrome() ? 180 : 0;
+            setTimeout(() => {
+              try {
+                if ((this.state.mode === 'online' || this.state.mode === 'route') && this.state.isRecording) {
+                  try { console.log('[UnifiedSpeechRecognition] startRecording: вызываем _initWebSpeech, язык =', this.state.language); } catch (e) {}
+                  this._initWebSpeech();
+                }
+              } catch (e) {
+              }
+            }, delayMs);
+          } catch (e) {
           }
-        };
+        }
 
-        mr.start();
+        // Offline Whisper mode: ensure model is loaded before recording ends.
+        if (this.state.mode && this.state.mode.startsWith('route-off|') && window.WhisperModelManager) {
+          try {
+            const parts = this.state.mode.split('|');
+            const modelSize = parts.length > 1 ? parts[1] : 'base';
+            const mm = new window.WhisperModelManager();
+            const modelKey = mm._getModelKey('en', modelSize);
+            const storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
+            if (!storedModel || !storedModel.recognizer) {
+              try { console.log('[UnifiedSpeechRecognition] Whisper model not in memory, loading ' + modelSize + '...'); } catch (e) {}
+              // Don't await — load in background, stopRecording() will await if needed.
+              this._whisperLoadPromise = mm.loadLanguageModel('en', modelSize);
+              this._whisperLoadPromise.then(function() {
+                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
+              }).catch(function(err) {
+                try { console.error('[UnifiedSpeechRecognition] Whisper load error:', err); } catch (e) {}
+              });
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Whisper preload error:', e); } catch (e2) {}
+          }
+        }
       } catch (e) {
         this._emitError(e);
         throw e;
@@ -112,7 +138,12 @@
 
     async stopRecording(cause) {
       try {
-        const isOnline = this.state.mode === 'online';
+        // Очищаем таймер автоматической остановки записи
+        this._clearRecordingTimer();
+
+        const isOnline = this.state.mode === 'online' || this.state.mode === 'route';
+        const isServer = this.state.mode === 'server';
+        const isOffline = this.state.mode && this.state.mode.startsWith('route-off|');
         const rec = this._recognition;
         const mySessionId = this._sessionId;
 
@@ -131,7 +162,7 @@
             // If stop fails, we still proceed to stop recorder and return what we have.
           }
         } else {
-          // Offline mode does not use WebSpeech results; ignore any stale events.
+          // Offline/server mode does not use WebSpeech results; ignore any stale events.
           this._ignoreResults = true;
           if (rec) {
             try {
@@ -145,40 +176,18 @@
           }
         }
 
-        // MediaRecorder 'stop' event may occasionally never fire in some browsers / edge cases.
-        // We must never hang here, otherwise the UI stays on "Распознаю..." forever.
-        if (this._mediaRecorder) {
-          const mr = this._mediaRecorder;
-          const mrState = (mr && mr.state) ? String(mr.state) : '';
-          if (mrState === 'recording') {
-            const STOP_TIMEOUT_MS = 4000;
-            await Promise.race([
-              new Promise((resolve) => {
-                const done = () => resolve();
-                try {
-                  mr.addEventListener('stop', done, { once: true });
-                } catch (e) {
-                  resolve();
-                  return;
-                }
-                try {
-                  mr.stop();
-                } catch (e) {
-                  resolve();
-                }
-              }),
-              new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS)),
-            ]);
+        try {
+          const am = window.AudioManager;
+          if (am && typeof am.stopUserRecording === 'function') {
+            const stopped = await am.stopUserRecording({ timeoutMs: 4000 });
+            this._audioBlob = stopped ? stopped.audioBlob : null;
           }
+        } catch (e) {
         }
 
-        if (this._mediaStream) {
-          for (const t of this._mediaStream.getTracks()) {
-            try {
-              t.stop();
-            } catch (e) {
-            }
-          }
+        this.state.isRecording = false;
+        if (typeof this.callbacks.onRecordingStop === 'function') {
+          this.callbacks.onRecordingStop();
         }
 
         if (isOnline && rec) {
@@ -195,6 +204,100 @@
           if (mySessionId !== this._sessionId) {
             this._finalText = '';
             this._lastText = '';
+          }
+        }
+
+        // Server mode: send audio to server-side Whisper endpoint.
+        if (isServer && this._audioBlob) {
+          try {
+            const langCode = this.state.language ? this.state.language.split('-')[0].toLowerCase() : 'en';
+
+            if (typeof this.callbacks.onProcessingStart === 'function') {
+              this.callbacks.onProcessingStart();
+            }
+
+            const formData = new FormData();
+            formData.append('audio', this._audioBlob, 'recording.webm');
+            formData.append('lang', langCode);
+
+            const resp = await fetch('/api/speech-recognition/transcribe', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!resp.ok) {
+              throw new Error('Server transcribe failed: ' + resp.status);
+            }
+
+            const data = await resp.json();
+            const transcribed = data && data.text ? String(data.text).trim() : '';
+            this._finalText = transcribed;
+            this._lastText = transcribed;
+
+            if (transcribed && typeof this.callbacks.onFinalTranscript === 'function') {
+              this.callbacks.onFinalTranscript(transcribed);
+            }
+            if (transcribed && typeof this.callbacks.onTranscript === 'function') {
+              this.callbacks.onTranscript(transcribed, true);
+            }
+
+            if (typeof this.callbacks.onProcessingEnd === 'function') {
+              this.callbacks.onProcessingEnd();
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Server transcribe error:', e); } catch (e2) {}
+            if (typeof this.callbacks.onError === 'function') {
+              this.callbacks.onError(e);
+            }
+          }
+        }
+
+        // Offline Whisper mode: transcribe the recorded audio blob locally.
+        if (isOffline && this._audioBlob) {
+          try {
+            const parts = this.state.mode.split('|');
+            const modelSize = parts.length > 1 ? parts[1] : 'base';
+            const langCode = this.state.language ? this.state.language.split('-')[0].toLowerCase() : 'en';
+
+            if (typeof this.callbacks.onProcessingStart === 'function') {
+              this.callbacks.onProcessingStart();
+            }
+
+            if (window.WhisperModelManager) {
+              const mm = new window.WhisperModelManager();
+              // Whisper is multilingual — loadLanguageModel uses 'en' as placeholder,
+              // the actual language is passed to transcribe().
+              const modelKey = mm._getModelKey('en', modelSize);
+              const storedModel = window.WhisperModels && window.WhisperModels.get ? window.WhisperModels.get(modelKey) : null;
+              if (!storedModel || !storedModel.recognizer) {
+                // Model not loaded in memory yet — load it first.
+                try { console.log('[UnifiedSpeechRecognition] Whisper model not in memory, loading ' + modelSize + '...'); } catch (e) {}
+                await mm.loadLanguageModel('en', modelSize);
+                try { console.log('[UnifiedSpeechRecognition] Whisper model loaded'); } catch (e) {}
+              }
+              const result = await mm.transcribe(this._audioBlob, langCode, modelSize);
+              const transcribed = result && result.text ? String(result.text).trim() : '';
+              this._finalText = transcribed;
+              this._lastText = transcribed;
+
+              if (transcribed && typeof this.callbacks.onFinalTranscript === 'function') {
+                this.callbacks.onFinalTranscript(transcribed);
+              }
+              if (transcribed && typeof this.callbacks.onTranscript === 'function') {
+                this.callbacks.onTranscript(transcribed, true);
+              }
+            } else {
+              try { console.warn('[UnifiedSpeechRecognition] WhisperModelManager not available for offline mode'); } catch (e) {}
+            }
+
+            if (typeof this.callbacks.onProcessingEnd === 'function') {
+              this.callbacks.onProcessingEnd();
+            }
+          } catch (e) {
+            try { console.error('[UnifiedSpeechRecognition] Whisper transcribe error:', e); } catch (e2) {}
+            if (typeof this.callbacks.onError === 'function') {
+              this.callbacks.onError(e);
+            }
           }
         }
 
@@ -251,6 +354,7 @@
       const rec = new SpeechRecognition();
       this._recognition = rec;
       const mySessionId = this._sessionId;
+      try { console.log('WWWWWWWWW[UnifiedSpeechRecognition] _initWebSpeech: язык перед rec.start() =', this.state.language); } catch (e) {}
       rec.lang = this.state.language;
       // Android Chrome often returns empty transcripts in continuous+interim mode.
       // Prefer single-utterance recognition with final results.
@@ -325,8 +429,10 @@
       };
 
       try {
+        try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() с языком', rec.lang); } catch (e) {}
         rec.start();
       } catch (e) {
+        try { console.log('[UnifiedSpeechRecognition] _initWebSpeech: rec.start() ошибка:', e); } catch (e2) {}
         this._emitError(e);
       }
     }
@@ -341,6 +447,16 @@
       }
       try {
         console.error('UnifiedSpeechRecognition error:', err);
+      } catch (e) {
+      }
+    }
+
+    _clearRecordingTimer() {
+      try {
+        if (this._recordingTimer) {
+          clearTimeout(this._recordingTimer);
+          this._recordingTimer = null;
+        }
       } catch (e) {
       }
     }

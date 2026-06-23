@@ -1,0 +1,84 @@
+<div id="create-assignment-modal" class="modal" style="display: none;">
+    <div class="modal-content create-assignment-modal-content">
+        <div class="modal-header create-assignment-modal-header">
+            <div class="create-assignment-modal-title">
+                <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
+                <div class="create-assignment-modal-title-text" id="create-assignment-modal-title">Все упражнения</div>
+            </div>
+
+            <div class="create-assignment-modal-header-actions">
+                <button type="button" id="create-assignment-save" class="btn-primary create-assignment-save-btn">
+                    <i data-lucide="save"></i>
+                    <span>Сохранить</span>
+                </button>
+                <button type="button" id="create-assignment-close" class="modal-close create-assignment-close-btn" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body create-assignment-modal-body">
+            <input type="hidden" id="create-assignment-dictation-id" value="">
+
+            <div class="create-assignment-top">
+                <div class="create-assignment-cover">
+                    <div class="create-assignment-cover-box">
+                        <img id="create-assignment-cover-img" alt="" class="create-assignment-cover-img" />
+                    </div>
+                </div>
+
+                <div class="create-assignment-top-right">
+                    <div id="create-assignment-dictation-title" class="create-assignment-dictation-title"></div>
+                    <div id="create-assignment-cover-meta" class="create-assignment-cover-meta"></div>
+                    <div class="create-assignment-top-controls">
+                        <div class="create-assignment-top-row">
+                            <div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="create-assignment-bottom" class="create-assignment-bottom">
+                <div id="create-assignment-exercises-panel" class="create-assignment-panel create-assignment-panel--days">
+                    <div class="create-assignment-panel-body">
+                        <div class="create-assignment-panel-actions">
+                            <button type="button" id="create-assignment-exercise-create" class="topbar-icon-btn create-assignment-icon-btn" title="Создать упражнение"><i data-lucide="plus"></i></button>
+                            <button type="button" id="create-assignment-exercise-delete" class="topbar-icon-btn create-assignment-icon-btn" title="Удалить упражнение"><i data-lucide="trash-2"></i></button>
+                        </div>
+                        <div style="max-height: 420px; overflow: auto;">
+                            <table id="create-assignment-exercises-table" class="create-assignment-table" style="width:100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th id="create-assignment-exercises-col-title" style="text-align:left; padding:8px 10px;">Упражнения</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="create-assignment-exercisesTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="create-assignment-panel create-assignment-panel--sentences">
+                    <div class="create-assignment-panel-body">
+                        <div class="create-assignment-sentences-scroll">
+                            <table class="create-assignment-table create-assignment-table--sentences">
+                                <thead>
+                                    <tr>
+                                        <th class="create-assignment-th-num">№</th>
+                                        <th class="create-assignment-th-check">
+                                            <button type="button" id="create-assignment-sentences-toggle-all" class="topbar-icon-btn create-assignment-icon-btn" title="Выбрать/снять все">
+                                                <i data-lucide="circle"></i>
+                                            </button>
+                                        </th>
+                                        <th class="create-assignment-th-text" id="create-assignment-sentences-col-text">Текст</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="create-assignment-sentences-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

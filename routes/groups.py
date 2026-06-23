@@ -11,6 +11,7 @@ from helpers.db_groups import (
     create_group_invite,
     accept_email_invite,
     decline_email_invite,
+    delete_group,
     get_group_invite_preview_by_token,
     get_latest_active_group_invite,
     get_group_for_teacher,
@@ -139,6 +140,25 @@ def api_update_group(group_id: int):
         return jsonify({"success": True, "group": group})
     except Exception as exc:
         logger.error("Ошибка обновления группы %s: %s", group_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@groups_bp.route("/api/group/<int:group_id>", methods=["DELETE"])
+@jwt_required()
+def api_delete_group(group_id: int):
+    """Полностью удалить группу и все связанные данные."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    try:
+        delete_group(group_id, user["id"])
+        return jsonify({"success": True})
+    except PermissionError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 403
+    except Exception as exc:
+        logger.error("Ошибка удаления группы %s: %s", group_id, exc)
         return jsonify({"success": False, "error": str(exc)}), 500
 
 

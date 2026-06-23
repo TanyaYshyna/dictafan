@@ -81,6 +81,25 @@
     }
   }
 
+  function getCoverUrl(dictationId, languageCode) {
+    try {
+      const raw = (dictationId !== undefined && dictationId !== null) ? String(dictationId).trim() : '';
+      const cleaned = raw.replace(/^dict_/, '').trim();
+      if (cleaned && /^\d+$/.test(cleaned)) {
+        return maybeCacheBustDictationCover(`/api/dictations_covers/${encodeURIComponent(cleaned)}.webp`);
+      }
+
+      const langRaw = (languageCode !== undefined && languageCode !== null) ? String(languageCode).trim().toLowerCase() : '';
+      const lang = langRaw === 'ua' ? 'uk' : langRaw;
+      if (lang) {
+        return `/static/data/covers/cover_${encodeURIComponent(lang)}.webp`;
+      }
+      return '/static/data/covers/cover_en.webp';
+    } catch (e) {
+      return '/static/data/covers/cover_en.webp';
+    }
+  }
+
   function avatarUrlForUser(userId, size = 'small') {
     try {
       if (!userId) return '';
@@ -496,7 +515,18 @@
     withCacheBust,
     withCacheBustVersion,
     maybeCacheBustDictationCover,
+    getCoverUrl,
     avatarUrlForUser,
     prefetchUrls,
   };
+
+  try {
+    if (!window.ImageManager) {
+      window.ImageManager = {};
+    }
+    if (typeof window.ImageManager.getCoverUrl !== 'function') {
+      window.ImageManager.getCoverUrl = getCoverUrl;
+    }
+  } catch (e) {
+  }
 })();

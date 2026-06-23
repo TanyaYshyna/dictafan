@@ -15,6 +15,7 @@ from helpers.db_history import (
     get_success_count_for_subset,
     get_activity_lead_time_by_day_range,
     get_activity_lead_time_year_bounds,
+    get_successes_sum_from_history_by_day,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -34,6 +35,189 @@ except Exception:
 statistics_bp = Blueprint('statistics', __name__, url_prefix='/api/statistics')
 
 
+@statistics_bp.route('/money/spend', methods=['POST'])
+@jwt_required()
+def api_statistics_money_spend():
+    """Spend user's money by creating a negative ledger entry (kt). Balance is calculated from user_money_ledger on the fly."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    data = request.get_json(silent=True) or {}
+    try:
+        cost = int(data.get('cost') or 0)
+    except Exception:
+        cost = 0
+    if cost <= 0:
+        return jsonify({'success': False, 'error': 'invalid_cost'}), 400
+
+    reason = (data.get('reason') or '').strip() or 'spend'
+    try:
+        dictation_id = data.get('dictation_id')
+        dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
+    except Exception:
+        dictation_id = None
+
+    try:
+        positions = data.get('positions')
+        if not isinstance(positions, list):
+            positions = []
+        pos_norm = []
+        for p in positions:
+            try:
+                v = int(p)
+                if v > 0:
+                    pos_norm.append(v)
+            except Exception:
+                continue
+        pos_norm = sorted(list(set(pos_norm)))
+    except Exception:
+        pos_norm = []
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # Считаем баланс из user_money_ledger на лету
+        cur.execute(
+            """
+            SELECT
+                COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
+        row = cur.fetchone()
+        current_balance = int(row[0] or 0) if row else 0
+        if current_balance < cost:
+            conn.rollback()
+            return jsonify({'success': False, 'error': 'not_enough_money', 'money_balance': current_balance}), 400
+
+        today_iso = datetime.now().strftime('%Y-%m-%d')
+        cur.execute(
+            """
+            INSERT INTO user_money_ledger (user_id, kt, reason, dictation_id, positions, date_start, date_fact)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (int(user['id']), cost, reason, dictation_id, pos_norm, today_iso, today_iso),
+        )
+        conn.commit()
+
+        # Пересчитываем баланс после списания
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
+        row = cur.fetchone()
+        new_balance = int(row[0] or 0) if row else 0
+
+        return jsonify({'success': True, 'money_balance': new_balance})
+    except Exception as e:
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
+
+@statistics_bp.route('/money/earn', methods=['POST'])
+@jwt_required()
+def api_statistics_money_earn():
+    """Earn user's money by creating a positive ledger entry (dt). Balance is calculated from user_money_ledger on the fly."""
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
+
+    data = request.get_json(silent=True) or {}
+    try:
+        amount = int(data.get('amount') or 0)
+    except Exception:
+        amount = 0
+    if amount <= 0:
+        return jsonify({'success': False, 'error': 'invalid_amount'}), 400
+
+    reason = (data.get('reason') or '').strip() or 'earn'
+    try:
+        dictation_id = data.get('dictation_id')
+        dictation_id = int(dictation_id) if dictation_id is not None and str(dictation_id).strip() != '' else None
+    except Exception:
+        dictation_id = None
+
+    try:
+        positions = data.get('positions')
+        if not isinstance(positions, list):
+            positions = []
+        pos_norm = []
+        for p in positions:
+            try:
+                v = int(p)
+                if v > 0:
+                    pos_norm.append(v)
+            except Exception:
+                continue
+        pos_norm = sorted(list(set(pos_norm)))
+    except Exception:
+        pos_norm = []
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        today_iso = datetime.now().strftime('%Y-%m-%d')
+        cur.execute(
+            """
+            INSERT INTO user_money_ledger (user_id, dt, reason, dictation_id, positions, date_start, date_fact)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (int(user['id']), amount, reason, dictation_id, pos_norm, today_iso, today_iso),
+        )
+        conn.commit()
+
+        # Считаем баланс из user_money_ledger на лету
+        cur.execute(
+            """
+            SELECT COALESCE(SUM(dt), 0) - COALESCE(SUM(kt), 0) AS balance
+            FROM user_money_ledger
+            WHERE user_id = %s
+            """,
+            (int(user['id']),),
+        )
+        row = cur.fetchone()
+        new_balance = int(row[0] or 0) if row else 0
+
+        return jsonify({'success': True, 'money_balance': new_balance})
+    except Exception as e:
+        try:
+            if conn:
+                conn.rollback()
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        try:
+            if conn:
+                conn.close()
+        except Exception:
+            pass
+
+
 @statistics_bp.route('/telegram/send_self', methods=['POST'])
 @jwt_required()
 def api_statistics_telegram_send_self():
@@ -50,7 +234,7 @@ def api_statistics_telegram_send_self():
         return jsonify({'success': False, 'error': 'Telegram disabled'}), 400
 
     chat_id = user.get('telegram_chat_id')
-    if not chat_id or not bool(user.get('telegram_enabled')):
+    if not chat_id:
         return jsonify({'success': False, 'error': 'telegram_not_linked'}), 400
 
     data = request.get_json(silent=True) or {}
@@ -163,43 +347,21 @@ def _fmt_duration(ms: int) -> str:
 
 def _build_teacher_report_text(*, student_username: str, dictation_title: str, dictation_level: str, date_iso: str,
                               completion_count_value, error_words, report_header_mode: str = 'success') -> str:
-    error_words_lines = []
-    try:
-        ew = error_words if isinstance(error_words, dict) else {}
-        items = []
-        for k, v in ew.items():
-            try:
-                w = str(k or '').strip()
-                c = int(v or 0)
-            except Exception:
-                continue
-            if not w or c <= 0:
-                continue
-            items.append((w, c))
-        items.sort(key=lambda x: (-x[1], x[0]))
-        items = items[:15]
-        for w, c in items:
-            error_words_lines.append(f"{_safe_html(w)} - {c}")
-    except Exception:
-        error_words_lines = []
-
     medals_inline = ''
     if completion_count_value is not None:
         medals_inline = f"  🥇 {completion_count_value}"
 
     mode = str(report_header_mode or 'success').strip().lower()
     if mode == 'interim':
-        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
+        first_line = f"📊 {_safe_html(student_username)}, промежуточные результаты"
     else:
-        first_line = f"✅ <b>{_safe_html(student_username)}</b> выполнил(а) диктант"
+        first_line = f"✅ {_safe_html(student_username)}, успешно выполненный диктант"
 
     text = (
         f"{first_line}\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
-        f"Дата: {date_iso}"
+        f"{_safe_html(dictation_title)} (уровень {_safe_html(dictation_level)}){medals_inline}\n"
+        f"{date_iso}"
     )
-    if error_words_lines:
-        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
     return text
 
 
@@ -228,22 +390,85 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                                    completed_at_ms, completed_at_tz_offset_min, time_ms,
                                    completion_count_value, perfect_count, corrected_count, audio_count,
                                    attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
-                                   settings_json, error_words, report_header_mode: str = 'success') -> str:
-    # Date line
-    success_date_iso = datetime.now().date().isoformat()
-    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
-    date_line = when_local or success_date_iso
+                                   settings_json, error_words, report_header_mode: str = 'success',
+                                   total_chars=None, money_earned=None) -> str:
+    """
+    Собирает текст отчёта для отправки в Telegram.
+    Формат (только шапка, без детализации по предложениям):
 
-    # Totals
+    ✅ TanyaYushyna, успешно выполненный диктант
+    popular (уровень A1)  🥇 4
+    2026-05-08 17:46
+    $: 154
+    🪲: 32 / 670
+    ⭐ - 20
+    ½⭐ - 59
+    о - 90
+    🎤 - 20
+    Длительность: 1:03
+    Схема аудио: oto
+    """
     def _int_or_0(x):
         try:
             return int(x or 0)
         except Exception:
             return 0
 
-    totals_compact = f"{_int_or_0(perfect_count)}-{_int_or_0(corrected_count)}-{_int_or_0(audio_count)}-{_int_or_0(attempts_total)}-{_int_or_0(error_count)}"
+    # Дата и время завершения
+    success_date_iso = datetime.now().date().isoformat()
+    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
+    date_line = when_local or success_date_iso
 
-    # Audio scheme
+    # Количество завершений (медаль)
+    medals_inline = ''
+    if completion_count_value is not None:
+        medals_inline = f"  🥇 {completion_count_value}"
+
+    # Заголовок
+    mode = str(report_header_mode or 'success').strip().lower()
+    if mode == 'interim':
+        first_line = f"📊 {_safe_html(student_username)}, промежуточные результаты"
+    else:
+        first_line = f"✅ {_safe_html(student_username)}, успешно выполненный диктант"
+
+    lines = [first_line]
+
+    # Название диктанта + уровень + медаль
+    title_line = f"{_safe_html(dictation_title)} (уровень {_safe_html(dictation_level)}){medals_inline}"
+    lines.append(title_line)
+
+    # Дата
+    lines.append(date_line)
+
+    # Деньги (заработанные за диктант)
+    me = _int_or_0(money_earned) if money_earned is not None else 0
+    lines.append(f"$: {me}")
+
+    # Ошибки / всего символов
+    err_count = _int_or_0(error_count)
+    ch_count = _int_or_0(total_chars) if total_chars is not None else 0
+    if ch_count > 0:
+        lines.append(f"🪲: {err_count} / {ch_count}")
+    else:
+        lines.append(f"🪲: {err_count}")
+
+    # ⭐ - perfect
+    lines.append(f"⭐ - {_int_or_0(perfect_count)}")
+    # ½⭐ - corrected
+    lines.append(f"½⭐ - {_int_or_0(corrected_count)}")
+    # о - текстовая активность (text_activity_count из sentences_data)
+    text_activity_total = 0
+    if isinstance(sentences_data, list):
+        for sd in sentences_data:
+            text_activity_total += _int_or_0(sd.get('text_activity_count'))
+    lines.append(f"о - {text_activity_total}")
+    # 🎤 - аудио (number_of_audio)
+    lines.append(f"🎤 - {_int_or_0(audio_count)}")
+
+    # Длительность
+    lines.append(f"Длительность: {_fmt_duration(time_ms)}")
+
+    # Схема аудио
     audio_scheme_line = ''
     try:
         sj = settings_json
@@ -256,120 +481,15 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
         if isinstance(sj_obj, dict):
             audio_cfg = sj_obj.get('audio') if isinstance(sj_obj.get('audio'), dict) else {}
             start = str(audio_cfg.get('start') or '').strip()
-            typo = str(audio_cfg.get('typo') or '').strip()
-            success_scheme = str(audio_cfg.get('success') or '').strip()
-            if start or typo or success_scheme:
-                audio_scheme_line = f"Схема аудио: {start} - {typo} - {success_scheme}\n"
+            if start:
+                audio_scheme_line = f"Схема аудио: {start}"
     except Exception:
         audio_scheme_line = ''
 
-    # Per-sentence lines
-    lines = []
-    rows = []
-    if isinstance(sentences_data, list):
-        for r in sentences_data:
-            if not isinstance(r, dict):
-                continue
-            skey = r.get('sentence_key')
-            if not skey:
-                continue
-            try:
-                sentence = get_sentence_by_key(dictation_int, dictation_lang, str(skey))
-            except Exception:
-                sentence = None
-            text_sentence = ''
-            position = None
-            if isinstance(sentence, dict):
-                text_sentence = sentence.get('text') or ''
-                position = sentence.get('position')
+    if audio_scheme_line:
+        lines.append(audio_scheme_line)
 
-            rows.append(
-                {
-                    'sentence_key': str(skey),
-                    'position': position,
-                    'perfect_count': _int_or_0(r.get('perfect_count')),
-                    'corrected_count': _int_or_0(r.get('corrected_count')),
-                    'audio_count': _int_or_0(r.get('audio_count')),
-                    'attempts_total': _int_or_0(r.get('attempts_total')),
-                    'error_count': _int_or_0(r.get('error_count')),
-                    'text': text_sentence,
-                }
-            )
-
-    try:
-        def _row_sort_key(x: dict):
-            p = x.get('position')
-            try:
-                if p is not None:
-                    return (0, int(p))
-            except Exception:
-                pass
-            return (1, str(x.get('sentence_key') or ''))
-
-        rows.sort(key=_row_sort_key)
-    except Exception:
-        pass
-
-    rows = rows[:35]
-    for i, rr in enumerate(rows, start=1):
-        stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
-        compact = f"{stars}-{rr.get('attempts_total')}-{rr.get('error_count')}"
-        sent_text = _safe_html(rr.get('text'))
-        if sent_text and len(sent_text) > 120:
-            sent_text = sent_text[:117] + '...'
-        line_num = i
-        try:
-            p = rr.get('position')
-            if p is not None:
-                line_num = int(p)
-        except Exception:
-            line_num = i
-        lines.append(f"{line_num}) {compact}   {sent_text}")
-
-    # Error words (reuse short builder logic)
-    short_part = _build_teacher_report_text(
-        student_username=student_username,
-        dictation_title=dictation_title,
-        dictation_level=dictation_level,
-        date_iso=success_date_iso,
-        completion_count_value=completion_count_value,
-        error_words=error_words,
-        report_header_mode=report_header_mode,
-    )
-
-    medals_inline = ''
-    if completion_count_value is not None:
-        medals_inline = f"  🥇 {completion_count_value}"
-
-    mode = str(report_header_mode or 'success').strip().lower()
-    if mode == 'interim':
-        first_line = f"📊 <b>{_safe_html(student_username)}</b>, промежуточные результаты"
-    else:
-        first_line = f"✅ <b>{_safe_html(student_username)}</b>, вы успешно выполнили диктант"
-
-    header = (
-        f"{first_line}\n"
-        f"<b>{_safe_html(dictation_title)}</b> (уровень {_safe_html(dictation_level)}){medals_inline}\n"
-        f"Дата: {date_line}\n"
-        f"Длительность: {_fmt_duration(time_ms)}\n"
-        + (audio_scheme_line or '')
-        + "\n"
-        f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
-        f"Итоги: {totals_compact}"
-    )
-
-    # Extract error-words block from short_part (everything after first double newline)
-    extra = ''
-    try:
-        if '\n\n' in short_part:
-            extra = short_part.split('\n\n', 1)[1]
-            extra = '\n\n' + extra
-    except Exception:
-        extra = ''
-
-    body_lines = "\n" + "\n".join(lines) if lines else ''
-
-    return header + (extra or '') + ("\n\n" + body_lines if body_lines else '')
+    return '\n'.join(lines)
 
 
 @statistics_bp.route('/teacher_report/recipients', methods=['POST'])
@@ -536,6 +656,9 @@ def teacher_report_send():
     # Prefer full report when enough data is provided
     want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
     if want_full:
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count')
         text = _build_teacher_report_text_full(
             student_username=student_username,
             dictation_title=dictation_title,
@@ -548,13 +671,15 @@ def teacher_report_send():
             corrected_count=data.get('corrected_count') or 0,
             audio_count=data.get('audio_count') or 0,
             attempts_total=data.get('attempts_total') or 0,
-            error_count=data.get('error_count') or 0,
+            error_count=mistake_count or 0,
             sentences_data=data.get('sentences_data') or [],
             dictation_int=int(dictation_int),
             dictation_lang=str(dictation_lang),
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
             report_header_mode=report_header_mode or 'success',
+            total_chars=data.get('total_chars'),
+            money_earned=data.get('money_earned'),
         )
     else:
         today_iso = _today_iso_local()
@@ -628,7 +753,7 @@ def teacher_report_recipients_auto():
 
     # self
     try:
-        if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')):
+        if user.get('telegram_chat_id'):
             recipients.append({'type': 'self', 'label': 'Я'})
     except Exception:
         pass
@@ -737,10 +862,21 @@ def teacher_report_send_auto():
     # self chat
     self_chat_id = None
     try:
-        if send_to_self and user.get('telegram_chat_id') and bool(user.get('telegram_enabled')):
+        if send_to_self and user.get('telegram_chat_id'):
             self_chat_id = int(user.get('telegram_chat_id'))
     except Exception:
         self_chat_id = None
+
+    # Логируем полный список получателей
+    try:
+        recipient_log = []
+        if self_chat_id is not None:
+            recipient_log.append(f"self(chat_id={self_chat_id})")
+        for cid in chat_ids:
+            recipient_log.append(f"teacher(chat_id={cid})")
+        print(f"📨 [TELEGRAM][SEND_AUTO] recipients_list=[{', '.join(recipient_log)}]")
+    except Exception:
+        pass
 
     if not chat_ids and self_chat_id is None:
         try:
@@ -756,7 +892,11 @@ def teacher_report_send_auto():
         completion_count_value = None
     if completion_count_value is None:
         try:
-            completion_count_value = int(get_success_count(int(user.get('id')), int(dictation_int)) or 0)
+            # Используем history_by_day.successes (history_successes будет удалена)
+            selected_sentence_positions = data.get('selected_sentence_positions')
+            completion_count_value = get_successes_sum_from_history_by_day(
+                int(user.get('id')), int(dictation_int), selected_sentence_positions
+            )
         except Exception:
             completion_count_value = None
 
@@ -772,6 +912,9 @@ def teacher_report_send_auto():
 
     want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
     if want_full:
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count')
         text = _build_teacher_report_text_full(
             student_username=student_username,
             dictation_title=dictation_title,
@@ -784,13 +927,15 @@ def teacher_report_send_auto():
             corrected_count=data.get('corrected_count') or 0,
             audio_count=data.get('audio_count') or 0,
             attempts_total=data.get('attempts_total') or 0,
-            error_count=data.get('error_count') or 0,
+            error_count=mistake_count or 0,
             sentences_data=data.get('sentences_data') or [],
             dictation_int=int(dictation_int),
             dictation_lang=str(dictation_lang),
             settings_json=data.get('settings_json'),
             error_words=data.get('error_words'),
             report_header_mode=report_header_mode or 'success',
+            total_chars=data.get('total_chars'),
+            money_earned=data.get('money_earned'),
         )
     else:
         today_iso = _today_iso_local()
@@ -1038,7 +1183,7 @@ def save_activity():
 
     Поддерживает:
     - legacy: {type_activity, number, lead_time_ms}
-    - bulk: {perfect_count, corrected_count, audio_count, lead_time_ms}
+    - bulk: {perfect_count, corrected_count, audio_count, money_count, mistake_count, monenumber_of_characters, lead_time_ms}
     """
     try:
         current_email = get_jwt_identity()
@@ -1060,12 +1205,24 @@ def save_activity():
         perfect_count = data.get('perfect_count')
         corrected_count = data.get('corrected_count')
         audio_count = data.get('audio_count')
+        activity_count = data.get('activity_count')
+        money_count = data.get('money_count')
+        mistake_count = data.get('mistake_count')
+        monenumber_of_characters = data.get('monenumber_of_characters')
         
         if not dictation_id:
             print(f'❌ [SAVE_ACTIVITY] Ошибка: не указан dictation_id')
             return jsonify({'error': 'Не указан dictation_id'}), 400
 
-        is_bulk = (perfect_count is not None) or (corrected_count is not None) or (audio_count is not None)
+        is_bulk = (
+            (perfect_count is not None)
+            or (corrected_count is not None)
+            or (audio_count is not None)
+            or (activity_count is not None)
+            or (money_count is not None)
+            or (mistake_count is not None)
+            or (monenumber_of_characters is not None)
+        )
 
         if not is_bulk:
             if not type_activity:
@@ -1093,6 +1250,10 @@ def save_activity():
                 perfect_count=perfect_count or 0,
                 corrected_count=corrected_count or 0,
                 audio_count=audio_count or 0,
+                activity_count=activity_count or 0,
+                money_count=money_count or 0,
+                mistake_count=mistake_count or 0,
+                monenumber_of_characters=monenumber_of_characters or 0,
                 lead_time_ms=lead_time_ms or 0,
                 date_override=activity_date,
                 dictation_language_code=dictation_language_code,
@@ -1664,7 +1825,7 @@ def api_planfact_report():
 @statistics_bp.route('/rating', methods=['POST'])
 @jwt_required()
 def api_rating_report():
-    """Рейтинг активности: агрегируем perfect/corrected/audio за период по всем пользователям."""
+    """Рейтинг активности: агрегируем данные из history_by_day за период по всем пользователям."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -1738,78 +1899,43 @@ def api_rating_report():
                 if lang:
                     cur.execute(
                         """
-                        WITH activity AS (
-                            SELECT
-                                ha.user_id,
-                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
-                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
-                                COALESCE(SUM(ha.audio_count), 0) AS audio
-                            FROM history_activity ha
-                            LEFT JOIN dictations d ON d.id = ha.dictation_id
-                            WHERE ha.date >= %s
-                              AND ha.date <= %s
-                              AND COALESCE(ha.dictation_language_code, d.language_code) = %s
-                            GROUP BY ha.user_id
-                        ),
-                        times AS (
-                            SELECT
-                                hs.user_id,
-                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
-                            FROM history_successes hs
-                            LEFT JOIN dictations d ON d.id = hs.dictation_id
-                            WHERE DATE(hs.created_at) >= %s
-                              AND DATE(hs.created_at) <= %s
-                              AND COALESCE(hs.dictation_language_code, d.language_code) = %s
-                            GROUP BY hs.user_id
-                        )
                         SELECT
-                            a.user_id,
+                            h.user_id,
                             u.username,
-                            a.perfect,
-                            a.corrected,
-                            a.audio,
-                            COALESCE(t.time_ms, 0) AS time_ms
-                        FROM activity a
-                        JOIN users u ON u.id = a.user_id
-                        LEFT JOIN times t ON t.user_id = a.user_id
+                            COALESCE(SUM(h.perfect_count), 0) AS perfect,
+                            COALESCE(SUM(h.corrected_count), 0) AS corrected,
+                            COALESCE(SUM(h.audio_count), 0) AS audio,
+                            COALESCE(SUM(h.lead_time), 0) AS lead_time,
+                            COALESCE(SUM(h.money_dt_count), 0) AS money_dt_count,
+                            COALESCE(SUM(h.monenumber_of_characters), 0) AS monenumber_of_characters
+                        FROM history_by_day h
+                        JOIN users u ON u.id = h.user_id
+                        WHERE h.date_fact >= %s
+                          AND h.date_fact <= %s
+                          AND h.dictation_language_code = %s
+                        GROUP BY h.user_id, u.username
                         """,
-                        (start_date, end_date, lang, start_date, end_date, lang),
+                        (start_date, end_date, lang),
                     )
                 else:
                     cur.execute(
                         """
-                        WITH activity AS (
-                            SELECT
-                                ha.user_id,
-                                COALESCE(SUM(ha.perfect_count), 0) AS perfect,
-                                COALESCE(SUM(ha.corrected_count), 0) AS corrected,
-                                COALESCE(SUM(ha.audio_count), 0) AS audio
-                            FROM history_activity ha
-                            WHERE ha.date >= %s
-                              AND ha.date <= %s
-                            GROUP BY ha.user_id
-                        ),
-                        times AS (
-                            SELECT
-                                hs.user_id,
-                                COALESCE(SUM(hs.time_ms), 0) AS time_ms
-                            FROM history_successes hs
-                            WHERE DATE(hs.created_at) >= %s
-                              AND DATE(hs.created_at) <= %s
-                            GROUP BY hs.user_id
-                        )
                         SELECT
-                            a.user_id,
+                            h.user_id,
                             u.username,
-                            a.perfect,
-                            a.corrected,
-                            a.audio,
-                            COALESCE(t.time_ms, 0) AS time_ms
-                        FROM activity a
-                        JOIN users u ON u.id = a.user_id
-                        LEFT JOIN times t ON t.user_id = a.user_id
+                            COALESCE(SUM(h.perfect_count), 0) AS perfect,
+                            COALESCE(SUM(h.corrected_count), 0) AS corrected,
+                            COALESCE(SUM(h.audio_count), 0) AS audio,
+                            COALESCE(SUM(h.lead_time), 0) AS lead_time,
+                            COALESCE(SUM(h.money_dt_count), 0) AS money_dt_count,
+                            COALESCE(SUM(h.monenumber_of_characters), 0) AS monenumber_of_characters
+                        FROM history_by_day h
+                        JOIN users u ON u.id = h.user_id
+                        WHERE h.date_fact >= %s
+                          AND h.date_fact <= %s
+                        GROUP BY h.user_id, u.username
                         """,
-                        (start_date, end_date, start_date, end_date),
+                        (start_date, end_date),
                     )
 
                 rows = cur.fetchall() or []
@@ -1823,7 +1949,9 @@ def api_rating_report():
                                 'perfect': int(r.get('perfect') or 0),
                                 'corrected': int(r.get('corrected') or 0),
                                 'audio': int(r.get('audio') or 0),
-                                'time_ms': int(r.get('time_ms') or 0),
+                                'lead_time': int(r.get('lead_time') or 0),
+                                'money_dt_count': int(r.get('money_dt_count') or 0),
+                                'monenumber_of_characters': int(r.get('monenumber_of_characters') or 0),
                             }
                         )
                     else:
@@ -1835,7 +1963,9 @@ def api_rating_report():
                                 'perfect': int(r[2] or 0),
                                 'corrected': int(r[3] or 0),
                                 'audio': int(r[4] or 0),
-                                'time_ms': int(r[5] or 0),
+                                'lead_time': int(r[5] or 0),
+                                'money_dt_count': int(r[6] or 0),
+                                'monenumber_of_characters': int(r[7] or 0),
                             }
                         )
         finally:
@@ -1843,6 +1973,8 @@ def api_rating_report():
 
         total_users = len(out)
 
+        # Сортировка на сервере — по умолчанию по perfect, audio, corrected (как было)
+        # Фронтенд может пересортировать по своим правилам
         out.sort(
             key=lambda x: (
                 -int(x.get('perfect') or 0),
@@ -1929,16 +2061,58 @@ def save_success():
         corrected_count = data.get('corrected_count', 0)
         audio_count = data.get('audio_count', 0)
         attempts_total = data.get('attempts_total', 0)
-        error_count = data.get('error_count', 0)
+        mistake_count = data.get('mistake_count')
+        if mistake_count is None:
+            mistake_count = data.get('error_count', 0)
+        monenumber_of_characters = data.get('monenumber_of_characters', 0)
         time_ms = data.get('time_ms', 0)
+        money_earned = data.get('money_earned', 0)
+        try:
+            money_earned = int(money_earned) if money_earned else 0
+        except Exception:
+            money_earned = 0
+        date_start = data.get('date_start')
         source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
         completion_count_after = data.get('completion_count_after')
-        selected_sentence_positions = data.get('selected_sentence_positions')
+        selected_sentence_positions_raw = data.get('selected_sentence_positions')
+        # Нормализуем positions для INTEGER[]
+        try:
+            if not isinstance(selected_sentence_positions_raw, list):
+                selected_sentence_positions = []
+            else:
+                pos_norm = []
+                for p in selected_sentence_positions_raw:
+                    try:
+                        v = int(p)
+                        if v > 0:
+                            pos_norm.append(v)
+                    except Exception:
+                        continue
+                selected_sentence_positions = sorted(list(set(pos_norm)))
+        except Exception:
+            selected_sentence_positions = []
         dictation_language_code = data.get('dictation_language_code')
+
+        started_at = None
+        try:
+            started_at_iso = data.get('started_at') or data.get('started_at_iso')
+            started_at_ms = data.get('started_at_ms')
+            started_at_tz_offset_min = data.get('started_at_tz_offset_min')
+            if started_at_iso:
+                started_at = datetime.fromisoformat(str(started_at_iso))
+            elif started_at_ms is not None:
+                ms = int(started_at_ms)
+                tz_min = int(started_at_tz_offset_min) if started_at_tz_offset_min is not None else int(completed_at_tz_offset_min) if completed_at_tz_offset_min is not None else None
+                if tz_min is None:
+                    started_at = datetime.utcfromtimestamp(ms / 1000.0)
+                else:
+                    started_at = datetime.utcfromtimestamp((ms - (tz_min * 60 * 1000)) / 1000.0)
+        except Exception:
+            started_at = None
         
         if not dictation_id:
             print(f'❌ [SAVE_SUCCESS] Ошибка: не указан dictation_id')
@@ -1967,290 +2141,17 @@ def save_success():
             audio_count,
             time_ms,
             attempts_total,
-            error_count,
+            mistake_count,
+            monenumber_of_characters=monenumber_of_characters,
             source_group_id=source_group_id,
             selected_sentence_positions=selected_sentence_positions,
             dictation_language_code=dictation_language_code,
+            started_at=started_at,
+            date_start=date_start,
         )
 
-        # Telegram уведомления отправляются отдельной процедурой /teacher_report/send_auto
-        try:
-            if False and is_telegram_enabled():
-                dictation_int = None
-                if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
-                    dictation_int = int(dictation_id.replace('dict_', ''))
-                else:
-                    dictation_int = int(dictation_id)
-
-                success_date_iso = datetime.now().date().isoformat()
-                teacher_chat_ids = list_teacher_chat_ids_for_student_success(
-                    student_user_id=user_id,
-                    dictation_id=dictation_int,
-                    success_date_iso=success_date_iso,
-                )
-
-                if teacher_chat_ids:
-                    info = get_student_and_dictation_info(user_id, dictation_int)
-                    student_username = info.get('student_username') or 'Ученик'
-                    dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
-                    dictation_level = info.get('dictation_level') or '—'
-
-                    try:
-                        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
-                    except Exception:
-                        completion_count_value = None
-                    if completion_count_value is None:
-                        try:
-                            completion_count_value = int(get_success_count(user_id, dictation_int) or 0)
-                        except Exception:
-                            completion_count_value = None
-
-                    error_words_lines = []
-                    try:
-                        ew = error_words if isinstance(error_words, dict) else {}
-                        items = []
-                        for k, v in ew.items():
-                            try:
-                                w = str(k or '').strip()
-                                c = int(v or 0)
-                            except Exception:
-                                continue
-                            if not w or c <= 0:
-                                continue
-                            items.append((w, c))
-                        items.sort(key=lambda x: (-x[1], x[0]))
-                        items = items[:15]
-                        for w, c in items:
-                            error_words_lines.append(f"{_safe(w)} - {c}")
-                    except Exception:
-                        error_words_lines = []
-
-                    text = (
-                        f"✅ <b>{student_username}</b> выполнил(а) задание\n"
-                        f"<b>{dictation_title}</b> (уровень {dictation_level})\n"
-                        f"Дата: {success_date_iso}"
-                    )
-                    if completion_count_value is not None:
-                        text = text + f"\n🥇 {completion_count_value}"
-                    if error_words_lines:
-                        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
-                    for cid in teacher_chat_ids:
-                        try:
-                            send_telegram_message(cid, text)
-                        except Exception:
-                            pass
-        except Exception:
-            pass
-
-        # Telegram self-report студенту отправляется отдельной процедурой /teacher_report/send_auto
-        try:
-            if False and is_telegram_enabled():
-                if user.get('telegram_chat_id') and bool(user.get('telegram_enabled')) and bool(user.get('telegram_self_reports_enabled')):
-                    dictation_int = None
-                    if isinstance(dictation_id, str) and dictation_id.startswith('dict_'):
-                        dictation_int = int(dictation_id.replace('dict_', ''))
-                    else:
-                        dictation_int = int(dictation_id)
-
-                    success_date_iso = datetime.now().date().isoformat()
-                    info = get_student_and_dictation_info(user_id, dictation_int)
-                    student_username = info.get('student_username') or 'Вы'
-                    dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
-                    dictation_level = info.get('dictation_level') or '—'
-
-                    try:
-                        from helpers.db_dictations import get_dictation_info
-
-                        dictation_info = get_dictation_info(dictation_int) or {}
-                        dictation_lang = dictation_info.get('language_code') or 'en'
-                    except Exception:
-                        dictation_lang = 'en'
-
-                    def _fmt_duration(ms: int) -> str:
-                        try:
-                            ms = int(ms or 0)
-                        except Exception:
-                            ms = 0
-                        sec = max(0, ms // 1000)
-                        m = sec // 60
-                        s = sec % 60
-                        if m <= 0:
-                            return f"{s}с"
-                        return f"{m}м {s:02d}с"
-
-                    def _safe(v: str) -> str:
-                        v = str(v or '')
-                        return (
-                            v.replace('&', '&amp;')
-                            .replace('<', '&lt;')
-                            .replace('>', '&gt;')
-                        )
-
-                    def _fmt_user_local_dt(ts_ms, tz_offset_min) -> str:
-                        try:
-                            ts_ms = int(ts_ms or 0)
-                        except Exception:
-                            ts_ms = 0
-                        try:
-                            tz_offset_min = int(tz_offset_min or 0)
-                        except Exception:
-                            tz_offset_min = 0
-
-                        if ts_ms <= 0:
-                            return ''
-
-                        try:
-                            # tz_offset_min: minutes east of UTC (e.g. +180)
-                            dt_utc = datetime.utcfromtimestamp(ts_ms / 1000.0)
-                            dt_local = dt_utc + timedelta(minutes=tz_offset_min)
-                            return dt_local.strftime('%Y-%m-%d %H:%M')
-                        except Exception:
-                            return ''
-
-                    # Build per-sentence table from payload + DB texts
-                    rows = []
-                    if isinstance(sentences_data, list):
-                        for r in sentences_data:
-                            if not isinstance(r, dict):
-                                continue
-                            skey = r.get('sentence_key')
-                            if not skey:
-                                continue
-                            try:
-                                sentence = get_sentence_by_key(dictation_int, dictation_lang, str(skey))
-                            except Exception:
-                                sentence = None
-                            text_sentence = ''
-                            position = None
-                            if isinstance(sentence, dict):
-                                text_sentence = sentence.get('text') or ''
-                                position = sentence.get('position')
-
-                            rows.append(
-                                {
-                                    'sentence_key': str(skey),
-                                    'position': position,
-                                    'perfect_count': int(r.get('perfect_count') or 0),
-                                    'corrected_count': int(r.get('corrected_count') or 0),
-                                    'audio_count': int(r.get('audio_count') or 0),
-                                    'attempts_total': int(r.get('attempts_total') or 0),
-                                    'error_count': int(r.get('error_count') or 0),
-                                    'text': text_sentence,
-                                }
-                            )
-
-                    # Sort by dictation position (fallback to sentence_key) and keep message bounded
-                    try:
-                        def _row_sort_key(x: dict):
-                            p = x.get('position')
-                            try:
-                                if p is not None:
-                                    return (0, int(p))
-                            except Exception:
-                                pass
-                            return (1, str(x.get('sentence_key') or ''))
-
-                        rows.sort(key=_row_sort_key)
-                    except Exception:
-                        pass
-                    max_rows = 35
-                    rows = rows[:max_rows]
-
-                    lines = []
-                    if rows:
-                        # lines.append('№) ⭐ - ½⭐ - 🎤 - попыток - ошибок  текст')
-                        for i, rr in enumerate(rows, start=1):
-                            stars = f"{rr.get('perfect_count')}-{rr.get('corrected_count')}-{rr.get('audio_count')}"
-                            att = rr.get('attempts_total')
-                            err = rr.get('error_count')
-                            compact = f"{stars}-{att}-{err}"
-                            sent_text = _safe(rr.get('text'))
-                            if sent_text and len(sent_text) > 120:
-                                sent_text = sent_text[:117] + '...'
-                            lines.append(f"{i}) {compact}   {sent_text}")
-
-                    when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
-                    date_line = success_date_iso
-                    if when_local:
-                        date_line = when_local
-
-                    totals_compact = (
-                        f"{int(perfect_count or 0)}-{int(corrected_count or 0)}-{int(audio_count or 0)}-"
-                        f"{int(attempts_total or 0)}-{int(error_count or 0)}"
-                    )
-
-                    try:
-                        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
-                    except Exception:
-                        completion_count_value = None
-                    if completion_count_value is None:
-                        try:
-                            completion_count_value = int(get_success_count(user_id, dictation_int) or 0)
-                        except Exception:
-                            completion_count_value = None
-
-                    audio_scheme_line = ''
-                    try:
-                        sj = data.get('settings_json')
-                        if isinstance(sj, str) and sj.strip():
-                            sj_obj = json.loads(sj)
-                        elif isinstance(sj, dict):
-                            sj_obj = sj
-                        else:
-                            sj_obj = None
-                        if isinstance(sj_obj, dict):
-                            audio_cfg = sj_obj.get('audio') if isinstance(sj_obj.get('audio'), dict) else {}
-                            start = str(audio_cfg.get('start') or '').strip()
-                            typo = str(audio_cfg.get('typo') or '').strip()
-                            success_scheme = str(audio_cfg.get('success') or '').strip()
-                            if start or typo or success_scheme:
-                                audio_scheme_line = f"Схема аудио: {start} - {typo} - {success_scheme}\n"
-                    except Exception:
-                        audio_scheme_line = ''
-
-                    error_words_lines = []
-                    try:
-                        ew = error_words if isinstance(error_words, dict) else {}
-                        items = []
-                        for k, v in ew.items():
-                            try:
-                                w = str(k or '').strip()
-                                c = int(v or 0)
-                            except Exception:
-                                continue
-                            if not w or c <= 0:
-                                continue
-                            items.append((w, c))
-                        items.sort(key=lambda x: (-x[1], x[0]))
-                        items = items[:30]
-                        for w, c in items:
-                            error_words_lines.append(f"{_safe(w)} - {c}")
-                    except Exception:
-                        error_words_lines = []
-
-                    text = (
-                        f"✅ <b>{_safe(student_username)}</b>, вы успешно выполнили диктант\n"
-                        f"<b>{_safe(dictation_title)}</b> (уровень {_safe(dictation_level)}) 🥇"
-                        + (f"{completion_count_value}" if completion_count_value is not None else "")
-                        + "\n"
-                        f"Дата: {date_line}\n"
-                        f"Длительность: {_fmt_duration(time_ms)}\n"
-                        + (audio_scheme_line or "")
-                        + "\n"
-                        f"⭐ - ½⭐ - 🎤 - попыток - ошибок\n"
-                        f"Итоги: {totals_compact}"
-                    )
-                    if error_words_lines:
-                        text = text + "\n\n" + "<b>Слова с ошибками</b>\n" + "\n".join(error_words_lines)
-                    if lines:
-                        text = text + "\n\n" + "\n".join(lines)
-
-                    send_telegram_message(int(user.get('telegram_chat_id')), text)
-        except Exception:
-            pass
-        
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
-        
+
         return jsonify({
             'success': True,
             'success_data': success
@@ -2305,10 +2206,13 @@ def get_success_counts():
 @statistics_bp.route('/success/count_subset', methods=['POST'])
 @jwt_required()
 def get_success_count_subset():
-    """Return completion count for a specific assignment subset (selected_sentence_positions).
+    """Return completion count for an exercise (dictation + sentence positions).
 
-    Medals count only full dictations (selected_sentence_positions IS NULL).
-    This endpoint is for candies: it counts exact subset matches.
+    Counts sum of successes from history_by_day for this dictation_id and positions.
+    Used for medal display in dictation header.
+
+    NOTE: history_successes will be removed in the future.
+    All completion counting should use history_by_day.successes.
     """
     try:
         current_email = get_jwt_identity()
@@ -2326,8 +2230,10 @@ def get_success_count_subset():
 
         user_id = int(user['id'])
 
-        cnt = int(get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions) or 0)
-        return jsonify({'success': True, 'count': cnt})
+        # Считаем сумму successes из history_by_day для этого упражнения
+        total = get_successes_sum_from_history_by_day(user_id, dictation_id, selected_sentence_positions)
+
+        return jsonify({'success': True, 'count': total})
     except Exception as e:
         print(f'❌ [GET_SUCCESS_COUNT_SUBSET] Ошибка: {e}')
         import traceback

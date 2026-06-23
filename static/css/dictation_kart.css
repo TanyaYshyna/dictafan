@@ -1,0 +1,211 @@
+.dictation-kart {
+  display: block;
+}
+
+/* Десктопная карточка: обрезаем длинный заголовок через ellipsis */
+.page-index .desk-card .short-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: block;
+}
+
+.dictation-kart--book-row {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+
+.dictation-kart--book-row.short-card {
+  display: block;
+  min-height: 0;
+}
+
+.page-index .short-card.dictation-kart {
+  border-radius: 16px;
+  padding: 12px;
+  background: var(--color-panel-bg, #fff);
+  border: 2px solid var(--color-border, #e2e8f0);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .06);
+  transition: none;
+  overflow: visible;
+  box-sizing: border-box;
+  width: 180px;
+  min-width: 180px;
+  flex: 0 0 180px;
+}
+
+.page-index .desk-card .short-thumb {
+  width: calc(100% + 24px);
+  margin: -12px -12px 0 -12px;
+  border-radius: 14px 14px 0 0;
+  overflow: hidden;
+}
+
+.page-index .desk-card .short-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.page-index .desk-card .short-meta.short-meta--row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.page-index .desk-card .short-meta-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.page-index .desk-card .short-meta-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.page-index .desk-card .short-sentences-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.page-index .desk-card .short-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.page-index .desk-card .dictation-kart-launch-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.page-index .desk-card .dictation-kart-launch-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  padding: 0;
+}
+
+.page-index .desk-card .dictation-kart-launch-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: auto;
+  z-index: 200600;
+  background-color: var(--color-panel-bg, #fff);
+  border: 1px solid var(--color-border-light, #dee2e6);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.page-index .short-card.dictation-kart:hover {
+  transform: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, .06);
+  border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__main {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dictation-kart--book-row .short-thumb {
+  flex: 0 0 200px;
+  width: 200px;
+  height: 120px;
+  margin: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.dictation-kart--book-row .short-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__content {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.dictation-kart--book-row .dictation-kart-book-row__side-bottom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dictation-kart--book-row .short-title {
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  line-clamp: 1;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+#auto-toast {
+  position: fixed;
+  left: 50%;
+  top: 24px;
+  transform: translateX(-50%);
+  z-index: 200500;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  max-width: min(92vw, 520px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  user-select: text;
+  cursor: pointer;
+  display: none;
+}

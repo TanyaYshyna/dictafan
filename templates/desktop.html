@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}DictaFan{% endblock %}
+
+{% block page_head %}
+    <link rel="stylesheet" href="/static/css/desktop.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/dictation_kart.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/book_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/private_library_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/global_library_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/tasks_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/desktop_confirm_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/plan_tasks_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/desktop_stats_panel.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/style_dictations_reports.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/user_profile_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/dictation_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/active_dictations_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/audio_cache_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
+{% endblock %}
+
+{% block body_attrs %}class="page-index"{% endblock %}
+
+{% block build_channel %}dictafan:build:desktop{% endblock %}
+
+{% block topbar %}
+    <div class="topbar">
+        <a href="/" class="logo-link">
+            <img src="/static/icons/logo.svg" class="logo">
+        </a>
+        <div class="user-section" id="user-section">
+            <div class="auth-buttons" style="display: none;"></div>
+            <div class="user-info" style="display: none;">
+                <div class="desktop-user-meta">
+                    <div class="dropdown-menu-wrapper" id="desktopUserMenuWrapper">
+                        <button type="button" class="username" id="desktopUserMenuToggle" aria-haspopup="true" aria-expanded="false">
+                            <div class="user-avatar-small"></div>
+                            <span class="username-text"></span>
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="desktopUserMenuDropdown" role="menu">
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-profile" role="menuitem">
+                                <i data-lucide="user"></i>
+                                <span>Профиль пользователя</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-tracker" role="menuitem">
+                                <i data-lucide="calendar"></i>
+                                <span>Трекер</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-ratings" role="menuitem">
+                                <i data-lucide="trophy"></i>
+                                <span>Рейтинги</span>
+                            </button>
+                            <button type="button" class="dropdown-menu-item" data-action="desktop-menu-coffee" role="menuitem">
+                                <i data-lucide="coffee"></i>
+                                <span>На кофе</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="logoutBtn" class="logout-btn" title="">
+                        <i data-lucide="log-out"></i>
+                        <span class="logout-text"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="panel">
+        <div class="desk-zone" id="desktopDeskZone">
+            <div class="tool-palette tool-palette--desk" id="desktopToolPalette">
+                <button class="tool-palette-btn" type="button" data-action="desktop-new" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-home" title="">
+                    <i data-lucide="home"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-public" title="">
+                    <i data-lucide="globe"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-plan" title="">
+                    <i data-lucide="calendar-check"></i>
+                </button>
+                <div class="tool-palette-separator"></div>
+                <div class="dropdown-menu-wrapper" id="desktopAdminMenuWrapper">
+                    <button class="tool-palette-btn" type="button" id="desktopAdminMenuToggle" title="Администрирование">
+                        <i data-lucide="glasses"></i>
+                    </button>
+                    <div class="dropdown-menu" id="desktopAdminMenuDropdown" role="menu">
+                        <button type="button" class="dropdown-menu-item" data-action="desktop-admin-active-dictations" role="menuitem">
+                            <i data-lucide="database"></i>
+                            <span>Активные диктанты</span>
+                        </button>
+                        <button type="button" class="dropdown-menu-item" data-action="desktop-admin-audio-cache" role="menuitem">
+                            <i data-lucide="music"></i>
+                            <span>Аудио в кэше</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="tool-palette-separator"></div>
+                <button class="tool-palette-btn" type="button" data-action="desktop-layout-toggle" title="" aria-pressed="false" id="btnDeskFreeLayoutToggle">
+                    <i data-lucide="grip-vertical"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-zoom-in" title="">
+                    <i data-lucide="plus"></i>
+                </button>
+                <button class="tool-palette-btn" type="button" data-action="desktop-zoom-out" title="">
+                    <i data-lucide="minus"></i>
+                </button>
+            </div>
+
+            <div class="desk-scroll-container">
+                <div class="desk-cards-container" id="deskCardsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'partials/tasks_modal.html' %}
+    {% include 'partials/plan_tasks_modal.html' %}
+    {% include 'partials/reports_modal.html' %}
+    {% include 'partials/dictation_kart.html' %}
+    {% include 'partials/book_modal.html' %}
+
+    {% include 'partials/private_library_modal.html' %}
+    {% include 'partials/global_library_modal.html' %}
+
+    {% include 'partials/user_profile_modal.html' %}
+
+    {% include 'partials/dictation_modal.html' %}
+
+    {% include 'partials/desktop_confirm_modal.html' %}
+
+    {% include 'partials/active_dictations_modal.html' %}
+    {% include 'partials/audio_cache_modal.html' %}
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script defer src="/static/js/dictation_kart.js?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/tasks_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/desktop_confirm_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/plan_tasks_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/book_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/private_library_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/global_library_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/dictation_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+    <script type="module" id="transformers-loader">
+        import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';
+
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            if (args[0] && typeof args[0] === 'string' && args[0].includes('CleanUnusedInitializersAndNodeArgs')) {
+                return;
+            }
+            originalWarn.apply(console, args);
+        };
+
+        env.allowLocalModels = false;
+        env.allowRemoteModels = true;
+
+        window.pipeline = pipeline;
+        window.transformers = { pipeline, env };
+
+        window.dispatchEvent(new CustomEvent('transformers-ready'));
+    </script>
+    <script defer src="{{ url_for('static', filename='js/whisper-model-manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/speech_recognition_unified.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/audio_settings_panel.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="{{ url_for('static', filename='js/user_profile_modal.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/active_dictations_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/audio_cache_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/desktop_stats_panel.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/statistics_report.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/desktop.js?v={{ app_cache_revision }}"></script>
+{% endblock %}

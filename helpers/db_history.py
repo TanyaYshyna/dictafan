@@ -7,6 +7,148 @@ from psycopg2 import sql
 from helpers.db import get_db_connection
 
 
+def _normalize_selected_sentence_positions(selected_sentence_positions):
+    try:
+        if selected_sentence_positions is None:
+            return []
+        if isinstance(selected_sentence_positions, str):
+            raw = selected_sentence_positions.strip()
+            if not raw or raw == '[]':
+                return []
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, list):
+                    return [int(x) for x in parsed]
+                return []
+            except Exception:
+                return []
+        return [int(x) for x in list(selected_sentence_positions or [])]
+    except Exception:
+        return []
+
+
+def _ensure_dictation_exercise(cur, dictation_id: int, positions_arr: list[int]) -> int:
+    """Возвращает id упражнения (dictation_exercises), создавая его при необходимости.
+
+    positions_arr=[] означает Full (весь диктант).
+    """
+    cur.execute(
+        """
+        INSERT INTO dictation_exercises (dictation_id, positions)
+        VALUES (%s, %s)
+        ON CONFLICT (dictation_id, positions)
+        DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+        RETURNING id
+        """,
+        (int(dictation_id), positions_arr),
+    )
+    row = cur.fetchone()
+    return int(row[0])
+
+
+def _resolve_teacher_id(cur, user_id: int, source_group_id) -> int:
+    if not source_group_id:
+        return int(user_id)
+    cur.execute(
+        """
+        SELECT teacher_id
+        FROM groups
+        WHERE id = %s
+        """,
+        (int(source_group_id),),
+    )
+    row = cur.fetchone()
+    if not row or row[0] is None:
+        return int(user_id)
+    return int(row[0])
+
+
+def _upsert_history_by_day(
+    cur,
+    *,
+    user_id: int,
+    teacher_id: int,
+    dictation_language_code,
+    dictation_id: int,
+    positions=None,
+    date_plan,
+    date_fact,
+    date_start=None,
+    perfect_delta: int = 0,
+    corrected_delta: int = 0,
+    audio_delta: int = 0,
+    mistake_delta: int = 0,
+    monenumber_of_characters_delta: int = 0,
+    lead_time_delta: int = 0,
+    successes_delta: int = 0,
+    activity_count_delta: int = 0,
+    money_dt_delta: int = 0,
+) -> None:
+    positions_arr = _normalize_selected_sentence_positions(positions)
+    # Если date_start не передан, используем date_fact
+    if date_start is None:
+        date_start = date_fact
+    cur.execute(
+        """
+        INSERT INTO history_by_day (
+            user_id,
+            teacher_id,
+            dictation_language_code,
+            dictation_id,
+            positions,
+            date_plan,
+            date_fact,
+            date_start,
+            perfect_count,
+            corrected_count,
+            audio_count,
+            monenumber_of_characters,
+            mistake_count,
+            lead_time,
+            successes,
+            activity_count,
+            money_dt_count,
+            created_at,
+            updated_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
+        DO UPDATE SET
+            perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
+            corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
+            audio_count = COALESCE(history_by_day.audio_count, 0) + EXCLUDED.audio_count,
+            monenumber_of_characters = COALESCE(history_by_day.monenumber_of_characters, 0) + EXCLUDED.monenumber_of_characters,
+            mistake_count = COALESCE(history_by_day.mistake_count, 0) + EXCLUDED.mistake_count,
+            lead_time = COALESCE(history_by_day.lead_time, 0) + EXCLUDED.lead_time,
+            successes = COALESCE(history_by_day.successes, 0) + EXCLUDED.successes,
+            activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
+            money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
+            dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
+            date_start = LEAST(COALESCE(history_by_day.date_start, EXCLUDED.date_start), EXCLUDED.date_start),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (
+            int(user_id),
+            int(teacher_id),
+            dictation_language_code,
+            int(dictation_id),
+            positions_arr,
+            date_plan,
+            date_fact,
+            date_start,
+            int(perfect_delta or 0),
+            int(corrected_delta or 0),
+            int(audio_delta or 0),
+            int(monenumber_of_characters_delta or 0),
+            int(mistake_delta or 0),
+            int(lead_time_delta or 0),
+            int(successes_delta or 0),
+            int(activity_count_delta or 0),
+            int(money_dt_delta or 0),
+        ),
+    )
+
+
 def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
     """
     Добавляет или обновляет запись активности в history_activity (агрегация по дням)
@@ -84,26 +226,7 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
     # Нормализуем selected_sentence_positions к int[] для БД.
     # Пустой массив означает: все предложения.
-    try:
-        if selected_sentence_positions is None:
-            selected_sentence_positions_arr = []
-        elif isinstance(selected_sentence_positions, str):
-            raw = selected_sentence_positions.strip()
-            if not raw or raw == '[]':
-                selected_sentence_positions_arr = []
-            else:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        selected_sentence_positions_arr = [int(x) for x in parsed]
-                    else:
-                        selected_sentence_positions_arr = []
-                except Exception:
-                    selected_sentence_positions_arr = []
-        else:
-            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
-    except Exception:
-        selected_sentence_positions_arr = []
+    selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
     
     conn = get_db_connection()
     try:
@@ -152,6 +275,39 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
             )
 
             row = cur.fetchone()
+
+            try:
+                if type_activity == 'perfect':
+                    perfect_delta = int(number or 0)
+                    corrected_delta = 0
+                    audio_delta = 0
+                elif type_activity == 'corrected':
+                    perfect_delta = 0
+                    corrected_delta = int(number or 0)
+                    audio_delta = 0
+                else:
+                    perfect_delta = 0
+                    corrected_delta = 0
+                    audio_delta = int(number or 0)
+
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(user_id),
+                    dictation_language_code=dictation_language_code,
+                    dictation_id=int(dictation_id),
+                    positions=selected_sentence_positions_arr,
+                    date_plan=target_date,
+                    date_fact=target_date,
+                    perfect_delta=perfect_delta,
+                    corrected_delta=corrected_delta,
+                    audio_delta=audio_delta,
+                    lead_time_delta=int(lead_time_ms_int or 0),
+                    successes_delta=0,
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             activity = {
@@ -179,10 +335,10 @@ def add_activity(user_id, dictation_id, type_activity, number=1, date_override=N
 
 
 def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, language_code=None):
-    """Return summed lead_time (ms) and activity counters by day from history_activity for a given period.
+    """Return summed lead_time (ms) and counters by day from history_by_day for a given period.
 
     Returns:
-        list[dict]: [{date: 'YYYY-MM-DD', lead_time: int, activity: int}, ...]
+        list[dict]: [{date, lead_time, money_dt, mistakes, chars}, ...]
     """
     conn = get_db_connection()
     try:
@@ -196,16 +352,18 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 cur.execute(
                     """
                     SELECT
-                        date,
+                        date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
-                    FROM history_activity
+                        COALESCE(SUM(money_dt_count), 0) AS money_dt,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS chars
+                    FROM history_by_day
                     WHERE user_id = %s
-                      AND date >= %s
-                      AND date <= %s
+                      AND date_fact >= %s
+                      AND date_fact <= %s
                       AND dictation_language_code = %s
-                    GROUP BY date
-                    ORDER BY date ASC
+                    GROUP BY date_fact
+                    ORDER BY date_fact ASC
                     """,
                     (int(user_id), start_date, end_date, str(language_code).strip().lower()),
                 )
@@ -213,15 +371,17 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 cur.execute(
                     """
                     SELECT
-                        date,
+                        date_fact AS date,
                         COALESCE(SUM(lead_time), 0) AS lead_time,
-                        COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) AS activity
-                    FROM history_activity
+                        COALESCE(SUM(money_dt_count), 0) AS money_dt,
+                        COALESCE(SUM(mistake_count), 0) AS mistakes,
+                        COALESCE(SUM(monenumber_of_characters), 0) AS chars
+                    FROM history_by_day
                     WHERE user_id = %s
-                      AND date >= %s
-                      AND date <= %s
-                    GROUP BY date
-                    ORDER BY date ASC
+                      AND date_fact >= %s
+                      AND date_fact <= %s
+                    GROUP BY date_fact
+                    ORDER BY date_fact ASC
                     """,
                     (int(user_id), start_date, end_date),
                 )
@@ -235,7 +395,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 out.append({
                     'date': date_iso,
                     'lead_time': int(r.get('lead_time') or 0),
-                    'activity': int(r.get('activity') or 0),
+                    'money_dt': int(r.get('money_dt') or 0),
+                    'mistakes': int(r.get('mistakes') or 0),
+                    'chars': int(r.get('chars') or 0),
                 })
             else:
                 d = r[0]
@@ -243,7 +405,9 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
                 out.append({
                     'date': date_iso,
                     'lead_time': int(r[1] or 0),
-                    'activity': int(r[2] or 0) if len(r) > 2 else 0,
+                    'money_dt': int(r[2] or 0) if len(r) > 2 else 0,
+                    'mistakes': int(r[3] or 0) if len(r) > 3 else 0,
+                    'chars': int(r[4] or 0) if len(r) > 4 else 0,
                 })
         return out
     finally:
@@ -251,7 +415,7 @@ def get_activity_lead_time_by_day_range(user_id: int, start_date, end_date, lang
 
 
 def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
-    """Return (min_year, max_year) where user has any activity rows (lead_time or counts) in history_activity."""
+    """Return (min_year, max_year) where user has any activity rows (lead_time or counts) in history_by_day."""
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
@@ -259,9 +423,9 @@ def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
                 cur.execute(
                     """
                     SELECT
-                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
-                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
-                    FROM history_activity
+                        MIN(EXTRACT(YEAR FROM date_fact))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date_fact))::int AS max_year
+                    FROM history_by_day
                     WHERE user_id = %s
                       AND dictation_language_code = %s
                     """,
@@ -271,9 +435,9 @@ def get_activity_lead_time_year_bounds(user_id: int, language_code=None):
                 cur.execute(
                     """
                     SELECT
-                        MIN(EXTRACT(YEAR FROM date))::int AS min_year,
-                        MAX(EXTRACT(YEAR FROM date))::int AS max_year
-                    FROM history_activity
+                        MIN(EXTRACT(YEAR FROM date_fact))::int AS min_year,
+                        MAX(EXTRACT(YEAR FROM date_fact))::int AS max_year
+                    FROM history_by_day
                     WHERE user_id = %s
                     """,
                     (int(user_id),),
@@ -294,6 +458,10 @@ def add_activity_bulk(
     perfect_count=0,
     corrected_count=0,
     audio_count=0,
+    activity_count=0,
+    money_count=0,
+    mistake_count=0,
+    monenumber_of_characters=0,
     lead_time_ms=0,
     date_override=None,
     dictation_language_code=None,
@@ -352,35 +520,41 @@ def add_activity_bulk(
     except Exception:
         lead_time_ms_int = 0
 
+    try:
+        activity_count_int = int(activity_count or 0)
+    except Exception:
+        activity_count_int = 0
+    try:
+        money_count_int = int(money_count or 0)
+    except Exception:
+        money_count_int = 0
+    try:
+        mistake_count_int = int(mistake_count or 0)
+    except Exception:
+        mistake_count_int = 0
+    try:
+        monenumber_of_characters_int = int(monenumber_of_characters or 0)
+    except Exception:
+        monenumber_of_characters_int = 0
+
     if perfect_count_int < 0:
         perfect_count_int = 0
     if corrected_count_int < 0:
         corrected_count_int = 0
     if audio_count_int < 0:
         audio_count_int = 0
+    if activity_count_int < 0:
+        activity_count_int = 0
     if lead_time_ms_int < 0:
         lead_time_ms_int = 0
+    if money_count_int < 0:
+        money_count_int = 0
+    if mistake_count_int < 0:
+        mistake_count_int = 0
+    if monenumber_of_characters_int < 0:
+        monenumber_of_characters_int = 0
 
-    try:
-        if selected_sentence_positions is None:
-            selected_sentence_positions_arr = []
-        elif isinstance(selected_sentence_positions, str):
-            raw = selected_sentence_positions.strip()
-            if not raw or raw == '[]':
-                selected_sentence_positions_arr = []
-            else:
-                try:
-                    parsed = json.loads(raw)
-                    if isinstance(parsed, list):
-                        selected_sentence_positions_arr = [int(x) for x in parsed]
-                    else:
-                        selected_sentence_positions_arr = []
-                except Exception:
-                    selected_sentence_positions_arr = []
-        else:
-            selected_sentence_positions_arr = [int(x) for x in list(selected_sentence_positions or [])]
-    except Exception:
-        selected_sentence_positions_arr = []
+    selected_sentence_positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
 
     conn = get_db_connection()
     try:
@@ -414,6 +588,44 @@ def add_activity_bulk(
                 ),
             )
             row = cur.fetchone()
+
+            # Начисление денег: каждая активность приносит money_count монет
+            if money_count_int > 0:
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO user_money_ledger
+                        (user_id, dt, kt, reason, created_at, date_start, date_fact)
+                        VALUES (%s, %s, 0, %s, CURRENT_TIMESTAMP, %s, %s)
+                        """,
+                        (int(user_id), money_count_int, f"dictation_activity:{dictation_id}", target_date, target_date),
+                    )
+                except Exception:
+                    pass
+
+            try:
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(user_id),
+                    dictation_language_code=dictation_language_code,
+                    dictation_id=int(dictation_id),
+                    positions=selected_sentence_positions_arr,
+                    date_plan=target_date,
+                    date_fact=target_date,
+                    perfect_delta=int(perfect_count_int or 0),
+                    corrected_delta=int(corrected_count_int or 0),
+                    audio_delta=int(audio_count_int or 0),
+                    mistake_delta=int(mistake_count_int or 0),
+                    monenumber_of_characters_delta=int(monenumber_of_characters_int or 0),
+                    lead_time_delta=int(lead_time_ms_int or 0),
+                    successes_delta=0,
+                    activity_count_delta=int(activity_count_int or 0),
+                    money_dt_delta=int(money_count_int or 0),
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             return {
@@ -479,9 +691,9 @@ def get_activity_total_for_date(user_id, date_value, language_code=None):
 
 
 def calculate_streak_days(user_id, today=None):
-    """Calculate consecutive active days based on history_activity.
+    """Calculate consecutive active days based on history_by_day.
 
-    A day counts as active if total(perfect+corrected+audio) > 0.
+    A day counts as active if the user earned any money (money_dt_count > 0).
     """
     if today is None:
         today = datetime.now().date()
@@ -492,12 +704,12 @@ def calculate_streak_days(user_id, today=None):
             # Pull recent active dates (descending). Limit protects from scanning huge history.
             cur.execute(
                 """
-                SELECT date
-                FROM history_activity
+                SELECT date_fact AS date
+                FROM history_by_day
                 WHERE user_id = %s
-                GROUP BY date
-                HAVING COALESCE(SUM(perfect_count + corrected_count + audio_count), 0) > 0
-                ORDER BY date DESC
+                GROUP BY date_fact
+                HAVING COALESCE(SUM(money_dt_count), 0) > 0
+                ORDER BY date_fact DESC
                 LIMIT 400
                 """,
                 (int(user_id),),
@@ -612,7 +824,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, error_count=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, completion_count=None):
     """
     Добавляет запись успешного завершения диктанта в history_successes
     
@@ -646,7 +858,8 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     print(f'   corrected_count: {corrected_count}')
     print(f'   audio_count: {audio_count}')
     print(f'   attempts_total: {attempts_total}')
-    print(f'   error_count: {error_count}')
+    print(f'   mistake_count: {mistake_count}')
+    print(f'   monenumber_of_characters: {monenumber_of_characters}')
     print(f'   time_ms: {time_ms}')
     print(f'   source_group_id: {source_group_id}')
     print(f'   selected_sentence_positions: {selected_sentence_positions}')
@@ -655,14 +868,61 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
+            # history_successes хранит только полные диктанты (без subset).
+            # selected_sentence_positions передаётся в history_by_day и user_money_ledger.
             cur.execute("""
                 INSERT INTO history_successes 
-                (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, created_at, updated_at
-            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions))
+                (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, error_count, time_ms, source_group_id, selected_sentence_positions, started_at, created_at, updated_at
+            """, (user_id, dictation_id, dictation_language_code, perfect_count, corrected_count, audio_count, attempts_total, mistake_count, time_ms, source_group_id, None, started_at))
 
             row = cur.fetchone()
+
+            try:
+                teacher_id = _resolve_teacher_id(cur, int(user_id), source_group_id)
+                date_fact = datetime.now().date()
+                date_plan = date_fact
+
+                # date_start: если передан — используем его, иначе date_fact
+                if date_start is not None:
+                    try:
+                        if isinstance(date_start, str):
+                            date_start_parsed = datetime.strptime(date_start, '%Y-%m-%d').date()
+                        else:
+                            date_start_parsed = date_start
+                    except Exception:
+                        date_start_parsed = date_fact
+                else:
+                    date_start_parsed = date_fact
+
+                # Нормализуем selected_sentence_positions для history_by_day
+                positions_for_hbd = _normalize_selected_sentence_positions(selected_sentence_positions)
+
+                _upsert_history_by_day(
+                    cur,
+                    user_id=int(user_id),
+                    teacher_id=int(teacher_id),
+                    dictation_language_code=dictation_language_code,
+                    dictation_id=int(dictation_id),
+                    positions=positions_for_hbd,
+                    date_plan=date_plan,
+                    date_fact=date_fact,
+                    date_start=date_start_parsed,
+                    # perfect/corrected/audio уже обновлены в add_activity_bulk — не дублируем
+                    perfect_delta=0,
+                    corrected_delta=0,
+                    audio_delta=0,
+                    mistake_delta=int(mistake_count or 0),
+                    monenumber_of_characters_delta=int(monenumber_of_characters or 0),
+                    lead_time_delta=int(time_ms or 0),
+                    successes_delta=int(completion_count or 1),
+                    activity_count_delta=0,
+                    money_dt_delta=0,
+                )
+            except Exception:
+                pass
+
             conn.commit()
 
             success = {
@@ -674,12 +934,13 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 'corrected_count': row[5],
                 'audio_count': row[6],
                 'attempts_total': row[7],
-                'error_count': row[8],
+                'mistake_count': row[8],
                 'time_ms': row[9],
                 'source_group_id': row[10],
                 'selected_sentence_positions': list(row[11] or []) if row[11] is not None else None,
-                'created_at': row[12].isoformat() if row[12] else None,
-                'updated_at': row[13].isoformat() if row[13] else None,
+                'started_at': row[12].isoformat() if row[12] else None,
+                'created_at': row[13].isoformat() if row[13] else None,
+                'updated_at': row[14].isoformat() if row[14] else None,
             }
             
             print(f'✅ [HISTORY_SUCCESSES] Успех сохранен: id={success["id"]}, created_at={success["created_at"]}')
@@ -999,7 +1260,7 @@ def save_unclosed_dictation(user_id, dictation_id, time_ms, settings_json, sente
                         sentence.get('corrected_count', 0),
                         sentence.get('audio_count', 0),
                         sentence.get('attempts_total', 0),
-                        sentence.get('error_count', 0),
+                        sentence.get('mistake_count', sentence.get('error_count', 0)),
                         selection_state
                     ))
             
@@ -1076,7 +1337,7 @@ def get_unclosed_dictation(user_id, dictation_id):
                     'corrected_count': s_row[2],
                     'audio_count': s_row[3],
                     'attempts_total': s_row[4],
-                    'error_count': s_row[5],
+                    'mistake_count': s_row[5],
                     'selection_state': s_row[6] or 'unchecked'
                 })
             
@@ -1168,3 +1429,115 @@ def get_unclosed_dictation_stats(user_id, dictation_id):
         'audio': audio
     }
 
+def get_history_by_day_totals(user_id: int) -> dict:
+    """Return totals from history_by_day for a user.
+
+    Returns:
+        dict with keys: total_lead_time (ms), total_money (coins), total_activity_count,
+                        total_money_dt_count
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0) AS total_lead_time,
+                    COALESCE(SUM(money_dt_count), 0) AS total_money,
+                    COALESCE(SUM(activity_count), 0) AS total_activity_count,
+                    COALESCE(SUM(money_dt_count), 0) AS total_money_dt_count
+                FROM history_by_day
+                WHERE user_id = %s
+                """,
+                (int(user_id),),
+            )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return {
+                    'total_lead_time': int(row.get('total_lead_time') or 0),
+                    'total_money': int(row.get('total_money') or 0),
+                    'total_activity_count': int(row.get('total_activity_count') or 0),
+                    'total_money_dt_count': int(row.get('total_money_dt_count') or 0),
+                }
+            return {
+                'total_lead_time': int(row[0] or 0) if row else 0,
+                'total_money': int(row[1] or 0) if row else 0,
+                'total_activity_count': int(row[2] or 0) if row else 0,
+                'total_money_dt_count': int(row[3] or 0) if row else 0,
+            }
+    finally:
+        conn.close()
+
+
+def get_history_by_day_totals_for_date(user_id: int, date_value) -> dict:
+    """Return totals from history_by_day for a specific date.
+
+    Returns:
+        dict with keys: lead_time (ms), money (coins), activity_count,
+                        money_dt_count
+    """
+    conn = get_db_connection()
+    try:
+        if isinstance(date_value, str):
+            date_value = datetime.fromisoformat(date_value).date()
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0) AS lead_time,
+                    COALESCE(SUM(money_dt_count), 0) AS money,
+                    COALESCE(SUM(activity_count), 0) AS activity_count,
+                    COALESCE(SUM(money_dt_count), 0) AS money_dt_count
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND date_fact = %s
+                """,
+                (int(user_id), date_value),
+            )
+            row = cur.fetchone()
+            if isinstance(row, dict):
+                return {
+                    'lead_time': int(row.get('lead_time') or 0),
+                    'money': int(row.get('money') or 0),
+                    'activity_count': int(row.get('activity_count') or 0),
+                    'money_dt_count': int(row.get('money_dt_count') or 0),
+                }
+            return {
+                'lead_time': int(row[0] or 0) if row else 0,
+                'money': int(row[1] or 0) if row else 0,
+                'activity_count': int(row[2] or 0) if row else 0,
+                'money_dt_count': int(row[3] or 0) if row else 0,
+            }
+    finally:
+        conn.close()
+
+
+def get_successes_sum_from_history_by_day(user_id: int, dictation_id: int, selected_sentence_positions=None) -> int:
+    """Return sum of successes from history_by_day for a specific exercise (dictation + positions).
+
+    Args:
+        user_id: ID пользователя
+        dictation_id: ID диктанта
+        selected_sentence_positions: список позиций (или None для полного диктанта)
+
+    Returns:
+        int: сумма successes
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            positions_arr = _normalize_selected_sentence_positions(selected_sentence_positions)
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(successes), 0)
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(user_id), int(dictation_id), positions_arr),
+            )
+            row = cur.fetchone()
+            return int(row[0] or 0) if row else 0
+    finally:
+        conn.close()

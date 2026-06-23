@@ -21,12 +21,104 @@
       text: '',
     };
 
+    // Информация об очередях отправки и интернете
+    var queueInfoState = {
+      online: navigator.onLine,
+      count: 0,
+      timerRemainingMs: null,
+      updateTimerId: null,
+    };
+
     // Public page-published info shown on the right.
     // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
     var pageInfo = {
       meta: '',
       kv: {},
     };
+
+    function formatTimerRemaining(ms) {
+      try {
+        if (ms == null || ms <= 0) return '';
+        var totalSec = Math.ceil(ms / 1000);
+        var hh = Math.floor(totalSec / 3600);
+        var mm = Math.floor((totalSec % 3600) / 60);
+        var ss = totalSec % 60;
+        return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function updateQueueInfo() {
+      try {
+        var online = navigator.onLine;
+        queueInfoState.online = online;
+
+        if (typeof window.OutboxBatcher !== 'undefined' && typeof window.OutboxBatcher.getQueueInfo === 'function') {
+          window.OutboxBatcher.getQueueInfo().then(function (info) {
+            try {
+              queueInfoState.count = info.count;
+              queueInfoState.timerRemainingMs = info.timerRemainingMs;
+            } catch (e) {
+              console.warn('[SB:53b] updateQueueInfo: ошибка обработки', e);
+            }
+            renderQueueInfo();
+          }).catch(function (err) {
+            console.warn('[SB:53c] updateQueueInfo: getQueueInfo rejected', err);
+            renderQueueInfo();
+          });
+        } else {
+          renderQueueInfo();
+        }
+      } catch (e) {
+        console.warn('[SB:53e] updateQueueInfo: ошибка', e);
+      }
+    }
+
+    function renderQueueInfo() {
+      try {
+        var el = document.getElementById(BAR_ID + '__queueInfo');
+        if (!el) {
+          console.warn('[SB:77] renderQueueInfo: элемент не найден');
+          return;
+        }
+
+        var parts = [];
+
+        // Статус интернета
+        if (queueInfoState.online) {
+          parts.push('🟢 online');
+        } else {
+          parts.push('🔴 offline');
+        }
+
+        // Общая очередь — показываем всегда, даже если 0
+        var total = queueInfoState.count;
+        var str = 'queue: ' + total;
+        var timer = formatTimerRemaining(queueInfoState.timerRemainingMs);
+        if (timer) str += ' (' + timer + ')';
+        parts.push(str);
+
+        var text = parts.join(' | ');
+        el.textContent = text;
+      } catch (e) {
+        console.warn('[SB:77err] renderQueueInfo: ошибка', e);
+      }
+    }
+
+    function startQueueInfoPolling() {
+      try {
+        if (queueInfoState.updateTimerId) {
+          return;
+        }
+        updateQueueInfo();
+        queueInfoState.updateTimerId = setInterval(function () {
+          updateQueueInfo();
+        }, 5000); // обновление каждые 5 секунд
+      } catch (e) {
+        console.warn('[SB:109err] startQueueInfoPolling: ошибка', e);
+      }
+    }
 
     function getBuildValue() {
       try {
@@ -90,6 +182,7 @@
           "#" + BAR_ID + " .swbar-left{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
           "#" + BAR_ID + " .swbar-left-wrap{display:flex;align-items:center;gap:10px;min-width:0;}" +
           "#" + BAR_ID + " .swbar-msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+          "#" + BAR_ID + " .swbar-queue-info{flex:0 0 auto;white-space:nowrap;opacity:0.85;}" +
           "#" + BAR_ID + " .swbar-progress{display:none;align-items:center;gap:8px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-progress.on{display:flex;}" +
           "#" + BAR_ID + " .swbar-progress-track{width:160px;height:8px;border-radius:999px;background:rgba(0,0,0,0.06);overflow:hidden;}" +
@@ -170,8 +263,14 @@
         pct.id = BAR_ID + '__progressPct';
         pct.textContent = '';
 
+        var queueInfo = document.createElement('div');
+        queueInfo.className = 'swbar-queue-info';
+        queueInfo.id = BAR_ID + '__queueInfo';
+        queueInfo.textContent = '';
+
         leftWrap.appendChild(msg);
         leftWrap.appendChild(leftExtra);
+        leftWrap.appendChild(queueInfo);
         left.appendChild(leftWrap);
 
         var right = document.createElement('div');
@@ -517,14 +616,29 @@
           document.addEventListener('DOMContentLoaded', function () {
             ensureBar();
             hideLegacyBuildBadges();
+            startQueueInfoPolling();
           });
         } else {
           ensureBar();
           hideLegacyBuildBadges();
+          startQueueInfoPolling();
         }
       } catch (e) {
       }
       installInterceptor();
+
+      // Слушаем изменения статуса интернета
+      try {
+        window.addEventListener('online', function () {
+          queueInfoState.online = true;
+          updateQueueInfo();
+        });
+        window.addEventListener('offline', function () {
+          queueInfoState.online = false;
+          updateQueueInfo();
+        });
+      } catch (e) {
+      }
 
       try {
         if ('serviceWorker' in navigator) {

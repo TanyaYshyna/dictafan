@@ -57,6 +57,13 @@
           }
         } catch (e) {
         }
+
+        try {
+          if (!db.objectStoreNames.contains('sessions')) {
+            db.createObjectStore('sessions', { keyPath: 'key' });
+          }
+        } catch (e) {
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

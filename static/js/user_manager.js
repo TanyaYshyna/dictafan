@@ -380,7 +380,7 @@ class UserManager {
     let hideActivity = false;
     try {
       const p = String(window.location && window.location.pathname ? window.location.pathname : '');
-      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor');
+      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor') || p.startsWith('/desktop');
     } catch (e) {
       hideActivity = false;
     }
@@ -436,38 +436,45 @@ class UserManager {
 
     // Daily activity plan: show as today/goal near username
     try {
-      const todayTotal = Number(userData?.today_activity_total);
-      const goal = Number(userData?.daily_activity_goal);
-      const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;
-      const goalOk = Number.isFinite(goal) && goal > 0;
-
-      let el = userSection.querySelector('.daily-activity-progress');
-      if (!el) {
-        el = document.createElement('span');
-        el.className = 'daily-activity-progress';
-        if (activityBadge && !hideActivity) {
-          activityBadge.appendChild(el);
-        } else if (usernameElement && usernameElement.parentElement) {
-          usernameElement.parentElement.appendChild(el);
+      if (hideActivity) {
+        const existing = userSection.querySelector('.daily-activity-progress');
+        if (existing) {
+          try { existing.remove(); } catch (e2) {}
         }
-      }
+      } else {
+        const todayTotal = Number(userData?.today_activity_total);
+        const goal = Number(userData?.daily_activity_goal);
+        const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;
+        const goalOk = Number.isFinite(goal) && goal > 0;
 
-      if (el) {
-        if (todayOk && goalOk) {
-          el.textContent = `${todayTotal}/${goal}`;
-          el.style.display = 'inline';
-        } else {
-          el.textContent = '';
-          el.style.display = 'none';
+        let el = userSection.querySelector('.daily-activity-progress');
+        if (!el) {
+          el = document.createElement('span');
+          el.className = 'daily-activity-progress';
+          if (activityBadge && !hideActivity) {
+            activityBadge.appendChild(el);
+          } else if (usernameElement && usernameElement.parentElement) {
+            usernameElement.parentElement.appendChild(el);
+          }
         }
-      }
 
-      if (activityBadge) {
-        // unified hint for the whole badge
-        if (todayOk && goalOk) {
-          activityBadge.title = `План на день: ${todayTotal}/${goal}`;
-        } else {
-          activityBadge.title = 'План на день';
+        if (el) {
+          if (todayOk && goalOk) {
+            el.textContent = `${todayTotal}/${goal}`;
+            el.style.display = 'inline';
+          } else {
+            el.textContent = '';
+            el.style.display = 'none';
+          }
+        }
+
+        if (activityBadge) {
+          // unified hint for the whole badge
+          if (todayOk && goalOk) {
+            activityBadge.title = `План на день: ${todayTotal}/${goal}`;
+          } else {
+            activityBadge.title = 'План на день';
+          }
         }
       }
     } catch (e) {
@@ -648,6 +655,16 @@ class UserManager {
         localStorage.setItem('jwt_token', token);
         this.token = token;
         this.userData = data.user;
+
+        // Важно: login endpoint может вернуть неполный объект user (без avatar и т.п.).
+        // Дотягиваем каноничные данные через /user/api/me, чтобы шапка/аватар работали одинаково на всех страницах.
+        try {
+          const fresh = await this.validateToken(token);
+          if (fresh && typeof fresh === 'object') {
+            this.userData = fresh;
+          }
+        } catch (e) {
+        }
 
         this._saveUserCache(this.userData);
 

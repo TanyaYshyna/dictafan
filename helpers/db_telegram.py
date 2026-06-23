@@ -57,7 +57,7 @@ def link_telegram_chat_by_code(code: str, chat_id: int) -> Optional[int]:
 
     conn, cur = get_db_cursor()
     try:
-        _ensure_users_telegram_columns(cur, ['telegram_link_code', 'telegram_chat_id', 'telegram_enabled'])
+        _ensure_users_telegram_columns(cur, ['telegram_link_code', 'telegram_chat_id'])
         cur.execute(
             """
             SELECT id
@@ -76,7 +76,6 @@ def link_telegram_chat_by_code(code: str, chat_id: int) -> Optional[int]:
             """
             UPDATE users
             SET telegram_chat_id = %s,
-                telegram_enabled = TRUE,
                 telegram_link_code = NULL,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
@@ -90,25 +89,6 @@ def link_telegram_chat_by_code(code: str, chat_id: int) -> Optional[int]:
         conn.close()
 
 
-def set_user_telegram_enabled(user_id: int, enabled: bool) -> None:
-    conn, cur = get_db_cursor()
-    try:
-        _ensure_users_telegram_columns(cur, ['telegram_enabled'])
-        cur.execute(
-            """
-            UPDATE users
-            SET telegram_enabled = %s,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
-            """,
-            (bool(enabled), int(user_id)),
-        )
-        conn.commit()
-    finally:
-        cur.close()
-        conn.close()
-
-
 def list_teacher_chat_ids_for_student_success(student_user_id: int, dictation_id: int, *, success_date_iso: str) -> list[int]:
     """Return teacher chat_ids to notify for a student's success of dictation_id on date.
 
@@ -116,7 +96,7 @@ def list_teacher_chat_ids_for_student_success(student_user_id: int, dictation_id
     - active student in group_students
     - group_students.notify_teacher_on_success = TRUE
     - group has active teacher (groups.teacher_id)
-    - teacher has telegram_chat_id and telegram_enabled
+    - teacher has telegram_chat_id
     - there exists an active assignment in that group for this dictation and date range
     """
     conn, cur = get_db_cursor()
@@ -136,7 +116,6 @@ def list_teacher_chat_ids_for_student_success(student_user_id: int, dictation_id
               AND a.archived_at IS NULL
               AND (%s::date >= a.start_date AND %s::date <= a.end_date)
               AND u.telegram_chat_id IS NOT NULL
-              AND u.telegram_enabled = TRUE
             """,
             (int(student_user_id), int(dictation_id), success_date_iso, success_date_iso),
         )
@@ -186,7 +165,7 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
     Rules:
     - student is active in group_students
     - COALESCE(group_students.notify_teacher_on_success, TRUE) = TRUE (учитель включил уведомления для ученика)
-    - teacher is groups.teacher_id, teacher has telegram_chat_id and telegram_enabled
+    - teacher is groups.teacher_id, teacher has telegram_chat_id
     - teacher language preferences must not block student->teacher reports
     """
     conn, cur = get_db_cursor()
@@ -205,7 +184,6 @@ def list_teacher_recipients_for_student_manual_report(student_user_id: int, *, d
               AND gs.removed_at IS NULL
               AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
               AND u.telegram_chat_id IS NOT NULL
-              AND u.telegram_enabled = TRUE
             ORDER BY u.username ASC, u.id ASC
             """,
             (int(student_user_id),),
@@ -266,7 +244,6 @@ def filter_manual_teacher_chat_ids(
               AND COALESCE(gs.notify_teacher_on_success, TRUE) = TRUE
               AND g.teacher_id = ANY(%s)
               AND u.telegram_chat_id IS NOT NULL
-              AND u.telegram_enabled = TRUE
             """,
             (int(student_user_id), ids),
         )

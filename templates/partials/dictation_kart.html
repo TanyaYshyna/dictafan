@@ -1,0 +1,76 @@
+<template id="dictationKartTemplate"></template>
+
+<template id="dictationKartDeskTemplate">
+    <div class="short-card dictation-kart desk-card" data-dictation-id="" data-desk-item-id="">
+        <div class="short-thumb" data-href="" data-lang-notice="" role="link" tabindex="0">
+            <img src="" data-cover-url="" alt="" class="short-cover" loading="lazy" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
+            <div class="card-progress-stats"></div>
+        </div>
+        <h3 class="short-title" data-slot="title"></h3>
+
+        <div class="short-meta short-meta--row">
+            <div class="short-meta-left">
+                <span class="short-lang-flags" data-slot="langPair"></span>
+                <span class="short-level" data-slot="level"></span>
+            </div>
+            <div class="short-meta-right">
+                <div class="short-sentences-count" title="Количество предложений">
+                    <i data-lucide="layers"></i><span data-slot="sentencesCount"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="short-stats" data-dictation-id="">
+            <div class="stats-placeholder"></div>
+        </div>
+
+        <div class="short-footer">
+            <div class="dictation-kart-launch-wrapper">
+                <button type="button" class="short-action-btn dictation-kart-launch-btn" data-action="launch-assignment" title="Запустить задание" aria-label="Запустить задание">
+                    <i data-lucide="pen-tool"></i>
+                </button>
+                <div class="short-card-actions-menu dictation-kart-launch-menu" style="display:none;"></div>
+            </div>
+            <div class="short-dikt-number" data-slot="dictationIdFormatted"></div>
+            <div class="short-actions-menu-wrapper" data-slot="menu"></div>
+        </div>
+    </div>
+</template>
+
+<template id="dictationKartBookTemplate">
+    <div class="short-card dictation-kart dictation-kart--book-row" data-dictation-id="" data-action="toggle-desk" data-edit-url="">
+        <div class="dictation-kart-book-row__main">
+            <div class="short-thumb">
+                <img src="" alt="" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
+            </div>
+
+            <div class="dictation-kart-book-row__content">
+                <div class="dictation-kart-book-row__text">
+                    <h3 class="short-title" data-slot="title"></h3>
+
+                    <div class="dictation-kart-book-row__meta">
+                        <span class="short-lang-flags" data-slot="langPair"></span>
+                        <span class="short-level" data-slot="level"></span>
+                    </div>
+
+                    <div class="short-dikt-number" data-slot="dictationId"></div>
+                </div>
+
+                <div class="dictation-kart-book-row__side">
+                    <div class="dictation-kart-book-row__side-top">
+                        <div class="short-sentences-count" title="Количество предложений">
+                            <i data-lucide="layers"></i><span data-slot="sentencesCount"></span>
+                        </div>
+                    </div>
+                    <div class="dictation-kart-book-row__side-bottom">
+                        <button class="short-action-btn short-action-btn--kebab short-desk-toggle-btn" data-action="toggle-desk-explicit" data-dictation-id="" title="" aria-label="">
+                            <i data-lucide="arrow-big-up-dash"></i>
+                        </button>
+                        <div data-slot="menu"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</template>

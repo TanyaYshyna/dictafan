@@ -16,14 +16,14 @@ class ProgressPanel {
         // Элементы DOM для статистики
         this.elements = {
             timer: document.getElementById('timer'),
-            timerSettings: document.getElementById('btn-timer-settings'),
+            errors: document.getElementById('count-errors'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             // Модальные элементы
             modalTimer: document.getElementById('modal_timer'),
-            modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
+            modalErrors: document.getElementById('modal-count-errors'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -34,6 +34,11 @@ class ProgressPanel {
         this.stats = {
             timer: 0, // секунды
             circleNumber: 0,
+            errors: 0,
+            chars: 0,
+            accuracyPct: 100,
+            moneyEarned: 0,
+            moneySpent: 0,
             perfect: 0,
             corrected: 0,
             audio: 0,
@@ -90,29 +95,34 @@ class ProgressPanel {
     _generateHTML(variant = 'inline') {
         const prefix = variant === 'modal' ? 'modal-' : '';
         const timerId = variant === 'modal' ? 'modal_timer' : 'timer';
-        const timerBtnId = variant === 'modal' ? 'btn-modal-timer' : 'btn-timer';
-        const timerSettingsId = variant === 'modal' ? 'btn-modal-timer-settings' : 'btn-timer-settings';
+        const clockBtnId = variant === 'modal' ? 'btn-modal-timer' : 'btn-timer';
+        const clockInteractiveAttr = variant === 'inline' ? ' data-interactive="true"' : '';
         
         return `
             <table class="table-progress">
                 <colgroup>
-                    <col class="progress-col">
-                    <col class="progress-col">
-                    <col class="progress-col">
-                    <col class="progress-col">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-fixed">
+                    <col class="progress-col progress-col-flex">
                 </colgroup>
                 <tr>
                     <td colspan="2">
-                        <button id="${timerSettingsId}" class="pp-timer-settings" title="Время работы над диктантом">
+                        <button id="${clockBtnId}" class="pp-clock" title="Время работы над диктантом"${clockInteractiveAttr}>
                             <i data-lucide="clock"></i>
                             <span id="${timerId}" class="timer-value">00:00:00</span>
                         </button>
                     </td>
-                    <td colspan="2">
-                        <button id="${timerBtnId}" class="pp-timer" disabled title="Таймер">
-                            <span class="timer-label">Таймер</span>
-                            <span class="timer-value" hidden>00:00:00</span>
-                            <i data-lucide="timer"></i>
+                    <td>
+                        <button id="btn-${prefix}count-accuracy" class="pp-total" disabled title="Точность набора">
+                            <i data-lucide="bug"></i>
+                            <span id="${prefix}count-accuracy">100.00%</span>
+                        </button>
+                    </td>
+                    <td>
+                        <button id="btn-${prefix}count-money" class="pp-money" disabled title="Деньги">
+                            <i data-lucide="circle-dollar-sign"></i>
+                            <span id="${prefix}count-money">+0</span>
                         </button>
                     </td>
                 </tr>
@@ -136,9 +146,9 @@ class ProgressPanel {
                         </button>
                     </td>
                     <td>
-                        <button id="btn-${prefix}count-total" class="pp-total" disabled title="Общее количество предложений">
-                            <i data-lucide="layers"></i>
-                            <span id="${prefix}count-total">0</span>
+                        <button id="btn-${prefix}count-errors" class="pp-total" disabled title="Ошибки / Набранные символы">
+                            <i data-lucide="bug"></i>
+                            <span id="${prefix}count-errors">0 / 0</span>
                         </button>
                     </td>
                 </tr>
@@ -164,13 +174,17 @@ class ProgressPanel {
         // перенастроим элементы после рендера
         this.elements = {
             timer: document.getElementById('timer'),
-            timerSettings: document.getElementById('btn-timer-settings'),
+            errors: document.getElementById('count-errors'),
+            accuracy: document.getElementById('count-accuracy'),
+            money: document.getElementById('count-money'),
             perfect: document.getElementById('count-perfect'),
             corrected: document.getElementById('count-corrected'),
             audio: document.getElementById('count-audio'),
             total: document.getElementById('count-total'),
             modalTimer: document.getElementById('modal_timer'),
-            modalTimerSettings: document.getElementById('btn-modal-timer-settings'),
+            modalErrors: document.getElementById('modal-count-errors'),
+            modalAccuracy: document.getElementById('modal-count-accuracy'),
+            modalMoney: document.getElementById('modal-count-money'),
             modalPerfect: document.getElementById('modal-count-perfect'),
             modalCorrected: document.getElementById('modal-count-corrected'),
             modalAudio: document.getElementById('modal-count-audio'),
@@ -183,12 +197,6 @@ class ProgressPanel {
         // Убеждаемся, что таймер показывает 00:00:00 при первом рендере
         this.stats.timer = 0;
         this.updateTimer();
-        this._loadTimerPreference();
-        this._initTimerControls();
-        // Загружаем список звуков таймера
-        this._loadTimerSounds();
-        // Загружаем список звуков победы
-        this._loadVictorySounds();
         
         // Обновим глобальные переменные для совместимости со старым кодом
         if (typeof window !== 'undefined') {
@@ -204,6 +212,9 @@ class ProgressPanel {
         }
 
         this.markClean({ lastSaveOk: true });
+        
+        // Инициализируем обработчики кнопок таймера после рендера
+        this._initTimerControls();
     }
 
     /**
@@ -417,14 +428,16 @@ class ProgressPanel {
     }
 
     updateTimerButtons() {
-        const shouldShowValue = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
+        const isCountdownActive = !!(this.countdownEnabled && this.timerState && this.timerState.countdownRemainingMs > 0);
         const apply = (btnId) => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
             const label = btn.querySelector('.timer-label');
             const value = btn.querySelector('.timer-value');
-            if (label) label.hidden = shouldShowValue;
-            if (value) value.hidden = !shouldShowValue;
+            // В режиме clock (countdownEnabled = false) всегда показываем время
+            // В режиме countdown: скрываем label, показываем value, если отсчёт активен
+            if (label) label.hidden = isCountdownActive;
+            if (value) value.hidden = false; // Всегда показываем время
         };
         apply('btn-timer');
         apply('btn-modal-timer');
@@ -608,8 +621,7 @@ class ProgressPanel {
             const num = Number(value);
             return Number.isFinite(num) ? num : 0;
         };
-        console.log('[Timer] updateUI -> mode=%s perfect=%s corrected=%s audio=%s total=%s circleNumber=%s timer=%s', this.timerMode, this.stats.perfect, this.stats.corrected, this.stats.audio, this.stats.total, this.stats.circleNumber, this.stats.timer);
-
+ 
         // Обновляем основной UI
         if (this.elements.perfect) {
             this.elements.perfect.textContent = safe(this.stats.perfect);
@@ -620,8 +632,19 @@ class ProgressPanel {
         if (this.elements.audio) {
             this.elements.audio.textContent = safe(this.stats.audio);
         }
-        if (this.elements.total) {
-            this.elements.total.textContent = safe(this.stats.total);
+        if (this.elements.errors) {
+            const e = safe(this.stats.errors);
+            const c = safe(this.stats.chars);
+            this.elements.errors.textContent = `${e} / ${c}`;
+        }
+        if (this.elements.accuracy) {
+            const pct = Number(this.stats.accuracyPct);
+            const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+            this.elements.accuracy.textContent = (v === 100 ? '100%' : `${v.toFixed(2)}%`);
+        }
+        if (this.elements.money) {
+            const earned = safe(this.stats.moneyEarned);
+            this.elements.money.textContent = `+${earned}`;
         }
 
         // Обновляем модальный UI
@@ -634,14 +657,70 @@ class ProgressPanel {
         if (this.elements.modalAudio) {
             this.elements.modalAudio.textContent = safe(this.stats.audio);
         }
-        if (this.elements.modalTotal) {
-            this.elements.modalTotal.textContent = safe(this.stats.total);
+        if (this.elements.modalErrors) {
+            const e = safe(this.stats.errors);
+            const c = safe(this.stats.chars);
+            this.elements.modalErrors.textContent = `${e} / ${c}`;
         }
+        if (this.elements.modalAccuracy) {
+            const pct = Number(this.stats.accuracyPct);
+            const v = Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : 0;
+            this.elements.modalAccuracy.textContent = (v === 100 ? '100%' : `${v.toFixed(2)}%`);
+        }
+        if (this.elements.modalMoney) {
+            const earned = safe(this.stats.moneyEarned);
+            this.elements.modalMoney.textContent = `+${earned}`;
+        }
+
+        // Обновляем иконку микрофона в панели прогресса
+        // Если stats.audio > 0 — mic, иначе mic-off
+        this._updateAudioIcon();
 
         // Обновляем таймер
         this.updateTimer();
         // обновляем индикаторы несохраненного прогресса
         this.updateUnsavedIndicators();
+    }
+
+    /**
+     * Обновить иконку микрофона в панели прогресса
+     * Если выполненных аудио > 0 — mic, иначе mic-off
+     */
+    _updateAudioIcon() {
+        try {
+            const audioCount = Number(this.stats.audio) || 0;
+            const iconName = audioCount > 0 ? 'mic' : 'mic-off';
+
+            // Inline кнопка
+            const btnAudio = document.getElementById('btn-count-audio');
+            if (btnAudio) {
+                const icon = btnAudio.querySelector('i[data-lucide]');
+                if (icon) {
+                    const currentIcon = icon.getAttribute('data-lucide');
+                    if (currentIcon !== iconName) {
+                        icon.setAttribute('data-lucide', iconName);
+                    }
+                }
+            }
+
+            // Модальная кнопка
+            const btnModalAudio = document.getElementById('btn-modal-count-audio');
+            if (btnModalAudio) {
+                const icon = btnModalAudio.querySelector('i[data-lucide]');
+                if (icon) {
+                    const currentIcon = icon.getAttribute('data-lucide');
+                    if (currentIcon !== iconName) {
+                        icon.setAttribute('data-lucide', iconName);
+                    }
+                }
+            }
+
+            // Перерисовываем lucide-иконки
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+                window.lucide.createIcons();
+            }
+        } catch (e) {
+        }
     }
 
     /**
@@ -812,24 +891,14 @@ class ProgressPanel {
      */
     _initTimerControls() {
         this._ensureTimerButtonsEnabled();
-        this._setupTimerSettingsButton(this.elements.timerSettings);
-        this._setupTimerSettingsButton(this.elements.modalTimerSettings);
-        this._setupTimerButton(document.getElementById('btn-timer'));
-        this._setupTimerButton(document.getElementById('btn-modal-timer'));
+        // Кнопка с часами переключает паузу (как в старой версии script_dictation.js)
+        this._setupTimerPauseButton(document.getElementById('btn-timer'));
+        this._setupTimerPauseButton(document.getElementById('btn-modal-timer'));
         this.updateTimerButtons();
         this._updateTimerButtonColor();
     }
 
-    _setupTimerButton(button) {
-        if (!button || button.dataset.timerSetup === '1') return;
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            this.openTimerDialog();
-        });
-        button.dataset.timerSetup = '1';
-    }
-
-    _setupTimerSettingsButton(button) {
+    _setupTimerPauseButton(button) {
         if (!button || button.dataset.timerSetup === '1') return;
         button.addEventListener('click', (event) => {
             event.preventDefault();
@@ -837,8 +906,6 @@ class ProgressPanel {
             if (event && typeof event.detail === 'number' && event.detail > 1) {
                 return;
             }
-            // Кнопка "время" (маленькая) переключает паузу (как раньше),
-            // а широкая кнопка "таймер" открывает настройки таймера.
             const pauseModal = document.getElementById('pauseModal');
             if (pauseModal && pauseModal.style.display === 'flex') {
                 if (typeof window.resumeGame === 'function') window.resumeGame();
@@ -882,7 +949,6 @@ class ProgressPanel {
         if (!overlay || !minutesInput || !secondsInput) return;
 
         const baseSeconds = (this.timerState.countdownDefaultSeconds || this.countdownDuration || 300);
-        console.log('[Timer] openTimerDialog() baseSeconds=%s countdownRemaining=%s countdownDuration=%s', baseSeconds, this.countdownRemaining, this.countdownDuration);
         minutesInput.value = Math.floor(baseSeconds / 60);
         secondsInput.value = baseSeconds % 60;
 
@@ -1009,7 +1075,6 @@ class ProgressPanel {
             this.timerDialogElements.secondsInput.value = safeSeconds;
         }
         const totalSeconds = safeMinutes * 60 + safeSeconds;
-        console.log('[Timer] _applyTimerSettings -> режим таймер: minutes=%s seconds=%s totalSeconds=%s', safeMinutes, safeSeconds, totalSeconds);
         if (totalSeconds <= 0) {
             alert('Укажите время таймера больше нуля.');
             return false;
@@ -1020,7 +1085,6 @@ class ProgressPanel {
         this._setCountdownSeconds(totalSeconds);
         // Сразу обновляем отображение установленного времени
         this.stats.timer = totalSeconds;
-        console.log('[Timer] _applyTimerSettings -> сохранено totalSeconds=%s', totalSeconds);
         this.updateTimer();
         this.updateTimerButtons();
         this._updateTimerButtonColor();
@@ -1071,8 +1135,7 @@ class ProgressPanel {
                 if (pref && Number(pref.duration) > 0) {
                     const duration = Number(pref.duration);
                     this._setCountdownSeconds(duration);
-                    console.log('[Timer] _loadTimerPreference -> duration=%s', duration);
-                }
+                 }
             }
         } catch (error) {
             console.warn('Ошибка чтения настроек таймера:', error);
@@ -1091,8 +1154,7 @@ class ProgressPanel {
             const duration = Number(this.countdownDuration || 0);
             if (!(duration > 0)) return;
             localStorage.setItem(this.timerPreferenceKey, JSON.stringify({ duration }));
-            console.log('[Timer] _saveTimerPreference -> duration=%s', duration);
-        } catch (error) {
+         } catch (error) {
             console.warn('Ошибка сохранения настроек таймера:', error);
         }
     }

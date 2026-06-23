@@ -6,7 +6,7 @@ class AudioSettingsPanel {
     constructor(options = {}) {
         this.options = {
             container: null,
-            mode: 'inline', // 'inline', 'modal', 'user-settings'
+            mode: 'inline', // 'inline', 'user-settings'
             showExplanations: true, // показывать ли описание значений букв
             onSettingsChange: null, // callback при изменении настроек
             ...options
@@ -325,7 +325,7 @@ class AudioSettingsPanel {
         }
 
         // Если у пользователя есть настройки - используем их
-        // Если пустые - оставляем пустыми (для старых пользователей в режиме inline/modal)
+        // Если пустые - оставляем пустыми (для старых пользователей в режиме inline)
         // Для новых пользователей в режиме user-settings используем значения по умолчанию
         if (userSettings.audio_start !== undefined && userSettings.audio_start !== null && userSettings.audio_start !== '') {
             this.settings.start = userSettings.audio_start;
@@ -333,7 +333,7 @@ class AudioSettingsPanel {
             // Для новых пользователей в режиме user-settings используем значения по умолчанию
             this.settings.start = this.defaults.start;
         }
-        // Для inline/modal режимов - оставляем текущее значение (не перезаписываем)
+        // Для inline режима - оставляем текущее значение (не перезаписываем)
 
         if (userSettings.audio_typo !== undefined && userSettings.audio_typo !== null && userSettings.audio_typo !== '') {
             this.settings.typo = userSettings.audio_typo;
@@ -386,11 +386,11 @@ class AudioSettingsPanel {
 
     /**
      * Генерирует HTML для панели настроек аудио
-     * @param {('inline'|'modal'|'user-settings')} mode - режим отображения
+     * @param {('inline'|'user-settings')} mode - режим отображения
      * @returns {string} HTML строка
      */
     _generateHTML(mode = 'inline') {
-        const prefix = mode === 'modal' ? 'modal-' : '';
+        const prefix = '';
         const showExplanations = this.options.showExplanations && mode !== 'inline';
         
         // Для режима user-settings - две панели (слева настройки, справа обозначения)
@@ -403,10 +403,6 @@ class AudioSettingsPanel {
             const repeatsLabel = this._t('profile.audio.repeats.label', null, 'Повторы аудио:');
             const onlyAudioLabel = this._t('profile.audio.only_audio.label', null, 'Только аудио (без ввода текста):');
             const showHintLabel = this._t('profile.audio.show_hint.label', null, 'Показывать подсказку:');
-            const speechRecLabel = this._t('profile.audio.speech_recognition.label', null, 'Распознавание речи:');
-            const testRecLabel = this._t('profile.audio.test_recording.label', null, 'Тест записи:');
-            const recordBtnText = this._t('profile.audio.test_recording.record', null, 'Записать');
-            const testRecPlaceholder = this._t('profile.audio.test_recording.placeholder', null, 'Распознанный текст появится тут');
 
             const explanationValues = {
                 'o': this._t('profile.audio.explanations.o', null, this.explanations['o']),
@@ -565,33 +561,6 @@ class AudioSettingsPanel {
                                             </button>
                                         </td>
                                     </tr>
-                                    <tr>
-                                        <td class="audio-settings-label">
-                                            <label>${speechRecLabel}</label>
-                                        </td>
-                                        <td class="audio-settings-input">
-                                            <div class="speech-recognition-toggle-button" 
-                                                 data-prefix="${prefix}"
-                                                 data-mode="${this.settings.speech_recognition_mode}">
-                                                <i data-lucide="${this.getSpeechRecognitionIcon(this.settings.speech_recognition_mode)}" class="speech-recognition-icon"></i>
-                                                <span class="speech-recognition-label">${this.getSpeechRecognitionLabel(this.settings.speech_recognition_mode)}</span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td class="audio-settings-label">
-                                            <label>${testRecLabel}</label>
-                                        </td>
-                                        <td class="audio-settings-input">
-                                            <div style="display:flex; flex-direction:column; gap:8px;">
-                                                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                                                    <button type="button" id="profileTestRecordingBtn" class="button-color-yellow" style="height: 34px; padding: 0 12px;">${recordBtnText}</button>
-                                                    <span id="profileTestRecordingStatus" style="font-size: 12px; color: #666;"></span>
-                                                </div>
-                                                <textarea id="profileTestRecordingResult" rows="2" style="width: min(520px, 100%); resize: vertical;" placeholder="${testRecPlaceholder}" readonly></textarea>
-                                            </div>
-                                        </td>
-                                    </tr>
                                 </table>
                             </div>
                         </td>
@@ -602,14 +571,14 @@ class AudioSettingsPanel {
                 </table>
             `;
         }
-        
+
         const hasModel = this.checkWhisperModelAvailable();
         const currentLang = this._getCurrentLangCode();
         const selectedSize = this._getSelectedWhisperSize(currentLang);
         const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
 
         // В диктанте оффлайн -> только локальный режим (без выбора "интернет")
-        if (isOffline && (this.options.mode === 'inline' || this.options.mode === 'modal')) {
+        if (isOffline && (this.options.mode === 'inline')) {
             this.settings.speech_recognition_mode = 'route-off';
         }
         const isLocalMode = this.settings.speech_recognition_mode === 'route-off';
@@ -650,7 +619,7 @@ class AudioSettingsPanel {
         const onTypoLabel = this._t('profile.audio.play_audio.on_typo', null, 'при ошибке:');
         const onSuccessLabel = this._t('profile.audio.play_audio.on_success', null, 'при успехе:');
 
-        // Для inline и modal режимов - обычная структура
+        // Для inline режима - обычная структура
         const explanationsHTML = showExplanations ? `
             <div class="audio-explanations">
                 <label>${explanationsLabel}</label>
@@ -795,7 +764,7 @@ class AudioSettingsPanel {
         const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
 
         // В диктанте оффлайн -> только локально (даже если модели нет, показываем красный лейбл)
-        if (isOffline && (this.options.mode === 'inline' || this.options.mode === 'modal')) {
+        if (isOffline && (this.options.mode === 'inline')) {
             this.settings.speech_recognition_mode = 'route-off';
         }
 
@@ -809,7 +778,7 @@ class AudioSettingsPanel {
         this.options.container.innerHTML = this._generateHTML(this.options.mode);
 
         // После рендера, обновляем состояние кнопки распознавания
-        const prefix = this.options.mode === 'modal' ? 'modal-' : '';
+        const prefix = '';
         const speechRecognitionButton = this.options.container.querySelector(`.speech-recognition-toggle-button[data-prefix="${prefix}"]`);
         if (speechRecognitionButton) {
             // Убеждаемся, что data-mode установлен правильно из настроек
@@ -845,7 +814,7 @@ class AudioSettingsPanel {
      * Привязка обработчиков событий
      */
     bindEvents() {
-        const prefix = this.options.mode === 'modal' ? 'modal-' : '';
+        const prefix = '';
         
         // Находим все поля ввода
         const startInput = document.getElementById(`${prefix}playSequenceStart`);
@@ -1055,7 +1024,7 @@ class AudioSettingsPanel {
                 const hasModel = checkWhisperModel();
                 const currentMode = speechRecognitionButton.dataset.mode || 'route';
 
-                const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
+                const isDictationPanel = this.options.mode === 'inline';
                 const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
 
                 if (isDictationPanel && isOffline) {
@@ -1112,7 +1081,7 @@ class AudioSettingsPanel {
                 
                 const hasModel = checkWhisperModel();
 
-                const isDictationPanel = this.options.mode === 'inline' || this.options.mode === 'modal';
+                const isDictationPanel = this.options.mode === 'inline';
                 const isOffline = (typeof navigator !== 'undefined' && navigator && navigator.onLine === false);
                 
                 // Получаем текущий режим из data-mode или из настроек (для первого клика)
@@ -1238,8 +1207,10 @@ class AudioSettingsPanel {
     getSpeechRecognitionIcon(mode) {
         const icons = {
             'route': 'route',
-            'route-server': 'server',
-            'route-off': 'route-off'
+            'server': 'server',
+            'route-off|tiny': 'house-heart',
+            'route-off|base': 'house',
+            'route-off|small': 'house-plus',
         };
         return icons[mode] || 'route';
     }
@@ -1249,9 +1220,14 @@ class AudioSettingsPanel {
      */
     getSpeechRecognitionLabel(mode) {
         const norm = String(mode || 'route');
-        if (norm === 'route-server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
-        if (norm === 'route-off') return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
-        return this._t('profile.audio.speech_recognition.mode_internet', null, 'интернет');
+        if (norm === 'server') return this._t('profile.audio.speech_recognition.mode_server', null, 'сервер');
+        if (norm.startsWith('route-off')) {
+            if (norm.includes('tiny')) return this._t('profile.audio.speech_recognition.mode_local_tiny', null, 'Whisper Tiny');
+            if (norm.includes('base')) return this._t('profile.audio.speech_recognition.mode_local_base', null, 'Whisper Base');
+            if (norm.includes('small')) return this._t('profile.audio.speech_recognition.mode_local_small', null, 'Whisper Small');
+            return this._t('profile.audio.speech_recognition.mode_local', null, 'локально');
+        }
+        return this._t('profile.audio.speech_recognition.mode_internet', null, 'інтернет');
     }
 
     /**

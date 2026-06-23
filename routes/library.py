@@ -195,6 +195,19 @@ def api_book_sections(book_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
+@library_bp.route("/api/book/<int:book_id>/sections-tree", methods=["GET"])
+@jwt_required()
+def api_book_sections_tree(book_id: int):
+    """Возвращает плоский список всех разделов книги (дерево) для UI перемещения диктанта."""
+    try:
+        from helpers.db_books import get_book_sections_tree
+        sections = get_book_sections_tree(book_id)
+        return jsonify({"success": True, "sections": sections})
+    except Exception as exc:
+        logger.error("Ошибка получения дерева разделов книги %s: %s", book_id, exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
 @library_bp.route("/api/book/<int:book_id>/add-to-my", methods=["POST"])
 @jwt_required()
 def api_add_book_to_my_library(book_id: int):
@@ -324,7 +337,6 @@ def api_create_book():
         theme = (request.form.get("theme") or "").strip() or None
         parent_id = request.form.get("parent_id")
         order_index = request.form.get("order_index", 0)
-        section_number = request.form.get("section_number")
         author_materials_url = request.form.get("author_materials_url")
         cover_file = request.files.get("cover")
     else:
@@ -338,11 +350,10 @@ def api_create_book():
         theme = (payload.get("theme") or "").strip() or None
         parent_id = payload.get("parent_id")
         order_index = payload.get("order_index", 0)
-        section_number = payload.get("section_number")
         author_materials_url = payload.get("author_materials_url")
         cover_file = None
 
-    # Преобразуем parent_id, order_index и section_number в правильные типы
+    # Преобразуем parent_id и order_index в правильные типы
     if parent_id:
         try:
             parent_id = int(parent_id)
@@ -353,13 +364,6 @@ def api_create_book():
         order_index = int(order_index)
     except (ValueError, TypeError):
         order_index = 0
-    
-    section_number_int = None
-    if section_number:
-        try:
-            section_number_int = int(section_number)
-        except (ValueError, TypeError):
-            section_number_int = None
     
     author_materials_url_str = None
     if author_materials_url:
@@ -379,7 +383,6 @@ def api_create_book():
             theme=theme,
             parent_id=parent_id,
             order_index=order_index,
-            section_number=section_number_int,
             author_materials_url=author_materials_url_str,
         )
 
@@ -421,7 +424,6 @@ def api_update_book(book_id: int):
             "author_text": request.form.get("author_text"),
             "theme": request.form.get("theme"),
             "order_index": request.form.get("order_index"),
-            "section_number": request.form.get("section_number"),
             "author_materials_url": request.form.get("author_materials_url"),
         }
         # Убираем пустые значения, но сохраняем author_materials_url даже если пусто (для очистки)
@@ -434,7 +436,6 @@ def api_update_book(book_id: int):
             "short_description": request.form.get("short_description"),
             "theme": request.form.get("theme"),
             "order_index": request.form.get("order_index"),
-            "section_number": request.form.get("section_number"),
         }.items():
             if v:
                 update_data[k] = v.strip() if isinstance(v, str) else v
@@ -448,18 +449,12 @@ def api_update_book(book_id: int):
                 update_data["order_index"] = int(update_data["order_index"])
             except (ValueError, TypeError):
                 update_data.pop("order_index", None)
-        # section_number преобразуем в int
-        if "section_number" in update_data and update_data["section_number"] is not None:
-            try:
-                update_data["section_number"] = int(update_data["section_number"])
-            except (ValueError, TypeError):
-                update_data.pop("section_number", None)
         cover_file = request.files.get("cover")
     else:
         # JSON - получаем данные из JSON
         payload = request.get_json(silent=True) or {}
         update_data = {}
-        # Обрабатываем каждое поле отдельно, чтобы не потерять section_number
+        # Обрабатываем каждое поле отдельно
         if "title" in payload:
             update_data["title"] = payload.get("title")
         if "original_language" in payload:
@@ -477,17 +472,6 @@ def api_update_book(book_id: int):
                 update_data["order_index"] = int(payload.get("order_index")) if payload.get("order_index") is not None else None
             except (ValueError, TypeError):
                 pass
-        if "section_number" in payload:
-            # section_number может быть числом, строкой или None
-            section_number_val = payload.get("section_number")
-            if section_number_val is not None and section_number_val != "":
-                try:
-                    update_data["section_number"] = int(section_number_val)
-                except (ValueError, TypeError):
-                    # Если не удалось преобразовать в int, не добавляем в update_data
-                    pass
-            # Если передано None или пустая строка, не добавляем в update_data
-            # (чтобы не обновлять поле, если оно не указано явно)
         if "author_materials_url" in payload:
             update_data["author_materials_url"] = payload.get("author_materials_url")
         
@@ -542,22 +526,15 @@ def api_get_user_books():
     try:
         own_books, shelf_books = get_user_library_books(user["id"])
 
-        # Workbook must exist for every user (even when there are no orphan dictations).
-        orphan_dictations = get_orphan_dictations(user["id"]) or []
-        workbook = get_or_create_workbook(user["id"])
-
-        # Ensure workbook is present, first, and has flags.
-        workbook_index = next((i for i, book in enumerate(own_books) if book["id"] == workbook["id"]), None)
-        if workbook_index is not None:
-            own_books[workbook_index]["is_workbook"] = True
-            own_books[workbook_index]["orphan_count"] = len(orphan_dictations)
-            if workbook_index > 0:
-                workbook_data = own_books.pop(workbook_index)
-                own_books.insert(0, workbook_data)
-        else:
-            workbook["is_workbook"] = True
-            workbook["orphan_count"] = len(orphan_dictations)
-            own_books = [workbook] + own_books
+        # Safety fallback: workbook is expected to exist for every user.
+        # If missing (old DB / manual modifications), create it.
+        if not any(bool(b.get("is_workbook")) for b in (own_books or [])):
+            workbook = get_or_create_workbook(user["id"])
+            try:
+                workbook["is_workbook"] = True
+            except Exception:
+                pass
+            own_books = [workbook] + (own_books or [])
 
         return jsonify({
             "success": True,
@@ -635,72 +612,25 @@ def api_get_dictation_book(dictation_id: int):
                 book_id = row["book_id"]
                 logger.info("✅ Найден book_id %s для диктанта %s", book_id, dictation_id)
                 
-                # Проверяем, является ли это корневой книгой (parent_id IS NULL)
-                cur.execute("""
-                    SELECT id, parent_id, title 
-                    FROM books 
-                    WHERE id = %s
-                """, (book_id,))
-                book_row = cur.fetchone()
-                
-                if not book_row:
-                    logger.warning("⚠️ Книга/раздел %s не найдена в БД", book_id)
-                    return jsonify({"success": False, "book_id": None, "root_book_id": None})
-                
-                logger.info("📖 Книга/раздел %s: title='%s', parent_id=%s", 
-                          book_id, book_row.get("title"), book_row["parent_id"])
-                
                 # Всегда возвращаем прямой book_id (книга или раздел)
                 direct_book_id = book_id
 
-                # Если это уже корневая книга (parent_id IS NULL), возвращаем и как root
-                if book_row["parent_id"] is None:
-                    logger.info("✅ Найдена корневая книга %s для диктанта %s", book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": direct_book_id})
-                
-                # Иначе ищем корневую книгу, идя вверх по иерархии
-                # Используем рекурсивный CTE для поиска корневой книги
-                cur.execute("""
-                    WITH RECURSIVE book_hierarchy AS (
-                        -- Начальный уровень: текущая книга/раздел
-                        SELECT id, parent_id, 0 as level
-                        FROM books
-                        WHERE id = %s
-                        
-                        UNION ALL
-                        
-                        -- Рекурсивный уровень: родительская книга
-                        SELECT b.id, b.parent_id, bh.level + 1
-                        FROM books b
-                        INNER JOIN book_hierarchy bh ON b.id = bh.parent_id
-                        WHERE bh.parent_id IS NOT NULL
-                    )
-                    SELECT id 
-                    FROM book_hierarchy 
-                    WHERE parent_id IS NULL 
-                    LIMIT 1
-                """, (book_id,))
-                
-                root_book_row = cur.fetchone()
-                if root_book_row:
-                    root_book_id = root_book_row["id"]
-                    logger.info("✅ Найдена корневая книга %s (через раздел %s) для диктанта %s", 
-                              root_book_id, book_id, dictation_id)
-                    return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": root_book_id})
-                else:
-                    logger.warning("⚠️ Не удалось найти корневую книгу для раздела %s (диктант %s)", 
-                                 book_id, dictation_id)
-                    # Проверяем всю иерархию для отладки
-                    cur.execute("""
-                        SELECT id, parent_id, title 
-                        FROM books 
-                        WHERE id = %s OR parent_id = %s
-                    """, (book_id, book_id))
-                    all_related = cur.fetchall()
-                    logger.info("🔍 Всего связанных книг/разделов: %s", len(all_related))
-                    for r in all_related:
-                        logger.info("  - id=%s, parent_id=%s, title='%s'", r["id"], r["parent_id"], r.get("title"))
+                # С root_book_id можем определить корневую книгу одним запросом (без рекурсии)
+                cur.execute(
+                    """
+                    SELECT root_book_id
+                    FROM books
+                    WHERE id = %s
+                    """,
+                    (book_id,),
+                )
+                book_row = cur.fetchone()
+                if not book_row:
+                    logger.warning("⚠️ Книга/раздел %s не найдена в БД", book_id)
                     return jsonify({"success": False, "book_id": None, "root_book_id": None})
+
+                root_book_id = book_row.get("root_book_id") or direct_book_id
+                return jsonify({"success": True, "book_id": direct_book_id, "root_book_id": root_book_id})
         finally:
             conn.close()
     except Exception as exc:
@@ -728,7 +658,8 @@ def api_move_dictation_to_book(dictation_id: int):
         return jsonify({"success": False, "error": "book_id is required"}), 400
 
     try:
-        add_dictation_to_book(dictation_id, book_id)
+        from helpers.db_books import move_dictation_to_book
+        move_dictation_to_book(dictation_id, book_id)
         return jsonify({"success": True})
     except Exception as exc:
         logger.error("Ошибка перемещения диктанта %s в книгу %s: %s", dictation_id, book_id, exc)

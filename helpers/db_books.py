@@ -1,6 +1,6 @@
 """
 Функции для работы с книгами и полками пользователей (таблицы books, book_categories,
-book_category_links, book_dictations, user_books, desk_items).
+book_dictations, user_books, desk_items).
 """
 
 from typing import List, Optional, Dict, Any, Tuple
@@ -17,7 +17,6 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
     Возвращает список публичных книг с краткой информацией:
     - основные поля книги
     - автор (username)
-    - список категорий (названия)
     - количество диктантов в книге
     """
     conn, cur = get_db_cursor()
@@ -35,15 +34,9 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
                 b.updated_at,
                 b.creator_user_id,
                 u.username AS creator_username,
-                COALESCE(
-                    ARRAY_AGG(DISTINCT c.title) FILTER (WHERE c.id IS NOT NULL),
-                    '{}'::varchar[]
-                ) AS categories,
                 COUNT(DISTINCT bd.id) AS dictations_count
             FROM books b
             LEFT JOIN users u ON u.id = b.creator_user_id
-            LEFT JOIN book_category_links l ON l.book_id = b.id
-            LEFT JOIN book_categories c ON c.id = l.category_id
             LEFT JOIN book_dictations bd ON bd.book_id = b.id
             WHERE b.visibility = 'public'
             GROUP BY
@@ -84,12 +77,120 @@ def get_public_books(limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
                     else None,
                     "creator_user_id": row["creator_user_id"],
                     "creator_username": row["creator_username"],
-                    "categories": list(row["categories"] or []),
                     "dictations_count": int(row["dictations_count"] or 0),
                 }
             )
 
         return result
+    finally:
+        cur.close()
+        conn.close()
+
+
+def move_dictation_to_book(dictation_id: int, book_id: int, order_index: int = 0) -> bool:
+    """Перемещает диктант в книгу/раздел.
+
+    Канонизирует связи в book_dictations так, чтобы для dictation_id оставалась
+    ровно одна запись:
+
+    - если запись уже есть: обновляем book_id (и order_index)
+    - если записей несколько: оставляем первую, остальные удаляем
+    - если записей нет: вставляем новую
+    """
+    conn, cur = get_db_cursor()
+    try:
+        cur.execute(
+            """
+            SELECT id
+            FROM book_dictations
+            WHERE dictation_id = %s
+            ORDER BY id ASC
+            """,
+            (int(dictation_id),),
+        )
+        rows = cur.fetchall() or []
+
+        if not rows:
+            cur.execute(
+                """
+                INSERT INTO book_dictations (book_id, dictation_id, order_index)
+                VALUES (%s, %s, %s)
+                """,
+                (int(book_id), int(dictation_id), int(order_index)),
+            )
+            conn.commit()
+            return True
+
+        keep_id = rows[0]["id"]
+
+        cur.execute(
+            """
+            UPDATE book_dictations
+            SET book_id = %s, order_index = %s
+            WHERE id = %s
+            """,
+            (int(book_id), int(order_index), int(keep_id)),
+        )
+
+        extra_ids = [int(r["id"]) for r in rows[1:]]
+        if extra_ids:
+            cur.execute(
+                """
+                DELETE FROM book_dictations
+                WHERE id = ANY(%s)
+                """,
+                (extra_ids,),
+            )
+
+        conn.commit()
+        return True
+    except Exception as exc:
+        conn.rollback()
+        raise exc
+    finally:
+        cur.close()
+        conn.close()
+
+
+def get_book_sections_tree(root_book_id: int) -> List[Dict[str, Any]]:
+    """
+    Возвращает плоский список всех разделов (books) внутри книги root_book_id
+    (включая подразделы любого уровня).
+
+    Возвращаемые элементы совместимы с UI-деревом: нужны id/title/parent_id/order_index.
+    """
+    conn, cur = get_db_cursor()
+    try:
+        query = """
+            SELECT
+                id,
+                title,
+                parent_id,
+                order_index,
+                created_at,
+                updated_at
+            FROM books
+            WHERE root_book_id = %s
+              AND id <> %s
+            ORDER BY
+                COALESCE(parent_id, 0) ASC,
+                COALESCE(order_index, 0) ASC,
+                id ASC
+        """
+
+        cur.execute(query, (int(root_book_id), int(root_book_id)))
+        rows = cur.fetchall()
+        return [
+            {
+                "id": row["id"],
+                "title": row["title"],
+                "parent_id": row["parent_id"],
+                "order_index": row["order_index"],
+                "created_at": row["created_at"].isoformat() if row.get("created_at") else None,
+                "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+            }
+            for row in rows
+        ]
     finally:
         cur.close()
         conn.close()
@@ -303,9 +404,6 @@ def delete_book(book_id: int) -> bool:
         for child in child_sections:
             delete_book(child["id"])  # Рекурсивное удаление
         
-        # Удаляем связи с категориями
-        cur.execute("DELETE FROM book_category_links WHERE book_id = %s", (book_id,))
-        
         # Удаляем связи с полками пользователей
         cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))
         
@@ -360,9 +458,6 @@ def delete_book(book_id: int) -> bool:
         for child in child_sections:
             delete_book(child["id"])  # Рекурсивное удаление
         
-        # Удаляем связи с категориями
-        cur.execute("DELETE FROM book_category_links WHERE book_id = %s", (book_id,))
-        
         # Удаляем связи с полками пользователей
         cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))
         
@@ -396,20 +491,15 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
                 b.updated_at,
                 u.username AS creator_username,
-                COALESCE(
-                    ARRAY_AGG(DISTINCT c.title) FILTER (WHERE c.id IS NOT NULL),
-                    '{}'::varchar[]
-                ) AS categories,
                 COUNT(DISTINCT bd.id) AS dictations_count
             FROM books b
             LEFT JOIN users u ON u.id = b.creator_user_id
-            LEFT JOIN book_category_links l ON l.book_id = b.id
-            LEFT JOIN book_categories c ON c.id = l.category_id
             LEFT JOIN book_dictations bd ON bd.book_id = b.id
             WHERE b.creator_user_id = %s AND b.parent_id IS NULL
             GROUP BY
@@ -421,6 +511,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -435,17 +526,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
         def _rows_to_books(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             books: List[Dict[str, Any]] = []
             for row in rows:
-                # Правильно обрабатываем PostgreSQL массив
-                categories_raw = row.get("categories")
-                if categories_raw is None:
-                    categories = []
-                elif isinstance(categories_raw, list):
-                    categories = categories_raw
-                elif hasattr(categories_raw, '__iter__') and not isinstance(categories_raw, str):
-                    categories = list(categories_raw)
-                else:
-                    categories = []
-                
                 books.append(
                     {
                         "id": row["id"],
@@ -457,6 +537,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                         "original_language": row["original_language"],
                         "visibility": row["visibility"],
                         "theme": row["theme"],
+                        "is_workbook": bool(row.get("is_workbook")),
                         "parent_id": row.get("parent_id"),
                         "order_index": row.get("order_index", 0),
                         "created_at": row["created_at"].isoformat()
@@ -466,7 +547,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                         if row["updated_at"]
                         else None,
                         "creator_username": row["creator_username"],
-                        "categories": categories,
                         "dictations_count": int(row["dictations_count"] or 0),
                     }
                 )
@@ -486,6 +566,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -494,16 +575,10 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 ub.is_owner_copy,
                 ub.is_derived,
                 ub.editor_note,
-                COALESCE(
-                    ARRAY_AGG(DISTINCT c.title) FILTER (WHERE c.id IS NOT NULL),
-                    '{}'::varchar[]
-                ) AS categories,
                 COUNT(DISTINCT bd.id) AS dictations_count
             FROM user_books ub
             JOIN books b ON b.id = ub.book_id
             LEFT JOIN users u_creator ON u_creator.id = b.creator_user_id
-            LEFT JOIN book_category_links l ON l.book_id = b.id
-            LEFT JOIN book_categories c ON c.id = l.category_id
             LEFT JOIN book_dictations bd ON bd.book_id = b.id
             WHERE ub.user_id = %s
               AND b.parent_id IS NULL
@@ -517,6 +592,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                 b.original_language,
                 b.visibility,
                 b.theme,
+                b.is_workbook,
                 b.parent_id,
                 b.order_index,
                 b.created_at,
@@ -534,17 +610,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
 
         shelf_books: List[Dict[str, Any]] = []
         for row in shelf_rows:
-            # Правильно обрабатываем PostgreSQL массив
-            categories_raw = row.get("categories")
-            if categories_raw is None:
-                categories = []
-            elif isinstance(categories_raw, list):
-                categories = categories_raw
-            elif hasattr(categories_raw, '__iter__') and not isinstance(categories_raw, str):
-                categories = list(categories_raw)
-            else:
-                categories = []
-            
             shelf_books.append(
                 {
                     "id": row["id"],
@@ -556,6 +621,7 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                     "original_language": row["original_language"],
                     "visibility": row["visibility"],
                     "theme": row["theme"],
+                    "is_workbook": bool(row.get("is_workbook")),
                     "parent_id": row.get("parent_id"),
                     "order_index": row.get("order_index", 0),
                     "created_at": row["created_at"].isoformat()
@@ -565,7 +631,6 @@ def get_user_library_books(user_id: int) -> Tuple[List[Dict[str, Any]], List[Dic
                     if row["updated_at"]
                     else None,
                     "creator_username": row["creator_username"],
-                    "categories": categories,
                     "dictations_count": int(row["dictations_count"] or 0),
                     "is_owner_copy": row["is_owner_copy"],
                     "is_derived": row["is_derived"],
@@ -585,14 +650,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
     """
     conn, cur = get_db_cursor()
     try:
-        # Проверяем, существует ли колонка section_number
-        cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='books' AND column_name='section_number'
-        """)
-        has_section_number = cur.fetchone() is not None
-        
         # Проверяем, существует ли колонка author_materials_url
         cur.execute("""
             SELECT column_name 
@@ -601,7 +658,7 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
         """)
         has_author_materials_url = cur.fetchone() is not None
         
-        if has_section_number and has_author_materials_url:
+        if has_author_materials_url:
             query = """
                 SELECT
                     b.id,
@@ -614,30 +671,7 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                     b.theme,
                     b.parent_id,
                     b.order_index,
-                    b.section_number,
                     b.author_materials_url,
-                    b.created_at,
-                    b.updated_at,
-                    u.username AS creator_username
-                FROM books b
-                LEFT JOIN users u ON u.id = b.creator_user_id
-                WHERE b.id = %s
-            """
-        elif has_section_number:
-            query = """
-                SELECT
-                    b.id,
-                    b.title,
-                    b.author_text,
-                    b.creator_user_id,
-                    b.original_language,
-                    b.visibility,
-                    b.short_description,
-                    b.theme,
-                    b.parent_id,
-                    b.order_index,
-                    b.section_number,
-                    NULL as author_materials_url,
                     b.created_at,
                     b.updated_at,
                     u.username AS creator_username
@@ -658,7 +692,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                     b.theme,
                     b.parent_id,
                     b.order_index,
-                    NULL as section_number,
                     b.author_materials_url,
                     b.created_at,
                     b.updated_at,
@@ -680,7 +713,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
                     b.theme,
                     b.parent_id,
                     b.order_index,
-                    NULL as section_number,
                     NULL as author_materials_url,
                     b.created_at,
                     b.updated_at,
@@ -714,7 +746,6 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
             "theme": row["theme"],
             "parent_id": row["parent_id"],
             "order_index": row["order_index"],
-            "section_number": row.get("section_number"),
             "author_materials_url": row.get("author_materials_url"),
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
@@ -727,51 +758,24 @@ def get_book_by_id(book_id: int) -> Optional[Dict[str, Any]]:
 def get_book_sections(parent_id: int) -> List[Dict[str, Any]]:
     """
     Возвращает список дочерних разделов (sections) книги/раздела,
-    отсортированных по section_number, затем по order_index.
+    отсортированных по order_index.
     """
     conn, cur = get_db_cursor()
     try:
-        # Проверяем, существует ли колонка section_number
-        cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
-            WHERE table_name='books' AND column_name='section_number'
-        """)
-        has_section_number = cur.fetchone() is not None
-        
-        if has_section_number:
-            query = """
-                SELECT
-                    id,
-                    title,
-                    parent_id,
-                    order_index,
-                    section_number,
-                    created_at,
-                    updated_at
-                FROM books
-                WHERE parent_id = %s
-                ORDER BY 
-                    COALESCE(section_number, 999999) ASC,
-                    COALESCE(order_index, 0) ASC,
-                    id ASC
-            """
-        else:
-            query = """
-                SELECT
-                    id,
-                    title,
-                    parent_id,
-                    order_index,
-                    NULL as section_number,
-                    created_at,
-                    updated_at
-                FROM books
-                WHERE parent_id = %s
-                ORDER BY 
-                    COALESCE(order_index, 0) ASC,
-                    id ASC
-            """
+        query = """
+            SELECT
+                id,
+                title,
+                parent_id,
+                order_index,
+                created_at,
+                updated_at
+            FROM books
+            WHERE parent_id = %s
+            ORDER BY 
+                COALESCE(order_index, 0) ASC,
+                id ASC
+        """
         
         cur.execute(query, (parent_id,))
         rows = cur.fetchall()
@@ -782,7 +786,6 @@ def get_book_sections(parent_id: int) -> List[Dict[str, Any]]:
                 "title": row["title"],
                 "parent_id": row["parent_id"],
                 "order_index": row["order_index"],
-                "section_number": row["section_number"],
                 "created_at": row["created_at"].isoformat() if row["created_at"] else None,
                 "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
             }
@@ -804,7 +807,6 @@ def create_book(
     theme: Optional[str] = None,
     parent_id: Optional[int] = None,
     order_index: int = 0,
-    section_number: Optional[int] = None,
     author_materials_url: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -834,13 +836,12 @@ def create_book(
                     theme,
                     parent_id,
                     order_index,
-                    section_number,
                     author_materials_url
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, title, author_text, creator_user_id,
                           original_language, visibility, short_description, theme,
-                          parent_id, order_index, section_number, author_materials_url, created_at, updated_at
+                          parent_id, order_index, author_materials_url, created_at, updated_at
                 """,
                 (
                     title,
@@ -852,7 +853,6 @@ def create_book(
                     theme,
                     parent_id,
                     order_index,
-                    section_number,
                     author_materials_url,
                 ),
             )
@@ -869,12 +869,11 @@ def create_book(
                     theme,
                     parent_id,
                     order_index,
-                    section_number
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, title, author_text, creator_user_id,
                           original_language, visibility, short_description, theme,
-                          parent_id, order_index, section_number, created_at, updated_at
+                          parent_id, order_index, created_at, updated_at
                 """,
                 (
                     title,
@@ -886,7 +885,6 @@ def create_book(
                     theme,
                     parent_id,
                     order_index,
-                    section_number,
                 ),
             )
         row = cur.fetchone()
@@ -904,7 +902,6 @@ def create_book(
             "theme": row["theme"],
             "parent_id": row["parent_id"],
             "order_index": row["order_index"],
-            "section_number": row["section_number"],
             "created_at": row["created_at"].isoformat() if row["created_at"] else None,
             "updated_at": row["updated_at"].isoformat() if row["updated_at"] else None,
         }
@@ -923,11 +920,10 @@ def update_book(
     author_text: Optional[str] = None,
     theme: Optional[str] = None,
     order_index: Optional[int] = None,
-    section_number: Optional[int] = None,
     author_materials_url: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Обновляет базовые поля книги/раздела, включая order_index, section_number и author_materials_url для сортировки.
+    Обновляет базовые поля книги/раздела, включая order_index и author_materials_url для сортировки.
     """
     conn, cur = get_db_cursor()
     try:
@@ -963,14 +959,6 @@ def update_book(
         if order_index is not None:
             updates.append("order_index = %s")
             values.append(order_index)
-        # section_number может быть числом или None
-        # Обновляем, если значение не None
-        if section_number is not None:
-            updates.append("section_number = %s")
-            values.append(section_number)
-        # Если section_number явно передан как None (для очистки), нужно его обновить
-        # Но в текущей сигнатуре функции мы не можем различить "не передан" и "передан None"
-        # Поэтому изменим логику в routes/library.py, чтобы передавать section_number всегда, если он в payload
         if has_author_materials_url and author_materials_url is not None:
             updates.append("author_materials_url = %s")
             values.append(author_materials_url)
@@ -1229,9 +1217,6 @@ def delete_book(book_id: int) -> bool:
         child_sections = cur.fetchall()
         for child in child_sections:
             delete_book(child["id"])  # Рекурсивное удаление
-        
-        # Удаляем связи с категориями
-        cur.execute("DELETE FROM book_category_links WHERE book_id = %s", (book_id,))
         
         # Удаляем связи с полками пользователей
         cur.execute("DELETE FROM user_books WHERE book_id = %s", (book_id,))

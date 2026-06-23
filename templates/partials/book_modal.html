@@ -1,0 +1,167 @@
+{# Book modal group (desktop) #}
+
+<div id="book-view-modal" class="modal-overlay">
+    <div class="modal-content book-view-modal-content">
+        <div class="modal-header">
+            <h3 id="book-view-title"></h3>
+            <button class="modal-close" id="book-view-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body book-view-modal-body">
+            <div class="active-book-card" id="bookViewCard"></div>
+            <div class="active-book-content">
+                <div class="book-structure" id="bookViewStructure"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="book-edit-modal" class="modal-overlay">
+    <div class="modal-content book-edit-modal-content">
+        <div class="modal-header">
+            <div>
+                <h3 id="book-edit-title"><span id="book-edit-unsaved-star">*</span></h3>
+                <div id="book-edit-dev-id" class="book-edit-dev-id"></div>
+            </div>
+            <div class="book-edit-header-actions">
+                <button type="submit" form="book-edit-form" class="modal-close book-edit-save-header" aria-label="" title="">
+                    <i data-lucide="save"></i>
+                </button>
+                <button class="modal-close" id="book-edit-close" title="">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+        <div class="modal-body book-edit-modal-body">
+            <div class="book-edit-form-container">
+                <div class="book-edit-form-left">
+                    <div class="book-cover-upload-section">
+                        <label class="book-cover-label"></label>
+                        <div class="book-cover-preview-wrapper" id="book-cover-clickable">
+                            <img id="book-cover-preview" src="" alt="" class="book-cover-preview">
+                            <div id="book-cover-placeholder" class="book-cover-placeholder">
+                                <i data-lucide="image"></i>
+                                <span>200x200</span>
+                            </div>
+                        </div>
+                        <input type="file" id="book-cover-upload" accept="image/*">
+                        <button type="button" id="book-cover-upload-btn" class="btn-secondary"></button>
+                    </div>
+                </div>
+                <form id="book-edit-form" class="book-edit-form-right">
+                    <input type="hidden" id="book-id-input" value="">
+                    <div class="form-row">
+                        <label for="book-title-input"></label>
+                        <input type="text" id="book-title-input" required>
+                    </div>
+                    <div class="form-row">
+                        <label for="book-author-text-input"></label>
+                        <input type="text" id="book-author-text-input">
+                    </div>
+                    <div class="form-row">
+                        <label for="book-author-materials-url-input"></label>
+                        <input type="url" id="book-author-materials-url-input" placeholder="">
+                    </div>
+                    <div class="form-row">
+                        <label></label>
+                        <div id="book-language-selector" class="language-selector-wrapper"></div>
+                    </div>
+                    <div class="form-row">
+                        <label for="book-theme-input"></label>
+                        <input type="text" id="book-theme-input" placeholder="">
+                    </div>
+                    <div class="form-row">
+                        <label for="book-visibility-input"></label>
+                        <select id="book-visibility-input">
+                            <option value="private"></option>
+                            <option value="public"></option>
+                        </select>
+                    </div>
+                    <div class="form-row form-row-textarea">
+                        <label for="book-description-input"></label>
+                        <textarea id="book-description-input" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="section-edit-modal" class="modal" style="display: none;">
+    <div class="modal-content section-edit-modal-content">
+        <div class="modal-header section-edit-modal-header">
+            <h3 id="section-edit-title"></h3>
+            <button class="section-edit-modal-save" id="section-edit-save" type="button" aria-label="" title="">
+                <i data-lucide="save"></i>
+            </button>
+            <button class="modal-close section-edit-modal-close" id="section-edit-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body section-edit-modal-body">
+            <form id="section-edit-form">
+                <input type="hidden" id="section-id-input" value="">
+                <input type="hidden" id="section-parent-id-input" value="">
+                <div class="form-row section-edit-form-row">
+                    <label for="section-number-input"></label>
+                    <input type="number" id="section-number-input" min="1" placeholder="">
+                </div>
+                <div class="form-row section-edit-form-row">
+                    <label for="section-title-input"></label>
+                    <input type="text" id="section-title-input" required placeholder="">
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="move-dictation-modal" class="modal" style="display: none;">
+    <div class="modal-content move-dictation-modal-content">
+        <div class="modal-header">
+            <h3></h3>
+            <button class="modal-close" id="move-dictation-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body move-dictation-modal-body">
+            <form id="move-dictation-form">
+                <input type="hidden" id="move-dictation-id" value="">
+                <input type="hidden" id="move-target-section" value="">
+                <div class="form-row move-dictation-book-row">
+                    <label for="move-target-book"></label>
+                    <select id="move-target-book" class="form-control move-dictation-book-select" required>
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div id="move-dictation-sections-container" class="move-dictation-sections-container" style="display: none;">
+                    <label></label>
+                    <div id="move-dictation-sections-list" class="move-dictation-sections-list"></div>
+                </div>
+                <div class="form-actions move-dictation-actions">
+                    <button type="submit" class="btn-secondary move-dictation-submit"></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="crop-modal" class="modal" style="display: none;">
+    <div class="modal-content crop-modal-content">
+        <div class="modal-header">
+            <h3></h3>
+            <button class="modal-close" id="crop-close" type="button" aria-label="" title="">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="modal-body crop-modal-body">
+            <div class="crop-container">
+                <img id="crop-image" src="" alt="Crop">
+            </div>
+            <div class="crop-actions">
+                <button type="button" class="btn-secondary" id="crop-cancel"></button>
+                <button type="button" class="btn-primary" id="crop-confirm"></button>
+            </div>
+        </div>
+    </div>
+</div>

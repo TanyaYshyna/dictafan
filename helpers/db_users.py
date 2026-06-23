@@ -38,15 +38,19 @@ def create_user(
 
         password_hash = generate_password_hash(password)
 
-        # Проверяем наличие колонки settings_json (новый формат настроек)
+        # Проверяем наличие колонок
         cur.execute(
             """
             SELECT column_name
             FROM information_schema.columns
-            WHERE table_name='users' AND column_name='settings_json'
+            WHERE table_name='users' AND column_name IN ('settings_json', 'daily_time_plan', 'daily_money_plan')
             """
         )
-        has_settings_json = cur.fetchone() is not None
+        rows = cur.fetchall()
+        cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+        has_settings_json = 'settings_json' in cols
+        has_daily_time_plan = 'daily_time_plan' in cols
+        has_daily_money_plan = 'daily_money_plan' in cols
 
         default_settings_json = json.dumps(
             {
@@ -65,7 +69,33 @@ def create_user(
         )
 
         # Вставляем пользователя
-        if has_settings_json:
+        if has_settings_json and has_daily_time_plan and has_daily_money_plan:
+            cur.execute(
+                """
+                INSERT INTO users (
+                    username, email, password_hash,
+                    native_language, current_learning,
+                    streak_days, role,
+                    settings_json,
+                    daily_time_plan, daily_money_plan
+                )
+                VALUES (%s, %s, %s, %s, %s, 0, %s, %s, %s, %s)
+                RETURNING id, username, email, native_language, current_learning, streak_days, role,
+                          created_at, updated_at, settings_json, daily_time_plan, daily_money_plan
+                """,
+                (
+                    username,
+                    email,
+                    password_hash,
+                    native_language,
+                    current_learning,
+                    role,
+                    default_settings_json,
+                    10,  # daily_time_plan default 10 min
+                    100,  # daily_money_plan default 100 coins
+                ),
+            )
+        elif has_settings_json:
             cur.execute(
                 """
                 INSERT INTO users (
@@ -110,6 +140,26 @@ def create_user(
                 ),
             )
         user_row = cur.fetchone()
+
+        # Telegram notifications defaults for new users
+        try:
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='users'
+                  AND column_name IN ('telegram_self_reports_enabled')
+                """
+            )
+            rows = cur.fetchall() or []
+            cols = {r.get('column_name') if isinstance(r, dict) else r[0] for r in rows}
+            if 'telegram_self_reports_enabled' in cols:
+                cur.execute(
+                    "UPDATE users SET telegram_self_reports_enabled = TRUE WHERE id = %s",
+                    (user_row["id"],),
+                )
+        except Exception:
+            pass
 
         # Очищаем и заполняем user_learning_languages
         cur.execute(
@@ -281,17 +331,18 @@ def get_user_by_email(email: str) -> Optional[dict]:
     """
     conn, cur = get_db_cursor()
     try:
-        # Проверяем наличие колонок settings_json и audio_settings_json (для обратной совместимости)
+        # Проверяем наличие колонок
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='users' AND column_name IN (
                 'settings_json',
                 'audio_settings_json',
                 'assignment_history_retention_days',
                 'daily_activity_goal',
+                'daily_time_plan',
+                'daily_money_plan',
                 'telegram_chat_id',
-                'telegram_enabled',
                 'telegram_link_code',
                 'telegram_self_reports_enabled'
             )
@@ -303,10 +354,21 @@ def get_user_by_email(email: str) -> Optional[dict]:
         has_audio_settings_json = 'audio_settings_json' in columns
         has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
         has_daily_activity_goal = 'daily_activity_goal' in columns
+        has_daily_time_plan = 'daily_time_plan' in columns
+        has_daily_money_plan = 'daily_money_plan' in columns
         has_telegram_chat_id = 'telegram_chat_id' in columns
-        has_telegram_enabled = 'telegram_enabled' in columns
         has_telegram_link_code = 'telegram_link_code' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
+
+        # tr_* flags (learning languages)
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_name='users' AND column_name LIKE 'tr\_%' ESCAPE '\\'
+            ORDER BY column_name
+        """)
+        tr_rows = cur.fetchall()
+        tr_columns = [r['column_name'] if isinstance(r, dict) else r[0] for r in tr_rows]
         
         # Формируем список полей для SELECT
         select_fields = [
@@ -322,14 +384,19 @@ def get_user_by_email(email: str) -> Optional[dict]:
             select_fields.append("u.assignment_history_retention_days")
         if has_daily_activity_goal:
             select_fields.append("u.daily_activity_goal")
+        if has_daily_time_plan:
+            select_fields.append("u.daily_time_plan")
+        if has_daily_money_plan:
+            select_fields.append("u.daily_money_plan")
         if has_telegram_chat_id:
             select_fields.append("u.telegram_chat_id")
-        if has_telegram_enabled:
-            select_fields.append("u.telegram_enabled")
         if has_telegram_link_code:
             select_fields.append("u.telegram_link_code")
         if has_telegram_self_reports_enabled:
             select_fields.append("u.telegram_self_reports_enabled")
+
+        for c in tr_columns:
+            select_fields.append(f"u.{c}")
         
         cur.execute(
             f"""
@@ -381,14 +448,25 @@ def get_user_by_email(email: str) -> Optional[dict]:
         if has_daily_activity_goal and "daily_activity_goal" in row:
             result["daily_activity_goal"] = row.get("daily_activity_goal")
 
+        if has_daily_time_plan and "daily_time_plan" in row:
+            result["daily_time_plan"] = row.get("daily_time_plan")
+
+        if has_daily_money_plan and "daily_money_plan" in row:
+            result["daily_money_plan"] = row.get("daily_money_plan")
+
         if has_telegram_chat_id and "telegram_chat_id" in row:
             result["telegram_chat_id"] = row.get("telegram_chat_id")
-        if has_telegram_enabled and "telegram_enabled" in row:
-            result["telegram_enabled"] = bool(row.get("telegram_enabled"))
         if has_telegram_link_code and "telegram_link_code" in row:
             result["telegram_link_code"] = row.get("telegram_link_code")
         if has_telegram_self_reports_enabled and "telegram_self_reports_enabled" in row:
             result["telegram_self_reports_enabled"] = bool(row.get("telegram_self_reports_enabled"))
+
+        try:
+            for c in tr_columns:
+                if c in row:
+                    result[c] = bool(row.get(c))
+        except Exception:
+            pass
         
         return result
     finally:
@@ -477,13 +555,15 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         
         # Проверяем наличие колонок settings_json, audio_settings_json, assignment_history_retention_days и telegram_self_reports_enabled
         cur.execute("""
-            SELECT column_name 
-            FROM information_schema.columns 
+            SELECT column_name
+            FROM information_schema.columns
             WHERE table_name='users' AND column_name IN (
                 'settings_json',
                 'audio_settings_json',
                 'assignment_history_retention_days',
                 'daily_activity_goal',
+                'daily_time_plan',
+                'daily_money_plan',
                 'telegram_self_reports_enabled'
             )
         """)
@@ -494,7 +574,22 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         has_audio_settings_json = 'audio_settings_json' in columns
         has_assignment_history_retention_days = 'assignment_history_retention_days' in columns
         has_daily_activity_goal = 'daily_activity_goal' in columns
+        has_daily_time_plan = 'daily_time_plan' in columns
+        has_daily_money_plan = 'daily_money_plan' in columns
         has_telegram_self_reports_enabled = 'telegram_self_reports_enabled' in columns
+
+        tr_columns = []
+        try:
+            cur.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name='users' AND column_name LIKE 'tr\_%' ESCAPE '\\'
+                ORDER BY column_name
+            """)
+            tr_rows = cur.fetchall()
+            tr_columns = [r['column_name'] if isinstance(r, dict) else r[0] for r in tr_rows]
+        except Exception:
+            tr_columns = []
 
         if 'assignment_history_retention_days' in updates:
             if has_assignment_history_retention_days:
@@ -530,6 +625,44 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
                 raise RuntimeError(
                     "DB schema mismatch: column users.daily_activity_goal is missing. "
                     "Apply migrations/add_daily_activity_goal_to_users.sql"
+                )
+
+        if 'daily_time_plan' in updates:
+            if has_daily_time_plan:
+                v = updates.get('daily_time_plan')
+                try:
+                    v_int = int(v)
+                except Exception:
+                    v_int = 10
+                if v_int < 10:
+                    v_int = 10
+                if v_int > 600:  # 10 hours max
+                    v_int = 600
+                update_fields.append("daily_time_plan = %s")
+                update_values.append(v_int)
+            else:
+                raise RuntimeError(
+                    "DB schema mismatch: column users.daily_time_plan is missing. "
+                    "Apply migrations/add_daily_time_money_plan_to_users.sql"
+                )
+
+        if 'daily_money_plan' in updates:
+            if has_daily_money_plan:
+                v = updates.get('daily_money_plan')
+                try:
+                    v_int = int(v)
+                except Exception:
+                    v_int = 100
+                if v_int < 100:
+                    v_int = 100
+                if v_int > 1000000:
+                    v_int = 1000000
+                update_fields.append("daily_money_plan = %s")
+                update_values.append(v_int)
+            else:
+                raise RuntimeError(
+                    "DB schema mismatch: column users.daily_money_plan is missing. "
+                    "Apply migrations/add_daily_time_money_plan_to_users.sql"
                 )
         
         # Обновляем settings_json (приоритет) или audio_settings_json (для обратной совместимости)
@@ -569,6 +702,43 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
             update_values.append(email)  # для WHERE условия
             update_query = f"UPDATE users SET {', '.join(update_fields)} WHERE email = %s"
             cur.execute(update_query, update_values)
+
+        # Обновляем tr_* флаги если они есть в таблице
+        try:
+            needs_tr_update = False
+            if tr_columns:
+                if 'learning_languages' in updates:
+                    needs_tr_update = True
+                else:
+                    for k in updates.keys():
+                        if isinstance(k, str) and k.startswith('tr_'):
+                            needs_tr_update = True
+                            break
+
+            if needs_tr_update:
+                selected = set()
+                if 'learning_languages' in updates and isinstance(updates.get('learning_languages'), list):
+                    selected = {str(x).strip().lower() for x in updates.get('learning_languages') if isinstance(x, str) and str(x).strip()}
+                else:
+                    for k, v in updates.items():
+                        if isinstance(k, str) and k.startswith('tr_') and bool(v):
+                            selected.add(k[3:].strip().lower())
+
+                # one UPDATE setting all columns
+                if tr_columns:
+                    parts = []
+                    vals = []
+                    for col in tr_columns:
+                        code = col[3:]
+                        parts.append(f"{col} = %s")
+                        vals.append(code in selected)
+                    vals.append(email)
+                    cur.execute(
+                        f"UPDATE users SET {', '.join(parts)}, updated_at = CURRENT_TIMESTAMP WHERE email = %s",
+                        tuple(vals),
+                    )
+        except Exception:
+            pass
         
         # Обновляем языки обучения если указаны
         if 'learning_languages' in updates:

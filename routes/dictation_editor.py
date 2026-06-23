@@ -739,6 +739,119 @@ def api_create_dictation():
         return jsonify({'error': str(e)}), 500
 
 
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises', methods=['GET'])
+@jwt_required()
+def api_list_dictation_exercises(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from helpers.db_dictations import list_dictation_exercises
+
+    try:
+        items = list_dictation_exercises(int(dictation_id))
+        return jsonify({"success": True, "exercises": items})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises/reconcile', methods=['POST'])
+@jwt_required()
+def api_reconcile_dictation_exercises(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    exercises_payload = data.get('exercises')
+
+    from helpers.db_dictations import reconcile_dictation_exercises, list_dictation_exercises
+
+    try:
+        reconcile_res = reconcile_dictation_exercises(int(dictation_id), exercises_payload)
+        items = list_dictation_exercises(int(dictation_id))
+        return jsonify({"success": True, "result": reconcile_res, "exercises": items})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises', methods=['POST'])
+@jwt_required()
+def api_create_dictation_exercise(dictation_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    data = request.get_json(silent=True) or {}
+    positions = data.get('positions')
+    title = data.get('title')
+
+    from helpers.db_dictations import create_dictation_exercise
+
+    try:
+        item = create_dictation_exercise(int(dictation_id), positions=positions, title=title)
+        return jsonify({"success": True, "exercise": item})
+    except ValueError as e:
+        msg = str(e) or 'Exercise already exists'
+        if 'exists' in msg.lower():
+            return jsonify({"success": False, "error": msg, "code": "exists"}), 409
+        return jsonify({"success": False, "error": msg}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@editor_bp.route('/dictation_editor/api/dictation/<int:dictation_id>/exercises/<int:exercise_id>/delete', methods=['POST'])
+@jwt_required()
+def api_delete_dictation_exercise(dictation_id: int, exercise_id: int):
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    dictation = get_dictation_by_id(int(dictation_id))
+    if not dictation:
+        return jsonify({"success": False, "error": "Dictation not found"}), 404
+
+    owner_id = dictation.get('owner_id')
+    if not owner_id or int(owner_id) != int(user_db.get('id')):
+        return jsonify({"success": False, "error": "Forbidden"}), 403
+
+    from helpers.db_dictations import delete_dictation_exercise
+
+    try:
+        deleted = delete_dictation_exercise(int(dictation_id), int(exercise_id))
+        return jsonify({"success": True, "deleted": bool(deleted)})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @editor_bp.route('/download/<path:filename>')
 def download(filename):
     return send_file(filename, as_attachment=True)
@@ -1237,6 +1350,37 @@ def save_dictation_final():
             )
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
+
+        exercises_saved = True
+        exercises_error = None
+        exercises_after_save = None
+        # Reconcile dictation exercises only during explicit dictation save.
+        # Client sends the desired exercises set (excluding Full if it wants; server ensures Full exists).
+        try:
+            exercises_payload = data.get('exercises')
+            if exercises_payload is not None:
+                from helpers.db_dictations import reconcile_dictation_exercises
+                reconcile_res = reconcile_dictation_exercises(int(db_id), exercises_payload)
+                try:
+                    from helpers.db_dictations import list_dictation_exercises
+                    exercises_after_save = list_dictation_exercises(int(db_id))
+                except Exception:
+                    exercises_after_save = None
+                try:
+                    logger.info(
+                        "✅ Упражнения сохранены для dictation_id=%s: %s",
+                        db_id,
+                        reconcile_res,
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            exercises_saved = False
+            try:
+                exercises_error = str(e)
+            except Exception:
+                exercises_error = 'Failed to save exercises'
+            logger.warning(f"⚠️ Не удалось сохранить упражнения диктанта {db_id}: {exercises_error}")
         
         # Умное сохранение предложений: обновляем только изменённые, добавляем новые, удаляем только отсутствующие
         from helpers.db_dictations import get_sentence_by_key, update_sentence
@@ -1596,12 +1740,36 @@ def save_dictation_final():
             result = add_dictation_to_categories(dictation_id, info, category_key, db_id=db_id)
         
         if result:
-            return jsonify({"success": True, "message": "Dictation saved to DB and added to category", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB and added to category",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
+            })
         elif target_book_id:
-            return jsonify({"success": True, "message": "Dictation saved to DB and added to book", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB and added to book",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
+            })
         else:
             logger.warning("⚠️ Диктант сохранен в БД, но не добавлен ни в категорию, ни в книгу")
-            return jsonify({"success": True, "message": "Dictation saved to DB", "dictation_id": dictation_id, "db_id": db_id})
+            return jsonify({
+                "success": True,
+                "message": "Dictation saved to DB",
+                "dictation_id": dictation_id,
+                "db_id": db_id,
+                "exercises_saved": exercises_saved,
+                "exercises_error": exercises_error,
+                "exercises_after_save": exercises_after_save,
+            })
         
     except Exception as e:
         import traceback

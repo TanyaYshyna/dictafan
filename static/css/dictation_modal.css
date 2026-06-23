@@ -1,0 +1,2105 @@
+#dictationModal.dictation-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100249;
+  display: none;
+  background: rgba(17, 24, 39, 0.38);
+  backdrop-filter: blur(1px);
+}
+
+#dictationModal .modal {
+  z-index: 100255;
+}
+
+#dictationModal .modal-content {
+  z-index: 100256;
+}
+
+#dictationModal #coinExchangeModal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+#dictationModal #coinExchangeModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  padding: 16px;
+}
+
+#dictationModal #coinExchangeModal .start-modal-title-row {
+  position: relative;
+  padding-right: 44px;
+}
+
+#dictationModal #coinExchangeModal .start-modal-header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+#dictationModal #start-modal.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 92px;
+  padding-left: 12px;
+  padding-right: 12px;
+  padding-bottom: 40px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .modal-content {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  width: min(1280px, calc(100vw - 24px));
+  height: calc(100vh - 122px - var(--sw-status-bar-height, 0px));
+  max-height: calc(100vh - 122px - var(--sw-status-bar-height, 0px));
+  overflow: hidden;
+  padding: 10px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 680px) {
+  #dictationModal #start-modal.modal {
+    padding-top: 86px;
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-bottom: 24px;
+  }
+
+  #dictationModal #start-modal .modal-content {
+    border-radius: 14px;
+    width: calc(100vw - 16px);
+    height: calc(100vh - 110px - var(--sw-status-bar-height, 0px));
+    max-height: calc(100vh - 110px - var(--sw-status-bar-height, 0px));
+  }
+}
+
+#dictationModal .dictation-modal__content {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: var(--sw-status-bar-height, 0px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg, #ffffff);
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+}
+
+#dictationModal .panel-tablo .panels-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+#dictationModal .panel-tablo .sentence-nav-table {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+#dictationModal .panel-tablo .dictation-top-progress-wrap {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 320px;
+}
+
+@media (max-width: 860px) {
+  #dictationModal .panel-tablo .panels-row {
+    flex-wrap: wrap;
+  }
+
+  #dictationModal .panel-tablo .dictation-top-progress-wrap {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-end;
+  }
+}
+
+#dictationModal .dictation-langpair {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#dictationModal .dictation-langpair .flag-pair-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: default;
+}
+
+#dictationModal .dictation-langpair .flag-pair-side {
+  display: inline-flex;
+  align-items: center;
+}
+
+#dictationModal .dictation-langpair .flag-pair-combo i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+html[dir="rtl"] #dictationModal #dictationLangPair {
+  direction: ltr;
+}
+
+#dictationModal .sentence-nav-top-inner {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 8px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-top-inner #dictationLangPair {
+  flex: 0 0 auto;
+}
+
+#dictationModal .sentence-nav-bottom-inner {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 6px;
+  padding: 6px 10px;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-top-inner > *,
+#dictationModal .sentence-nav-bottom-inner > * {
+  flex: 0 0 auto;
+}
+
+#dictationModal .sentence-nav-bottom-inner .sentence-counter {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+#dictationModal .sentence-nav-bottom-inner .sentence-counter .sentence-counter-simple {
+  width: auto;
+}
+
+#dictationModal .sentence-nav-table,
+#dictationModal .sentence-nav-table tr,
+#dictationModal .sentence-nav-table td {
+  border: none;
+}
+
+#dictationModal .dictation-title {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+#dictationModal .sentence-nav-cell {
+  padding: 0;
+  vertical-align: middle;
+}
+
+#dictationModal .sentence-nav-table button {
+  min-height: 44px;
+  height: 44px;
+  padding: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .sentence-nav-table button.button-color-gray {
+  color: var(--color-button-gray);
+}
+
+#dictationModal .sentence-nav-table button.button-color-yellow {
+  color: var(--color-button-yellow);
+}
+
+#dictationModal .sentence-nav-table .sentence-counter-simple {
+  gap: 6px;
+  justify-content: flex-start !important;
+}
+
+#dictationModal .sentence-nav-table .sentence-counter,
+#dictationModal .sentence-nav-table .sentence-counter-simple,
+#dictationModal .sentence-nav-table .sentence-current-number,
+#dictationModal .sentence-nav-table .sentence-total-number {
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  font-weight: bold;
+  font-size: 22px;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .progress-panel-modal-r .table-progress {
+  min-width: 320px;
+}
+
+#dictationModal .table-progress {
+  width: auto;
+  table-layout: auto;
+  border: 0px;
+  border-collapse: separate;
+  border-spacing: 4px;
+}
+
+#dictationModal .table-progress col.progress-col-fixed {
+  width: 80px;
+}
+
+#dictationModal .table-progress col.progress-col-flex {
+  width: auto;
+}
+
+#dictationModal .modal-content .table-progress td,
+#dictationModal .modal-content .table-progress th {
+  padding: 0 !important;
+}
+
+#dictationModal .table-progress td {
+  padding: 0;
+  text-align: center;
+  border: 0px;
+}
+
+#dictationModal .table-progress button {
+  all: unset;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: default;
+}
+
+#dictationModal .table-progress button:disabled {
+  opacity: 1;
+  pointer-events: none;
+}
+
+#dictationModal .table-progress button {
+  pointer-events: none;
+}
+
+#dictationModal .table-progress button[data-interactive="true"] {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+#dictationModal .table-progress .pp-clock {
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
+}
+
+#dictationModal .table-progress .pp-perfect {
+  background: var(--color-button-mint);
+  color: var(--color-button-text-mint);
+}
+
+#dictationModal .table-progress .pp-corrected {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
+}
+
+#dictationModal .table-progress .pp-audio {
+  background: var(--color-button-purple);
+  color: var(--color-button-text-purple);
+}
+
+#dictationModal .table-progress .pp-total {
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .table-progress .pp-money {
+  background: var(--color-button-pink);
+  color: var(--color-button-text-pink);
+}
+
+#dictationModal .table-progress .pp-bug {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+
+#dictationModal .table-progress .pp-errors {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 42px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--color-button-pink);
+  color: var(--color-button-text-pink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+#dictationModal .table-progress button [data-lucide] {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+}
+
+#dictationModal #start-modal {
+  position: fixed;
+  inset: 0;
+}
+
+#dictationModal #pauseModal {
+  position: fixed;
+  inset: 0;
+}
+
+#dictationModal #pauseModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  border: none;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#dictationModal #pauseModal .pause-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+  color: var(--color-button-shadow-pink);
+}
+
+#dictationModal #pauseModal #pauseTimer {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+#dictationModal #pauseModal #resumeBtn {
+  align-self: flex-end;
+  min-height: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+#dictationModal .audio-players-wrapper {
+  margin-top: 8px;
+}
+
+#dictationModal #originalAudioPlayer,
+#dictationModal .translation-audio-button-wrapper {
+  margin-top: 6px;
+}
+
+#dictationModal #completionModal.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+#dictationModal #completionModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  padding: 24px;
+  max-width: 460px;
+  width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#dictationModal #completionModal .completion-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  width: 100%;
+}
+
+#dictationModal #completionModal .completion-buttons button {
+  height: 44px;
+  padding-left: 10px;
+  padding-right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#dictationModal #completionModal .completion-transparent-btn {
+  background: transparent;
+  border: 1px solid var(--color-border-light, #d1d5db);
+  color: var(--color-text, #1f2933);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#dictationModal #completionModal .completion-transparent-btn:hover {
+  background: var(--color-hover, #f3f4f6);
+  border-color: var(--color-button-shadow-yellow, #d1d5db);
+}
+
+#dictationModal #completionModal .completion-transparent-btn:focus {
+  outline: 2px solid var(--color-button-text-yellow);
+  outline-offset: 2px;
+}
+
+#dictationModal .custom-audio-player {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-hover-panel);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin-bottom: 0;
+  width: auto;
+  flex-shrink: 1;
+  font-family: sans-serif;
+}
+
+#dictationModal .custom-audio-player .controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 5px !important;
+  width: 100%;
+  justify-content: flex-start;
+  margin: 0 2px;
+}
+
+#dictationModal .custom-audio-player .controls > * {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 1px !important;
+  padding-right: 1px !important;
+  border: none !important;
+}
+
+#dictationModal .custom-audio-player .audio-player-language {
+  color: var(--color-button-text-gray);
+  font-size: 20px;
+  font-weight: 800;
+  min-width: 40px;
+}
+
+#dictationModal .custom-audio-player[data-audio-id="audio1"] .play-btn,
+#dictationModal .custom-audio-player[data-audio-id="audio1"] .play-btn svg {
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .custom-audio-player .play-btn,
+#dictationModal .custom-audio-player .current-time,
+#dictationModal .custom-audio-player .total-time,
+#dictationModal .custom-audio-player .mute-btn,
+#dictationModal .custom-audio-player .custom-speed-select {
+  background: transparent;
+  font-size: 20px;
+}
+
+#dictationModal .custom-audio-player .controls > *:not(.play-btn):not(.progress-bar) {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .custom-audio-player .play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .custom-audio-player .play-btn svg {
+  width: 24px !important;
+  height: 24px !important;
+}
+
+#dictationModal .custom-audio-player .controls .progress-bar {
+  flex: 1 1 0 !important;
+  min-width: 100px !important;
+  max-width: none !important;
+}
+
+#dictationModal .custom-audio-player .audio-type-select-wrapper,
+#dictationModal .custom-audio-player .custom-speed-select {
+  margin-left: auto !important;
+  flex-shrink: 0;
+}
+
+#dictationModal .custom-audio-player .custom-speed-select {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+#dictationModal .custom-audio-player .speed-select-button {
+  background-color: var(--color-panel-bg);
+  color: var(--color-button-text-gray);
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  padding: 3px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  outline: none;
+}
+
+#dictationModal .custom-audio-player .speed-arrow {
+  width: 16px;
+  height: 16px;
+}
+
+#dictationModal .custom-audio-player .speed-options {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  display: none;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  max-height: 200px;
+  overflow-y: auto;
+  min-width: 80px;
+  z-index: 100;
+}
+
+#dictationModal .custom-audio-player .custom-speed-select.open .speed-options,
+#dictationModal .custom-audio-player .custom-speed-select.is-open .speed-options,
+#dictationModal .custom-audio-player .custom-speed-select.active .speed-options {
+  display: block;
+}
+
+#dictationModal .custom-audio-player .speed-options li {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+#dictationModal .custom-audio-player .speed-options li:hover {
+  background-color: var(--color-button-gray);
+}
+
+#dictationModal .custom-audio-player .progress-bar {
+  height: 20px;
+  background: transparent;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+  accent-color: var(--color-button-yellow, #fccf5e);
+}
+
+#dictationModal .custom-audio-player .progress-bar:focus,
+#dictationModal .custom-audio-player .progress-bar:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-webkit-slider-runnable-track {
+  height: 8px;
+  background: #bdbdbd;
+  border-radius: 4px;
+  border: none;
+  box-shadow: none;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: var(--color-button-text-yellow, #fbbf24);
+  margin-top: -6px;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-range-track {
+  height: 8px;
+  background: #bdbdbd;
+  border-radius: 4px;
+  border: none;
+  box-shadow: none;
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  background: var(--color-button-text-yellow, #fbbf24);
+}
+
+#dictationModal .custom-audio-player .progress-bar::-moz-focus-outer {
+  border: 0;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-panel {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+#dictationModal #audioSettingsModal.modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
+  background: rgba(17, 24, 39, 0.38);
+  backdrop-filter: blur(1px);
+}
+
+#dictationModal #audioSettingsModal .modal-content {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+  width: min(980px, calc(100vw - 24px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  padding: 16px;
+}
+
+#dictationModal #audioSettingsModal .modal-header {
+  position: relative;
+  padding-right: 92px;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-header-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-panel-left {
+  border: none;
+  padding: 0;
+}
+
+#dictationModal #audioSettingsModal .audio-settings-modal-two-panels {
+  grid-template-columns: 1fr;
+}
+
+#audioSettingsModal .dictation-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-areas: "order params" "speech-rec speech-rec";
+  gap: 16px;
+}
+
+#audioSettingsModal .dictation-settings-card-order {
+  grid-area: order;
+}
+
+#audioSettingsModal .dictation-settings-card-params {
+  grid-area: params;
+}
+
+#audioSettingsModal .dictation-settings-card {
+  border: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
+  border-radius: 12px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+#audioSettingsModal .dictation-settings-title {
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--color-text, #1f2933);
+}
+
+#audioSettingsModal table.dictation-settings-table {
+  width: 100% !important;
+  border-collapse: separate !important;
+  border-spacing: 10px 10px !important;
+  table-layout: auto !important;
+}
+
+#audioSettingsModal .dictation-settings-table td {
+  border: none;
+  padding: 0;
+  vertical-align: middle;
+}
+
+#audioSettingsModal .dictation-settings-td-label {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-text, #1f2933);
+  font-weight: 600;
+  width: 1%;
+}
+
+#audioSettingsModal .dictation-settings-td-input {
+  width: auto;
+}
+
+#audioSettingsModal #modal-playSequenceStart {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 20px;
+  box-sizing: border-box;
+  background: #fff;
+  color: var(--color-text, #1f2933);
+}
+
+#audioSettingsModal #modal-playSequenceStart:focus {
+  outline: none;
+  border-color: var(--color-button-text-pink);
+  box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:checked::after {
+  transform: scale(1);
+}
+
+#audioSettingsModal input[type="radio"][name="modal-audioExerciseMode"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+#audioSettingsModal .dictation-settings-audio-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-audio-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-icon-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#audioSettingsModal .dictation-settings-icon-label i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#audioSettingsModal .dictation-settings-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#audioSettingsModal .dictation-settings-inline i[data-lucide] {
+  width: 18px;
+  height: 18px;
+}
+
+#audioSettingsModal .dictation-settings-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--color-text, #1f2933);
+}
+
+#audioSettingsModal .dictation-settings-legend-row strong {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+}
+
+@media (max-width: 780px) {
+  #audioSettingsModal .dictation-settings-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "order"
+      "params"
+      "speech-rec";
+  }
+}
+
+#audioSettingsModal .dictation-settings-card-speech-rec {
+  grid-area: speech-rec;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(17, 24, 39, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  background: #fff;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.85);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]:checked::after {
+  transform: scale(1);
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode input[type="radio"]:focus-visible {
+  outline: 3px solid rgba(245, 158, 11, 0.35);
+  outline-offset: 2px;
+}
+
+#audioSettingsModal .dictation-settings-speech-rec-mode-device {
+  padding-left: 32px;
+}
+
+#dictationModal .dictation-modal__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-hover, #f8f9fa);
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+#dictationModal .dictation-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+#dictationModal .dictation-modal__logo {
+  height: 5em;
+  width: auto;
+  max-height: 80px;
+  cursor: pointer;
+}
+
+#dictationModal .dictation-modal__logo--min {
+  display: none;
+}
+
+#dictationModal .dictation-modal__cover-wrapper {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+#dictationModal .dictation-modal__cover {
+  width: 96px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-light, rgba(0,0,0,0.12));
+  display: block;
+}
+
+#dictationModal .dictation-modal__medal {
+  position: absolute;
+  bottom: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
+  border-radius: 12px;
+  padding: 2px 7px 2px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  white-space: nowrap;
+  z-index: 2;
+}
+
+#dictationModal .dictation-modal__medal i {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.5;
+}
+#dictationModal .dictation-modal__header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+#dictationModal .dictation-modal__user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+#dictationModal .dictation-modal__user .user-avatar-small {
+  opacity: 1;
+}
+
+#dictationModal .dictation-modal__username {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #1f2933);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28vw;
+}
+
+#dictationModal .dictation-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+#dictationModal .dictation-modal__body {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+#dictationModal .dictation-modal__body .panel {
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+#dictationModal .audio-players-wrapper {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+#dictationModal .audio-players-wrapper > * {
+  min-width: 0;
+}
+
+html[dir="rtl"] #dictationModal .audio-players-wrapper {
+  direction: ltr;
+}
+
+#dictationModal #originalAudioPlayer {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  margin-top: 6px;
+}
+
+#dictationModal .translation-audio-button-wrapper {
+  background-color: var(--color-hover-panel);
+  border-radius: 8px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-height: 43px;
+  margin-top: 6px;
+}
+
+#dictationModal .translation-audio-button-wrapper .language {
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--color-button-text-gray);
+  margin-right: 0;
+  margin-left: 8px;
+  min-width: 30px;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+#dictationModal .speaker-tablo-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dictationModal #speaker,
+#dictationModal #tablo_result {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal #speaker [data-lucide],
+#dictationModal #tablo_result [data-lucide] {
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal #userInput.text-input,
+#dictationModal #userInput {
+  min-height: 56px;
+  height: auto;
+}
+
+#dictationModal .word-correct {
+  color: black;
+}
+
+#dictationModal .word-missing {
+  color: green;
+  text-decoration: underline;
+}
+
+#dictationModal .word-error {
+  border-bottom: 3px solid #ffd54f;
+  font-weight: bold;
+}
+
+#dictationModal .letter-error {
+  border-bottom: 2px solid red;
+  font-weight: bold;
+}
+
+#dictationModal .correct-line-word {
+  color: green;
+}
+
+#dictationModal .correct-line-letter {
+  text-decoration: underline green;
+}
+
+#dictationModal .result-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#dictationModal .check-group {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+#dictationModal .error-count-label {
+  color: var(--color-button-gray);
+}
+
+#dictationModal .translation-audio-button-wrapper .play-btn-translation {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--color-button-text-gray);
+  margin: 0;
+  padding: 5px;
+  padding-left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: auto;
+  width: auto;
+  min-height: 44px;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#dictationModal .translation-audio-button-wrapper .play-btn-translation:hover,
+#dictationModal .translation-audio-button-wrapper .play-btn-translation:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  border: 1px solid transparent !important;
+}
+
+#dictationModal .translation-audio-button-wrapper .play-btn-translation:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#dictationModal .audio-user-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+#dictationModal #checkBtn {
+  min-height: 44px;
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+#dictationModal .audio-user-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: 420px;
+  max-width: calc(100vw - 40px);
+  margin-left: 0;
+  margin-right: auto;
+}
+
+#dictationModal .audio-user-table,
+#dictationModal .audio-user-table tr,
+#dictationModal .audio-user-table td,
+#dictationModal .audio-user-table th {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+#dictationModal .audio-user-col-1 {
+  width: 44px;
+}
+
+#dictationModal .audio-user-col-2 {
+  width: auto;
+}
+
+#dictationModal .audio-user-col-3 {
+  width: 110px;
+}
+
+#dictationModal .audio-user-col-4 {
+  width: 80px;
+}
+
+#dictationModal .audio-user-top-row {
+  width: 100%;
+}
+
+#dictationModal .audio-user-top-row td {
+  padding: 0;
+  vertical-align: middle;
+}
+
+#dictationModal .audio-user-top-percent {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-button-purple);
+  font-weight: 800;
+  font-size: 22px;
+}
+
+#dictationModal .recognition-mode-icon,
+#dictationModal #recognitionModeIcon {
+  color: var(--color-button-purple);
+}
+
+#dictationModal .audio-user-indicator,
+#dictationModal .audio-user-percent,
+#dictationModal .audio-user-mode {
+  padding: 0;
+  vertical-align: middle;
+}
+
+#dictationModal .audio-user-mode {
+  text-align: right;
+}
+
+#dictationModal .coin_exchange {
+  white-space: nowrap;
+}
+
+#dictationModal .audio-coin_exchange {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+  color: var(--color-button-purple);
+  vertical-align: middle;
+}
+
+#dictationModal #btn_coin_exchange_audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+#dictationModal #btn_coin_exchange_audio i,
+#dictationModal #btn_coin_exchange_audio svg {
+  color: var(--color-button-purple);
+}
+
+#dictationModal .audio-user-bottom-row .audio-user-visualizer {
+  padding-right: 4px;
+}
+
+#dictationModal .audio-user-bottom-row .audio-user-record {
+  padding-left: 4px;
+}
+
+#dictationModal .audio-user-visualizer .audio-visualizer,
+#dictationModal .audio-visualizer {
+  display: block;
+  width: 100%;
+  height: 44px;
+  border-radius: 10px;
+  min-width: 140px;
+  background-color: var(--color-button-purple);
+}
+
+#dictationModal .audio-user-record #recordButton {
+  width: 80px;
+  min-width: 80px;
+  min-height: 42px;
+  height: 42px;
+  border-radius: 8px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .audio-user-record {
+  text-align: right;
+}
+
+#dictationModal #checkBtn {
+  width: auto;
+  min-width: 80px;
+  height: 42px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 0 10px;
+  justify-content: center;
+  gap: 6px;
+}
+
+#dictationModal #recordButton:focus,
+#dictationModal #recordButton:focus-visible {
+  outline: 2px solid var(--color-button-text-purple);
+  outline-offset: 2px;
+}
+
+#dictationModal .recording-indicator-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  box-sizing: border-box;
+  outline: none !important;
+  box-shadow: none !important;
+  margin-bottom: 8px;
+}
+
+#dictationModal .recording-indicator-btn.recording {
+  background: var(--color-button-pink);
+  color: white;
+  animation: pulse-recording 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+#dictationModal .recording-indicator-btn i {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: currentColor;
+}
+
+#dictationModal .recording-indicator-btn i svg {
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-width: 0;
+}
+
+#dictationModal .recording-indicator-btn:not(.recording) i svg {
+  stroke: none !important;
+  fill: currentColor;
+  stroke-width: 0 !important;
+}
+
+#dictationModal .dictation-next-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  margin-top: 10px;
+  gap: 10px;
+  min-height: 44px;
+}
+
+#dictationModal .dictation-session-info {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #888);
+  opacity: 0.8;
+}
+
+#dictationModal .dictation-session-info span {
+  white-space: nowrap;
+}
+
+#dictationModal #resultNextBtn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#dictationModal #resultNextBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  pointer-events: none;
+  background: var(--color-button-gray);
+  color: var(--color-button-text-gray);
+  border: 1px solid transparent;
+}
+
+#dictationModal #resultNextBtn.is-last {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
+}
+
+#dictationModal #resultNextBtn.is-last:focus {
+  outline: 2px solid var(--color-button-text-lightgreen);
+  outline-offset: 2px;
+}
+
+#dictationModal #resultNextBtn.is-last:hover {
+  border: 1px solid var(--color-button-shadow-lightgreen);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-lightgreen);
+}
+
+#dictationModal #resultNextBtn.is-last:active {
+  border: 1px solid var(--color-button-shadow-lightgreen);
+}
+
+/* Стили для кнопки Проверить-повторить в режиме полузвезды */
+#dictationModal #checkBtn.button-color-lightgreen {
+  background: var(--color-button-lightgreen);
+  color: var(--color-button-text-lightgreen);
+}
+
+/* Стили для кнопки Проверить-повторить в режиме активности (оранжевый) */
+#dictationModal #checkBtn.button-color-orange {
+  background: var(--color-button-orange);
+  color: var(--color-button-text-orange);
+}
+
+#dictationModal #confirmStartBtn {
+  font-size: 30px;
+  background: var(--color-button-yellow);
+}
+
+#dictationModal #start-modal #confirmStartBtn {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 22px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0;
+}
+
+#dictationModal #confirmStartBtn:focus {
+  outline: 2px solid var(--color-button-text-lightgreen);
+  outline-offset: 2px;
+}
+
+#dictationModal .warning-message {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin: 0 0 30px 0;
+  line-height: 1.6;
+}
+
+#dictationModal .warning-buttons {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+#dictationModal .warning-buttons button {
+  flex: 1;
+  min-width: 150px;
+  padding: 14px 24px;
+  transition: all 0.2s ease;
+}
+
+#dictationModal .warning-buttons button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#dictationModal .table-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+#dictationModal #sentences-table,
+#dictationModal #final-sentences-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  font-size: 14px;
+  table-layout: fixed;
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th,
+#dictationModal #sentences-table td,
+#dictationModal #final-sentences-table td {
+  padding: 4px 8px;
+  line-height: 1.2;
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th {
+  font-weight: 800;
+}
+
+#dictationModal #sentences-table col.col-rownum,
+#dictationModal #final-sentences-table col.col-rownum {
+  width: 26px;
+}
+
+#dictationModal #sentences-table col.col-choice,
+#dictationModal #final-sentences-table col.col-choice {
+  width: 34px;
+}
+
+#dictationModal #sentences-table col.col-code,
+#dictationModal #final-sentences-table col.col-code {
+  width: 0;
+}
+
+#dictationModal #sentences-table col.col-star,
+#dictationModal #final-sentences-table col.col-star {
+  width: 32px;
+}
+
+#dictationModal #sentences-table col.col-mic,
+#dictationModal #final-sentences-table col.col-mic {
+  width: 32px;
+}
+
+#dictationModal #sentences-table col.col-half-stars,
+#dictationModal #final-sentences-table col.col-half-stars {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-activities,
+#dictationModal #final-sentences-table col.col-activities {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-time,
+#dictationModal #final-sentences-table col.col-time {
+  width: 60px;
+}
+
+#dictationModal #sentences-table col.col-characters,
+#dictationModal #final-sentences-table col.col-characters {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-mistakes,
+#dictationModal #final-sentences-table col.col-mistakes {
+  width: 50px;
+}
+
+#dictationModal #sentences-table col.col-money-dt,
+#dictationModal #final-sentences-table col.col-money-dt,
+#dictationModal #sentences-table col.col-money-kt,
+#dictationModal #final-sentences-table col.col-money-kt {
+  width: 50px;
+}
+
+#dictationModal #sentences-table th.col-time,
+#dictationModal #sentences-table td.col-time,
+#dictationModal #sentences-table th.col-star,
+#dictationModal #sentences-table td.col-star,
+#dictationModal #sentences-table th.col-mic,
+#dictationModal #sentences-table td.col-mic,
+#dictationModal #sentences-table th.col-half-stars,
+#dictationModal #sentences-table td.col-half-stars,
+#dictationModal #sentences-table th.col-activities,
+#dictationModal #sentences-table td.col-activities,
+#dictationModal #sentences-table th.col-characters,
+#dictationModal #sentences-table td.col-characters,
+#dictationModal #sentences-table th.col-mistakes,
+#dictationModal #sentences-table td.col-mistakes,
+#dictationModal #sentences-table th.col-money-dt,
+#dictationModal #sentences-table td.col-money-dt,
+#dictationModal #sentences-table th.col-money-kt,
+#dictationModal #sentences-table td.col-money-kt {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+#dictationModal #sentences-table td.col-star .star-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal #sentences-table td.col-star .star-icon--perfect {
+  color: var(--color-button-mint, #34d399);
+}
+
+#dictationModal #sentences-table td.col-star .star-icon--half {
+  color: var(--color-button-lightgreen, #4ade80);
+}
+
+#dictationModal #sentences-table td.col-star .star-icon--none {
+  color: var(--color-button-text-gray, #9ca3af);
+  opacity: 0.5;
+}
+
+#dictationModal #sentences-table td.col-mic .mic-icon--done {
+  color: var(--color-button-purple, #a78bfa);
+}
+
+#dictationModal #sentences-table td.col-mic .mic-icon--none {
+  color: var(--color-button-text-gray, #9ca3af);
+  opacity: 0.5;
+}
+
+#dictationModal #sentences-table td.col-half-stars .half-star-count,
+#dictationModal #sentences-table td.col-activities .activity-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-button-text-gray, #9ca3af);
+}
+
+#dictationModal #sentences-table td.col-half-stars .half-star-count i,
+#dictationModal #sentences-table td.col-activities .activity-count i {
+  width: 14px;
+  height: 14px;
+}
+
+#dictationModal #sentences-table th#thSentenceRowNumber,
+#dictationModal #sentences-table th#thSentenceChoice {
+  text-align: center;
+}
+
+#dictationModal #sentences-table th#thSentenceChoice {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#dictationModal #sentences-table th#thSentenceChoice #allCheckbox.all-checkbox-btn {
+  padding: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+#dictationModal #sentences-table th#thSentenceChoice #allCheckbox.all-checkbox-btn [data-lucide] {
+  width: 18px !important;
+  height: 18px !important;
+}
+
+#dictationModal #sentences-table th#thSentenceOriginal,
+#dictationModal #sentences-table th#thSentenceTranslation {
+  text-align: left;
+}
+
+#dictationModal #sentences-table col.col-text-original,
+#dictationModal #final-sentences-table col.col-text-original,
+#dictationModal #sentences-table col.col-text-translation,
+#dictationModal #final-sentences-table col.col-text-translation {
+  width: auto;
+}
+
+#dictationModal #sentences-table.hide-star col.col-star,
+#dictationModal #sentences-table.hide-star th.col-star,
+#dictationModal #sentences-table.hide-star td.col-star {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-mic col.col-mic,
+#dictationModal #sentences-table.hide-mic th.col-mic,
+#dictationModal #sentences-table.hide-mic td.col-mic {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-half-stars col.col-half-stars,
+#dictationModal #sentences-table.hide-half-stars th.col-half-stars,
+#dictationModal #sentences-table.hide-half-stars td.col-half-stars {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-activities col.col-activities,
+#dictationModal #sentences-table.hide-activities th.col-activities,
+#dictationModal #sentences-table.hide-activities td.col-activities {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-original col.col-text-original,
+#dictationModal #sentences-table.hide-original th.col-text-original,
+#dictationModal #sentences-table.hide-original td.col-text-original {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-money-dt col.col-money-dt,
+#dictationModal #sentences-table.hide-money-dt th.col-money-dt,
+#dictationModal #sentences-table.hide-money-dt td.col-money-dt {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-money-kt col.col-money-kt,
+#dictationModal #sentences-table.hide-money-kt th.col-money-kt,
+#dictationModal #sentences-table.hide-money-kt td.col-money-kt {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-translation col.col-text-translation,
+#dictationModal #sentences-table.hide-translation th.col-text-translation,
+#dictationModal #sentences-table.hide-translation td.col-text-translation {
+  display: none !important;
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th,
+#dictationModal #sentences-table td,
+#dictationModal #final-sentences-table td {
+  border: 1px solid var(--color-panel-bg);
+}
+
+#dictationModal #sentences-table th,
+#dictationModal #final-sentences-table th {
+  background-color: var(--color-panel-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#dictationModal #sentences-table thead,
+#dictationModal #final-sentences-table thead {
+  display: table-header-group;
+}
+
+#dictationModal #sentences-table button {
+  box-shadow: none !important;
+  margin: 0;
+  padding: 0;
+}
+
+#dictationModal .sentence-check {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:hover {
+  background-color: var(--color-button-gray);
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:active {
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .sentence-check:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+#dictationModal .start-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+#dictationModal .dikt-number-badge {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-button-text-gray);
+}
+
+#dictationModal .all-checkbox-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: transparent;
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--color-text);
+  transition: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:hover {
+  background-color: var(--color-button-gray);
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:active {
+  transform: none;
+  box-shadow: none !important;
+}
+
+#dictationModal .all-checkbox-btn:focus {
+  outline: none;
+  box-shadow: none !important;
+}
+
+#dictationModal #start-modal .start-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 12px 6px 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#dictationModal #start-modal .start-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dictationModal #start-modal .dikt-number-badge {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#dictationModal #start-modal h2#title-diktation {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#dictationModal #start-modal .start-modal-title-row {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-header-actions {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-header-actions {
+  flex: 0 0 auto;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r {
+  display: flex;
+  flex-direction: column;
+  gap: 2px !important;
+  margin-left: auto;
+  align-items: flex-end;
+  width: fit-content;
+  text-align: right;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r .table-progress {
+  margin-left: auto !important;
+}
+
+#dictationModal #start-modal .progress-panel-modal-r .table-progress td {
+  vertical-align: middle;
+}
+
+#dictationModal #start-modal .start-progress-wrap {
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+#dictationModal #start-modal .start-modal-controls {
+  flex-wrap: nowrap;
+}
+
+#dictationModal #start-modal .start-modal-controls > .all-checkbox-container {
+  flex: 0 0 auto;
+}
+
+#dictationModal #start-modal .start-modal-controls > .all-checkbox-container[style*="margin-left:auto"] {
+  margin-left: auto !important;
+}
+
+@media (max-width: 860px) {
+  #dictationModal #start-modal .start-modal-controls {
+    flex-wrap: wrap;
+  }
+}
+
+#dictationModal #start-modal .table-container {
+  padding: 0 12px 12px 12px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  #dictationModal #start-modal .start-modal-controls {
+    flex-wrap: wrap;
+  }
+}
+
+#dictationModal #startModalOpenSettingsBtn,
+#dictationModal .start-modal-settings-btn,
+#dictationModal .start-modal-exit-btn,
+#dictationModal .start-modal-close-btn {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  vertical-align: middle;
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#dictationModal .start-modal-settings-btn i,
+#dictationModal .start-modal-settings-btn svg,
+#dictationModal .start-modal-exit-btn i,
+#dictationModal .start-modal-exit-btn svg,
+#dictationModal .start-modal-close-btn i,
+#dictationModal .start-modal-close-btn svg {
+  width: 25px;
+  height: 25px;
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
+#dictationModal .start-modal-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 700px) {
+  #dictationModal .audio-players-wrapper {
+    flex-wrap: nowrap !important;
+  }
+}
+
+
+@media (max-width: 680px) {
+  #dictationModal .dictation-modal__logo--full {
+    display: none;
+  }
+
+  #dictationModal .dictation-modal__logo--min {
+    display: inline-block;
+  }
+
+  #dictationModal .dictation-modal__username {
+    max-width: 38vw;
+  }
+}
+
+/* Иконка короны для завершённого диктанта */
+#dictationModal .crown-icon {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  color: #ffc107;
+}

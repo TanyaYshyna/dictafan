@@ -44,11 +44,11 @@ def get_app_cache_revision() -> str:
         base_dir = os.path.dirname(__file__)
         candidates = [
             'sw.js',
-            os.path.join('static', 'js', 'script_dictation.js'),
+            # os.path.join('static', 'js', 'script_dictation.js'),
             os.path.join('static', 'js', 'script_dictation_editor.js'),
             os.path.join('static', 'js', 'audio_manager.js'),
-            os.path.join('static', 'js', 'sw_register.js'),
-            os.path.join('static', 'css', 'style_dictation.css'),
+            os.path.join('static', 'js', 'sw_register.js')
+            # os.path.join('static', 'css', 'style_dictation.css'),
         ]
         parts = []
         for rel in candidates:
@@ -77,6 +77,7 @@ def inject_app_cache_revision():
             'ui_lang': ui_lang,
             'ui_dir': get_ui_dir(ui_lang),
             'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
+            'telegram_bot_name': (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip(),
         }
     except Exception:
         return {
@@ -85,6 +86,7 @@ def inject_app_cache_revision():
             'ui_lang': 'en',
             'ui_dir': 'ltr',
             'monobank_jar_url': (os.getenv('MONOBANK_JAR_URL') or '').strip(),
+            'telegram_bot_name': (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip(),
         }
 
 # Нужен валидный app.static_folder для логики бэкенда, где используются пути
@@ -195,8 +197,10 @@ from routes.user_routes import user_bp
 from routes.statistics import statistics_bp
 from routes.library import library_bp
 from routes.desk import desk_bp
+from routes.desktop import desktop_bp
 from routes.groups import groups_bp
 from routes.assignments import assignments_bp
+from routes.plan_tasks import plan_tasks_bp
 from routes.telegram import telegram_bp
 
 app.register_blueprint(index_bp)
@@ -206,8 +210,10 @@ app.register_blueprint(user_bp)
 app.register_blueprint(statistics_bp)
 app.register_blueprint(library_bp)
 app.register_blueprint(desk_bp)
+app.register_blueprint(desktop_bp)
 app.register_blueprint(groups_bp)
 app.register_blueprint(assignments_bp)
+app.register_blueprint(plan_tasks_bp)
 app.register_blueprint(telegram_bp)
 
 

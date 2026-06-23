@@ -7,7 +7,7 @@ import json
 import shutil
 from datetime import datetime
 import uuid
-from flask import Blueprint, jsonify, render_template, request, redirect, make_response, send_file
+from flask import Blueprint, Response, jsonify, render_template, request, redirect, make_response, send_file
 from flask_jwt_extended import (
     create_access_token,
     jwt_required,
@@ -19,6 +19,7 @@ from urllib.parse import urlencode
 import secrets
 import requests
 from flask import render_template_string
+import qrcode
 
 # Импортируем из helpers
 from helpers.language_data import load_language_data
@@ -31,13 +32,19 @@ from helpers.db_users import (
     create_password_reset_token,
     reset_password_by_token,
 )
-from helpers.db_history import calculate_streak_days, get_activity_total_for_date
+from helpers.db_history import (
+    calculate_streak_days,
+    get_activity_total_for_date,
+    get_activity_lead_time_by_day_range,
+    get_history_by_day_totals,
+    get_history_by_day_totals_for_date,
+)
 from helpers.email_sender import send_email
 from helpers.telegram import is_telegram_enabled, send_telegram_message
 from helpers.db_telegram import (
     generate_and_store_telegram_link_code,
     link_telegram_chat_by_code,
-    set_user_telegram_enabled,
+    list_teacher_recipients_for_student_manual_report,
 )
 from helpers.i18n import DEFAULT_UI_LANG, SUPPORTED_UI_LANGS
 from helpers.db_groups import ensure_personal_group_for_user
@@ -380,8 +387,7 @@ def api_password_reset_request_telegram():
             return jsonify({'success': True})
 
         chat_id = user_db.get('telegram_chat_id')
-        telegram_enabled = bool(user_db.get('telegram_enabled'))
-        if not chat_id or not telegram_enabled:
+        if not chat_id:
             return jsonify({'success': True})
 
         token = create_password_reset_token(email)
@@ -440,11 +446,24 @@ def api_get_current_user():
     user_copy.pop('password_hash', None)
 
     try:
+        # Ensure tr_* flags (learning languages) are preserved in response
+        for k, v in list(user_data.items()):
+            if isinstance(k, str) and k.startswith('tr_'):
+                user_copy[k] = bool(v)
+    except Exception:
+        pass
+
+    try:
         user_id_int = int(user_data.get('id'))
         user_copy['streak_days'] = calculate_streak_days(user_id_int)
         user_copy['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
     except Exception:
         user_copy['today_activity_total'] = int(user_copy.get('today_activity_total') or 0)
+
+    if 'daily_time_plan' in user_data:
+        user_copy['daily_time_plan'] = user_data.get('daily_time_plan')
+    if 'daily_money_plan' in user_data:
+        user_copy['daily_money_plan'] = user_data.get('daily_money_plan')
     
     # audio_settings_json уже включен в user_data из get_user_by_email
     # и будет возвращен автоматически
@@ -480,6 +499,8 @@ def api_get_current_user():
     except Exception:
         pass
     
+    user_copy['telegram_bot_name'] = (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip()
+    
     return jsonify(user_copy)
 
 @user_bp.route('/api/logout', methods=['POST'])
@@ -511,8 +532,8 @@ def api_set_ui_lang():
 
 @user_bp.route('/profile')
 def profile_page():
-    """Страница профиля пользователя"""
-    return render_template('user_profile_jwt.html', language_data=load_language_data())
+    """Страница профиля — перенаправляем на рабочий стол, где профиль открывается в модалке"""
+    return redirect(url_for('index.index'))
 
 @user_bp.route('/logout')
 def logout():
@@ -557,6 +578,14 @@ def api_update_profile():
         
         if 'current_learning' in updates:
             db_updates['current_learning'] = updates['current_learning']
+
+        # tr_* flags (learning languages)
+        try:
+            for k, v in updates.items():
+                if isinstance(k, str) and k.startswith('tr_'):
+                    db_updates[k] = bool(v)
+        except Exception:
+            pass
         
         # Обновляем settings_json (новый способ хранения настроек)
         if 'settings_json' in updates:
@@ -570,6 +599,12 @@ def api_update_profile():
 
         if 'daily_activity_goal' in updates:
             db_updates['daily_activity_goal'] = updates['daily_activity_goal']
+
+        if 'daily_time_plan' in updates:
+            db_updates['daily_time_plan'] = updates['daily_time_plan']
+
+        if 'daily_money_plan' in updates:
+            db_updates['daily_money_plan'] = updates['daily_money_plan']
         
         # Обновляем данные в БД
         if db_updates:
@@ -592,6 +627,13 @@ def api_update_profile():
         }
 
         try:
+            for k, v in updated_user.items():
+                if isinstance(k, str) and k.startswith('tr_'):
+                    user_response[k] = bool(v)
+        except Exception:
+            pass
+
+        try:
             user_id_int = int(updated_user.get('id'))
             user_response['streak_days'] = calculate_streak_days(user_id_int)
             user_response['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
@@ -601,10 +643,14 @@ def api_update_profile():
         if 'daily_activity_goal' in updated_user:
             user_response['daily_activity_goal'] = updated_user.get('daily_activity_goal')
 
+        if 'daily_time_plan' in updated_user:
+            user_response['daily_time_plan'] = updated_user.get('daily_time_plan')
+
+        if 'daily_money_plan' in updated_user:
+            user_response['daily_money_plan'] = updated_user.get('daily_money_plan')
+
         if 'telegram_chat_id' in updated_user:
             user_response['telegram_chat_id'] = updated_user.get('telegram_chat_id')
-        if 'telegram_enabled' in updated_user:
-            user_response['telegram_enabled'] = bool(updated_user.get('telegram_enabled'))
         if 'telegram_link_code' in updated_user:
             user_response['telegram_link_code'] = updated_user.get('telegram_link_code')
         if 'telegram_self_reports_enabled' in updated_user:
@@ -651,6 +697,13 @@ def api_get_profile():
     }
 
     try:
+        for k, v in user_db.items():
+            if isinstance(k, str) and k.startswith('tr_'):
+                user_response[k] = bool(v)
+    except Exception:
+        pass
+
+    try:
         user_id_int = int(user_db.get('id'))
         user_response['streak_days'] = calculate_streak_days(user_id_int)
         user_response['today_activity_total'] = get_activity_total_for_date(user_id_int, datetime.now().date())
@@ -660,10 +713,14 @@ def api_get_profile():
     if 'daily_activity_goal' in user_db:
         user_response['daily_activity_goal'] = user_db.get('daily_activity_goal')
 
+    if 'daily_time_plan' in user_db:
+        user_response['daily_time_plan'] = user_db.get('daily_time_plan')
+
+    if 'daily_money_plan' in user_db:
+        user_response['daily_money_plan'] = user_db.get('daily_money_plan')
+
     if 'telegram_chat_id' in user_db:
         user_response['telegram_chat_id'] = user_db.get('telegram_chat_id')
-    if 'telegram_enabled' in user_db:
-        user_response['telegram_enabled'] = bool(user_db.get('telegram_enabled'))
     if 'telegram_link_code' in user_db:
         user_response['telegram_link_code'] = user_db.get('telegram_link_code')
     if 'telegram_self_reports_enabled' in user_db:
@@ -696,22 +753,30 @@ def api_telegram_link_code():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@user_bp.route('/api/telegram/enabled', methods=['POST'])
+@user_bp.route('/api/telegram/qr', methods=['GET'])
 @jwt_required()
-def api_telegram_set_enabled():
-    current_email = get_jwt_identity()
-    user_db = get_user_by_email(current_email)
-    if not user_db:
-        return jsonify({'success': False, 'error': 'User not found'}), 404
+def api_telegram_qr():
+    code = (request.args.get('code') or '').strip()
+    if not code:
+        return jsonify({'success': False, 'error': 'Code is required'}), 400
 
-    data = request.get_json(silent=True) or {}
-    enabled = bool(data.get('enabled'))
+    bot_username = (os.getenv('TELEGRAM_BOT_NAME') or 'dictafan_user_bot').strip()
+    url = f"https://t.me/{bot_username}?start={code}"
 
-    try:
-        set_user_telegram_enabled(int(user_db['id']), enabled)
-        return jsonify({'success': True, 'enabled': enabled})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    qr = qrcode.QRCode(
+        version=None,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=2,
+    )
+    qr.add_data(url)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color='black', back_color='white')
+
+    buf = io.BytesIO()
+    img.save(buf, format='PNG')
+    buf.seek(0)
+    return Response(buf.getvalue(), mimetype='image/png')
 
 
 @user_bp.route('/api/telegram/self_reports_enabled', methods=['POST'])
@@ -732,6 +797,56 @@ def api_telegram_set_self_reports_enabled():
         return jsonify({'success': True, 'enabled': bool(updated.get('telegram_self_reports_enabled'))})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@user_bp.route('/api/telegram/test_send', methods=['POST'])
+@jwt_required()
+def api_telegram_test_send():
+    """Отправить тестовое сообщение в Telegram: себе (если включено) и всем учителям."""
+    current_email = get_jwt_identity()
+    user_db = get_user_by_email(current_email)
+    if not user_db:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    text = str(data.get('text') or 'Тест').strip()
+    if not text:
+        text = 'Тест'
+
+    sent_count = 0
+    errors = []
+
+    # Отправляем себе, если включены self_reports
+    self_reports = bool(user_db.get('telegram_self_reports_enabled'))
+    chat_id = user_db.get('telegram_chat_id')
+    if self_reports and chat_id:
+        try:
+            send_telegram_message(int(chat_id), text)
+            sent_count += 1
+        except Exception as e:
+            errors.append(f"self: {e}")
+
+    # Отправляем учителям
+    try:
+        teachers = list_teacher_recipients_for_student_manual_report(
+            int(user_db['id']),
+            dictation_language_code='',
+        )
+        for teacher in teachers:
+            t_chat_id = teacher.get('telegram_chat_id')
+            if t_chat_id:
+                try:
+                    send_telegram_message(int(t_chat_id), text)
+                    sent_count += 1
+                except Exception as e:
+                    errors.append(f"teacher {t_chat_id}: {e}")
+    except Exception as e:
+        errors.append(f"list_teachers: {e}")
+
+    if sent_count == 0 and errors:
+        return jsonify({'success': False, 'error': '; '.join(errors)}), 500
+
+    return jsonify({'success': True, 'sent_count': sent_count})
 
 
 @user_bp.route('/api/avatar', methods=['POST'])
@@ -1106,6 +1221,51 @@ def api_save_history(month_identifier):
         import traceback
         print(f"❌ [API_SAVE_HISTORY] Error saving history: {e}")
         print(f"❌ [API_SAVE_HISTORY] Traceback: {traceback.format_exc()}")
+        return jsonify({'error': str(e)}), 500
+
+
+@user_bp.route('/api/stats/dashboard', methods=['GET'])
+@jwt_required()
+def api_dashboard_stats():
+    """Получить статистику для панели «Время / Деньги» на рабочем столе.
+
+    Returns:
+        streak_days: int — количество дней подряд с активностью
+        today_lead_time: int — затраченное время сегодня (ms)
+        today_money: int — заработано монет сегодня
+        total_lead_time: int — общее затраченное время за всё время (ms)
+        total_money: int — всего монет за всё время
+        daily_time_plan: int — план времени (мин)
+        daily_money_plan: int — план монет
+    """
+    try:
+        current_email = get_jwt_identity()
+        user_data = get_user_by_email(current_email)
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+
+        user_id = user_data['id']
+        today = datetime.now().date()
+
+        streak_days = calculate_streak_days(user_id, today=today)
+
+        today_stats = get_history_by_day_totals_for_date(user_id, today)
+        all_time_stats = get_history_by_day_totals(user_id)
+
+        daily_time_plan = int(user_data.get('daily_time_plan') or 10)
+        daily_money_plan = int(user_data.get('daily_money_plan') or 100)
+
+        return jsonify({
+            'streak_days': streak_days,
+            'today_lead_time': today_stats['lead_time'],
+            'today_money': today_stats['money'],
+            'total_lead_time': all_time_stats['total_lead_time'],
+            'total_money': all_time_stats['total_money'],
+            'daily_time_plan': daily_time_plan,
+            'daily_money_plan': daily_money_plan,
+        })
+    except Exception as e:
+        print(f'Error in api_dashboard_stats: {e}')
         return jsonify({'error': str(e)}), 500
 
 @user_bp.route('/api/history/all', methods=['GET'])

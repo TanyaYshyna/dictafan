@@ -28,6 +28,10 @@
     "native_language": {
       "label": "Native language:"
     },
+    "learning_languages": {
+      "label": "Learning languages:",
+      "at_least_one": "Select at least one language"
+    },
     "learning_language": {
       "label": "Learning language:"
     },
@@ -53,7 +57,7 @@
     "sections": {
       "languages": "Languages",
       "activity_goal": "Daily Activity Goal",
-      "local_models": "Offline language models settings",
+      "local_models": "Speech recognition types",
       "dictation_settings": "Dictation settings",
       "assignment_history": "Assignment history",
       "groups": "Groups"
@@ -70,6 +74,7 @@
       },
       "play_audio": {
         "title": "Play audio:",
+        "order_title": "Audio playback order within a sentence",
         "on_start": "on start:",
         "on_typo": "on mistake:",
         "on_success": "on success:",
@@ -148,6 +153,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "My groups"
+      },
       "table": {
         "id": "ID",
         "name": "Name"
@@ -160,7 +168,7 @@
       },
       "filter": {
         "title": "Filter",
-        "active": "show only active",
+        "active": "only active",
         "all": "show all"
       },
       "actions": {
@@ -172,6 +180,9 @@
       },
       "invite_link": {
         "label": "Invite link",
+        "copy": "Copy",
+        "create": "Create invite",
+        "create_button": "Invitation",
         "errors": {
           "get_failed": "Failed to get link"
         }
@@ -215,6 +226,11 @@
     "models": {
       "all_models": "All models",
       "languages": "Languages",
+      "method_google": "Google services",
+      "method_server_whisper_tiny": "Whisper Tiny on server",
+      "method_device_whisper_tiny": "Whisper Tiny on device",
+      "method_device_whisper_base": "Whisper Base on device",
+      "method_device_whisper_small": "Whisper Small on device",
       "browser_storage": "Browser storage:",
       "loading_info": "Loading info...",
       "calculating_storage": "Calculating storage usage...",
@@ -471,6 +487,8 @@
     },
     "assignments": {
       "max_7_days": "Maximum 7 days",
+      "exercises_modal_title": "All exercises",
+      "exercises_column": "Exercises",
       "modal_title": "Assignment",
       "add_day": "Add day",
       "text_column": "Text",
@@ -506,7 +524,7 @@
     },
     "dictation_card_actions": {
       "title": "Actions",
-      "create_assignment_new": "New assignment",
+      "create_assignment_new": "Exercises",
       "cache": "Cache",
       "edit": "Edit",
       "show_in_book": "Show in book",
@@ -715,6 +733,14 @@
         "creating_account": "Creating account…"
       }
     },
+  "desktop": {
+    "confirm": {
+      "title": "Save changes?",
+      "save": "Save",
+      "exit": "Exit",
+      "close": "Close"
+    }
+  },
   "support": {
     "topbar": {
       "title": "Buy me a coffee"

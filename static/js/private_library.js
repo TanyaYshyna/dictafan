@@ -16,6 +16,61 @@ function libT(key, params, fallback) {
   return String(key || '');
 }
 
+function _getCreateAssignmentSelectedPositionsForSave(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  if (st.draft && st.draft.selected === true) {
+    const pos = normalizeExercisePositions(st.draft.positions || []);
+    return pos;
+  }
+  const id = Number(st.selectedExerciseId);
+  if (Number.isFinite(id) && id > 0) {
+    const ex = findCreateAssignmentExerciseById(modal, id);
+    const pos = normalizeExercisePositions(ex && ex.positions ? ex.positions : []);
+    return pos;
+  }
+  const sentenceState = getCreateAssignmentSentencesState(modal);
+  const pos = normalizeExercisePositions(Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : []);
+  return pos;
+}
+
+function _getCreateAssignmentExercisesPayloadForSave(modal) {
+  try {
+    const st = getCreateAssignmentExercisesState(modal);
+    const items = getVisibleCreateAssignmentExercises(modal);
+    const out = [];
+
+    // If there's an active draft with positions, include it too.
+    if (st && st.draft && st.draft.selected === true) {
+      const pos = normalizeExercisePositions(st.draft.positions || []);
+      if (pos && pos.length) {
+        out.push({ positions: pos });
+      }
+    }
+
+    (Array.isArray(items) ? items : []).forEach((ex) => {
+      if (!ex || ex.__deleted === true) return;
+      const positions = normalizeExercisePositions(ex.positions || []);
+      const id = Number(ex.id);
+      const title = (ex.title && String(ex.title).trim()) ? String(ex.title).trim() : null;
+      const row = { positions };
+      if (Number.isFinite(id) && id > 0) row.id = id;
+      if (title) row.title = title;
+      out.push(row);
+    });
+
+    // De-dup by positions key, keep first occurrence.
+    const seen = new Set();
+    return out.filter((x) => {
+      const key = createAssignmentPositionsKey(x.positions || []);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } catch (e) {
+    return [];
+  }
+}
+
 function applyPrivateLibraryTranslations() {
   try {
     document.title = libT('private_library.page_title');
@@ -123,7 +178,6 @@ function applyPrivateLibraryTranslations() {
   setAttr('btnHomeLibrary', 'title', 'private_library.toolbar.my_library');
   setAttr('btnPublicLibrary', 'title', 'private_library.toolbar.public_library');
   setAttr('btnStudentPlan', 'title', 'private_library.toolbar.plan');
-  setAttr('btnTeacherAssignments', 'title', 'private_library.toolbar.assignments');
   setAttr('btnDeskZoomIn', 'title', 'private_library.toolbar.zoom_in');
   setAttr('btnDeskZoomOut', 'title', 'private_library.toolbar.zoom_out');
 
@@ -917,8 +971,259 @@ function renderCreateAssignmentSentencesTable(modal) {
       const setAll = allPos.length > 0 && nextSelected.length === allPos.length;
       setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: setAll ? null : nextSelected }));
       renderCreateAssignmentSentencesTable(modal);
+
+      try {
+        syncCreateAssignmentSelectedExerciseFromSentences(modal);
+      } catch (e2) {
+      }
     });
   }
+}
+
+function getCreateAssignmentExercisesState(modal) {
+  try {
+    const raw = modal && modal.dataset ? modal.dataset.exercisesState : '';
+    if (!raw) return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+    return Object.assign({ exercises: [], selectedExerciseId: null, draft: null, dirty: false }, parsed);
+  } catch (e) {
+    return { exercises: [], selectedExerciseId: null, draft: null, dirty: false };
+  }
+}
+
+function setCreateAssignmentExercisesState(modal, state) {
+  try {
+    if (!modal || !modal.dataset) return;
+    modal.dataset.exercisesState = JSON.stringify(state && typeof state === 'object' ? state : { exercises: [], selectedExerciseId: null, draft: null, dirty: false });
+  } catch (e) {
+  }
+}
+
+function setCreateAssignmentExercisesDirty(modal, isDirty) {
+  const st = getCreateAssignmentExercisesState(modal);
+  st.dirty = !!isDirty;
+  setCreateAssignmentExercisesState(modal, st);
+  try {
+    const star2 = document.getElementById('create-assignment-dictation-unsaved-star');
+    if (star2) star2.style.display = st.dirty ? 'inline' : 'none';
+  } catch (e) {
+  }
+}
+
+function normalizeExercisePositions(positions) {
+  const prepared = [];
+  try {
+    for (const x of Array.isArray(positions) ? positions : []) {
+      const n = Number(x);
+      if (!Number.isFinite(n)) continue;
+      prepared.push(n);
+    }
+  } catch (e) {
+  }
+  const uniq = Array.from(new Set(prepared));
+  uniq.sort((a, b) => a - b);
+  return uniq;
+}
+
+function createAssignmentPositionsKey(positions) {
+  try {
+    return JSON.stringify(normalizeExercisePositions(positions));
+  } catch (e) {
+    return '[]';
+  }
+}
+
+function createAssignmentPositionsToTitle(positions) {
+  const arr = normalizeExercisePositions(positions);
+  if (!arr.length) return 'весь диктант';
+  const ranges = [];
+  let start = arr[0];
+  let prev = arr[0];
+  for (let i = 1; i < arr.length; i++) {
+    const cur = arr[i];
+    if (cur === prev + 1) {
+      prev = cur;
+      continue;
+    }
+    ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+    start = cur;
+    prev = cur;
+  }
+  ranges.push(start === prev ? String(start) : `${start}-${prev}`);
+  return `s: ${ranges.join(', ')}`;
+}
+
+function getVisibleCreateAssignmentExercises(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = Array.isArray(st.exercises) ? st.exercises : [];
+  return items.filter(x => x && x.__deleted !== true);
+}
+
+function findCreateAssignmentExerciseById(modal, id) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = Array.isArray(st.exercises) ? st.exercises : [];
+  return items.find(x => x && Number(x.id) === Number(id)) || null;
+}
+
+function syncCreateAssignmentSelectedExerciseFromSentences(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  const sent = getCreateAssignmentSentencesState(modal);
+  const sel = Array.isArray(sent.selectedPositions) ? normalizeExercisePositions(sent.selectedPositions) : null;
+  const positions = sel == null ? [] : sel;
+
+  if (st.draft && st.draft.selected === true) {
+    st.draft.positions = positions;
+    setCreateAssignmentExercisesState(modal, st);
+    setCreateAssignmentExercisesDirty(modal, true);
+    try { renderCreateAssignmentExercisesTable(modal); } catch (e2) {}
+    return;
+  }
+
+  const id = Number(st.selectedExerciseId);
+  if (!Number.isFinite(id) || id <= 0) return;
+  const ex = findCreateAssignmentExerciseById(modal, id);
+  if (!ex) return;
+  ex.positions = positions;
+  setCreateAssignmentExercisesState(modal, st);
+  setCreateAssignmentExercisesDirty(modal, true);
+  try { renderCreateAssignmentExercisesTable(modal); } catch (e2) {}
+}
+
+function renderCreateAssignmentExercisesTable(modal) {
+  const tbody = document.getElementById('create-assignment-exercisesTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  const st = getCreateAssignmentExercisesState(modal);
+  const items = getVisibleCreateAssignmentExercises(modal);
+  const rows = items.slice();
+  if (st.draft && typeof st.draft === 'object') {
+    rows.push(Object.assign({ __draft: true }, st.draft));
+  }
+
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="2" style="padding:10px; color: rgba(0,0,0,0.55);">Нет упражнений</td>`;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  rows.forEach((ex) => {
+    const isDraft = ex && ex.__draft === true;
+    const idRaw = isDraft ? 'draft' : String(Number(ex.id));
+    const pos = Array.isArray(ex.positions) ? ex.positions : [];
+    const canDelete = isDraft ? true : (pos.length > 0);
+    const posLabel = pos.length
+      ? createAssignmentPositionsToTitle(pos).replace(/^s:\s*/g, '')
+      : (isDraft ? 'выбери предложения' : 'весь диктант');
+
+    const tr = document.createElement('tr');
+    tr.dataset.exerciseId = idRaw;
+    tr.classList.add('exercise-row');
+
+    if (isDraft) {
+      if (st.draft && st.draft.selected === true) tr.classList.add('selected');
+    } else if (st.selectedExerciseId && Number(st.selectedExerciseId) === Number(ex.id)) {
+      tr.classList.add('selected');
+    }
+
+    tr.innerHTML = `
+      <td style="padding:8px 10px;">${escapeHtml(posLabel)}</td>
+      <td style="padding:8px 10px; text-align:right; width: 1%; white-space: nowrap;">
+        ${canDelete
+          ? `<button type="button" class="topbar-icon-btn create-assignment-icon-btn" data-action="delete-exercise" title="${escapeHtml(libT('private_library.common.delete', null, 'Удалить'))}"><i data-lucide="trash-2"></i></button>`
+          : ''}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  if (!tbody.dataset.listenerAttached) {
+    tbody.dataset.listenerAttached = '1';
+    tbody.addEventListener('click', (e) => {
+      const delBtn = e.target && e.target.closest ? e.target.closest('button[data-action="delete-exercise"]') : null;
+      if (delBtn) {
+        const row = delBtn.closest ? delBtn.closest('tr[data-exercise-id]') : null;
+        if (!row) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const idRaw = row.dataset.exerciseId;
+        const st = getCreateAssignmentExercisesState(modal);
+        if (idRaw === 'draft') {
+          if (st.draft) {
+            st.draft = null;
+            setCreateAssignmentExercisesState(modal, st);
+            setCreateAssignmentExercisesDirty(modal, true);
+            renderCreateAssignmentExercisesTable(modal);
+          }
+          return;
+        }
+        const id = Number(idRaw);
+        if (!Number.isFinite(id)) return;
+        const ex = findCreateAssignmentExerciseById(modal, id);
+        if (!ex) return;
+        const pos = Array.isArray(ex.positions) ? ex.positions : [];
+        if (!pos.length) {
+          try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e2) { }
+          return;
+        }
+        ex.__deleted = true;
+        if (st.selectedExerciseId && Number(st.selectedExerciseId) === Number(id)) {
+          st.selectedExerciseId = null;
+        }
+        setCreateAssignmentExercisesState(modal, st);
+        setCreateAssignmentExercisesDirty(modal, true);
+        renderCreateAssignmentExercisesTable(modal);
+        return;
+      }
+      const row = e.target && e.target.closest ? e.target.closest('tr[data-exercise-id]') : null;
+      if (!row) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const idRaw = row.dataset.exerciseId;
+      if (idRaw === 'draft') {
+        selectCreateAssignmentDraftExercise(modal);
+        return;
+      }
+      const id = Number(idRaw);
+      if (!Number.isFinite(id)) return;
+      selectCreateAssignmentExerciseById(modal, id);
+    });
+  }
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: tbody });
+    }
+  } catch (e) {
+  }
+}
+
+function selectCreateAssignmentExerciseById(modal, id) {
+  const st = getCreateAssignmentExercisesState(modal);
+  st.selectedExerciseId = id;
+  if (st.draft) st.draft.selected = false;
+  setCreateAssignmentExercisesState(modal, st);
+
+  const ex = findCreateAssignmentExerciseById(modal, id);
+  const positions = ex && Array.isArray(ex.positions) ? normalizeExercisePositions(ex.positions) : [];
+  const curSent = getCreateAssignmentSentencesState(modal);
+  setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: positions.length ? positions : null }));
+  renderCreateAssignmentSentencesTable(modal);
+  renderCreateAssignmentExercisesTable(modal);
+}
+
+function selectCreateAssignmentDraftExercise(modal) {
+  const st = getCreateAssignmentExercisesState(modal);
+  if (!st.draft) return;
+  st.selectedExerciseId = null;
+  st.draft.selected = true;
+  setCreateAssignmentExercisesState(modal, st);
+  const curSent = getCreateAssignmentSentencesState(modal);
+  setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: [] }));
+  renderCreateAssignmentSentencesTable(modal);
+  renderCreateAssignmentExercisesTable(modal);
 }
 
 function ensureCreateAssignmentModal() {
@@ -946,7 +1251,7 @@ function ensureCreateAssignmentModal() {
       <div class="modal-header create-assignment-modal-header">
         <div class="create-assignment-modal-title">
           <div class="create-assignment-modal-title-icon"><i data-lucide="clipboard-list"></i></div>
-          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.assignments.modal_title'))}</div>
+          <div class="create-assignment-modal-title-text">${escapeHtml(libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения'))}</div>
         </div>
 
         <div class="create-assignment-modal-header-actions">
@@ -978,7 +1283,7 @@ function ensureCreateAssignmentModal() {
             <div id="create-assignment-cover-meta" class="create-assignment-cover-meta"></div>
             <div class="create-assignment-top-controls">
               <div class="create-assignment-top-row">
-                <select id="create-assignment-group" class="create-assignment-select"></select>
+                <div></div>
               </div>
             </div>
           </div>
@@ -986,14 +1291,23 @@ function ensureCreateAssignmentModal() {
 
         <!-- НИЖНЯЯ ПАНЕЛЬ -->
         <div id="create-assignment-bottom" class="create-assignment-bottom">
-          <div id="create-assignment-days-panel" class="create-assignment-panel create-assignment-panel--days">
+          <div id="create-assignment-exercises-panel" class="create-assignment-panel create-assignment-panel--days">
             <div class="create-assignment-panel-body">
               <div class="create-assignment-panel-actions">
-                <button type="button" id="create-assignment-days-add" class="topbar-icon-btn create-assignment-icon-btn" title="${escapeHtml(libT('private_library.assignments.add_day'))}">
-                  <i data-lucide="plus"></i>
-                </button>
+                <button type="button" id="create-assignment-exercise-create" class="topbar-icon-btn create-assignment-icon-btn" title="Создать упражнение"><i data-lucide="plus"></i></button>
+                <button type="button" id="create-assignment-exercise-delete" class="topbar-icon-btn create-assignment-icon-btn" title="Удалить упражнение"><i data-lucide="trash-2"></i></button>
               </div>
-              <div id="create-assignment-days-table"></div>
+              <div style="max-height: 420px; overflow: auto;">
+                <table id="create-assignment-exercises-table" class="create-assignment-table" style="width:100%; border-collapse: collapse;">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left; padding:8px 10px;">${escapeHtml(libT('private_library.assignments.exercises_column', null, 'Упражнения'))}</th>
+                      <th style="text-align:right; padding:8px 10px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="create-assignment-exercisesTableBody"></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -1030,6 +1344,736 @@ function ensureCreateAssignmentModal() {
   }
 
   return modal;
+}
+
+function ensurePlanTasksModal() {
+  let modal = document.getElementById('plan-tasks-modal');
+  return modal;
+}
+
+const _planTasksStore = new WeakMap();
+
+function _ensurePlanTasksStore(modal) {
+  if (!modal) return { tasks: [], exercises: [], currentId: null, dirty: false };
+  const existing = _planTasksStore.get(modal);
+  if (existing) return existing;
+  const init = { tasks: [], exercises: [], currentId: null, dirty: false };
+  _planTasksStore.set(modal, init);
+  return init;
+}
+
+function _sortPlanTasks(items) {
+  const tasks = Array.isArray(items) ? items.slice() : [];
+  tasks.sort((a, b) => {
+    const da = String(a && a.date_plan ? a.date_plan : '');
+    const db = String(b && b.date_plan ? b.date_plan : '');
+    if (da < db) return -1;
+    if (da > db) return 1;
+    const ia = (a && a.id != null) ? Number(a.id) : NaN;
+    const ib = (b && b.id != null) ? Number(b.id) : NaN;
+    if (Number.isFinite(ia) && Number.isFinite(ib)) return ia - ib;
+    return 0;
+  });
+  return tasks;
+}
+
+function _getPlanTasksState(modal) {
+  return _ensurePlanTasksStore(modal).tasks;
+}
+
+function _setPlanTasksState(modal, tasks) {
+  const st = _ensurePlanTasksStore(modal);
+  st.tasks = _sortPlanTasks(tasks);
+}
+
+function _getPlanTasksExercises(modal) {
+  return _ensurePlanTasksStore(modal).exercises;
+}
+
+function _setPlanTasksExercises(modal, exercises) {
+  const st = _ensurePlanTasksStore(modal);
+  st.exercises = Array.isArray(exercises) ? exercises.slice() : [];
+}
+
+function _getPlanTasksCurrentId(modal) {
+  return _ensurePlanTasksStore(modal).currentId;
+}
+
+function _setPlanTasksCurrentId(modal, id) {
+  const st = _ensurePlanTasksStore(modal);
+  st.currentId = (id == null || id === '') ? null : Number(id);
+}
+
+function _setPlanTasksDirty(modal, dirty) {
+  _ensurePlanTasksStore(modal).dirty = Boolean(dirty);
+}
+
+function _getPlanTasksDirty(modal) {
+  return Boolean(_ensurePlanTasksStore(modal).dirty);
+}
+
+function _findPlanTaskIndexById(tasks, id) {
+  const idNum = Number(id);
+  if (!Array.isArray(tasks) || !Number.isFinite(idNum)) return -1;
+  return tasks.findIndex(t => Number(t && t.id) === idNum);
+}
+
+function _planPositionsKey(pos) {
+  try {
+    const arr = Array.isArray(pos) ? pos.map(x => Number(x)).filter(x => Number.isFinite(x)).sort((a, b) => a - b) : [];
+    return arr.join(',');
+  } catch (e) {
+    return '';
+  }
+}
+
+function _planExerciseLabel(ex) {
+  try {
+    if (!ex) return '';
+    const t = (ex.title != null) ? String(ex.title).trim() : '';
+    if (t) return t;
+    const pos = Array.isArray(ex.positions) ? ex.positions : [];
+    if (!pos.length) return 'Весь диктант';
+    return `s: ${pos.join(', ')}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+const _planTasksAutosaveTimers = new WeakMap();
+const _planTasksAutosaveInFlight = new WeakMap();
+
+function _getPlanTasksContext(modal) {
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+  const dictationIdNum = Number(dictationIdRaw);
+  const groupSel = document.getElementById('plan-tasks-group');
+  const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
+  return { dictationIdNum, groupIdNum };
+}
+
+function _buildPlanTasksPayload(modal) {
+  const tasks = _getPlanTasksState(modal);
+  return (Array.isArray(tasks) ? tasks : []).map(t => ({
+    id: t && t.id != null ? Number(t.id) : null,
+    positions: Array.isArray(t && t.positions) ? t.positions : [],
+    date_plan: t && t.date_plan ? String(t.date_plan) : '',
+    repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+  }));
+}
+
+function _validatePlanTasksPayload(payload) {
+  const items = Array.isArray(payload) ? payload : [];
+  const seen = new Set();
+  for (const t of items) {
+    if (!t.date_plan) return 'Заполни дату во всех строках';
+    if (!Number.isFinite(Number(t.repeat_count)) || Number(t.repeat_count) <= 0) return 'Повторы должны быть >= 1';
+
+    const k = `${String(t.date_plan)}|${_planPositionsKey(Array.isArray(t.positions) ? t.positions : [])}`;
+    if (seen.has(k)) return 'Нельзя сохранять две одинаковые строки (одна дата + одно упражнение)';
+    seen.add(k);
+  }
+  return null;
+}
+
+async function _reconcilePlanTasksNow(modal, opts) {
+  const silent = Boolean(opts && opts.silent);
+  if (!modal) return;
+
+  const { dictationIdNum, groupIdNum } = _getPlanTasksContext(modal);
+  if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0) return;
+  if (!Number.isFinite(groupIdNum) || groupIdNum <= 0) return;
+  if (_planTasksAutosaveInFlight.get(modal) === true) return;
+
+  const payload = _buildPlanTasksPayload(modal);
+  const validationError = _validatePlanTasksPayload(payload);
+  if (validationError) {
+    if (!silent) showToast(validationError);
+    return;
+  }
+
+  _planTasksAutosaveInFlight.set(modal, true);
+  try {
+    const res = await apiRequest(
+      `/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}/reconcile`,
+      { method: 'POST', body: JSON.stringify({ tasks: payload }) }
+    );
+    if (!res || res.success !== true) {
+      if (!silent) {
+        const msg = res && res.error ? String(res.error) : 'Не удалось сохранить планы';
+        showToast(msg, { durationMs: 3500 });
+      }
+      return;
+    }
+
+    const next = (res && Array.isArray(res.tasks)) ? res.tasks : [];
+    _setPlanTasksState(modal, next.map(t => ({
+      id: t && t.id != null ? Number(t.id) : null,
+      positions: Array.isArray(t && t.positions) ? t.positions : [],
+      date_plan: t && t.date_plan ? String(t.date_plan) : '',
+      repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+    })));
+    _setPlanTasksDirty(modal, false);
+    _renderPlanTasksTable(modal);
+  } catch (e) {
+    if (!silent) showToast('Ошибка сохранения планов', { durationMs: 2500 });
+  } finally {
+    _planTasksAutosaveInFlight.set(modal, false);
+    if (_getPlanTasksDirty(modal)) _schedulePlanTasksAutosave(modal);
+  }
+}
+
+function _schedulePlanTasksAutosave(modal) {
+  if (!modal) return;
+  _setPlanTasksDirty(modal, true);
+
+  const prev = _planTasksAutosaveTimers.get(modal);
+  if (prev) clearTimeout(prev);
+  const t = setTimeout(() => {
+    _planTasksAutosaveTimers.delete(modal);
+    void _reconcilePlanTasksNow(modal, { silent: true });
+  }, 450);
+  _planTasksAutosaveTimers.set(modal, t);
+}
+
+function _ensurePlanTaskEditOverlay() {
+  let el = document.getElementById('plan-task-edit-overlay');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'plan-task-edit-overlay';
+  el.style.display = 'none';
+  document.body.appendChild(el);
+  return el;
+}
+
+function _closePlanTaskEditor() {
+  const el = document.getElementById('plan-task-edit-overlay');
+  if (el) el.style.display = 'none';
+}
+
+function _maybeClosePlanTaskEditor() {
+  const overlay = document.getElementById('plan-task-edit-overlay');
+  if (!overlay) return;
+
+  try {
+    const modeNow = String(overlay.dataset.mode || 'edit');
+    const isDelete = modeNow === 'delete';
+    if (!isDelete) {
+      const dEl = overlay.querySelector('#plan-task-edit-date');
+      const exEl = overlay.querySelector('#plan-task-edit-ex');
+      const cEl = overlay.querySelector('#plan-task-edit-count');
+
+      const curDate = dEl ? String(dEl.value || '').trim() : '';
+      const curEx = exEl ? String(exEl.value || '').trim() : '';
+      const curCount = cEl ? String(cEl.value || '').trim() : '';
+
+      const initDate = String(overlay.dataset.initDate || '');
+      const initEx = String(overlay.dataset.initEx || '');
+      const initCount = String(overlay.dataset.initCount || '');
+
+      const dirty = (curDate !== initDate) || (curEx !== initEx) || (curCount !== initCount);
+      if (dirty) {
+        const ok = confirm('Закрыть без сохранения?');
+        if (!ok) return;
+      }
+    }
+  } catch (e) {
+  }
+
+  _closePlanTaskEditor();
+}
+
+function _fillPlanTaskEditorExercises(exSel, exercises, positions) {
+  if (!exSel) return;
+  exSel.innerHTML = '';
+  (Array.isArray(exercises) ? exercises : []).forEach(ex => {
+    const opt = document.createElement('option');
+    opt.value = String(ex && ex.id != null ? ex.id : '');
+    opt.textContent = _planExerciseLabel(ex);
+    exSel.appendChild(opt);
+  });
+
+  const posKey = _planPositionsKey(Array.isArray(positions) ? positions : []);
+  const found = (Array.isArray(exercises) ? exercises : []).find(ex => _planPositionsKey(ex && ex.positions ? ex.positions : []) === posKey);
+  if (found && found.id != null) {
+    exSel.value = String(found.id);
+  } else {
+    const first = (Array.isArray(exercises) ? exercises : [])[0];
+    if (first && first.id != null) exSel.value = String(first.id);
+  }
+}
+
+function _openPlanTaskEditor(modal, opts) {
+  const el = _ensurePlanTaskEditOverlay();
+  const dateInput = el.querySelector('#plan-task-edit-date');
+  const exSel = el.querySelector('#plan-task-edit-ex');
+  const countInput = el.querySelector('#plan-task-edit-count');
+  const saveBtn = el.querySelector('#plan-task-edit-save');
+  const closeBtn = el.querySelector('#plan-task-edit-close');
+
+  const mode = opts && opts.mode ? String(opts.mode) : 'edit';
+  const taskId = (opts && opts.id != null) ? Number(opts.id) : null;
+  const idxFallback = Number(opts && opts.idx != null ? opts.idx : -1);
+
+  const tasks = Array.isArray(_getPlanTasksState(modal)) ? _getPlanTasksState(modal) : [];
+  const exercises = Array.isArray(_getPlanTasksExercises(modal)) ? _getPlanTasksExercises(modal) : [];
+  const idx = (taskId != null) ? _findPlanTaskIndexById(tasks, taskId) : idxFallback;
+  const row = (idx >= 0 && idx < tasks.length) ? tasks[idx] : null;
+
+  try { el.dataset.mode = mode; } catch (e) { }
+  try { el.dataset.taskId = (taskId != null ? String(taskId) : ''); } catch (e) { }
+
+  const initDate = (row && row.date_plan) ? String(row.date_plan) : getTodayIsoDate();
+  const initPositions = (row && Array.isArray(row.positions)) ? row.positions : [];
+  const initRepeat = (row && row.repeat_count != null) ? Number(row.repeat_count) : 1;
+
+  if (dateInput) dateInput.value = initDate;
+  if (countInput) countInput.value = String((Number.isFinite(initRepeat) && initRepeat > 0 ? initRepeat : 1) || 1);
+  _fillPlanTaskEditorExercises(exSel, exercises, initPositions);
+
+  try {
+    el.dataset.initDate = dateInput ? String(dateInput.value || '').trim() : '';
+    el.dataset.initEx = exSel ? String(exSel.value || '').trim() : '';
+    el.dataset.initCount = countInput ? String(countInput.value || '').trim() : '';
+  } catch (e) {
+  }
+
+  const isDelete = mode === 'delete';
+  if (dateInput) dateInput.disabled = isDelete;
+  if (exSel) exSel.disabled = isDelete;
+  if (countInput) countInput.disabled = isDelete;
+  if (saveBtn) saveBtn.textContent = isDelete ? 'Удалить' : 'Сохранить';
+
+  if (!el.dataset.listenersAttached) {
+    el.dataset.listenersAttached = '1';
+    el.addEventListener('click', (e) => {
+      if (e && e.target === el) {
+        try { e.preventDefault(); } catch (e2) { }
+        try { e.stopPropagation(); } catch (e2) { }
+        return;
+      }
+    });
+    if (closeBtn) closeBtn.addEventListener('click', () => { _maybeClosePlanTaskEditor(); });
+    if (saveBtn) {
+      saveBtn.addEventListener('click', async () => {
+        const overlay = document.getElementById('plan-task-edit-overlay');
+        if (!overlay) return;
+
+        if (saveBtn.disabled) return;
+        saveBtn.disabled = true;
+
+        try {
+
+        const modeNow = String(overlay.dataset.mode || 'edit');
+        const idNowRaw = String(overlay.dataset.taskId || '').trim();
+        const idNow = idNowRaw ? Number(idNowRaw) : null;
+
+        const dEl = overlay.querySelector('#plan-task-edit-date');
+        const exEl = overlay.querySelector('#plan-task-edit-ex');
+        const cEl = overlay.querySelector('#plan-task-edit-count');
+
+        const datePlan = dEl ? String(dEl.value || '').trim() : '';
+        const exId = exEl ? String(exEl.value || '').trim() : '';
+        const repeatRaw = cEl ? parseInt(String(cEl.value || '1'), 10) : 1;
+        const repeatCount = Number.isFinite(repeatRaw) && repeatRaw > 0 ? repeatRaw : 1;
+
+        if (!datePlan) {
+          showToast('Укажи дату', { durationMs: 2200 });
+          return;
+        }
+
+        const tasksNow = Array.isArray(_getPlanTasksState(modal)) ? _getPlanTasksState(modal) : [];
+        const exercisesNow = Array.isArray(_getPlanTasksExercises(modal)) ? _getPlanTasksExercises(modal) : [];
+        const exObj = exercisesNow.find(x => String(x && x.id != null ? x.id : '') === String(exId));
+        const positions = exObj && Array.isArray(exObj.positions) ? exObj.positions.map(p => Number(p)).filter(p => Number.isFinite(p)) : [];
+
+        if (modeNow !== 'delete') {
+          const isDup = tasksNow.some((t, j) => {
+            if (modeNow !== 'new' && idNow != null && Number(t && t.id) === Number(idNow)) return false;
+            const sameDate = String(t && t.date_plan ? t.date_plan : '') === datePlan;
+            const samePos = _planPositionsKey(t && t.positions ? t.positions : []) === _planPositionsKey(positions);
+            return sameDate && samePos;
+          });
+          if (isDup) {
+            showToast('Нельзя сохранять две одинаковые строки (одна дата + одно упражнение)', { durationMs: 3200 });
+            return;
+          }
+        }
+
+        const next = tasksNow.slice();
+
+        if (modeNow === 'new') {
+          next.push({ id: null, date_plan: datePlan, positions, repeat_count: repeatCount });
+          _setPlanTasksState(modal, next);
+        } else if (modeNow === 'delete') {
+          if (idNow != null) {
+            const delIdx = _findPlanTaskIndexById(next, idNow);
+            if (delIdx >= 0) next.splice(delIdx, 1);
+            _setPlanTasksState(modal, next);
+          }
+        } else {
+          if (idNow != null) {
+            const editIdx = _findPlanTaskIndexById(next, idNow);
+            if (editIdx >= 0) next[editIdx] = Object.assign({}, next[editIdx], { date_plan: datePlan, positions, repeat_count: repeatCount });
+            _setPlanTasksState(modal, next);
+          }
+        }
+
+        await _reconcilePlanTasksNow(modal, { silent: false });
+        _closePlanTaskEditor();
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+    }
+  }
+
+  el.style.display = 'flex';
+}
+
+async function _loadGroupsForPlanTasksModal() {
+  const res = await apiRequest('/groups/api/my', { method: 'GET' });
+  if (!res || !res.success) return [];
+  const groups = Array.isArray(res.groups) ? res.groups : [];
+
+  const personal = groups.filter(g => g && g.is_personal === true);
+  const activeTeacher = groups.filter(g => g && !g.archived_at && g.is_personal !== true);
+
+  const out = [];
+  (personal || []).forEach(g => out.push(g));
+  (activeTeacher || []).forEach(g => out.push(g));
+  return out;
+}
+
+function _fillPlanTasksGroupsSelect(groups, preferredGroupId) {
+  const sel = document.getElementById('plan-tasks-group');
+  if (!sel) return null;
+  sel.innerHTML = '';
+
+  const items = Array.isArray(groups) ? groups : [];
+  items.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = String(g && g.id != null ? g.id : '');
+    const isPersonal = Boolean(g && g.is_personal === true);
+    const title = g && g.title ? String(g.title) : '';
+    opt.textContent = isPersonal ? 'Моя группа' : title;
+    sel.appendChild(opt);
+  });
+
+  const pick = (() => {
+    const pref = Number(preferredGroupId);
+    if (Number.isFinite(pref) && pref > 0 && items.some(g => Number(g && g.id) === pref)) return String(pref);
+    const p = items.find(g => g && g.is_personal === true);
+    if (p && p.id != null) return String(p.id);
+    const a = items.find(g => g && !g.archived_at);
+    if (a && a.id != null) return String(a.id);
+    return (items[0] && items[0].id != null) ? String(items[0].id) : '';
+  })();
+
+  if (pick) sel.value = String(pick);
+  return pick ? Number(pick) : null;
+}
+
+async function _loadPlanTasksForSelectedGroup(modal) {
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+  const dictationIdNum = Number(dictationIdRaw);
+  const groupSel = document.getElementById('plan-tasks-group');
+  const groupIdNum = groupSel ? Number(groupSel.value) : NaN;
+
+  if (!Number.isFinite(dictationIdNum) || dictationIdNum <= 0 || !Number.isFinite(groupIdNum) || groupIdNum <= 0) {
+    _setPlanTasksExercises(modal, []);
+    _setPlanTasksState(modal, []);
+    _renderPlanTasksTable(modal);
+    return;
+  }
+
+  try {
+    const exRes = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationIdNum))}/exercises`, { method: 'GET' });
+    const exercises = (exRes && exRes.success && Array.isArray(exRes.exercises)) ? exRes.exercises : [];
+    _setPlanTasksExercises(modal, exercises);
+  } catch (e) {
+    _setPlanTasksExercises(modal, []);
+  }
+
+  try {
+    const res = await apiRequest(`/api/plan_tasks/teacher/group/${encodeURIComponent(String(groupIdNum))}/dictation/${encodeURIComponent(String(dictationIdNum))}`, { method: 'GET' });
+    const tasks = (res && res.success && Array.isArray(res.tasks)) ? res.tasks : [];
+    _setPlanTasksState(modal, tasks.map(t => ({
+      id: t && t.id != null ? Number(t.id) : null,
+      positions: Array.isArray(t && t.positions) ? t.positions : [],
+      date_plan: t && t.date_plan ? String(t.date_plan) : '',
+      repeat_count: t && t.repeat_count != null ? Number(t.repeat_count) : 1,
+    })));
+  } catch (e) {
+    _setPlanTasksState(modal, []);
+  }
+
+  try { modal.dataset.planTasksDirty = '0'; } catch (e) { }
+  _renderPlanTasksTable(modal);
+}
+
+function _renderPlanTasksTable(modal) {
+  const body = document.getElementById('plan-tasks-body');
+  if (!body) return;
+  body.innerHTML = '';
+
+  const tasks = _getPlanTasksState(modal);
+  const exercises = _getPlanTasksExercises(modal);
+
+  let currentId = _getPlanTasksCurrentId(modal);
+  if (!Array.isArray(tasks) || !tasks.length) {
+    _setPlanTasksCurrentId(modal, null);
+  } else {
+    const hasCurrent = currentId != null && _findPlanTaskIndexById(tasks, currentId) >= 0;
+    if (!hasCurrent) {
+      const firstId = (tasks[0] && tasks[0].id != null) ? Number(tasks[0].id) : null;
+      _setPlanTasksCurrentId(modal, firstId);
+      currentId = firstId;
+    }
+  }
+
+  if (!tasks.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 3;
+    td.style.padding = '12px 10px';
+    td.style.color = 'rgba(0,0,0,0.55)';
+    td.textContent = 'Добавь план кнопкой +';
+    tr.appendChild(td);
+    body.appendChild(tr);
+    return;
+  }
+
+  const exKeyToId = new Map();
+  (Array.isArray(exercises) ? exercises : []).forEach(ex => {
+    const k = _planPositionsKey(ex && ex.positions ? ex.positions : []);
+    if (!exKeyToId.has(k)) exKeyToId.set(k, ex && ex.id != null ? String(ex.id) : '');
+  });
+
+  const setCurrentIdSoft = (nextId) => {
+    _setPlanTasksCurrentId(modal, nextId);
+    try {
+      const rows = Array.from(body.querySelectorAll('tr'));
+      rows.forEach((r) => {
+        const rid = r && r.dataset ? String(r.dataset.taskId || '') : '';
+        r.style.background = (nextId != null && rid && Number(rid) === Number(nextId)) ? 'rgba(236, 72, 153, 0.10)' : '';
+      });
+    } catch (e) {
+    }
+  };
+
+  tasks.forEach((row, idx) => {
+    const tr = document.createElement('tr');
+    tr.style.borderBottom = '1px solid rgba(0,0,0,0.06)';
+    const rowId = (row && row.id != null) ? Number(row.id) : null;
+    try { tr.dataset.taskId = (rowId != null ? String(rowId) : ''); } catch (e) { }
+    if (rowId != null && currentId != null && Number(rowId) === Number(currentId)) {
+      tr.style.background = 'rgba(236, 72, 153, 0.10)';
+    }
+
+    let pressTimer = null;
+    let didLongPress = false;
+    const clearPressTimer = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    };
+
+    tr.addEventListener('click', (e) => {
+      if (didLongPress) {
+        didLongPress = false;
+        return;
+      }
+      const nextTasks = _getPlanTasksState(modal);
+      if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+      if (rowId != null) setCurrentIdSoft(rowId);
+    });
+
+    tr.addEventListener('dblclick', (e) => {
+      const nextTasks = _getPlanTasksState(modal);
+      if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+      if (rowId != null) setCurrentIdSoft(rowId);
+      _openPlanTaskEditor(modal, { mode: 'edit', id: rowId, idx });
+    });
+
+    tr.addEventListener('pointerdown', (e) => {
+      try {
+        if (!e || e.pointerType !== 'touch') return;
+      } catch (err) {
+        return;
+      }
+
+      clearPressTimer();
+      didLongPress = false;
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        didLongPress = true;
+
+        const nextTasks = _getPlanTasksState(modal);
+        if (!Array.isArray(nextTasks) || !nextTasks.length) return;
+        if (rowId != null) setCurrentIdSoft(rowId);
+        _openPlanTaskEditor(modal, { mode: 'edit', id: rowId, idx });
+      }, 600);
+    });
+
+    tr.addEventListener('pointerup', () => {
+      clearPressTimer();
+    });
+
+    tr.addEventListener('pointercancel', () => {
+      clearPressTimer();
+    });
+
+    tr.addEventListener('pointermove', () => {
+      clearPressTimer();
+    });
+
+    const tdDate = document.createElement('td');
+    tdDate.style.padding = '10px';
+    tdDate.style.width = '120px';
+    tdDate.style.maxWidth = '120px';
+    tdDate.style.whiteSpace = 'nowrap';
+    tdDate.textContent = row && row.date_plan ? String(row.date_plan) : '';
+
+    const tdEx = document.createElement('td');
+    tdEx.style.padding = '10px';
+    tdEx.style.whiteSpace = 'nowrap';
+    tdEx.style.overflow = 'hidden';
+    tdEx.style.textOverflow = 'ellipsis';
+    const selectedKey = _planPositionsKey(row && row.positions ? row.positions : []);
+    const exObj = (Array.isArray(exercises) ? exercises : []).find(ex => _planPositionsKey(ex && ex.positions ? ex.positions : []) === selectedKey);
+    tdEx.textContent = _planExerciseLabel(exObj || { positions: (row && row.positions) ? row.positions : [] });
+
+    const tdCount = document.createElement('td');
+    tdCount.style.padding = '10px';
+    tdCount.style.width = '56px';
+    tdCount.style.maxWidth = '56px';
+    tdCount.style.whiteSpace = 'nowrap';
+    tdCount.textContent = String((row && row.repeat_count != null ? row.repeat_count : 1) || 1);
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdEx);
+    tr.appendChild(tdCount);
+    body.appendChild(tr);
+  });
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: body });
+    }
+  } catch (e) {
+  }
+}
+
+async function openPlanTasksModal(dictationId) {
+  const modal = ensurePlanTasksModal();
+  const idInput = document.getElementById('plan-tasks-dictation-id');
+  if (idInput) idInput.value = String(dictationId || '');
+
+  _setPlanTasksState(modal, []);
+  _setPlanTasksExercises(modal, []);
+  _renderPlanTasksTable(modal);
+
+  try {
+    const meta = await loadDictationMetaForAssignmentModal(dictationId);
+    const titleEl = document.getElementById('plan-tasks-dictation-title');
+    const coverImg = document.getElementById('plan-tasks-cover-img');
+    const coverMeta = document.getElementById('plan-tasks-cover-meta');
+
+    if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
+    if (coverImg) {
+      const rawId = String(dictationId || '').trim();
+      const numericId = rawId.replace(/^dict_/, '').trim();
+      const canonicalCover = numericId ? `/api/dictations_covers/${encodeURIComponent(numericId)}.webp` : '';
+      const src = (
+        (meta && (meta.cover_url || meta.coverUrl))
+          ? String(meta.cover_url || meta.coverUrl)
+          : canonicalCover
+      );
+      coverImg.src = src || '';
+      coverImg.onerror = () => { coverImg.src = '/static/data/covers/cover_en.webp'; };
+    }
+    if (coverMeta) coverMeta.textContent = meta && meta.metaText ? String(meta.metaText) : '';
+  } catch (e) {
+  }
+
+  const closeBtn = document.getElementById('plan-tasks-close');
+  const saveBtn = document.getElementById('plan-tasks-save');
+  const addBtn = document.getElementById('plan-tasks-add');
+  const deleteBtn = document.getElementById('plan-tasks-delete');
+  const groupSel = document.getElementById('plan-tasks-group');
+
+  try {
+    const groups = await _loadGroupsForPlanTasksModal();
+    _fillPlanTasksGroupsSelect(groups, groupSel ? groupSel.value : null);
+  } catch (e) {
+  }
+
+  try {
+    await _loadPlanTasksForSelectedGroup(modal);
+  } catch (e) {
+  }
+
+  if (!modal.dataset.listenersAttached) {
+    modal.dataset.listenersAttached = '1';
+    modal.addEventListener('click', (e) => {
+      try {
+        if (e.target === modal) {
+          return;
+        }
+      } catch (e2) {
+      }
+    });
+  }
+
+  if (closeBtn && !closeBtn.dataset.listenerAttached) {
+    closeBtn.dataset.listenerAttached = '1';
+    closeBtn.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+  }
+  if (saveBtn && !saveBtn.dataset.listenerAttached) {
+    saveBtn.dataset.listenerAttached = '1';
+    saveBtn.addEventListener('click', async () => {
+      await _reconcilePlanTasksNow(modal, { silent: false });
+    });
+  }
+  if (addBtn && !addBtn.dataset.listenerAttached) {
+    addBtn.dataset.listenerAttached = '1';
+    addBtn.addEventListener('click', () => {
+      _openPlanTaskEditor(modal, { mode: 'new' });
+    });
+  }
+  if (deleteBtn && !deleteBtn.dataset.listenerAttached) {
+    deleteBtn.dataset.listenerAttached = '1';
+    deleteBtn.addEventListener('click', () => {
+      const next = _getPlanTasksState(modal);
+      if (!Array.isArray(next) || !next.length) return;
+      const currentId = _getPlanTasksCurrentId(modal);
+      let idx = (currentId != null) ? _findPlanTaskIndexById(next, currentId) : -1;
+      if (!(idx >= 0 && idx < next.length)) idx = 0;
+
+      const row = next[idx];
+      const rowId = (row && row.id != null) ? Number(row.id) : null;
+      if (rowId != null) _setPlanTasksCurrentId(modal, rowId);
+      _openPlanTaskEditor(modal, { mode: 'delete', id: rowId, idx });
+    });
+  }
+  if (groupSel && !groupSel.dataset.listenerAttached) {
+    groupSel.dataset.listenerAttached = '1';
+    groupSel.addEventListener('change', () => { void _loadPlanTasksForSelectedGroup(modal); });
+  }
+
+  modal.style.display = 'flex';
+
+  try {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons({ root: modal });
+    }
+  } catch (e) {
+  }
 }
 
 function getTodayIsoDate() {
@@ -1096,64 +2140,9 @@ function setCreateAssignmentDaysState(modal, days) {
 }
 
 function ensureStudentPlanPanel() {
-  let panel = document.getElementById('student-plan-panel');
+  const panel = document.getElementById('student-plan-panel');
   if (panel) return panel;
-
-  panel = document.createElement('div');
-  panel.id = 'student-plan-panel';
-  panel.tabIndex = -1;
-  panel.style.display = 'none';
-  panel.style.position = 'fixed';
-  panel.style.left = '0';
-  panel.style.top = '0';
-  panel.style.width = '100%';
-  panel.style.height = '100%';
-  panel.style.zIndex = '100000';
-  panel.style.background = 'rgba(0,0,0,0.35)';
-  panel.style.backdropFilter = 'blur(4px)';
-  panel.style.outline = 'none';
-
-  panel.innerHTML = `
-    <div id="student-plan-panel-drawer" tabindex="-1" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column; outline:none;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
-            <i data-lucide="calendar-check"></i>
-          </div>
-          <div>
-            <div style="font-weight:700; font-size:16px; line-height:1.1;">${escapeHtml(libT('private_library.student_plan.title'))}</div>
-            <div id="student-plan-subtitle" style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;"></div>
-          </div>
-        </div>
-        <button type="button" id="student-plan-close" class="modal-close" title="${escapeHtml(libT('private_library.common.close'))}" style="background:transparent; border:0; cursor:pointer; padding:6px;">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-
-      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:space-between; gap:10px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-prev" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.prev_day'))}" style="width:40px; height:40px;">
-            <i data-lucide="chevron-left"></i>
-          </button>
-          <input type="date" id="student-plan-date" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16);">
-          <button type="button" id="student-plan-next" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.next_day'))}" style="width:40px; height:40px;">
-            <i data-lucide="chevron-right"></i>
-          </button>
-        </div>
-        <div style="display:flex; align-items:center; gap:10px;">
-          <button type="button" id="student-plan-today" class="button-secondary" style="height:40px;">${escapeHtml(libT('private_library.student_plan.today'))}</button>
-          <button type="button" id="student-plan-refresh" class="topbar-icon-btn" title="${escapeHtml(libT('private_library.student_plan.refresh'))}" style="width:40px; height:40px;">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-      </div>
-
-      <div id="student-plan-list" style="padding:14px; overflow:auto; flex:1;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(panel);
-  return panel;
+  throw new Error('student-plan-panel not found');
 }
 
 function ensureTeacherAssignmentStudentsModal() {
@@ -1339,6 +2328,167 @@ function _setAssignmentLaunchContext(ctx) {
   }
 }
 
+function openStudentPlanLaunchConfirmModal(ctx) {
+  try {
+    const payload = (ctx && typeof ctx === 'object') ? ctx : {};
+    const modal = ensureStudentPlanLaunchConfirmModal();
+    if (!modal) return;
+
+    const coverEl = modal.querySelector('#student-plan-launch-confirm-cover');
+    const titleEl = modal.querySelector('#student-plan-launch-confirm-title');
+    const subtitleEl = modal.querySelector('#student-plan-launch-confirm-subtitle');
+    const warningEl = modal.querySelector('#student-plan-launch-confirm-warning');
+    const positionsEl = modal.querySelector('#student-plan-launch-confirm-positions');
+    const sentencesEl = modal.querySelector('#student-plan-launch-confirm-sentences');
+    const closeBtn = modal.querySelector('#student-plan-launch-confirm-close');
+    const startBtn = modal.querySelector('#student-plan-launch-confirm-start');
+
+    const dictationId = payload.dictation_id != null ? Number(payload.dictation_id) : null;
+    const lang = payload.dictation_language_code != null ? String(payload.dictation_language_code) : 'en';
+    const title = payload.dictation_title != null ? String(payload.dictation_title) : '';
+    let coverUrl = payload.dictation_cover_url != null ? String(payload.dictation_cover_url) : '';
+
+    try {
+      if (!coverUrl && window.ImageManager && typeof window.ImageManager.getCoverUrl === 'function' && dictationId != null) {
+        const u = window.ImageManager.getCoverUrl(dictationId, lang);
+        if (u) coverUrl = String(u);
+      }
+    } catch (e) {
+    }
+
+    if (titleEl) {
+      titleEl.textContent = title || libT('private_library.student_plan.dictation_fallback_title', { id: dictationId });
+    }
+    if (subtitleEl) {
+      const parts = [];
+      if (payload.plan_date) parts.push(String(payload.plan_date));
+      if (payload.source_group_title) parts.push(String(payload.source_group_title));
+      subtitleEl.textContent = parts.join(' · ');
+    }
+    if (coverEl) {
+      coverEl.style.backgroundImage = coverUrl ? `url(${coverUrl})` : '';
+    }
+
+    const positions = Array.isArray(payload.selected_sentence_positions)
+      ? payload.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
+      : [];
+    try { positions.sort((a, b) => a - b); } catch (e) { }
+
+    if (warningEl) {
+      warningEl.textContent = String(libT('private_library.student_plan_launch.warning') || '');
+    }
+
+    if (positionsEl) {
+      positionsEl.textContent = positions.length ? positions.join(', ') : '';
+    }
+
+    if (sentencesEl) {
+      sentencesEl.innerHTML = '';
+      const box = document.createElement('div');
+      box.style.padding = '8px 0';
+      box.style.color = 'rgba(0,0,0,0.55)';
+      box.style.fontSize = '13px';
+      box.textContent = positions.length ? 'Загрузка…' : '';
+      sentencesEl.appendChild(box);
+    }
+
+    try {
+      console.log('[student_plan] launch_modal_open', {
+        dictation_id: dictationId,
+        lang,
+        title,
+        coverUrl,
+        positions_count: positions.length,
+        positions,
+      });
+    } catch (e) {
+    }
+
+    try {
+      if (sentencesEl && positions.length && dictationId != null) {
+        const langOrig = String(lang || 'en').trim().toLowerCase() || 'en';
+        const nativeLang = (window.USER_LANGUAGE_DATA && window.USER_LANGUAGE_DATA.nativeLanguage)
+          ? String(window.USER_LANGUAGE_DATA.nativeLanguage).toLowerCase()
+          : '';
+        const langTr = (nativeLang || langOrig || 'en');
+        apiRequest(`/api/dictation/dict_${Number(dictationId)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langTr)}/sentences`, { method: 'GET' })
+          .then((res) => {
+            try {
+              if (!res || !res.success) {
+                throw new Error('sentences fetch failed');
+              }
+              const all = Array.isArray(res.sentences) ? res.sentences : [];
+              const set = new Set(positions);
+              const subset = all.filter(s => {
+                const p = (s && (s.position != null ? Number(s.position) : Number(s.serial_number))) || null;
+                return p != null && set.has(p);
+              });
+
+              sentencesEl.innerHTML = '';
+              subset.slice(0, 50).forEach((s) => {
+                const p = (s && (s.position != null ? Number(s.position) : Number(s.serial_number))) || '';
+                const t = s && s.text ? String(s.text) : '';
+                const row = document.createElement('div');
+                row.style.padding = '8px 10px';
+                row.style.border = '1px solid rgba(0,0,0,0.08)';
+                row.style.borderRadius = '12px';
+                row.style.background = 'rgba(0,0,0,0.02)';
+                row.style.fontSize = '13px';
+                row.innerHTML = `<div style=\"font-weight:900; font-size:12px; color: rgba(0,0,0,0.60);\">${escapeHtml(String(p))}</div><div style=\"margin-top:2px;\">${escapeHtml(t)}</div>`;
+                sentencesEl.appendChild(row);
+              });
+
+              try {
+                console.log('[student_plan] launch_modal_sentences', { total: all.length, subset: subset.length });
+              } catch (e2) {
+              }
+            } catch (err) {
+              try {
+                sentencesEl.innerHTML = '<div style="padding:8px 0; color: rgba(0,0,0,0.55); font-size:13px;">Не удалось загрузить предложения</div>';
+              } catch (e2) {
+              }
+            }
+          })
+          .catch(() => {
+            try {
+              sentencesEl.innerHTML = '<div style="padding:8px 0; color: rgba(0,0,0,0.55); font-size:13px;">Не удалось загрузить предложения</div>';
+            } catch (e2) {
+            }
+          });
+      }
+    } catch (e) {
+    }
+
+    if (closeBtn && !closeBtn.__splc_bound) {
+      closeBtn.__splc_bound = true;
+      closeBtn.addEventListener('click', () => {
+        try { modal.style.display = 'none'; } catch (e) { }
+      });
+    }
+
+    if (startBtn && !startBtn.__splc_bound) {
+      startBtn.__splc_bound = true;
+      startBtn.addEventListener('click', () => {
+        try {
+          _setAssignmentLaunchContext(payload);
+        } catch (e) {
+        }
+        try { modal.style.display = 'none'; } catch (e) { }
+        try { _studentPlanOpenDictation(dictationId, lang); } catch (e) { }
+      });
+    }
+
+    modal.style.display = 'block';
+    try {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons({ root: modal });
+      }
+    } catch (e) {
+    }
+  } catch (e) {
+  }
+}
+
 function ensureStudentPlanLaunchConfirmModal() {
   let modal = document.getElementById('student-plan-launch-confirm-modal');
   if (modal) return modal;
@@ -1394,130 +2544,7 @@ function ensureStudentPlanLaunchConfirmModal() {
   return modal;
 }
 
-async function openStudentPlanLaunchConfirmModal(ctx) {
-  const modal = ensureStudentPlanLaunchConfirmModal();
-  const closeBtn = document.getElementById('student-plan-launch-confirm-close');
-  const startBtn = document.getElementById('student-plan-launch-confirm-start');
-  const titleEl = document.getElementById('student-plan-launch-confirm-title');
-  const subtitleEl = document.getElementById('student-plan-launch-confirm-subtitle');
-  const coverEl = document.getElementById('student-plan-launch-confirm-cover');
-  const warningEl = document.getElementById('student-plan-launch-confirm-warning');
-  const posEl = document.getElementById('student-plan-launch-confirm-positions');
-  const sentsEl = document.getElementById('student-plan-launch-confirm-sentences');
 
-  if (titleEl) titleEl.textContent = String((ctx && ctx.dictation_title) || libT('private_library.student_plan_launch.dictation_fallback_title'));
-  if (subtitleEl) subtitleEl.textContent = String((ctx && ctx.plan_date) ? libT('private_library.student_plan_launch.assignment_for_date', { date: ctx.plan_date }) : '');
-  if (coverEl) {
-    const url = String((ctx && ctx.dictation_cover_url) || '');
-    coverEl.style.backgroundImage = url ? `url(${escapeHtml(url)})` : 'none';
-  }
-  if (warningEl) {
-    warningEl.textContent = libT('private_library.student_plan_launch.past_day_warning');
-  }
-
-  const positions = Array.isArray(ctx && ctx.selected_sentence_positions)
-    ? ctx.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-    : [];
-  positions.sort((a, b) => a - b);
-
-  const formatPositionsLabel = () => {
-    try {
-      if (!positions.length) return libT('private_library.student_plan_launch.all_sentences');
-      const uniq = Array.from(new Set(positions));
-      uniq.sort((a, b) => a - b);
-      const ranges = [];
-      let start = null;
-      let prev = null;
-      for (const n of uniq) {
-        if (start == null) {
-          start = n;
-          prev = n;
-          continue;
-        }
-        if (n === prev + 1) {
-          prev = n;
-          continue;
-        }
-        ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-        start = n;
-        prev = n;
-      }
-      if (start != null && prev != null) ranges.push(start === prev ? String(start) : `${start}-${prev}`);
-      const compact = ranges.join(',');
-      return compact ? `(${compact})` : libT('private_library.student_plan_launch.all_sentences');
-    } catch (e) {
-      return '';
-    }
-  };
-
-  if (posEl) posEl.textContent = formatPositionsLabel();
-  if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.loading'))}</div>`;
-
-  try {
-    const did = Number(ctx && ctx.dictation_id);
-    const all = await loadDictationSentencesForAssignmentModal(did);
-    const list = Array.isArray(all) ? all : [];
-
-    let pick = list;
-    if (positions.length) {
-      const set = new Set(positions);
-      pick = list.filter(s => {
-        try {
-          const p = Number(s && s.position);
-          return Number.isFinite(p) && set.has(p);
-        } catch (e) {
-          return false;
-        }
-      });
-    }
-
-    const rows = pick.slice(0, 60).map(s => {
-      const p = Number(s && s.position);
-      const txt = String((s && (s.text || s.sentence || s.value)) || '').trim();
-      const short = txt.length > 160 ? `${txt.slice(0, 160)}…` : txt;
-      return `
-        <div style="display:flex; gap:10px; padding:10px 12px; border-radius:14px; background: rgba(0,0,0,0.04);">
-          <div style="flex:0 0 auto; min-width:38px; height:26px; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.06); font-weight:900; font-size:12px;">${escapeHtml(String(Number.isFinite(p) ? p : ''))}</div>
-          <div style="flex:1 1 auto; font-size:13px; line-height:1.35; color: rgba(0,0,0,0.78);">${escapeHtml(short || '')}</div>
-        </div>
-      `;
-    }).join('');
-    if (sentsEl) sentsEl.innerHTML = rows || `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.no_sentences'))}</div>`;
-  } catch (e) {
-    if (sentsEl) sentsEl.innerHTML = `<div style="color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan_launch.load_sentences_failed'))}</div>`;
-  }
-
-  const close = () => {
-    try { modal.style.display = 'none'; } catch (e) { }
-  };
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  if (startBtn) {
-    startBtn.onclick = () => {
-      try {
-        _setAssignmentLaunchContext({
-          assignment_id: Number(ctx && ctx.assignment_id),
-          dictation_id: Number(ctx && ctx.dictation_id),
-          source_group_id: ctx && ctx.source_group_id != null ? Number(ctx.source_group_id) : null,
-          source_group_title: ctx && ctx.source_group_title != null ? String(ctx.source_group_title) : null,
-          selected_sentence_positions: positions.length ? positions : null,
-          required_completions: Number(ctx && ctx.required_completions || 0) || 0,
-        });
-      } catch (e) {
-      }
-      close();
-      _studentPlanOpenDictation(ctx && ctx.dictation_id, ctx && ctx.dictation_language_code);
-    };
-  }
-
-  modal.style.display = 'block';
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: modal });
-    }
-  } catch (e) {
-  }
-}
 
 const STUDENT_PLAN_CACHE_STORE = 'student_plan_cache';
 const STUDENT_PLAN_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -1610,699 +2637,14 @@ function _pickTranslationLanguageForOpen({ preferredNative, availableTranslation
   return { lang: fallback || 'en', usedFallback: false, reason: '' };
 }
 
-function _studentPlanRender(panel, dateIso, items) {
-  const list = document.getElementById('student-plan-list');
-  const subtitle = document.getElementById('student-plan-subtitle');
-  if (subtitle) subtitle.textContent = dateIso ? String(dateIso) : '';
-  if (!list) return;
-
-  const buildSubsetLabel = (selectedPositions, totalCount) => {
-    try {
-      const total = Number(totalCount || 0) || 0;
-      const pos = Array.isArray(selectedPositions)
-        ? selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
-        : [];
-      const uniq = Array.from(new Set(pos));
-      uniq.sort((a, b) => a - b);
-      const cnt = uniq.length;
-      const minP = cnt ? uniq[0] : null;
-      const maxP = cnt ? uniq[cnt - 1] : null;
-      if (!cnt) {
-        return total ? `${total}/${total}` : '';
-      }
-      const base = `${cnt}/${total || 0}`;
-      if (minP != null && maxP != null) {
-        return `${base} (${minP}-${maxP})`;
-      }
-      return base;
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const rows = Array.isArray(items) ? items : [];
-  if (!rows.length) {
-    list.innerHTML = `<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">${escapeHtml(libT('private_library.student_plan.no_assignments'))}</div>`;
-    return;
-  }
-
-  // Group by dictation first, then show per-group rows inside dictation card.
-  const byDictation = new Map();
-  for (const a of rows) {
-    const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
-    const key = dictationId != null ? String(dictationId) : `no_dict_${Math.random()}`;
-    if (!byDictation.has(key)) byDictation.set(key, []);
-    byDictation.get(key).push(a);
-  }
-
-  const blocks = [];
-  for (const [dictKey, dictItems] of byDictation.entries()) {
-    const first = dictItems[0] || {};
-    const dictationTitle = String(first && first.dictation_title
-      ? first.dictation_title
-      : libT('private_library.student_plan.dictation_fallback_title', { id: first.dictation_id }));
-    const level = first && first.dictation_level ? String(first.dictation_level) : '—';
-    const coverUrl = String(first && first.dictation_cover_url ? first.dictation_cover_url : '');
-    const isCached = !!(first && first.__cached);
-    const cacheBadge = isCached
-      ? `<div title="${escapeHtml(libT('private_library.student_plan.cached_title'))}" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>${escapeHtml(libT('private_library.student_plan.cached_badge'))}</span></div>`
-      : '';
-    const range = dateIso ? String(dateIso) : '—';
-
-    const coverStyle = coverUrl
-      ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
-      : '';
-    const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
-    const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
-
-    const rowsHtml = dictItems.map(a => {
-      const groupTitle = String(a && (a.group_title || a.group_id)
-        ? (a.group_title || libT('private_library.student_plan.group_fallback_title', { id: a.group_id }))
-        : libT('private_library.student_plan.group_generic_title'));
-      const groupId = a && a.group_id ? Number(a.group_id) : null;
-      const dictationId = a && a.dictation_id ? Number(a.dictation_id) : null;
-      const langCode = a && a.dictation_language_code ? String(a.dictation_language_code) : 'en';
-      const assignmentId = a && a.id ? Number(a.id) : null;
-
-      const req = Number(a && a.required_completions ? a.required_completions : 1);
-      const done = Number(a && typeof a.done !== 'undefined' ? a.done : 0);
-      const overdue = !!(a && a.overdue);
-      const badgeBg = overdue ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.06)';
-      const badgeColor = overdue ? '#b91c1c' : '#111827';
-
-      const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
-        ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-        : null;
-      const selectedPositionsAttr = Array.isArray(selectedPositions) ? selectedPositions.join(',') : '';
-
-      const subsetLabel = buildSubsetLabel(selectedPositions, a && a.dictation_sentences_count);
-
-      return `
-        <tr>
-          <td style="padding:4px 6px 4px 0; font-weight:800; font-size:12px; color: rgba(0,0,0,0.72); text-align:right; white-space:nowrap; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">${escapeHtml(String(groupTitle))}</td>
-          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
-            <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:900; font-size:12px; line-height:1;">${done}/${req}</div>
-          </td>
-          <td style="padding:4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
-            <div style="display:inline-flex; padding:4px 8px; border-radius:999px; background:rgba(0,0,0,0.06); color:#111827; font-weight:900; font-size:12px; line-height:1;">${escapeHtml(String(subsetLabel || ''))}</div>
-          </td>
-          <td style="padding:4px 0 4px 6px; width:1%; white-space:nowrap; text-align:right; border:none !important; outline:none !important; box-shadow:none !important; background:transparent !important;">
-            <button type="button" class="button-color-yellow" data-action="student-plan-open" data-assignment-id="${escapeHtml(String(assignmentId || ''))}" data-source-group-id="${escapeHtml(String(groupId || ''))}" data-source-group-title="${escapeHtml(String(groupTitle || ''))}" data-selected-positions="${escapeHtml(String(selectedPositionsAttr || ''))}" data-required-completions="${escapeHtml(String(req || 1))}" data-dictation-id="${dictationId || ''}" data-dictation-lang="${escapeHtml(langCode)}" data-plan-date="${escapeHtml(String(range || ''))}" data-dictation-title="${escapeHtml(String(dictationTitle || ''))}" data-dictation-cover-url="${escapeHtml(String(coverUrl || ''))}" style="height:34px; padding:0 10px;">${escapeHtml(libT('private_library.student_plan_launch.start'))}</button>
-          </td>
-        </tr>
-      `;
-    }).join('');
-
-    blocks.push(`
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:10px 10px 8px 10px; margin-top:10px; ${cardBg}">
-        <div style="display:flex; align-items:flex-start; gap:12px;">
-          <div style="width:96px; height:96px; border-radius:16px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
-          <div style="min-width:0; flex:1; display:flex; flex-direction:column; align-items:flex-end;">
-            <div style="width:100%; display:flex; align-items:flex-start; justify-content:space-between; gap:10px;">
-              <div style="min-width:0; text-align:right;">
-                <div style="font-weight:900; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-                <div style="margin-top:2px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)} · уровень ${escapeHtml(level)}</div>
-              </div>
-              <div style="flex-shrink:0;">${cacheBadge}</div>
-            </div>
-            <div style="margin-top:6px; width:auto; margin-left:auto;">
-              <table style="width:auto; border:none !important; border-collapse:separate; border-spacing:0 4px; margin-left:auto; background:transparent !important;">
-                <tbody>
-                  ${rowsHtml}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    `);
-  }
-
-  list.innerHTML = blocks.join('');
-
-  list.querySelectorAll('[data-action="student-plan-open"]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const dictationId = btn.getAttribute('data-dictation-id');
-      const lang = btn.getAttribute('data-dictation-lang');
-      const assignmentId = btn.getAttribute('data-assignment-id');
-      const sourceGroupId = btn.getAttribute('data-source-group-id');
-      const sourceGroupTitle = btn.getAttribute('data-source-group-title');
-      const selectedPositionsStr = btn.getAttribute('data-selected-positions');
-      const requiredCompletions = btn.getAttribute('data-required-completions');
-      const planDate = btn.getAttribute('data-plan-date');
-      const dictTitle = btn.getAttribute('data-dictation-title');
-      const coverUrl = btn.getAttribute('data-dictation-cover-url');
-      if (dictationId) {
-        const positions = String(selectedPositionsStr || '')
-          .split(',')
-          .map(x => Number(String(x || '').trim()))
-          .filter(x => Number.isFinite(x));
-
-        const today = getTodayIsoDate();
-        const forDay = String(planDate || '').trim();
-        const isToday = Boolean(forDay && today && forDay === today);
-        if (isToday) {
-          _setAssignmentLaunchContext({
-            assignment_id: Number(assignmentId),
-            dictation_id: Number(dictationId),
-            source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
-            source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
-            selected_sentence_positions: positions.length ? positions : null,
-            required_completions: Number(requiredCompletions || 0) || 0,
-          });
-          _studentPlanOpenDictation(dictationId, lang);
-          return;
-        }
-
-        openStudentPlanLaunchConfirmModal({
-          assignment_id: Number(assignmentId),
-          dictation_id: Number(dictationId),
-          dictation_language_code: String(lang || ''),
-          dictation_title: String(dictTitle || ''),
-          dictation_cover_url: String(coverUrl || ''),
-          plan_date: forDay,
-          source_group_id: sourceGroupId != null ? Number(sourceGroupId) : null,
-          source_group_title: sourceGroupTitle != null ? String(sourceGroupTitle) : null,
-          selected_sentence_positions: positions.length ? positions : null,
-          required_completions: Number(requiredCompletions || 0) || 0,
-        });
-      }
-    });
-  });
-
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: list });
-    }
-  } catch (e) {
-  }
-}
 
 async function openStudentPlanPanel(dateIso = null) {
-  const panel = ensureStudentPlanPanel();
-  const dateInput = document.getElementById('student-plan-date');
-  const closeBtn = document.getElementById('student-plan-close');
-  const prevBtn = document.getElementById('student-plan-prev');
-  const nextBtn = document.getElementById('student-plan-next');
-  const todayBtn = document.getElementById('student-plan-today');
-  const refreshBtn = document.getElementById('student-plan-refresh');
-
-  const today = getTodayIsoDate();
-  const initial = String(dateIso || (dateInput && dateInput.value) || today);
-  if (dateInput) dateInput.value = initial;
-
-  const close = () => {
-    try { panel.style.display = 'none'; } catch (e) { }
-  };
-
-  panel.onclick = (e) => {
-    const drawer = document.getElementById('student-plan-panel-drawer');
-    if (e.target === panel) close();
-    if (drawer && e.target === drawer) {
-    }
-  };
-
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  const updateTodayVisibility = () => {
-    try {
-      if (!todayBtn) return;
-      const v = dateInput ? String(dateInput.value || '').trim() : '';
-      todayBtn.style.display = (v && v === today) ? 'none' : 'inline-flex';
-    } catch (e) {
-    }
-  };
-
-  const load = async (opts = {}) => {
-    const forceRefresh = !!(opts && opts.forceRefresh);
-    const tLoad0 = _nowTs();
-    const d = dateInput ? String(dateInput.value || '').trim() : '';
-    if (!d) return;
-    const list = document.getElementById('student-plan-list');
-
-    updateTodayVisibility();
-
-    try {
-      const tClean0 = _nowTs();
-      await _cleanupStudentPlanCacheIdb();
-      _planLog('cleanup_cache', tClean0);
-    } catch (e) {
-    }
-
-    if (!forceRefresh) {
-      const tIdb0 = _nowTs();
-      const cached = await _getStudentPlanCacheForDateIdb(d);
-      _planLog('idb_read', tIdb0);
-      if (cached && Array.isArray(cached.assignments) && cached.assignments.length) {
-        _studentPlanRender(panel, d, cached.assignments);
-      } else {
-        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-      }
-    } else {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-    }
-    try {
-      const tNet0 = _nowTs();
-      const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(d)}`, { method: 'GET' });
-      _planLog('api_fetch', tNet0);
-      if (!res || !res.success) {
-        const fallback = await _getStudentPlanCacheForDateIdb(d);
-        if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
-          _studentPlanRender(panel, d, fallback.assignments);
-          return;
-        }
-        if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-        return;
-      }
-      const items = Array.isArray(res.assignments) ? res.assignments : [];
-
-      try {
-        const tCache0 = _nowTs();
-        const cachedIds = await _getCachedDictationIdSetIdb();
-        for (const it of items) {
-          try {
-            const did = (it && it.dictation_id != null) ? String(it.dictation_id) : '';
-            const cleaned = did.replace(/^dict_/, '').trim();
-            if (cleaned) it.__cached = cachedIds.has(cleaned);
-          } catch (e) {
-          }
-        }
-        _planLog('check_dictations_cache', tCache0);
-      } catch (e) {
-      }
-
-      const tIdbW0 = _nowTs();
-      await _setStudentPlanCacheForDateIdb(d, items);
-      _planLog('idb_write', tIdbW0);
-
-      const tRender0 = _nowTs();
-      _studentPlanRender(panel, d, items);
-      _planLog('render', tRender0);
-      _planLog(`load_total(force=${forceRefresh ? '1' : '0'})`, tLoad0);
-    } catch (e) {
-      const fallback = await _getStudentPlanCacheForDateIdb(d);
-      if (fallback && Array.isArray(fallback.assignments) && fallback.assignments.length) {
-        _studentPlanRender(panel, d, fallback.assignments);
-        return;
-      }
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-    }
-  };
-
-  if (dateInput) dateInput.onchange = () => load();
-  if (todayBtn) todayBtn.onclick = () => {
-    if (dateInput) dateInput.value = today;
-    load();
-  };
-  if (refreshBtn) refreshBtn.onclick = () => {
-    load({ forceRefresh: true });
-  };
-  if (prevBtn) prevBtn.onclick = () => {
-    if (!dateInput) return;
-    const cur = String(dateInput.value || today);
-    dateInput.value = addDaysIsoDate(cur, -1);
-    load();
-  };
-  if (nextBtn) nextBtn.onclick = () => {
-    if (!dateInput) return;
-    const cur = String(dateInput.value || today);
-    dateInput.value = addDaysIsoDate(cur, 1);
-    load();
-  };
-
-  panel.style.display = 'block';
-
   try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: panel });
+    if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+      await window.StudentPlanPanel.open(dateIso);
     }
   } catch (e) {
   }
-
-  updateTodayVisibility();
-  await load();
-}
-
-function ensureTeacherAssignmentsPanel() {
-  let panel = document.getElementById('teacher-assignments-panel');
-  if (panel) return panel;
-
-  panel = document.createElement('div');
-  panel.id = 'teacher-assignments-panel';
-  panel.style.display = 'none';
-  panel.style.position = 'fixed';
-  panel.style.left = '0';
-  panel.style.top = '0';
-  panel.style.width = '100%';
-  panel.style.height = '100%';
-  panel.style.zIndex = '100000';
-  panel.style.background = 'rgba(0,0,0,0.35)';
-  panel.style.backdropFilter = 'blur(4px)';
-
-  panel.innerHTML = `
-    <div id="teacher-assignments-panel-drawer" style="position:absolute; right:0; top:0; height:100%; width:min(75vw, 980px); background:#fff; color:#222; box-shadow:-12px 0 40px rgba(0,0,0,0.25); display:flex; flex-direction:column;">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 14px 10px 14px; border-bottom:1px solid rgba(0,0,0,0.08);">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div style="width:36px; height:36px; border-radius:10px; background: rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center;">
-            <i data-lucide="hat-glasses"></i>
-          </div>
-          <div>
-            <div style="font-weight:700; font-size:16px; line-height:1.1;">Задания</div>
-            <div style="font-size:12px; color: rgba(0,0,0,0.55); margin-top:2px;">Список заданий для выбранной группы</div>
-          </div>
-        </div>
-        <button type="button" id="teacher-assignments-close" class="modal-close" title="Закрыть" style="background:transparent; border:0; cursor:pointer; padding:6px;">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-
-      <div style="padding:12px 14px; border-bottom:1px solid rgba(0,0,0,0.08); display:flex; flex-direction:column; gap:10px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-          <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
-            <div style="font-size:12px; color: rgba(0,0,0,0.65); white-space:nowrap;">Группа</div>
-            <select id="teacher-assignments-group" style="height:40px; padding:0 10px; border-radius:12px; border:1px solid rgba(0,0,0,0.16); min-width:0; flex:1;"></select>
-          </div>
-          <button type="button" id="teacher-assignments-refresh" class="topbar-icon-btn" title="Обновить" style="width:40px; height:40px;">
-            <i data-lucide="refresh-cw"></i>
-          </button>
-        </div>
-      </div>
-
-      <div id="teacher-assignments-list" style="padding:14px; overflow:auto; flex:1;"></div>
-    </div>
-  `;
-
-  document.body.appendChild(panel);
-  return panel;
-}
-
-function _teacherAssignmentsRender(items) {
-  const list = document.getElementById('teacher-assignments-list');
-  if (!list) return;
-
-  const buildSubsetLabel = (selectedPositions, totalCount) => {
-    try {
-      const total = Number(totalCount || 0) || 0;
-      const pos = Array.isArray(selectedPositions)
-        ? selectedPositions.map(x => Number(x)).filter(x => Number.isFinite(x))
-        : [];
-      const uniq = Array.from(new Set(pos));
-      uniq.sort((a, b) => a - b);
-      const cnt = uniq.length;
-      const minP = cnt ? uniq[0] : null;
-      const maxP = cnt ? uniq[cnt - 1] : null;
-      if (!cnt) {
-        return total ? `${total}/${total}` : '';
-      }
-      const base = `${cnt}/${total || 0}`;
-      if (minP != null && maxP != null) {
-        return `${base} (${minP}-${maxP})`;
-      }
-      return base;
-    } catch (e) {
-      return '';
-    }
-  };
-
-  const rows = Array.isArray(items) ? items : [];
-  if (!rows.length) {
-    list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Заданий нет</div>';
-    return;
-  }
-
-  const blocks = rows.map(a => {
-    const dictationTitle = String(a && a.dictation_title ? a.dictation_title : `Диктант ${a.dictation_id}`);
-    const groupTitle = String(a && (a.group_title || a.group_id) ? (a.group_title || `Группа ${a.group_id}`) : '');
-    const level = a && a.dictation_level ? String(a.dictation_level) : '—';
-    const sentencesCount = Number(a && typeof a.dictation_sentences_count !== 'undefined' ? a.dictation_sentences_count : 0);
-    const selectedPositions = Array.isArray(a && a.selected_sentence_positions)
-      ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-      : null;
-    const subsetLabel = buildSubsetLabel(selectedPositions, sentencesCount);
-    const groupLabel = groupTitle ? `${groupTitle}${subsetLabel ? ` · ${subsetLabel}` : ''}` : '';
-    const sentenceCountLabel = subsetLabel ? subsetLabel : String(sentencesCount || 0);
-    const coverUrl = String(a && a.dictation_cover_url ? a.dictation_cover_url : '');
-    const days = Array.isArray(a && a.days ? a.days : null) ? a.days : [];
-    const dayDates = days
-      .map(d => String(d && (d.date || d.day_date) ? (d.date || d.day_date) : '').trim())
-      .filter(Boolean)
-      .sort();
-    const start = dayDates.length ? dayDates[0] : '';
-    const end = dayDates.length ? dayDates[dayDates.length - 1] : '';
-    const range = (start && end && start !== end) ? `${start} — ${end}` : (start || end || '—');
-    const req = (() => {
-      let maxReq = 1;
-      for (const d of days) {
-        const v = Number(d && (d.required_completions ?? d.count) ? (d.required_completions ?? d.count) : 1);
-        if (Number.isFinite(v) && v > maxReq) maxReq = v;
-      }
-      return maxReq;
-    })();
-    const isCached = !!(a && a.__cached);
-    const pct = (a && typeof a.class_percent_completed === 'number') ? a.class_percent_completed : null;
-    const badgeBg = 'rgba(245,158,11,0.16)';
-    const badgeColor = '#92400e';
-
-    const coverStyle = coverUrl
-      ? `background-image:url(${escapeHtml(coverUrl)}); background-size:cover; background-position:center;`
-      : '';
-
-    const leftBadge = (pct == null)
-      ? ''
-      : `<div title="Выполнение классом" style="padding:6px 10px; border-radius:999px; background:rgba(37,99,235,0.12); color:#1e40af; font-weight:800; font-size:12px;">${Number(pct)}%</div>`;
-
-    const cacheBadge = isCached
-      ? '<div title="В кеше" style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:var(--color-cesh); color:var(--color-cesh-text); font-weight:800; font-size:12px;"><i data-lucide="download"></i><span>в кеше</span></div>'
-      : '';
-
-    const cacheCoverBorder = isCached ? 'border: 1px solid var(--color-cesh-text);' : '';
-    const cardBg = isCached ? 'background: var(--color-cesh);' : 'background: #fff;';
-
-    return `
-      <div style="border:1px solid rgba(0,0,0,0.08); border-radius:14px; padding:12px; margin-top:10px; ${cardBg}">
-        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-          <div style="min-width:0; display:flex; gap:10px;">
-            <div style="width:200px; height:120px; border-radius:14px; background:#eee; flex-shrink:0; ${coverStyle} ${cacheCoverBorder}"></div>
-            <div style="min-width:0;">
-              <div style="font-weight:700; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(dictationTitle)}</div>
-              <div style="margin-top:4px; font-size:12px; color: rgba(0,0,0,0.55);">${escapeHtml(range)}${groupLabel ? ` · ${escapeHtml(groupLabel)}` : ''} · уровень ${escapeHtml(level)} · ${escapeHtml(String(sentenceCountLabel))} предлож.</div>
-              <div style="margin-top:8px;">${cacheBadge}</div>
-            </div>
-          </div>
-          <div style="flex-shrink:0; display:flex; gap:8px; align-items:center;">
-            <button type="button" class="topbar-icon-btn" data-action="teacher-view-assignment-students" data-assignment-id="${escapeHtml(String(a.id))}" title="Ученики" style="width:34px; height:34px;">
-              <i data-lucide="user"></i>
-            </button>
-            <button type="button" class="topbar-icon-btn" data-action="teacher-edit-assignment" data-assignment-id="${escapeHtml(String(a.id))}" data-group-id="${escapeHtml(String(a.group_id))}" data-dictation-id="${escapeHtml(String(a.dictation_id))}" title="Редактировать" style="width:34px; height:34px;">
-              <i data-lucide="pencil"></i>
-            </button>
-            ${leftBadge}
-            <div title="Сколько раз пройти на медальку" style="padding:6px 10px; border-radius:999px; background:${badgeBg}; color:${badgeColor}; font-weight:800; font-size:12px;">${req}x</div>
-            <button type="button" class="topbar-icon-btn" data-action="teacher-delete-assignment" data-assignment-id="${escapeHtml(String(a.id))}" title="Удалить" style="width:34px; height:34px;"><i data-lucide="trash-2"></i></button>
-          </div>
-        </div>
-      </div>
-    `
-  }).join('');
-
-  list.innerHTML = blocks;
-
-  list.querySelectorAll('[data-action="teacher-delete-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      const ok = window.confirm('Удалить задание?');
-      if (!ok) return;
-      btn.disabled = true;
-      try {
-        await apiRequest('/api/assignments/teacher/delete', {
-          method: 'POST',
-          body: JSON.stringify({ ids: [Number(id)] }),
-        });
-        try { showToast('Задание удалено', { durationMs: 2000 }); } catch (e2) { }
-        await _teacherAssignmentsReload();
-      } catch (err) {
-        try { showToast('Не удалось удалить', { durationMs: 2500 }); } catch (e2) { }
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  list.querySelectorAll('[data-action="teacher-view-assignment-students"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      btn.disabled = true;
-      try {
-        await openTeacherAssignmentStudentsModal(id);
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  list.querySelectorAll('[data-action="teacher-edit-assignment"]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const id = btn.getAttribute('data-assignment-id');
-      if (!id) return;
-      btn.disabled = true;
-      try {
-        let dictationId = null;
-        try {
-          const raw = btn.getAttribute('data-dictation-id');
-          const n = Number(String(raw || '').trim());
-          dictationId = (Number.isFinite(n) && n > 0) ? n : null;
-        } catch (e2) {
-        }
-
-        if (!dictationId) {
-          const a = await loadAssignmentForTeacherModal(id);
-          dictationId = (a && a.dictation_id != null) ? Number(a.dictation_id) : null;
-        }
-
-        if (!dictationId) {
-          try { showToast('Не найден dictation_id', { durationMs: 2500 }); } catch (e3) { }
-          return;
-        }
-
-        await openCreateAssignmentModal(dictationId, { edit_assignment_id: Number(id) });
-      } finally {
-        btn.disabled = false;
-      }
-    });
-  });
-
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: list });
-    }
-  } catch (e) {
-  }
-}
-
-async function _teacherAssignmentsReload(opts = {}) {
-  const groupSelect = document.getElementById('teacher-assignments-group');
-  const list = document.getElementById('teacher-assignments-list');
-  const groupIdRaw = groupSelect ? String(groupSelect.value || '').trim() : '';
-  if (!groupIdRaw) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Выбери группу</div>';
-    return;
-  }
-
-  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-  try {
-    const groupIdInt = Number(groupIdRaw);
-    if (!Number.isFinite(groupIdInt) || groupIdInt <= 0) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Некорректная группа</div>';
-      return;
-    }
-    const res = await apiRequest(`/api/assignments/teacher/group/${encodeURIComponent(String(groupIdInt))}`, { method: 'GET' });
-    if (!res || !res.success) {
-      if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-      return;
-    }
-    const items = Array.isArray(res.assignments) ? res.assignments : [];
-    _teacherAssignmentsRender(items);
-  } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить задания</div>';
-  }
-}
-
-async function openTeacherAssignmentsPanel() {
-  const panel = ensureTeacherAssignmentsPanel();
-  const closeBtn = document.getElementById('teacher-assignments-close');
-  const refreshBtn = document.getElementById('teacher-assignments-refresh');
-  const groupSelect = document.getElementById('teacher-assignments-group');
-  const list = document.getElementById('teacher-assignments-list');
-
-  // Guard against concurrent opens (double click / re-entrance) that can append options multiple times.
-  const openSeq = (window.__TEACHER_ASSIGNMENTS_OPEN_SEQ = (Number(window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) || 0) + 1);
-
-  const close = () => {
-    try { panel.style.display = 'none'; } catch (e) { }
-  };
-
-  panel.onclick = (e) => {
-    if (e.target === panel) close();
-  };
-  if (closeBtn) closeBtn.onclick = () => close();
-
-  if (groupSelect) {
-    groupSelect.innerHTML = '';
-    const opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = '— выбери группу —';
-    groupSelect.appendChild(opt);
-  }
-  if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Загрузка…</div>';
-
-  try {
-    const groups = await loadMyGroupsForAssignmentModal();
-    // If another open call started after this one, ignore this render.
-    if (openSeq !== window.__TEACHER_ASSIGNMENTS_OPEN_SEQ) return;
-    if (groupSelect) {
-      // Defensive de-duplication (API/cache can sometimes return duplicates)
-      const uniq = [];
-      const seen = new Set();
-      groups.forEach(g => {
-        const id = g && g.id != null ? String(g.id) : '';
-        if (!id) return;
-        if (seen.has(id)) return;
-        seen.add(id);
-        uniq.push(g);
-      });
-
-      uniq.forEach(g => {
-        const o = document.createElement('option');
-        o.value = String(g.id);
-        o.textContent = String(g.title || `Группа ${g.id}`);
-        groupSelect.appendChild(o);
-      });
-      const last = getAssignmentLastGroupId();
-      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
-        groupSelect.value = last;
-      } else if (uniq.length === 1) {
-        groupSelect.value = String(uniq[0].id);
-        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      } else if (uniq.length > 0) {
-        groupSelect.value = String(uniq[0].id);
-        try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      }
-    }
-  } catch (e) {
-    if (list) list.innerHTML = '<div style="padding: 10px 0; color: rgba(0,0,0,0.55);">Не удалось загрузить группы</div>';
-  }
-
-  if (groupSelect) {
-    groupSelect.onchange = () => {
-      try { setAssignmentLastGroupId(groupSelect.value); } catch (e) { }
-      _teacherAssignmentsReload().catch(() => { });
-    };
-  }
-  if (refreshBtn) {
-    refreshBtn.onclick = () => {
-      _teacherAssignmentsReload().catch(() => { });
-    };
-  }
-
-  panel.style.display = 'block';
-  try {
-    if (window.lucide && typeof window.lucide.createIcons === 'function') {
-      window.lucide.createIcons({ root: panel });
-    }
-  } catch (e) {
-  }
-
-  await _teacherAssignmentsReload();
 }
 
 function renderCreateAssignmentDaysTable(modal) {
@@ -2476,46 +2818,36 @@ async function openCreateAssignmentModal(dictationId) {
   } catch (e) {
   }
 
-  const idInput = document.getElementById('create-assignment-dictation-id');
-  if (idInput) idInput.value = String(dictationId || '');
+  const today = getTodayIsoDate();
 
-  const groupSelect = document.getElementById('create-assignment-group');
-  if (groupSelect) {
-    groupSelect.innerHTML = '';
-  }
+  const editAssignmentId = (() => {
+    try {
+      const raw = modal.dataset.editAssignmentId;
+      if (!raw) return null;
+      const n = Number(raw);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    } catch (e) {
+      return null;
+    }
+  })();
 
   try {
-    const groups = await loadMyGroupsForAssignmentModal();
-    if (groupSelect) {
-      groups.forEach(g => {
-        const o = document.createElement('option');
-        o.value = String(g.id);
-        o.textContent = String(g.title || `Группа ${g.id}`);
-        groupSelect.appendChild(o);
-      });
-
-      const last = getAssignmentLastGroupId();
-      if (last && groupSelect.querySelector(`option[value="${CSS.escape(last)}"]`)) {
-        groupSelect.value = last;
-      } else if (groups.length > 0) {
-        groupSelect.value = String(groups[0].id);
-      }
-    }
+    modal.__assignmentDays = [{ date: today, required_completions: 1 }];
   } catch (e) {
   }
 
-  if (groupSelect) {
-    groupSelect.onchange = () => {
-      setAssignmentLastGroupId(groupSelect.value);
-    };
-  }
+  const idInput = document.getElementById('create-assignment-dictation-id');
+  if (idInput) idInput.value = String(dictationId || '');
 
   try {
     const meta = await loadDictationMetaForAssignmentModal(dictationId);
     const titleEl = document.getElementById('create-assignment-dictation-title');
     const coverImg = document.getElementById('create-assignment-cover-img');
     const metaEl = document.getElementById('create-assignment-cover-meta');
-    if (titleEl) titleEl.textContent = meta && meta.title ? String(meta.title) : '';
+    if (titleEl) {
+      const title = meta && meta.title ? String(meta.title) : '';
+      titleEl.innerHTML = `${escapeHtml(title)}<span id="create-assignment-dictation-unsaved-star" class="unsaved-star" style="display:none;">*</span>`;
+    }
     if (coverImg) coverImg.src = meta && meta.cover_url ? String(meta.cover_url) : '';
     if (metaEl) {
       const level = meta && meta.level ? String(meta.level) : '—';
@@ -2534,93 +2866,24 @@ async function openCreateAssignmentModal(dictationId) {
     renderCreateAssignmentSentencesTable(modal);
   }
 
-  const daysAddBtn = document.getElementById('create-assignment-days-add');
+  setCreateAssignmentExercisesState(modal, { exercises: [], selectedExerciseId: null, draft: null, dirty: false });
+  setCreateAssignmentExercisesDirty(modal, false);
 
-  const today = getTodayIsoDate();
+  try {
+    const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`, { method: 'GET' });
+    const items = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
+    const st = getCreateAssignmentExercisesState(modal);
+    st.exercises = items;
+    st.draft = null;
+    st.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
+    setCreateAssignmentExercisesState(modal, st);
 
-  setCreateAssignmentDaysState(modal, [{ date: today, count: 1 }]);
-  renderCreateAssignmentDaysTable(modal);
-
-  const editAssignmentId = (() => {
-    try {
-      const raw = modal.dataset.editAssignmentId;
-      if (!raw) return null;
-      const n = Number(raw);
-      return Number.isFinite(n) && n > 0 ? n : null;
-    } catch (e) {
-      return null;
+    renderCreateAssignmentExercisesTable(modal);
+    if (st.selectedExerciseId) {
+      selectCreateAssignmentExerciseById(modal, Number(st.selectedExerciseId));
     }
-  })();
-
-  if (editAssignmentId) {
-    try {
-      const a = await loadAssignmentForTeacherModal(editAssignmentId);
-      if (a && typeof a === 'object') {
-        try {
-          if (groupSelect && a.group_id != null) {
-            const v = String(a.group_id);
-            if (groupSelect.querySelector(`option[value="${CSS.escape(v)}"]`)) {
-              groupSelect.value = v;
-              setAssignmentLastGroupId(v);
-            }
-          }
-        } catch (e) {
-        }
-
-        try {
-          const daysSrc = Array.isArray(a.days) ? a.days : [];
-          const preparedDays = (daysSrc.length ? daysSrc : [{ date: today, required_completions: 1 }])
-            .map(x => ({
-              date: String(x && (x.date || x.day_date) ? (x.date || x.day_date) : '').trim(),
-              count: Number(x && (x.required_completions ?? x.count) ? (x.required_completions ?? x.count) : 1) || 1,
-            }))
-            .filter(x => x.date);
-
-          setCreateAssignmentDaysState(modal, preparedDays.length ? preparedDays : [{ date: today, count: 1 }]);
-          renderCreateAssignmentDaysTable(modal);
-          if (daysAddBtn) daysAddBtn.disabled = false;
-        } catch (e) {
-        }
-
-        try {
-          const curSent = getCreateAssignmentSentencesState(modal);
-          const selected = Array.isArray(a.selected_sentence_positions)
-            ? a.selected_sentence_positions.map(x => Number(x)).filter(x => Number.isFinite(x))
-            : null;
-          setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: selected && selected.length ? selected : null }));
-          renderCreateAssignmentSentencesTable(modal);
-        } catch (e) {
-        }
-      }
-    } catch (e) {
-    }
-  } else {
-    if (daysAddBtn) daysAddBtn.disabled = false;
-  }
-
-  if (daysAddBtn) {
-    daysAddBtn.onclick = () => {
-      const cur0 = getCreateAssignmentDaysState(modal);
-      const uniq0 = Array.from(new Set(cur0.map(x => String(x && x.date ? x.date : '').trim()).filter(Boolean)));
-      if (uniq0.length >= 7) {
-        try { showToast('Максимум 7 дней'); } catch (e) { }
-        return;
-      }
-      const cur = getCreateAssignmentDaysState(modal);
-      const last = cur.length > 0 ? cur[cur.length - 1] : null;
-      const lastDate = last && last.date ? String(last.date) : today;
-      cur.push({ date: addDaysIsoDate(lastDate, 1), count: 1 });
-      setCreateAssignmentDaysState(modal, cur);
-
-      const v = validateAssignmentDaysWeekLimit(modal);
-      if (!v.ok) {
-        cur.pop();
-        setCreateAssignmentDaysState(modal, cur);
-        try { showToast(v.reason); } catch (e) { }
-        return;
-      }
-      renderCreateAssignmentDaysTable(modal);
-    };
+  } catch (e) {
+    renderCreateAssignmentExercisesTable(modal);
   }
 
   const toggleAllBtn = document.getElementById('create-assignment-sentences-toggle-all');
@@ -2638,129 +2901,184 @@ async function openCreateAssignmentModal(dictationId) {
 
       setCreateAssignmentSentencesState(modal, Object.assign({}, cur, { selectedPositions: allSelected ? [] : null }));
       renderCreateAssignmentSentencesTable(modal);
+
+      try {
+        syncCreateAssignmentSelectedExerciseFromSentences(modal);
+      } catch (e2) {
+      }
     };
   }
 
   const closeBtn = document.getElementById('create-assignment-close');
   const saveBtn = document.getElementById('create-assignment-save');
 
+  const persistExercises = async () => {
+    const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
+    if (!dictationIdRaw) {
+      showToast('Не найден dictation_id');
+      return false;
+    }
+
+    const dictation_id = Number(dictationIdRaw);
+    if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
+      showToast('Неверный dictation_id');
+      return false;
+    }
+
+    const selectedPositions = _getCreateAssignmentSelectedPositionsForSave(modal);
+
+    try {
+      const exSt = getCreateAssignmentExercisesState(modal);
+      const isDraftSelected = Boolean(exSt && exSt.draft && exSt.draft.selected === true);
+      if (isDraftSelected && Array.isArray(selectedPositions) && selectedPositions.length === 0) {
+        showToast('Выбери хотя бы одно предложение');
+        return false;
+      }
+    } catch (e0) {
+    }
+
+    try {
+      const exSt = getCreateAssignmentExercisesState(modal);
+      if (exSt && exSt.dirty === true) {
+        const exercisesPayload = _getCreateAssignmentExercisesPayloadForSave(modal);
+        const reconcile = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
+          method: 'POST',
+          body: JSON.stringify({ exercises: exercisesPayload })
+        });
+        if (!reconcile || reconcile.success !== true) {
+          const msg = reconcile && reconcile.error ? String(reconcile.error) : 'Не удалось сохранить упражнения';
+          showToast(msg, { durationMs: 3500 });
+          return false;
+        }
+
+        try {
+          const items = (reconcile && Array.isArray(reconcile.exercises)) ? reconcile.exercises : [];
+          const next = getCreateAssignmentExercisesState(modal);
+          next.exercises = items;
+          next.draft = null;
+          if (next.selectedExerciseId && !findCreateAssignmentExerciseById(modal, Number(next.selectedExerciseId))) {
+            next.selectedExerciseId = (items && items.length && items[0].id) ? Number(items[0].id) : null;
+          }
+          setCreateAssignmentExercisesState(modal, next);
+          setCreateAssignmentExercisesDirty(modal, false);
+          renderCreateAssignmentExercisesTable(modal);
+        } catch (e) {
+          try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) {}
+        }
+      }
+    } catch (e) {
+      showToast('Ошибка сохранения упражнений', { durationMs: 2500 });
+      return false;
+    }
+
+    showToast('Упражнения сохранены', { durationMs: 2500 });
+    return true;
+  };
+
   const close = () => {
     try { modal.style.display = 'none'; } catch (e) { }
   };
 
-  if (closeBtn) closeBtn.onclick = () => close();
-  modal.onclick = (e) => {
-    if (e.target === modal) close();
+  const maybeCloseWithPrompt = async () => {
+    const st = getCreateAssignmentExercisesState(modal);
+    if (!st || st.dirty !== true) {
+      close();
+      return;
+    }
+
+    const wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
+    if (wantSave) {
+      const ok = await persistExercises();
+      if (ok) close();
+      return;
+    }
+
+    const wantDiscard = window.confirm('Выйти без сохранения?');
+    if (wantDiscard) {
+      close();
+      return;
+    }
   };
+
+  if (closeBtn) closeBtn.onclick = () => { void maybeCloseWithPrompt(); };
+  modal.onclick = (e) => {
+    if (e.target === modal) { void maybeCloseWithPrompt(); }
+  };
+
+  const createBtn = document.getElementById('create-assignment-exercise-create');
+  if (createBtn && createBtn.dataset.listenerAttached !== '1') {
+    createBtn.dataset.listenerAttached = '1';
+    createBtn.addEventListener('click', () => {
+      const st = getCreateAssignmentExercisesState(modal);
+
+      if (st.draft && st.draft.selected === true) {
+        const pos = normalizeExercisePositions(st.draft.positions || []);
+        if (!pos.length) {
+          try { showToast('Выбери хотя бы одно предложение'); } catch (e) { }
+          return;
+        }
+        const key = createAssignmentPositionsKey(pos);
+        const exists = getVisibleCreateAssignmentExercises(modal).some(x => x && createAssignmentPositionsKey(x.positions || []) === key);
+        if (exists) {
+          try { showToast('Такое упражнение уже существует'); } catch (e) { }
+          return;
+        }
+
+        const nextId = -Math.floor(Math.random() * 1000000000) - 1;
+        st.exercises = Array.isArray(st.exercises) ? st.exercises : [];
+        st.exercises.push({ id: nextId, positions: pos });
+        st.draft = null;
+        st.selectedExerciseId = nextId;
+      }
+
+      st.draft = { positions: [], selected: true };
+      st.selectedExerciseId = null;
+      setCreateAssignmentExercisesState(modal, st);
+      setCreateAssignmentExercisesDirty(modal, true);
+
+      const curSent = getCreateAssignmentSentencesState(modal);
+      setCreateAssignmentSentencesState(modal, Object.assign({}, curSent, { selectedPositions: [] }));
+      renderCreateAssignmentSentencesTable(modal);
+      renderCreateAssignmentExercisesTable(modal);
+    });
+  }
+
+  const deleteBtn = document.getElementById('create-assignment-exercise-delete');
+  if (deleteBtn && deleteBtn.dataset.listenerAttached !== '1') {
+    deleteBtn.dataset.listenerAttached = '1';
+    deleteBtn.addEventListener('click', () => {
+      const st = getCreateAssignmentExercisesState(modal);
+      if (st.draft && st.draft.selected === true) {
+        st.draft = null;
+        setCreateAssignmentExercisesState(modal, st);
+        setCreateAssignmentExercisesDirty(modal, true);
+        renderCreateAssignmentExercisesTable(modal);
+        return;
+      }
+
+      const id = Number(st.selectedExerciseId);
+      if (!Number.isFinite(id)) return;
+      const ex = findCreateAssignmentExerciseById(modal, id);
+      if (!ex) return;
+      const pos = Array.isArray(ex.positions) ? ex.positions : [];
+      if (!pos.length) {
+        try { showToast('Упражнение "весь диктант" удалить нельзя'); } catch (e) { }
+        return;
+      }
+      ex.__deleted = true;
+      st.selectedExerciseId = null;
+      setCreateAssignmentExercisesState(modal, st);
+      setCreateAssignmentExercisesDirty(modal, true);
+      renderCreateAssignmentExercisesTable(modal);
+    });
+  }
 
   if (saveBtn) {
     saveBtn.onclick = async () => {
       try {
-        const groupId = groupSelect ? String(groupSelect.value || '').trim() : '';
-        const dictationIdRaw = idInput ? String(idInput.value || '').trim() : '';
-
-        if (!groupId) {
-          showToast('Выбери группу');
-          return;
-        }
-        if (!dictationIdRaw) {
-          showToast('Не найден dictation_id');
-          return;
-        }
-
-        const group_id = Number(groupId);
-        const dictation_id = Number(dictationIdRaw);
-        if (!Number.isFinite(group_id) || group_id <= 0) {
-          showToast('Неверный group_id');
-          return;
-        }
-        if (!Number.isFinite(dictation_id) || dictation_id <= 0) {
-          showToast('Неверный dictation_id');
-          return;
-        }
-
-        const state = getCreateAssignmentDaysState(modal);
-        const days = (Array.isArray(state) ? state : []).map(x => ({
-          date: String(x?.date || '').trim(),
-          required_completions: Number(x?.count || 1)
-        })).filter(x => x.date);
-
-        const sentenceState = getCreateAssignmentSentencesState(modal);
-        const selected_sentence_positions = Array.isArray(sentenceState.selectedPositions) ? sentenceState.selectedPositions : null;
-
-        if (Array.isArray(selected_sentence_positions) && selected_sentence_positions.length === 0) {
-          showToast('Выбери хотя бы одно предложение');
-          return;
-        }
-
-        if (!days.length) {
-          showToast('Добавь хотя бы один день');
-          return;
-        }
-
-        for (const d of days) {
-          if (!Number.isFinite(d.required_completions) || d.required_completions <= 0) {
-            showToast('Неверное число попыток в плане');
-            return;
-          }
-        }
-
-        const uniq = Array.from(new Set(days.map(x => x.date))).sort();
-        if (uniq.length > 7) {
-          showToast('Максимум 7 дней');
-          return;
-        }
-        const span = uniq.length ? diffDaysIsoDate(uniq[0], uniq[uniq.length - 1]) : 0;
-        if (span != null && span > 6) {
-          showToast('Максимум 7 дней');
-          return;
-        }
-
-        const editIdRaw = (() => {
-          try { return modal.dataset.editAssignmentId || ''; } catch (e) { return ''; }
-        })();
-        const editId = Number(editIdRaw);
-
-        const isEdit = Number.isFinite(editId) && editId > 0;
-
-        const res = isEdit
-          ? await apiRequest(`/api/assignments/teacher/assignment/${encodeURIComponent(String(editId))}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-              group_id,
-              days,
-              selected_sentence_positions
-            })
-          })
-          : await apiRequest('/api/assignments/teacher/create', {
-            method: 'POST',
-            body: JSON.stringify({
-              group_id,
-              dictation_id,
-              mode: 'days',
-              days,
-              selected_sentence_positions
-            })
-          });
-
-        if (!res || !res.success) {
-          const rawErr = res && res.error ? String(res.error) : '';
-          const friendly = (rawErr && rawErr.toLowerCase().includes('overlap'))
-            ? 'На выбранные даты уже есть задание для этого диктанта и этого же набора предложений. Если хочешь второе задание — выбери другой набор предложений или другую дату.'
-            : (rawErr || 'Ошибка сохранения');
-          showToast(friendly, { durationMs: 4000 });
-          return;
-        }
-
-        showToast('Задание сохранено', { durationMs: 2500 });
-        close();
-        try {
-          await _teacherAssignmentsReload();
-        } catch (e) {
-        }
-        return;
+        await persistExercises();
       } catch (e) {
-        showToast('Ошибка сохранения', { durationMs: 2500 });
+        showToast((e && e.message) ? String(e.message) : 'Ошибка сохранения', { durationMs: 20000, sticky: true });
       }
     };
   }
@@ -2769,7 +3087,9 @@ async function openCreateAssignmentModal(dictationId) {
 
   try {
     const t = document.querySelector('.create-assignment-modal-title-text');
-    if (t) t.textContent = editAssignmentId ? 'Задание (редактирование)' : 'Задание';
+    if (t) {
+      t.textContent = libT('private_library.assignments.exercises_modal_title', null, 'Все упражнения');
+    }
   } catch (e) {
   }
 
@@ -3756,8 +4076,9 @@ async function apiRequest(url, options = {}) {
 }
 
 function showToast(message, opts = {}) {
-  const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 1000;
+  const durationMs = typeof opts.durationMs === 'number' ? opts.durationMs : 4000;
   const beepUrl = typeof opts.beepUrl === 'string' ? opts.beepUrl : null;
+  const sticky = opts && opts.sticky === true;
 
   let el = document.getElementById('auto-toast');
   if (!el) {
@@ -3767,7 +4088,7 @@ function showToast(message, opts = {}) {
     el.style.left = '50%';
     el.style.top = '24px';
     el.style.transform = 'translateX(-50%)';
-    el.style.zIndex = '100000';
+    el.style.zIndex = '200500';
     el.style.background = 'rgba(0,0,0,0.78)';
     el.style.color = '#fff';
     el.style.padding = '10px 14px';
@@ -3775,7 +4096,15 @@ function showToast(message, opts = {}) {
     el.style.fontSize = '14px';
     el.style.maxWidth = 'min(92vw, 520px)';
     el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+    el.style.userSelect = 'text';
+    el.style.cursor = 'pointer';
     el.style.display = 'none';
+    el.addEventListener('click', () => {
+      try {
+        el.style.display = 'none';
+      } catch (e) {
+      }
+    });
     document.body.appendChild(el);
   }
 
@@ -3792,13 +4121,15 @@ function showToast(message, opts = {}) {
   }
 
   if (el._hideTimer) window.clearTimeout(el._hideTimer);
-  el._hideTimer = window.setTimeout(() => {
-    try {
-      const node = document.getElementById('auto-toast');
-      if (node) node.style.display = 'none';
-    } catch (e) {
-    }
-  }, Math.max(0, durationMs));
+  if (!sticky) {
+    el._hideTimer = window.setTimeout(() => {
+      try {
+        const node = document.getElementById('auto-toast');
+        if (node) node.style.display = 'none';
+      } catch (e) {
+      }
+    }, Math.max(0, durationMs));
+  }
 }
 
 const deskToggleInFlight = new Set();
@@ -4904,14 +5235,31 @@ function ensureDeskGridContainer() {
 function insertDeskCardElement(item, position = 'start') {
   const grid = ensureDeskGridContainer();
   if (!grid) return null;
-  const html = createDictationCard(item, true);
-  if (position === 'end') {
-    grid.insertAdjacentHTML('beforeend', html);
-  } else {
-    grid.insertAdjacentHTML('afterbegin', html);
+  let el = null;
+  try {
+    if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
+      const fresh = window.DictationKart.createDeskCardElement(item);
+      if (fresh) {
+        if (position === 'end') {
+          grid.appendChild(fresh);
+        } else {
+          grid.insertBefore(fresh, grid.firstChild);
+        }
+        el = fresh;
+      }
+    }
+  } catch (e) {
   }
 
-  const el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+  if (!el) {
+    const html = createDictationCard(item, true);
+    if (position === 'end') {
+      grid.insertAdjacentHTML('beforeend', html);
+    } else {
+      grid.insertAdjacentHTML('afterbegin', html);
+    }
+    el = grid.querySelector(`.desk-card[data-desk-item-id="${String(item.id)}"]`);
+  }
   if (!el) return null;
 
   try {
@@ -5415,6 +5763,13 @@ async function toggleDictationOnDesk(dictationId) {
 // item - объект с данными диктанта
 // isDeskCard - true для карточки на столе, false для карточки в книге
 function createDictationCard(item, isDeskCard = false) {
+  try {
+    if (window.DictationKart && typeof window.DictationKart.render === 'function') {
+      return window.DictationKart.render(item, { context: isDeskCard ? 'desk' : 'book' });
+    }
+  } catch (e) {
+  }
+
   if (isDeskCard) {
     // Карточка для рабочего стола
     const dictationId = item.dictation_id;
@@ -5461,7 +5816,7 @@ function createDictationCard(item, isDeskCard = false) {
     return `
         <div class="short-card desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
           <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${escapeHtml(noticeMessage)}" role="link" tabindex="0">
-            <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async">
+            <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false">
             <div class="card-progress-stats"></div>
           </div>
           <h3 class="short-title">${item.title || 'Без названия'}</h3>
@@ -5492,6 +5847,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dictationId}">
                   <i data-lucide="clipboard-list"></i>
                   <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment_new'))}</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="plan-tasks" data-dictation-id="${dictationId}">
+                  <i data-lucide="calendar-plus"></i>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.plan', null, 'Запланировать'))}</span>
                 </button>
                 <button class="dropdown-menu-item" type="button" data-action="prefetch-dictation-cache" data-dictation-id="${dictationId}" data-lang-original="${escapeHtml(langOriginal)}" data-cover-url="${escapeHtml(coverUrl || '')}" data-translation-langs="${escapeHtml(availableTranslations.join(','))}">
                   <i data-lucide="download"></i>
@@ -5589,6 +5948,10 @@ function createDictationCard(item, isDeskCard = false) {
                 <button class="dropdown-menu-item" data-action="create-assignment" data-dictation-id="${dbId}">
                   <i data-lucide="clipboard-list"></i>
                   <span>${escapeHtml(libT('private_library.dictation_card_actions.create_assignment'))}</span>
+                </button>
+                <button class="dropdown-menu-item" data-action="plan-tasks" data-dictation-id="${dbId}">
+                  <i data-lucide="calendar-plus"></i>
+                  <span>${escapeHtml(libT('private_library.dictation_card_actions.plan', null, 'Запланировать'))}</span>
                 </button>
                 <button class="dropdown-menu-item" data-action="move-dictation" data-dictation-id="${dbId}">
                   <i data-lucide="folder-symlink"></i>
@@ -5937,6 +6300,16 @@ function renderDeskCards(items) {
   grid.className = 'shorts-grid';
 
   items.forEach(item => {
+    try {
+      if (window.DictationKart && typeof window.DictationKart.createDeskCardElement === 'function') {
+        const el = window.DictationKart.createDeskCardElement(item);
+        if (el) {
+          grid.appendChild(el);
+          return;
+        }
+      }
+    } catch (e) {
+    }
     const cardHtml = createDictationCard(item, true); // true = карточка для стола
     grid.insertAdjacentHTML('beforeend', cardHtml);
   });
@@ -6233,7 +6606,7 @@ async function loadActiveBook(bookId, isWorkbook = false) {
 
       console.log('📚 Загружены разделы:', sections);
       sections.forEach(s => {
-        console.log(`  - Раздел ${s.id}: "${s.title}", section_number: ${s.section_number}`);
+        console.log(`  - Раздел ${s.id}: "${s.title}", order_index: ${s.order_index}`);
       });
 
       // Сохраняем разделы в глобальной переменной для доступа при редактировании
@@ -6262,7 +6635,7 @@ function renderBookContentTo(container, sections, dictations, isWorkbook = false
   if (!isWorkbook && sections && sections.length > 0) {
     html += '<div class="book-structure-list">';
     sections.forEach(section => {
-      const sectionNumber = section.section_number ? `§ ${section.section_number}. ` : '§ ';
+      const sectionNumber = section.order_index ? `§ ${section.order_index}. ` : '§ ';
 
       html += `
           <div class="structure-item structure-section" data-section-id="${section.id}">
@@ -6763,7 +7136,7 @@ async function openSectionModal(section, parentId) {
     titleEl.textContent = "Редактирование раздела";
     idInput.value = section.id;
     parentIdInput.value = section.parent_id || '';
-    numberInput.value = section.section_number || '';
+    numberInput.value = section.order_index || '';
     titleInput.value = section.title || "";
   } else {
     // Создание нового раздела
@@ -6786,7 +7159,7 @@ async function openSectionModal(section, parentId) {
           // Находим максимальный номер и прибавляем 1
           const maxNumber = Math.max(
             ...sections
-              .map(s => s.section_number)
+              .map(s => s.order_index)
               .filter(n => n !== null && n !== undefined)
               .concat([0]) // Если все номера null, начинаем с 0
           );
@@ -6847,18 +7220,17 @@ async function handleSaveSection(event) {
     const payload = {
       title: titleInput.value.trim(),
       parent_id: parentId,
-      section_number: sectionNumber,
       // Разделы не имеют обложек, авторов и описаний
       author_text: null,
       short_description: null,
       original_language: null,
       visibility: 'private',
       theme: null,
-      order_index: 0
+      order_index: sectionNumber
     };
 
     console.log('💾 Сохраняю раздел с payload:', payload);
-    console.log('💾 section_number в payload:', payload.section_number, 'тип:', typeof payload.section_number);
+    console.log('💾 order_index в payload:', payload.order_index, 'тип:', typeof payload.order_index);
 
     let data;
     if (sectionId) {
@@ -6884,7 +7256,7 @@ async function handleSaveSection(event) {
     console.log('✅ Раздел сохранен, ответ сервера:', data);
     if (data.book) {
       console.log('📚 Сохраненный раздел:', data.book);
-      console.log('📚 section_number:', data.book.section_number);
+      console.log('📚 order_index:', data.book.order_index);
     }
 
     closeSectionModal();
@@ -7122,14 +7494,13 @@ function installEventHandlers() {
   const studentPlanBtn = document.getElementById('btnStudentPlan');
   if (studentPlanBtn) {
     studentPlanBtn.addEventListener('click', () => {
-      openStudentPlanPanel().catch(() => { });
-    });
-  }
-
-  const teacherAssignmentsBtn = document.getElementById('btnTeacherAssignments');
-  if (teacherAssignmentsBtn) {
-    teacherAssignmentsBtn.addEventListener('click', () => {
-      openTeacherAssignmentsPanel().catch(() => { });
+      try {
+        if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+          window.StudentPlanPanel.open().catch(() => { });
+          return;
+        }
+      } catch (e) {
+      }
     });
   }
 
@@ -7619,6 +7990,16 @@ function installEventHandlers() {
       const dictationId = btn.getAttribute('data-dictation-id');
       if (dictationId) {
         openCreateAssignmentModal(dictationId);
+      }
+    }
+
+    if (e.target.closest('[data-action="plan-tasks"]')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const btn = e.target.closest('[data-action="plan-tasks"]');
+      const dictationId = btn.getAttribute('data-dictation-id');
+      if (dictationId) {
+        openPlanTasksModal(dictationId);
       }
     }
 
@@ -9010,23 +9391,19 @@ async function _autoOpenTodayPlanIfNeeded() {
   const panel = document.getElementById('student-plan-panel');
   if (panel && panel.style && panel.style.display && panel.style.display !== 'none') return;
 
-  // 1) Fast path: check cached assignments for today (if any)
-  try {
-    const cached = await _getStudentPlanCacheForDateIdb(today);
-    if (cached && Array.isArray(cached.assignments) && _hasUnfinishedTodayHomework(cached.assignments)) {
-      openStudentPlanPanel(today);
-      return;
-    }
-  } catch (e) {
-  }
-
-  // 2) Network verification: open if API says there is unfinished homework
+  // Network verification: open if API says there is unfinished homework
   try {
     const res = await apiRequest(`/api/assignments/student/my?date=${encodeURIComponent(today)}`, { method: 'GET' });
     if (res && res.success) {
       const items = Array.isArray(res.assignments) ? res.assignments : [];
       if (_hasUnfinishedTodayHomework(items)) {
-        openStudentPlanPanel(today);
+        try {
+          if (window.StudentPlanPanel && typeof window.StudentPlanPanel.open === 'function') {
+            window.StudentPlanPanel.open(today);
+            return;
+          }
+        } catch (e) {
+        }
       }
     }
   } catch (e) {

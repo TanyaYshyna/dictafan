@@ -3,6 +3,7 @@
 // learning-selector - селектор языка изучения
 // learning-selector-compact - селектор языка изучения (только флаг в выбранном, флаг+название в списке)
 // learning-list - список изучаемых языков с чекбоксами
+// learning-flags - список всех языков с чекбоксами (для users.tr_*)
 // flag-combo - комбинация флагов (изучаемый → родной)
 // header-selector - выпадающий селектор для шапки
 // report-selector - текстовый селектор для отчетов (без флагов, включает "Все языки")
@@ -52,7 +53,33 @@ class LanguageSelector {
         this._modelsCentricModalTextEl = null;
         this._modelsCentricModalBarEl = null;
 
+        this._learningFlagsClickBound = false;
+
         this.init();
+    }
+
+    _renderLucideCheckboxButton(btn, checked, disabled) {
+        try {
+            if (!btn) return;
+            btn.dataset.checked = checked ? '1' : '0';
+            btn.dataset.disabled = disabled ? '1' : '0';
+            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+            btn.disabled = Boolean(disabled);
+            btn.innerHTML = `<span class="universal-choice-icon" aria-hidden="true"></span>`;
+        } catch (e) {
+        }
+    }
+
+    _renderLucideRadioButton(btn, checked, disabled) {
+        try {
+            if (!btn) return;
+            btn.dataset.checked = checked ? '1' : '0';
+            btn.dataset.disabled = disabled ? '1' : '0';
+            btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
+            btn.disabled = Boolean(disabled);
+            btn.innerHTML = `<span class="universal-choice-icon universal-choice-icon--radio" aria-hidden="true"></span>`;
+        } catch (e) {
+        }
     }
 
     async init() {
@@ -120,6 +147,21 @@ class LanguageSelector {
         }
     }
 
+    _getPrimaryModelKeyV2() {
+        try {
+            return (localStorage.getItem('primary_model_key_v2') || '').trim();
+        } catch (e) {
+            return '';
+        }
+    }
+
+    _setPrimaryModelKeyV2(modelKey) {
+        try {
+            localStorage.setItem('primary_model_key_v2', String(modelKey || '').trim());
+        } catch (e) {
+        }
+    }
+
     _getSelectedModelKeyV2(langCode) {
         const lc = (langCode || '').toString().trim().toLowerCase().split('-')[0] || '';
         if (!lc) return null;
@@ -168,121 +210,76 @@ class LanguageSelector {
     }
 
     createModelsCentricUI() {
+        // В профиле таблица моделей задается статически в HTML (skeleton),
+        // а JS только "оживляет" её. Поэтому тут возвращаем пустую строку.
+        return '';
+    }
+
+    hydrateModelsCentricUI() {
+        const root = this.options.container;
+        if (!root) return;
+        const table = root.querySelector('[data-role="models-centric-table"]');
+        if (!table) return;
+
         const models = this._collectGlobalModels();
-        const languages = Object.keys(this.languageData || {});
+        const bySize = {
+            tiny: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-tiny')) || null,
+            base: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-base')) || null,
+            small: models.find(m => m.modelType === 'whisper' && String(m.modelKey || '').includes('whisper-small')) || null,
+        };
+
         const downloaded = this._getDownloadedModelsV2();
         const downloadedKeys = new Set(Object.keys(downloaded || {}));
 
-        const getApplicableDownloaded = (langCode) => {
-            const lc = (langCode || '').toString().trim().toLowerCase().split('-')[0];
-            const langEntry = (this.languageData && this.languageData[lc]) ? this.languageData[lc] : (this.languageData ? this.languageData[langCode] : null);
-            const applicableKeys = langEntry && Array.isArray(langEntry.applicable_model_keys) ? langEntry.applicable_model_keys : [];
-            const applicableKeySet = new Set(applicableKeys.map(String));
-            return models.filter(m => {
-                if (!downloadedKeys.has(m.modelKey)) return false;
-                // Whisper multilingual: if the language references it, it's applicable.
-                return applicableKeySet.has(String(m.modelKey));
-            });
-        };
+        const rows = root.querySelectorAll('.models-centric-tr');
+        rows.forEach((tr) => {
+            try {
+                const size = String(tr.dataset.modelSize || '');
+                const sizeEl = tr.querySelector('[data-role="model-size"]');
+                const toggle = tr.querySelector('.model-download-toggle-v2');
 
-        const left = `
-            <div class="downloaded-models-panel" style="margin:0;">
-                <label class="language-label">${this._t('profile.models.all_models', null, 'Все модели')}</label>
-                <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
-                    ${models.map(m => {
-                        const isDownloaded = downloadedKeys.has(m.modelKey);
-                        const typeName = m.modelType === 'whisper' ? 'Whisper' : 'ASR';
-                        const langs = (m.supportedLanguages || []).includes('all') ? 'all' : (m.supportedLanguages || []).slice(0, 6).join(' ');
-                        const toggleEnabled = m.modelType === 'whisper';
-                        return `
-                            <div class="model-list-item" data-model-key="${m.modelKey}" data-model-type="${m.modelType}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f0f0;">
-                                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0; min-width: 70px; color:#666; font-size:12px;">${typeName}</div>
-                                <div style="flex-grow:1; min-width:0;">
-                                    <div style="font-size:13px; font-weight:500; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${m.name}</div>
-                                    <div style="font-size:12px; color:#666; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${langs}</div>
-                                </div>
-                                <div style="flex-shrink:0; color:#666; font-size:12px; min-width:80px; text-align:right;">${m.size || ''}</div>
-                                <div style="display:flex; align-items:center; flex-shrink:0;">
-                                    <label class="model-switch" style="position: relative; display: inline-block; width: 40px; height: 20px; opacity:${toggleEnabled ? '1' : '0.35'};">
-                                        <input type="checkbox"
-                                               class="model-download-toggle-v2"
-                                               ${isDownloaded ? 'checked' : ''}
-                                               ${toggleEnabled ? '' : 'disabled'}
-                                               data-model-key="${m.modelKey}"
-                                               data-model-type="${m.modelType}"
-                                               style="opacity: 0; width: 0; height: 0;">
-                                        <span class="model-slider ${isDownloaded ? 'downloaded' : ''}"
-                                              style="position: absolute; cursor: ${toggleEnabled ? 'pointer' : 'not-allowed'}; top: 0; left: 0; right: 0; bottom: 0; background-color: ${isDownloaded ? '#8B4513' : '#ccc'}; transition: .4s; border-radius: 20px;">
-                                            <span class="model-slider-circle"
-                                                  style="position: absolute; height: 16px; width: 16px; left: 2px; bottom: 2px; background-color: ${isDownloaded ? '#FFD700' : 'white'}; transition: .4s; border-radius: 50%; ${isDownloaded ? 'transform: translateX(20px);' : ''}"></span>
-                                        </span>
-                                    </label>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-                <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 0 4px;">${this._t('profile.models.downloaded_prefix', null, 'Загружено:')} ${downloadedKeys.size}</div>
-            </div>
-        `;
+                if (size === 'tiny' || size === 'base' || size === 'small') {
+                    const model = bySize[size] || null;
+                    const mk = model && model.modelKey ? String(model.modelKey) : '';
+                    const mSize = model && model.size ? String(model.size) : '';
 
-        const right = `
-            <div class="downloaded-models-panel" style="margin:0;">
-                <label class="language-label">${this._t('profile.models.languages', null, 'Языки')}</label>
-                <div class="models-list-container" style="max-height: 340px; overflow-y: auto; border: 1px solid #eee; border-radius: 4px; padding: 8px;">
-                    ${languages.map(code => {
-                        const applicable = getApplicableDownloaded(code);
-                        const selected = this._getSelectedModelKeyV2(code);
-                        const effectiveSelected = selected && applicable.some(m => m.modelKey === selected) ? selected : (applicable[0]?.modelKey || '');
+                    const isDownloaded = !!(mk && downloadedKeys.has(mk));
 
-                        if (!selected && effectiveSelected) {
-                            try { this._setSelectedModelKeyV2(code, effectiveSelected); } catch (e) {}
-                        }
+                    if (sizeEl) sizeEl.textContent = mSize ? `· ${mSize}` : '';
 
-                        return `
-                            <div class="language-item" data-lang="${code}" style="display:flex; align-items:center; gap:10px; padding:8px 12px; border-bottom:1px solid #f0f0f0;">
-                                <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-                                    ${this.createFlagElement(code)}
-                                    <span style="font-weight:500;">${this.getDisplayLanguageName(code)}</span>
-                                </div>
-                                <div style="flex-grow:1; min-width:0;"></div>
-                                <div style="flex-shrink:0; min-width: 260px;">
-                                    ${applicable.length ? `
-                                        <select class="language-model-select-v2" data-lang="${code}" style="width:100%; padding:6px 10px; border:1px solid #ddd; border-radius:6px; font-size:13px;">
-                                            ${applicable.map(m => {
-                                                const label = m.modelType === 'whisper' ? `whisper: ${m.name}` : `asr: ${m.name}`;
-                                                return `<option value="${m.modelKey}" ${String(effectiveSelected) === String(m.modelKey) ? 'selected' : ''}>${label}</option>`;
-                                            }).join('')}
-                                        </select>
-                                    ` : `
-                                        <div style="font-size:12px; color:#999;">${this._t('profile.models.no_downloaded_models', null, 'нет загруженных моделей')}</div>
-                                    `}
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-        `;
+                    if (toggle) {
+                        toggle.dataset.modelKey = mk;
+                        toggle.checked = !!(mk && downloadedKeys.has(mk));
+                        const busy = !!(mk && this._modelsCentricDownloadsInFlight && this._modelsCentricDownloadsInFlight.has(mk));
+                        toggle.disabled = !mk || busy;
+                    }
+                }
+            } catch (eRow) {
+            }
+        });
+    }
+
+    createLearningFlags() {
+        const selected = new Set(Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : []);
+        const current = String(this.options.currentLearning || '').trim().toLowerCase();
+        const languages = Object.keys(this.languageData || {});
 
         return `
-            <div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items:start;">
-                    ${left}
-                    ${right}
-                </div>
-                <div class="storage-info-full" style="margin-top: 16px; padding: 12px; background: #f9f9f9; border-radius: 4px; border: 1px solid #eee;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: #555;">
-                        <span style="font-weight: bold;">${this._t('profile.models.browser_storage', null, 'Хранилище браузера:')}</span>
-                        <span style="color: #333;" id="storage-stats-text">${this._t('profile.models.loading_info', null, 'Загрузка информации...')}</span>
+        <div class="learning-flags-list" style="border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: var(--color-panel-bg, #fff); padding: 8px; max-height: 240px; overflow: auto;">
+            ${languages.map(code => {
+                const c = String(code || '').trim().toLowerCase();
+                if (!c) return '';
+                const isChecked = selected.has(c);
+                const isCurrent = current && c === current;
+                return `
+                    <div class="learning-flag-row" data-lang="${c}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius: 10px; ${isCurrent ? 'background: var(--color-hover, #f8f9fa);' : ''}">
+                        <button type="button" class="topbar-icon-btn checkbox-btn learning-flag-checkbox" data-lang="${c}" aria-label="${this.getLanguageName(c)}" style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;"></button>
+                        ${this.createFlagElement(c, 'small')}
+                        <button type="button" class="learning-flag-toggle" data-lang="${c}" style="all: unset; cursor: pointer; flex: 1; min-width: 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${this.getLanguageName(c)}</button>
                     </div>
-                    <div class="storage-progress-full" style="height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; position: relative;">
-                        <div class="storage-progress-fill-full" id="storage-progress-fill" style="height: 100%; background: #4CAF50; width: 0%; transition: width 0.3s;"></div>
-                        <div class="storage-progress-text-full" id="storage-progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: white; text-shadow: 1px 1px 1px rgba(0,0,0,0.3);">0%</div>
-                    </div>
-                    <div style="font-size: 11px; color: #888; margin-top: 4px; text-align: center;" id="storage-details">${this._t('profile.models.calculating_storage', null, 'Рассчитываем использование памяти...')}</div>
-                </div>
-            </div>
+                `;
+            }).join('')}
+        </div>
         `;
     }
 
@@ -373,94 +370,88 @@ class LanguageSelector {
         }
         this._modelsCentricBound = true;
 
-        this.options.container.addEventListener('change', async (e) => {
-            const toggle = e.target && e.target.classList && e.target.classList.contains('model-download-toggle-v2') ? e.target : null;
-            if (toggle) {
-                const modelKey = toggle.dataset.modelKey;
-                const modelType = toggle.dataset.modelType;
-                const isChecked = !!toggle.checked;
-                if (!modelKey || !modelType) return;
+        const handleDownloadToggle = async (modelKey, modelType, shouldDownload) => {
+            if (!modelKey || !modelType) return;
 
-                if (!isChecked) {
-                    if (this._modelsCentricDownloadsInFlight.has(modelKey)) {
-                        toggle.checked = true;
-                        return;
-                    }
-                    this._removeDownloadedV2(modelKey);
-                    this.render();
-                    return;
-                }
-
-                if (modelType !== 'whisper') {
-                    toggle.checked = false;
-                    return;
-                }
-
+            if (!shouldDownload) {
                 if (this._modelsCentricDownloadsInFlight.has(modelKey)) {
                     return;
                 }
-
-                const parts = String(modelKey).split(':');
-                const hf = parts.length >= 2 ? parts.slice(1).join(':') : '';
-                const size = hf.includes('whisper-tiny') ? 'tiny' : (hf.includes('whisper-small') ? 'small' : 'base');
-
-                try {
-                    toggle.disabled = true;
-                } catch (e) {
+                this._removeDownloadedV2(modelKey);
+                if (String(this._getPrimaryModelKeyV2()) === String(modelKey)) {
+                    this._setPrimaryModelKeyV2('');
                 }
-
-                this._openModelsCentricModal(this._t('profile.models.download_modal.preparing', null, 'Подготовка загрузки…'), 0);
-
-                const p = (async () => {
-                    try {
-                        if (!window.WhisperModelManager) {
-                            throw new Error('WhisperModelManager not available');
-                        }
-                        const mm = new window.WhisperModelManager();
-                        await mm.loadLanguageModel('en', size, (info) => {
-                            try {
-                                const prog = info && typeof info.progress === 'number' ? info.progress : 0;
-                                const file = info && info.file ? String(info.file) : '';
-                                const status = info && info.status ? String(info.status) : '';
-                                const text = file
-                                    ? `${status} ${file}`.trim()
-                                    : (status || this._t('profile.models.download_modal.downloading', null, 'Загрузка…'));
-                                this._openModelsCentricModal(text, prog);
-                            } catch (e) {
-                            }
-                        });
-                        this._setDownloadedV2(modelKey, { modelType, hf_repo: hf, size });
-                    } catch (err) {
-                        try { console.warn('❌ Whisper download failed:', err); } catch (e2) {}
-                        try { toggle.checked = false; } catch (e3) {}
-                        this._removeDownloadedV2(modelKey);
-                        throw err;
-                    } finally {
-                        this._closeModelsCentricModal();
-                        try { toggle.disabled = false; } catch (e4) {}
-                    }
-                })();
-
-                this._modelsCentricDownloadsInFlight.set(modelKey, p);
-                try {
-                    await p;
-                } catch (e) {
-                } finally {
-                    this._modelsCentricDownloadsInFlight.delete(modelKey);
-                }
-
                 this.render();
                 return;
             }
 
-            const sel = e.target && e.target.classList && e.target.classList.contains('language-model-select-v2') ? e.target : null;
-            if (sel) {
-                const lang = sel.dataset.lang;
-                const val = sel.value;
-                this._setSelectedModelKeyV2(lang, val);
+            if (modelType !== 'whisper') {
+                return;
+            }
+
+            if (this._modelsCentricDownloadsInFlight.has(modelKey)) {
+                return;
+            }
+
+            const parts = String(modelKey).split(':');
+            const hf = parts.length >= 2 ? parts.slice(1).join(':') : '';
+            const size = hf.includes('whisper-tiny') ? 'tiny' : (hf.includes('whisper-small') ? 'small' : 'base');
+
+            this._openModelsCentricModal(this._t('profile.models.download_modal.preparing', null, 'Подготовка загрузки…'), 0);
+
+            const p = (async () => {
+                try {
+                    if (!window.WhisperModelManager) {
+                        throw new Error('WhisperModelManager not available');
+                    }
+                    const mm = new window.WhisperModelManager();
+                    await mm.loadLanguageModel('en', size, (info) => {
+                        try {
+                            const prog = info && typeof info.progress === 'number' ? info.progress : 0;
+                            const file = info && info.file ? String(info.file) : '';
+                            const status = info && info.status ? String(info.status) : '';
+                            const text = file
+                                ? `${status} ${file}`.trim()
+                                : (status || this._t('profile.models.download_modal.downloading', null, 'Загрузка…'));
+                            this._openModelsCentricModal(text, prog);
+                        } catch (e) {
+                        }
+                    });
+                    this._setDownloadedV2(modelKey, { modelType, hf_repo: hf, size });
+                    if (!this._getPrimaryModelKeyV2()) {
+                        this._setPrimaryModelKeyV2(modelKey);
+                    }
+                } catch (err) {
+                    try { console.warn('❌ Whisper download failed:', err); } catch (e2) {}
+                    this._removeDownloadedV2(modelKey);
+                    throw err;
+                } finally {
+                    this._closeModelsCentricModal();
+                }
+            })();
+
+            this._modelsCentricDownloadsInFlight.set(modelKey, p);
+            try {
+                await p;
+            } catch (e) {
+            } finally {
+                this._modelsCentricDownloadsInFlight.delete(modelKey);
+            }
+
+            this.render();
+        };
+
+        this.options.container.addEventListener('change', async (e) => {
+            const toggle = e.target && e.target.classList && e.target.classList.contains('model-download-toggle-v2') ? e.target : null;
+            if (toggle) {
+                const modelKey = String(toggle.dataset.modelKey || '');
+                const modelType = String(toggle.dataset.modelType || '');
+                const shouldDownload = !!toggle.checked;
+                await handleDownloadToggle(modelKey, modelType, shouldDownload);
                 return;
             }
         });
+
     }
 
     calculateStorageUsageV2() {
@@ -551,22 +542,45 @@ class LanguageSelector {
             if (browserQuota && displayUsage != null && browserAvailable != null) {
                 const displayUsageMB = displayUsage / (1024 * 1024);
                 const displayAvailableMB = browserAvailable / (1024 * 1024);
-                const modelsInfo = storageInfo.downloadedCount > 0
-                    ? ` | <strong>${this._t('profile.models.storage.models', null, 'Модели:')}</strong> ${this._t(
+                const modelsValue = storageInfo.downloadedCount > 0
+                    ? this._t(
                         'profile.models.storage.models_count',
                         { count: storageInfo.downloadedCount, size: this.formatSize(storageInfo.downloadedSizeMB) },
                         `${storageInfo.downloadedCount} шт. (${this.formatSize(storageInfo.downloadedSizeMB)})`
-                    )}`
-                    : '';
+                    )
+                    : this._t('profile.models.storage.none', null, 'нет');
                 detailsText.innerHTML = `
-                    <strong>${this._t('profile.models.storage.used', null, 'Использовано:')}</strong> ${this.formatSize(displayUsageMB)} |
-                    <strong>${this._t('profile.models.storage.available', null, 'Доступно:')}</strong> ${this.formatSize(displayAvailableMB)} |
-                    <strong>${this._t('profile.models.storage.total', null, 'Всего:')}</strong> ${this.formatSize(browserQuota / (1024 * 1024))}${modelsInfo}
+                    <table class="storage-summary-table">
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.used', null, 'Использовано')}</td>
+                            <td class="storage-summary-v">${this.formatSize(displayUsageMB)}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.available', null, 'Доступно')}</td>
+                            <td class="storage-summary-v">${this.formatSize(displayAvailableMB)}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.total', null, 'Всего')}</td>
+                            <td class="storage-summary-v">${this.formatSize(browserQuota / (1024 * 1024))}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.models', null, 'Модели')}</td>
+                            <td class="storage-summary-v">${modelsValue}</td>
+                        </tr>
+                    </table>
                 `;
             } else {
                 detailsText.innerHTML = `
-                    <strong>${this._t('profile.models.storage.downloaded_models', null, 'Загружено моделей:')}</strong> ${storageInfo.downloadedCount} |
-                    <strong>${this._t('profile.models.storage.models_size', null, 'Размер моделей:')}</strong> ${this.formatSize(storageInfo.downloadedSizeMB)}
+                    <table class="storage-summary-table">
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.downloaded_models', null, 'Загружено моделей')}</td>
+                            <td class="storage-summary-v">${storageInfo.downloadedCount}</td>
+                        </tr>
+                        <tr>
+                            <td class="storage-summary-k">${this._t('profile.models.storage.models_size', null, 'Размер моделей')}</td>
+                            <td class="storage-summary-v">${this.formatSize(storageInfo.downloadedSizeMB)}</td>
+                        </tr>
+                    </table>
                 `;
             }
         }
@@ -1580,6 +1594,25 @@ class LanguageSelector {
         }
 
         let html = '';
+
+        if (this.options.mode === 'models-centric') {
+            try {
+                const hasSkeleton = !!this.options.container.querySelector('[data-role="models-centric-table"]');
+                if (hasSkeleton) {
+                    this.bindEvents();
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                    try { this.hydrateModelsCentricUI(); } catch (e0) {}
+                    setTimeout(() => {
+                        this.updateStorageInfoV2();
+                    }, 100);
+                    return;
+                }
+            } catch (e) {
+            }
+        }
+
         switch (this.options.mode) {
             case 'native-selector':
                 html = this.createNativeSelector();
@@ -1590,6 +1623,9 @@ class LanguageSelector {
                 break;
             case 'learning-list':
                 html = this.createLearningList();
+                break;
+            case 'learning-flags':
+                html = this.createLearningFlags();
                 break;
             case 'flag-combo':
                 html = this.createFlagCombo();
@@ -1660,6 +1696,88 @@ class LanguageSelector {
         if (this.options.mode === 'models-centric') {
             this.bindModelsCentricEvents();
             return;
+        }
+
+        // learning-flags (users.tr_*): локальные клики без полной перерисовки
+        try {
+            if (this.options.mode === 'learning-flags') {
+                const btns = this.options.container.querySelectorAll('.learning-flag-checkbox');
+                btns.forEach((btn) => {
+                    const lang = String(btn.dataset.lang || '').trim().toLowerCase();
+                    const isChecked = Array.isArray(this.options.learningLanguages)
+                        ? this.options.learningLanguages.map(x => String(x || '').trim().toLowerCase()).includes(lang)
+                        : false;
+                    this._renderLucideCheckboxButton(btn, isChecked, false);
+                });
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (this.options.mode === 'learning-flags' && this._learningFlagsClickBound) {
+                return;
+            }
+
+            this.options.container.addEventListener('click', (e) => {
+                const btn = e.target && e.target.closest ? e.target.closest('.learning-flag-checkbox') : null;
+                const toggle = e.target && e.target.closest ? e.target.closest('.learning-flag-toggle') : null;
+                const target = btn || toggle;
+                if (!target) return;
+
+                if (this.options.mode !== 'learning-flags') return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const lang = String(target.dataset.lang || '').trim().toLowerCase();
+                if (!lang) return;
+
+                const list = Array.isArray(this.options.learningLanguages) ? [...this.options.learningLanguages] : [];
+                const set = new Set(list.map(x => String(x || '').trim().toLowerCase()).filter(Boolean));
+
+                const hasLang = set.has(lang);
+                if (hasLang && set.size <= 1) {
+                    try {
+                        const msg = this._t('profile.learning_languages.at_least_one', null, 'Нужно выбрать хотя бы один язык');
+                        if (window.showInfo) window.showInfo(msg);
+                        else alert(msg);
+                    } catch (e2) {
+                    }
+                    return;
+                }
+
+                if (hasLang) set.delete(lang);
+                else set.add(lang);
+
+                const next = [...set];
+                next.sort();
+                this.options.learningLanguages = next;
+
+                const cur = String(this.options.currentLearning || '').trim().toLowerCase();
+                if (cur && !set.has(cur)) {
+                    this.options.currentLearning = next[0] || '';
+                } else if (!cur && next.length) {
+                    this.options.currentLearning = next[0];
+                }
+
+                // обновляем только иконку кликаемой строки
+                try {
+                    const row = target.closest('.learning-flag-row');
+                    const rowBtn = row ? row.querySelector('.learning-flag-checkbox') : null;
+                    if (rowBtn) {
+                        const nowChecked = set.has(lang);
+                        this._renderLucideCheckboxButton(rowBtn, nowChecked, false);
+                    }
+                } catch (e3) {
+                }
+
+                this.triggerChange();
+            });
+
+            if (this.options.mode === 'learning-flags') {
+                this._learningFlagsClickBound = true;
+            }
+        } catch (e) {
         }
 
         if (this.options.mode === 'report-selector') {

@@ -37,7 +37,8 @@ td {
 }
 
 button {
-    padding: 10px 15px;
+    /* padding: 10px 15px; */
+    padding: 0;
     background-color: transparent;
     color: var(--color-text);
     font-weight: bold;
@@ -52,10 +53,8 @@ button {
 }
 
 button:hover {
-    border: 0;
-    /* появляется “обводка” */
-    box-shadow: 0;
-    /* нижняя граница толще — имитация */
+    border: 1px solid transparent;
+    box-shadow: none;
 }
 
 button:active {
@@ -606,7 +605,7 @@ html[dir="rtl"] .topbar-save-group {
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
     font-size: 14px;
     font-weight: 600;
-    z-index: 1500;
+    z-index: 200500;
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 

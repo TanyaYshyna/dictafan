@@ -1,0 +1,88 @@
+<div id="plan-tasks-modal" class="modal plan-tasks-modal">
+    <div class="modal-content create-assignment-modal-content">
+        <div class="modal-header create-assignment-modal-header">
+            <div class="create-assignment-modal-title">
+                <div class="create-assignment-modal-title-icon"><i data-lucide="calendar-plus"></i></div>
+                <div class="create-assignment-modal-title-text">План по диктанту для</div>
+                <select id="plan-tasks-group" class="create-assignment-select plan-tasks-group-select"></select>
+            </div>
+
+            <div class="create-assignment-modal-header-actions">
+                <button type="button" id="plan-tasks-save" class="topbar-icon-btn" title="Сохранить">
+                    <i data-lucide="save"></i>
+                </button>
+                <button type="button" id="plan-tasks-refresh" class="topbar-icon-btn" title="Обновить">
+                    <i data-lucide="refresh-cw"></i>
+                </button>
+                <button type="button" id="plan-tasks-close" class="modal-close create-assignment-close-btn" title="Закрыть">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="modal-body create-assignment-modal-body">
+            <input type="hidden" id="plan-tasks-dictation-id" value="">
+
+            <div class="create-assignment-top">
+                <div class="create-assignment-cover">
+                    <div class="create-assignment-cover-box">
+                        <img id="plan-tasks-cover-img" alt="" class="create-assignment-cover-img" />
+                    </div>
+                </div>
+                <div class="create-assignment-top-right">
+                    <div id="plan-tasks-dictation-title" class="create-assignment-dictation-title"></div>
+                    <div id="plan-tasks-cover-meta" class="create-assignment-cover-meta"></div>
+                </div>
+            </div>
+
+            <div class="create-assignment-bottom plan-tasks-bottom">
+                <div class="create-assignment-panel create-assignment-panel--days plan-tasks-panel">
+                    <div class="create-assignment-panel-body">
+                        <div class="plan-tasks-toolbar">
+                            <button type="button" id="plan-tasks-add" class="topbar-icon-btn plan-tasks-tool-btn" title="Добавить">
+                                <i data-lucide="plus"></i>
+                            </button>
+                            <button type="button" id="plan-tasks-delete" class="topbar-icon-btn plan-tasks-tool-btn" title="Удалить">
+                                <i data-lucide="trash-2"></i>
+                            </button>
+                        </div>
+
+                        <div class="plan-tasks-table-wrap">
+                            <table class="create-assignment-table plan-tasks-table">
+                                <thead>
+                                    <tr class="plan-tasks-tr-head">
+                                        <th class="plan-tasks-th plan-tasks-th-date">Дата</th>
+                                        <th class="plan-tasks-th plan-tasks-th-exercise">Упражнение</th>
+                                        <th class="plan-tasks-th plan-tasks-th-award">
+                                            <i data-lucide="award" class="plan-tasks-award-icon"></i>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="plan-tasks-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="plan-task-edit-overlay" class="plan-task-edit-overlay">
+    <div class="plan-task-edit-card">
+        <div class="plan-task-edit-header">
+            <div class="plan-task-edit-title">План</div>
+            <button type="button" id="plan-task-edit-close" class="topbar-icon-btn" title="Закрыть">
+                <i data-lucide="x"></i>
+            </button>
+        </div>
+        <div class="plan-task-edit-body">
+            <input id="plan-task-edit-date" type="date" class="plan-task-edit-input" />
+            <select id="plan-task-edit-ex" class="plan-task-edit-input"></select>
+            <input id="plan-task-edit-count" type="number" min="1" step="1" class="plan-task-edit-input" />
+            <div class="plan-task-edit-actions">
+                <button type="button" id="plan-task-edit-save" class="plan-task-edit-save-btn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -53,7 +53,7 @@
     "sections": {
       "languages": "اللغات",
       "activity_goal": "هدف النشاط اليومي",
-      "local_models": "نماذج محلية",
+      "local_models": "أنواع التعرف على الكلام",
       "dictation_settings": "إعدادات الإملاء",
       "assignment_history": "سجل الواجبات",
       "groups": "المجموعات"
@@ -70,6 +70,7 @@
       },
       "play_audio": {
         "title": "تشغيل الصوت:",
+        "order_title": "ترتيب تشغيل الصوت داخل الجملة",
         "on_start": "عند البدء:",
         "on_typo": "عند الخطأ:",
         "on_success": "عند النجاح:",
@@ -148,6 +149,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "مجموعاتي"
+      },
       "table": {
         "id": "ID",
         "name": "الاسم"
@@ -160,7 +164,7 @@
       },
       "filter": {
         "title": "تصفية",
-        "active": "إظهار النشطة فقط",
+        "active": "المستخدمون النشطون",
         "all": "إظهار الكل"
       },
       "actions": {
@@ -172,6 +176,9 @@
       },
       "invite_link": {
         "label": "رابط الدعوة",
+        "copy": "نسخ",
+        "create": "إنشاء دعوة",
+        "create_button": "دعوة",
         "errors": {
           "get_failed": "تعذر الحصول على الرابط"
         }
@@ -215,6 +222,11 @@
     "models": {
       "all_models": "جميع النماذج",
       "languages": "اللغات",
+      "method_google": "خدمات Google",
+      "method_server_whisper_tiny": "Whisper Tiny على الخادم",
+      "method_device_whisper_tiny": "Whisper Tiny على الجهاز",
+      "method_device_whisper_base": "Whisper Base على الجهاز",
+      "method_device_whisper_small": "Whisper Small على الجهاز",
       "browser_storage": "تخزين المتصفح:",
       "loading_info": "جارٍ تحميل المعلومات...",
       "calculating_storage": "جارٍ حساب استخدام التخزين...",
@@ -471,6 +483,8 @@
     },
     "assignments": {
       "max_7_days": "الحد الأقصى 7 أيام",
+      "exercises_modal_title": "كل التمارين",
+      "exercises_column": "تمارين",
       "modal_title": "مهمة",
       "add_day": "إضافة يوم",
       "text_column": "النص",
@@ -506,7 +520,7 @@
     },
     "dictation_card_actions": {
       "title": "إجراءات",
-      "create_assignment_new": "مهمة جديدة",
+      "create_assignment_new": "تمارين",
       "cache": "حفظ في التخزين المؤقت",
       "edit": "تعديل",
       "show_in_book": "إظهار في الكتاب",
@@ -713,6 +727,15 @@
       "saving": "جارٍ الحفظ...",
       "logging_in": "جارٍ تسجيل الدخول...",
       "creating_account": "جارٍ إنشاء الحساب..."
+    }
+  },
+
+  "desktop": {
+    "confirm": {
+      "title": "هل تريد حفظ التغييرات؟",
+      "save": "حفظ",
+      "exit": "خروج",
+      "close": "إغلاق"
     }
   },
 

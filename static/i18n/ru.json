@@ -28,6 +28,10 @@
     "native_language": {
       "label": "Родной язык:"
     },
+    "learning_languages": {
+      "label": "Изучаю языки:",
+      "at_least_one": "Нужно выбрать хотя бы один язык"
+    },
     "learning_language": {
       "label": "Изучаю язык:"
     },
@@ -53,7 +57,7 @@
     "sections": {
       "languages": "Языки",
       "activity_goal": "План активности",
-      "local_models": "Локальные модели",
+      "local_models": "Виды распознавания речи",
       "dictation_settings": "Настройки диктантов",
       "assignment_history": "История заданий",
       "groups": "Группы"
@@ -70,6 +74,7 @@
       },
       "play_audio": {
         "title": "Проигрываем аудио:",
+        "order_title": "Порядок воспроизведения аудио в предложении",
         "on_start": "при старте:",
         "on_typo": "при ошибке:",
         "on_success": "при успехе:",
@@ -148,6 +153,9 @@
       }
     },
     "groups": {
+      "my_groups": {
+        "title": "Мои группы"
+      },
       "table": {
         "id": "ID",
         "name": "Название"
@@ -160,7 +168,7 @@
       },
       "filter": {
         "title": "Фильтр",
-        "active": "показать только активные",
+        "active": "только активные",
         "all": "показать все"
       },
       "actions": {
@@ -172,6 +180,9 @@
       },
       "invite_link": {
         "label": "Инвайт ссылка",
+        "copy": "Скопировать",
+        "create": "Создать инвайт",
+        "create_button": "Приглашение",
         "errors": {
           "get_failed": "Не удалось получить ссылку"
         }
@@ -215,6 +226,11 @@
     "models": {
       "all_models": "Все модели",
       "languages": "Языки",
+      "method_google": "Google сервисы",
+      "method_server_whisper_tiny": "На сервере Whisper Tiny",
+      "method_device_whisper_tiny": "На устройстве Whisper Tiny",
+      "method_device_whisper_base": "На устройстве Whisper Base",
+      "method_device_whisper_small": "На устройстве Whisper Small",
       "browser_storage": "Хранилище браузера:",
       "loading_info": "Загрузка информации...",
       "calculating_storage": "Рассчитываем использование памяти...",
@@ -471,6 +487,8 @@
     },
     "assignments": {
       "max_7_days": "Максимум 7 дней",
+      "exercises_modal_title": "Все упражнения",
+      "exercises_column": "Упражнения",
       "modal_title": "Задание",
       "add_day": "Добавить день",
       "text_column": "Текст",
@@ -506,7 +524,7 @@
     },
     "dictation_card_actions": {
       "title": "Действия",
-      "create_assignment_new": "Новое задание",
+      "create_assignment_new": "Упражнения",
       "cache": "Получить в кеш",
       "edit": "Редактировать",
       "show_in_book": "Показать в книге",
@@ -713,6 +731,15 @@
       "saving": "Сохраняем...",
       "logging_in": "Вход...",
       "creating_account": "Создаём аккаунт..."
+    }
+  },
+
+  "desktop": {
+    "confirm": {
+      "title": "Сохранить изменения?",
+      "save": "Сохранить",
+      "exit": "Выйти",
+      "close": "Закрыть"
     }
   },
 

@@ -14,7 +14,141 @@ class AudioManagerClass {
         this._b2LedgerDbName = 'dictafan_drafts';
         this._b2LedgerStoreName = 'b2_upload_ledger';
 
+        this._micRecording = {
+            stream: null,
+            recorder: null,
+            chunks: [],
+            blob: null,
+            startedAt: 0,
+        };
+
         this._storageOutageLastShownAt = 0;
+    }
+
+    getUserRecordingStream() {
+        try {
+            return this._micRecording && this._micRecording.stream ? this._micRecording.stream : null;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    _getSupportedMicMimeType() {
+        try {
+            const candidates = [
+                'audio/webm;codecs=opus',
+                'audio/webm',
+                'audio/mp4',
+            ];
+            for (const t of candidates) {
+                try {
+                    if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) {
+                        return t;
+                    }
+                } catch (e) {
+                }
+            }
+        } catch (e) {
+        }
+        return '';
+    }
+
+    async startUserRecording({ mimeType } = {}) {
+        // Single entry-point for all microphone recordings on the page.
+        try {
+            if (this._micRecording && this._micRecording.recorder && this._micRecording.recorder.state === 'recording') {
+                return { ok: true, alreadyRecording: true, stream: this._micRecording.stream };
+            }
+        } catch (e) {
+        }
+
+        // Ensure no audio is playing while recording.
+        try {
+            this.stop();
+        } catch (e) {
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mt = String(mimeType || '').trim() || this._getSupportedMicMimeType();
+        const mr = new MediaRecorder(stream, mt ? { mimeType: mt } : undefined);
+
+        this._micRecording.stream = stream;
+        this._micRecording.recorder = mr;
+        this._micRecording.chunks = [];
+        this._micRecording.blob = null;
+        this._micRecording.startedAt = Date.now();
+
+        mr.ondataavailable = (e) => {
+            try {
+                if (e && e.data && e.data.size) this._micRecording.chunks.push(e.data);
+            } catch (e2) {
+            }
+        };
+
+        mr.start();
+        return { ok: true, stream, recorder: mr };
+    }
+
+    async stopUserRecording({ timeoutMs } = {}) {
+        const STOP_TIMEOUT_MS = Number(timeoutMs) > 0 ? Number(timeoutMs) : 4000;
+        const rec = this._micRecording || null;
+        const mr = rec ? rec.recorder : null;
+        const stream = rec ? rec.stream : null;
+
+        try {
+            if (mr && mr.state === 'recording') {
+                await Promise.race([
+                    new Promise((resolve) => {
+                        const done = () => resolve();
+                        try {
+                            mr.addEventListener('stop', done, { once: true });
+                        } catch (e) {
+                            resolve();
+                            return;
+                        }
+                        try {
+                            mr.stop();
+                        } catch (e) {
+                            resolve();
+                        }
+                    }),
+                    new Promise((resolve) => setTimeout(resolve, STOP_TIMEOUT_MS)),
+                ]);
+            }
+        } catch (e) {
+        }
+
+        let blob = null;
+        try {
+            const chunks = rec && Array.isArray(rec.chunks) ? rec.chunks : [];
+            const mt = (mr && mr.mimeType) ? String(mr.mimeType) : '';
+            const blobType = (mt && mt.includes('mp4')) ? 'audio/mp4' : (mt || 'audio/webm');
+            blob = chunks.length ? new Blob(chunks, { type: blobType }) : null;
+            if (rec) rec.blob = blob;
+        } catch (e) {
+            blob = null;
+        }
+
+        try {
+            if (stream && stream.getTracks) {
+                for (const t of stream.getTracks()) {
+                    try { t.stop(); } catch (e) {}
+                }
+            }
+        } catch (e) {
+        }
+
+        try {
+            if (rec) {
+                rec.stream = null;
+                rec.recorder = null;
+                rec.chunks = [];
+                rec.startedAt = 0;
+            }
+        } catch (e) {
+        }
+
+        return { ok: true, audioBlob: blob };
     }
 
     _notifyStorageOutageOnce(details = {}) {
@@ -901,6 +1035,101 @@ class AudioManagerClass {
         }
     }
 
+    async deleteDictationAudioFromCache(dictationId) {
+        try {
+            const id = String(dictationId || '').trim();
+            if (!id) return { success: false, deleted: 0 };
+            const cache = await this.openMediaCache();
+            if (!cache) return { success: false, deleted: 0 };
+            const requests = await cache.keys();
+            let deleted = 0;
+            for (const request of requests) {
+                try {
+                    const url = request.url;
+                    // Ищем URL вида /api/dictations/{dictationId}/
+                    if (url.includes(`/api/dictations/${encodeURIComponent(id)}/`)) {
+                        await cache.delete(request);
+                        deleted += 1;
+                    }
+                } catch (e) {
+                    // ignore individual errors
+                }
+            }
+            return { success: true, deleted };
+        } catch (e) {
+            return { success: false, deleted: 0 };
+        }
+    }
+
+    /** Отозвать blob URL'ы для всех аудио конкретного диктанта */
+    revokeDictationBlobUrls(dictationId) {
+        try {
+            const id = String(dictationId || '').trim();
+            if (!id) return;
+            const pattern = `/api/dictations/${encodeURIComponent(id)}/`;
+            const keysToDelete = [];
+            for (const [key, value] of Object.entries(this._objectUrlByCanonicalUrl || {})) {
+                if (key.includes(pattern)) {
+                    keysToDelete.push(key);
+                }
+            }
+            for (const key of keysToDelete) {
+                try {
+                    const url = this._objectUrlByCanonicalUrl[key];
+                    if (url && typeof url === 'string' && url.startsWith('blob:')) {
+                        URL.revokeObjectURL(url);
+                    }
+                } catch (e) {
+                }
+                delete this._objectUrlByCanonicalUrl[key];
+            }
+        } catch (e) {
+        }
+    }
+
+    /** Получить список всех blob URL'ов из AudioManager */
+    getBlobEntries() {
+        try {
+            const entries = [];
+            const map = this._objectUrlByCanonicalUrl || {};
+            for (const [key, value] of Object.entries(map)) {
+                if (value && typeof value === 'string' && value.startsWith('blob:')) {
+                    // Парсим ключ для получения информации
+                    let dictationId = '';
+                    let lang = '';
+                    let filename = '';
+                    try {
+                        const urlObj = new URL(key);
+                        const pathParts = urlObj.pathname.split('/').filter(Boolean);
+                        if (pathParts.length >= 4 && pathParts[0] === 'api' && pathParts[1] === 'dictations') {
+                            dictationId = pathParts[2];
+                            lang = pathParts[3];
+                            filename = pathParts.slice(4).join('/');
+                        }
+                    } catch (e) {
+                        filename = key;
+                    }
+                    entries.push({
+                        cacheKey: key,
+                        blobUrl: value,
+                        dictationId: dictationId,
+                        lang: lang,
+                        filename: filename,
+                    });
+                }
+            }
+            // Сортируем по dictationId + filename
+            entries.sort((a, b) => {
+                const aKey = `${a.dictationId}/${a.filename}`;
+                const bKey = `${b.dictationId}/${b.filename}`;
+                return aKey.localeCompare(bKey);
+            });
+            return entries;
+        } catch (e) {
+            return [];
+        }
+    }
+
     async ensureCachedResponse(url) {
         try {
             const u = this.normalizeMediaUrl(url);
@@ -1432,5 +1661,16 @@ class AudioManagerClass {
     }
 }
 
-const audioManager = new AudioManagerClass();
-window.AudioManager = window.AudioManager || audioManager;
+let audioManager = null;
+try {
+    audioManager = window.AudioManager || null;
+} catch (e) {
+    audioManager = null;
+}
+if (!audioManager) {
+    audioManager = new AudioManagerClass();
+}
+try {
+    window.AudioManager = audioManager;
+} catch (e) {
+}

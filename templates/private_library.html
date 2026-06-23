@@ -4,7 +4,9 @@
 
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/style_private_library.css?v=42">
+    <link rel="stylesheet" href="/static/css/student_plan_panel.css?v=42">
     <link rel="stylesheet" href="/static/css/style_dictations_reports.css?v=42">
+    <link rel="stylesheet" href="/static/css/dictation_kart.css?v=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script defer src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
@@ -18,6 +20,9 @@
     <div class="topbar">
         <a href="/" class="logo-link">
             <img src="/static/icons/logo.svg" class="logo">
+        </a>
+        <a href="/desktop" class="topbar-icon-btn" title="Desktop" style="margin-left: 10px;">
+            <i data-lucide="layout-grid"></i>
         </a>
         <div class="user-section" id="user-section">
             <div class="auth-buttons" style="display: none;"></div>
@@ -67,6 +72,8 @@
 {% block modals %}
     {{ super() }}
     {% include 'partials/reports_modal.html' %}
+    {% include 'partials/plan_tasks_modal.html' %}
+    {% include 'partials/student_plan_panel.html' %}
     <div id="delete-dictation-modal" class="modal" style="display: none;">
         <div class="modal-content" style="max-width: 520px;">
             <div class="modal-header">
@@ -318,9 +325,6 @@
                 <button id="btnStudentPlan" class="tool-palette-btn" title="">
                     <i data-lucide="calendar-check"></i>
                 </button>
-                <button id="btnTeacherAssignments" class="tool-palette-btn" title="">
-                    <i data-lucide="hat-glasses"></i>
-                </button>
                 <div class="tool-palette-separator"></div>
                 <button id="btnDeskZoomIn" class="tool-palette-btn" title="">
                     <i data-lucide="plus"></i>
@@ -342,5 +346,6 @@
     <script src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/user_activity_history.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/statistics_report.js') }}?v={{ app_cache_revision }}"></script>
-    <script src="{{ url_for('static', filename='js/private_library.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/student_plan_panel.js') }}?v={{ app_cache_revision }}"></script>
+    <script src="{{ url_for('static', filename='js/dictation_kart.js') }}?v={{ app_cache_revision }}"></script>
 {% endblock %}

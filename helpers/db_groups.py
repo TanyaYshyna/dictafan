@@ -1041,6 +1041,42 @@ def set_group_student_notify_teacher_on_success(
         conn.close()
 
 
+def delete_group(group_id: int, teacher_user_id: int) -> None:
+    """Полностью удалить группу и все связанные данные (CASCADE)."""
+    conn, cur = get_db_cursor()
+    try:
+        # Запрещаем удаление личной группы
+        gcols = _groups_columns(cur, ['is_personal', 'personal_owner_user_id'])
+        if 'is_personal' in gcols and 'personal_owner_user_id' in gcols:
+            cur.execute(
+                """
+                SELECT is_personal, personal_owner_user_id
+                FROM groups
+                WHERE id = %s AND teacher_id = %s
+                """,
+                (int(group_id), int(teacher_user_id)),
+            )
+            row = cur.fetchone() or {}
+            if row and _is_personal_group_row(row):
+                raise PermissionError('Cannot delete personal group')
+
+        cur.execute(
+            """
+            DELETE FROM groups
+            WHERE id = %s AND teacher_id = %s
+            RETURNING id
+            """,
+            (int(group_id), int(teacher_user_id)),
+        )
+        deleted = cur.fetchone()
+        if not deleted:
+            raise PermissionError("Group not found or not owned by you")
+        conn.commit()
+    finally:
+        cur.close()
+        conn.close()
+
+
 def soft_remove_group_student(group_id: int, teacher_user_id: int, student_user_id: int) -> None:
     conn, cur = get_db_cursor()
     try:

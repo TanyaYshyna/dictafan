@@ -102,6 +102,408 @@ def create_dictation(title, language_code, level=None, owner_id=None, is_public=
         conn.close()
 
 
+def update_dictation_exercise(dictation_id: int, exercise_id: int, positions: list[int] | None = None, title: str | None = None) -> dict:
+    if not dictation_id or not exercise_id:
+        raise ValueError("dictation_id and exercise_id are required")
+
+    prepared: list[int] = []
+    try:
+        for x in list(positions or []):
+            if x is None:
+                continue
+            prepared.append(int(x))
+    except Exception:
+        prepared = []
+    prepared = sorted({int(x) for x in prepared})
+
+    title_norm = None
+    try:
+        title_norm = str(title).strip() if title is not None else None
+    except Exception:
+        title_norm = None
+    if title_norm == "":
+        title_norm = None
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE dictation_exercises
+                SET positions = %s,
+                    title = %s,
+                    updated_at = NOW()
+                WHERE id = %s AND dictation_id = %s
+                RETURNING id, dictation_id, positions, title, created_at, updated_at
+                """,
+                (prepared, title_norm, int(exercise_id), int(dictation_id)),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("Exercise not found")
+            conn.commit()
+            return {
+                "id": int(row[0] or 0),
+                "dictation_id": int(row[1] or 0),
+                "positions": list(row[2] or []),
+                "title": row[3],
+                "created_at": row[4].isoformat() if row[4] else None,
+                "updated_at": row[5].isoformat() if row[5] else None,
+            }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        if isinstance(e, ValueError):
+            raise
+        raise Exception(f"Failed to update dictation exercise: {e}")
+    finally:
+        conn.close()
+
+
+def reconcile_dictation_exercises(dictation_id: int, exercises_payload: list[dict] | None) -> dict:
+    """Apply client's desired exercises set.
+
+    Rules:
+    - Full exercise (positions=[]) must exist and must not be deleted.
+    - Items with id are updated.
+    - Items without id are created.
+    - Existing exercises absent from payload are deleted (except Full).
+    """
+    if not dictation_id:
+        raise ValueError("dictation_id is required")
+
+    payload_items = [x for x in list(exercises_payload or []) if isinstance(x, dict)]
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Ensure Full exists
+            cur.execute(
+                """
+                INSERT INTO dictation_exercises (dictation_id, positions)
+                VALUES (%s, %s)
+                ON CONFLICT (dictation_id, positions) DO NOTHING
+                """,
+                (int(dictation_id), []),
+            )
+
+            cur.execute(
+                """
+                SELECT id, positions
+                FROM dictation_exercises
+                WHERE dictation_id = %s
+                """,
+                (int(dictation_id),),
+            )
+            existing_rows = cur.fetchall() or []
+            existing_by_id: dict[int, list[int]] = {}
+            for r in existing_rows:
+                try:
+                    ex_id = int(r[0])
+                    positions = list(r[1] or [])
+                    existing_by_id[ex_id] = positions
+                except Exception:
+                    continue
+
+            keep_ids: set[int] = set()
+            created_ids: list[int] = []
+            updated_ids: list[int] = []
+
+            for item in payload_items:
+                ex_id_raw = item.get('id')
+                positions = item.get('positions')
+                title = item.get('title')
+
+                prepared: list[int] = []
+                try:
+                    for x in list(positions or []):
+                        if x is None:
+                            continue
+                        prepared.append(int(x))
+                except Exception:
+                    prepared = []
+                prepared = sorted({int(x) for x in prepared})
+
+                title_norm = None
+                try:
+                    title_norm = str(title).strip() if title is not None else None
+                except Exception:
+                    title_norm = None
+                if title_norm == "":
+                    title_norm = None
+
+                ex_id_int: int | None = None
+                try:
+                    if ex_id_raw is not None and str(ex_id_raw).strip() != "":
+                        ex_id_int = int(ex_id_raw)
+                except Exception:
+                    ex_id_int = None
+
+                # Negative/zero ids are client-side temporary ids; treat them as new items
+                if ex_id_int is not None and ex_id_int > 0:
+                    ex_id = int(ex_id_int)
+                    keep_ids.add(ex_id)
+                    cur.execute(
+                        """
+                        UPDATE dictation_exercises
+                        SET positions = %s,
+                            title = %s,
+                            updated_at = NOW()
+                        WHERE id = %s AND dictation_id = %s
+                        """,
+                        (prepared, title_norm, int(ex_id), int(dictation_id)),
+                    )
+                    if cur.rowcount:
+                        updated_ids.append(int(ex_id))
+                else:
+                    # do not create another Full
+                    if len(prepared) == 0:
+                        continue
+                    cur.execute(
+                        """
+                        INSERT INTO dictation_exercises (dictation_id, positions, title)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (dictation_id, positions) DO NOTHING
+                        RETURNING id
+                        """,
+                        (int(dictation_id), prepared, title_norm),
+                    )
+                    row = cur.fetchone()
+                    created_id: int | None = None
+                    if row and row[0]:
+                        created_id = int(row[0])
+                        created_ids.append(created_id)
+                    else:
+                        # Conflict: exercise already exists for these positions, fetch its id so we don't delete it.
+                        cur.execute(
+                            """
+                            SELECT id
+                            FROM dictation_exercises
+                            WHERE dictation_id = %s AND positions = %s
+                            LIMIT 1
+                            """,
+                            (int(dictation_id), prepared),
+                        )
+                        r2 = cur.fetchone()
+                        if r2 and r2[0]:
+                            try:
+                                created_id = int(r2[0])
+                            except Exception:
+                                created_id = None
+                    if created_id is not None and created_id > 0:
+                        keep_ids.add(int(created_id))
+
+            # delete removed (excluding Full)
+            keep_ids_list = sorted(list(keep_ids))
+            if keep_ids_list:
+                cur.execute(
+                    """
+                    DELETE FROM dictation_exercises
+                    WHERE dictation_id = %s
+                      AND positions <> %s
+                      AND id NOT IN %s
+                    """,
+                    (int(dictation_id), [], tuple(keep_ids_list)),
+                )
+            else:
+                cur.execute(
+                    """
+                    DELETE FROM dictation_exercises
+                    WHERE dictation_id = %s
+                      AND positions <> %s
+                    """,
+                    (int(dictation_id), []),
+                )
+            deleted_count = int(cur.rowcount or 0)
+
+        conn.commit()
+        return {
+            "created_ids": created_ids,
+            "updated_ids": updated_ids,
+            "deleted_count": deleted_count,
+        }
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
+def list_dictation_exercises(dictation_id: int) -> list[dict]:
+    if not dictation_id:
+        return []
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, dictation_id, positions, title, created_at, updated_at
+                FROM dictation_exercises
+                WHERE dictation_id = %s
+                ORDER BY id ASC
+                """,
+                (int(dictation_id),),
+            )
+            rows = cur.fetchall() or []
+
+            if not rows:
+                cur.execute(
+                    """
+                    INSERT INTO dictation_exercises (dictation_id, positions)
+                    VALUES (%s, %s)
+                    ON CONFLICT (dictation_id, positions) DO NOTHING
+                    RETURNING id, dictation_id, positions, title, created_at, updated_at
+                    """,
+                    (int(dictation_id), []),
+                )
+                row = cur.fetchone()
+                if row:
+                    conn.commit()
+                    rows = [row]
+                else:
+                    conn.commit()
+                    cur.execute(
+                        """
+                        SELECT id, dictation_id, positions, title, created_at, updated_at
+                        FROM dictation_exercises
+                        WHERE dictation_id = %s
+                        ORDER BY id ASC
+                        """,
+                        (int(dictation_id),),
+                    )
+                    rows = cur.fetchall() or []
+
+        out: list[dict] = []
+        for r in rows:
+            if isinstance(r, dict):
+                out.append(
+                    {
+                        "id": int(r.get("id") or 0),
+                        "dictation_id": int(r.get("dictation_id") or 0),
+                        "positions": list(r.get("positions") or []),
+                        "title": r.get("title"),
+                        "created_at": r.get("created_at").isoformat() if r.get("created_at") else None,
+                        "updated_at": r.get("updated_at").isoformat() if r.get("updated_at") else None,
+                    }
+                )
+            else:
+                out.append(
+                    {
+                        "id": int(r[0] or 0),
+                        "dictation_id": int(r[1] or 0),
+                        "positions": list(r[2] or []),
+                        "title": r[3],
+                        "created_at": r[4].isoformat() if r[4] else None,
+                        "updated_at": r[5].isoformat() if r[5] else None,
+                    }
+                )
+        return out
+    finally:
+        conn.close()
+
+
+def create_dictation_exercise(dictation_id: int, positions: list[int] | None = None, title: str | None = None) -> dict:
+    if not dictation_id:
+        raise ValueError("dictation_id is required")
+
+    prepared: list[int] = []
+    try:
+        for x in list(positions or []):
+            if x is None:
+                continue
+            prepared.append(int(x))
+    except Exception:
+        prepared = []
+    prepared = sorted({int(x) for x in prepared})
+
+    title_norm = None
+    try:
+        title_norm = str(title).strip() if title is not None else None
+    except Exception:
+        title_norm = None
+    if title_norm == "":
+        title_norm = None
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id
+                FROM dictation_exercises
+                WHERE dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(dictation_id), prepared),
+            )
+            existing = cur.fetchone()
+            if existing:
+                raise ValueError("Exercise already exists")
+
+            cur.execute(
+                """
+                INSERT INTO dictation_exercises (dictation_id, positions, title)
+                VALUES (%s, %s, %s)
+                RETURNING id, dictation_id, positions, title, created_at, updated_at
+                """,
+                (int(dictation_id), prepared, title_norm),
+            )
+            row = cur.fetchone()
+            conn.commit()
+
+        return {
+            "id": int(row[0] or 0),
+            "dictation_id": int(row[1] or 0),
+            "positions": list(row[2] or []),
+            "title": row[3],
+            "created_at": row[4].isoformat() if row[4] else None,
+            "updated_at": row[5].isoformat() if row[5] else None,
+        }
+    except Exception as e:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        if isinstance(e, ValueError):
+            raise
+        raise Exception(f"Failed to create dictation exercise: {e}")
+    finally:
+        conn.close()
+
+
+def delete_dictation_exercise(dictation_id: int, exercise_id: int) -> bool:
+    if not dictation_id or not exercise_id:
+        return False
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                DELETE FROM dictation_exercises
+                WHERE id = %s AND dictation_id = %s
+                """,
+                (int(exercise_id), int(dictation_id)),
+            )
+            deleted = cur.rowcount > 0
+            conn.commit()
+            return bool(deleted)
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
+
+
 def refresh_dictation_translation_flags(dictation_id: int) -> None:
     """Recompute dictations.tr_* flags for a dictation.
 
