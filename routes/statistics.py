@@ -915,7 +915,7 @@ def teacher_report_send_auto():
         completion_count_value = None
     if completion_count_value is None:
         try:
-            # Используем history_by_day.successes (history_successes будет удалена)
+            # Используем history_by_day.successes
             selected_sentence_positions = data.get('selected_sentence_positions')
             completion_count_value = get_successes_sum_from_history_by_day(
                 int(user.get('id')), int(dictation_int), selected_sentence_positions
@@ -1041,7 +1041,7 @@ def save_history():
     Сохранить статистику активности
     
     ВАЖНО: Сохранение в JSON файл h_YYYYMM.json отключено.
-    Все данные теперь сохраняются в таблицу history_activity в БД.
+    Все данные теперь сохраняются в таблицу history_by_day в БД.
     Этот endpoint оставлен для обратной совместимости, но не выполняет сохранение в файл.
     """
     try:
@@ -1203,7 +1203,7 @@ def update_user_streak(email):
 @statistics_bp.route('/activity', methods=['POST'])
 @jwt_required()
 def save_activity():
-    """Сохранить активность пользователя в history_activity.
+    """Сохранить активность пользователя в history_by_day.
 
     Поддерживает:
     - legacy: {type_activity, number, lead_time_ms}
@@ -1315,7 +1315,7 @@ def save_activity():
 @statistics_bp.route('/activity/report', methods=['POST'])
 @jwt_required()
 def api_activity_report():
-    """Вернуть активность из history_activity за период (для отчёта "Статистика занятий")."""
+    """Вернуть активность из history_by_day за период (для отчёта "Статистика занятий")."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -1433,7 +1433,7 @@ def api_activity_tracker():
 @statistics_bp.route('/planfact', methods=['POST'])
 @jwt_required()
 def api_planfact_report():
-    """Отчет План‑Факт: план из assignments + факт из history_successes и history_activity."""
+    """Отчет План‑Факт: план из assignments + факт из history_by_day."""
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -1555,22 +1555,22 @@ def api_planfact_report():
                 )
                 plan_rows = cur.fetchall() or []
 
-                # 2) Факт (successes): количество завершений по дню/диктанту/позициям.
+                # 2) Факт (successes): количество завершений по дню/диктанту/позициям из history_by_day.
                 successes = {}
                 cur.execute(
                     """
                     SELECT
-                        hs.dictation_id,
-                        hs.created_at::date AS d,
-                        hs.selected_sentence_positions,
-                        COUNT(*)::int AS cnt
-                    FROM history_successes hs
-                    LEFT JOIN dictations d ON d.id = hs.dictation_id
-                    WHERE hs.user_id = %s
-                      AND hs.created_at::date >= %s
-                      AND hs.created_at::date <= %s
+                        hbd.dictation_id,
+                        hbd.date_fact AS d,
+                        hbd.positions,
+                        COALESCE(SUM(hbd.successes), 0)::int AS cnt
+                    FROM history_by_day hbd
+                    LEFT JOIN dictations d ON d.id = hbd.dictation_id
+                    WHERE hbd.user_id = %s
+                      AND hbd.date_fact >= %s
+                      AND hbd.date_fact <= %s
                       AND (%s IS NULL OR LOWER(COALESCE(d.language_code, '')) = %s)
-                    GROUP BY hs.dictation_id, hs.created_at::date, hs.selected_sentence_positions
+                    GROUP BY hbd.dictation_id, hbd.date_fact, hbd.positions
                     """,
                     (target_user_id, start_date, end_date, language_code_norm, language_code_norm),
                 )
@@ -1578,7 +1578,7 @@ def api_planfact_report():
                     try:
                         did = int(rr.get('dictation_id') if isinstance(rr, dict) else rr[0])
                         day = rr.get('d') if isinstance(rr, dict) else rr[1]
-                        raw_pos = rr.get('selected_sentence_positions') if isinstance(rr, dict) else rr[2]
+                        raw_pos = rr.get('positions') if isinstance(rr, dict) else rr[2]
                         cnt = int(rr.get('cnt') if isinstance(rr, dict) else rr[3])
 
                         pos_key = _positions_to_key(raw_pos)
@@ -1587,25 +1587,25 @@ def api_planfact_report():
                     except Exception:
                         continue
 
-                # 3) Факт (activity): счетчики по дню/диктанту/позициям.
+                # 3) Факт (activity): счетчики по дню/диктанту/позициям из history_by_day.
                 activities = {}
                 cur.execute(
                     """
                     SELECT
-                        ha.date,
-                        ha.dictation_id,
-                        ha.selected_sentence_positions,
-                        COALESCE(SUM(perfect_count), 0) AS perfect,
-                        COALESCE(SUM(corrected_count), 0) AS corrected,
-                        COALESCE(SUM(audio_count), 0) AS audio
-                    FROM history_activity ha
-                    LEFT JOIN dictations d ON d.id = ha.dictation_id
-                    WHERE ha.user_id = %s
-                      AND ha.date >= %s
-                      AND ha.date <= %s
+                        hbd.date_fact AS date,
+                        hbd.dictation_id,
+                        hbd.positions,
+                        COALESCE(SUM(hbd.perfect_count), 0) AS perfect,
+                        COALESCE(SUM(hbd.corrected_count), 0) AS corrected,
+                        COALESCE(SUM(hbd.audio_count), 0) AS audio
+                    FROM history_by_day hbd
+                    LEFT JOIN dictations d ON d.id = hbd.dictation_id
+                    WHERE hbd.user_id = %s
+                      AND hbd.date_fact >= %s
+                      AND hbd.date_fact <= %s
                       AND (%s IS NULL OR LOWER(COALESCE(d.language_code, '')) = %s)
-                    GROUP BY ha.date, ha.dictation_id, ha.selected_sentence_positions
-                    ORDER BY ha.date ASC, ha.dictation_id ASC
+                    GROUP BY hbd.date_fact, hbd.dictation_id, hbd.positions
+                    ORDER BY hbd.date_fact ASC, hbd.dictation_id ASC
                     """,
                     (target_user_id, start_date, end_date, language_code_norm, language_code_norm),
                 )
@@ -1614,7 +1614,7 @@ def api_planfact_report():
                         if isinstance(ar, dict):
                             day = ar.get('date')
                             did = int(ar.get('dictation_id') or 0)
-                            raw_pos = ar.get('selected_sentence_positions')
+                            raw_pos = ar.get('positions')
                             pos_key = _positions_to_key(raw_pos)
                             activities[(did, day.isoformat() if hasattr(day, 'isoformat') else str(day), pos_key)] = {
                                 'perfect': int(ar.get('perfect') or 0),
@@ -2070,7 +2070,7 @@ def api_activity_users():
 @statistics_bp.route('/success', methods=['POST'])
 @jwt_required()
 def save_success():
-    """Сохранить успешное завершение диктанта в history_successes"""
+    """Сохранить успешное завершение диктанта в history_by_day"""
     try:
         current_email = get_jwt_identity()
         data = request.get_json()
@@ -2235,8 +2235,7 @@ def get_success_count_subset():
     Counts sum of successes from history_by_day for this dictation_id and positions.
     Used for medal display in dictation header.
 
-    NOTE: history_successes will be removed in the future.
-    All completion counting should use history_by_day.successes.
+    NOTE: Данные берутся из history_by_day.successes.
     """
     try:
         current_email = get_jwt_identity()

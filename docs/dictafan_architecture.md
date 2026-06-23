@@ -18,51 +18,12 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - ~~`static/js/script_user_profile.js`~~ **УДАЛЁН** (код перенесён в `user_profile_modal.js`)
 - `assignments`
 - `assignments_by_date`
-- ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. `calculate_streak_days()` переписан на `history_by_day.activity_count` (вместо `perfect_count + corrected_count + audio_count`). После миграции всех данных — удалить таблицу.
-- ~~`history_successes`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем записи. Все завершения диктантов учитываются через `history_by_day.successes` — сумма по полю `successes` с фильтром по `dictation_id` и `positions`. После миграции всех данных — удалить таблицу.
+- ~~`history_activity`~~ **УДАЛЁН**: таблица удалена миграцией `migrations/drop_history_activity_and_history_successes.sql`. Все данные перенесены в `history_by_day`.
+- ~~`history_successes`~~ **УДАЛЁН**: таблица удалена миграцией `migrations/drop_history_activity_and_history_successes.sql`. Все данные перенесены в `history_by_day`.
 
 ## Структура таблиц истории (актуальная на 2026-06-23)
 
-### `history_activity` — агрегированная активность по дням (готовится к удалению)
-
-| Колонка | Тип | NOT NULL | DEFAULT | Описание |
-|---------|-----|----------|---------|----------|
-| id | integer | YES | nextval(...) | Первичный ключ |
-| user_id | integer | YES | — | ID пользователя |
-| dictation_id | integer | YES | — | ID диктанта |
-| date | date | YES | — | Дата активности |
-| perfect_count | integer | YES | 0 | Количество perfect |
-| corrected_count | integer | YES | 0 | Количество corrected |
-| audio_count | integer | YES | 0 | Количество audio |
-| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
-| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
-| dictation_language_code | text | NO | — | Язык диктанта |
-| selected_sentence_positions | integer[] | YES | '{}' | Выбранные предложения |
-| lead_time | bigint | YES | 0 | Время в мс |
-
-Уникальный ключ: `(user_id, dictation_id, date, selected_sentence_positions)`
-
-### `history_successes` — завершённые диктанты (готовится к удалению)
-
-| Колонка | Тип | NOT NULL | DEFAULT | Описание |
-|---------|-----|----------|---------|----------|
-| id | integer | YES | nextval(...) | Первичный ключ |
-| user_id | integer | YES | — | ID пользователя |
-| dictation_id | integer | YES | — | ID диктанта |
-| perfect_count | integer | YES | — | Число perfect |
-| corrected_count | integer | YES | — | Число corrected |
-| audio_count | integer | YES | — | Число audio |
-| time_ms | bigint | YES | — | Время в мс |
-| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
-| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
-| attempts_total | integer | YES | 0 | Всего попыток |
-| error_count | integer | YES | 0 | Число ошибок |
-| source_group_id | integer | NO | — | ID группы (если из группы) |
-| selected_sentence_positions | integer[] | NO | — | Выбранные предложения |
-| dictation_language_code | text | NO | — | Язык диктанта |
-| started_at | timestamp | NO | — | Время старта диктанта |
-
-### `history_by_day` — дневная история (целевая таблица)
+### `history_by_day` — дневная история (единственная таблица истории)
 
 | Колонка | Тип | NOT NULL | DEFAULT | Описание |
 |---------|-----|----------|---------|----------|
@@ -660,7 +621,7 @@ window.__APP_BUILD = 'YYYY-MM-DD_hhmm';
 - `assignments` — назначение диктанта группе.
   - поле `selected_sentence_positions` (если задано) ограничивает, какие предложения считаются в задании
 - `assignments_by_date` — план по дням (на каждый день: `required_completions`)
-- `history_successes` — факты "полного завершения диктанта" (медали). Это источник факта выполнения.
+- `history_by_day` — факты выполнения диктантов (медали) через поле `successes`. Это источник факта выполнения.
 
 ### Backend API (группы)
 
@@ -740,11 +701,11 @@ Email-инвайты:
 
 ### Как попытка засчитывается в задание
 
-Источник факта выполнения: `history_successes` (медаль).
+Источник факта выполнения: `history_by_day.successes` (медаль).
 
 - При полном завершении диктанта frontend вызывает `POST /api/statistics/success`.
-- Backend сохраняет запись в `history_successes`.
-- Прогресс заданий считается через запросы в `helpers/db_assignments.py` (на основе дат/диктанта/групп и фактов success).
+- Backend увеличивает счётчик `successes` в `history_by_day` через `_upsert_history_by_day()`.
+- Прогресс заданий считается через запросы в `helpers/db_assignments.py` (на основе дат/диктанта/групп и суммы `hbd.successes`).
 
 Инвариант (MVP): в задание засчитываются только **полные завершения**, т.е. ровно те случаи, когда выдаётся медаль.
 
@@ -791,7 +752,7 @@ Email-инвайты:
 
 ### Инварианты / важные ограничения (реализация)
 
-- факт выполнения = запись в `history_successes` (медаль). Именно это учитывается как «completion»
+- факт выполнения = запись в `history_by_day` с `successes > 0` (медаль). Именно это учитывается как «completion»
 - Telegram-уведомление учителю по умолчанию привязано к наличию задания на текущую дату (без задания — авто-уведомления нет)
 - ручной отчёт допускается только если на текущую дату авто-уведомления не будет (backend возвращает `409 auto_report_available`, если всё же есть assignment)
 - язык для фильтра учителей берётся из `dictations.language_code` (язык оригинала)
@@ -958,9 +919,8 @@ Many-to-many: ученик может быть в нескольких груп�
 - `POST /api/statistics/activity` → функция `save_activity()`
 - Вызывает `add_activity_bulk()` из `helpers/db_history.py`
 - `add_activity_bulk()`:
-  1. Пишет/обновляет запись в `history_activity` (только `perfect_count`, `corrected_count`, `audio_count`, `lead_time` — старые поля)
-  2. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
-  3. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми счётчиками, включая `activity_count_delta`, `money_dt_delta`, `mistake_delta`, `monenumber_of_characters_delta`
+  1. Начисляет деньги: `INSERT INTO user_money_ledger (user_id, dt, ...)` за каждое действие
+  2. Вызывает `_upsert_history_by_day()` — UPSERT в `history_by_day` со всеми счётчиками, включая `activity_count_delta`, `money_dt_delta`, `mistake_delta`, `monenumber_of_characters_delta`, `perfect_count`, `corrected_count`, `audio_count`, `lead_time`
 
 ### Endpoint B: `POST /api/statistics/success` (завершение диктанта)
 
@@ -990,9 +950,8 @@ Many-to-many: ученик может быть в нескольких груп�
 - `POST /api/statistics/success` → функция `save_success()`
 - Вызывает `add_success()` из `helpers/db_history.py`
 - `add_success()`:
-  1. Создаёт запись в `history_successes` (каждое завершение — отдельная строка)
-  2. Вызывает `_upsert_history_by_day()` только с `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`
-  3. **НЕ обновляет** `perfect_count`, `corrected_count`, `audio_count`, `activity_count`, `money_dt_count` — эти поля уже обновлены в `add_activity_bulk()` во время диктанта
+  1. Вызывает `_upsert_history_by_day()` с `successes_delta=1`, `mistake_delta`, `monenumber_of_characters_delta`, `lead_time_delta`
+  2. **НЕ обновляет** `perfect_count`, `corrected_count`, `audio_count`, `activity_count`, `money_dt_count` — эти поля уже обновлены в `add_activity_bulk()` во время диктанта
 
 ### Внутренняя функция `_upsert_history_by_day()`
 

@@ -531,13 +531,9 @@ def delete_dictation(dictation_id):
             try:
                 conn, cur = get_db_cursor()
                 try:
-                    # Remove user progress/history
+                    # Remove user progress/history from history_by_day
                     try:
-                        cur.execute("DELETE FROM history_successes WHERE dictation_id = %s", (db_id,))
-                    except Exception:
-                        pass
-                    try:
-                        cur.execute("DELETE FROM history_activity WHERE dictation_id = %s", (db_id,))
+                        cur.execute("DELETE FROM history_by_day WHERE dictation_id = %s", (db_id,))
                     except Exception:
                         pass
 

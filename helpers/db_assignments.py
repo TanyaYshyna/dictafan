@@ -646,11 +646,11 @@ def get_assignment_students_progress_for_teacher(assignment_id: int, teacher_use
             sid = int(s.get("student_user_id"))
             cur.execute(
                 """
-                SELECT COUNT(*)::int AS cnt
-                FROM history_successes hs
-                WHERE hs.user_id = %s
-                  AND hs.dictation_id = %s
-                  AND hs.created_at::date = %s
+                SELECT COALESCE(SUM(hbd.successes), 0)::int AS cnt
+                FROM history_by_day hbd
+                WHERE hbd.user_id = %s
+                  AND hbd.dictation_id = %s
+                  AND hbd.date_fact = %s
                 """,
                 (sid, dictation_id, progress_day),
             )
@@ -934,16 +934,16 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             t_cnt0 = time.perf_counter()
             cur.execute(
                 """
-                SELECT hs.dictation_id,
-                       hs.created_at::date AS d,
-                       hs.selected_sentence_positions,
-                       COUNT(*)::int AS cnt
-                FROM history_successes hs
-                WHERE hs.user_id = %s
-                  AND hs.dictation_id = ANY(%s)
-                  AND hs.created_at::date >= %s
-                  AND hs.created_at::date <= %s
-                GROUP BY hs.dictation_id, hs.created_at::date, hs.selected_sentence_positions
+                SELECT hbd.dictation_id,
+                       hbd.date_fact AS d,
+                       hbd.positions,
+                       COALESCE(SUM(hbd.successes), 0)::int AS cnt
+                FROM history_by_day hbd
+                WHERE hbd.user_id = %s
+                  AND hbd.dictation_id = ANY(%s)
+                  AND hbd.date_fact >= %s
+                  AND hbd.date_fact <= %s
+                GROUP BY hbd.dictation_id, hbd.date_fact, hbd.positions
                 """,
                 (student_user_id, list(set(dictation_ids)), min_start, max_end),
             )
@@ -953,7 +953,7 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
                     day = rr.get("d")
                     cnt = int(rr.get("cnt") or 0)
 
-                    raw_pos = rr.get("selected_sentence_positions")
+                    raw_pos = rr.get("positions")
                     pos_key = None
                     if raw_pos is not None:
                         try:
@@ -972,7 +972,7 @@ def list_my_assignments_for_student(student_user_id: int, *, for_date: Any) -> l
             t_cnt1 = time.perf_counter()
             try:
                 logger.info(
-                    "[student_plan] history_successes aggregate: dictations=%s, days=%s, %.1fms",
+                    "[student_plan] history_by_day aggregate: dictations=%s, days=%s, %.1fms",
                     len(set(dictation_ids)),
                     (max_end - min_start).days + 1 if (min_start and max_end) else 0,
                     (t_cnt1 - t_cnt0) * 1000.0,
