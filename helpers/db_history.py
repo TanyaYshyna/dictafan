@@ -1102,6 +1102,48 @@ def get_history_by_day_totals_for_date(user_id: int, target_date) -> dict:
         conn.close()
 
 
+def get_successes_sum_from_history_by_day(user_id: int, dictation_id: int, selected_sentence_positions=None) -> int:
+    """Return total sum of successes from history_by_day for a user/dictation/positions."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            if selected_sentence_positions is not None and selected_sentence_positions != '':
+                try:
+                    if isinstance(selected_sentence_positions, str):
+                        positions_arr = json.loads(selected_sentence_positions)
+                    else:
+                        positions_arr = list(selected_sentence_positions)
+                except Exception:
+                    positions_arr = []
+                cur.execute(
+                    """
+                    SELECT COALESCE(SUM(successes), 0)::int
+                    FROM history_by_day
+                    WHERE user_id = %s
+                      AND dictation_id = %s
+                      AND positions = %s
+                    """,
+                    (user_id, dictation_id, positions_arr),
+                )
+            else:
+                cur.execute(
+                    """
+                    SELECT COALESCE(SUM(successes), 0)::int
+                    FROM history_by_day
+                    WHERE user_id = %s
+                      AND dictation_id = %s
+                      AND positions = %s
+                    """,
+                    (user_id, dictation_id, []),
+                )
+            row = cur.fetchone()
+            return int(row[0] if row else 0)
+    except Exception as e:
+        raise Exception(f"Failed to get successes sum from history_by_day: {e}")
+    finally:
+        conn.close()
+
+
 def get_history_by_day_totals(user_id: int) -> dict:
     """Return aggregated total lead_time and money_dt_count from history_by_day."""
     conn = get_db_connection()
