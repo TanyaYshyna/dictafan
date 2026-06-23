@@ -391,22 +391,26 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                                    completion_count_value, perfect_count, corrected_count, audio_count,
                                    attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
                                    settings_json, error_words, report_header_mode: str = 'success',
-                                   total_chars=None, money_earned=None) -> str:
+                                   total_chars=None, money_earned=None,
+                                   date_start_iso=None) -> str:
     """
     Собирает текст отчёта для отправки в Telegram.
-    Формат (только шапка, без детализации по предложениям):
+    Формат:
 
-    ✅ TanyaYushyna, успешно выполненный диктант
-    popular (уровень A1)  🥇 4
-    2026-05-08 17:46
-    $: 154
-    🪲: 32 / 670
-    ⭐ - 20
-    ½⭐ - 59
-    о - 90
-    🎤 - 20
-    Длительность: 1:03
+    ✅ Успешно закончен (или 📊 Промежуточный результат) [дата начала - ]дата и время окончания
+    Имя Юзера
+    1.2 Irregular verbs (phrases) (уровень A1)  🥇 4
+    (id: 33)
     Схема аудио: oto
+
+    Длительность: 66:11
+    $: 273
+    🪲: 65 / 2918 (2.2%)
+
+    ⭐ - 50
+    ½⭐ - 28
+    о - 13
+    🎤 - 50
     """
     def _int_or_0(x):
         try:
@@ -417,56 +421,39 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
     # Дата и время завершения
     success_date_iso = datetime.now().date().isoformat()
     when_local = _fmt_user_local_dt(completed_at_ms, completed_at_tz_offset_min)
-    date_line = when_local or success_date_iso
+    date_end_str = when_local or success_date_iso
 
-    # Количество завершений (медаль)
-    medals_inline = ''
-    if completion_count_value is not None:
-        medals_inline = f"  🥇 {completion_count_value}"
+    # Дата начала (если отличается от даты окончания)
+    date_start_str = ''
+    if date_start_iso:
+        try:
+            ds = str(date_start_iso).strip()
+            if ds and ds[:10] != date_end_str[:10]:
+                date_start_str = ds[:10] + ' - '
+        except Exception:
+            date_start_str = ''
 
     # Заголовок
     mode = str(report_header_mode or 'success').strip().lower()
     if mode == 'interim':
-        first_line = f"📊 {_safe_html(student_username)}, промежуточные результаты"
+        header_label = "📊 Промежуточный результат"
     else:
-        first_line = f"✅ {_safe_html(student_username)}, успешно выполненный диктант"
+        header_label = "✅ Успешно закончен"
 
-    lines = [first_line]
+    lines = [f"{header_label} {date_start_str}{date_end_str}"]
+
+    # Имя пользователя
+    lines.append(_safe_html(student_username))
 
     # Название диктанта + уровень + медаль
+    medals_inline = ''
+    if completion_count_value is not None:
+        medals_inline = f"  🥇 {completion_count_value}"
     title_line = f"{_safe_html(dictation_title)} (уровень {_safe_html(dictation_level)}){medals_inline}"
     lines.append(title_line)
 
-    # Дата
-    lines.append(date_line)
-
-    # Деньги (заработанные за диктант)
-    me = _int_or_0(money_earned) if money_earned is not None else 0
-    lines.append(f"$: {me}")
-
-    # Ошибки / всего символов
-    err_count = _int_or_0(error_count)
-    ch_count = _int_or_0(total_chars) if total_chars is not None else 0
-    if ch_count > 0:
-        lines.append(f"🪲: {err_count} / {ch_count}")
-    else:
-        lines.append(f"🪲: {err_count}")
-
-    # ⭐ - perfect
-    lines.append(f"⭐ - {_int_or_0(perfect_count)}")
-    # ½⭐ - corrected
-    lines.append(f"½⭐ - {_int_or_0(corrected_count)}")
-    # о - текстовая активность (text_activity_count из sentences_data)
-    text_activity_total = 0
-    if isinstance(sentences_data, list):
-        for sd in sentences_data:
-            text_activity_total += _int_or_0(sd.get('text_activity_count'))
-    lines.append(f"о - {text_activity_total}")
-    # 🎤 - аудио (number_of_audio)
-    lines.append(f"🎤 - {_int_or_0(audio_count)}")
-
-    # Длительность
-    lines.append(f"Длительность: {_fmt_duration(time_ms)}")
+    # id диктанта
+    lines.append(f"(id: {_int_or_0(dictation_int)})")
 
     # Схема аудио
     audio_scheme_line = ''
@@ -488,6 +475,41 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
 
     if audio_scheme_line:
         lines.append(audio_scheme_line)
+
+    # Пустая строка
+    lines.append('')
+
+    # Длительность
+    lines.append(f"Длительность: {_fmt_duration(time_ms)}")
+
+    # Деньги (заработанные за диктант)
+    me = _int_or_0(money_earned) if money_earned is not None else 0
+    lines.append(f"$: {me}")
+
+    # Ошибки / всего символов + точность в %
+    err_count = _int_or_0(error_count)
+    ch_count = _int_or_0(total_chars) if total_chars is not None else 0
+    if ch_count > 0:
+        accuracy_pct = round((1 - err_count / ch_count) * 100, 1) if ch_count > 0 else 0
+        lines.append(f"🪲: {err_count} / {ch_count} ({accuracy_pct}%)")
+    else:
+        lines.append(f"🪲: {err_count}")
+
+    # Пустая строка перед звёздами
+    lines.append('')
+
+    # ⭐ - perfect
+    lines.append(f"⭐ - {_int_or_0(perfect_count)}")
+    # ½⭐ - corrected
+    lines.append(f"½⭐ - {_int_or_0(corrected_count)}")
+    # о - текстовая активность (text_activity_count из sentences_data)
+    text_activity_total = 0
+    if isinstance(sentences_data, list):
+        for sd in sentences_data:
+            text_activity_total += _int_or_0(sd.get('text_activity_count'))
+    lines.append(f"о - {text_activity_total}")
+    # 🎤 - аудио (number_of_audio)
+    lines.append(f"🎤 - {_int_or_0(audio_count)}")
 
     return '\n'.join(lines)
 
@@ -859,10 +881,11 @@ def teacher_report_send_auto():
     except Exception:
         pass
 
-    # self chat
+    # self chat — отправляем себе только если включены self_reports
     self_chat_id = None
     try:
-        if send_to_self and user.get('telegram_chat_id'):
+        self_reports_enabled = bool(user.get('telegram_self_reports_enabled'))
+        if send_to_self and self_reports_enabled and user.get('telegram_chat_id'):
             self_chat_id = int(user.get('telegram_chat_id'))
     except Exception:
         self_chat_id = None
@@ -936,6 +959,7 @@ def teacher_report_send_auto():
             report_header_mode=report_header_mode or 'success',
             total_chars=data.get('total_chars'),
             money_earned=data.get('money_earned'),
+            date_start_iso=data.get('date_start_iso'),
         )
     else:
         today_iso = _today_iso_local()

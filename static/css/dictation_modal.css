@@ -136,6 +136,39 @@
   }
 }
 
+/* Прогресс-бар выполнения заданий диктанта */
+#dictationModal .dictation-task-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+#dictationModal .dictation-task-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--color-button-gray, #eeede8);
+  border-radius: 4px;
+  overflow: hidden;
+  min-width: 100px;
+}
+
+#dictationModal .dictation-task-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-button-lightgreen, #bbf1ca);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+#dictationModal .dictation-task-progress-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-button-text-gray, rgb(168, 167, 155));
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
 #dictationModal .dictation-langpair {
   display: inline-flex;
   align-items: center;
@@ -231,7 +264,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-button-text-gray);
+  color: var(--color-button-text-gray) !important;
 }
 
 #dictationModal .sentence-nav-table button.button-color-gray {
@@ -257,7 +290,7 @@ html[dir="rtl"] #dictationModal #dictationLangPair {
   line-height: 1;
   font-weight: bold;
   font-size: 22px;
-  color: var(--color-button-text-gray);
+  color: var(--color-button-text-gray) !important;
 }
 
 #dictationModal .progress-panel-modal-r .table-progress {

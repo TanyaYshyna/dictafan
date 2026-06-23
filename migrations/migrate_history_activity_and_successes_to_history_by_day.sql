@@ -48,8 +48,8 @@ SELECT
     ha.corrected_count,
     ha.audio_count,
     ha.lead_time,
-    0 AS successes,
-    1 AS activity_count,
+    1 AS successes,          -- каждая строка из history_activity = одно завершение диктанта
+    0 AS activity_count,     -- activity_count заполним отдельно через money_fields миграцию
     ha.created_at,
     ha.updated_at
 FROM history_activity ha
