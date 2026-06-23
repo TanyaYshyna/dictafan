@@ -873,8 +873,6 @@ class ProgressPanel {
         const modal = document.getElementById('modalUnsavedStar');
         if (inline) inline.style.display = show ? 'inline-flex' : 'none';
         if (modal) modal.style.display = show ? 'inline-flex' : 'none';
-        const header = document.getElementById('unsavedStar');
-        if (header) header.style.display = show ? 'inline-flex' : 'none';
     }
 
     markClean(options = {}) {

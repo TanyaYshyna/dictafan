@@ -23,9 +23,6 @@
           <button id="openDictationSettingsBtn" class="topbar-icon-btn" type="button" title="Настройки" aria-label="Настройки">
             <i data-lucide="settings"></i>
           </button>
-          <button id="saveBtn" class="topbar-icon-btn save-status-clean" type="button" title="Сохранить" aria-label="Сохранить">
-            <i data-lucide="save"></i>
-          </button>
           <button id="dictationModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
             <i data-lucide="x"></i>
           </button>
@@ -75,7 +72,6 @@
             </table>
             <div class="dictation-meta-hidden" style="display:none;">
               <span id="dictationIdDisplay" class="dictation-id"></span>
-              <span id="unsavedStar" class="unsaved-star" title="Есть несохраненный прогресс (Ctrl/⌘ + S — сохранить)" style="display:none">*</span>
             </div>
             <div class="dictation-top-progress-wrap">
               <!-- Контейнер для рендера прогресс-панели (страница) -->
@@ -483,25 +479,6 @@
         <button id="completionExitBtn" class="button-color-yellow">
           <i data-lucide="log-out"></i>
           <span id="completionExitBtnLabel">Выйти</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Модальное окно выхода из диктанта -->
-  <div id="exitModal" class="modal" style="display: none;">
-    <div class="modal-content exit-modal-content">
-      <h2>Вернуться на рабочий стол?</h2>
-      <p id="exitModalMessage">Что сделать с текущими изменениями?</p>
-      <div class="exit-modal-buttons">
-        <button id="exitStayBtn" class="button-secondary">Остаться</button>
-        <button id="exitWithoutSavingBtn" class="button-color-lightgreen">
-          <i data-lucide="save-off"></i>
-          <span id="exitWithoutSavingBtnLabel">Выйти</span>
-        </button>
-        <button id="exitWithSavingBtn" class="button-color-yellow" style="display: none;">
-          <i data-lucide="save"></i>
-          <span id="exitWithSavingBtnLabel">Выйти</span>
         </button>
       </div>
     </div>

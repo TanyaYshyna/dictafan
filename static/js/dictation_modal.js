@@ -137,69 +137,6 @@
     }
   }
 
-  async function hasLocalPendingDraft() {
-    return false;
-  }
-
-  async function showExitModal(action) {
-    const exitModal = document.getElementById('exitModal');
-    if (!exitModal) return;
-
-    const panel = getProgressPanelInstance();
-    const hasPanelPending = panel && typeof panel.hasPending === 'function' ? panel.hasPending() : false;
-    const hasLocalPending = await hasLocalPendingDraft();
-    const hasPending = hasPanelPending || hasLocalPending;
-
-    window.pendingExitAction = typeof action === 'function' ? action : () => {
-      try { close(); } catch (e) {}
-    };
-
-    const messageEl = document.getElementById('exitModalMessage');
-    if (messageEl) {
-      messageEl.textContent = hasPending
-        ? dictationT('exit_modal.unsaved_progress_confirm', messageEl.textContent || '')
-        : dictationT('exit_modal.saved_progress_next', messageEl.textContent || '');
-    }
-
-    try {
-      const exitWithoutLabel = document.getElementById('exitWithoutSavingBtnLabel');
-      if (exitWithoutLabel) {
-        exitWithoutLabel.textContent = dictationT('exit_modal.exit', exitWithoutLabel.textContent || '');
-      }
-    } catch (e) {
-    }
-
-    try {
-      const exitWithLabel = document.getElementById('exitWithSavingBtnLabel');
-      if (exitWithLabel) {
-        exitWithLabel.textContent = dictationT('exit_modal.exit', exitWithLabel.textContent || '');
-      }
-    } catch (e) {
-    }
-
-    const exitWithBtn = document.getElementById('exitWithSavingBtn');
-    if (exitWithBtn) {
-      if (hasPending) {
-        exitWithBtn.style.display = '';
-        exitWithBtn.disabled = false;
-        exitWithBtn.classList.remove('disabled');
-      } else {
-        exitWithBtn.style.display = 'none';
-      }
-    }
-
-    exitModal.style.display = 'flex';
-    const stayBtn = document.getElementById('exitStayBtn');
-    if (stayBtn) stayBtn.focus();
-  }
-
-  function hideExitModal() {
-    const exitModal = document.getElementById('exitModal');
-    if (exitModal) {
-      exitModal.style.display = 'none';
-    }
-    window.pendingExitAction = null;
-  }
 
   async function autoSendTeacherReportAfterSuccess({
     completionCountAfter,
@@ -5088,58 +5025,18 @@
   } catch (e) {
   }
 
-  async function hasUnsavedProgress() {
-    try {
-      const panel = window.progressPanel;
-      const hasPanelPending = panel && typeof panel.hasPending === 'function' ? !!panel.hasPending() : false;
-      if (hasPanelPending) return true;
-    } catch (e) {
-    }
-
-    try {
-      if (typeof hasLocalPendingDraft === 'function') {
-        return !!(await hasLocalPendingDraft());
-      }
-    } catch (e) {
-    }
-
-    return false;
-  }
-
   async function exitDictationFromStartModal() {
-    const doClose = () => {
-      try { hideStartModal(); } catch (e0) {}
-      // Если диктант завершён — очищаем сессию
-      try {
-        const session = window.__dictationModalActiveSession;
-        if (session && session.completed === true) {
-          close(true);
-          return;
-        }
-      } catch (eCheck) {
-      }
-      try { close(); } catch (e1) {}
-    };
-
+    try { hideStartModal(); } catch (e0) {}
+    // Если диктант завершён — очищаем сессию
     try {
-      const pending = await hasUnsavedProgress();
-      if (!pending) {
-        doClose();
+      const session = window.__dictationModalActiveSession;
+      if (session && session.completed === true) {
+        close(true);
         return;
       }
-    } catch (e) {
+    } catch (eCheck) {
     }
-
-    try {
-      if (typeof showExitModal === 'function') {
-        await showExitModal(() => doClose());
-        return;
-      }
-    } catch (e) {
-    }
-
-    // Fallback: close without confirmation
-    doClose();
+    try { close(); } catch (e1) {}
   }
 
   const LS_SPEECH_REC_MODE_KEY = 'dictafan_speech_rec_mode';
@@ -6119,44 +6016,6 @@
     });
   }
 
-  function bindExitModalControls() {
-    try {
-      const exitModal = document.getElementById('exitModal');
-      if (!exitModal) return;
-      if (exitModal.dataset.boundDictationModal === '1') return;
-      exitModal.dataset.boundDictationModal = '1';
-
-      const stayBtn = document.getElementById('exitStayBtn');
-      if (stayBtn) {
-        stayBtn.addEventListener('click', () => {
-          try { exitModal.style.display = 'none'; } catch (e) {}
-          window.pendingExitAction = null;
-        });
-      }
-
-      const withoutBtn = document.getElementById('exitWithoutSavingBtn');
-      if (withoutBtn) {
-        withoutBtn.addEventListener('click', () => {
-          try { exitModal.style.display = 'none'; } catch (e) {}
-          const action = window.pendingExitAction;
-          window.pendingExitAction = null;
-          if (typeof action === 'function') action();
-        });
-      }
-
-      const withBtn = document.getElementById('exitWithSavingBtn');
-      if (withBtn) {
-        withBtn.addEventListener('click', () => {
-          try { exitModal.style.display = 'none'; } catch (e) {}
-          const action = window.pendingExitAction;
-          window.pendingExitAction = null;
-          if (typeof action === 'function') action();
-        });
-      }
-    } catch (e) {
-    }
-  }
-
   async function open(dictationUrl, opts = {}) {
     if (state.opening) return;
     state.opening = true;
@@ -6193,7 +6052,6 @@
       setAvatar();
       bindHeaderButtons();
       bindOverlayClose();
-      bindExitModalControls();
 
       modal.style.display = 'flex';
       modal.classList.add('show');
