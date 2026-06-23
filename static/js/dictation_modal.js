@@ -217,6 +217,7 @@
     reportHeaderMode,
     totalChars,
     moneyEarned,
+    dateStartIso,
   }) {
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
@@ -344,7 +345,19 @@
       const finalTotalChars = totalChars != null ? totalChars : (snapshot ? snapshot.totalChars : null);
       const finalMoneyEarned = moneyEarned != null ? moneyEarned : (snapshot ? snapshot.moneyEarned : null);
 
-      // Отправляем авто-отчёт только текущему учителю
+      // Получаем dateStart из сессии
+      let finalDateStartIso = dateStartIso;
+      if (!finalDateStartIso) {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session && session.dateStart) {
+            finalDateStartIso = String(session.dateStart).trim();
+          }
+        } catch (e) {
+        }
+      }
+
+      // Отправляем авто-отчёт: себе (если включены self_reports) и учителям
       let teacher_user_ids = [];
       try {
         const session = window.__dictationModalActiveSession;
@@ -354,8 +367,8 @@
         teacher_user_ids = [];
       }
 
-      if (!teacher_user_ids.length) return;
-      const send_to_self = false;
+      // Отправляем всегда, даже если нет учителя (отправится себе)
+      const send_to_self = true;
 
       await fetch('/api/statistics/teacher_report/send_auto', {
         method: 'POST',
@@ -382,6 +395,7 @@
           error_words: finalErrorWords,
           total_chars: finalTotalChars,
           money_earned: finalMoneyEarned,
+          date_start_iso: finalDateStartIso,
         }),
       });
     } catch (e) {
@@ -799,6 +813,7 @@
           settingsJson: modalSettingsJson,
           totalChars: totalChars,
           moneyEarned: totalMoneyEarned,
+          dateStartIso: session.dateStart || null,
         });
       }
     } catch (e6) {
@@ -3425,6 +3440,17 @@
               try { window.__forceFocusRecordAfterRecognition = true; } catch (e00) { }
             }
 
+            // Обновляем табло предложения и прогресс после любого результата распознавания,
+            // чтобы отобразить накопленные audio_activity50_count (кружочки) и кнопку обмена
+            try {
+              updateSentenceTabloFromSession(session, _key);
+            } catch (eTablo) {
+            }
+            try {
+              updateTaskProgressFromSession(session);
+            } catch (eTask) {
+            }
+
             try {
               if (ok) {
                 const checkBtn = document.getElementById('checkBtn');
@@ -5685,18 +5711,72 @@
               ? `${Math.floor(timeMs / 60000)}:${String(Math.floor((timeMs % 60000) / 1000)).padStart(2, '0')}`
               : '0:00';
 
+            // Получаем username из UM
+            let username = '';
+            try {
+              const um = window.UM;
+              if (um && um.userData && um.userData.username) {
+                username = String(um.userData.username).trim();
+              }
+            } catch (eUser) {
+            }
+
+            // Получаем dateStart из сессии
+            let dateStartStr = '';
+            try {
+              const s = window.__dictationModalActiveSession;
+              if (s && s.dateStart) {
+                dateStartStr = String(s.dateStart).trim();
+              }
+            } catch (eDs) {
+            }
+
+            // Текущая дата и время
+            const now = new Date();
+            const nowLocalStr = now.getFullYear() + '-' +
+              String(now.getMonth() + 1).padStart(2, '0') + '-' +
+              String(now.getDate()).padStart(2, '0') + ' ' +
+              String(now.getHours()).padStart(2, '0') + ':' +
+              String(now.getMinutes()).padStart(2, '0');
+
+            // Дата начала (если отличается от даты окончания)
+            const todayStr = now.getFullYear() + '-' +
+              String(now.getMonth() + 1).padStart(2, '0') + '-' +
+              String(now.getDate()).padStart(2, '0');
+            const datePrefix = (dateStartStr && dateStartStr.slice(0, 10) !== todayStr)
+              ? dateStartStr.slice(0, 10) + ' - '
+              : '';
+
+            // Точность
+            let accuracyPct = '';
+            if (totalChars > 0) {
+              const pct = ((1 - totalErrors / totalChars) * 100).toFixed(1);
+              accuracyPct = ` (${pct}%)`;
+            }
+
+            // Получаем схему аудио из сессии
+            let audioScheme = '';
+            try {
+              const seq = typeof getPlaySequenceStartValue === 'function' ? getPlaySequenceStartValue() : (window.playSequenceStart || 'oto');
+              if (seq) audioScheme = `Схема аудио: ${seq}`;
+            } catch (eScheme) {
+            }
+
             const text = [
-              `✅ Тестовое сообщение из диктанта`,
+              `📊 Промежуточный результат ${datePrefix}${nowLocalStr}`,
+              `${username}`,
               `${dictationTitle}`,
+              `(id: ${dictationIdForDb})`,
+              audioScheme,
               ``,
+              `Длительность: ${durationStr}`,
               `$: ${totalMoneyEarned}`,
-              `🪲: ${totalErrors} / ${totalChars}`,
+              `🪲: ${totalErrors} / ${totalChars}${accuracyPct}`,
+              ``,
               `⭐ - ${totalPerfect}`,
               `½⭐ - ${totalCorrected}`,
               `о - ${totalTextActivity}`,
               `🎤 - ${totalAudio}`,
-              `Длительность: ${durationStr}`,
-              `dictationId: ${dictationIdForDb}`,
             ].join('\n');
 
             console.log('📨 [TELEGRAM][INTERIM] sending test message...');
