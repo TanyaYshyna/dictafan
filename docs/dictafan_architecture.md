@@ -21,6 +21,73 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - ~~`history_activity`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем новые поля (`money_count`, `mistake_count`, `monenumber_of_characters`). Все движения идут напрямую в `history_by_day` и `user_money_ledger`. `calculate_streak_days()` переписан на `history_by_day.activity_count` (вместо `perfect_count + corrected_count + audio_count`). После миграции всех данных — удалить таблицу.
 - ~~`history_successes`~~ **ГОТОВИТСЯ К УДАЛЕНИЮ**: больше не пишем записи. Все завершения диктантов учитываются через `history_by_day.successes` — сумма по полю `successes` с фильтром по `dictation_id` и `positions`. После миграции всех данных — удалить таблицу.
 
+## Структура таблиц истории (актуальная на 2026-06-23)
+
+### `history_activity` — агрегированная активность по дням (готовится к удалению)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| dictation_id | integer | YES | — | ID диктанта |
+| date | date | YES | — | Дата активности |
+| perfect_count | integer | YES | 0 | Количество perfect |
+| corrected_count | integer | YES | 0 | Количество corrected |
+| audio_count | integer | YES | 0 | Количество audio |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| selected_sentence_positions | integer[] | YES | '{}' | Выбранные предложения |
+| lead_time | bigint | YES | 0 | Время в мс |
+
+Уникальный ключ: `(user_id, dictation_id, date, selected_sentence_positions)`
+
+### `history_successes` — завершённые диктанты (готовится к удалению)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| dictation_id | integer | YES | — | ID диктанта |
+| perfect_count | integer | YES | — | Число perfect |
+| corrected_count | integer | YES | — | Число corrected |
+| audio_count | integer | YES | — | Число audio |
+| time_ms | bigint | YES | — | Время в мс |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| attempts_total | integer | YES | 0 | Всего попыток |
+| error_count | integer | YES | 0 | Число ошибок |
+| source_group_id | integer | NO | — | ID группы (если из группы) |
+| selected_sentence_positions | integer[] | NO | — | Выбранные предложения |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| started_at | timestamp | NO | — | Время старта диктанта |
+
+### `history_by_day` — дневная история (целевая таблица)
+
+| Колонка | Тип | NOT NULL | DEFAULT | Описание |
+|---------|-----|----------|---------|----------|
+| id | integer | YES | nextval(...) | Первичный ключ |
+| user_id | integer | YES | — | ID пользователя |
+| teacher_id | integer | YES | — | ID учителя |
+| dictation_language_code | text | NO | — | Язык диктанта |
+| date_plan | date | YES | — | Плановая дата |
+| date_fact | date | YES | — | Фактическая дата |
+| perfect_count | integer | YES | 0 | Количество perfect |
+| corrected_count | integer | YES | 0 | Количество corrected |
+| audio_count | integer | YES | 0 | Количество audio |
+| lead_time | bigint | YES | 0 | Время в мс |
+| successes | integer | YES | 0 | Число завершений диктанта |
+| created_at | timestamp | YES | CURRENT_TIMESTAMP | Дата создания |
+| updated_at | timestamp | YES | CURRENT_TIMESTAMP | Дата обновления |
+| dictation_id | integer | YES | — | ID диктанта |
+| positions | integer[] | YES | '{}' | Выбранные предложения |
+| monenumber_of_characters | integer | YES | 0 | Символов (денег) |
+| mistake_count | integer | YES | 0 | Число ошибок |
+| date_start | date | YES | — | Дата начала |
+| activity_count | integer | YES | 0 | Число активностей |
+| money_dt_count | integer | YES | 0 | Заработано монет |
+
+Уникальный ключ: `(user_id, teacher_id, dictation_id, positions, date_plan, date_fact)`
 ## Принципы разделения ответственности
 
 - **HTML = структура**
