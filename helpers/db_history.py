@@ -1071,3 +1071,60 @@ def get_success_counts_for_dictations(user_id, dictation_ids):
         raise Exception(f"Failed to get success counts: {e}")
     finally:
         conn.close()
+
+
+def get_history_by_day_totals_for_date(user_id: int, target_date) -> dict:
+    """Return aggregated lead_time and money_dt_count for a specific date from history_by_day."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0)::bigint AS lead_time,
+                    COALESCE(SUM(money_dt_count), 0)::int AS money
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND date_fact = %s
+                """,
+                (user_id, target_date),
+            )
+            row = cur.fetchone()
+            if row:
+                return {
+                    'lead_time': int(row.get('lead_time') if isinstance(row, dict) else row[0]),
+                    'money': int(row.get('money') if isinstance(row, dict) else row[1]),
+                }
+            return {'lead_time': 0, 'money': 0}
+    except Exception as e:
+        raise Exception(f"Failed to get history_by_day totals for date: {e}")
+    finally:
+        conn.close()
+
+
+def get_history_by_day_totals(user_id: int) -> dict:
+    """Return aggregated total lead_time and money_dt_count from history_by_day."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(SUM(lead_time), 0)::bigint AS total_lead_time,
+                    COALESCE(SUM(money_dt_count), 0)::int AS total_money
+                FROM history_by_day
+                WHERE user_id = %s
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+            if row:
+                return {
+                    'total_lead_time': int(row.get('total_lead_time') if isinstance(row, dict) else row[0]),
+                    'total_money': int(row.get('total_money') if isinstance(row, dict) else row[1]),
+                }
+            return {'total_lead_time': 0, 'total_money': 0}
+    except Exception as e:
+        raise Exception(f"Failed to get history_by_day totals: {e}")
+    finally:
+        conn.close()
