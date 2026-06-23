@@ -1179,6 +1179,8 @@
           if (!session) return;
           // Сохраняем время текущего предложения перед уходом
           try { _saveSentenceTime(session); } catch (e0st) {}
+          // Сохраняем сессию в IDB (кеш состояния диктанта) — моментально, без очереди
+          try { _persistSessionToIdb(); } catch (e0ps) {}
           // Переходим на следующее предложение, которое ещё не закрыто (нет звезды или не закрыт микрофон)
           goNextIncomplete(session);
           try { resetSentenceUiFromSession(session); } catch (e00) {}
@@ -1200,6 +1202,8 @@
           if (!session) return;
           // Сохраняем время текущего предложения перед уходом
           try { _saveSentenceTime(session); } catch (e0st) {}
+          // Сохраняем сессию в IDB (кеш состояния диктанта) — моментально, без очереди
+          try { _persistSessionToIdb(); } catch (e0ps) {}
           session.goPrev();
           try { resetSentenceUiFromSession(session); } catch (e00) {}
           // Запоминаем время старта нового предложения
@@ -1647,6 +1651,10 @@
           updateNavigatorFromSession(session);
         } catch (e9) {
         }
+
+        // Сохраняем сессию в IDB после проверки текста (на случай, если handleActivity не был вызван,
+        // например при reward === 0 или при отсутствии allCorrect, но изменении mistake_count).
+        try { await _persistSessionToIdb(); } catch (ePersist) {}
       };
     }
   } catch (e) {
@@ -2035,6 +2043,15 @@
 
       clearAllRecordingTimers();
       stopAllAudios();
+
+      // Останавливаем активную запись речи, если она идёт
+      try {
+        const panel = state._speechPanel;
+        if (panel && typeof panel.stopRecording === 'function') {
+          panel.stopRecording('pause');
+        }
+      } catch (eSpeech) {
+      }
 
       try {
         const el = document.getElementById('pauseTimer');
@@ -2762,6 +2779,16 @@
         } else {
           title.textContent = 'Обменять 3 аудио-попытки (50-80%) на микрофон?';
         }
+
+        // Останавливаем активную запись речи, если она идёт
+        try {
+          const panel = state._speechPanel;
+          if (panel && typeof panel.stopRecording === 'function') {
+            panel.stopRecording('exchange');
+          }
+        } catch (eSpeech) {
+        }
+
         modal.style.display = 'flex';
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
@@ -3080,11 +3107,15 @@
       console.warn('[DM:handleActivity] enqueueActivity: ошибка', e0ob);
     }
 
-    // Сохраняем сессию в IndexedDB после каждого действия
+    // Сохраняем сессию в IndexedDB после каждого действия.
+    // Важно: используем await, чтобы гарантировать сохранение ДО того,
+    // как пользователь может закрыть страницу. Сессия в IDB — это кеш
+    // состояния диктанта, который не должен участвовать в очереди OutboxBatcher.
+    // Данные должны сохраняться моментально после начисления денег.
     try {
       var _store = getRuntimeStore();
       if (_store && typeof _store.persistToIdb === 'function') {
-        _store.persistToIdb();
+        await _store.persistToIdb();
       }
     } catch (_ePersist) {
     }
@@ -3469,6 +3500,10 @@
               }
             } catch (e0) {
             }
+
+            // Сохраняем сессию в IDB после любого результата распознавания,
+            // включая случаи pct >= 50 (где handleActivity не вызывается).
+            try { await _persistSessionToIdb(); } catch (ePersist) {}
           } catch (e) {
           }
         },
@@ -4150,6 +4185,28 @@
     }
   }
 
+  /**
+   * Вспомогательная функция для моментального сохранения сессии в IndexedDB.
+   * Сохранение сессии (кеш состояния диктанта) не должно участвовать в очереди OutboxBatcher.
+   * Данные должны сохраняться сразу после изменения состояния, чтобы при перезагрузке
+   * страницы пользователь мог продолжить с того же места.
+   *
+   * Используется в местах, где меняется состояние сессии, но не начисляются деньги:
+   * - переключение между предложениями (nextSentence/previousSentence)
+   * - изменение selection_state (чекбоксы)
+   * - сброс прогресса диктанта
+   */
+  async function _persistSessionToIdb() {
+    try {
+      const store = getRuntimeStore();
+      if (store && typeof store.persistToIdb === 'function') {
+        await store.persistToIdb();
+      }
+    } catch (e) {
+      // silent — сохранение в кеш не критично для работы приложения
+    }
+  }
+
   async function loadSentencesFromIndexedDb({ dictationId, langOrig, langTr }) {
     try {
       const idb = window.IdbManager;
@@ -4498,6 +4555,8 @@
             } catch (e2) {
             }
             updateNavigatorFromSession(session);
+            // Сохраняем сессию в IDB после изменения selection_state
+            try { _persistSessionToIdb(); } catch (e3) {}
           } catch (e1) {
           }
         });
@@ -5523,6 +5582,8 @@
         updateAllCheckboxButtonFromSession(session);
       } catch (e) {
       }
+      // Сохраняем сессию в IDB после сброса прогресса
+      try { _persistSessionToIdb(); } catch (e) {}
     } catch (e) {
     }
   }

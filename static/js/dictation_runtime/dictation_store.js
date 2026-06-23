@@ -438,6 +438,24 @@
     }
 
     async persistToIdb() {
+      // Сериализуем вызовы: если persist уже выполняется, ждём его,
+      // чтобы не было гонок и потери данных при конкурентных вызовах.
+      if (this._persistPromise) {
+        try {
+          await this._persistPromise;
+        } catch (e) {
+          // ignore
+        }
+      }
+      this._persistPromise = this._doPersistToIdb();
+      try {
+        await this._persistPromise;
+      } finally {
+        this._persistPromise = null;
+      }
+    }
+
+    async _doPersistToIdb() {
       try {
         if (!window.IdbManager || typeof window.IdbManager.idbPut !== 'function') return;
         for (const [key, session] of this._sessions) {
