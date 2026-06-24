@@ -3492,9 +3492,14 @@ class DictationReport {
             const js = await res.json().catch(() => null);
             if (js && js.success && Array.isArray(js.users)) {
                 this._users = js.users;
+                if (this._users.length === 0) {
+                    console.warn('[DictationReport] API вернул пустой список пользователей');
+                }
+            } else {
+                console.warn('[DictationReport] Ошибка загрузки пользователей:', js?.error || 'неизвестная ошибка');
             }
         } catch (e) {
-            console.warn('Failed to load users for dictation report', e);
+            console.warn('[DictationReport] Failed to load users for dictation report', e);
         }
     }
 
