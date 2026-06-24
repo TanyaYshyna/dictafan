@@ -3485,7 +3485,7 @@ class DictationReport {
         const token = this.getToken();
         if (!token) return;
         try {
-            const res = await fetch('/api/statistics/dictation-report/users', {
+            const res = await fetch('/api/statistics/report-users', {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
