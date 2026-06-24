@@ -2289,27 +2289,43 @@ def get_success_count_subset():
 @jwt_required()
 def api_dictation_report_data():
     """Данные для отчета по диктантам за период."""
+    import sys
+    print("=== DICTATION REPORT DATA START ===", flush=True)
     try:
         current_email = get_jwt_identity()
+        print(f"[dictation-report/data] current_email={current_email}", flush=True)
         user = get_user_by_email(current_email)
         if not user:
+            print("[dictation-report/data] User not found", flush=True)
             return jsonify({"success": False, "error": "User not found"}), 404
 
         current_user_id = int(user.get('id'))
         body = request.get_json(silent=True) or {}
+        print(f"[dictation-report/data] body={body}", flush=True)
         
         target_user_id = int(body.get('user_id', current_user_id))
         start_date = body.get('start_date')
         end_date = body.get('end_date')
+        print(f"[dictation-report/data] target_user_id={target_user_id}, start={start_date}, end={end_date}", flush=True)
 
         if not start_date or not end_date:
             return jsonify({"success": False, "error": "start_date and end_date required"}), 400
 
         # Получаем книги пользователя (свои + на полке)
-        own_books, shelf_books = get_user_library_books(target_user_id)
+        print(f"[dictation-report/data] calling get_user_library_books({target_user_id})...", flush=True)
+        try:
+            own_books, shelf_books = get_user_library_books(target_user_id)
+            print(f"[dictation-report/data] own_books={len(own_books)}, shelf_books={len(shelf_books)}", flush=True)
+        except Exception as e:
+            print(f"[dictation-report/data] ERROR in get_user_library_books: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return jsonify({"success": False, "error": f"get_user_library_books failed: {str(e)}"}), 500
         all_books = own_books + shelf_books
+        print(f"[dictation-report/data] all_books count={len(all_books)}", flush=True)
 
         # Получаем данные из history_by_day за период
+        print(f"[dictation-report/data] querying history_by_day...", flush=True)
         conn = get_db_connection()
         try:
             with conn.cursor() as cur:
@@ -2333,6 +2349,7 @@ def api_dictation_report_data():
                     (target_user_id, start_date, end_date),
                 )
                 history_rows = cur.fetchall() or []
+                print(f"[dictation-report/data] history_rows count={len(history_rows)}", flush=True)
         finally:
             conn.close()
 
@@ -2359,11 +2376,13 @@ def api_dictation_report_data():
                 "successes": int(r.get('total_successes') or 0),
                 "symbols": int(r.get('total_symbols') or 0),
             }
+        print(f"[dictation-report/data] history_by_dict keys={list(history_by_dict.keys())}", flush=True)
 
         # Строим иерархию: язык → книга → раздел → диктант → упражнение
         languages_map = {}  # language_code -> { language, books: [] }
 
-        for book in all_books:
+        for book_idx, book in enumerate(all_books):
+            print(f"[dictation-report/data] processing book {book_idx}/{len(all_books)}: id={book.get('id')}, title={book.get('title')}", flush=True)
             book_id = int(book.get('id'))
             book_title = str(book.get('title') or 'Без названия')
             book_cover = str(book.get('cover_url') or '')
@@ -2372,18 +2391,23 @@ def api_dictation_report_data():
 
             # Только книги верхнего уровня (не разделы)
             if parent_id is not None:
+                print(f"[dictation-report/data]   skipping section (parent_id={parent_id})", flush=True)
                 continue
 
             # Получаем разделы книги
             try:
                 sections = get_book_sections(book_id)
-            except Exception:
+                print(f"[dictation-report/data]   sections count={len(sections)}", flush=True)
+            except Exception as e:
+                print(f"[dictation-report/data]   ERROR get_book_sections({book_id}): {e}", flush=True)
                 sections = []
 
             # Получаем диктанты книги
             try:
                 book_dictations = get_book_dictations(book_id)
-            except Exception:
+                print(f"[dictation-report/data]   book_dictations count={len(book_dictations)}", flush=True)
+            except Exception as e:
+                print(f"[dictation-report/data]   ERROR get_book_dictations({book_id}): {e}", flush=True)
                 book_dictations = []
 
             # Собираем все диктанты (из книги напрямую + из разделов)
@@ -2395,12 +2419,14 @@ def api_dictation_report_data():
                 sec_id = int(sec.get('id'))
                 try:
                     sec_dicts = get_book_dictations(sec_id)
-                except Exception:
+                except Exception as e:
+                    print(f"[dictation-report/data]   ERROR get_book_dictations for section {sec_id}: {e}", flush=True)
                     sec_dicts = []
                 section_dictations_map[sec_id] = sec_dicts
                 all_dictations.extend(sec_dicts)
 
             if not all_dictations and not sections:
+                print(f"[dictation-report/data]   no dictations and no sections, skipping book", flush=True)
                 continue
 
             # Группируем диктанты по языку
@@ -2429,12 +2455,18 @@ def api_dictation_report_data():
                 dtitle = str(d.get('title') or 'Без названия')
                 
                 # Получаем обложку диктанта
-                d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                try:
+                    d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                except Exception as e:
+                    print(f"[dictation-report/data]   ERROR get_cover_url_for_id(dict_{did}): {e}", flush=True)
+                    d_cover = ''
                 
                 # Получаем упражнения
                 try:
                     exercises = list_dictation_exercises(did)
-                except Exception:
+                    print(f"[dictation-report/data]   dictation {did} exercises count={len(exercises)}", flush=True)
+                except Exception as e:
+                    print(f"[dictation-report/data]   ERROR list_dictation_exercises({did}): {e}", flush=True)
                     exercises = []
                 
                 # Строим упражнения
@@ -2497,11 +2529,16 @@ def api_dictation_report_data():
                     did = int(d.get('id'))
                     dlang = str(d.get('language_code') or book_lang)
                     dtitle = str(d.get('title') or 'Без названия')
-                    d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                    try:
+                        d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                    except Exception as e:
+                        print(f"[dictation-report/data]   ERROR get_cover_url_for_id(dict_{did}) in section: {e}", flush=True)
+                        d_cover = ''
                     
                     try:
                         exercises = list_dictation_exercises(did)
-                    except Exception:
+                    except Exception as e:
+                        print(f"[dictation-report/data]   ERROR list_dictation_exercises({did}) in section: {e}", flush=True)
                         exercises = []
                     
                     exercise_list = []
@@ -2568,6 +2605,8 @@ def api_dictation_report_data():
 
         # Преобразуем в список
         languages_list = list(languages_map.values())
+        print(f"[dictation-report/data] languages count={len(languages_list)}", flush=True)
+        print(f"[dictation-report/data] SUCCESS", flush=True)
 
         return jsonify({
             "success": True,
@@ -2575,5 +2614,6 @@ def api_dictation_report_data():
         })
     except Exception as exc:
         import traceback
+        print(f"[dictation-report/data] UNHANDLED EXCEPTION: {exc}", flush=True)
         traceback.print_exc()
         return jsonify({"success": False, "error": str(exc)}), 500
