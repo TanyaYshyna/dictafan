@@ -3402,3 +3402,775 @@ class ActivityTrackerReport {
         await rep.show();
     }
 }
+
+
+/**
+ * Отчёт по диктантам — иерархическая таблица: язык → книга → раздел → диктант → упражнение.
+ * Слева блок диктантов, справа — колонки повторений (1, 2, 3…).
+ * В каждой ячейке: время, деньги, ошибки/символы (настраиваемые чекбоксы).
+ */
+class DictationReport {
+    constructor() {
+        this._modalId = 'dictation-report-modal';
+        this._token = null;
+        this._users = [];
+        this._selectedUserId = null;
+        this._languagesData = null;
+        this._startDate = null;
+        this._endDate = null;
+        this._showTime = true;
+        this._showMoney = true;
+        this._showErrors = true;
+        this._loading = false;
+    }
+
+    /* ---------- helpers ---------- */
+
+    getToken() {
+        if (this._token) return this._token;
+        try {
+            const raw = localStorage.getItem('access_token');
+            if (raw) this._token = raw;
+        } catch (e) { /* ignore */ }
+        return this._token;
+    }
+
+    escapeHtml(v) {
+        if (v == null) return '';
+        return String(v)
+            .replace(/&/g, '&')
+            .replace(/</g, '<')
+            .replace(/>/g, '>')
+            .replace(/"/g, '"')
+            .replace(/'/g, '&#039;');
+    }
+
+    formatDateForInput(dt) {
+        if (!dt) return '';
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    formatDurationHhMmSs(ms) {
+        if (!ms || ms <= 0) return '—';
+        const totalSec = Math.floor(ms / 1000);
+        const h = Math.floor(totalSec / 3600);
+        const m = Math.floor((totalSec % 3600) / 60);
+        const s = totalSec % 60;
+        if (h > 0) return `${h}ч ${m}м`;
+        if (m > 0) return `${m}м ${s}с`;
+        return `${s}с`;
+    }
+
+    formatMoney(val) {
+        if (val == null || val === 0) return '—';
+        return String(val);
+    }
+
+    formatSymbols(val) {
+        if (val == null || val === 0) return '—';
+        return String(val);
+    }
+
+    avatarUrlForUser(userId) {
+        return `/user/api/avatar?user_id=${userId}&size=small`;
+    }
+
+    /* ---------- user picker ---------- */
+
+    async ensureUsersLoaded() {
+        if (this._users.length > 0) return;
+        const token = this.getToken();
+        if (!token) return;
+        try {
+            const res = await fetch('/api/statistics/dictation-report/users', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success && Array.isArray(js.users)) {
+                this._users = js.users;
+            }
+        } catch (e) {
+            console.warn('Failed to load users for dictation report', e);
+        }
+    }
+
+    _getFlatUsers() {
+        const flat = [];
+        for (const u of this._users) {
+            if (u.type === 'group' && Array.isArray(u.children)) {
+                for (const c of u.children) {
+                    flat.push(c);
+                }
+            } else {
+                flat.push(u);
+            }
+        }
+        return flat;
+    }
+
+    _findUserById(id) {
+        const flat = this._getFlatUsers();
+        return flat.find(u => String(u.id) === String(id)) || null;
+    }
+
+    _renderUserPicker(container) {
+        container.innerHTML = '';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'dictation-report-user-picker';
+
+        const trigger = document.createElement('button');
+        trigger.className = 'user-picker-trigger';
+        trigger.type = 'button';
+
+        const avatarImg = document.createElement('img');
+        avatarImg.className = 'avatar';
+        avatarImg.alt = '';
+        const chevron = document.createElement('i');
+        chevron.setAttribute('data-lucide', 'chevron-down');
+        chevron.className = 'chevron';
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'label';
+
+        trigger.appendChild(avatarImg);
+        trigger.appendChild(labelSpan);
+        trigger.appendChild(chevron);
+
+        const menu = document.createElement('div');
+        menu.className = 'user-picker-menu';
+
+        const updateTrigger = (user) => {
+            if (!user) {
+                const self = this._users.find(u => u.type === 'self');
+                if (self) {
+                    this._selectedUserId = self.id;
+                    updateTrigger(self);
+                    return;
+                }
+                return;
+            }
+            avatarImg.src = this.avatarUrlForUser(user.id);
+            avatarImg.onerror = () => { avatarImg.src = '/static/icons/default-avatar-small.svg'; };
+            labelSpan.textContent = user.label || `User #${user.id}`;
+            this._selectedUserId = user.id;
+        };
+
+        const buildMenu = () => {
+            menu.innerHTML = '';
+            for (const u of this._users) {
+                if (u.type === 'group' && Array.isArray(u.children)) {
+                    const groupLabel = document.createElement('div');
+                    groupLabel.className = 'menu-group-label';
+                    const icon = document.createElement('i');
+                    icon.setAttribute('data-lucide', 'users');
+                    groupLabel.appendChild(icon);
+                    groupLabel.appendChild(document.createTextNode(u.label));
+                    menu.appendChild(groupLabel);
+
+                    for (const c of u.children) {
+                        const item = document.createElement('button');
+                        item.className = 'menu-item menu-item--child';
+                        item.type = 'button';
+                        if (String(c.id) === String(this._selectedUserId)) {
+                            item.classList.add('selected');
+                        }
+                        const cAvatar = document.createElement('img');
+                        cAvatar.className = 'avatar';
+                        cAvatar.src = this.avatarUrlForUser(c.id);
+                        cAvatar.onerror = () => { cAvatar.src = '/static/icons/default-avatar-small.svg'; };
+                        cAvatar.alt = '';
+                        item.appendChild(cAvatar);
+                        item.appendChild(document.createTextNode(c.label || `User #${c.id}`));
+                        item.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            updateTrigger(c);
+                            menu.classList.remove('open');
+                            chevron.classList.remove('open');
+                            buildMenu();
+                            this._onUserChange();
+                        });
+                        menu.appendChild(item);
+                    }
+                } else {
+                    const item = document.createElement('button');
+                    item.className = 'menu-item';
+                    item.type = 'button';
+                    if (String(u.id) === String(this._selectedUserId)) {
+                        item.classList.add('selected');
+                    }
+                    const uAvatar = document.createElement('img');
+                    uAvatar.className = 'avatar';
+                    uAvatar.src = this.avatarUrlForUser(u.id);
+                    uAvatar.onerror = () => { uAvatar.src = '/static/icons/default-avatar-small.svg'; };
+                    uAvatar.alt = '';
+                    item.appendChild(uAvatar);
+                    item.appendChild(document.createTextNode(u.label || `User #${u.id}`));
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        updateTrigger(u);
+                        menu.classList.remove('open');
+                        chevron.classList.remove('open');
+                        buildMenu();
+                        this._onUserChange();
+                    });
+                    menu.appendChild(item);
+                }
+            }
+            lucide.createIcons({ icons: { users: LucideIcons.users } }, menu);
+        };
+
+        trigger.addEventListener('click', () => {
+            const isOpen = menu.classList.contains('open');
+            menu.classList.toggle('open');
+            chevron.classList.toggle('open');
+            if (!isOpen) buildMenu();
+        });
+
+        // Close on outside click
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target)) {
+                menu.classList.remove('open');
+                chevron.classList.remove('open');
+            }
+        });
+
+        wrapper.appendChild(trigger);
+        wrapper.appendChild(menu);
+        container.appendChild(wrapper);
+
+        // Init trigger with self user
+        const self = this._users.find(u => u.type === 'self');
+        if (self) {
+            updateTrigger(self);
+        }
+    }
+
+    /* ---------- modal ---------- */
+
+    createModal() {
+        const existing = document.getElementById(this._modalId);
+        if (existing) return;
+
+        const modal = document.createElement('div');
+        modal.id = this._modalId;
+        modal.className = 'modal dictation-report-modal';
+        modal.style.cssText = `
+            position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+            align-items: flex-start; justify-content: center;
+            background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+            overflow: hidden; z-index: 10150; padding-top: 20px;
+        `;
+
+        const content = document.createElement('div');
+        content.className = 'modal-content statistics-modal-content';
+        content.style.cssText = `
+            max-width: 95vw; width: 1400px; margin: 0 auto;
+            display: flex; flex-direction: column; max-height: calc(100vh - 40px);
+        `;
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'dictation-report-header';
+
+        const leftPanel = document.createElement('div');
+        leftPanel.className = 'dictation-report-header-left';
+
+        // Title
+        const title = document.createElement('h2');
+        title.className = 'reports-modal-title';
+        title.textContent = 'Отчет по диктантам';
+
+        // User picker
+        const userPickerContainer = document.createElement('div');
+        userPickerContainer.id = 'dictation-report-user-picker';
+
+        // Date range
+        const dateRange = document.createElement('div');
+        dateRange.className = 'dictation-report-date-range';
+
+        const dateFromLabel = document.createElement('label');
+        dateFromLabel.textContent = 'с';
+        const dateFromInput = document.createElement('input');
+        dateFromInput.type = 'date';
+        dateFromInput.id = 'dictation-report-date-from';
+        const now = new Date();
+        dateFromInput.value = this.formatDateForInput(now);
+
+        const dateToLabel = document.createElement('label');
+        dateToLabel.textContent = 'по';
+        const dateToInput = document.createElement('input');
+        dateToInput.type = 'date';
+        dateToInput.id = 'dictation-report-date-to';
+        dateToInput.value = this.formatDateForInput(now);
+
+        dateRange.appendChild(dateFromLabel);
+        dateRange.appendChild(dateFromInput);
+        dateRange.appendChild(dateToLabel);
+        dateRange.appendChild(dateToInput);
+
+        leftPanel.appendChild(title);
+        leftPanel.appendChild(userPickerContainer);
+        leftPanel.appendChild(dateRange);
+
+        // Right panel
+        const rightPanel = document.createElement('div');
+        rightPanel.className = 'dictation-report-header-right';
+
+        // Refresh button
+        const refreshBtn = document.createElement('button');
+        refreshBtn.className = 'dictation-report-refresh-btn';
+        refreshBtn.title = 'Обновить';
+        refreshBtn.type = 'button';
+        const refreshIcon = document.createElement('i');
+        refreshIcon.setAttribute('data-lucide', 'rotate-cw');
+        refreshBtn.appendChild(refreshIcon);
+        refreshBtn.addEventListener('click', () => this._onRefresh());
+
+        // Close button
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'statistics-close';
+        closeBtn.type = 'button';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('click', () => this.hide());
+
+        rightPanel.appendChild(refreshBtn);
+        rightPanel.appendChild(closeBtn);
+
+        header.appendChild(leftPanel);
+        header.appendChild(rightPanel);
+
+        // Column options (checkboxes)
+        const colOptions = document.createElement('div');
+        colOptions.className = 'dictation-report-column-options';
+
+        const timeOpt = this._makeColOption('time', 'clock', 'Время', this._showTime);
+        const moneyOpt = this._makeColOption('money', 'dollar-sign', 'Деньги', this._showMoney);
+        const errorsOpt = this._makeColOption('errors', 'bug', 'Ошибки/Символы', this._showErrors);
+
+        timeOpt.querySelector('input').addEventListener('change', (e) => {
+            this._showTime = e.target.checked;
+            this._renderTable();
+        });
+        moneyOpt.querySelector('input').addEventListener('change', (e) => {
+            this._showMoney = e.target.checked;
+            this._renderTable();
+        });
+        errorsOpt.querySelector('input').addEventListener('change', (e) => {
+            this._showErrors = e.target.checked;
+            this._renderTable();
+        });
+
+        colOptions.appendChild(timeOpt);
+        colOptions.appendChild(moneyOpt);
+        colOptions.appendChild(errorsOpt);
+
+        // Body (table wrapper)
+        const body = document.createElement('div');
+        body.className = 'statistics-content reports-modal-body';
+        const tableWrapper = document.createElement('div');
+        tableWrapper.id = 'dictation-report-table-wrapper';
+        tableWrapper.className = 'dictation-report-table-wrapper';
+        body.appendChild(tableWrapper);
+
+        content.appendChild(header);
+        content.appendChild(colOptions);
+        content.appendChild(body);
+        modal.appendChild(content);
+        document.body.appendChild(modal);
+
+        // Init lucide icons
+        lucide.createIcons({ icons: { 'rotate-cw': LucideIcons['rotate-cw'] } }, refreshBtn);
+
+        // Date change handlers
+        dateFromInput.addEventListener('change', () => this._onDateChange());
+        dateToInput.addEventListener('change', () => this._onDateChange());
+
+        // Store refs
+        this._modal = modal;
+        this._tableWrapper = tableWrapper;
+        this._dateFromInput = dateFromInput;
+        this._dateToInput = dateToInput;
+        this._userPickerContainer = userPickerContainer;
+    }
+
+    _makeColOption(id, iconName, label, checked) {
+        const labelEl = document.createElement('label');
+        labelEl.className = 'col-option';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = checked;
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', iconName);
+        labelEl.appendChild(cb);
+        labelEl.appendChild(icon);
+        labelEl.appendChild(document.createTextNode(label));
+        return labelEl;
+    }
+
+    /* ---------- show / hide ---------- */
+
+    async show() {
+        this.createModal();
+        this._modal.style.display = 'flex';
+
+        // Load users and render picker
+        await this.ensureUsersLoaded();
+        this._renderUserPicker(this._userPickerContainer);
+
+        // Init lucide icons in user picker
+        lucide.createIcons();
+
+        // Load data
+        await this._loadData();
+    }
+
+    hide() {
+        if (this._modal) {
+            this._modal.style.display = 'none';
+        }
+    }
+
+    /* ---------- data loading ---------- */
+
+    _onUserChange() {
+        this._loadData();
+    }
+
+    _onDateChange() {
+        this._loadData();
+    }
+
+    _onRefresh() {
+        this._loadData();
+    }
+
+    async _loadData() {
+        if (this._loading) return;
+        this._loading = true;
+
+        const wrapper = this._tableWrapper;
+        wrapper.innerHTML = `
+            <div class="dictation-report-loading">
+                <i data-lucide="loader-2"></i>
+                <span>Загрузка...</span>
+            </div>
+        `;
+        lucide.createIcons({ icons: { 'loader-2': LucideIcons['loader-2'] } }, wrapper);
+
+        const token = this.getToken();
+        if (!token) {
+            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Ошибка авторизации</p></div>';
+            this._loading = false;
+            return;
+        }
+
+        const userId = this._selectedUserId;
+        const startDate = this._dateFromInput ? this._dateFromInput.value : '';
+        const endDate = this._dateToInput ? this._dateToInput.value : '';
+
+        if (!startDate || !endDate) {
+            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Выберите даты</p></div>';
+            this._loading = false;
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/statistics/dictation-report/data', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    start_date: startDate,
+                    end_date: endDate
+                })
+            });
+            const js = await res.json().catch(() => null);
+            if (js && js.success) {
+                this._data = js.languages || [];
+                this._renderTable();
+            } else {
+                wrapper.innerHTML = `<div class="dictation-report-empty"><p>${this.escapeHtml(js?.error || 'Ошибка загрузки')}</p></div>`;
+            }
+        } catch (e) {
+            wrapper.innerHTML = '<div class="dictation-report-empty"><p>Ошибка сети</p></div>';
+            console.warn('DictationReport load error', e);
+        } finally {
+            this._loading = false;
+        }
+    }
+
+    /* ---------- table rendering ---------- */
+
+    _renderTable() {
+        const wrapper = this._tableWrapper;
+        if (!this._data || this._data.length === 0) {
+            wrapper.innerHTML = `
+                <div class="dictation-report-empty">
+                    <i data-lucide="file-text"></i>
+                    <p>Нет данных за выбранный период</p>
+                </div>
+            `;
+            lucide.createIcons({ icons: { 'file-text': LucideIcons['file-text'] } }, wrapper);
+            return;
+        }
+
+        // Определяем максимальное количество повторений (упражнений) среди всех диктантов
+        let maxRepeats = 0;
+        for (const lang of this._data) {
+            for (const book of (lang.books || [])) {
+                for (const d of (book.dictations || [])) {
+                    if ((d.exercises || []).length > maxRepeats) {
+                        maxRepeats = d.exercises.length;
+                    }
+                }
+                for (const sec of (book.sections || [])) {
+                    for (const d of (sec.dictations || [])) {
+                        if ((d.exercises || []).length > maxRepeats) {
+                            maxRepeats = d.exercises.length;
+                        }
+                    }
+                }
+            }
+        }
+        if (maxRepeats < 1) maxRepeats = 1;
+
+        const table = document.createElement('table');
+        table.className = 'dictation-report-table';
+
+        // THEAD
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+
+        // First column: Dictation block
+        const thDict = document.createElement('th');
+        thDict.className = 'dictation-report-th-sticky';
+        thDict.textContent = 'Диктант';
+        thDict.style.textAlign = 'left';
+        headerRow.appendChild(thDict);
+
+        // Value columns header (time, money, errors)
+        const valueCols = [];
+        if (this._showTime) valueCols.push('time');
+        if (this._showMoney) valueCols.push('money');
+        if (this._showErrors) valueCols.push('errors');
+
+        for (const vc of valueCols) {
+            const th = document.createElement('th');
+            th.textContent = vc === 'time' ? 'Время' : vc === 'money' ? 'Деньги' : 'Ош/Сим';
+            headerRow.appendChild(th);
+        }
+
+        // Repeat count headers
+        for (let i = 1; i <= maxRepeats; i++) {
+            const th = document.createElement('th');
+            th.className = 'repeat-header';
+            th.textContent = String(i);
+            headerRow.appendChild(th);
+        }
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // TBODY
+        const tbody = document.createElement('tbody');
+
+        for (const lang of this._data) {
+            // Language row
+            const langRow = document.createElement('tr');
+            langRow.className = 'level-language';
+            const langTd = document.createElement('td');
+            langTd.className = 'dictation-report-td-sticky';
+            langTd.textContent = `🌐 ${(lang.language || '').toUpperCase()}`;
+            langTd.style.textAlign = 'left';
+            langRow.appendChild(langTd);
+
+            // Empty cells for language row
+            for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+                const td = document.createElement('td');
+                td.textContent = '';
+                langRow.appendChild(td);
+            }
+            tbody.appendChild(langRow);
+
+            for (const book of (lang.books || [])) {
+                // Book row
+                const bookRow = document.createElement('tr');
+                bookRow.className = 'level-book';
+                const bookTd = document.createElement('td');
+                bookTd.className = 'dictation-report-td-sticky';
+                bookTd.style.textAlign = 'left';
+
+                const bookCover = document.createElement('img');
+                bookCover.className = 'book-cover-thumb';
+                bookCover.src = book.cover_url || '';
+                bookCover.alt = '';
+                bookCover.onerror = function () { this.style.display = 'none'; };
+                bookTd.appendChild(bookCover);
+                bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
+                bookRow.appendChild(bookTd);
+
+                for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+                    const td = document.createElement('td');
+                    td.textContent = '';
+                    bookRow.appendChild(td);
+                }
+                tbody.appendChild(bookRow);
+
+                // Dictations directly in book
+                for (const d of (book.dictations || [])) {
+                    this._appendDictationRow(tbody, d, valueCols, maxRepeats, 'dictation');
+                }
+
+                // Sections
+                for (const sec of (book.sections || [])) {
+                    // Section row
+                    const secRow = document.createElement('tr');
+                    secRow.className = 'level-section';
+                    const secTd = document.createElement('td');
+                    secTd.className = 'dictation-report-td-sticky';
+                    secTd.style.textAlign = 'left';
+                    secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
+                    secRow.appendChild(secTd);
+
+                    for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+                        const td = document.createElement('td');
+                        td.textContent = '';
+                        secRow.appendChild(td);
+                    }
+                    tbody.appendChild(secRow);
+
+                    for (const d of (sec.dictations || [])) {
+                        this._appendDictationRow(tbody, d, valueCols, maxRepeats, 'dictation');
+                    }
+                }
+            }
+        }
+
+        table.appendChild(tbody);
+        wrapper.innerHTML = '';
+        wrapper.appendChild(table);
+        lucide.createIcons();
+    }
+
+    _appendDictationRow(tbody, d, valueCols, maxRepeats, level) {
+        const exercises = d.exercises || [];
+
+        if (exercises.length === 0) {
+            // Dictation without exercises - single row
+            const row = document.createElement('tr');
+            row.className = 'level-dictation';
+            const td = document.createElement('td');
+            td.className = 'dictation-report-td-sticky';
+            td.style.textAlign = 'left';
+
+            const cover = document.createElement('img');
+            cover.className = 'dict-cover-thumb';
+            cover.src = d.cover_url || '';
+            cover.alt = '';
+            cover.onerror = function () { this.style.display = 'none'; };
+            td.appendChild(cover);
+            td.appendChild(document.createTextNode(d.title || 'Без названия'));
+            row.appendChild(td);
+
+            // Value cells (aggregated from all exercises or empty)
+            let totalTime = 0, totalMoney = 0, totalMistakes = 0, totalSymbols = 0;
+            // No exercises, so no data
+            for (const vc of valueCols) {
+                const cell = document.createElement('td');
+                cell.className = 'value-cell';
+                cell.textContent = '—';
+                row.appendChild(cell);
+            }
+
+            // Repeat cells (empty)
+            for (let i = 0; i < maxRepeats; i++) {
+                const cell = document.createElement('td');
+                cell.className = 'value-cell';
+                cell.textContent = '—';
+                row.appendChild(cell);
+            }
+            tbody.appendChild(row);
+            return;
+        }
+
+        for (let ei = 0; ei < exercises.length; ei++) {
+            const ex = exercises[ei];
+            const row = document.createElement('tr');
+
+            if (ei === 0) {
+                // First exercise - show dictation name with cover
+                row.className = 'level-dictation';
+                const td = document.createElement('td');
+                td.className = 'dictation-report-td-sticky';
+                td.style.textAlign = 'left';
+
+                const cover = document.createElement('img');
+                cover.className = 'dict-cover-thumb';
+                cover.src = d.cover_url || '';
+                cover.alt = '';
+                cover.onerror = function () { this.style.display = 'none'; };
+                td.appendChild(cover);
+                td.appendChild(document.createTextNode(d.title || 'Без названия'));
+                row.appendChild(td);
+            } else {
+                // Subsequent exercises - show exercise name indented
+                row.className = 'level-exercise';
+                const td = document.createElement('td');
+                td.className = 'dictation-report-td-sticky';
+                td.style.textAlign = 'left';
+                td.textContent = `↳ ${ex.title || 'Упражнение'}`;
+                row.appendChild(td);
+            }
+
+            // Value cells for this exercise
+            for (const vc of valueCols) {
+                const cell = document.createElement('td');
+                cell.className = 'value-cell';
+                if (vc === 'time') {
+                    cell.textContent = this.formatDurationHhMmSs(ex.lead_time);
+                } else if (vc === 'money') {
+                    cell.textContent = this.formatMoney(ex.money);
+                } else if (vc === 'errors') {
+                    const errStr = ex.mistakes > 0 ? `✗${ex.mistakes}` : '';
+                    const symStr = ex.symbols > 0 ? `⟐${ex.symbols}` : '';
+                    cell.textContent = [errStr, symStr].filter(Boolean).join(' ') || '—';
+                }
+                row.appendChild(cell);
+            }
+
+            // Repeat cells: each exercise goes into its corresponding repeat column
+            for (let ri = 0; ri < maxRepeats; ri++) {
+                const cell = document.createElement('td');
+                cell.className = 'value-cell';
+                if (ri === ei) {
+                    // This exercise's data goes into this repeat column
+                    const parts = [];
+                    if (this._showTime) {
+                        parts.push(this.formatDurationHhMmSs(ex.lead_time));
+                    }
+                    if (this._showMoney) {
+                        parts.push(this.formatMoney(ex.money));
+                    }
+                    if (this._showErrors) {
+                        const errStr = ex.mistakes > 0 ? `✗${ex.mistakes}` : '';
+                        const symStr = ex.symbols > 0 ? `⟐${ex.symbols}` : '';
+                        parts.push([errStr, symStr].filter(Boolean).join(' ') || '—');
+                    }
+                    cell.textContent = parts.filter(Boolean).join(' | ') || '—';
+                } else {
+                    cell.textContent = '—';
+                }
+                row.appendChild(cell);
+            }
+
+            tbody.appendChild(row);
+        }
+    }
+}

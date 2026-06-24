@@ -303,3 +303,438 @@
     cursor: not-allowed;
     pointer-events: none;
 }
+
+/* ===== Dictation Report ===== */
+.dictation-report-modal .modal-content {
+  max-width: 95vw;
+  width: 1400px;
+}
+
+.dictation-report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 8px 0;
+}
+
+.dictation-report-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dictation-report-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.dictation-report-refresh-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  color: rgba(31, 41, 51, 0.7);
+}
+
+.dictation-report-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 41, 51, 0.3);
+  color: rgba(31, 41, 51, 0.95);
+}
+
+.dictation-report-refresh-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+.dictation-report-refresh-btn:active i {
+  transform: rotate(180deg);
+  transition: transform 0.3s;
+}
+
+.dictation-report-date-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dictation-report-date-range label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(31, 41, 51, 0.7);
+  white-space: nowrap;
+}
+
+.dictation-report-date-range input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dictation-report-date-range input[type="date"]:focus {
+  border-color: var(--color-button-blue, #4a90d9);
+}
+
+/* User picker with hierarchy */
+.dictation-report-user-picker {
+  position: relative;
+  min-width: 200px;
+}
+
+.dictation-report-user-picker .user-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid rgba(31, 41, 51, 0.15);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.dictation-report-user-picker .user-picker-trigger:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(31, 41, 51, 0.3);
+}
+
+.dictation-report-user-picker .user-picker-trigger .avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.dictation-report-user-picker .user-picker-trigger .label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(31, 41, 51, 0.85);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictation-report-user-picker .user-picker-trigger .chevron {
+  width: 16px;
+  height: 16px;
+  color: rgba(31, 41, 51, 0.4);
+  flex: 0 0 auto;
+  transition: transform 0.2s;
+}
+
+.dictation-report-user-picker .user-picker-trigger .chevron.open {
+  transform: rotate(180deg);
+}
+
+.dictation-report-user-picker .user-picker-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid rgba(31, 41, 51, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 10200;
+  padding: 4px 0;
+  display: none;
+}
+
+.dictation-report-user-picker .user-picker-menu.open {
+  display: block;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.85);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item:hover {
+  background: rgba(31, 41, 51, 0.06);
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item.selected {
+  background: rgba(74, 144, 217, 0.1);
+  font-weight: 600;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item .avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: rgba(31, 41, 51, 0.4);
+  cursor: default;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item--child {
+  padding-left: 28px;
+}
+
+.dictation-report-user-picker .user-picker-menu .menu-item i {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  color: rgba(31, 41, 51, 0.4);
+}
+
+/* Checkbox panel for columns */
+.dictation-report-column-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.dictation-report-column-options .col-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(31, 41, 51, 0.7);
+  user-select: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.dictation-report-column-options .col-option:hover {
+  background: rgba(31, 41, 51, 0.06);
+}
+
+.dictation-report-column-options .col-option input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--color-button-blue, #4a90d9);
+}
+
+.dictation-report-column-options .col-option i {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+/* Table wrapper */
+.dictation-report-table-wrapper {
+  overflow: auto;
+  max-height: calc(100vh - 260px);
+  border: 1px solid rgba(31, 41, 51, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.dictation-report-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 600px;
+  font-size: 13px;
+}
+
+.dictation-report-table th,
+.dictation-report-table td {
+  border: 1px solid rgba(31, 41, 51, 0.08);
+  padding: 6px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.dictation-report-table th {
+  background: rgba(31, 41, 51, 0.04);
+  font-weight: 700;
+  font-size: 12px;
+  color: rgba(31, 41, 51, 0.7);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.dictation-report-table th.dictation-report-th-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: rgba(245, 246, 248, 0.98);
+}
+
+.dictation-report-table td.dictation-report-td-sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+/* Hierarchy indentation */
+.dictation-report-table .level-language td:first-child {
+  font-weight: 700;
+  font-size: 14px;
+  color: rgba(31, 41, 51, 0.9);
+  background: rgba(74, 144, 217, 0.06);
+}
+
+.dictation-report-table .level-book td:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.dictation-report-table .level-book .book-cover-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.dictation-report-table .level-section td:first-child {
+  padding-left: 28px;
+  font-weight: 600;
+  color: rgba(31, 41, 51, 0.75);
+  font-style: italic;
+}
+
+.dictation-report-table .level-dictation td:first-child {
+  padding-left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dictation-report-table .level-dictation .dict-cover-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.dictation-report-table .level-exercise td:first-child {
+  padding-left: 40px;
+  font-size: 12px;
+  color: rgba(31, 41, 51, 0.6);
+}
+
+/* Value cells */
+.dictation-report-table .value-cell {
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+}
+
+.dictation-report-table .value-cell .val-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 13px;
+  height: 13px;
+  margin-right: 3px;
+}
+
+.dictation-report-table .value-cell .val-icon svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Repeat count header */
+.dictation-report-table .repeat-header {
+  font-size: 13px;
+  font-weight: 800;
+  color: rgba(31, 41, 51, 0.85);
+  min-width: 55px;
+}
+
+/* Sub-header for repeat columns */
+.dictation-report-table .repeat-subheader {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(31, 41, 51, 0.5);
+  padding: 2px 6px;
+}
+
+/* Empty state */
+.dictation-report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: rgba(31, 41, 51, 0.4);
+  gap: 8px;
+}
+
+.dictation-report-empty i {
+  width: 48px;
+  height: 48px;
+}
+
+.dictation-report-empty p {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Loading state */
+.dictation-report-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: rgba(31, 41, 51, 0.5);
+  gap: 10px;
+}
+
+.dictation-report-loading i {
+  width: 24px;
+  height: 24px;
+  animation: dict-report-spin 1s linear infinite;
+}
+
+@keyframes dict-report-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

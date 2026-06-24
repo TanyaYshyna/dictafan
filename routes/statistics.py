@@ -24,8 +24,11 @@ from helpers.db_telegram import (
     get_student_and_dictation_info,
 )
 from helpers.telegram import is_telegram_enabled, send_telegram_message
-from helpers.db_dictations import get_sentence_by_key
+from helpers.db_dictations import get_sentence_by_key, list_dictation_exercises
 from helpers.db import get_db_connection
+from helpers.db_books import get_user_library_books, get_book_sections, get_book_dictations
+from helpers.db_groups import list_my_groups, list_group_students_for_teacher
+from routes.index import get_cover_url_for_id
 
 try:
     from helpers.db_dictations import get_dictation_by_id
@@ -392,7 +395,8 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
                                    attempts_total, error_count, sentences_data, dictation_int, dictation_lang,
                                    settings_json, error_words, report_header_mode: str = 'success',
                                    total_chars=None, money_earned=None,
-                                   date_start_iso=None) -> str:
+                                   date_start_iso=None,
+                                   selected_sentence_positions=None) -> str:
     """
     Собирает текст отчёта для отправки в Telegram.
     Формат:
@@ -454,6 +458,33 @@ def _build_teacher_report_text_full(*, student_username: str, dictation_title: s
 
     # id диктанта
     lines.append(f"(id: {_int_or_0(dictation_int)})")
+
+    # Выбранные позиции предложений (если не весь диктант)
+    positions_label = ''
+    if selected_sentence_positions is not None:
+        try:
+            if isinstance(selected_sentence_positions, str):
+                positions_label = selected_sentence_positions.strip()
+            elif isinstance(selected_sentence_positions, (list, tuple)):
+                uniq = sorted(set(int(x) for x in selected_sentence_positions if x is not None))
+                if uniq:
+                    ranges = []
+                    start = uniq[0]
+                    prev = uniq[0]
+                    for i in range(1, len(uniq)):
+                        cur = uniq[i]
+                        if cur == prev + 1:
+                            prev = cur
+                            continue
+                        ranges.append(str(start) if start == prev else f"{start}-{prev}")
+                        start = cur
+                        prev = cur
+                    ranges.append(str(start) if start == prev else f"{start}-{prev}")
+                    positions_label = '(' + ', '.join(ranges) + ')'
+        except Exception:
+            positions_label = ''
+    if positions_label:
+        lines.append(positions_label)
 
     # Схема аудио
     audio_scheme_line = ''
@@ -960,6 +991,7 @@ def teacher_report_send_auto():
             total_chars=data.get('total_chars'),
             money_earned=data.get('money_earned'),
             date_start_iso=data.get('date_start_iso'),
+            selected_sentence_positions=data.get('selected_sentence_positions'),
         )
     else:
         today_iso = _today_iso_local()
@@ -2263,3 +2295,379 @@ def get_success_count_subset():
         traceback.print_exc()
         return jsonify({'error': 'Ошибка получения количества завершений для поднабора'}), 500
 
+
+@statistics_bp.route('/dictation-report/users', methods=['GET'])
+@jwt_required()
+def api_dictation_report_users():
+    """Список пользователей с группами для отчета по диктантам (иерархический)."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        current_user_id = int(user.get('id'))
+        current_username = str(user.get('username') or 'Я')
+
+        # Получаем группы пользователя
+        groups = list_my_groups(current_user_id)
+        
+        out = []
+        # Сначала сам пользователь
+        out.append({
+            "id": current_user_id,
+            "label": current_username,
+            "type": "self",
+            "group_id": None,
+            "group_title": None
+        })
+
+        for g in groups:
+            gid = int(g.get('id'))
+            gtitle = str(g.get('title') or f'Group #{gid}')
+            is_personal = g.get('is_personal', False)
+            
+            # Получаем студентов группы
+            try:
+                students = list_group_students_for_teacher(gid, current_user_id)
+            except Exception:
+                students = []
+            
+            # Фильтруем: исключаем самого себя и removed
+            active_students = [
+                s for s in students
+                if int(s.get('id')) != current_user_id
+                and s.get('status') == 'active'
+                and s.get('removed_at') is None
+            ]
+            
+            if not active_students:
+                continue
+            
+            # Если группа персональная или в ней всего 1 студент - показываем студента на верхнем уровне
+            if is_personal or len(active_students) == 1:
+                for s in active_students:
+                    out.append({
+                        "id": int(s.get('id')),
+                        "label": str(s.get('username') or f'User #{s.get("id")}'),
+                        "type": "student",
+                        "group_id": gid,
+                        "group_title": gtitle if not is_personal else None
+                    })
+            else:
+                # Группа с несколькими студентами - показываем группу с детьми
+                children = []
+                for s in active_students:
+                    children.append({
+                        "id": int(s.get('id')),
+                        "label": str(s.get('username') or f'User #{s.get("id")}'),
+                        "type": "student",
+                        "group_id": gid,
+                        "group_title": gtitle
+                    })
+                out.append({
+                    "id": f"group_{gid}",
+                    "label": gtitle,
+                    "type": "group",
+                    "group_id": gid,
+                    "group_title": gtitle,
+                    "children": children
+                })
+
+        return jsonify({"success": True, "users": out})
+    except Exception as exc:
+        return jsonify({"success": False, "error": str(exc)}), 500
+
+
+@statistics_bp.route('/dictation-report/data', methods=['POST'])
+@jwt_required()
+def api_dictation_report_data():
+    """Данные для отчета по диктантам за период."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({"success": False, "error": "User not found"}), 404
+
+        current_user_id = int(user.get('id'))
+        body = request.get_json(silent=True) or {}
+        
+        target_user_id = int(body.get('user_id', current_user_id))
+        start_date = body.get('start_date')
+        end_date = body.get('end_date')
+
+        if not start_date or not end_date:
+            return jsonify({"success": False, "error": "start_date and end_date required"}), 400
+
+        # Получаем книги пользователя (свои + на полке)
+        own_books, shelf_books = get_user_library_books(target_user_id)
+        all_books = own_books + shelf_books
+
+        # Получаем данные из history_by_day за период
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT
+                        dictation_id,
+                        positions,
+                        COALESCE(SUM(lead_time), 0) as total_lead_time,
+                        COALESCE(SUM(money_dt_count), 0) as total_money,
+                        COALESCE(SUM(mistake_count), 0) as total_mistakes,
+                        COALESCE(SUM(corrected_count), 0) as total_corrected,
+                        COALESCE(SUM(successes), 0) as total_successes,
+                        COALESCE(SUM(monenumber_of_characters), 0) as total_symbols
+                    FROM history_by_day
+                    WHERE user_id = %s
+                      AND date_fact >= %s::date
+                      AND date_fact <= %s::date
+                    GROUP BY dictation_id, positions
+                    """,
+                    (target_user_id, start_date, end_date),
+                )
+                history_rows = cur.fetchall() or []
+        finally:
+            conn.close()
+
+        # Индексируем историю по dictation_id
+        history_by_dict = {}
+        for r in history_rows:
+            did = int(r.get('dictation_id') or 0)
+            if did not in history_by_dict:
+                history_by_dict[did] = {}
+            positions = r.get('positions')
+            # Преобразуем positions в ключ
+            if positions is None:
+                pos_key = '__all__'
+            elif isinstance(positions, (list, tuple)):
+                pos_key = ','.join(str(p) for p in sorted(positions)) if positions else '__all__'
+            else:
+                pos_key = '__all__'
+            
+            history_by_dict[did][pos_key] = {
+                "lead_time": int(r.get('total_lead_time') or 0),
+                "money": int(r.get('total_money') or 0),
+                "mistakes": int(r.get('total_mistakes') or 0),
+                "corrected": int(r.get('total_corrected') or 0),
+                "successes": int(r.get('total_successes') or 0),
+                "symbols": int(r.get('total_symbols') or 0),
+            }
+
+        # Строим иерархию: язык → книга → раздел → диктант → упражнение
+        languages_map = {}  # language_code -> { language, books: [] }
+
+        for book in all_books:
+            book_id = int(book.get('id'))
+            book_title = str(book.get('title') or 'Без названия')
+            book_cover = str(book.get('cover_url') or '')
+            book_lang = str(book.get('original_language') or 'en')
+            parent_id = book.get('parent_id')
+
+            # Только книги верхнего уровня (не разделы)
+            if parent_id is not None:
+                continue
+
+            # Получаем разделы книги
+            try:
+                sections = get_book_sections(book_id)
+            except Exception:
+                sections = []
+
+            # Получаем диктанты книги
+            try:
+                book_dictations = get_book_dictations(book_id)
+            except Exception:
+                book_dictations = []
+
+            # Собираем все диктанты (из книги напрямую + из разделов)
+            all_dictations = list(book_dictations)
+
+            # Диктанты из разделов
+            section_dictations_map = {}
+            for sec in sections:
+                sec_id = int(sec.get('id'))
+                try:
+                    sec_dicts = get_book_dictations(sec_id)
+                except Exception:
+                    sec_dicts = []
+                section_dictations_map[sec_id] = sec_dicts
+                all_dictations.extend(sec_dicts)
+
+            if not all_dictations and not sections:
+                continue
+
+            # Группируем диктанты по языку
+            for d in all_dictations:
+                dlang = str(d.get('language_code') or book_lang)
+                if dlang not in languages_map:
+                    languages_map[dlang] = {
+                        "language": dlang,
+                        "books": []
+                    }
+
+            # Строим структуру книги
+            book_entry = {
+                "id": book_id,
+                "title": book_title,
+                "cover_url": book_cover,
+                "language": book_lang,
+                "sections": [],
+                "dictations": []
+            }
+
+            # Добавляем диктанты напрямую в книгу
+            for d in book_dictations:
+                did = int(d.get('id'))
+                dlang = str(d.get('language_code') or book_lang)
+                dtitle = str(d.get('title') or 'Без названия')
+                
+                # Получаем обложку диктанта
+                d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                
+                # Получаем упражнения
+                try:
+                    exercises = list_dictation_exercises(did)
+                except Exception:
+                    exercises = []
+                
+                # Строим упражнения
+                exercise_list = []
+                for ex in exercises:
+                    ex_id = int(ex.get('id'))
+                    ex_positions = ex.get('positions')
+                    ex_title = ex.get('title')
+                    
+                    pos_key = '__all__'
+                    if ex_positions and isinstance(ex_positions, (list, tuple)) and len(ex_positions) > 0:
+                        pos_key = ','.join(str(p) for p in sorted(ex_positions))
+                    
+                    ex_data = history_by_dict.get(did, {}).get(pos_key, {})
+                    
+                    exercise_list.append({
+                        "id": ex_id,
+                        "title": ex_title or (f"Упражнение #{ex_id}" if ex_positions else "По всем"),
+                        "positions": list(ex_positions) if ex_positions else [],
+                        "lead_time": ex_data.get('lead_time', 0),
+                        "money": ex_data.get('money', 0),
+                        "mistakes": ex_data.get('mistakes', 0),
+                        "corrected": ex_data.get('corrected', 0),
+                        "successes": ex_data.get('successes', 0),
+                        "symbols": ex_data.get('symbols', 0),
+                    })
+                
+                # Если нет упражнений, создаём одно "по всем"
+                if not exercise_list:
+                    all_data = history_by_dict.get(did, {}).get('__all__', {})
+                    exercise_list.append({
+                        "id": 0,
+                        "title": "По всем",
+                        "positions": [],
+                        "lead_time": all_data.get('lead_time', 0),
+                        "money": all_data.get('money', 0),
+                        "mistakes": all_data.get('mistakes', 0),
+                        "corrected": all_data.get('corrected', 0),
+                        "successes": all_data.get('successes', 0),
+                        "symbols": all_data.get('symbols', 0),
+                    })
+                
+                dict_entry = {
+                    "id": did,
+                    "title": dtitle,
+                    "cover_url": d_cover,
+                    "language": dlang,
+                    "exercises": exercise_list
+                }
+                book_entry["dictations"].append(dict_entry)
+
+            # Добавляем разделы
+            for sec in sections:
+                sec_id = int(sec.get('id'))
+                sec_title = str(sec.get('title') or 'Без названия')
+                sec_dicts = section_dictations_map.get(sec_id, [])
+                
+                section_dictation_list = []
+                for d in sec_dicts:
+                    did = int(d.get('id'))
+                    dlang = str(d.get('language_code') or book_lang)
+                    dtitle = str(d.get('title') or 'Без названия')
+                    d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
+                    
+                    try:
+                        exercises = list_dictation_exercises(did)
+                    except Exception:
+                        exercises = []
+                    
+                    exercise_list = []
+                    for ex in exercises:
+                        ex_id = int(ex.get('id'))
+                        ex_positions = ex.get('positions')
+                        ex_title = ex.get('title')
+                        
+                        pos_key = '__all__'
+                        if ex_positions and isinstance(ex_positions, (list, tuple)) and len(ex_positions) > 0:
+                            pos_key = ','.join(str(p) for p in sorted(ex_positions))
+                        
+                        ex_data = history_by_dict.get(did, {}).get(pos_key, {})
+                        
+                        exercise_list.append({
+                            "id": ex_id,
+                            "title": ex_title or (f"Упражнение #{ex_id}" if ex_positions else "По всем"),
+                            "positions": list(ex_positions) if ex_positions else [],
+                            "lead_time": ex_data.get('lead_time', 0),
+                            "money": ex_data.get('money', 0),
+                            "mistakes": ex_data.get('mistakes', 0),
+                            "corrected": ex_data.get('corrected', 0),
+                            "successes": ex_data.get('successes', 0),
+                            "symbols": ex_data.get('symbols', 0),
+                        })
+                    
+                    if not exercise_list:
+                        all_data = history_by_dict.get(did, {}).get('__all__', {})
+                        exercise_list.append({
+                            "id": 0,
+                            "title": "По всем",
+                            "positions": [],
+                            "lead_time": all_data.get('lead_time', 0),
+                            "money": all_data.get('money', 0),
+                            "mistakes": all_data.get('mistakes', 0),
+                            "corrected": all_data.get('corrected', 0),
+                            "successes": all_data.get('successes', 0),
+                            "symbols": all_data.get('symbols', 0),
+                        })
+                    
+                    section_dictation_list.append({
+                        "id": did,
+                        "title": dtitle,
+                        "cover_url": d_cover,
+                        "language": dlang,
+                        "exercises": exercise_list
+                    })
+                
+                book_entry["sections"].append({
+                    "id": sec_id,
+                    "title": sec_title,
+                    "dictations": section_dictation_list
+                })
+
+            # Добавляем книгу в соответствующий язык
+            if book_entry["dictations"] or book_entry["sections"]:
+                lang_key = book_lang
+                if lang_key not in languages_map:
+                    languages_map[lang_key] = {
+                        "language": lang_key,
+                        "books": []
+                    }
+                languages_map[lang_key]["books"].append(book_entry)
+
+        # Преобразуем в список
+        languages_list = list(languages_map.values())
+
+        return jsonify({
+            "success": True,
+            "languages": languages_list
+        })
+    except Exception as exc:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(exc)}), 500

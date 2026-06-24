@@ -155,6 +155,7 @@
     totalChars,
     moneyEarned,
     dateStartIso,
+    selectedSentencePositions,
   }) {
     const token = window.UM?.token || localStorage.getItem('jwt_token');
     if (!token) return;
@@ -217,8 +218,19 @@
         } catch (e2) {
         }
 
-        const timerSnapshot = getProgressTimerSnapshot();
-        const totalTimeMs = timerSnapshot.accumulatedMs || 0;
+        // Используем session.timer для консистентности времени
+        let totalTimeMs = 0;
+        try {
+          const s = window.__dictationModalActiveSession;
+          if (s && s.timer) {
+            totalTimeMs = s.timer.accumulatedMs || 0;
+          }
+        } catch (eTimer) {
+        }
+        if (!totalTimeMs) {
+          const timerSnapshot = getProgressTimerSnapshot();
+          totalTimeMs = timerSnapshot.accumulatedMs || 0;
+        }
         const nowMs = Date.now();
         const tzOffsetMin = -new Date().getTimezoneOffset();
 
@@ -294,6 +306,18 @@
         }
       }
 
+      // Получаем selectedSentencePositions из сессии
+      let finalSelectedSentencePositions = selectedSentencePositions;
+      if (!finalSelectedSentencePositions) {
+        try {
+          const session = window.__dictationModalActiveSession;
+          if (session) {
+            finalSelectedSentencePositions = _getSelectedSentencePositions(session);
+          }
+        } catch (e) {
+        }
+      }
+
       // Отправляем авто-отчёт: себе (если включены self_reports) и учителям
       let teacher_user_ids = [];
       try {
@@ -333,6 +357,7 @@
           total_chars: finalTotalChars,
           money_earned: finalMoneyEarned,
           date_start_iso: finalDateStartIso,
+          selected_sentence_positions: finalSelectedSentencePositions,
         }),
       });
     } catch (e) {
@@ -735,6 +760,8 @@
           totalMoneyEarned += Number(st.money_earned) || 0;
         }
 
+        const selectedSentencePositions = _getSelectedSentencePositions(session);
+
         autoSendTeacherReportAfterSuccess({
           completionCountAfter: completionCountAfter,
           errorWords: null,
@@ -751,6 +778,7 @@
           totalChars: totalChars,
           moneyEarned: totalMoneyEarned,
           dateStartIso: session.dateStart || null,
+          selectedSentencePositions: selectedSentencePositions,
         });
       }
     } catch (e6) {
@@ -1075,10 +1103,16 @@
           const session = window.__dictationModalActiveSession;
           if (session) {
             try { state.dictationStarted = true; } catch (e0) {}
-            // Устанавливаем дату начала диктанта (локальная дата, без времени)
+            // Устанавливаем дату и время начала диктанта (локальная дата+время)
             if (!session.dateStart) {
               const d = new Date();
-              session.dateStart = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+              const yyyy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              const hh = String(d.getHours()).padStart(2, '0');
+              const mi = String(d.getMinutes()).padStart(2, '0');
+              const ss = String(d.getSeconds()).padStart(2, '0');
+              session.dateStart = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
             }
             try {
               const p = getProgressPanelInstance();
@@ -5720,11 +5754,23 @@
             } catch (eScheme) {
             }
 
+            // Получаем выбранные позиции предложений
+            let selectedPositionsLabel = '';
+            try {
+              const positions = _getSelectedSentencePositions(session);
+              if (positions && positions.length > 0) {
+                const label = positionsToLabel(positions);
+                if (label) selectedPositionsLabel = `(${label})`;
+              }
+            } catch (ePos) {
+            }
+
             const text = [
               `📊 Промежуточный результат ${datePrefix}${nowLocalStr}`,
               `${username}`,
               `${dictationTitle}`,
               `(id: ${dictationIdForDb})`,
+              selectedPositionsLabel,
               audioScheme,
               ``,
               `Длительность: ${durationStr}`,
@@ -5735,7 +5781,7 @@
               `½⭐ - ${totalCorrected}`,
               `о - ${totalTextActivity}`,
               `🎤 - ${totalAudio}`,
-            ].join('\n');
+            ].filter(line => line !== '').join('\n');
 
             console.log('📨 [TELEGRAM][INTERIM] sending test message...');
             console.log(`📨 [TELEGRAM][INTERIM] text:\n${text}`);
@@ -6185,24 +6231,55 @@
           } catch (eCc) {
           }
 
+          // Обновляем текст кнопки СТАРТ в зависимости от состояния сессии
           const startBtn = document.getElementById('confirmStartBtn');
-          if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
-            startBtn.dataset.boundDictationRuntime = '1';
-            startBtn.addEventListener('click', (e) => {
+          if (startBtn) {
+            // Определяем состояние: завершён / в процессе / новый
+            const isCompleted = session.completed === true;
+            const hasProgress = (() => {
               try {
-                e.preventDefault();
-                e.stopPropagation();
-              } catch (e0) {
-              }
-              try {
-                try {
-                  startNewRewardCycle();
-                } catch (e00c) {
+                const keys = session.content ? session.content.getAllKeys() : [];
+                for (const key of keys) {
+                  const st = session.getState(key);
+                  if (st && (Number(st.number_of_perfect) > 0 || Number(st.number_of_corrected) > 0 || Number(st.number_of_audio) > 0)) {
+                    return true;
+                  }
                 }
-                hideStartModal();
-              } catch (e1) {
-              }
-            });
+              } catch (e) {}
+              return false;
+            })();
+
+            if (isCompleted) {
+              startBtn.textContent = 'Н О В Ы Й   С Т А Р Т';
+            } else if (hasProgress) {
+              startBtn.textContent = 'П Р О Д О Л Ж А Е М   И Г Р А Т Ь';
+            } else {
+              startBtn.textContent = 'S T A R T';
+            }
+
+            if (startBtn.dataset.boundDictationRuntime !== '1') {
+              startBtn.dataset.boundDictationRuntime = '1';
+              startBtn.addEventListener('click', (e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch (e0) {
+                }
+                try {
+                  // Если сессия завершена — сбрасываем прогресс перед стартом
+                  const s = window.__dictationModalActiveSession;
+                  if (s && s.completed === true) {
+                    resetDictationProgressForSession(s);
+                  }
+                  try {
+                    startNewRewardCycle();
+                  } catch (e00c) {
+                  }
+                  hideStartModal();
+                } catch (e1) {
+                }
+              });
+            }
           }
         }
       } catch (e) {
