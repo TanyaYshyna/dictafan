@@ -3528,6 +3528,8 @@ class DictationReport {
     }
 
     _renderUserPicker(container) {
+        console.log('[DictationReport] _renderUserPicker() вызван, container:', container?.id || container?.className || 'unknown');
+        console.log('[DictationReport] _users в _renderUserPicker:', JSON.stringify(this._users));
         container.innerHTML = '';
         const wrapper = document.createElement('div');
         wrapper.className = 'dictation-report-user-picker';
@@ -3554,6 +3556,7 @@ class DictationReport {
         menu.className = 'user-picker-menu';
 
         const updateTrigger = (user) => {
+            console.log('[DictationReport] updateTrigger() вызван с user:', user?.id, user?.label);
             if (!user) {
                 const self = this._users.find(u => u.type === 'self');
                 if (self) {
@@ -3561,6 +3564,7 @@ class DictationReport {
                     updateTrigger(self);
                     return;
                 }
+                console.warn('[DictationReport] Нет self user в _users!');
                 return;
             }
             avatarImg.src = this.avatarUrlForUser(user.id);
@@ -3570,6 +3574,7 @@ class DictationReport {
         };
 
         const buildMenu = () => {
+            console.log('[DictationReport] buildMenu() вызван, _users.length:', this._users.length);
             menu.innerHTML = '';
             for (const u of this._users) {
                 if (u.type === 'group' && Array.isArray(u.children)) {
@@ -3633,9 +3638,11 @@ class DictationReport {
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons({ root: menu });
             }
+            console.log('[DictationReport] buildMenu() завершён, menu.children.length:', menu.children.length);
         };
 
         trigger.addEventListener('click', () => {
+            console.log('[DictationReport] trigger click!');
             const isOpen = menu.classList.contains('open');
             menu.classList.toggle('open');
             chevron.classList.toggle('open');
@@ -3658,7 +3665,10 @@ class DictationReport {
         const self = this._users.find(u => u.type === 'self');
         if (self) {
             updateTrigger(self);
+        } else {
+            console.warn('[DictationReport] self не найден в _users, триггер не инициализирован');
         }
+        console.log('[DictationReport] _renderUserPicker() завершён');
     }
 
     /* ---------- modal ---------- */
@@ -3828,12 +3838,19 @@ if (typeof lucide !== 'undefined') {
     /* ---------- show / hide ---------- */
 
     async show() {
+        console.log('[DictationReport] show() вызван');
         this.createModal();
+        console.log('[DictationReport] createModal() выполнен, _modal:', !!this._modal);
         this._modal.style.display = 'flex';
+        console.log('[DictationReport] modal показан');
 
         // Load users and render picker
+        console.log('[DictationReport] вызываю ensureUsersLoaded()...');
         await this.ensureUsersLoaded();
+        console.log('[DictationReport] ensureUsersLoaded() завершён, _users.length:', this._users.length, '_users:', JSON.stringify(this._users));
+        console.log('[DictationReport] вызываю _renderUserPicker()...');
         this._renderUserPicker(this._userPickerContainer);
+        console.log('[DictationReport] _renderUserPicker() выполнен');
 // Init lucide icons
 if (typeof lucide !== 'undefined') {
     lucide.createIcons();
@@ -3841,7 +3858,9 @@ if (typeof lucide !== 'undefined') {
 
 
         // Load data
+        console.log('[DictationReport] вызываю _loadData()...');
         await this._loadData();
+        console.log('[DictationReport] _loadData() выполнен');
     }
 
     hide() {
