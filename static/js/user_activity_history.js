@@ -15,6 +15,7 @@ class UserActivityHistory {
             const token = this.getToken();
             if (!token) return [];
 
+            console.log('[UserActivityHistory] Загружаю пользователей...');
             const res = await fetch('/api/statistics/report-users', {
                 method: 'GET',
                 headers: {
@@ -22,8 +23,14 @@ class UserActivityHistory {
                     'Content-Type': 'application/json'
                 }
             });
-            const js = await res.json().catch(() => null);
-            if (!(res && res.ok && js && js.success && Array.isArray(js.users))) return [];
+            console.log('[UserActivityHistory] Статус ответа:', res.status, res.statusText);
+            const text = await res.text();
+            console.log('[UserActivityHistory] Сырой ответ:', text.substring(0, 500));
+            const js = JSON.parse(text);
+            if (!(js && js.success && Array.isArray(js.users))) {
+                console.warn('[UserActivityHistory] Ошибка:', js?.error || 'неизвестная ошибка', 'full:', JSON.stringify(js));
+                return [];
+            }
 
             // Разворачиваем иерархию в плоский список для обратной совместимости
             const flat = [];
@@ -36,8 +43,10 @@ class UserActivityHistory {
                     flat.push({ id: u.id, label: u.label, type: u.type });
                 }
             }
+            console.log('[UserActivityHistory] Загружено пользователей (flat):', flat.length, JSON.stringify(flat));
             return flat;
         } catch (e) {
+            console.warn('[UserActivityHistory] Ошибка загрузки пользователей:', e);
             return [];
         }
     }
