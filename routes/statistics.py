@@ -2146,7 +2146,14 @@ def get_success_count_subset():
 @statistics_bp.route('/dictation-report/users', methods=['GET'])
 @jwt_required()
 def api_dictation_report_users():
-    """Список пользователей с группами для отчета по диктантам (иерархический)."""
+    """Список пользователей с группами для отчета по диктантам (иерархический).
+
+    Возвращает иерархическую структуру:
+      - Сам пользователь (type: "self")
+      - Группы, где пользователь teacher, со студентами (type: "group" с children)
+      - Если в группе 1 студент — он показывается на верхнем уровне без группы
+      - Персональные группы исключаются (в них только сам пользователь)
+    """
     try:
         current_email = get_jwt_identity()
         user = get_user_by_email(current_email)
@@ -2156,9 +2163,6 @@ def api_dictation_report_users():
         current_user_id = int(user.get('id'))
         current_username = str(user.get('username') or 'Я')
 
-        # Получаем группы пользователя
-        groups = list_my_groups(current_user_id)
-        
         out = []
         # Сначала сам пользователь
         out.append({
@@ -2169,57 +2173,108 @@ def api_dictation_report_users():
             "group_title": None
         })
 
-        for g in groups:
-            gid = int(g.get('id'))
-            gtitle = str(g.get('title') or f'Group #{gid}')
-            is_personal = g.get('is_personal', False)
-            
-            # Получаем студентов группы
-            try:
-                students = list_group_students_for_teacher(gid, current_user_id)
-            except Exception:
-                students = []
-            
-            # Фильтруем: исключаем самого себя и removed
-            active_students = [
-                s for s in students
-                if int(s.get('id')) != current_user_id
-                and s.get('status') == 'active'
-                and s.get('removed_at') is None
-            ]
-            
-            if not active_students:
-                continue
-            
-            # Если группа персональная или в ней всего 1 студент - показываем студента на верхнем уровне
-            if is_personal or len(active_students) == 1:
-                for s in active_students:
-                    out.append({
-                        "id": int(s.get('id')),
-                        "label": str(s.get('username') or f'User #{s.get("id")}'),
-                        "type": "student",
-                        "group_id": gid,
-                        "group_title": gtitle if not is_personal else None
-                    })
-            else:
-                # Группа с несколькими студентами - показываем группу с детьми
-                children = []
-                for s in active_students:
-                    children.append({
-                        "id": int(s.get('id')),
-                        "label": str(s.get('username') or f'User #{s.get("id")}'),
-                        "type": "student",
-                        "group_id": gid,
-                        "group_title": gtitle
-                    })
-                out.append({
-                    "id": f"group_{gid}",
-                    "label": gtitle,
-                    "type": "group",
-                    "group_id": gid,
-                    "group_title": gtitle,
-                    "children": children
-                })
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                # Проверяем наличие колонок is_personal / personal_owner_user_id
+                cur.execute(
+                    """
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name='groups'
+                      AND column_name = ANY(%s)
+                    """,
+                    (['is_personal', 'personal_owner_user_id'],),
+                )
+                existing_cols = {r.get('column_name') if isinstance(r, dict) else r[0]
+                                for r in (cur.fetchall() or [])}
+                has_personal_cols = ('is_personal' in existing_cols and
+                                     'personal_owner_user_id' in existing_cols)
+
+                # Динамически строим запрос групп
+                extra_select = ""
+                exclude_personal = ""
+                if has_personal_cols:
+                    extra_select = ", g.is_personal, g.personal_owner_user_id"
+                    exclude_personal = "AND NOT (g.is_personal = TRUE AND g.personal_owner_user_id = %s)"
+
+                cur.execute(
+                    f"""
+                    SELECT g.id, g.title
+                           {extra_select}
+                    FROM groups g
+                    WHERE g.teacher_id = %s
+                      AND g.archived_at IS NULL
+                      {exclude_personal}
+                    ORDER BY g.id DESC
+                    """,
+                    (current_user_id, current_user_id) if has_personal_cols else (current_user_id,),
+                )
+                group_rows = cur.fetchall() or []
+
+                for gr in group_rows:
+                    gid = int(gr.get('id') if isinstance(gr, dict) else gr[0])
+                    gtitle = str(gr.get('title') if isinstance(gr, dict) else gr[1] or f'Group #{gid}')
+
+                    # Получаем активных студентов группы (исключая самого учителя)
+                    cur.execute(
+                        """
+                        SELECT u.id AS user_id, u.username
+                        FROM group_students gs
+                        JOIN users u ON u.id = gs.student_user_id
+                        WHERE gs.group_id = %s
+                          AND gs.status = 'active'
+                          AND gs.removed_at IS NULL
+                          AND gs.student_user_id != %s
+                        ORDER BY u.id ASC
+                        """,
+                        (gid, current_user_id),
+                    )
+                    student_rows = cur.fetchall() or []
+
+                    active_students = []
+                    for sr in student_rows:
+                        sid = int(sr.get('user_id') if isinstance(sr, dict) else sr[0])
+                        sname = str(sr.get('username') if isinstance(sr, dict) else sr[1] or f'User #{sid}')
+                        active_students.append({
+                            "id": sid,
+                            "username": sname
+                        })
+
+                    if not active_students:
+                        continue
+
+                    # Если в группе 1 студент — показываем его на верхнем уровне
+                    if len(active_students) == 1:
+                        s = active_students[0]
+                        out.append({
+                            "id": s["id"],
+                            "label": s["username"],
+                            "type": "student",
+                            "group_id": gid,
+                            "group_title": gtitle
+                        })
+                    else:
+                        # Группа с несколькими студентами — показываем группу с детьми
+                        children = []
+                        for s in active_students:
+                            children.append({
+                                "id": s["id"],
+                                "label": s["username"],
+                                "type": "student",
+                                "group_id": gid,
+                                "group_title": gtitle
+                            })
+                        out.append({
+                            "id": f"group_{gid}",
+                            "label": gtitle,
+                            "type": "group",
+                            "group_id": gid,
+                            "group_title": gtitle,
+                            "children": children
+                        })
+        finally:
+            conn.close()
 
         return jsonify({"success": True, "users": out})
     except Exception as exc:
