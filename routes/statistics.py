@@ -2614,6 +2614,10 @@ def api_dictation_report_data():
         })
     except Exception as exc:
         import traceback
+        import io
+        buf = io.StringIO()
+        traceback.print_exc(file=buf)
+        tb_str = buf.getvalue()
         print(f"[dictation-report/data] UNHANDLED EXCEPTION: {exc}", flush=True)
-        traceback.print_exc()
-        return jsonify({"success": False, "error": str(exc)}), 500
+        print(tb_str, flush=True)
+        return jsonify({"success": False, "error": str(exc), "traceback": tb_str}), 500

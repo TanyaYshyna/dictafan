@@ -3942,7 +3942,12 @@ if (typeof lucide !== 'undefined') {
                 this._data = js.languages || [];
                 this._renderTable();
             } else {
-                wrapper.innerHTML = `<div class="dictation-report-empty"><p>${this.escapeHtml(js?.error || 'Ошибка загрузки')}</p></div>`;
+                let errMsg = js?.error || 'Ошибка загрузки';
+                if (js?.traceback) {
+                    errMsg += '<br><br><pre style="font-size:11px;text-align:left;background:#fdd;padding:8px;border-radius:4px;max-height:300px;overflow:auto;">' + this.escapeHtml(js.traceback) + '</pre>';
+                }
+                wrapper.innerHTML = `<div class="dictation-report-empty"><p>${errMsg}</p></div>`;
+                console.error('[DictationReport] Ошибка сервера:', js);
             }
         } catch (e) {
             wrapper.innerHTML = '<div class="dictation-report-empty"><p>Ошибка сети</p></div>';
