@@ -3620,7 +3620,9 @@ class DictationReport {
                     menu.appendChild(item);
                 }
             }
-            lucide.createIcons({ icons: { users: LucideIcons.users } }, menu);
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons({ root: menu });
+            }
         };
 
         trigger.addEventListener('click', () => {
@@ -3781,9 +3783,11 @@ class DictationReport {
         content.appendChild(body);
         modal.appendChild(content);
         document.body.appendChild(modal);
+// Init lucide icons
+if (typeof lucide !== 'undefined') {
+    lucide.createIcons({ root: refreshBtn });
+}
 
-        // Init lucide icons
-        lucide.createIcons({ icons: { 'rotate-cw': LucideIcons['rotate-cw'] } }, refreshBtn);
 
         // Date change handlers
         dateFromInput.addEventListener('change', () => this._onDateChange());
@@ -3820,9 +3824,11 @@ class DictationReport {
         // Load users and render picker
         await this.ensureUsersLoaded();
         this._renderUserPicker(this._userPickerContainer);
+// Init lucide icons
+if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+}
 
-        // Init lucide icons in user picker
-        lucide.createIcons();
 
         // Load data
         await this._loadData();
@@ -3859,7 +3865,9 @@ class DictationReport {
                 <span>Загрузка...</span>
             </div>
         `;
-        lucide.createIcons({ icons: { 'loader-2': LucideIcons['loader-2'] } }, wrapper);
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ root: wrapper });
+        }
 
         const token = this.getToken();
         if (!token) {
@@ -3917,7 +3925,9 @@ class DictationReport {
                     <p>Нет данных за выбранный период</p>
                 </div>
             `;
-            lucide.createIcons({ icons: { 'file-text': LucideIcons['file-text'] } }, wrapper);
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons({ root: wrapper });
+            }
             return;
         }
 
@@ -4056,7 +4066,9 @@ class DictationReport {
         table.appendChild(tbody);
         wrapper.innerHTML = '';
         wrapper.appendChild(table);
-        lucide.createIcons();
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
     }
 
     _appendDictationRow(tbody, d, valueCols, maxRepeats, level) {

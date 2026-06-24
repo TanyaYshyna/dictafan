@@ -331,7 +331,7 @@
       // Отправляем всегда, даже если нет учителя (отправится себе)
       const send_to_self = true;
 
-      await fetch('/api/statistics/teacher_report/send_auto', {
+      await fetch('/api/statistics/teacher_report/send', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -5456,6 +5456,12 @@
       try {
         session.completed = false;
       } catch (eFlag) {
+      }
+
+      // Сбрасываем completionCount — при следующем открытии loadCompletionCount перезагрузит с сервера
+      try {
+        session.completionCount = 0;
+      } catch (eCc) {
       }
 
       const keys = session.content ? session.content.getAllKeys() : [];

@@ -611,7 +611,7 @@ def teacher_report_recipients():
 @statistics_bp.route('/teacher_report/send', methods=['POST'])
 @jwt_required()
 def teacher_report_send():
-    """Send a manual teacher report in Telegram when completion is outside today's plan."""
+    """Send Telegram report after dictation completion to selected recipients (self + teachers)."""
     current_email = get_jwt_identity()
     user = get_user_by_email(current_email)
     if not user:
@@ -623,6 +623,7 @@ def teacher_report_send():
     data = request.get_json(silent=True) or {}
     dictation_id_raw = data.get('dictation_id')
     teacher_user_ids = data.get('teacher_user_ids') or []
+    send_to_self = bool(data.get('send_to_self'))
 
     report_header_mode = None
     try:
@@ -648,25 +649,13 @@ def teacher_report_send():
 
     try:
         print(
-            f"📨 [TELEGRAM][SEND_MANUAL] student_user_id={user.get('id')} dictation_id={dictation_int} "
-            f"dictation_lang={dictation_lang!r} teacher_user_ids={teacher_user_ids}"
+            f"📨 [TELEGRAM][SEND] student_user_id={user.get('id')} dictation_id={dictation_int} "
+            f"dictation_lang={dictation_lang!r} teacher_user_ids={teacher_user_ids} send_to_self={send_to_self}"
         )
     except Exception:
         pass
 
-    today_iso = _today_iso_local()
-    try:
-        auto_chat_ids = list_teacher_chat_ids_for_student_success(
-            student_user_id=int(user.get('id')),
-            dictation_id=int(dictation_int),
-            success_date_iso=today_iso,
-        )
-    except Exception:
-        auto_chat_ids = []
-
-    if auto_chat_ids:
-        return jsonify({'success': False, 'error': 'auto_report_available'}), 409
-
+    # teachers: filter for this student + language + teacher telegram
     chat_ids = []
     try:
         chat_ids = filter_manual_teacher_chat_ids(
@@ -678,12 +667,36 @@ def teacher_report_send():
         chat_ids = []
 
     try:
-        print(f"📨 [TELEGRAM][SEND_AUTO] filtered_teacher_chat_ids={chat_ids}")
+        print(f"📨 [TELEGRAM][SEND] filtered_teacher_chat_ids={chat_ids}")
     except Exception:
         pass
 
-    if not chat_ids:
-        return jsonify({'success': False, 'error': 'no_recipients'}), 400
+    # self chat — отправляем себе только если включены self_reports
+    self_chat_id = None
+    try:
+        self_reports_enabled = bool(user.get('telegram_self_reports_enabled'))
+        if send_to_self and self_reports_enabled and user.get('telegram_chat_id'):
+            self_chat_id = int(user.get('telegram_chat_id'))
+    except Exception:
+        self_chat_id = None
+
+    # Логируем полный список получателей
+    try:
+        recipient_log = []
+        if self_chat_id is not None:
+            recipient_log.append(f"self(chat_id={self_chat_id})")
+        for cid in chat_ids:
+            recipient_log.append(f"teacher(chat_id={cid})")
+        print(f"📨 [TELEGRAM][SEND] recipients_list=[{', '.join(recipient_log)}]")
+    except Exception:
+        pass
+
+    if not chat_ids and self_chat_id is None:
+        try:
+            print("📨 [TELEGRAM][SEND] no recipients -> skip")
+        except Exception:
+            pass
+        return jsonify({'success': True, 'sent': 0, 'recipients': 0})
 
     try:
         completion_count_after = data.get('completion_count_after')
@@ -692,7 +705,11 @@ def teacher_report_send():
         completion_count_value = None
     if completion_count_value is None:
         try:
-            completion_count_value = int(get_success_count(int(user.get('id')), int(dictation_int)) or 0)
+            # Используем history_by_day.successes с учётом selected_sentence_positions
+            selected_sentence_positions = data.get('selected_sentence_positions')
+            completion_count_value = get_successes_sum_from_history_by_day(
+                int(user.get('id')), int(dictation_int), selected_sentence_positions
+            )
         except Exception:
             completion_count_value = None
 
@@ -706,7 +723,6 @@ def teacher_report_send():
         dictation_title = f'Диктант {dictation_int}'
         dictation_level = '—'
 
-    # Prefer full report when enough data is provided
     want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
     if want_full:
         mistake_count = data.get('mistake_count')
@@ -733,6 +749,8 @@ def teacher_report_send():
             report_header_mode=report_header_mode or 'success',
             total_chars=data.get('total_chars'),
             money_earned=data.get('money_earned'),
+            date_start_iso=data.get('date_start_iso'),
+            selected_sentence_positions=data.get('selected_sentence_positions'),
         )
     else:
         today_iso = _today_iso_local()
@@ -751,14 +769,21 @@ def teacher_report_send():
         try:
             send_telegram_message(int(cid), text)
             sent += 1
-        except Exception as e:
-            try:
-                print(f"📨 [TELEGRAM][SEND_AUTO] send failed chat_id={cid}: {e}")
-            except Exception:
-                pass
+        except Exception:
             continue
 
-    return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids)})
+    if self_chat_id is not None:
+        try:
+            send_telegram_message(int(self_chat_id), text)
+            sent += 1
+        except Exception as e:
+            try:
+                print(f"📨 [TELEGRAM][SEND] self send failed chat_id={self_chat_id}: {e}")
+            except Exception:
+                pass
+            pass
+
+    return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids) + (1 if self_chat_id is not None else 0)})
 
 
 @statistics_bp.route('/teacher_report/recipients_auto', methods=['POST'])
@@ -847,184 +872,6 @@ def teacher_report_recipients_auto():
         pass
 
     return jsonify({'success': True, 'recipients': recipients})
-
-
-@statistics_bp.route('/teacher_report/send_auto', methods=['POST'])
-@jwt_required()
-def teacher_report_send_auto():
-    """Send auto Telegram report after dictation completion to selected recipients."""
-    current_email = get_jwt_identity()
-    user = get_user_by_email(current_email)
-    if not user:
-        return jsonify({'success': False, 'error': 'Пользователь не найден'}), 404
-
-    if not is_telegram_enabled():
-        return jsonify({'success': False, 'error': 'Telegram disabled'}), 400
-
-    data = request.get_json(silent=True) or {}
-    dictation_id_raw = data.get('dictation_id')
-    teacher_user_ids = data.get('teacher_user_ids') or []
-    send_to_self = bool(data.get('send_to_self'))
-
-    report_header_mode = None
-    try:
-        report_header_mode = str(data.get('report_header_mode') or '').strip().lower() or None
-    except Exception:
-        report_header_mode = None
-
-    try:
-        dictation_int = int(str(dictation_id_raw).replace('dict_', ''))
-    except Exception:
-        return jsonify({'success': False, 'error': 'Некорректный dictation_id'}), 400
-
-    dictation_lang = None
-    try:
-        if callable(get_dictation_by_id):
-            info = get_dictation_by_id(dictation_int) or {}
-            dictation_lang = (info.get('language_code') or '').strip().lower()
-    except Exception:
-        dictation_lang = None
-
-    if not dictation_lang:
-        return jsonify({'success': False, 'error': 'Не удалось определить язык диктанта'}), 400
-
-    try:
-        print(
-            f"📨 [TELEGRAM][SEND_AUTO] student_user_id={user.get('id')} dictation_id={dictation_int} "
-            f"dictation_lang={dictation_lang!r} teacher_user_ids={teacher_user_ids} send_to_self={send_to_self}"
-        )
-    except Exception:
-        pass
-
-    # teachers: filter for this student + language + teacher telegram
-    chat_ids = []
-    try:
-        chat_ids = filter_manual_teacher_chat_ids(
-            int(user.get('id')),
-            teacher_user_ids,
-            dictation_language_code=dictation_lang,
-        )
-    except Exception:
-        chat_ids = []
-
-    try:
-        print(f"📨 [TELEGRAM][SEND_AUTO] filtered_teacher_chat_ids={chat_ids}")
-    except Exception:
-        pass
-
-    # self chat — отправляем себе только если включены self_reports
-    self_chat_id = None
-    try:
-        self_reports_enabled = bool(user.get('telegram_self_reports_enabled'))
-        if send_to_self and self_reports_enabled and user.get('telegram_chat_id'):
-            self_chat_id = int(user.get('telegram_chat_id'))
-    except Exception:
-        self_chat_id = None
-
-    # Логируем полный список получателей
-    try:
-        recipient_log = []
-        if self_chat_id is not None:
-            recipient_log.append(f"self(chat_id={self_chat_id})")
-        for cid in chat_ids:
-            recipient_log.append(f"teacher(chat_id={cid})")
-        print(f"📨 [TELEGRAM][SEND_AUTO] recipients_list=[{', '.join(recipient_log)}]")
-    except Exception:
-        pass
-
-    if not chat_ids and self_chat_id is None:
-        try:
-            print("📨 [TELEGRAM][SEND_AUTO] no recipients -> skip")
-        except Exception:
-            pass
-        return jsonify({'success': True, 'sent': 0, 'recipients': 0})
-
-    try:
-        completion_count_after = data.get('completion_count_after')
-        completion_count_value = int(completion_count_after) if completion_count_after is not None else None
-    except Exception:
-        completion_count_value = None
-    if completion_count_value is None:
-        try:
-            # Используем history_by_day.successes
-            selected_sentence_positions = data.get('selected_sentence_positions')
-            completion_count_value = get_successes_sum_from_history_by_day(
-                int(user.get('id')), int(dictation_int), selected_sentence_positions
-            )
-        except Exception:
-            completion_count_value = None
-
-    try:
-        info = get_student_and_dictation_info(int(user.get('id')), int(dictation_int))
-        student_username = info.get('student_username') or 'Ученик'
-        dictation_title = info.get('dictation_title') or f'Диктант {dictation_int}'
-        dictation_level = info.get('dictation_level') or '—'
-    except Exception:
-        student_username = user.get('username') or 'Ученик'
-        dictation_title = f'Диктант {dictation_int}'
-        dictation_level = '—'
-
-    want_full = bool(data.get('sentences_data')) or data.get('time_ms') is not None
-    if want_full:
-        mistake_count = data.get('mistake_count')
-        if mistake_count is None:
-            mistake_count = data.get('error_count')
-        text = _build_teacher_report_text_full(
-            student_username=student_username,
-            dictation_title=dictation_title,
-            dictation_level=dictation_level,
-            completed_at_ms=data.get('completed_at_ms'),
-            completed_at_tz_offset_min=data.get('completed_at_tz_offset_min'),
-            time_ms=data.get('time_ms') or 0,
-            completion_count_value=completion_count_value,
-            perfect_count=data.get('perfect_count') or 0,
-            corrected_count=data.get('corrected_count') or 0,
-            audio_count=data.get('audio_count') or 0,
-            attempts_total=data.get('attempts_total') or 0,
-            error_count=mistake_count or 0,
-            sentences_data=data.get('sentences_data') or [],
-            dictation_int=int(dictation_int),
-            dictation_lang=str(dictation_lang),
-            settings_json=data.get('settings_json'),
-            error_words=data.get('error_words'),
-            report_header_mode=report_header_mode or 'success',
-            total_chars=data.get('total_chars'),
-            money_earned=data.get('money_earned'),
-            date_start_iso=data.get('date_start_iso'),
-            selected_sentence_positions=data.get('selected_sentence_positions'),
-        )
-    else:
-        today_iso = _today_iso_local()
-        text = _build_teacher_report_text(
-            student_username=student_username,
-            dictation_title=dictation_title,
-            dictation_level=dictation_level,
-            date_iso=today_iso,
-            completion_count_value=completion_count_value,
-            error_words=data.get('error_words'),
-            report_header_mode=report_header_mode or 'success',
-        )
-
-    sent = 0
-    for cid in chat_ids:
-        try:
-            send_telegram_message(int(cid), text)
-            sent += 1
-        except Exception:
-            continue
-
-    if self_chat_id is not None:
-        try:
-            send_telegram_message(int(self_chat_id), text)
-            sent += 1
-        except Exception as e:
-            try:
-                print(f"📨 [TELEGRAM][SEND_AUTO] self send failed chat_id={self_chat_id}: {e}")
-            except Exception:
-                pass
-            pass
-
-    return jsonify({'success': True, 'sent': sent, 'recipients': len(chat_ids) + (1 if self_chat_id is not None else 0)})
 
 
 @statistics_bp.route('/history', methods=['GET'])
