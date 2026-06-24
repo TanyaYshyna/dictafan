@@ -15,7 +15,7 @@ class UserActivityHistory {
             const token = this.getToken();
             if (!token) return [];
 
-            const res = await fetch('/api/statistics/activity/users', {
+            const res = await fetch('/api/statistics/report-users', {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -24,7 +24,19 @@ class UserActivityHistory {
             });
             const js = await res.json().catch(() => null);
             if (!(res && res.ok && js && js.success && Array.isArray(js.users))) return [];
-            return js.users;
+
+            // Разворачиваем иерархию в плоский список для обратной совместимости
+            const flat = [];
+            for (const u of js.users) {
+                if (u.type === 'group' && Array.isArray(u.children)) {
+                    for (const c of u.children) {
+                        flat.push({ id: c.id, label: c.label, type: 'student' });
+                    }
+                } else {
+                    flat.push({ id: u.id, label: u.label, type: u.type });
+                }
+            }
+            return flat;
         } catch (e) {
             return [];
         }
