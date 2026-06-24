@@ -475,6 +475,23 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-menu-dictation-report') {
+        (async () => {
+          try {
+            if (typeof DictationReport === 'undefined') {
+              console.warn('[desktop] DictationReport not available');
+              return;
+            }
+            if (!window.__dictationReport) {
+              window.__dictationReport = new DictationReport();
+            }
+            await window.__dictationReport.show();
+          } catch (e) {
+            console.error('[desktop] dictation report error', e);
+          }
+        })();
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }

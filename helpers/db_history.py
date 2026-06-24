@@ -112,7 +112,7 @@ def _upsert_history_by_day(
             updated_at
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact)
+        ON CONFLICT (user_id, teacher_id, dictation_id, positions, date_plan, date_fact, date_start)
         DO UPDATE SET
             perfect_count = COALESCE(history_by_day.perfect_count, 0) + EXCLUDED.perfect_count,
             corrected_count = COALESCE(history_by_day.corrected_count, 0) + EXCLUDED.corrected_count,
@@ -124,7 +124,7 @@ def _upsert_history_by_day(
             activity_count = COALESCE(history_by_day.activity_count, 0) + EXCLUDED.activity_count,
             money_dt_count = COALESCE(history_by_day.money_dt_count, 0) + EXCLUDED.money_dt_count,
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
-            date_start = LEAST(COALESCE(history_by_day.date_start, EXCLUDED.date_start), EXCLUDED.date_start),
+            date_start = COALESCE(history_by_day.date_start, EXCLUDED.date_start),
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -795,11 +795,13 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
             date_fact = datetime.now().date()
             date_plan = date_fact
 
-            # date_start: если передан — используем его, иначе date_fact
+            # date_start: если передан — используем его (теперь TIMESTAMP, может быть с временем), иначе date_fact
             if date_start is not None:
                 try:
                     if isinstance(date_start, str):
-                        date_start_parsed = datetime.strptime(date_start, '%Y-%m-%d').date()
+                        ds = date_start.strip()
+                        # PostgreSQL сам сконвертирует строку в TIMESTAMP
+                        date_start_parsed = ds
                     else:
                         date_start_parsed = date_start
                 except Exception:
