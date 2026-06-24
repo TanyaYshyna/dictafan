@@ -3429,8 +3429,17 @@ class DictationReport {
     getToken() {
         if (this._token) return this._token;
         try {
-            const raw = localStorage.getItem('access_token');
-            if (raw) this._token = raw;
+            // Пробуем через UserManager
+            if (typeof window !== 'undefined' && window.UM && window.UM.token) {
+                this._token = window.UM.token;
+                return this._token;
+            }
+            // Пробуем из localStorage (ключ jwt_token)
+            const raw = localStorage.getItem('jwt_token');
+            if (raw) {
+                this._token = raw;
+                return this._token;
+            }
         } catch (e) { /* ignore */ }
         return this._token;
     }
