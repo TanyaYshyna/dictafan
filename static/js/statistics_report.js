@@ -3485,18 +3485,23 @@ class DictationReport {
         const token = this.getToken();
         if (!token) return;
         try {
+            console.log('[DictationReport] Загружаю пользователей...');
             const res = await fetch('/api/statistics/report-users', {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            const js = await res.json().catch(() => null);
+            console.log('[DictationReport] Статус ответа:', res.status, res.statusText);
+            const text = await res.text();
+            console.log('[DictationReport] Сырой ответ:', text.substring(0, 500));
+            const js = JSON.parse(text);
             if (js && js.success && Array.isArray(js.users)) {
                 this._users = js.users;
+                console.log('[DictationReport] Загружено пользователей:', this._users.length, JSON.stringify(this._users));
                 if (this._users.length === 0) {
                     console.warn('[DictationReport] API вернул пустой список пользователей');
                 }
             } else {
-                console.warn('[DictationReport] Ошибка загрузки пользователей:', js?.error || 'неизвестная ошибка');
+                console.warn('[DictationReport] Ошибка загрузки пользователей:', js?.error || 'неизвестная ошибка', 'full:', JSON.stringify(js));
             }
         } catch (e) {
             console.warn('[DictationReport] Failed to load users for dictation report', e);
