@@ -2324,7 +2324,8 @@ def api_dictation_report_data():
         all_books = own_books + shelf_books
         print(f"[dictation-report/data] all_books count={len(all_books)}", flush=True)
 
-        # Получаем данные из history_by_day за период
+        # Получаем данные из history_by_day за период — КАЖДУЮ строку отдельно (без GROUP BY)
+        # Каждая строка = одно выполнение (повторение) диктанта
         print(f"[dictation-report/data] querying history_by_day...", flush=True)
         conn = get_db_connection()
         try:
@@ -2334,17 +2335,18 @@ def api_dictation_report_data():
                     SELECT
                         dictation_id,
                         positions,
-                        COALESCE(SUM(lead_time), 0) as total_lead_time,
-                        COALESCE(SUM(money_dt_count), 0) as total_money,
-                        COALESCE(SUM(mistake_count), 0) as total_mistakes,
-                        COALESCE(SUM(corrected_count), 0) as total_corrected,
-                        COALESCE(SUM(successes), 0) as total_successes,
-                        COALESCE(SUM(monenumber_of_characters), 0) as total_symbols
+                        date_start,
+                        lead_time,
+                        money_dt_count,
+                        mistake_count,
+                        corrected_count,
+                        successes,
+                        monenumber_of_characters
                     FROM history_by_day
                     WHERE user_id = %s
                       AND date_fact >= %s::date
                       AND date_fact <= %s::date
-                    GROUP BY dictation_id, positions
+                    ORDER BY dictation_id, positions, date_start
                     """,
                     (target_user_id, start_date, end_date),
                 )
@@ -2353,34 +2355,39 @@ def api_dictation_report_data():
         finally:
             conn.close()
 
-        # Индексируем историю по dictation_id
-        # fetchall() возвращает кортежи, а не словари
-        # Порядок колонок: dictation_id(0), positions(1), total_lead_time(2),
-        #   total_money(3), total_mistakes(4), total_corrected(5),
-        #   total_successes(6), total_symbols(7)
-        history_by_dict = {}
+        # Группируем повторения по (dictation_id, positions)
+        # Порядок колонок: dictation_id(0), positions(1), date_start(2),
+        #   lead_time(3), money_dt_count(4), mistake_count(5),
+        #   corrected_count(6), successes(7), monenumber_of_characters(8)
+        history_repeats = {}  # (did, pos_key) -> [repeat1, repeat2, ...]
         for r in history_rows:
             did = int(r[0] or 0)
-            if did not in history_by_dict:
-                history_by_dict[did] = {}
-            positions = r[1]
-            # Преобразуем positions в ключ
-            if positions is None:
+            raw_pos = r[1]
+            if raw_pos is None:
                 pos_key = '__all__'
-            elif isinstance(positions, (list, tuple)):
-                pos_key = ','.join(str(p) for p in sorted(positions)) if positions else '__all__'
+            elif isinstance(raw_pos, (list, tuple)):
+                pos_key = ','.join(str(p) for p in sorted(raw_pos)) if raw_pos else '__all__'
             else:
                 pos_key = '__all__'
             
-            history_by_dict[did][pos_key] = {
-                "lead_time": int(r[2] or 0),
-                "money": int(r[3] or 0),
-                "mistakes": int(r[4] or 0),
-                "corrected": int(r[5] or 0),
-                "successes": int(r[6] or 0),
-                "symbols": int(r[7] or 0),
-            }
-        print(f"[dictation-report/data] history_by_dict keys={list(history_by_dict.keys())}", flush=True)
+            key = (did, pos_key)
+            if key not in history_repeats:
+                history_repeats[key] = []
+            
+            # date_start — TIMESTAMP, может быть None
+            ds = r[2]
+            date_start_str = str(ds) if ds is not None else ''
+            
+            history_repeats[key].append({
+                "date_start": date_start_str,
+                "lead_time": int(r[3] or 0),
+                "money": int(r[4] or 0),
+                "mistakes": int(r[5] or 0),
+                "corrected": int(r[6] or 0),
+                "successes": int(r[7] or 0),
+                "symbols": int(r[8] or 0),
+            })
+        print(f"[dictation-report/data] history_repeats keys count={len(history_repeats)}", flush=True)
 
         # Строим иерархию: язык → книга → раздел → диктант → упражнение
         languages_map = {}  # language_code -> { language, books: [] }
@@ -2395,23 +2402,18 @@ def api_dictation_report_data():
 
             # Только книги верхнего уровня (не разделы)
             if parent_id is not None:
-                print(f"[dictation-report/data]   skipping section (parent_id={parent_id})", flush=True)
                 continue
 
             # Получаем разделы книги
             try:
                 sections = get_book_sections(book_id)
-                print(f"[dictation-report/data]   sections count={len(sections)}", flush=True)
-            except Exception as e:
-                print(f"[dictation-report/data]   ERROR get_book_sections({book_id}): {e}", flush=True)
+            except Exception:
                 sections = []
 
             # Получаем диктанты книги
             try:
                 book_dictations = get_book_dictations(book_id)
-                print(f"[dictation-report/data]   book_dictations count={len(book_dictations)}", flush=True)
-            except Exception as e:
-                print(f"[dictation-report/data]   ERROR get_book_dictations({book_id}): {e}", flush=True)
+            except Exception:
                 book_dictations = []
 
             # Собираем все диктанты (из книги напрямую + из разделов)
@@ -2423,24 +2425,13 @@ def api_dictation_report_data():
                 sec_id = int(sec.get('id'))
                 try:
                     sec_dicts = get_book_dictations(sec_id)
-                except Exception as e:
-                    print(f"[dictation-report/data]   ERROR get_book_dictations for section {sec_id}: {e}", flush=True)
+                except Exception:
                     sec_dicts = []
                 section_dictations_map[sec_id] = sec_dicts
                 all_dictations.extend(sec_dicts)
 
             if not all_dictations and not sections:
-                print(f"[dictation-report/data]   no dictations and no sections, skipping book", flush=True)
                 continue
-
-            # Группируем диктанты по языку
-            for d in all_dictations:
-                dlang = str(d.get('language_code') or book_lang)
-                if dlang not in languages_map:
-                    languages_map[dlang] = {
-                        "language": dlang,
-                        "books": []
-                    }
 
             # Строим структуру книги
             book_entry = {
@@ -2461,19 +2452,16 @@ def api_dictation_report_data():
                 # Получаем обложку диктанта
                 try:
                     d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
-                except Exception as e:
-                    print(f"[dictation-report/data]   ERROR get_cover_url_for_id(dict_{did}): {e}", flush=True)
+                except Exception:
                     d_cover = ''
                 
                 # Получаем упражнения
                 try:
                     exercises = list_dictation_exercises(did)
-                    print(f"[dictation-report/data]   dictation {did} exercises count={len(exercises)}", flush=True)
-                except Exception as e:
-                    print(f"[dictation-report/data]   ERROR list_dictation_exercises({did}): {e}", flush=True)
+                except Exception:
                     exercises = []
                 
-                # Строим упражнения
+                # Строим упражнения с повторениями
                 exercise_list = []
                 for ex in exercises:
                     ex_id = int(ex.get('id'))
@@ -2484,34 +2472,30 @@ def api_dictation_report_data():
                     if ex_positions and isinstance(ex_positions, (list, tuple)) and len(ex_positions) > 0:
                         pos_key = ','.join(str(p) for p in sorted(ex_positions))
                     
-                    ex_data = history_by_dict.get(did, {}).get(pos_key, {})
+                    # Получаем массив повторений для этого упражнения
+                    repeats = history_repeats.get((did, pos_key), [])
                     
                     exercise_list.append({
                         "id": ex_id,
                         "title": ex_title or (f"Упражнение #{ex_id}" if ex_positions else "По всем"),
                         "positions": list(ex_positions) if ex_positions else [],
-                        "lead_time": ex_data.get('lead_time', 0),
-                        "money": ex_data.get('money', 0),
-                        "mistakes": ex_data.get('mistakes', 0),
-                        "corrected": ex_data.get('corrected', 0),
-                        "successes": ex_data.get('successes', 0),
-                        "symbols": ex_data.get('symbols', 0),
+                        "repeats": repeats
                     })
                 
                 # Если нет упражнений, создаём одно "по всем"
                 if not exercise_list:
-                    all_data = history_by_dict.get(did, {}).get('__all__', {})
+                    repeats = history_repeats.get((did, '__all__'), [])
                     exercise_list.append({
                         "id": 0,
                         "title": "По всем",
                         "positions": [],
-                        "lead_time": all_data.get('lead_time', 0),
-                        "money": all_data.get('money', 0),
-                        "mistakes": all_data.get('mistakes', 0),
-                        "corrected": all_data.get('corrected', 0),
-                        "successes": all_data.get('successes', 0),
-                        "symbols": all_data.get('symbols', 0),
+                        "repeats": repeats
                     })
+                
+                # Пропускаем диктанты, у которых нет повторений
+                has_data = any(len(ex.get('repeats', [])) > 0 for ex in exercise_list)
+                if not has_data:
+                    continue
                 
                 dict_entry = {
                     "id": did,
@@ -2535,14 +2519,12 @@ def api_dictation_report_data():
                     dtitle = str(d.get('title') or 'Без названия')
                     try:
                         d_cover = get_cover_url_for_id(f"dict_{did}", dlang)
-                    except Exception as e:
-                        print(f"[dictation-report/data]   ERROR get_cover_url_for_id(dict_{did}) in section: {e}", flush=True)
+                    except Exception:
                         d_cover = ''
                     
                     try:
                         exercises = list_dictation_exercises(did)
-                    except Exception as e:
-                        print(f"[dictation-report/data]   ERROR list_dictation_exercises({did}) in section: {e}", flush=True)
+                    except Exception:
                         exercises = []
                     
                     exercise_list = []
@@ -2555,33 +2537,28 @@ def api_dictation_report_data():
                         if ex_positions and isinstance(ex_positions, (list, tuple)) and len(ex_positions) > 0:
                             pos_key = ','.join(str(p) for p in sorted(ex_positions))
                         
-                        ex_data = history_by_dict.get(did, {}).get(pos_key, {})
+                        repeats = history_repeats.get((did, pos_key), [])
                         
                         exercise_list.append({
                             "id": ex_id,
                             "title": ex_title or (f"Упражнение #{ex_id}" if ex_positions else "По всем"),
                             "positions": list(ex_positions) if ex_positions else [],
-                            "lead_time": ex_data.get('lead_time', 0),
-                            "money": ex_data.get('money', 0),
-                            "mistakes": ex_data.get('mistakes', 0),
-                            "corrected": ex_data.get('corrected', 0),
-                            "successes": ex_data.get('successes', 0),
-                            "symbols": ex_data.get('symbols', 0),
+                            "repeats": repeats
                         })
                     
                     if not exercise_list:
-                        all_data = history_by_dict.get(did, {}).get('__all__', {})
+                        repeats = history_repeats.get((did, '__all__'), [])
                         exercise_list.append({
                             "id": 0,
                             "title": "По всем",
                             "positions": [],
-                            "lead_time": all_data.get('lead_time', 0),
-                            "money": all_data.get('money', 0),
-                            "mistakes": all_data.get('mistakes', 0),
-                            "corrected": all_data.get('corrected', 0),
-                            "successes": all_data.get('successes', 0),
-                            "symbols": all_data.get('symbols', 0),
+                            "repeats": repeats
                         })
+                    
+                    # Пропускаем диктанты без данных
+                    has_data = any(len(ex.get('repeats', [])) > 0 for ex in exercise_list)
+                    if not has_data:
+                        continue
                     
                     section_dictation_list.append({
                         "id": did,
@@ -2591,13 +2568,17 @@ def api_dictation_report_data():
                         "exercises": exercise_list
                     })
                 
+                # Пропускаем разделы без диктантов с данными
+                if not section_dictation_list:
+                    continue
+                
                 book_entry["sections"].append({
                     "id": sec_id,
                     "title": sec_title,
                     "dictations": section_dictation_list
                 })
 
-            # Добавляем книгу в соответствующий язык
+            # Добавляем книгу в язык только если есть диктанты или разделы с данными
             if book_entry["dictations"] or book_entry["sections"]:
                 lang_key = book_lang
                 if lang_key not in languages_map:

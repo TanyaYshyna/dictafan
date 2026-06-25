@@ -3974,19 +3974,21 @@ if (typeof lucide !== 'undefined') {
             return;
         }
 
-        // Определяем максимальное количество повторений (упражнений) среди всех диктантов
+        // Определяем максимальное количество повторений среди всех упражнений
         let maxRepeats = 0;
         for (const lang of this._data) {
             for (const book of (lang.books || [])) {
                 for (const d of (book.dictations || [])) {
-                    if ((d.exercises || []).length > maxRepeats) {
-                        maxRepeats = d.exercises.length;
+                    for (const ex of (d.exercises || [])) {
+                        const rlen = (ex.repeats || []).length;
+                        if (rlen > maxRepeats) maxRepeats = rlen;
                     }
                 }
                 for (const sec of (book.sections || [])) {
                     for (const d of (sec.dictations || [])) {
-                        if ((d.exercises || []).length > maxRepeats) {
-                            maxRepeats = d.exercises.length;
+                        for (const ex of (d.exercises || [])) {
+                            const rlen = (ex.repeats || []).length;
+                            if (rlen > maxRepeats) maxRepeats = rlen;
                         }
                     }
                 }
@@ -4014,13 +4016,8 @@ if (typeof lucide !== 'undefined') {
         if (this._showMoney) valueCols.push('money');
         if (this._showErrors) valueCols.push('errors');
 
-        for (const vc of valueCols) {
-            const th = document.createElement('th');
-            th.textContent = vc === 'time' ? 'Время' : vc === 'money' ? 'Деньги' : 'Ош/Сим';
-            headerRow.appendChild(th);
-        }
-
-        // Repeat count headers
+        // Repeat count headers — одна колонка на каждое повторение
+        // Внутри каждой колонки повторения — три строки: время, деньги, ош/сим
         for (let i = 1; i <= maxRepeats; i++) {
             const th = document.createElement('th');
             th.className = 'repeat-header';
@@ -4044,8 +4041,7 @@ if (typeof lucide !== 'undefined') {
             langTd.style.textAlign = 'left';
             langRow.appendChild(langTd);
 
-            // Empty cells for language row
-            for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+            for (let i = 0; i < maxRepeats; i++) {
                 const td = document.createElement('td');
                 td.textContent = '';
                 langRow.appendChild(td);
@@ -4069,7 +4065,7 @@ if (typeof lucide !== 'undefined') {
                 bookTd.appendChild(document.createTextNode(book.title || 'Без названия'));
                 bookRow.appendChild(bookTd);
 
-                for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+                for (let i = 0; i < maxRepeats; i++) {
                     const td = document.createElement('td');
                     td.textContent = '';
                     bookRow.appendChild(td);
@@ -4092,7 +4088,7 @@ if (typeof lucide !== 'undefined') {
                     secTd.textContent = `📂 ${sec.title || 'Без названия'}`;
                     secRow.appendChild(secTd);
 
-                    for (let i = 0; i < valueCols.length + maxRepeats; i++) {
+                    for (let i = 0; i < maxRepeats; i++) {
                         const td = document.createElement('td');
                         td.textContent = '';
                         secRow.appendChild(td);
@@ -4118,7 +4114,7 @@ if (typeof lucide !== 'undefined') {
         const exercises = d.exercises || [];
 
         if (exercises.length === 0) {
-            // Dictation without exercises - single row
+            // Dictation without exercises — одна строка, без повторений
             const row = document.createElement('tr');
             row.className = 'level-dictation';
             const td = document.createElement('td');
@@ -4134,21 +4130,10 @@ if (typeof lucide !== 'undefined') {
             td.appendChild(document.createTextNode(d.title || 'Без названия'));
             row.appendChild(td);
 
-            // Value cells (aggregated from all exercises or empty)
-            let totalTime = 0, totalMoney = 0, totalMistakes = 0, totalSymbols = 0;
-            // No exercises, so no data
-            for (const vc of valueCols) {
-                const cell = document.createElement('td');
-                cell.className = 'value-cell';
-                cell.textContent = '—';
-                row.appendChild(cell);
-            }
-
-            // Repeat cells (empty)
             for (let i = 0; i < maxRepeats; i++) {
                 const cell = document.createElement('td');
                 cell.className = 'value-cell';
-                cell.textContent = '—';
+                // Пусто, если нет данных
                 row.appendChild(cell);
             }
             tbody.appendChild(row);
@@ -4157,10 +4142,11 @@ if (typeof lucide !== 'undefined') {
 
         for (let ei = 0; ei < exercises.length; ei++) {
             const ex = exercises[ei];
+            const repeats = ex.repeats || [];
             const row = document.createElement('tr');
 
             if (ei === 0) {
-                // First exercise - show dictation name with cover
+                // First exercise — показываем название диктанта с обложкой
                 row.className = 'level-dictation';
                 const td = document.createElement('td');
                 td.className = 'dictation-report-td-sticky';
@@ -4175,7 +4161,7 @@ if (typeof lucide !== 'undefined') {
                 td.appendChild(document.createTextNode(d.title || 'Без названия'));
                 row.appendChild(td);
             } else {
-                // Subsequent exercises - show exercise name indented
+                // Subsequent exercises — показываем название упражнения
                 row.className = 'level-exercise';
                 const td = document.createElement('td');
                 td.className = 'dictation-report-td-sticky';
@@ -4184,48 +4170,47 @@ if (typeof lucide !== 'undefined') {
                 row.appendChild(td);
             }
 
-            // Value cells for this exercise
-            for (const vc of valueCols) {
-                const cell = document.createElement('td');
-                cell.className = 'value-cell';
-                if (vc === 'time') {
-                    cell.textContent = this.formatDurationHhMmSs(ex.lead_time);
-                } else if (vc === 'money') {
-                    cell.textContent = this.formatMoney(ex.money);
-                } else if (vc === 'errors') {
-                    const errStr = ex.mistakes > 0 ? `✗${ex.mistakes}` : '';
-                    const symStr = ex.symbols > 0 ? `⟐${ex.symbols}` : '';
-                    cell.textContent = [errStr, symStr].filter(Boolean).join(' ') || '—';
-                }
-                row.appendChild(cell);
-            }
-
-            // Repeat cells: each exercise goes into its corresponding repeat column
+            // Колонки повторений
+            // В каждой ячейке — три строки: время, деньги, ош/символы
             for (let ri = 0; ri < maxRepeats; ri++) {
                 const cell = document.createElement('td');
                 cell.className = 'value-cell';
-                if (ri === ei) {
-                    // This exercise's data goes into this repeat column
-                    const parts = [];
+
+                if (ri < repeats.length) {
+                    const rep = repeats[ri];
+                    // Строим содержимое ячейки: три строки
+                    const lines = [];
+                    
+                    // Время
                     if (this._showTime) {
-                        parts.push(this.formatDurationHhMmSs(ex.lead_time));
+                        const t = rep.lead_time || 0;
+                        lines.push(t > 0 ? this.formatDurationHhMmSs(t) : '');
                     }
+                    // Деньги
                     if (this._showMoney) {
-                        parts.push(this.formatMoney(ex.money));
+                        const m = rep.money || 0;
+                        lines.push(m > 0 ? this.formatMoney(m) : '');
                     }
+                    // Ошибки/символы
                     if (this._showErrors) {
-                        const errStr = ex.mistakes > 0 ? `✗${ex.mistakes}` : '';
-                        const symStr = ex.symbols > 0 ? `⟐${ex.symbols}` : '';
-                        parts.push([errStr, symStr].filter(Boolean).join(' ') || '—');
+                        const errStr = (rep.mistakes || 0) > 0 ? `✗${rep.mistakes}` : '';
+                        const symStr = (rep.symbols || 0) > 0 ? `⟐${rep.symbols}` : '';
+                        const errPart = [errStr, symStr].filter(Boolean).join(' ');
+                        lines.push(errPart || '');
                     }
-                    cell.textContent = parts.filter(Boolean).join(' | ') || '—';
-                } else {
-                    cell.textContent = '—';
+
+                    // Если все три пустые — ячейка пустая
+                    const hasAny = lines.some(l => l !== '');
+                    if (hasAny) {
+                        cell.innerHTML = lines.map(l => `<div>${l}</div>`).join('');
+                    }
+                    // else: пустая ячейка
                 }
+                // else: пустая ячейка (нет повторения с таким номером)
+
                 row.appendChild(cell);
             }
 
             tbody.appendChild(row);
         }
     }
-}
