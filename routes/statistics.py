@@ -2354,12 +2354,16 @@ def api_dictation_report_data():
             conn.close()
 
         # Индексируем историю по dictation_id
+        # fetchall() возвращает кортежи, а не словари
+        # Порядок колонок: dictation_id(0), positions(1), total_lead_time(2),
+        #   total_money(3), total_mistakes(4), total_corrected(5),
+        #   total_successes(6), total_symbols(7)
         history_by_dict = {}
         for r in history_rows:
-            did = int(r.get('dictation_id') or 0)
+            did = int(r[0] or 0)
             if did not in history_by_dict:
                 history_by_dict[did] = {}
-            positions = r.get('positions')
+            positions = r[1]
             # Преобразуем positions в ключ
             if positions is None:
                 pos_key = '__all__'
@@ -2369,12 +2373,12 @@ def api_dictation_report_data():
                 pos_key = '__all__'
             
             history_by_dict[did][pos_key] = {
-                "lead_time": int(r.get('total_lead_time') or 0),
-                "money": int(r.get('total_money') or 0),
-                "mistakes": int(r.get('total_mistakes') or 0),
-                "corrected": int(r.get('total_corrected') or 0),
-                "successes": int(r.get('total_successes') or 0),
-                "symbols": int(r.get('total_symbols') or 0),
+                "lead_time": int(r[2] or 0),
+                "money": int(r[3] or 0),
+                "mistakes": int(r[4] or 0),
+                "corrected": int(r[5] or 0),
+                "successes": int(r[6] or 0),
+                "symbols": int(r[7] or 0),
             }
         print(f"[dictation-report/data] history_by_dict keys={list(history_by_dict.keys())}", flush=True)
 
