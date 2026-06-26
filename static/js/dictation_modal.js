@@ -26,6 +26,8 @@
     opening: false,
     dictationStarted: false,
     rewardCycleId: 0,
+    // Контекст открытия start-modal: 'open' (из карточки), 'navigator' (btn-new-circle), 'success' (completion)
+    startModalContext: 'open',
     // Для корректного расчёта времени предложения при перезаходах:
     // _sentenceTimeAccumulatedAtStart — session.getElapsedMs() на момент входа в предложение
     // _sentencePreviousAccumulatedTime — st.time_count на момент входа в предложение
@@ -920,6 +922,7 @@
             const session = window.__dictationModalActiveSession;
             if (session) {
               renderStartModalSentencesTable(session);
+              state.startModalContext = 'success';
               showStartModal();
               updateNavigatorFromSession(session);
             }
@@ -5033,6 +5036,57 @@
     });
   }
 
+  function updateStartButton() {
+    try {
+      const startBtn = document.getElementById('confirmStartBtn');
+      if (!startBtn) return;
+
+      const session = window.__dictationModalActiveSession;
+      const context = state.startModalContext || 'open';
+
+      if (context === 'success') {
+        // Из окна успехов — всегда "НОВА ГРА"
+        startBtn.textContent = 'Н О В А   Г Р А';
+        return;
+      }
+
+      if (context === 'navigator') {
+        // Из навигатора — всегда "ГРАЙМО ДАЛІ"
+        startBtn.textContent = 'Г Р А Й М О   Д А Л І';
+        return;
+      }
+
+      // context === 'open' — из карточки диктанта
+      if (!session) {
+        startBtn.textContent = 'S T A R T';
+        return;
+      }
+
+      const isCompleted = session.completed === true;
+      const hasProgress = (() => {
+        try {
+          const keys = session.content ? session.content.getAllKeys() : [];
+          for (const key of keys) {
+            const st = session.getState(key);
+            if (st && (Number(st.number_of_perfect) > 0 || Number(st.number_of_corrected) > 0 || Number(st.number_of_audio) > 0)) {
+              return true;
+            }
+          }
+        } catch (e) {}
+        return false;
+      })();
+
+      if (isCompleted) {
+        startBtn.textContent = 'Н О В И Й   С Т А Р Т';
+      } else if (hasProgress) {
+        startBtn.textContent = 'Г Р А Й М О   Д А Л І';
+      } else {
+        startBtn.textContent = 'S T A R T';
+      }
+    } catch (e) {
+    }
+  }
+
   function showStartModal() {
     try {
       const startModal = document.getElementById('start-modal');
@@ -5051,6 +5105,9 @@
       }
     } catch (e) {
     }
+
+    // Обновляем текст кнопки в зависимости от контекста
+    updateStartButton();
 
     // Останавливаем таймер при открытии start-modal
     _pauseDictationTimer();
@@ -5888,6 +5945,7 @@
               _saveSentenceTime(session);
             }
             // Показываем модалку (она сама остановит таймер)
+            state.startModalContext = 'navigator';
             showStartModal();
           } catch (e1) {
           }
@@ -6227,6 +6285,7 @@
           } catch (e0) {
           }
           renderStartModalSentencesTable(session);
+          state.startModalContext = 'open';
           showStartModal();
           updateNavigatorFromSession(session);
 
@@ -6252,55 +6311,48 @@
           } catch (eCc) {
           }
 
-          // Обновляем текст кнопки СТАРТ в зависимости от состояния сессии
+          // Биндим обработчик клика на кнопку СТАРТ (один раз)
           const startBtn = document.getElementById('confirmStartBtn');
-          if (startBtn) {
-            // Определяем состояние: завершён / в процессе / новый
-            const isCompleted = session.completed === true;
-            const hasProgress = (() => {
+          if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
+            startBtn.dataset.boundDictationRuntime = '1';
+            startBtn.addEventListener('click', (e) => {
               try {
-                const keys = session.content ? session.content.getAllKeys() : [];
-                for (const key of keys) {
-                  const st = session.getState(key);
-                  if (st && (Number(st.number_of_perfect) > 0 || Number(st.number_of_corrected) > 0 || Number(st.number_of_audio) > 0)) {
-                    return true;
+                e.preventDefault();
+                e.stopPropagation();
+              } catch (e0) {
+              }
+              try {
+                const s = window.__dictationModalActiveSession;
+                const ctx = state.startModalContext || 'open';
+
+                if (ctx === 'success') {
+                  // Из окна успехов — сбрасываем прогресс и обновляем дату старта
+                  if (s) {
+                    resetDictationProgressForSession(s);
+                    const d = new Date();
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mi = String(d.getMinutes()).padStart(2, '0');
+                    const ss = String(d.getSeconds()).padStart(2, '0');
+                    s.dateStart = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
                   }
-                }
-              } catch (e) {}
-              return false;
-            })();
-
-            if (isCompleted) {
-              startBtn.textContent = 'Н О В Ы Й   С Т А Р Т';
-            } else if (hasProgress) {
-              startBtn.textContent = 'П Р О Д О Л Ж А Е М   И Г Р А Т Ь';
-            } else {
-              startBtn.textContent = 'S T A R T';
-            }
-
-            if (startBtn.dataset.boundDictationRuntime !== '1') {
-              startBtn.dataset.boundDictationRuntime = '1';
-              startBtn.addEventListener('click', (e) => {
-                try {
-                  e.preventDefault();
-                  e.stopPropagation();
-                } catch (e0) {
-                }
-                try {
-                  // Если сессия завершена — сбрасываем прогресс перед стартом
-                  const s = window.__dictationModalActiveSession;
+                } else if (ctx === 'open') {
+                  // Из карточки диктанта: если сессия завершена — сбрасываем прогресс
                   if (s && s.completed === true) {
                     resetDictationProgressForSession(s);
                   }
-                  try {
-                    startNewRewardCycle();
-                  } catch (e00c) {
-                  }
-                  hideStartModal();
-                } catch (e1) {
                 }
-              });
-            }
+                // context === 'navigator' — ничего не сбрасываем, просто продолжаем
+
+                // Вызываем startGame() — он запускает таймер, скрывает модалку, переходит к первому предложению
+                if (typeof window.startGame === 'function') {
+                  window.startGame();
+                }
+              } catch (e1) {
+              }
+            });
           }
         }
       } catch (e) {
