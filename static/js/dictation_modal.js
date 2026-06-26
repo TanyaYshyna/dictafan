@@ -5591,6 +5591,22 @@
         updateAllCheckboxButtonFromSession(session);
       } catch (e) {
       }
+      // Сбрасываем панель прогресса (таймер, прогресс-бар)
+      try {
+        const p = getProgressPanelInstance();
+        if (p) {
+          if (typeof p.stopTimer === 'function') p.stopTimer();
+          if (p.timerState) p.timerState.dictationAccumulatedMs = 0;
+          if (typeof p.updateTimer === 'function') p.updateTimer();
+          if (typeof p.resetAll === 'function') p.resetAll();
+        }
+      } catch (e) {
+      }
+      // Сбрасываем state.dictationStarted, чтобы при следующем старте всё началось заново
+      try {
+        state.dictationStarted = false;
+      } catch (e) {
+      }
       // Сохраняем сессию в IDB после сброса прогресса
       try { _persistSessionToIdb(); } catch (e) {}
     } catch (e) {
@@ -6060,6 +6076,49 @@
             const session = window.__dictationModalActiveSession;
             if (!session) return;
             resetDictationProgressForSession(session);
+            // Обновляем текст кнопки после сброса прогресса
+            updateStartButton();
+          } catch (e1) {
+          }
+        });
+      }
+    } catch (e) {
+    }
+
+    // confirmStartBtn — обработчик клика на кнопку СТАРТ/ГРАЙМО ДАЛІ/НОВА ГРА
+    try {
+      const startBtn = document.getElementById('confirmStartBtn');
+      if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
+        startBtn.dataset.boundDictationRuntime = '1';
+        startBtn.addEventListener('click', (e) => {
+          try {
+            e.preventDefault();
+            e.stopPropagation();
+          } catch (e0) {
+          }
+          try {
+            const s = window.__dictationModalActiveSession;
+            const ctx = state.startModalContext || 'open';
+
+            if (ctx === 'success') {
+              // Из окна успехов — сбрасываем прогресс и обнуляем дату старта
+              if (s) {
+                resetDictationProgressForSession(s);
+                // Сбрасываем dateStart, чтобы startGame() установил новую дату
+                s.dateStart = null;
+              }
+            } else if (ctx === 'open') {
+              // Из карточки диктанта: если сессия завершена — сбрасываем прогресс
+              if (s && s.completed === true) {
+                resetDictationProgressForSession(s);
+              }
+            }
+            // context === 'navigator' — ничего не сбрасываем, просто продолжаем
+
+            // Вызываем startGame() — он запускает таймер, скрывает модалку, переходит к первому предложению
+            if (typeof window.startGame === 'function') {
+              window.startGame();
+            }
           } catch (e1) {
           }
         });
@@ -6311,49 +6370,6 @@
           } catch (eCc) {
           }
 
-          // Биндим обработчик клика на кнопку СТАРТ (один раз)
-          const startBtn = document.getElementById('confirmStartBtn');
-          if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
-            startBtn.dataset.boundDictationRuntime = '1';
-            startBtn.addEventListener('click', (e) => {
-              try {
-                e.preventDefault();
-                e.stopPropagation();
-              } catch (e0) {
-              }
-              try {
-                const s = window.__dictationModalActiveSession;
-                const ctx = state.startModalContext || 'open';
-
-                if (ctx === 'success') {
-                  // Из окна успехов — сбрасываем прогресс и обновляем дату старта
-                  if (s) {
-                    resetDictationProgressForSession(s);
-                    const d = new Date();
-                    const yyyy = d.getFullYear();
-                    const mm = String(d.getMonth() + 1).padStart(2, '0');
-                    const dd = String(d.getDate()).padStart(2, '0');
-                    const hh = String(d.getHours()).padStart(2, '0');
-                    const mi = String(d.getMinutes()).padStart(2, '0');
-                    const ss = String(d.getSeconds()).padStart(2, '0');
-                    s.dateStart = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
-                  }
-                } else if (ctx === 'open') {
-                  // Из карточки диктанта: если сессия завершена — сбрасываем прогресс
-                  if (s && s.completed === true) {
-                    resetDictationProgressForSession(s);
-                  }
-                }
-                // context === 'navigator' — ничего не сбрасываем, просто продолжаем
-
-                // Вызываем startGame() — он запускает таймер, скрывает модалку, переходит к первому предложению
-                if (typeof window.startGame === 'function') {
-                  window.startGame();
-                }
-              } catch (e1) {
-              }
-            });
-          }
         }
       } catch (e) {
       }
