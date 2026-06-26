@@ -1205,9 +1205,13 @@
     if (typeof window.checkText !== 'function') {
       window.checkText = async () => {
         try {
-          if (!state.dictationStarted) return;
+          if (!state.dictationStarted) {
+            console.log('[DM:checkText] state.dictationStarted=false → выход');
+            return;
+          }
         } catch (e0) {
         }
+        console.log('[DM:checkText] ВХОД, dictationStarted=true');
 
         // В режимах p3 и p4 проверка текста не используется
         try {
@@ -1306,6 +1310,13 @@
           requiredPassedStarHalf,
           totalMistakeCount,
         });
+        console.log('[DM:checkText] checker.analyze() вернул:', JSON.stringify({
+          allCorrect: res?.allCorrect,
+          okToCheck: res?.okToCheck,
+          starOutcome: res?.starOutcome,
+          nextPerfect: res?.nextPerfect,
+          nextCorrected: res?.nextCorrected,
+        }));
 
         try {
           const notice = document.getElementById('userInputNotice');
@@ -2424,6 +2435,7 @@
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
     const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
+    console.log('[DM:computeSentenceCompletionState] perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' → textOk=' + textOk + ' audioOk=' + audioOk);
     return { textOk, audioOk, requiresAudio };
   }
 
@@ -2546,6 +2558,7 @@
     try {
       const checkBtn = document.getElementById('checkBtn');
       if (!checkBtn) return;
+      console.log('[DM:setCheckButtonState] mode=' + mode);
 
       checkBtn.classList.value = '';
       if (mode === 'ready') {
@@ -2589,12 +2602,14 @@
       }
       if (!st) st = getCurrentSentenceStateFromSession(session);
       if (!st) {
+        console.log('[DM:updateNextButton] st=null → disabled');
         btn.disabled = true;
         btn.classList.remove('button-color-yellow');
         btn.classList.add('button-color-gray');
         return;
       }
       const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
+      console.log('[DM:updateNextButton] textOk=' + textOk + ' audioOk=' + audioOk + ' requiresAudio=' + requiresAudio + ' → canNext=' + !!(textOk && audioOk));
 
       // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
       const canNext = !!(textOk && audioOk);
@@ -4866,14 +4881,21 @@
       input.dataset.boundEnterToCheck = '1';
       input.addEventListener('keydown', (e) => {
         try {
-          if (!state.isOpen) return;
-          if (!state.dictationStarted) return;
+          if (!state.isOpen) {
+            console.log('[DM:bindEnterToCheck] state.isOpen=false → выход');
+            return;
+          }
+          if (!state.dictationStarted) {
+            console.log('[DM:bindEnterToCheck] state.dictationStarted=false → выход');
+            return;
+          }
           if (!e) return;
           if (e.key !== 'Enter') return;
           if (e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
           // В режимах p3 и p4 Enter не запускает проверку текста
           const mode = getExerciseMode();
           if (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') return;
+          console.log('[DM:bindEnterToCheck] Enter нажат, вызываем checkText()');
           e.preventDefault();
           e.stopPropagation();
           if (typeof window.checkText === 'function') window.checkText();
