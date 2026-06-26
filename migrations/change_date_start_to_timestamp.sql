@@ -9,9 +9,16 @@
 BEGIN;
 
 -- ========== history_by_day ==========
--- Меняем тип с DATE на TIMESTAMP
+-- Меняем тип с DATE на TIMESTAMP (если ещё не изменено)
 ALTER TABLE history_by_day
     ALTER COLUMN date_start TYPE TIMESTAMP USING date_start::timestamp;
+
+-- Пересоздаём уникальный индекс: добавляем date_start,
+-- чтобы разные подходы к одному диктанту в один день не схлопывались.
+ALTER TABLE history_by_day DROP CONSTRAINT IF EXISTS uq_history_by_day;
+
+ALTER TABLE history_by_day
+    ADD CONSTRAINT uq_history_by_day UNIQUE (user_id, teacher_id, dictation_id, positions, date_plan, date_fact, date_start);
 
 -- ========== user_money_ledger ==========
 ALTER TABLE user_money_ledger
