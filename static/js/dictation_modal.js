@@ -5629,6 +5629,11 @@
         state.dictationStarted = false;
       } catch (e) {
       }
+      // Сбрасываем state._completionShown, чтобы окно успеха могло появиться снова
+      try {
+        state._completionShown = false;
+      } catch (e) {
+      }
       // Сохраняем сессию в IDB после сброса прогресса
       try { _persistSessionToIdb(); } catch (e) {}
     } catch (e) {
