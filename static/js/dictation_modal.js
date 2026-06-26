@@ -731,7 +731,15 @@
           }
         }
 
-        const totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+        // Используем progressPanel как единственный источник времени,
+        // т.к. session.timer не запускается при старте диктанта
+        let totalTimeMs = 0;
+        try {
+          const snap = getProgressTimerSnapshot();
+          totalTimeMs = snap.accumulatedMs || 0;
+        } catch (e) {
+          totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+        }
         const nowMs = Date.now();
         const tzOffsetMin = -new Date().getTimezoneOffset();
 
@@ -831,7 +839,14 @@
             }
           }
 
-          const totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+          // Используем progressPanel как единственный источник времени
+          let totalTimeMs = 0;
+          try {
+            const snap = getProgressTimerSnapshot();
+            totalTimeMs = snap.accumulatedMs || 0;
+          } catch (e) {
+            totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
+          }
           const nowMs = Date.now();
           const tzOffsetMin = -new Date().getTimezoneOffset();
           const dictationId = getCurrentDictationIdForDb();
