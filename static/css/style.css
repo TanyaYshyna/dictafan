@@ -197,6 +197,10 @@ button:active {
     box-shadow: 0 0 0 0 transparent; /* зарезервировать место под тень */
     transition: all 0.2s ease; /* плавность изменений */
     position: relative; /* если будем делать псевдоэффекты */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
 }
 .button-color-yellow:focus { 
     outline: 2px solid var(--color-button-text-yellow); 
@@ -269,6 +273,10 @@ button:active {
     box-shadow: 0 0 0 0 transparent; /* зарезервировать место под тень */
     transition: all 0.2s ease; /* плавность изменений */
     position: relative; /* если будем делать псевдоэффекты */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 .button-color-purple:focus { 
     outline: 2px solid var(--color-button-text-purple); 
@@ -1922,17 +1930,31 @@ html[dir="rtl"] .topbar-save-group {
 
 .login-form-actions .auth-submit {
     flex: 1;
+    height: 44px;
+    min-height: 44px;
+    min-width: 120px;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
 }
 
 .login-form-actions .button-color-gray {
     flex: 1;
+    height: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
 }
 
 .login-form-actions .button-color-purple {
     flex: 1;
+    height: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
+    gap: 8px;
 }
 
 .login-form .form-message {

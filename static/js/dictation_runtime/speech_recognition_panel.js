@@ -11,6 +11,7 @@
       this._isAudioComplete = false;
       this._language = 'en-US';
       this._mode = 'online';
+      this._numberTableLoaded = false;
 
       this.MIN_MATCH_PERCENT = Number.isFinite(Number(options.minMatchPercent))
         ? Number(options.minMatchPercent)
@@ -39,6 +40,37 @@
       this.bind();
     }
 
+    /**
+     * Загружает таблицу чисел для текущего языка (если ещё не загружена).
+     * Нужна для _normalizeForASR, чтобы заменять слова-числа на <num>.
+     */
+    async _ensureNumberTable() {
+      if (this._numberTableLoaded) return;
+      try {
+        const mgr = window.__numberTableManager;
+        if (!mgr) {
+          if (window.NumberTableManager) {
+            window.__numberTableManager = new window.NumberTableManager();
+          }
+        }
+        const manager = window.__numberTableManager;
+        if (manager) {
+          const langCode = this._getLangCodeForTable();
+          await manager.ensureLanguage(langCode);
+          this._numberTableLoaded = true;
+        }
+      } catch (e) {
+        // Таблица не загрузилась — не критично
+      }
+    }
+
+    /**
+     * Возвращает базовый код языка для загрузки таблицы чисел.
+     */
+    _getLangCodeForTable() {
+      return String(this._language || '').split('-')[0].toLowerCase() || 'en';
+    }
+
     _refreshElsFromDom() {
       const byId = (id) => {
         try {
@@ -60,6 +92,8 @@
     setExpectedText(text) {
       this._expectedText = String(text || '');
       this._isAudioComplete = false;
+      // При установке нового текста пытаемся загрузить таблицу чисел для языка
+      this._ensureNumberTable().catch(() => {});
       try {
         this._setRecordButtonCompleted(false);
       } catch (e0) {
@@ -184,6 +218,12 @@
 
       this._rec.callbacks.onTranscript = (text) => {
         try {
+          try {
+            if (this.els.userAudioAnswer) {
+              this.els.userAudioAnswer.textContent = text;
+            }
+          } catch (e) {
+          }
           const pct = this._computeMatchPercentASR(this._expectedText, text);
           this._setPercent(pct);
         } catch (e) {
@@ -208,8 +248,7 @@
     }
 
     async toggleRecording() {
-      try { console.log('[SpeechPanel] toggleRecording: _isProcessing=' + this._isProcessing); } catch (e) {}
-      if (this._isProcessing) return;
+     if (this._isProcessing) return;
 
       const rec = this._ensureRecognizer();
       if (rec && rec.state && rec.state.isRecording) {
@@ -220,16 +259,12 @@
     }
 
     async startRecording() {
-      try { console.log('[SpeechPanel] startRecording: _isProcessing=' + this._isProcessing); } catch (e) {}
       if (this._isProcessing) return;
       const rec = this._ensureRecognizer();
-      if (!rec) { try { console.log('[SpeechPanel] startRecording: rec=null'); } catch (e) {} return; }
-      try { console.log('[SpeechPanel] startRecording: rec.state.language=' + (rec.state ? rec.state.language : '?')); } catch (e) {}
       await rec.startRecording();
     }
 
     async stopRecording(cause = 'manual') {
-      try { console.log('[SpeechPanel] stopRecording: cause=' + cause); } catch (e) {}
       if (this._isProcessing) return;
       const rec = this._ensureRecognizer();
       if (!rec) return;
@@ -237,7 +272,13 @@
       this._isProcessing = true;
       try {
         const result = await rec.stopRecording(cause);
-        const text = String(result && result.text ? result.text : '').trim();
+        let text = String(result && result.text ? result.text : '').trim();
+        try {
+          if (this.els.userAudioAnswer) {
+            this.els.userAudioAnswer.textContent = text;
+          }
+        } catch (e) {
+        }
         const percent = this._computeMatchPercentASR(this._expectedText, text);
         this._setPercent(percent);
 
@@ -460,9 +501,37 @@
       this._viz.source = null;
     }
 
+    /**
+     * Нормализует текст для сравнения ASR.
+     * Заменяет и цифры, и слова-числа на <num>, чтобы "ten" ≡ "10".
+     * Удаляет пунктуацию и лишние пробелы.
+     */
     _normalizeForASR(text) {
-      let s = String(text || '').toLowerCase();
+      let s = String(text || '').toLowerCase().trim();
+      if (!s) return '';
+
+      // 1. Заменяем слова-числа на <num> (через NumberTableManager)
+      try {
+        const mgr = window.__numberTableManager;
+        if (mgr && this._numberTableLoaded) {
+          const langCode = this._getLangCodeForTable();
+          const words = s.split(/\s+/);
+          s = words.map((w) => {
+            const cleaned = w.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0750-\u077F\u0080-\u00FF']/g, '');
+            if (mgr.isNumberWord(cleaned, langCode)) {
+              return '<num>';
+            }
+            return w;
+          }).join(' ');
+        }
+      } catch (e) {
+        // fallback
+      }
+
+      // 2. Заменяем последовательности цифр на <num>
       s = s.replace(/\d+/g, '<num>');
+
+      // 3. Удаляем пунктуацию, лишние пробелы
       s = s.replace(/[\u2013\u2014\u2212\-]/g, ' ');
       s = s.replace(/[.,!?:;\"«»()]/g, '');
       s = s.replace(/\s+/g, '');

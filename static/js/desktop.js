@@ -822,6 +822,36 @@ window.Desktop = window.Desktop || {
     this.initStatsPanel();
     this.ensureDictationKartDeps();
     this.renderLucide(document.body);
+
+    // Предзагружаем таблицы чисел для языков пользователя
+    this._preloadNumberTables();
+  },
+
+  /**
+   * Предзагружает JSON-таблицы чисел для языков пользователя.
+   * Загружает currentLearning (изучаемый) и nativeLanguage (родной),
+   * чтобы при первом диктанте не было задержки на загрузку.
+   */
+  _preloadNumberTables() {
+    try {
+      const mgr = window.__numberTableManager;
+      if (!mgr) return;
+      const langData = window.USER_LANGUAGE_DATA;
+      if (!langData) return;
+
+      const langs = new Set();
+      if (langData.currentLearning) langs.add(langData.currentLearning);
+      if (langData.nativeLanguage) langs.add(langData.nativeLanguage);
+
+      if (langs.size > 0) {
+        // Загружаем все языки пользователя параллельно
+        Promise.all(
+          Array.from(langs).map(code => mgr.ensureLanguage(code).catch(() => {}))
+        ).catch(() => {});
+      }
+    } catch (e) {
+      // Предзагрузка не критична
+    }
   },
 };
 
