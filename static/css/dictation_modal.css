@@ -1830,6 +1830,24 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   display: none !important;
 }
 
+#dictationModal #sentences-table.hide-time col.col-time,
+#dictationModal #sentences-table.hide-time th.col-time,
+#dictationModal #sentences-table.hide-time td.col-time {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-characters col.col-characters,
+#dictationModal #sentences-table.hide-characters th.col-characters,
+#dictationModal #sentences-table.hide-characters td.col-characters {
+  display: none !important;
+}
+
+#dictationModal #sentences-table.hide-mistakes col.col-mistakes,
+#dictationModal #sentences-table.hide-mistakes th.col-mistakes,
+#dictationModal #sentences-table.hide-mistakes td.col-mistakes {
+  display: none !important;
+}
+
 #dictationModal #sentences-table.hide-money-kt col.col-money-kt,
 #dictationModal #sentences-table.hide-money-kt th.col-money-kt,
 #dictationModal #sentences-table.hide-money-kt td.col-money-kt {
