@@ -3854,6 +3854,9 @@
         'col-mic': 'hide-mic',
         'col-half-stars': 'hide-half-stars',
         'col-activities': 'hide-activities',
+        'col-time': 'hide-time',
+        'col-characters': 'hide-characters',
+        'col-mistakes': 'hide-mistakes',
         'col-money-dt': 'hide-money-dt',
         'col-money-kt': 'hide-money-kt',
         'col-text-original': 'hide-original',
@@ -4030,11 +4033,15 @@
     const showOrig = Boolean(p.original);
     const showTr = Boolean(p.translation);
 
-    // Колонки прогресса: star, mic, half-stars, activities
+    // Колонки прогресса: star, mic, half-stars, activities, time, characters, mistakes, money
     setColumnsVisibilityByClass({ className: 'col-star', visible: showProgress });
     setColumnsVisibilityByClass({ className: 'col-mic', visible: showProgress });
     setColumnsVisibilityByClass({ className: 'col-half-stars', visible: showProgress });
     setColumnsVisibilityByClass({ className: 'col-activities', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-time', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-characters', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-mistakes', visible: showProgress });
+    setColumnsVisibilityByClass({ className: 'col-money-dt', visible: showProgress });
     setColumnsVisibilityByClass({ className: 'col-text-original', visible: showOrig });
     setColumnsVisibilityByClass({ className: 'col-text-translation', visible: showTr });
 
