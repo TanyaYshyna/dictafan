@@ -504,23 +504,53 @@
     /**
      * Нормализует текст для сравнения ASR.
      * Заменяет и цифры, и слова-числа на <num>, чтобы "ten" ≡ "10".
+     * Обрабатывает форматы времени HH:MM и HH.MM, удаляет o'clock,
+     * извлекает числовые основы из слов с аффиксами (например, "sekizde" → "sekiz").
      * Удаляет пунктуацию и лишние пробелы.
      */
     _normalizeForASR(text) {
       let s = String(text || '').toLowerCase().trim();
       if (!s) return '';
 
-      // 1. Заменяем слова-числа на <num> (через NumberTableManager)
+      // 0. Удаляем o'clock (и варианты с апострофом)
+      s = s.replace(/\bo'?\s*clock\b/g, '');
+
+      // 1. Заменяем форматы времени HH:MM и HH.MM на <num>
+      //    Сначала HH:MM (с двоеточием), потом HH.MM (с точкой)
+      s = s.replace(/\b\d{1,2}:\d{2}\b/g, '<num>');
+      s = s.replace(/\b\d{1,2}\.\d{2}\b/g, '<num>');
+
+      // 2. Заменяем слова-числа на <num> (через NumberTableManager)
+      //    Также проверяем слова с возможными аффиксами (например, "sekizde" — турецкий падеж)
       try {
         const mgr = window.__numberTableManager;
         if (mgr && this._numberTableLoaded) {
           const langCode = this._getLangCodeForTable();
           const words = s.split(/\s+/);
           s = words.map((w) => {
+            // Очищаем от пунктуации для проверки
             const cleaned = w.replace(/[^a-zA-Zа-яА-ЯёЁ0-9\u00C0-\u024F\u0400-\u04FF\u0600-\u06FF\u0750-\u077F\u0080-\u00FF']/g, '');
+            if (!cleaned) return w;
+
+            // Прямая проверка: является ли слово числом
             if (mgr.isNumberWord(cleaned, langCode)) {
               return '<num>';
             }
+
+            // Проверка на числовую основу с аффиксами:
+            // Для языков с агглютинативными аффиксами (турецкий, и т.д.)
+            // Пробуем отсекать суффиксы и проверять основу
+            const numberWordsSet = mgr.getNumberWordsSet(langCode);
+            if (numberWordsSet && numberWordsSet.size > 0) {
+              // Пробуем найти основу слова в наборе числовых слов
+              for (const numWord of numberWordsSet) {
+                if (cleaned.startsWith(numWord) && cleaned.length > numWord.length) {
+                  // Слово начинается с числового слова и имеет дополнительные символы (аффикс)
+                  return '<num>';
+                }
+              }
+            }
+
             return w;
           }).join(' ');
         }
@@ -528,12 +558,12 @@
         // fallback
       }
 
-      // 2. Заменяем последовательности цифр на <num>
+      // 3. Заменяем последовательности цифр на <num>
       s = s.replace(/\d+/g, '<num>');
 
-      // 3. Удаляем пунктуацию, лишние пробелы
+      // 4. Удаляем пунктуацию, лишние пробелы
       s = s.replace(/[\u2013\u2014\u2212\-]/g, ' ');
-      s = s.replace(/[.,!?:;\"«»()]/g, '');
+      s = s.replace(/[.,!?:;\"«»()'`\u2018\u2019]/g, '');
       s = s.replace(/\s+/g, '');
       return s;
     }
