@@ -160,46 +160,141 @@ class ПроверкаНаОшибки {
   /**
    * Проверяет, является ли строка числом (цифрами).
    */
+  /**
+   * Проверяет, является ли строка цифровой.
+   * Расширенная версия: распознаёт также форматы времени HH:MM и HH.MM,
+   * а также очищает от апострофов и суффиксов (например "8.00'de" → "8.00").
+   * @param {string} str
+   * @returns {boolean}
+   */
   _isDigitString(str) {
-    return /^\d+$/.test(String(str || '').trim());
+    const s = String(str || '').trim();
+    if (!s) return false;
+    // Прямая проверка: только цифры
+    if (/^\d+$/.test(s)) return true;
+    // Формат HH:MM или HH.MM (время)
+    if (/^\d{1,2}[:\.]\d{2}$/.test(s)) return true;
+    // Очищаем от апострофа и суффикса (например "8.00'de" → "8.00")
+    const cleaned = s.replace(/['\u2018\u2019].*$/, '');
+    if (cleaned !== s) {
+      return this._isDigitString(cleaned);
+    }
+    return false;
   }
 
   /**
    * Проверяет, эквивалентны ли два слова с учётом чисел.
    * Например: "ten" ≡ "10", "один" ≡ "1", "10" ≡ "ten"
    */
+  /**
+   * Извлекает числовой префикс из строки.
+   * Например: "8.00de" → "8.00", "10:00da" → "10:00", "123abc" → "123"
+   * @param {string} str
+   * @returns {string|null}
+   */
+  _extractDigitPrefix(str) {
+    const s = String(str || '').trim();
+    if (!s) return null;
+    // Пробуем извлечь HH:MM или HH.MM в начале строки
+    const timeMatch = s.match(/^\d{1,2}[:\.]\d{2}/);
+    if (timeMatch) return timeMatch[0];
+    // Пробуем извлечь просто цифры в начале строки
+    const digitMatch = s.match(/^\d+/);
+    if (digitMatch) return digitMatch[0];
+    return null;
+  }
+
   _areNumberEquivalent(word1, word2, langCode) {
     if (!word1 || !word2) return false;
 
-    // Если одно из слов — цифры, а другое — слово-число
-    const d1 = this._isDigitString(word1);
-    const d2 = this._isDigitString(word2);
+    // Очищаем слова от апострофов и суффиксов для сравнения
+    // Например: "8.00'de" → "8.00", "sekizde" → проверяем основу "sekiz"
+    const cleanWord1 = String(word1).replace(/['\u2018\u2019].*$/, '').trim();
+    const cleanWord2 = String(word2).replace(/['\u2018\u2019].*$/, '').trim();
+
+    // Пробуем извлечь числовой префикс (для случаев вроде "8.00de" после simplifyText)
+    const prefix1 = this._extractDigitPrefix(cleanWord1);
+    const prefix2 = this._extractDigitPrefix(cleanWord2);
+
+    const d1 = this._isDigitString(prefix1 || cleanWord1);
+    const d2 = this._isDigitString(prefix2 || cleanWord2);
 
     if (d1 && !d2) {
-      // word1 — цифры, word2 — слово: проверяем, соответствует ли слово цифрам
+      // word1 — цифры (или цифровой префикс), word2 — слово
+      const digitStr = prefix1 || cleanWord1;
       try {
         const mgr = this._ensureNumberTableManager();
         if (mgr) {
           const code = String(langCode || '').split('-')[0].toLowerCase();
-          const digit = mgr.wordToDigit(word2, code);
-          return digit === word1;
+          const digit = mgr.wordToDigit(cleanWord2, code);
+          if (digit === digitStr) return true;
+          // Если цифры длиннее — возможно это время HH:MM без двоеточия (1000 = 10:00)
+          if (digit && digitStr.length > digit.length && digitStr.startsWith(digit)) {
+            return true;
+          }
         }
       } catch (e) {}
       // fallback: проверяем через NUM_WORDS_SET
-      return this.NUM_WORDS_SET.has(word2) && this._wordToDigitSimple(word2) === word1;
+      const simple = this._wordToDigitSimple(cleanWord2);
+      if (simple === digitStr) return true;
+      if (simple && digitStr.length > simple.length && digitStr.startsWith(simple)) {
+        return true;
+      }
+      return false;
     }
 
     if (!d1 && d2) {
-      // word1 — слово, word2 — цифры
+      // word1 — слово, word2 — цифры (или цифровой префикс)
+      const digitStr = prefix2 || cleanWord2;
       try {
         const mgr = this._ensureNumberTableManager();
         if (mgr) {
           const code = String(langCode || '').split('-')[0].toLowerCase();
-          const digit = mgr.wordToDigit(word1, code);
-          return digit === word2;
+          const digit = mgr.wordToDigit(cleanWord1, code);
+          if (digit === digitStr) return true;
+          // Если цифры длиннее — возможно это время HH:MM без двоеточия
+          if (digit && digitStr.length > digit.length && digitStr.startsWith(digit)) {
+            return true;
+          }
         }
       } catch (e) {}
-      return this.NUM_WORDS_SET.has(word1) && this._wordToDigitSimple(word1) === word2;
+      const simple = this._wordToDigitSimple(cleanWord1);
+      if (simple === digitStr) return true;
+      if (simple && digitStr.length > simple.length && digitStr.startsWith(simple)) {
+        return true;
+      }
+      return false;
+    }
+
+    // Если оба не цифры — проверяем, не является ли одно из слов
+    // числовой основой с аффиксом (например "sekizde" содержит "sekiz")
+    if (!d1 && !d2) {
+      try {
+        const mgr = this._ensureNumberTableManager();
+        if (mgr) {
+          const code = String(langCode || '').split('-')[0].toLowerCase();
+          const numberWordsSet = mgr.getNumberWordsSet(code);
+          if (numberWordsSet && numberWordsSet.size > 0) {
+            // Проверяем, содержит ли одно из слов числовую основу
+            for (const numWord of numberWordsSet) {
+              const w1Starts = cleanWord1.startsWith(numWord) && cleanWord1.length > numWord.length;
+              const w2Starts = cleanWord2.startsWith(numWord) && cleanWord2.length > numWord.length;
+              if (w1Starts && w2Starts) {
+                // Оба слова содержат одну и ту же числовую основу с разными аффиксами
+                return true;
+              }
+              if (w1Starts && cleanWord2 === numWord) {
+                // word1 = число+аффикс, word2 = чистое число
+                return true;
+              }
+              if (w2Starts && cleanWord1 === numWord) {
+                // word2 = число+аффикс, word1 = чистое число
+                return true;
+              }
+            }
+          }
+        }
+      } catch (e) {}
     }
 
     return false;
@@ -401,7 +496,9 @@ class ПроверкаНаОшибки {
         // ASR мог потерять следующие за числом слова (например, "o'clock" после "ten").
         // Проверяем: если следующее слово в оригинале не число и отсутствует в userInput,
         // пропускаем его как опциональное.
-        if (this._isDigitString(wordUser) && !this._isDigitString(wordOrig)) {
+        const isUserDigit = this._isDigitString(wordUser) || this._extractDigitPrefix(wordUser) !== null;
+        const isOrigDigit = this._isDigitString(wordOrig) || this._extractDigitPrefix(wordOrig) !== null;
+        if (isUserDigit && !isOrigDigit) {
           // wordOrig — слово-число (например "ten"), wordUser — цифры (например "10")
           // Смотрим, нет ли в оригинале следующих слов, которые ASR потерял
           while (i < simplOriginal.length) {
