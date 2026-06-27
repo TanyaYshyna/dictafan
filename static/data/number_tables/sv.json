@@ -1,6 +1,6 @@
 {
   "lang": "sv",
-  "label": "Svenska",
+  "label": "Swedish",
   "description": "Number word mappings for Swedish speech recognition",
   "digit_to_word": {
     "0": "noll",
@@ -59,7 +59,7 @@
     "53": "femtiotre",
     "54": "femtiofyra",
     "55": "femtiofem",
-    "56": "femtio sex",
+    "56": "femtiosex",
     "57": "femtiosju",
     "58": "femtioåtta",
     "59": "femtionio",
@@ -103,13 +103,12 @@
     "97": "nittiosju",
     "98": "nittioåtta",
     "99": "nittionio",
-    "100": "hundra",
-    "1000": "tusen"
+    "100": "ett hundra",
+    "1000": "ett tusen"
   },
   "word_to_digit": {
     "noll": "0",
     "ett": "1",
-    "en": "1",
     "två": "2",
     "tre": "3",
     "fyra": "4",
@@ -139,6 +138,33 @@
     "hundra": "100",
     "tusen": "1000"
   },
-  "special_phrases": {},
-  "contractions": {}
+  "special_phrases": {
+    "klockan": "klockan",
+    "halv": "halv",
+    "kvart": "kvart",
+    "kvart över": "kvart över",
+    "kvart i": "kvart i",
+    "tio över": "tio över",
+    "tio i": "tio i",
+    "fem över": "fem över",
+    "fem i": "fem i",
+    "fem minuter över": "fem minuter över",
+    "fem minuter i": "fem minuter i",
+    "tio minuter över": "tio minuter över",
+    "tio minuter i": "tio minuter i"
+  },
+  "contractions": {
+    "är": ["är"],
+    "det är": ["det", "är"],
+    "detär": ["det", "är"],
+    "inte": ["inte"],
+    "och": ["och"],
+    "att": ["att"],
+    "med": ["med"],
+    "för": ["för"],
+    "till": ["till"],
+    "på": ["på"],
+    "en": ["en"],
+    "ett": ["ett"]
+  }
 }
