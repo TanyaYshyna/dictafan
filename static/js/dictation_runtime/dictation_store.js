@@ -214,19 +214,25 @@
       this._ensureStateForKnownKeys();
       const allKeys = this.content ? this.content.getAllKeys() : [];
       let hasChecked = false;
+      let hasNonCompleted = false;
       for (const k of allKeys) {
         if (!this.isActiveKey(k)) continue;
         const st = this.getState(k);
         if (st.selection_state === 'checked') {
           hasChecked = true;
-          break;
+        }
+        if (st.selection_state !== 'completed') {
+          hasNonCompleted = true;
         }
       }
-      if (!hasChecked) {
+      // Если нет ни одного checked, но есть не-completed — проставляем checked всем не-completed
+      if (!hasChecked && hasNonCompleted) {
         for (const k of allKeys) {
           if (!this.isActiveKey(k)) continue;
           const st = this.getState(k);
-          st.selection_state = 'checked';
+          if (st.selection_state !== 'completed') {
+            st.selection_state = 'checked';
+          }
         }
         this._rebuildSelectedKeysFromStates();
       }

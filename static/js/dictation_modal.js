@@ -2980,6 +2980,24 @@
         }
       }
 
+      // Определяем, все ли предложения диктанта (activeKeys) выполнены
+      let allDictationCompleted = false;
+      try {
+        const activeKeys = session.activeKeys;
+        const allKeys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session.content ? session.content.getAllKeys() : []);
+        if (Array.isArray(allKeys) && allKeys.length > 0) {
+          allDictationCompleted = true;
+          for (const k of allKeys) {
+            const st = session.getState ? session.getState(k) : null;
+            if (!st) { allDictationCompleted = false; break; }
+            const { textOk, audioOk } = computeSentenceCompletionState(st);
+            if (!textOk || !audioOk) { allDictationCompleted = false; break; }
+          }
+        }
+      } catch (eAll) {
+        allDictationCompleted = false;
+      }
+
       try {
         const p = getProgressPanelInstance();
         if (p && typeof p.update === 'function') {
@@ -3014,13 +3032,65 @@
       try {
         if (allCompleted && state.dictationStarted && !state._completionShown) {
           if (!isPauseModalOpen() && !isStartModalOpen()) {
-            state._completionShown = true;
-            showCompletionModal();
+            // Если выполнены все предложения диктанта — показываем окно успеха
+            if (allDictationCompleted) {
+              state._completionShown = true;
+              showCompletionModal();
+            } else {
+              // Если выполнены только выбранные, но не все в диктанте —
+              // проставляем completed для выполненных, checked для невыполненных
+              // и показываем модалку выбора предложений
+              state._completionShown = true;
+              try {
+                _markCompletedAndShowStartModal(session);
+              } catch (eMark) {
+                // fallback: показываем completion modal если что-то пошло не так
+                showCompletionModal();
+              }
+            }
           }
         }
       } catch (e3) {
       }
     } catch (e) {
+    }
+  }
+
+  /**
+   * Проставляет selection_state='completed' для выполненных предложений
+   * и selection_state='checked' для невыполненных, затем показывает startModal.
+   * Вызывается, когда выбрана только часть предложений и они выполнены,
+   * но не все предложения диктанта завершены.
+   */
+  function _markCompletedAndShowStartModal(session) {
+    try {
+      if (!session) return;
+      const activeKeys = session.activeKeys;
+      const allKeys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session.content ? session.content.getAllKeys() : []);
+      if (!Array.isArray(allKeys)) return;
+
+      for (const k of allKeys) {
+        const st = session.getState ? session.getState(k) : null;
+        if (!st) continue;
+        const { textOk, audioOk } = computeSentenceCompletionState(st);
+        if (textOk && audioOk) {
+          // Выполненное предложение — защищённое состояние completed, нельзя снять галочку
+          st.selection_state = 'completed';
+        } else {
+          // Невыполненное предложение — ставим галочку для выбора
+          st.selection_state = 'checked';
+        }
+      }
+      session._rebuildSelectedKeysFromStates();
+      try { _persistSessionToIdb(); } catch (e) {}
+
+      // Показываем startModal с контекстом success
+      renderStartModalSentencesTable(session);
+      state.startModalContext = 'success';
+      showStartModal();
+      updateNavigatorFromSession(session);
+    } catch (e) {
+      console.error('[DM:_markCompletedAndShowStartModal] error:', e);
     }
   }
 
@@ -4520,8 +4590,15 @@
         const view = session.getSentenceView(key);
         if (!view) return;
 
+        const st = session.getState(key);
+        const isCompleted = st && String(st.selection_state) === 'completed';
+
         const tr = document.createElement('tr');
         tr.dataset.sentenceKey = String(view.key);
+        if (isCompleted) {
+          tr.style.opacity = '0.45';
+          tr.style.pointerEvents = 'none';
+        }
 
         const tdNum = document.createElement('td');
         const position = Number.isFinite(view.position) ? view.position : '';
@@ -4535,7 +4612,15 @@
 
         // selection_state хранится в сессии, а не в view (getSentenceView возвращает сырой объект предложения)
         const initialState = session.getState(key);
-        renderLucideCheckboxButton(btn, initialState && initialState.selection_state === 'checked', false);
+        const isChecked = initialState && initialState.selection_state === 'checked';
+        renderLucideCheckboxButton(btn, isChecked, false);
+
+        // Если предложение выполнено (completed) — кнопка неактивна
+        if (isCompleted) {
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+          btn.style.cursor = 'default';
+        }
 
         btn.addEventListener('click', (e) => {
           try {
@@ -4545,8 +4630,10 @@
           }
 
           try {
-            const st = session.getState(view.key);
-            const cur = st && st.selection_state ? String(st.selection_state) : 'unchecked';
+            const st2 = session.getState(view.key);
+            const cur = st2 && st2.selection_state ? String(st2.selection_state) : 'unchecked';
+            // Не даём переключать completed-строки
+            if (cur === 'completed') return;
             const next = (cur === 'checked') ? 'unchecked' : 'checked';
             session.setSelectionState(view.key, next);
             session.ensureDefaultSelection();
@@ -4564,8 +4651,6 @@
         });
 
         tdChoice.appendChild(btn);
-
-        const st = session.getState(view.key);
 
         // --- Колонка: Звезда / Полузвезда ---
         const tdStar = document.createElement('td');
@@ -6126,11 +6211,33 @@
             const ctx = state.startModalContext || 'open';
 
             if (ctx === 'success') {
-              // Из окна успехов — сбрасываем прогресс и обнуляем дату старта
+              // Из окна успехов или из модалки выбора после частичного выполнения
               if (s) {
-                resetDictationProgressForSession(s);
-                // Сбрасываем dateStart, чтобы startGame() установил новую дату
-                s.dateStart = null;
+                // Проверяем, есть ли completed-предложения (частичное выполнение)
+                let hasCompletedSentences = false;
+                try {
+                  const allKeys = s.content ? s.content.getAllKeys() : [];
+                  for (const k of allKeys) {
+                    const st = s.getState(k);
+                    if (st && String(st.selection_state) === 'completed') {
+                      hasCompletedSentences = true;
+                      break;
+                    }
+                  }
+                } catch (eCheck) {}
+
+                if (hasCompletedSentences) {
+                  // Частичное выполнение: не сбрасываем прогресс completed-предложений,
+                  // только сбрасываем флаги состояния
+                  try { state.dictationStarted = false; } catch (e) {}
+                  try { state._completionShown = false; } catch (e) {}
+                  // Сбрасываем dateStart, чтобы startGame() установил новую дату
+                  if (s) s.dateStart = null;
+                } else {
+                  // Полное выполнение (все предложения были завершены) — сбрасываем всё
+                  resetDictationProgressForSession(s);
+                  if (s) s.dateStart = null;
+                }
               }
             } else if (ctx === 'open') {
               // Из карточки диктанта: если сессия завершена — сбрасываем прогресс

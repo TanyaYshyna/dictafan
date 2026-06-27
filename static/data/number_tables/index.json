@@ -10,6 +10,7 @@
     "sv": { "file": "sv.json", "label": "Svenska", "script": "latin" },
     "de": { "file": "de.json", "label": "Deutsch", "script": "latin" },
     "fr": { "file": "fr.json", "label": "Français", "script": "latin" },
+    "es": { "file": "es.json", "label": "Español", "script": "latin" },
     "pl": { "file": "pl.json", "label": "Polski", "script": "latin" }
   }
 }
