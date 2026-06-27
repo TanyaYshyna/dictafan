@@ -2602,14 +2602,12 @@
       }
       if (!st) st = getCurrentSentenceStateFromSession(session);
       if (!st) {
-        console.log('[DM:updateNextButton] st=null → disabled');
         btn.disabled = true;
         btn.classList.remove('button-color-yellow');
         btn.classList.add('button-color-gray');
         return;
       }
       const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
-      console.log('[DM:updateNextButton] textOk=' + textOk + ' audioOk=' + audioOk + ' requiresAudio=' + requiresAudio + ' → canNext=' + !!(textOk && audioOk));
 
       // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
       const canNext = !!(textOk && audioOk);

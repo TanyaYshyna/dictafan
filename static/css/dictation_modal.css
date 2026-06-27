@@ -1289,14 +1289,6 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
   margin-top: 10px;
 }
 
-#dictationModal #checkBtn {
-  min-height: 44px;
-  height: 44px;
-  padding-top: 0;
-  padding-bottom: 0;
-  display: inline-flex;
-  align-items: center;
-}
 
 #dictationModal .audio-user-table {
   border-collapse: collapse;
@@ -1430,10 +1422,12 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #checkBtn {
   width: auto;
   min-width: 80px;
-  height: 42px;
-  min-height: 42px;
+  height: 44px;
+  min-height: 44px;
   border-radius: 8px;
   padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
   gap: 6px;
 }

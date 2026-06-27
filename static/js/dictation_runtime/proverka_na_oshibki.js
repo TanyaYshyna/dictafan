@@ -7,6 +7,24 @@ class ПроверкаНаОшибки {
     };
 
     this._initRegexes();
+    this._numberTableManager = null;
+  }
+
+  /**
+   * Инициализирует NumberTableManager для загрузки таблиц чисел по языку.
+   */
+  _ensureNumberTableManager() {
+    if (this._numberTableManager) return this._numberTableManager;
+    try {
+      if (window.__numberTableManager) {
+        this._numberTableManager = window.__numberTableManager;
+      } else if (window.NumberTableManager) {
+        this._numberTableManager = new window.NumberTableManager();
+        window.__numberTableManager = this._numberTableManager;
+      }
+    } catch (e) {
+    }
+    return this._numberTableManager;
   }
 
   _initRegexes() {
@@ -33,6 +51,8 @@ class ПроверкаНаОшибки {
     this.ARABIC_DIACRITICS_REGEX = /[\u064B-\u065F\u0670\u0671\u06D6-\u06ED]/g;
     this.ARABIC_ALIF_VARIANTS_REGEX = /[\u0622\u0623\u0625\u0671]/g;
 
+    // NUM_WORDS_SET теперь заполняется динамически через NumberTableManager,
+    // но оставляем базовый набор для обратной совместимости
     this.NUM_WORDS_SET = new Set([
       "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
       "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
@@ -103,6 +123,103 @@ class ПроверкаНаОшибки {
       cannot: ["cant"],
       cant: ["cannot"],
     };
+  }
+
+  /**
+   * Обновляет NUM_WORDS_SET из NumberTableManager для указанного языка.
+   * @param {string} langCode
+   */
+  async _updateNumberWordsForLang(langCode) {
+    try {
+      const mgr = this._ensureNumberTableManager();
+      if (mgr) {
+        const code = String(langCode || '').split('-')[0].toLowerCase();
+        await mgr.ensureLanguage(code);
+        const words = mgr.getNumberWordsSet(code);
+        if (words && words.size > 0) {
+          // Добавляем слова из таблицы в существующий Set
+          for (const w of words) {
+            this.NUM_WORDS_SET.add(w);
+          }
+        }
+        // Также добавляем contractions из таблицы
+        const contractions = mgr.getContractions(code);
+        if (contractions) {
+          for (const [key, val] of Object.entries(contractions)) {
+            if (!this.CONTRACTIONS_DICT[key]) {
+              this.CONTRACTIONS_DICT[key] = val;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // не критично
+    }
+  }
+
+  /**
+   * Проверяет, является ли строка числом (цифрами).
+   */
+  _isDigitString(str) {
+    return /^\d+$/.test(String(str || '').trim());
+  }
+
+  /**
+   * Проверяет, эквивалентны ли два слова с учётом чисел.
+   * Например: "ten" ≡ "10", "один" ≡ "1", "10" ≡ "ten"
+   */
+  _areNumberEquivalent(word1, word2, langCode) {
+    if (!word1 || !word2) return false;
+
+    // Если одно из слов — цифры, а другое — слово-число
+    const d1 = this._isDigitString(word1);
+    const d2 = this._isDigitString(word2);
+
+    if (d1 && !d2) {
+      // word1 — цифры, word2 — слово: проверяем, соответствует ли слово цифрам
+      try {
+        const mgr = this._ensureNumberTableManager();
+        if (mgr) {
+          const code = String(langCode || '').split('-')[0].toLowerCase();
+          const digit = mgr.wordToDigit(word2, code);
+          return digit === word1;
+        }
+      } catch (e) {}
+      // fallback: проверяем через NUM_WORDS_SET
+      return this.NUM_WORDS_SET.has(word2) && this._wordToDigitSimple(word2) === word1;
+    }
+
+    if (!d1 && d2) {
+      // word1 — слово, word2 — цифры
+      try {
+        const mgr = this._ensureNumberTableManager();
+        if (mgr) {
+          const code = String(langCode || '').split('-')[0].toLowerCase();
+          const digit = mgr.wordToDigit(word1, code);
+          return digit === word2;
+        }
+      } catch (e) {}
+      return this.NUM_WORDS_SET.has(word1) && this._wordToDigitSimple(word1) === word2;
+    }
+
+    return false;
+  }
+
+  /**
+   * Простой fallback: преобразует английское слово-число в цифру.
+   */
+  _wordToDigitSimple(word) {
+    const map = {
+      "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+      "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+      "ten": "10", "eleven": "11", "twelve": "12", "thirteen": "13",
+      "fourteen": "14", "fifteen": "15", "sixteen": "16", "seventeen": "17",
+      "eighteen": "18", "nineteen": "19", "twenty": "20", "thirty": "30",
+      "forty": "40", "fifty": "50", "sixty": "60", "seventy": "70",
+      "eighty": "80", "ninety": "90", "hundred": "100", "thousand": "1000",
+      "nitton": "19",
+    };
+    return map[String(word || '').toLowerCase()] || null;
   }
 
   getDictationScript(langCode) {
@@ -205,9 +322,12 @@ class ПроверкаНаОшибки {
     return result ? result.split(' ') : [];
   }
 
-  areWordsEquivalent(word1, word2) {
+  areWordsEquivalent(word1, word2, langCode) {
     if (!word1 || !word2) return false;
     if (word1 === word2) return true;
+
+    // Проверка эквивалентности чисел (цифры ↔ слова)
+    if (this._areNumberEquivalent(word1, word2, langCode)) return true;
 
     try {
       const eq1 = this.EQUIVALENT_WORDS_DICT[word1];
@@ -234,7 +354,7 @@ class ПроверкаНаОшибки {
     return len;
   }
 
-  checkWords(original, userInput) {
+  checkWords(original, userInput, langCode) {
     const simplOriginal = this.simplifyText(original);
     const simplUser = this.simplifyText(userInput);
 
@@ -259,6 +379,8 @@ class ПроверкаНаОшибки {
         continue;
       }
 
+      // Проверка: если слово из оригинала отсутствует в вводе пользователя
+      // (ASR мог пропустить слово, например "o'clock")
       if (!this.opts.requireEveryWord && simplOriginal[i + 1] === wordUser) {
         userVerified.push({ type: 'missing', text: fullWordOrig });
         errorCount++;
@@ -267,6 +389,40 @@ class ПроверкаНаОшибки {
       }
 
       let isEquivalent = false;
+
+      // Проверка эквивалентности чисел (цифры ↔ слова) с учётом языка
+      if (this._areNumberEquivalent(wordOrig, wordUser, langCode)) {
+        userVerified.push({ type: 'correct', text: fullWordOrig });
+        i++;
+        j++;
+        isEquivalent = true;
+
+        // Если слово из оригинала было числом (словом), а ASR вернул цифры,
+        // ASR мог потерять следующие за числом слова (например, "o'clock" после "ten").
+        // Проверяем: если следующее слово в оригинале не число и отсутствует в userInput,
+        // пропускаем его как опциональное.
+        if (this._isDigitString(wordUser) && !this._isDigitString(wordOrig)) {
+          // wordOrig — слово-число (например "ten"), wordUser — цифры (например "10")
+          // Смотрим, нет ли в оригинале следующих слов, которые ASR потерял
+          while (i < simplOriginal.length) {
+            const nextOrig = simplOriginal[i];
+            const nextUser = simplUser[j];
+            // Если следующее слово в userInput совпадает с текущим в оригинале — выходим
+            if (nextUser !== undefined && nextOrig === nextUser) {
+              break;
+            }
+            // Если следующее слово в userInput — число, эквивалентное текущему в оригинале — выходим
+            if (nextUser !== undefined && this._areNumberEquivalent(nextOrig, nextUser, langCode)) {
+              break;
+            }
+            // Иначе — ASR потерял это слово, пропускаем
+            userVerified.push({ type: 'missing', text: originalWords[i] || '' });
+            errorCount++;
+            i++;
+          }
+        }
+        continue;
+      }
 
       const expansionOrig = this.CONTRACTIONS_DICT[wordOrig];
       if (expansionOrig && j + expansionOrig.length <= simplUser.length) {
@@ -309,7 +465,7 @@ class ПроверкаНаОшибки {
         }
       }
 
-      if (!isEquivalent && this.areWordsEquivalent(wordOrig, wordUser)) {
+      if (!isEquivalent && this.areWordsEquivalent(wordOrig, wordUser, langCode)) {
         userVerified.push({ type: 'correct', text: fullWordOrig });
         i++;
         j++;
@@ -378,7 +534,13 @@ class ПроверкаНаОшибки {
       };
     }
 
-    const { verified, errorCount } = this.checkWords(originalText, userText);
+    // Асинхронно загружаем таблицу чисел для языка, если ещё не загружена
+    // (не ждём — это не критично для проверки)
+    if (langOriginal) {
+      this._updateNumberWordsForLang(langOriginal).catch(() => {});
+    }
+
+    const { verified, errorCount } = this.checkWords(originalText, userText, langOriginal);
     const allCorrect = verified.every(w => w && w.type === 'correct');
 
     let nextPerfect = Number(prevPerfect) || 0;

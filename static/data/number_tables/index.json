@@ -1,0 +1,15 @@
+{
+  "description": "Index of available number table files for speech recognition normalization",
+  "version": 1,
+  "languages": {
+    "en": { "file": "en.json", "label": "English", "script": "latin" },
+    "ru": { "file": "ru.json", "label": "Русский", "script": "cyrillic" },
+    "uk": { "file": "uk.json", "label": "Українська", "script": "cyrillic" },
+    "tr": { "file": "tr.json", "label": "Türkçe", "script": "latin" },
+    "ar": { "file": "ar.json", "label": "العربية", "script": "arabic" },
+    "sv": { "file": "sv.json", "label": "Svenska", "script": "latin" },
+    "de": { "file": "de.json", "label": "Deutsch", "script": "latin" },
+    "fr": { "file": "fr.json", "label": "Français", "script": "latin" },
+    "pl": { "file": "pl.json", "label": "Polski", "script": "latin" }
+  }
+}
