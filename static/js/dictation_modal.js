@@ -2440,6 +2440,22 @@
   }
 
   /**
+   * Сильный критерий завершённости предложения: только звезда (perfect >= 1) + аудио.
+   * Используется для визуального отображения (серый цвет строки, недоступность).
+   * Полузвезда (corrected) НЕ считается — пользователь может улучшить до звезды.
+   */
+  function computeSentenceStrongCompletionState(st) {
+    const perfect = Number(st && st.number_of_perfect) || 0;
+    const audioDone = Number(st && st.number_of_audio) || 0;
+    const requiresAudio = getRequiredAudioRepeatsValue();
+    const mode = getExerciseMode();
+    // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
+    const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1);
+    const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
+    return !!(textOk && audioOk);
+  }
+
+  /**
    * Проверяет, полностью ли закрыто предложение (для определения завершённости диктанта).
    * Считается закрытым: звезда ИЛИ полузвезда (если режим без текста — то без текста)
    * И аудио (если требуется по режиму).
@@ -3072,9 +3088,9 @@
       for (const k of allKeys) {
         const st = session.getState ? session.getState(k) : null;
         if (!st) continue;
-        const { textOk, audioOk } = computeSentenceCompletionState(st);
-        if (textOk && audioOk) {
-          // Выполненное предложение — защищённое состояние completed, нельзя снять галочку
+        // Сильный критерий (звезда + аудио) — предложение полностью закрыто,
+        // строка становится серой и недоступной для выбора
+        if (computeSentenceStrongCompletionState(st)) {
           st.selection_state = 'completed';
         } else {
           // Невыполненное предложение — ставим галочку для выбора
