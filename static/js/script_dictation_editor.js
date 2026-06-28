@@ -6550,6 +6550,20 @@ function setupAudioSettingsModalHandlers() {
             }
         });
     }
+
+    // Кнопка "Умная нарезка"
+    const smartSplitBtn = document.getElementById('smartSplitBtn');
+    if (smartSplitBtn) {
+        smartSplitBtn.addEventListener('click', () => {
+            const audioMode = document.querySelector('input[name="audioMode"]:checked');
+            const currentMode = audioMode ? audioMode.value : 'full';
+            if (currentMode === 'full') {
+                smartSplitAudio();
+            } else {
+                alert('Умная нарезка доступна только в режиме "Отображать весь файл"');
+            }
+        });
+    }
 }
 
 /**
@@ -7069,25 +7083,24 @@ function updateInterfaceForMicMode() {
 
 /**
  * Обработчик кнопки ножниц в режиме "Отображать весь файл"
+ * Делегирует в audio_editor_tools.js
  */
 function handleScissorsFullMode() {
-    const start = parseFloat(startInput.value) || 0;
-    const end = parseFloat(endInput.value) || 0;
-
-    if (start >= end) {
-        alert('Время начала должно быть меньше времени окончания');
-        return;
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.handleScissorsFullMode === 'function') {
+        window.AudioEditorTools.handleScissorsFullMode();
+    } else {
+        const start = parseFloat(startInput.value) || 0;
+        const end = parseFloat(endInput.value) || 0;
+        if (start >= end) {
+            alert('Время начала должно быть меньше времени окончания');
+            return;
+        }
+        if (!currentAudioFileName) {
+            alert('Не выбран аудиофайл для обрезки');
+            return;
+        }
+        trimAudioFile(currentAudioFileName, start, end);
     }
-
-    // Получаем текущий аудиофайл из режима "отображать весь файл"
-    //const currentAudioFile = getCurrentAudioFileForScissors();
-    if (!currentAudioFileName) {
-        alert('Не выбран аудиофайл для обрезки');
-        return;
-    }
-
-    // Вызываем функцию обрезки аудио
-    trimAudioFile(currentAudioFileName, start, end);
 }
 
 /**
@@ -8527,50 +8540,30 @@ function selectAudioFile(row) {
  * Разрезать аудио на предложения
  */
 function splitAudioIntoSeentences(row) {
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.splitAudioIntoSeentences === 'function') {
+        window.AudioEditorTools.splitAudioIntoSeentences(row);
+        return;
+    }
+    // Fallback (legacy) — если модуль не загружен
     const filename = row.dataset.filename;
     const filepath = row.dataset.filepath;
-    const startTime = parseFloat(row.querySelector('.start-input').value) || 0;
-    const endTime = parseFloat(row.querySelector('.end-input').value) || 0;
-
-    // console.log('✂️ Разрезаем аудио на предложения:', filename, startTime, '-', endTime);
-
-    // Показываем индикатор загрузки
     showLoadingIndicator('Разрезание аудио на предложения...');
-
     (async () => {
         try {
-            // Берём предложения (для split-аудио по строкам)
             const sentences = (workingData?.original?.sentences || []).map(s => ({
                 key: s.key,
                 start_time: Number(s.start) || 0,
                 end_time: Number(s.end) || 0,
                 language: currentDictation.language_original
             })).filter(s => s.key && s.end_time > s.start_time);
-
-            const payload = {
-                filename: filename,
-                filepath: filepath,
-                dictation_id: currentDictation.id,
-                sentences: sentences
-            };
-
             const response = await fetch('/split-audio', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, filepath, dictation_id: currentDictation.id, sentences })
             });
-
             const data = await response.json();
             hideLoadingIndicator();
-            if (!data.success) {
-                console.error('❌ Ошибка разрезания аудио:', data.error);
-                alert('Ошибка разрезания аудио: ' + (data.error || 'Неизвестная ошибка'));
-                return;
-            }
-
-            // Receive base64 segments and keep them in memory (blob URLs) until Save.
+            if (!data.success) { alert('Ошибка разрезания аудио'); return; }
             if (Array.isArray(data.files)) {
                 for (const f of data.files) {
                     if (!f || !f.filename || !f.audio_b64) continue;
@@ -8580,23 +8573,17 @@ function splitAudioIntoSeentences(row) {
                         for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
                         const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
                         await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, f.filename, outBlob, f.mime || 'audio/mpeg');
-
                         const sentence = workingData.original.sentences.find(s => s.key === f.key);
-                        if (sentence) {
-                            sentence.audio_user = f.filename;
-                        }
-                    } catch (e) {
-                        console.warn('⚠️ не удалось сохранить segment blob:', e);
-                    }
+                        if (sentence) sentence.audio_user = f.filename;
+                    } catch (e) { console.warn('⚠️', e); }
                 }
-
                 rebuildSentencesTable();
                 setDirtyFlags({ audio: true });
                 markAsUnsaved();
             }
         } catch (error) {
             hideLoadingIndicator();
-            console.error('❌ Ошибка разрезания аудио:', error);
+            console.error('❌', error);
             alert('Ошибка разрезания аудио');
         }
     })();
@@ -8604,68 +8591,40 @@ function splitAudioIntoSeentences(row) {
 
 /**
  * Обрезать аудиофайл
+ * Делегирует в audio_editor_tools.js
  */
 function cutAudioFile(row) {
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.cutAudioFile === 'function') {
+        window.AudioEditorTools.cutAudioFile(row);
+        return;
+    }
+    // Fallback
     const filename = row.dataset.filename;
     const filepath = row.dataset.filepath;
     const startTime = parseFloat(row.querySelector('.start-input').value) || 0;
     const endTime = parseFloat(row.querySelector('.end-input').value) || 0;
-
-    // console.log('✂️ Обрезаем аудиофайл:', filename, startTime, '-', endTime);
-
-    // Показываем индикатор загрузки
     showLoadingIndicator('Обрезание аудиофайла...');
-
     (async () => {
         try {
-            const payload = {
-                filename: filename,
-                filepath: filepath,
-                startTime: startTime,
-                endTime: endTime,
-                language: currentDictation.language_original,
-                dictation_id: currentDictation.id
-            };
-
             const response = await fetch('/cut-audio', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ filename, filepath, start_time: startTime, end_time: endTime, language: currentDictation.language_original, dictation_id: currentDictation.id })
             });
-
             const data = await response.json();
             hideLoadingIndicator();
-
-            if (!data.success) {
-                console.error('❌ Ошибка обрезания аудио:', data.error);
-                alert('Ошибка обрезания аудио: ' + (data.error || 'Неизвестная ошибка'));
-                return;
-            }
-
+            if (!data.success) { alert('Ошибка обрезания аудио'); return; }
             if (data.audio_b64) {
                 const binaryOut = atob(data.audio_b64);
                 const outBytes = new Uint8Array(binaryOut.length);
                 for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
                 const outBlob = new Blob([outBytes], { type: data.mime || 'audio/mpeg' });
-                const outUrl = await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, data.filename, outBlob, data.mime || 'audio/mpeg');
-                if (outUrl) {
-                    setDraftAudioUrl(currentDictation.language_original, data.filename, outUrl);
-                }
-
+                await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, data.filename, outBlob, data.mime || 'audio/mpeg');
                 row.dataset.filename = data.filename || filename;
-                const el = row.querySelector('.filename-text');
-                if (el) el.textContent = row.dataset.filename;
-            } else {
-                // Старый режим: backend перезаписал файл, но структура ответа тут не согласована.
-                // Просто перезагрузим волну по текущему filepath.
-                row.dataset.filename = filename;
-                row.dataset.filepath = filepath;
             }
         } catch (error) {
             hideLoadingIndicator();
-            console.error('❌ Ошибка обрезания аудио:', error);
+            console.error('❌', error);
             alert('Ошибка обрезания аудио');
         }
     })();
@@ -8864,184 +8823,79 @@ async function loadWaveformForFile(filepath) {
 
 /**
  * Получить текущий аудиофайл для обрезки ножницами
+ * Делегирует в audio_editor_tools.js
  */
 function getCurrentAudioFileForScissors() {
-    // Проверяем режим "отображать весь файл"
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.getCurrentAudioFileForScissors === 'function') {
+        return window.AudioEditorTools.getCurrentAudioFileForScissors();
+    }
+    // Fallback
     const audioMode = document.querySelector('input[name="audioMode"]:checked');
-    console.log('✂️✂️✂️✂️✂️4✂️ Режим "отображать весь файл":', audioMode, audioMode.value);
-    if (!audioMode || audioMode.value !== 'full') {
-        console.log('❌ Режим "отображать весь файл" не активен');
-        return null;
-    }
-
-    // Получаем имя файла из currentAudioFileName (уже содержит только имя файла)
-    const filename = currentAudioFileName;
-    console.log('✂️✂️✂️✂️✂️ 1 ✂️ Имя файла:', filename);
-
-    if (!filename) {
-        console.error('❌ Имя файла не найдено');
-        return null;
-    }
-
-
-    // Создаем правильный путь к файлу на сервере
-    const serverFilePath = `${getAudioPath(currentDictation.language_original)}/${filename}`;
-    console.log('✂️✂️✂️✂️✂️ 2 ✂️ Путь к файлу на сервере:', serverFilePath);
-
-    // Проверяем, есть ли файл в input элементе (для новых загрузок)
-    const fileInput = document.getElementById('audioFileInput');
-    let file = null;
-
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-        file = fileInput.files[0];
-    } else {
-        // Файл не в input, но он может быть на сервере (для существующих диктантов)
-    }
-    console.log('✂️✂️✂️✂️✂️ 2 ✂️ return:', {
-        filename: filename,
-        filepath: serverFilePath,
-        file: file // может быть null для существующих файлов
-    });
-
+    if (!audioMode || audioMode.value !== 'full') return null;
+    if (!currentAudioFileName) return null;
     return {
-        filename: filename,
-        filepath: serverFilePath,
-        file: file // может быть null для существующих файлов
+        filename: currentAudioFileName,
+        filepath: `${getAudioPath(currentDictation.language_original)}/${currentAudioFileName}`,
+        file: null
     };
 }
 /**
- * Разрезать аудио на предложения
+ * Разрезать аудио на предложения (равными частями)
+ * Делегирует в audio_editor_tools.js
  */
 async function splitAudioIntoSentences() {
-    // Получаем текущий аудиофайл
-    //const currentAudioFile = getCurrentAudioFileForScissors();
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.splitAudioIntoSentences === 'function') {
+        return window.AudioEditorTools.splitAudioIntoSentences();
+    }
+    // Fallback
     const filePath = `${getAudioPath(currentDictation.language_original)}/${currentAudioFileName}`;
-    console.log('✂️✂️✂️✂️✂️3✂️ Текущий аудиофайл:', currentAudioFileName);
-
-    // Получаем все предложения
-    if (!workingData || !workingData.original || !workingData.original.sentences) {
-        alert('Нет предложений для разрезания');
-        return;
-    }
-
+    if (!workingData?.original?.sentences) { alert('Нет предложений'); return; }
     const sentences = workingData.original.sentences.filter(s => s.key !== 'metadata');
-    if (sentences.length === 0) {
-        alert('Нет предложений для разрезания');
-        return;
-    }
-
-    // Получаем длительность аудио
-    const waveformCanvas = window.waveformCanvas;
-    if (!waveformCanvas) {
-        alert('Волна не загружена');
-        return;
-    }
-
-    const totalDuration = waveformCanvas.getDuration();
+    if (sentences.length === 0) { alert('Нет предложений'); return; }
+    const wf = window.waveformCanvas;
+    if (!wf) { alert('Волна не загружена'); return; }
+    const totalDuration = wf.getDuration();
     const segmentDuration = totalDuration / sentences.length;
-
-    console.log(`📊 Разрезаем ${totalDuration.toFixed(2)}с на ${sentences.length} частей по ${segmentDuration.toFixed(2)}с`);
-
-    // Показываем индикатор загрузки
     showLoadingIndicator('Разрезание аудио на предложения...');
-
     try {
-        // Сначала рассчитываем все концы интервалов
         const endTimes = [];
         let currentEndTime = 0;
-
         for (let i = 0; i < sentences.length; i++) {
-            // Конец интервала = предыдущий конец + длительность сегмента, округленная по старому правилу
             const rawEndTime = currentEndTime + segmentDuration;
-            const endTime = Math.floor(rawEndTime * 100) / 100; // Отбрасываем тысячные
+            const endTime = Math.floor(rawEndTime * 100) / 100;
             endTimes.push(endTime);
             currentEndTime = endTime;
         }
-
-        console.log(`📊 Рассчитанные концы интервалов:`, endTimes.map(t => t.toFixed(2)).join(', '));
-
-        // Теперь обновляем данные предложений
         for (let i = 0; i < sentences.length; i++) {
             const sentence = sentences[i];
-
-            // Начало интервала = конец предыдущего (или 0 для первого)
             const startTime = i === 0 ? 0 : endTimes[i - 1];
-
-            // Конец интервала = уже рассчитанный
             const endTime = endTimes[i];
-
-            console.log(`📊 Предложение ${i + 1}: ${startTime.toFixed(2)}с - ${endTime.toFixed(2)}с`);
-
-            // Обновляем данные в workingData
-            const sentenceIndex = workingData.original.sentences.findIndex(s => s.key === sentence.key);
-            if (sentenceIndex !== -1) {
-                workingData.original.sentences[sentenceIndex].start = startTime;
-                workingData.original.sentences[sentenceIndex].end = endTime;
-                workingData.original.sentences[sentenceIndex].chain = true; // Включаем цепочку по умолчанию
-                workingData.original.sentences[sentenceIndex].audio_user = `${sentence.key}_${currentDictation.language_original}_user.mp3`;
-            }
-
-            // Обновляем данные во всех переводах (ключи одинаковые)
-            try {
-                if (workingData && workingData.translations && typeof workingData.translations === 'object') {
-                    for (const k of Object.keys(workingData.translations)) {
-                        const bucket = workingData.translations[k];
-                        if (!bucket || !Array.isArray(bucket.sentences)) continue;
-                        const idx = bucket.sentences.findIndex(s => s && s.key === sentence.key);
-                        if (idx === -1) continue;
-                        bucket.sentences[idx].start = startTime;
-                        bucket.sentences[idx].end = endTime;
-                        bucket.sentences[idx].chain = true;
-                        bucket.sentences[idx].audio_user = `${sentence.key}_${normalizeLangCode(bucket.language)}_user.mp3`;
-                    }
-                }
-            } catch (e) {
+            const si = workingData.original.sentences.findIndex(s => s.key === sentence.key);
+            if (si !== -1) {
+                workingData.original.sentences[si].start = startTime;
+                workingData.original.sentences[si].end = endTime;
+                workingData.original.sentences[si].chain = true;
+                workingData.original.sentences[si].audio_user = `${sentence.key}_${currentDictation.language_original}_user.mp3`;
             }
         }
-
-        // Отправляем запрос на сервер для разрезания аудио
         const response = await fetch('/split-audio', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                filename: currentAudioFileName,
-                filepath: filePath,
-                sentences: sentences.map(s => ({
-                    key: s.key,
-                    start_time: workingData.original.sentences.find(ws => ws.key === s.key)?.start || 0,
-                    end_time: workingData.original.sentences.find(ws => ws.key === s.key)?.end || 0,
-                    language: currentDictation.language_original
-                })),
+                filename: currentAudioFileName, filepath: filePath,
+                sentences: sentences.map(s => ({ key: s.key, start_time: workingData.original.sentences.find(ws => ws.key === s.key)?.start || 0, end_time: workingData.original.sentences.find(ws => ws.key === s.key)?.end || 0, language: currentDictation.language_original })),
                 dictation_id: currentDictation.id
             })
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-
         if (data.success) {
-            // Обновляем таблицу
             updateTableWithNewAudio();
-
-            // Переключаем режим на "Текущее предложение"
             switchToSentenceMode();
-
-        } else {
-            console.error('❌ Ошибка разрезания аудио:', data.error);
-            alert('Ошибка разрезания аудио: ' + data.error);
-        }
+        } else { alert('Ошибка разрезания аудио: ' + data.error); }
     } catch (error) {
-        console.error('❌ Ошибка разрезания аудио:', error);
+        console.error('❌', error);
         alert('Ошибка разрезания аудио: ' + error.message);
-    } finally {
-        hideLoadingIndicator();
-    }
+    } finally { hideLoadingIndicator(); }
 }
 
 /**
@@ -9485,69 +9339,34 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
 
 /**
  * Обрезать аудиофайл ножницами
+ * Делегирует в audio_editor_tools.js
  */
 async function trimAudioFile(audioFileName, startTime, endTime) {
-    // console.log('✂️ Обрезаем аудиофайл:', audioFile.filename, 'с', startTime, 'по', endTime);
-
-    // Показываем индикатор загрузки
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.trimAudioFile === 'function') {
+        return window.AudioEditorTools.trimAudioFile(audioFileName, startTime, endTime);
+    }
+    // Fallback
     showLoadingIndicator('Обрезание аудиофайла...');
-
     try {
-        // Используем правильный путь к файлу на сервере
-        // console.log('📤 Обрезаем файл на сервере:', audioFile.filepath);
-        filePath = `${getAudioPath(currentDictation.language_original)}/${audioFileName}`;
-        // Обрезаем файл на сервере
+        const filePath = `${getAudioPath(currentDictation.language_original)}/${audioFileName}`;
         const response = await fetch('/cut-audio', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-                // ,
-                // 'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-            },
-            body: JSON.stringify({
-                filename: audioFileName,
-                filepath: filePath,
-                start_time: startTime,
-                end_time: endTime,
-                language: currentDictation.language_original,
-                dictation_id: currentDictation.id  // добавляем ID диктанта
-            })
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: audioFileName, filepath: filePath, start_time: startTime, end_time: endTime, language: currentDictation.language_original, dictation_id: currentDictation.id })
         });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
-
         if (data.success) {
             loadWaveformForFile(data.filepath);
-
-            // Автосохранение JSON удалено - данные только в workingData
-
-            // Приводим все кнопки воспроизведения к состоянию ready (play)
-            try {
-                document.querySelectorAll('.audio-btn.audio-btn-table').forEach(btn => {
-                    btn.dataset.state = 'ready';
-                    btn.innerHTML = '<i data-lucide="play"></i>';
-                });
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
-            } catch (e) {
-                console.warn('⚠️ Не удалось обновить состояние кнопок после обрезки:', e);
-            }
-        } else {
-            console.error('❌ Ошибка обрезания аудио:', data.error);
-            alert('Ошибка обрезания аудио: ' + data.error);
-        }
+            document.querySelectorAll('.audio-btn.audio-btn-table').forEach(btn => {
+                btn.dataset.state = 'ready';
+                btn.innerHTML = '<i data-lucide="play"></i>';
+            });
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        } else { alert('Ошибка обрезания аудио: ' + data.error); }
     } catch (error) {
-        console.error('❌ Ошибка обрезания аудио:', error);
+        console.error('❌', error);
         alert('Ошибка обрезания аудио: ' + error.message);
-    } finally {
-        hideLoadingIndicator();
-    }
+    } finally { hideLoadingIndicator(); }
 }
 
 /**
@@ -9560,55 +9379,41 @@ function handleAudioPlay() {
 
 /**
  * Обработчик кнопки Start
+ * Делегирует в audio_editor_tools.js
  */
 function handleAudioStart() {
-    // console.log('⏰ Устанавливаем время начала');
-
-    const waveformCanvas = window.waveformCanvas;
-    if (!waveformCanvas) {
-        console.log('❌ Волна не загружена');
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.handleAudioStart === 'function') {
+        window.AudioEditorTools.handleAudioStart();
         return;
     }
-
-    // Получаем текущую позицию playhead
-    const currentTime = waveformCanvas.getCurrentTime();
-
-    // Обновляем поле Start
-    if (startInput) {
-        startInput.value = currentTime.toFixed(2);
-    }
-
-    // Обновляем регион волны
-    const currentRegion = waveformCanvas.getRegion();
-    setupWaveformRegionCallback();
-    waveformCanvas.setRegion(currentTime, currentRegion.end);
+    // Fallback
+    const wf = window.waveformCanvas;
+    if (!wf) { console.log('❌ Волна не загружена'); return; }
+    const currentTime = wf.getCurrentTime();
+    if (startInput) startInput.value = currentTime.toFixed(2);
+    const currentRegion = wf.getRegion();
+    if (typeof setupWaveformRegionCallback === 'function') setupWaveformRegionCallback();
+    wf.setRegion(currentTime, currentRegion.end);
 }
 
 /**
  * Обработчик кнопки End
+ * Делегирует в audio_editor_tools.js
  */
 function handleAudioEnd() {
-    // console.log('⏰ Устанавливаем время окончания');
-
-    const waveformCanvas = window.waveformCanvas;
-    if (!waveformCanvas) {
-        console.log('❌ Волна не загружена');
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.handleAudioEnd === 'function') {
+        window.AudioEditorTools.handleAudioEnd();
         return;
     }
-
-    // Получаем текущую позицию playhead
-    const currentTime = waveformCanvas.getCurrentTime();
-
-    // Обновляем поле End
+    // Fallback
+    const wf = window.waveformCanvas;
+    if (!wf) { console.log('❌ Волна не загружена'); return; }
+    const currentTime = wf.getCurrentTime();
     const endTimeInput = document.getElementById('audioEndTime');
-    if (endTimeInput) {
-        endTimeInput.value = currentTime.toFixed(2);
-    }
-
-    // Обновляем регион волны
-    const currentRegion = waveformCanvas.getRegion();
-    setupWaveformRegionCallback();
-    waveformCanvas.setRegion(currentRegion.start, currentTime);
+    if (endTimeInput) endTimeInput.value = currentTime.toFixed(2);
+    const currentRegion = wf.getRegion();
+    if (typeof setupWaveformRegionCallback === 'function') setupWaveformRegionCallback();
+    wf.setRegion(currentRegion.start, currentTime);
 }
 
 // ============================================================================
