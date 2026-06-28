@@ -1128,6 +1128,10 @@
           if (session) {
             try { state.dictationStarted = true; } catch (e0) {}
             // Устанавливаем дату и время начала диктанта (локальная дата+время)
+            // dateStart устанавливается только если его нет — это позволяет различать:
+            //   - Продолжить (continue): dateStart уже есть, не меняем
+            //   - Новая игра / СТАРТ после сброса: dateStart сброшен в null,
+            //     поэтому устанавливается новая дата
             if (!session.dateStart) {
               const d = new Date();
               const yyyy = d.getFullYear();
@@ -4281,8 +4285,9 @@
       window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
         maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
       });
-      // Запоминаем Promise восстановления, чтобы open() мог дождаться его
-      window.__dictationRuntimeStore._restorePromise = window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
+      // НЕ вызываем restoreFromIdb() здесь — контент ещё не загружен,
+      // и restoreFromIdb() пропустит все сессии (проверка allKeys.length === 0).
+      // restoreFromIdb() вызывается в open() ПОСЛЕ загрузки контента.
       return window.__dictationRuntimeStore;
     } catch (e) {
       return null;
@@ -5195,7 +5200,7 @@
 
       // context === 'open' — из карточки диктанта
       if (!session) {
-        startBtn.textContent = 'S T A R T';
+        startBtn.textContent = 'С Т А Р Т';
         return;
       }
 
@@ -5218,7 +5223,7 @@
       } else if (hasProgress) {
         startBtn.textContent = 'Г Р А Й М О   Д А Л І';
       } else {
-        startBtn.textContent = 'S T A R T';
+        startBtn.textContent = 'С Т А Р Т';
       }
     } catch (e) {
     }
@@ -5671,6 +5676,12 @@
       try {
         session.completionCount = 0;
       } catch (eCc) {
+      }
+
+      // Сбрасываем dateStart, чтобы при следующем старте установилась новая дата/время
+      try {
+        session.dateStart = null;
+      } catch (eDs) {
       }
 
       const keys = session.content ? session.content.getAllKeys() : [];

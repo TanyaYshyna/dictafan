@@ -8,6 +8,12 @@
         window.__dictationRuntimeStore = new window.DictationRuntime.DictationSessionsStore({
           maxSessions: window.DictationRuntime.MAX_OPEN_SESSIONS || 5,
         });
+        // Восстанавливаем сессии из IDB, чтобы активные диктанты отображались корректно.
+        // Вызов без await — fire-and-forget, так как это не критично для отображения списка.
+        try {
+          window.__dictationRuntimeStore.restoreFromIdb().catch(function(e){});
+        } catch (eRestore) {
+        }
         return window.__dictationRuntimeStore;
       }
     } catch (e) {
