@@ -1035,13 +1035,19 @@
 
     try {
       const view = getCurrentSentenceViewFromSession(session);
-      if (view) view._textAttemptCount = 0;
+      if (view) {
+        console.log('[DM:resetSentenceUiFromSession] СБРОС view._textAttemptCount с ' + (view._textAttemptCount) + ' до 0, key=' + (view.key));
+        view._textAttemptCount = 0;
+      }
     } catch (e0a) {
     }
 
     try {
       const st = getCurrentSentenceStateFromSession(session);
-      if (st) st._textAttemptCount = 0;
+      if (st) {
+        console.log('[DM:resetSentenceUiFromSession] СБРОС st._textAttemptCount с ' + (st._textAttemptCount) + ' до 0');
+        st._textAttemptCount = 0;
+      }
     } catch (e0b) {
     }
 
@@ -1225,6 +1231,7 @@
 
         const view = getCurrentSentenceViewFromSession(session);
         if (!view) return;
+        console.log('[DM:checkText] view.key=' + (view ? view.key : 'null') + ' view._textAttemptCount=' + (view._textAttemptCount) + ' view.number_of_perfect=' + (view.number_of_perfect) + ' view.number_of_corrected=' + (view.number_of_corrected) + ' view._textAllCorrect=' + (view._textAllCorrect));
 
         // Если текст уже засчитан как правильный (allCorrect), не даём
         // повторно запускать проверку — это предотвращает дублирование
@@ -1316,7 +1323,7 @@
           starOutcome: res?.starOutcome,
           nextPerfect: res?.nextPerfect,
           nextCorrected: res?.nextCorrected,
-        }));
+        }), 'view._textAttemptCount=' + (view._textAttemptCount) + ' view.key=' + (view ? view.key : 'null'));
 
         try {
           const notice = document.getElementById('userInputNotice');
@@ -1462,6 +1469,7 @@
                 let reward = 0;
                 const perfectNow = Number(st && st.number_of_perfect) || 0;
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
+                console.log('[DM:checkText] РАСЧЁТ НАГРАДЫ: perfectNow=' + perfectNow + ' correctedNow=' + correctedNow + ' cycleId=' + (Number(state.rewardCycleId) || 0) + ' paidCycleId=' + (Number(st && st._paidTextRewardCycleId) || 0) + ' key=' + key + ' res.allCorrect=' + (res && res.allCorrect) + ' res.starOutcome=' + (res && res.starOutcome) + ' st.money_count=' + (st ? st.money_count : 'null') + ' st.money_earned=' + (st ? st.money_earned : 'null'));
                 if (perfectNow >= 1) {
                   reward = getPricingValue('star_reward', 3);
                 } else if (correctedNow > 0) {
