@@ -319,6 +319,11 @@
                                                 <i data-lucide="scissors"></i>
                                                 <span>на 1000 кусков</span>
                                             </button>
+                                            <button type="button" id="smartSplitBtn" class="button-standard button-color-yellow"
+                                                title="Умная нарезка с использованием Whisper — определяет границы предложений по смыслу">
+                                                <i data-lucide="wand-2"></i>
+                                                <span>Умная нарезка</span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -966,6 +971,7 @@
 {% endblock %}
 
 {% block page_scripts %}
+    <script src="{{ url_for('static', filename='js/audio_editor_tools.js') }}?v={{ app_cache_revision }}"></script>
     <script src="{{ url_for('static', filename='js/script_dictation_editor.js') }}?v={{ app_cache_revision }}"></script>
     <script>
         // Инициализация UserManager перед загрузкой основного скрипта
