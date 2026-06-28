@@ -1422,13 +1422,9 @@
         }
 
         try {
-          view.number_of_perfect = res.nextPerfect;
-          view.number_of_corrected = res.nextCorrected;
-        } catch (e7) {
-        }
-
-        try {
           if (res && res.allCorrect) {
+            view.number_of_perfect = res.nextPerfect;
+            view.number_of_corrected = res.nextCorrected;
             if (res.starOutcome === 'perfect') {
               setCheckButtonState('star');
             } else if (res.starOutcome === 'half' || res.starOutcome === 'corrected') {
@@ -1449,8 +1445,6 @@
             const prevAllCorrect = !!(st && st._textAllCorrect);
             const prevPerfectSt = Number(st && st.number_of_perfect) || 0;
             const prevCorrectedSt = Number(st && st.number_of_corrected) || 0;
-            st.number_of_perfect = res.nextPerfect;
-            st.number_of_corrected = res.nextCorrected;
 
             try {
               st._textAllCorrect = !!(res && res.allCorrect);
@@ -1460,6 +1454,8 @@
 
             try {
               if (res && res.allCorrect) {
+                st.number_of_perfect = res.nextPerfect;
+                st.number_of_corrected = res.nextCorrected;
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
