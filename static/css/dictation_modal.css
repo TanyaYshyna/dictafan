@@ -1644,6 +1644,8 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 #dictationModal #sentences-table col.col-choice,
 #dictationModal #final-sentences-table col.col-choice {
   width: 34px;
+  min-width: 34px;
+  max-width: 34px;
 }
 
 #dictationModal #sentences-table col.col-code,
@@ -1778,8 +1780,8 @@ html[dir="rtl"] #dictationModal .audio-players-wrapper {
 }
 
 #dictationModal #sentences-table th#thSentenceChoice #allCheckbox.all-checkbox-btn [data-lucide] {
-  width: 18px !important;
-  height: 18px !important;
+  width: 24px !important;
+  height: 24px !important;
 }
 
 #dictationModal #sentences-table th#thSentenceOriginal,
