@@ -8144,12 +8144,19 @@ function continueUpload(file, audioMode, durationFormatted, duration) {
                         const currentAudioInfo = document.getElementById('currentAudioInfo');
                         if (currentAudioInfo) {
                             const durationText = durationFormatted ? ` (${durationFormatted}с)` : '';
-                            currentAudioInfo.textContent = `Аудио для волны: ${data.filename}(${durationText}с)`;
+                            currentAudioInfo.textContent = `Аудио для волны: ${data.filename}${durationText}`;
                         }
 
                         // Обновляем текущее аудио
+                        // Сбрасываем currentAudioFileName, чтобы гарантировать перезагрузку волны
+                        // (даже если файл перезаписан с тем же именем)
+                        currentAudioFileName = '';
 
-                        updateCurrentAudioWave();
+                        // Загружаем волну через initWaveform с правильным путём от сервера
+                        // (data.filepath содержит актуальный путь к файлу в temp-папке)
+                        if (data.filepath) {
+                            initWaveform(data.filepath);
+                        }
                         break;
                     case 'mic':
                         const currentRow = document.querySelector('#sentences-table tbody tr.selected');
@@ -8162,7 +8169,7 @@ function continueUpload(file, audioMode, durationFormatted, duration) {
                             const currentAudioInfo = document.getElementById('currentAudioInfo');
                             if (currentAudioInfo) {
                                 const durationText = durationFormatted ? ` (${durationFormatted}с)` : '';
-                                currentAudioInfo.textContent = `Аудио для волны: ${data.filename}${durationText}с)`;
+                                currentAudioInfo.textContent = `Аудио для волны: ${data.filename}${durationText}`;
                             }
                         }
                         break;
@@ -8174,13 +8181,6 @@ function continueUpload(file, audioMode, durationFormatted, duration) {
 
                 // Автосохранение JSON удалено - данные только в workingData
 
-
-                // Инициализируем волну с загруженным файлом
-                if (data.filepath) {
-                    // Используем правильный путь из ответа сервера
-                    const audioUrl = data.filepath;
-                    initWaveform(audioUrl);
-                }
             } else {
                 console.error('❌ Ошибка загрузки файла:', data.error);
                 alert('Ошибка загрузки файла: ' + data.error);
@@ -8761,12 +8761,20 @@ async function loadWaveformForFile(filepath) {
 
     try {
 
-        // Получаем существующий WaveformCanvas или создаем новый
-        let waveformCanvas = window.waveformCanvas;
-        if (!waveformCanvas) {
-            waveformCanvas = new WaveformCanvas(waveformContainer);
-            window.waveformCanvas = waveformCanvas;
+        // Уничтожаем старый экземпляр, если есть
+        if (window.waveformCanvas) {
+            window.waveformCanvas.destroy();
         }
+        // Синхронизируем с локальной переменной
+        if (waveformCanvas) {
+            waveformCanvas.destroy();
+        }
+        window.waveformCanvas = null;
+        waveformCanvas = null;
+
+        // Создаем новый экземпляр WaveformCanvas
+        waveformCanvas = new WaveformCanvas(waveformContainer);
+        window.waveformCanvas = waveformCanvas;
 
         // Загружаем аудио с cache-busting, чтобы видеть новое содержимое при том же имени
         const url = `${filepath}${filepath.includes('?') ? '&' : '?'}ts=${Date.now()}`;
@@ -12662,9 +12670,14 @@ async function initWaveform(audioUrl) {
         return;
     }
 
+    // Уничтожаем старый экземпляр, если есть (и локальный, и window)
     if (waveformCanvas) {
         waveformCanvas.destroy();
+    } else if (window.waveformCanvas) {
+        window.waveformCanvas.destroy();
     }
+    waveformCanvas = null;
+    window.waveformCanvas = null;
 
     try {
         // Создаем новый экземпляр WaveformCanvas
@@ -12709,6 +12722,17 @@ async function initWaveform(audioUrl) {
         // Получаем длительность аудио
         const duration = waveformCanvas.getDuration();
         const roundedDuration = Math.floor(duration * 100) / 100;
+
+        // Обновляем currentAudioFileName для синхронизации с updateCurrentAudioWave
+        const fileName = audioUrl.split('/').pop();
+        if (fileName) {
+            currentAudioFileName = fileName;
+        }
+
+        // Обновляем информацию о текущем аудио
+        if (currentAudioInfo) {
+            currentAudioInfo.textContent = `Аудио для волны: ${fileName} (${roundedDuration}с)`;
+        }
 
         // Настраиваем callback для обновления региона
         setupWaveformRegionCallback();

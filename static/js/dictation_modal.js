@@ -3485,13 +3485,15 @@
     // её параметры ниже (язык, режим, ожидаемый текст и т.д.).
     // Ранний return убран, чтобы при смене диктанта язык распознавания
     // обновлялся на новый (см. panel.setLanguage ниже).
+    // Ключ предложения, которое было активным на момент начала записи.
+    // Захватывается в onRecordingStart, чтобы onRecognitionComplete
+    // применялся к правильному предложению, даже если пользователь
+    // переключился на другое во время записи.
+    // Храним в state, чтобы гарантированно сбрасывать при каждом вызове
+    // ensureSpeechPanel (даже если panel уже существует).
+    var _recordingSentenceKey = null;
     if (!panel) {
       try {
-        // Ключ предложения, которое было активным на момент начала записи.
-        // Захватывается в onRecordingStart, чтобы onRecognitionComplete
-        // применялся к правильному предложению, даже если пользователь
-        // переключился на другое во время записи.
-        var _recordingSentenceKey = null;
         panel = new window.DictationSpeechRecognitionPanel({
         minMatchPercent: 80,
         onRecordingStart: function () {
@@ -3532,6 +3534,7 @@
 
             const pct = Math.max(0, Math.min(100, Math.round(Number(percent) || 0)));
             console.log('[DM:onRecognitionComplete] pct=' + pct + ' ok=' + ok);
+            console.log('[DM:onRecognitionComplete] СТАРТ НАЧИСЛЕНИЯ: _key=' + _key + ' st=', st ? { number_of_audio: st.number_of_audio, money_count: st.money_count, money_earned: st.money_earned, audio_activity50_count: st.audio_activity50_count } : 'null', 'session.selectedKeys=' + (session ? session.selectedKeys : 'null'));
             if (ok) {
               const next = (Number(st.number_of_audio) || 0) + 1;
               st.number_of_audio = next;
@@ -3539,9 +3542,11 @@
               var _add = 0;
               try {
                 _add = getPricingValue('audio_activity_reward', 1);
+                console.log('[DM:onRecognitionComplete] _add (audio_activity_reward)=' + _add);
                 st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
                 st.money_count = (Number(st.money_count) || 0) + _add;
                 st.money_earned = (Number(st.money_earned) || 0) + _add;
+                console.log('[DM:onRecognitionComplete] ПОСЛЕ НАЧИСЛЕНИЯ: st.money_count=' + st.money_count + ' st.money_earned=' + st.money_earned);
                 playUiSound('coins_plus_audio');
                 console.log('[DM:onRecognitionComplete] звук сыгран, _add=' + _add);
               } catch (e0s) {
