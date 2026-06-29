@@ -140,7 +140,7 @@
             gap: 12px;
             padding: 16px 20px 12px 20px;
           ">
-            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 40px; width: auto; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
+            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 48px; width: auto; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
             <div id="dictation-launch-title" style="
               flex: 1;
               min-width: 0;
@@ -307,7 +307,7 @@
             color: #333;
             transition: background 0.15s;
           " onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''">
-            <i data-lucide="${isFull ? 'play-circle' : 'play'}" style="width: 20px; height: 20px; flex-shrink: 0; color: ${isFull ? '#4f46e5' : '#666'};"></i>
+            <i data-lucide="${isFull ? 'chess-queen' : 'play'}" style="width: 20px; height: 20px; flex-shrink: 0; color: #666;"></i>
             <span style="flex: 1; min-width: 0;">${escapeHtml(label)}</span>
             ${incompleteTasks.map(t => {
               const teacherId = t.created_by_teacher_user_id;
@@ -339,7 +339,7 @@
             color: #333;
             transition: background 0.15s;
           " onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''">
-            <i data-lucide="play-circle" style="width: 20px; height: 20px; flex-shrink: 0; color: #4f46e5;"></i>
+            <i data-lucide="chess-queen" style="width: 20px; height: 20px; flex-shrink: 0; color: #666;"></i>
             <span style="flex: 1; min-width: 0;">${escapeHtml(libT('private_library.assignments.full_dictation', null, 'весь диктант'))}</span>
           </button>
         `;
