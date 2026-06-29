@@ -43,6 +43,16 @@
                   <div class="sentence-nav-top-inner">
                     <div id="dictationLangPair" class="dictation-langpair"></div>
                     <h2 class="dictation-title" id="dictationTitle"></h2>
+                    <div id="dictationRecordLabel" class="dictation-record-label" style="display:none; font-size:13px; color:var(--color-button-gray); margin-top:4px; align-items:center; gap:8px; flex-wrap:wrap;">
+                      <span class="record-label-item">
+                        <i data-lucide="crown" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"></i>
+                        <span id="recordTimeDisplay"></span>
+                      </span>
+                      <span class="record-label-item">
+                        <i data-lucide="bug" style="width:14px;height:14px;vertical-align:middle;margin-right:3px;"></i>
+                        <span id="recordMistakesDisplay"></span>
+                      </span>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -251,6 +261,16 @@
           <div class="start-modal-title-row">
             <span class="dikt-number-badge" id="startModalDiktNumber"></span>
             <h2 id="title-diktation"></h2>
+            <div id="startModalRecordLabel" class="dictation-record-label" style="display:none; font-size:13px; color:var(--color-button-gray); margin-left:12px; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="record-label-item">
+                <i data-lucide="crown" style="width:14px;height:14px;"></i>
+                <span id="startModalRecordTimeDisplay"></span>
+              </span>
+              <span class="record-label-item">
+                <i data-lucide="bug" style="width:14px;height:14px;"></i>
+                <span id="startModalRecordMistakesDisplay"></span>
+              </span>
+            </div>
             <div class="start-modal-header-actions">
               <button id="startModalSendInterimReportBtn" class="start-modal-settings-btn" title="Отправить промежуточный отчет">
                 <i data-lucide="send-horizontal"></i>

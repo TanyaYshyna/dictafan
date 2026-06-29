@@ -237,8 +237,157 @@
   }
 
   /**
+   * Нормализовать позиции для сравнения: отсортированный массив чисел.
+   */
+  function _normalizePositions(pos) {
+    try {
+      if (pos == null) return [];
+      if (Array.isArray(pos)) {
+        return [...new Set(pos.map(Number).filter(v => !isNaN(v) && v > 0))].sort((a, b) => a - b);
+      }
+      if (typeof pos === 'string') {
+        try {
+          const parsed = JSON.parse(pos);
+          if (Array.isArray(parsed)) return _normalizePositions(parsed);
+        } catch (e) {}
+        return [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Проверить, являются ли два набора позиций одинаковыми (для сравнения рекордов).
+   */
+  function _positionsMatch(a, b) {
+    const na = _normalizePositions(a);
+    const nb = _normalizePositions(b);
+    if (na.length !== nb.length) return false;
+    return na.every((v, i) => v === nb[i]);
+  }
+
+  /**
+   * Локально проверить, является ли текущий результат рекордом,
+   * анализируя все success-записи в IndexedDB для данного пользователя/диктанта/позиций.
+   *
+   * @param {Object} currentPayload - текущий success payload
+   * @returns {Promise<{is_record: boolean, record: Object|null, is_first: boolean}>}
+   */
+  async function _checkRecordLocally(currentPayload) {
+    try {
+      const userId = _getUserId();
+      if (!userId) return { is_record: false, record: null, is_first: false };
+
+      const dictationId = String(currentPayload.dictation_id).trim();
+      const currentPositions = _normalizePositions(currentPayload.selected_sentence_positions);
+      const currentMistakes = Number(currentPayload.mistake_count) || 0;
+      const currentTime = Number(currentPayload.time_ms) || 0;
+
+      // Собираем все success-записи из outbox для этого пользователя и диктанта
+      const allRows = await window.IdbManager.idbGetAll('outbox');
+      const successRows = allRows.filter(r =>
+        r.type === 'success' &&
+        r.userId === userId &&
+        String(r.payload?.dictation_id).trim() === dictationId &&
+        _positionsMatch(r.payload?.selected_sentence_positions, currentPositions)
+      );
+
+      if (successRows.length === 0) {
+        // Нет других завершений — это первый рекорд
+        return {
+          is_record: true,
+          is_first: true,
+          record: {
+            dictation_id: dictationId,
+            positions: currentPositions,
+            perfect_count: Number(currentPayload.perfect_count) || 0,
+            corrected_count: Number(currentPayload.corrected_count) || 0,
+            audio_count: Number(currentPayload.audio_count) || 0,
+            activity_count: Number(currentPayload.attempts_total) || 0,
+            lead_time: currentTime,
+            mistake_count: currentMistakes,
+            monenumber_of_characters: Number(currentPayload.monenumber_of_characters) || 0,
+            money_dt_count: Number(currentPayload.money_earned) || 0,
+          },
+        };
+      }
+
+      // Ищем лучший результат среди всех success (включая текущий)
+      let bestPayload = currentPayload;
+      let bestMistakes = currentMistakes;
+      let bestTime = currentTime;
+
+      for (const row of successRows) {
+        const p = row.payload;
+        const m = Number(p.mistake_count) || 0;
+        const t = Number(p.time_ms) || 0;
+
+        const isBetter = (m < bestMistakes) || (m === bestMistakes && t < bestTime);
+        if (isBetter) {
+          bestPayload = p;
+          bestMistakes = m;
+          bestTime = t;
+        }
+      }
+
+      const isRecord = (bestMistakes === currentMistakes && bestTime === currentTime);
+
+      return {
+        is_record: isRecord,
+        is_first: successRows.length === 0,
+        record: isRecord ? {
+          dictation_id: dictationId,
+          positions: currentPositions,
+          perfect_count: Number(bestPayload.perfect_count) || 0,
+          corrected_count: Number(bestPayload.corrected_count) || 0,
+          audio_count: Number(bestPayload.audio_count) || 0,
+          activity_count: Number(bestPayload.attempts_total) || 0,
+          lead_time: bestTime,
+          mistake_count: bestMistakes,
+          monenumber_of_characters: Number(bestPayload.monenumber_of_characters) || 0,
+          money_dt_count: Number(bestPayload.money_earned) || 0,
+        } : null,
+      };
+    } catch (e) {
+      console.warn(TAG, '[checkRecordLocally] ошибка:', e);
+      return { is_record: false, record: null, is_first: false };
+    }
+  }
+
+  /**
+   * Сохранить запись о рекорде в outbox.
+   */
+  async function _enqueueRecord(recordData) {
+    try {
+      const userId = _getUserId();
+      if (!userId) return false;
+
+      const dictationId = String(recordData.dictation_id).trim();
+      const positions = _normalizePositions(recordData.positions);
+      const posKey = positions.length > 0 ? positions.join(',') : 'all';
+      const key = `rec:${userId}:${dictationId}:${posKey}`;
+
+      await window.IdbManager.idbPut('outbox', {
+        key,
+        type: 'dictation_record',
+        userId,
+        createdAt: Date.now(),
+        payload: recordData,
+      });
+
+      return true;
+    } catch (e) {
+      console.warn(TAG, '[enqueueRecord] ошибка:', e);
+      return false;
+    }
+  }
+
+  /**
    * Добавить success-данные в очередь (завершение диктанта).
    * Автоматически мержит с существующей записью (суммирует счётчики).
+   * После сохранения success — проверяет рекорд локально и сохраняет record.
    */
   async function enqueueSuccess(payload) {
     try {
@@ -270,6 +419,29 @@
         createdAt: existing?.createdAt || Date.now(),
         payload: mergedPayload,
       });
+
+      // Проверяем рекорд локально и сохраняем
+      try {
+        const recordResult = await _checkRecordLocally(mergedPayload);
+        if (recordResult.is_record && recordResult.record) {
+          await _enqueueRecord(recordResult.record);
+          console.log(TAG, '[enqueueSuccess] новый рекорд!', recordResult.record);
+          // Диспатчим событие для dictation_modal.js
+          try {
+            document.dispatchEvent(new CustomEvent('dictation-record', {
+              detail: {
+                is_record: true,
+                is_first: recordResult.is_first,
+                record: recordResult.record,
+              },
+            }));
+          } catch (eDisp) {
+            console.warn(TAG, '[enqueueSuccess] ошибка диспатча события:', eDisp);
+          }
+        }
+      } catch (eRec) {
+        console.warn(TAG, '[enqueueSuccess] ошибка проверки рекорда:', eRec);
+      }
 
       _scheduleFlush();
 
@@ -324,6 +496,11 @@
 
       for (const row of rows) {
         try {
+          // Пропускаем уже синхронизированные записи (кеш рекордов)
+          if (row.synced) {
+            continue;
+          }
+
           if (row.type === 'activity') {
             const response = await fetch('/api/statistics/activity', {
               method: 'POST',
@@ -368,6 +545,64 @@
 
             if (response.ok) {
               await window.IdbManager.idbDelete('outbox', row.key);
+            } else if (response.status === 401) {
+              allOk = false;
+              break;
+            } else {
+              allOk = false;
+              break;
+            }
+          } else if (row.type === 'dictation_record') {
+            // Отправляем рекорд на сервер
+            const response = await fetch('/api/statistics/dictation-record/save', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(row.payload),
+            });
+
+            if (response.ok) {
+              const respData = await response.json();
+              // Сервер всегда возвращает актуальный record для синхронизации кеша
+              if (respData && respData.record) {
+                const serverRecord = respData.record;
+                const updatedPayload = {
+                  dictation_id: serverRecord.dictation_id || row.payload.dictation_id,
+                  positions: serverRecord.positions || row.payload.positions,
+                  perfect_count: serverRecord.perfect_count || 0,
+                  corrected_count: serverRecord.corrected_count || 0,
+                  audio_count: serverRecord.audio_count || 0,
+                  activity_count: serverRecord.activity_count || 0,
+                  lead_time: serverRecord.lead_time || 0,
+                  mistake_count: serverRecord.mistake_count || 0,
+                  monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
+                  money_dt_count: serverRecord.money_dt_count || 0,
+                };
+                // Обновляем record в IndexedDB актуальными данными с сервера
+                // (запись остаётся как кеш для офлайн-доступа)
+                await window.IdbManager.idbPut('outbox', {
+                  key: row.key,
+                  type: 'dictation_record',
+                  userId: row.userId,
+                  createdAt: row.createdAt,
+                  payload: updatedPayload,
+                  synced: true,
+                });
+              } else {
+                // Сервер не вернул record — просто помечаем как синхронизированный
+                await window.IdbManager.idbPut('outbox', {
+                  key: row.key,
+                  type: 'dictation_record',
+                  userId: row.userId,
+                  createdAt: row.createdAt,
+                  payload: row.payload,
+                  synced: true,
+                });
+              }
+              // НЕ удаляем запись — она остаётся как кеш для офлайн-доступа
+              // При следующем flush запись с synced:true будет пропущена
             } else if (response.status === 401) {
               allOk = false;
               break;
@@ -456,6 +691,159 @@
     flushAll().catch(() => {});
   });
 
+  /**
+   * Получить текущий рекорд для диктанта из IndexedDB (локально).
+   * @param {string|number} dictationId
+   * @param {number[]} [positions]
+   * @returns {Promise<Object|null>}
+   */
+  async function getRecord(dictationId, positions) {
+    try {
+      const userId = _getUserId();
+      if (!userId || !dictationId) return null;
+
+      const dictId = String(dictationId).trim();
+      const pos = _normalizePositions(positions);
+      const posKey = pos.length > 0 ? pos.join(',') : 'all';
+      const key = `rec:${userId}:${dictId}:${posKey}`;
+
+      const row = await window.IdbManager.idbGet('outbox', key);
+      return row ? (row.payload || null) : null;
+    } catch (e) {
+      console.warn(TAG, '[getRecord] ошибка:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Синхронизировать рекорд с сервера и обновить в IndexedDB.
+   * Вызывается при открытии диктанта, если есть интернет.
+   * @param {string|number} dictationId
+   * @param {number[]} [positions]
+   * @returns {Promise<Object|null>} актуальный record с сервера или null
+   */
+  async function syncRecordFromServer(dictationId, positions) {
+    try {
+      const userId = _getUserId();
+      if (!userId || !dictationId) return null;
+
+      const token = window.UM?.token || localStorage.getItem('jwt_token');
+      if (!token) return null;
+
+      const resp = await fetch('/api/statistics/dictation-record', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          dictation_id: dictationId,
+          selected_sentence_positions: positions,
+        }),
+      });
+      if (!resp.ok) return null;
+
+      const data = await resp.json();
+      if (!data || !data.record) return null;
+
+      const serverRecord = data.record;
+
+      // Сохраняем актуальный record в IndexedDB
+      const dictId = String(dictationId).trim();
+      const pos = _normalizePositions(positions);
+      const posKey = pos.length > 0 ? pos.join(',') : 'all';
+      const key = `rec:${userId}:${dictId}:${posKey}`;
+
+      await window.IdbManager.idbPut('outbox', {
+        key,
+        type: 'dictation_record',
+        userId,
+        createdAt: Date.now(),
+        payload: {
+          dictation_id: serverRecord.dictation_id || dictationId,
+          positions: serverRecord.positions || pos,
+          perfect_count: serverRecord.perfect_count || 0,
+          corrected_count: serverRecord.corrected_count || 0,
+          audio_count: serverRecord.audio_count || 0,
+          activity_count: serverRecord.activity_count || 0,
+          lead_time: serverRecord.lead_time || 0,
+          mistake_count: serverRecord.mistake_count || 0,
+          monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
+          money_dt_count: serverRecord.money_dt_count || 0,
+        },
+      });
+
+      return serverRecord;
+    } catch (e) {
+      console.warn(TAG, '[syncRecordFromServer] ошибка:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Синхронизировать все рекорды пользователя с сервера.
+   * Вызывается при загрузке страницы, если есть интернет.
+   * Сохраняет полученные рекорды в IndexedDB как synced: true (кеш для офлайн-доступа).
+   * @returns {Promise<boolean>}
+   */
+  async function syncAllRecordsFromServer() {
+    try {
+      const userId = _getUserId();
+      if (!userId) return false;
+
+      const token = _getToken();
+      if (!token) return false;
+
+      if (!navigator.onLine) return false;
+
+      const resp = await fetch('/api/statistics/dictation-records/all', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer ' + token,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!resp.ok) return false;
+
+      const data = await resp.json();
+      if (!data || !data.records || !Array.isArray(data.records)) return false;
+
+      // Сохраняем все рекорды в IndexedDB
+      for (const serverRecord of data.records) {
+        const dictId = String(serverRecord.dictation_id).trim();
+        const pos = _normalizePositions(serverRecord.positions);
+        const posKey = pos.length > 0 ? pos.join(',') : 'all';
+        const key = 'rec:' + userId + ':' + dictId + ':' + posKey;
+
+        await window.IdbManager.idbPut('outbox', {
+          key: key,
+          type: 'dictation_record',
+          userId: userId,
+          createdAt: Date.now(),
+          payload: {
+            dictation_id: serverRecord.dictation_id,
+            positions: serverRecord.positions || pos,
+            perfect_count: serverRecord.perfect_count || 0,
+            corrected_count: serverRecord.corrected_count || 0,
+            audio_count: serverRecord.audio_count || 0,
+            activity_count: serverRecord.activity_count || 0,
+            lead_time: serverRecord.lead_time || 0,
+            mistake_count: serverRecord.mistake_count || 0,
+            monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
+            money_dt_count: serverRecord.money_dt_count || 0,
+          },
+          synced: true,
+        });
+      }
+
+      console.log(TAG, '[syncAllRecordsFromServer] синхронизировано ' + data.records.length + ' рекордов');
+      return true;
+    } catch (e) {
+      console.warn(TAG, '[syncAllRecordsFromServer] ошибка:', e);
+      return false;
+    }
+  }
+
   // Экспортируем в глобальную область
   window.OutboxBatcher = {
     enqueueActivity,
@@ -463,11 +851,22 @@
     flushAll,
     notifySwToSync,
     getQueueInfo,
+    getRecord,
+    syncRecordFromServer,
+    syncAllRecordsFromServer,
   };
 
   // Инициализация: если в IndexedDB есть неотправленные записи — запускаем таймер
   // (например, после перезагрузки страницы, когда pendingCount сброшен)
+  // Также синхронизируем рекорды с сервера при загрузке страницы (если есть интернет)
   (function init() {
+    // Синхронизируем рекорды с сервера при загрузке страницы (если есть интернет)
+    if (navigator.onLine) {
+      syncAllRecordsFromServer().catch(function (e) {
+        console.warn(TAG, '[init] ошибка синхронизации рекордов:', e);
+      });
+    }
+
     window.IdbManager.idbGetAll('outbox').then(function (rows) {
       var count = Array.isArray(rows) ? rows.length : 0;
       if (count > 0) {

@@ -111,7 +111,7 @@
         <!-- dictation-launch-modal: промежуточная модалка выбора упражнения -->
         <div class="dictation-launch-modal-content">
           <div class="dictation-launch-modal-header">
-            <img src="/static/icons/logo.svg" alt="DictaFan" class="dictation-launch-modal-logo" onclick="window.location.href='/'" />
+            <img id="dictation-launch-cover" src="" alt="" class="dictation-launch-modal-cover" />
             <div id="dictation-launch-title" class="dictation-launch-modal-title"></div>
             <button type="button" id="dictation-launch-close" class="dictation-launch-modal-close" title="Закрыть">
               <i data-lucide="x" class="dictation-launch-modal-close-icon"></i>
@@ -163,6 +163,7 @@
      * @param {string} options.title - Название диктанта
      * @param {string} options.openUrl - URL для открытия диктанта
      * @param {HTMLElement} options.cardEl - элемент карточки (для DictationModal.open)
+     * @param {string} [options.coverUrl] - URL обложки диктанта
      * @param {Array<{id: number|null, positions: number[]}>} options.exercises - список упражнений
      * @param {Array<{group_id: number, teacher_user_id: number, positions: number[]|null, done: number, required_completions: number}>} [options.todayTasks] - задания на сегодня от учителей
      * @param {object} [options.teacherAvatars] - словарь teacher_user_id -> URL аватарки
@@ -173,6 +174,7 @@
       const title = String(opts.title || '');
       const openUrl = String(opts.openUrl || '');
       const cardEl = opts.cardEl || null;
+      const coverUrl = opts.coverUrl || '';
       const exercises = Array.isArray(opts.exercises) ? opts.exercises : [];
       const todayTasks = Array.isArray(opts.todayTasks) ? opts.todayTasks : [];
       const teacherAvatars = opts.teacherAvatars || {};
@@ -191,6 +193,20 @@
       // Заголовок
       const titleEl = modal.querySelector('#dictation-launch-title');
       if (titleEl) titleEl.textContent = title;
+
+      // Обложка диктанта
+      const coverEl = modal.querySelector('#dictation-launch-cover');
+      if (coverEl) {
+        if (coverUrl) {
+          coverEl.src = coverUrl;
+          coverEl.alt = title || 'cover';
+          coverEl.style.display = '';
+        } else {
+          coverEl.src = '';
+          coverEl.alt = '';
+          coverEl.style.display = 'none';
+        }
+      }
 
       // Строим список
       const listEl = modal.querySelector('#dictation-launch-list');
@@ -402,12 +418,23 @@
         return;
       }
 
+      // Извлекаем URL обложки из карточки
+      let coverUrl = '';
+      try {
+        if (cardEl) {
+          const coverImg = cardEl.querySelector('.short-thumb img');
+          if (coverImg) coverUrl = coverImg.getAttribute('src') || '';
+        }
+      } catch (e) {
+      }
+
       // Иначе показываем модалку
       openLaunchModal({
         dictationId: id,
         title: dictationTitle || '',
         openUrl,
         cardEl,
+        coverUrl,
         exercises: exerciseList,
         todayTasks,
         teacherAvatars,
