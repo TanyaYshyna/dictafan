@@ -975,12 +975,12 @@
     try {
       if (exitBtn.dataset.boundDictafanCompletionModal !== '1') {
         exitBtn.dataset.boundDictafanCompletionModal = '1';
-        exitBtn.addEventListener('click', () => {
+        exitBtn.addEventListener('click', async () => {
           hideCompletionModal();
           try {
             // clearSession=true — удаляем сессию из store и IDB,
             // чтобы при повторном открытии не подхватывалась старая
-            close(true);
+            await close(true);
           } catch (e0) {
           }
         });
@@ -2881,13 +2881,13 @@
     }
 
     try {
-      closeBtn.addEventListener('click', (e) => {
+      closeBtn.addEventListener('click', async (e) => {
         try {
           e.preventDefault();
           e.stopPropagation();
         } catch (e0) {
         }
-        close();
+        try { await close(); } catch (eIgnore) {}
       });
     } catch (e) {
     }
@@ -2958,7 +2958,7 @@
         }
       } catch (e99) {
       }
-      close();
+      try { await close(); } catch (eIgnore) {}
     };
 
     try {
@@ -5399,12 +5399,12 @@
     try {
       const session = window.__dictationModalActiveSession;
       if (session && session.completed === true) {
-        close(true);
+        await close(true);
         return;
       }
     } catch (eCheck) {
     }
-    try { close(); } catch (e1) {}
+    try { await close(); } catch (e1) {}
   }
 
   const LS_SPEECH_REC_MODE_KEY = 'dictafan_speech_rec_mode';
@@ -5782,7 +5782,7 @@
     _pauseDictationTimer();
   }
 
-  function resetDictationProgressForSession(session) {
+  async function resetDictationProgressForSession(session) {
     try {
       if (!session) return;
 
@@ -5881,7 +5881,7 @@
       } catch (e) {
       }
       // Сохраняем сессию в IDB после сброса прогресса
-      try { _persistSessionToIdb(); } catch (e) {}
+      try { await _persistSessionToIdb(); } catch (e) {}
     } catch (e) {
     }
   }
@@ -6339,7 +6339,7 @@
       const resetBtn = document.getElementById('resetProgressBtn');
       if (resetBtn && resetBtn.dataset.boundDictationModal !== '1') {
         resetBtn.dataset.boundDictationModal = '1';
-        resetBtn.addEventListener('click', (e) => {
+        resetBtn.addEventListener('click', async (e) => {
           try {
             e.preventDefault();
             e.stopPropagation();
@@ -6348,7 +6348,7 @@
           try {
             const session = window.__dictationModalActiveSession;
             if (!session) return;
-            resetDictationProgressForSession(session);
+            await resetDictationProgressForSession(session);
             // Обновляем текст кнопки после сброса прогресса
             updateStartButton();
           } catch (e1) {
@@ -6363,7 +6363,7 @@
       const startBtn = document.getElementById('confirmStartBtn');
       if (startBtn && startBtn.dataset.boundDictationRuntime !== '1') {
         startBtn.dataset.boundDictationRuntime = '1';
-        startBtn.addEventListener('click', (e) => {
+        startBtn.addEventListener('click', async (e) => {
           try {
             e.preventDefault();
             e.stopPropagation();
@@ -6398,14 +6398,14 @@
                   if (s) s.dateStart = null;
                 } else {
                   // Полное выполнение (все предложения были завершены) — сбрасываем всё
-                  resetDictationProgressForSession(s);
+                  await resetDictationProgressForSession(s);
                   if (s) s.dateStart = null;
                 }
               }
             } else if (ctx === 'open') {
               // Из карточки диктанта: если сессия завершена — сбрасываем прогресс
               if (s && s.completed === true) {
-                resetDictationProgressForSession(s);
+                await resetDictationProgressForSession(s);
               }
             }
             // context === 'navigator' — ничего не сбрасываем, просто продолжаем
@@ -6472,10 +6472,10 @@
     const closeBtn = document.getElementById('dictationModalCloseBtn');
     if (closeBtn && closeBtn.dataset.bound !== '1') {
       closeBtn.dataset.bound = '1';
-      closeBtn.addEventListener('click', (e) => {
+      closeBtn.addEventListener('click', async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        close();
+        try { await close(); } catch (eIgnore) {}
       });
     }
   }
@@ -6486,10 +6486,10 @@
     modal.dataset.boundOverlay = '1';
 
     // Закрытие по Escape — оставляем
-    document.addEventListener('keydown', (e) => {
+    document.addEventListener('keydown', async (e) => {
       try {
         if (!state.isOpen) return;
-        if (e && e.key === 'Escape') close();
+        if (e && e.key === 'Escape') await close();
       } catch (e2) {
       }
     });
@@ -6546,7 +6546,11 @@
           document.addEventListener('visibilitychange', () => {
             try {
               if (document.hidden) {
-                _saveSentenceTimeOnPageUnload();
+                // При скрытии страницы (переключение вкладки) сохраняем время и persist-им в IDB.
+                // Используем await, т.к. при visibilitychange браузер даёт время на завершение.
+                (async () => {
+                  try { await _saveSentenceTimeOnPageUnload(); } catch (e) {}
+                })();
               }
             } catch (e) {}
           });
@@ -6629,7 +6633,7 @@
           // сбрасываем прогресс как при нажатии «всё по новой»
           try {
             if (session.completed === true) {
-              resetDictationProgressForSession(session);
+              await resetDictationProgressForSession(session);
             }
           } catch (eReset) {
           }
