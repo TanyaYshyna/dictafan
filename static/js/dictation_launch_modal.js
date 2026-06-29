@@ -400,6 +400,7 @@
           });
         }
       } catch (e) {
+        try { console.warn('[dictation_launch_modal] load exercises error:', e); } catch (e2) {}
         exercises = [];
       }
 
@@ -444,6 +445,8 @@
       }
       const exerciseList = Array.from(uniqueBySig.values());
 
+      try { console.log('[dictation_launch_modal] exercises count:', exerciseList.length, 'items:', exerciseList.map(e => ({id: e.id, pos: e.positions}))); } catch (e) {}
+
       // Есть ли невыполненные задания от учителей
       const hasIncompleteTasks = todayTasks.some(t => {
         const done = Number(t.done || 0);
@@ -451,8 +454,11 @@
         return done < required;
       });
 
+      try { console.log('[dictation_launch_modal] hasIncompleteTasks:', hasIncompleteTasks, 'todayTasks:', todayTasks.length); } catch (e) {}
+
       // Если только "весь диктант" (или пусто) и нет заданий от учителя — сразу открываем
       const onlyFull = exerciseList.length === 0 || (exerciseList.length === 1 && !exerciseList[0].positions.length);
+      try { console.log('[dictation_launch_modal] onlyFull:', onlyFull, 'willShowModal:', !(onlyFull && !hasIncompleteTasks)); } catch (e) {}
       if (onlyFull && !hasIncompleteTasks) {
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
