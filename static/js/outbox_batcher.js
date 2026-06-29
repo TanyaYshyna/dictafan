@@ -275,7 +275,7 @@
    * @param {Object} currentPayload - текущий success payload
    * @returns {Promise<{is_record: boolean, record: Object|null, is_first: boolean}>}
    */
-  async function _checkRecordLocally(currentPayload) {
+  async function _checkRecordLocally(currentPayload, excludeKey) {
     try {
       const userId = _getUserId();
       if (!userId) return { is_record: false, record: null, is_first: false };
@@ -291,7 +291,9 @@
         r.type === 'success' &&
         r.userId === userId &&
         String(r.payload?.dictation_id).trim() === dictationId &&
-        _positionsMatch(r.payload?.selected_sentence_positions, currentPositions)
+        _positionsMatch(r.payload?.selected_sentence_positions, currentPositions) &&
+        // Исключаем текущую запись (которая только что была добавлена)
+        r.key !== excludeKey
       );
 
       if (successRows.length === 0) {
@@ -314,7 +316,7 @@
         };
       }
 
-      // Ищем лучший результат среди всех success (включая текущий)
+      // Ищем лучший результат среди всех success (исключая текущий)
       let bestPayload = currentPayload;
       let bestMistakes = currentMistakes;
       let bestTime = currentTime;
@@ -336,7 +338,7 @@
 
       return {
         is_record: isRecord,
-        is_first: successRows.length === 0,
+        is_first: false, // если successRows.length > 0, значит это не первый
         record: isRecord ? {
           dictation_id: dictationId,
           positions: currentPositions,
@@ -421,8 +423,9 @@
       });
 
       // Проверяем рекорд локально и сохраняем
+      // Передаём ключ текущей записи, чтобы исключить её из поиска (иначе is_first никогда не сработает)
       try {
-        const recordResult = await _checkRecordLocally(mergedPayload);
+        const recordResult = await _checkRecordLocally(mergedPayload, key);
         if (recordResult.is_record && recordResult.record) {
           await _enqueueRecord(recordResult.record);
           console.log(TAG, '[enqueueSuccess] новый рекорд!', recordResult.record);

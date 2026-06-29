@@ -157,12 +157,21 @@
 
 .page-index .desk-zone {
   position: relative;
+  overflow: clip;
+}
+
+@supports not (overflow: clip) {
+  .page-index .desk-zone {
+    overflow: hidden;
+  }
 }
 
 .page-index .desk-scroll-container {
   flex: 1;
   min-height: 0;
   height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Безопасная зона, чтобы палитра не перекрывала первую карточку */

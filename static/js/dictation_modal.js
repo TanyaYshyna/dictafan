@@ -613,6 +613,15 @@
     const completionModal = document.getElementById('completionModal');
     if (!completionModal) return;
 
+    // Сбрасываем сообщение на значение по умолчанию перед каждым показом
+    try {
+      const msgEl = document.getElementById('completionMessage');
+      if (msgEl) {
+        msgEl.textContent = 'Вы успешно завершили диктант!';
+      }
+    } catch (eMsgReset) {
+    }
+
     // Помечаем сессию как завершённую — при закрытии диктанта
     // будет очищен кеш сессии (close(true)).
     try {

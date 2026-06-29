@@ -129,6 +129,13 @@
   background: var(--color-hover, #f8f9fa);
   border-radius: 12px;
   padding: 16px;
+  overflow: clip;
+}
+
+@supports not (overflow: clip) {
+  .page-index .desk-zone {
+    overflow: hidden;
+  }
 }
 
 .page-index .desk-zone {
@@ -143,6 +150,8 @@
   flex: 1;
   min-height: 0;
   height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .page-index .desk-cards-container {

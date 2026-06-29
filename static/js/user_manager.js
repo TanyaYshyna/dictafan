@@ -76,6 +76,8 @@ class UserManager {
           // console.log('✅ Пользователь авторизован:', this.userData.username);
           this._saveUserCache(this.userData);
           this.setupAuthenticatedUser(this.userData);
+          // Prefetch аватар пользователя в SW кеш для офлайн-доступа
+          this._prefetchAvatar();
         } else {
           if (this.isLikelyOfflineError(this._lastTokenValidationError)) {
             console.log('⚠️ Оффлайн/нет сети: не можем провалидировать токен сейчас. Оставляем токен и не показываем модальное окно.');
@@ -83,6 +85,8 @@ class UserManager {
             if (cached) {
               this.userData = cached;
               this.setupAuthenticatedUser(this.userData);
+              // Prefetch аватар из кеша пользователя для офлайн-доступа
+              this._prefetchAvatar();
             }
           } else {
             console.log('❌ Токен невалиден, очищаем и показываем модальное окно');
@@ -230,6 +234,22 @@ class UserManager {
     const avatarUrl = this.userData.avatar[size];
 
     return avatarUrl || null;
+  }
+
+  // Prefetch аватара в SW кеш для офлайн-доступа
+  _prefetchAvatar() {
+    try {
+      const avatarUrl = this.getAvatarUrl('small');
+      if (!avatarUrl) return;
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          action: 'prefetch',
+          urls: [avatarUrl],
+        });
+      }
+    } catch (e) {
+      // prefetch аватара не критичен
+    }
   }
 
   // Валидация токена
