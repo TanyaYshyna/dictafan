@@ -759,6 +759,20 @@ window.Desktop = window.Desktop || {
           }
         } catch (e2) {
         }
+
+        // Prefetch коверы диктантов в SW кеш для офлайн-доступа
+        try {
+          const coverUrls = data.items
+            .map(item => item.cover_url ? String(item.cover_url).trim() : '')
+            .filter(Boolean);
+          if (coverUrls.length > 0 && navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              action: 'prefetch',
+              urls: coverUrls,
+            });
+          }
+        } catch (e3) {
+        }
       }
     } catch (e) {
       // keep cache render
