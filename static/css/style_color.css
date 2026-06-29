@@ -113,6 +113,12 @@ body {
   --color-audio-orange-light: rgba(245, 158, 11, 0.1);   /* светлый оранжевый фон */
   --color-audio-orange-medium: rgba(245, 158, 11, 0.2);  /* средний оранжевый */
 
+  /* ========== ЦВЕТА ДЛЯ КОЛЕЦ СТАТИСТИКИ (desktop-stats-panel) ========== */
+  --color-stats-ring-money-bg: #eeede8ff;         /* фон внешнего кольца (деньги) */
+  --color-stats-ring-money: rgb(152, 154, 224);;             /* активное внешнее кольцо (деньги) */
+  --color-stats-ring-time-bg: #eeede8ff;           /* фон внутреннего кольца (время) */
+  --color-stats-ring-time: rgb(255, 198, 9);;              /* активное внутреннее кольцо (время) */
+
   /* ========== ЦВЕТА ДЛЯ ТРЕКЕРА АКТИВНОСТИ (годовой календарь) ========== */
   --tracker-activity-0: rgb(218, 217, 213);
   --tracker-activity-white: #ffffff;

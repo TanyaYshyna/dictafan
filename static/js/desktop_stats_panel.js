@@ -52,12 +52,12 @@ window.DesktopStatsPanel = {
             // --- Кольцевые диаграммы + центр ---
             '<div class="desktop-stats-rings" id="desktopStatsRings">' +
                 '<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">' +
-                    // Внешнее кольцо (деньги) — розовое
-                    '<circle cx="50" cy="50" r="44" fill="none" stroke="#f3e8f5" stroke-width="6" />' +
-                    '<circle id="statsRingMoney" cx="50" cy="50" r="44" fill="none" stroke="#ec4899" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 276.46" transform="rotate(-90 50 50)" />' +
-                    // Внутреннее кольцо (время) — жёлтое
-                    '<circle cx="50" cy="50" r="35" fill="none" stroke="#fef3c7" stroke-width="6" />' +
-                    '<circle id="statsRingTime" cx="50" cy="50" r="35" fill="none" stroke="#f59e0b" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 219.91" transform="rotate(-90 50 50)" />' +
+                    // Внешнее кольцо (деньги)
+                    '<circle cx="50" cy="50" r="44" fill="none" class="stats-ring-money-bg" stroke-width="6" />' +
+                    '<circle id="statsRingMoney" cx="50" cy="50" r="44" fill="none" class="stats-ring-money" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 276.46" transform="rotate(-90 50 50)" />' +
+                    // Внутреннее кольцо (время)
+                    '<circle cx="50" cy="50" r="35" fill="none" class="stats-ring-time-bg" stroke-width="6" />' +
+                    '<circle id="statsRingTime" cx="50" cy="50" r="35" fill="none" class="stats-ring-time" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 219.91" transform="rotate(-90 50 50)" />' +
                 '</svg>' +
                 '<div class="desktop-stats-rings-center">' +
                     '<div class="desktop-stats-fire-row">' +
