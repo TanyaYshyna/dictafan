@@ -146,6 +146,7 @@
 {% block scripts %}
     {{ super() }}
     <script defer src="/static/js/dictation_kart.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/dictation_launch_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/tasks_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop_confirm_modal.js?v={{ app_cache_revision }}"></script>
