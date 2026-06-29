@@ -6738,6 +6738,16 @@
         e.preventDefault();
         e.stopPropagation();
 
+        // Закрываем все выпадающие меню карточки (launch-menu и card-actions-menu)
+        try {
+          card.querySelectorAll('.dictation-kart-launch-menu, .short-card-actions-menu').forEach((m) => {
+            m.classList.remove('show');
+            m.style.display = 'none';
+          });
+          card.classList.remove('short-card--menu-open');
+        } catch (e3) {
+        }
+
         // Если есть launch modal — используем её для выбора упражнения
         const dictationId = Number(card.getAttribute('data-dictation-id'));
         const title = card.querySelector('.short-title');
