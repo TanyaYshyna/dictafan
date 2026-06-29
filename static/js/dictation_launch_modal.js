@@ -133,14 +133,14 @@
           flex-direction: column;
           position: relative;
         ">
-          <!-- Шапка: логотип + название + закрыть -->
+          <!-- dictation-launch-modal: шапка с логотипом, названием и кнопкой закрытия -->
           <div style="
             display: flex;
             align-items: center;
             gap: 12px;
             padding: 16px 20px 12px 20px;
           ">
-            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 48px; width: auto; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
+            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 48px; width: 120px; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
             <div id="dictation-launch-title" style="
               flex: 1;
               min-width: 0;
