@@ -106,67 +106,18 @@
       if (_modalEl && document.body.contains(_modalEl)) return _modalEl;
       _modalEl = document.createElement('div');
       _modalEl.id = 'dictation-launch-modal';
-      _modalEl.style.cssText = `
-        display: none;
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        justify-content: center;
-        align-items: center;
-        background-color: rgba(0, 0, 0, 0.35);
-        backdrop-filter: blur(2px);
-        -webkit-backdrop-filter: blur(2px);
-        z-index: 100300;
-      `;
 
       _modalEl.innerHTML = `
-        <div class="dictation-launch-modal-content" style="
-          max-width: 420px;
-          width: calc(100% - 32px);
-          background: #fff;
-          border-radius: 20px;
-          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-          overflow: hidden;
-          color: #222;
-          display: flex;
-          flex-direction: column;
-          position: relative;
-        ">
-          <!-- dictation-launch-modal: шапка с логотипом, названием и кнопкой закрытия -->
-          <div style="
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 16px 20px 12px 20px;
-          ">
-            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 48px; width: 120px; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
-            <div id="dictation-launch-title" style="
-              flex: 1;
-              min-width: 0;
-              font-size: 16px;
-              font-weight: 600;
-              color: #333;
-              line-height: 1.3;
-            "></div>
-            <button type="button" id="dictation-launch-close" style="
-              background: none;
-              border: none;
-              cursor: pointer;
-              padding: 4px;
-              color: #888;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              border-radius: 8px;
-              flex-shrink: 0;
-            " title="Закрыть">
-              <i data-lucide="x" style="width: 22px; height: 22px;"></i>
+        <!-- dictation-launch-modal: промежуточная модалка выбора упражнения -->
+        <div class="dictation-launch-modal-content">
+          <div class="dictation-launch-modal-header">
+            <img src="/static/icons/logo.svg" alt="DictaFan" class="dictation-launch-modal-logo" onclick="window.location.href='/'" />
+            <div id="dictation-launch-title" class="dictation-launch-modal-title"></div>
+            <button type="button" id="dictation-launch-close" class="dictation-launch-modal-close" title="Закрыть">
+              <i data-lucide="x" class="dictation-launch-modal-close-icon"></i>
             </button>
           </div>
-
-          <!-- Список -->
-          <div style="padding: 0 12px 12px 12px; max-height: 50vh; overflow-y: auto;">
+          <div class="dictation-launch-modal-body">
             <div id="dictation-launch-list"></div>
           </div>
         </div>
@@ -292,30 +243,16 @@
         });
 
         html += `
-          <button type="button" class="dictation-launch-item" data-positions="${escapeHtml(sig)}" data-full="${isFull ? '1' : '0'}" style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-radius: 12px;
-            text-align: left;
-            font-size: 14px;
-            color: #333;
-            transition: background 0.15s;
-          " onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''">
-            <i data-lucide="${isFull ? 'chess-queen' : 'play'}" style="width: 20px; height: 20px; flex-shrink: 0; color: #666;"></i>
-            <span style="flex: 1; min-width: 0;">${escapeHtml(label)}</span>
+          <button type="button" class="dictation-launch-item" data-positions="${escapeHtml(sig)}" data-full="${isFull ? '1' : '0'}">
+            <i data-lucide="${isFull ? 'crown' : 'play'}" class="dictation-launch-item-icon"></i>
+            <span class="dictation-launch-item-label">${escapeHtml(label)}</span>
             ${incompleteTasks.map(t => {
               const teacherId = t.created_by_teacher_user_id;
               const avatarUrl = teacherAvatars[teacherId] || '';
               const groupTitle = t.group_title || '';
               return avatarUrl
-                ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(groupTitle)}" title="${escapeHtml(groupTitle)}" style="width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex-shrink: 0; border: 2px solid #4f46e5;" />`
-                : `<span style="width: 24px; height: 24px; border-radius: 50%; background: #4f46e5; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0;" title="${escapeHtml(groupTitle)}">${escapeHtml((groupTitle || '?')[0])}</span>`;
+                ? `<img src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(groupTitle)}" title="${escapeHtml(groupTitle)}" class="dictation-launch-item-avatar" />`
+                : `<span class="dictation-launch-item-avatar-placeholder" title="${escapeHtml(groupTitle)}">${escapeHtml((groupTitle || '?')[0])}</span>`;
             }).join('')}
           </button>
         `;
@@ -324,23 +261,9 @@
       if (!html) {
         // Если нет упражнений — показываем "весь диктант"
         html = `
-          <button type="button" class="dictation-launch-item" data-positions="" data-full="1" style="
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            width: 100%;
-            padding: 10px 12px;
-            border: none;
-            background: none;
-            cursor: pointer;
-            border-radius: 12px;
-            text-align: left;
-            font-size: 14px;
-            color: #333;
-            transition: background 0.15s;
-          " onmouseenter="this.style.background='rgba(0,0,0,0.04)'" onmouseleave="this.style.background=''">
-            <i data-lucide="chess-queen" style="width: 20px; height: 20px; flex-shrink: 0; color: #666;"></i>
-            <span style="flex: 1; min-width: 0;">${escapeHtml(libT('private_library.assignments.full_dictation', null, 'весь диктант'))}</span>
+          <button type="button" class="dictation-launch-item" data-positions="" data-full="1">
+            <i data-lucide="crown" class="dictation-launch-item-icon"></i>
+            <span class="dictation-launch-item-label">${escapeHtml(libT('private_library.assignments.full_dictation', null, 'весь диктант'))}</span>
           </button>
         `;
       }
