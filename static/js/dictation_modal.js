@@ -794,8 +794,38 @@
     } catch (e6) {
     }
 
+    // Сначала устанавливаем слушатель события рекорда (до enqueueSuccess,
+    // т.к. enqueueSuccess диспатчит событие синхронно после локальной проверки)
+    try {
+      const recordHandler = function(e) {
+        try {
+          const detail = e.detail || {};
+          if (detail.is_record) {
+            const msgEl = document.getElementById('completionMessage');
+            if (msgEl) {
+              if (detail.is_first) {
+                msgEl.textContent = '🏆 Новый рекорд! Это ваш лучший результат!';
+              } else {
+                msgEl.textContent = '🏆 Новый рекорд! Вы побили свой предыдущий лучший результат!';
+              }
+            }
+            // Обновляем лейбл рекорда под заголовком
+            _updateDictationRecordLabel();
+          }
+        } catch (eInner) {
+        }
+        document.removeEventListener('dictation-record', recordHandler);
+      };
+      document.addEventListener('dictation-record', recordHandler);
+      // Таймаут на случай, если событие не пришло
+      setTimeout(function() {
+        document.removeEventListener('dictation-record', recordHandler);
+      }, 10000);
+    } catch (e9) {
+    }
+
     // Отправляем success в outbox_batcher (завершение диктанта)
-    // и принудительно сбрасываем всю очередь на сервер
+    // enqueueSuccess проверит рекорд локально и диспатчнет событие dictation-record
     try {
       const ob = window.OutboxBatcher;
       if (ob && typeof ob.enqueueSuccess === 'function') {
@@ -5083,6 +5113,87 @@
     }
   }
 
+  /** Обновить лейблы с рекордной информацией (в основном окне и в start modal) */
+  async function _updateDictationRecordLabel() {
+    try {
+      const session = window.__dictationModalActiveSession;
+      if (!session) return;
+      const dictationId = getCurrentDictationIdForDb();
+      if (!dictationId) return;
+
+      const selectedSentencePositions = _getSelectedSentencePositions(session);
+
+      // Если есть интернет — синхронизируем рекорд с сервера
+      // (чтобы получить успехи, сделанные на других устройствах)
+      let record = null;
+      try {
+        const ob = window.OutboxBatcher;
+        if (ob && typeof ob.syncRecordFromServer === 'function' && navigator.onLine) {
+          record = await ob.syncRecordFromServer(dictationId, selectedSentencePositions);
+        }
+      } catch (eSync) {
+        // игнорируем ошибку синхронизации
+      }
+
+      // Если синхронизация не удалась (нет интернета или ошибка) — читаем локально
+      if (!record) {
+        try {
+          const ob = window.OutboxBatcher;
+          if (ob && typeof ob.getRecord === 'function') {
+            record = await ob.getRecord(dictationId, selectedSentencePositions);
+          }
+        } catch (eIdb) {
+          // игнорируем ошибку IndexedDB
+        }
+      }
+
+      // Обновляем лейбл в основном окне диктанта (под заголовком)
+      _applyRecordLabel('dictationRecordLabel', 'recordTimeDisplay', 'recordMistakesDisplay', record);
+
+      // Обновляем лейбл в start modal (в строке заголовка)
+      _applyRecordLabel('startModalRecordLabel', 'startModalRecordTimeDisplay', 'startModalRecordMistakesDisplay', record);
+    } catch (e) {
+      // Если ошибка — скрываем оба лейбла
+      const labelEl = document.getElementById('dictationRecordLabel');
+      if (labelEl) labelEl.style.display = 'none';
+      const startLabelEl = document.getElementById('startModalRecordLabel');
+      if (startLabelEl) startLabelEl.style.display = 'none';
+    }
+  }
+
+  /** Применить данные рекорда к указанным элементам лейбла */
+  function _applyRecordLabel(labelId, timeDisplayId, mistakesDisplayId, record) {
+    try {
+      if (!record) {
+        const labelEl = document.getElementById(labelId);
+        if (labelEl) labelEl.style.display = 'none';
+        return;
+      }
+
+      const timeStr = formatMmSs(record.lead_time || 0);
+      const mistakesStr = String(record.mistake_count || 0);
+
+      const timeDisplay = document.getElementById(timeDisplayId);
+      const mistakesDisplay = document.getElementById(mistakesDisplayId);
+      const labelEl = document.getElementById(labelId);
+
+      if (timeDisplay) timeDisplay.textContent = timeStr;
+      if (mistakesDisplay) mistakesDisplay.textContent = mistakesStr;
+      if (labelEl) {
+        labelEl.style.display = 'flex';
+        // Обновляем lucide-иконки внутри лейбла
+        try {
+          if (window.lucide && typeof window.lucide.createIcons === 'function') {
+            window.lucide.createIcons({ root: labelEl });
+          }
+        } catch (eIcon) {}
+      }
+    } catch (e) {
+      const labelEl = document.getElementById(labelId);
+      if (labelEl) labelEl.style.display = 'none';
+    }
+  }
+
   function applyDictationMetaFromCard({ href, cardEl }) {
     const parsed = parseDictationHref(href);
     if (!parsed) return;
@@ -6543,6 +6654,12 @@
           try {
             loadCompletionCount(session);
           } catch (eCc) {
+          }
+
+          // Загружаем рекорд диктанта и показываем лейбл под заголовком
+          try {
+            _updateDictationRecordLabel();
+          } catch (eRec) {
           }
 
         }

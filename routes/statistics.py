@@ -16,6 +16,9 @@ from helpers.db_history import (
     get_activity_lead_time_by_day_range,
     get_activity_lead_time_year_bounds,
     get_successes_sum_from_history_by_day,
+    check_and_save_dictation_record,
+    get_dictation_record,
+    get_all_dictation_records,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -2197,9 +2200,32 @@ def save_success():
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
 
+        # Проверяем, является ли результат рекордом
+        try:
+            record_result = check_and_save_dictation_record(
+                user_id=user_id,
+                dictation_id=dictation_id,
+                positions=selected_sentence_positions,
+                perfect_count=perfect_count,
+                corrected_count=corrected_count,
+                audio_count=audio_count,
+                activity_count=attempts_total,
+                lead_time=time_ms,
+                mistake_count=mistake_count,
+                monenumber_of_characters=monenumber_of_characters,
+                money_dt_count=money_earned,
+            )
+            print(f'🏆 [SAVE_SUCCESS] Проверка рекорда: is_record={record_result.get("is_record")}, is_first={record_result.get("is_first")}')
+        except Exception as e:
+            print(f'❌ [SAVE_SUCCESS] Ошибка проверки рекорда: {e}')
+            import traceback
+            traceback.print_exc()
+            record_result = {'is_record': False, 'record': None, 'is_first': False}
+
         return jsonify({
             'success': True,
-            'success_data': success
+            'success_data': success,
+            'record': record_result,
         })
         
     except ValueError as e:
@@ -2211,6 +2237,122 @@ def save_success():
         print(f'❌ [SAVE_SUCCESS] Полная трассировка:')
         traceback.print_exc()
         return jsonify({'error': f'Ошибка сохранения успеха: {str(e)}'}), 500
+
+
+@statistics_bp.route('/dictation-record', methods=['POST'])
+@jwt_required()
+def api_get_dictation_record():
+    """Получить текущий рекорд пользователя по диктанту для отображения в лейбле."""
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json()
+        dictation_id = data.get('dictation_id')
+        selected_sentence_positions = data.get('selected_sentence_positions')
+
+        if not dictation_id:
+            return jsonify({'error': 'Не указан dictation_id'}), 400
+
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+
+        user_id = user['id']
+
+        record = get_dictation_record(
+            user_id=user_id,
+            dictation_id=dictation_id,
+            positions=selected_sentence_positions,
+        )
+
+        return jsonify({'record': record})
+
+    except Exception as e:
+        print(f'❌ [GET_DICTATION_RECORD] Ошибка: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@statistics_bp.route('/dictation-record/save', methods=['POST'])
+@jwt_required()
+def api_save_dictation_record():
+    """Сохранить рекорд из outbox (вызывается при отправке очереди).
+
+    Всегда возвращает актуальный рекорд с сервера для синхронизации кеша.
+    Если наш результат стал рекордом — сохраняет его и возвращает.
+    Если нет — возвращает существующий лучший рекорд с сервера.
+    """
+    try:
+        current_email = get_jwt_identity()
+        data = request.get_json()
+
+        dictation_id = data.get('dictation_id')
+        positions = data.get('positions')
+        perfect_count = data.get('perfect_count', 0)
+        corrected_count = data.get('corrected_count', 0)
+        audio_count = data.get('audio_count', 0)
+        activity_count = data.get('activity_count', 0)
+        lead_time = data.get('lead_time', 0)
+        mistake_count = data.get('mistake_count', 0)
+        monenumber_of_characters = data.get('monenumber_of_characters', 0)
+        money_dt_count = data.get('money_dt_count', 0)
+
+        if not dictation_id:
+            return jsonify({'error': 'Не указан dictation_id'}), 400
+
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+
+        user_id = user['id']
+
+        # Пытаемся сохранить рекорд (сервер сам решит, лучше ли он существующего)
+        result = check_and_save_dictation_record(
+            user_id=user_id,
+            dictation_id=dictation_id,
+            positions=positions,
+            perfect_count=perfect_count,
+            corrected_count=corrected_count,
+            audio_count=audio_count,
+            activity_count=activity_count,
+            lead_time=lead_time,
+            mistake_count=mistake_count,
+            monenumber_of_characters=monenumber_of_characters,
+            money_dt_count=money_dt_count,
+        )
+
+        # Всегда возвращаем актуальный record с сервера для синхронизации кеша
+        # Если result.record есть — это либо наш новый рекорд, либо существующий лучший
+        server_record = result.get('record')
+
+        return jsonify({
+            'success': True,
+            'is_record': result.get('is_record', False),
+            'is_first': result.get('is_first', False),
+            'record': server_record,
+        })
+
+    except Exception as e:
+        print(f'❌ [SAVE_DICTATION_RECORD] Ошибка: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
+@statistics_bp.route('/dictation-records/all', methods=['GET'])
+@jwt_required()
+def api_get_all_dictation_records():
+    """Получить все рекорды пользователя (для синхронизации кеша при загрузке страницы)."""
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+
+        user_id = user['id']
+        records = get_all_dictation_records(user_id)
+
+        return jsonify({'success': True, 'records': records})
+
+    except Exception as e:
+        print(f'❌ [GET_ALL_DICTATION_RECORDS] Ошибка: {e}')
+        return jsonify({'error': str(e)}), 500
 
 
 @statistics_bp.route('/success/count', methods=['POST'])

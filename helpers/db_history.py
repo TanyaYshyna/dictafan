@@ -1172,3 +1172,299 @@ def get_history_by_day_totals(user_id: int) -> dict:
         raise Exception(f"Failed to get history_by_day totals: {e}")
     finally:
         conn.close()
+
+
+def check_and_save_dictation_record(
+    user_id: int,
+    dictation_id: int,
+    positions,
+    perfect_count: int,
+    corrected_count: int,
+    audio_count: int,
+    activity_count: int,
+    lead_time: int,
+    mistake_count: int,
+    monenumber_of_characters: int,
+    money_dt_count: int,
+) -> dict:
+    """
+    Проверяет, является ли текущий результат рекордом для пользователя по диктанту.
+    Если да — сохраняет/обновляет запись в dictation_records.
+
+    Критерий рекорда:
+      1) Минимальное количество ошибок (mistake_count)
+      2) Если ошибок столько же (или 0) — минимальное время (lead_time)
+
+    Args:
+        user_id: ID пользователя
+        dictation_id: ID диктанта
+        positions: список позиций предложений (int[])
+        perfect_count: число perfect
+        corrected_count: число corrected
+        audio_count: число audio
+        activity_count: число активностей
+        lead_time: время в миллисекундах
+        mistake_count: количество ошибок
+        monenumber_of_characters: количество символов
+        money_dt_count: заработано монет
+
+    Returns:
+        dict с полями:
+          - is_record: bool — является ли результат новым рекордом
+          - record: dict | None — данные рекорда (текущего после сохранения)
+          - is_first: bool — первый ли это рекорд вообще
+    """
+    positions_arr = _normalize_selected_sentence_positions(positions)
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Получаем текущий рекорд для этого пользователя/диктанта/позиций
+            cur.execute(
+                """
+                SELECT
+                    id, user_id, dictation_id, positions, date_of_victory,
+                    perfect_count, corrected_count, audio_count, activity_count,
+                    lead_time, mistake_count, monenumber_of_characters, money_dt_count
+                FROM dictation_records
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(user_id), int(dictation_id), positions_arr),
+            )
+            existing = cur.fetchone()
+
+            is_first = existing is None
+            is_record = False
+
+            if existing is None:
+                # Нет рекорда — текущий результат становится рекордом
+                is_record = True
+            else:
+                # Сравниваем: сначала по ошибкам, потом по времени
+                existing_mistakes = int(existing[10] or 0) if len(existing) > 10 else 0
+                existing_lead_time = int(existing[9] or 0) if len(existing) > 9 else 0
+
+                if mistake_count < existing_mistakes:
+                    is_record = True
+                elif mistake_count == existing_mistakes and lead_time < existing_lead_time:
+                    is_record = True
+                # иначе — не рекорд
+
+            if is_record:
+                # Вставляем или обновляем рекорд
+                cur.execute(
+                    """
+                    INSERT INTO dictation_records (
+                        user_id, dictation_id, positions, date_of_victory,
+                        perfect_count, corrected_count, audio_count, activity_count,
+                        lead_time, mistake_count, monenumber_of_characters, money_dt_count,
+                        created_at, updated_at
+                    )
+                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s, %s, %s,
+                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT (user_id, dictation_id, positions)
+                    DO UPDATE SET
+                        date_of_victory = CURRENT_TIMESTAMP,
+                        perfect_count = EXCLUDED.perfect_count,
+                        corrected_count = EXCLUDED.corrected_count,
+                        audio_count = EXCLUDED.audio_count,
+                        activity_count = EXCLUDED.activity_count,
+                        lead_time = EXCLUDED.lead_time,
+                        mistake_count = EXCLUDED.mistake_count,
+                        monenumber_of_characters = EXCLUDED.monenumber_of_characters,
+                        money_dt_count = EXCLUDED.money_dt_count,
+                        updated_at = CURRENT_TIMESTAMP
+                    RETURNING
+                        id, user_id, dictation_id, positions, date_of_victory,
+                        perfect_count, corrected_count, audio_count, activity_count,
+                        lead_time, mistake_count, monenumber_of_characters, money_dt_count
+                    """,
+                    (
+                        int(user_id),
+                        int(dictation_id),
+                        positions_arr,
+                        int(perfect_count or 0),
+                        int(corrected_count or 0),
+                        int(audio_count or 0),
+                        int(activity_count or 0),
+                        int(lead_time or 0),
+                        int(mistake_count or 0),
+                        int(monenumber_of_characters or 0),
+                        int(money_dt_count or 0),
+                    ),
+                )
+                row = cur.fetchone()
+                conn.commit()
+
+                if row:
+                    record_data = {
+                        'id': int(row[0]),
+                        'user_id': int(row[1]),
+                        'dictation_id': int(row[2]),
+                        'positions': list(row[3]) if row[3] else [],
+                        'date_of_victory': row[4].isoformat() if hasattr(row[4], 'isoformat') else str(row[4]),
+                        'perfect_count': int(row[5] or 0),
+                        'corrected_count': int(row[6] or 0),
+                        'audio_count': int(row[7] or 0),
+                        'activity_count': int(row[8] or 0),
+                        'lead_time': int(row[9] or 0),
+                        'mistake_count': int(row[10] or 0),
+                        'monenumber_of_characters': int(row[11] or 0),
+                        'money_dt_count': int(row[12] or 0),
+                    }
+                else:
+                    record_data = None
+
+                return {
+                    'is_record': True,
+                    'record': record_data,
+                    'is_first': is_first,
+                }
+            else:
+                # Не рекорд — возвращаем существующий рекорд для сравнения
+                if existing:
+                    record_data = {
+                        'id': int(existing[0]),
+                        'user_id': int(existing[1]),
+                        'dictation_id': int(existing[2]),
+                        'positions': list(existing[3]) if existing[3] else [],
+                        'date_of_victory': existing[4].isoformat() if hasattr(existing[4], 'isoformat') else str(existing[4]),
+                        'perfect_count': int(existing[5] or 0),
+                        'corrected_count': int(existing[6] or 0),
+                        'audio_count': int(existing[7] or 0),
+                        'activity_count': int(existing[8] or 0),
+                        'lead_time': int(existing[9] or 0),
+                        'mistake_count': int(existing[10] or 0),
+                        'monenumber_of_characters': int(existing[11] or 0),
+                        'money_dt_count': int(existing[12] or 0),
+                    }
+                else:
+                    record_data = None
+
+                return {
+                    'is_record': False,
+                    'record': record_data,
+                    'is_first': False,
+                }
+
+    except Exception as e:
+        conn.rollback()
+        import traceback
+        print(f'❌ [DICTATION_RECORDS] Ошибка проверки/сохранения рекорда: {e}')
+        traceback.print_exc()
+        return {
+            'is_record': False,
+            'record': None,
+            'is_first': False,
+            'error': str(e),
+        }
+    finally:
+        conn.close()
+
+
+def get_dictation_record(user_id: int, dictation_id: int, positions=None) -> dict | None:
+    """Получить текущий рекорд пользователя по диктанту.
+
+    Args:
+        user_id: ID пользователя
+        dictation_id: ID диктанта
+        positions: список позиций предложений (опционально, по умолчанию [] — весь диктант)
+
+    Returns:
+        dict с данными рекорда или None, если рекорда нет
+    """
+    positions_arr = _normalize_selected_sentence_positions(positions)
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    id, user_id, dictation_id, positions, date_of_victory,
+                    perfect_count, corrected_count, audio_count, activity_count,
+                    lead_time, mistake_count, monenumber_of_characters, money_dt_count
+                FROM dictation_records
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+                """,
+                (int(user_id), int(dictation_id), positions_arr),
+            )
+            row = cur.fetchone()
+
+            if not row:
+                return None
+
+            return {
+                'id': int(row[0]),
+                'user_id': int(row[1]),
+                'dictation_id': int(row[2]),
+                'positions': list(row[3]) if row[3] else [],
+                'date_of_victory': row[4].isoformat() if hasattr(row[4], 'isoformat') else str(row[4]),
+                'perfect_count': int(row[5] or 0),
+                'corrected_count': int(row[6] or 0),
+                'audio_count': int(row[7] or 0),
+                'activity_count': int(row[8] or 0),
+                'lead_time': int(row[9] or 0),
+                'mistake_count': int(row[10] or 0),
+                'monenumber_of_characters': int(row[11] or 0),
+                'money_dt_count': int(row[12] or 0),
+            }
+    except Exception as e:
+        print(f'❌ [DICTATION_RECORDS] Ошибка получения рекорда: {e}')
+        return None
+    finally:
+        conn.close()
+
+
+def get_all_dictation_records(user_id: int) -> list[dict]:
+    """Получить все рекорды пользователя по всем диктантам.
+
+    Args:
+        user_id: ID пользователя
+
+    Returns:
+        list[dict] — список рекордов, каждый с полями:
+          dictation_id, positions, perfect_count, corrected_count,
+          audio_count, activity_count, lead_time, mistake_count,
+          monenumber_of_characters, money_dt_count
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    dictation_id, positions,
+                    perfect_count, corrected_count, audio_count, activity_count,
+                    lead_time, mistake_count, monenumber_of_characters, money_dt_count
+                FROM dictation_records
+                WHERE user_id = %s
+                ORDER BY dictation_id, positions
+                """,
+                (int(user_id),),
+            )
+            rows = cur.fetchall()
+            result = []
+            for row in rows:
+                result.append({
+                    'dictation_id': int(row[0]),
+                    'positions': list(row[1]) if row[1] else [],
+                    'perfect_count': int(row[2] or 0),
+                    'corrected_count': int(row[3] or 0),
+                    'audio_count': int(row[4] or 0),
+                    'activity_count': int(row[5] or 0),
+                    'lead_time': int(row[6] or 0),
+                    'mistake_count': int(row[7] or 0),
+                    'monenumber_of_characters': int(row[8] or 0),
+                    'money_dt_count': int(row[9] or 0),
+                })
+            return result
+    except Exception as e:
+        print(f'❌ [DICTATION_RECORDS] Ошибка получения всех рекордов: {e}')
+        return []
+    finally:
+        conn.close()
