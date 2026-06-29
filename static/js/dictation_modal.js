@@ -2443,7 +2443,7 @@
     // В режимах p3 и p4 текст не проверяется, поэтому textOk всегда true
     const textOk = (mode === 'audio-only-no-hint' || mode === 'audio-only-hint') ? true : (perfect >= 1 || corrected > 0);
     const audioOk = requiresAudio <= 0 || audioDone >= requiresAudio;
-    console.log('[DM:computeSentenceCompletionState] perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' → textOk=' + textOk + ' audioOk=' + audioOk);
+    // console.log('[DM:computeSentenceCompletionState] perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' → textOk=' + textOk + ' audioOk=' + audioOk);
     return { textOk, audioOk, requiresAudio };
   }
 
@@ -6737,7 +6737,16 @@
 
         e.preventDefault();
         e.stopPropagation();
-        open(href, { cardEl: card });
+
+        // Если есть launch modal — используем её для выбора упражнения
+        const dictationId = Number(card.getAttribute('data-dictation-id'));
+        const title = card.querySelector('.short-title');
+        const dictationTitle = title ? String(title.textContent || '').trim() : '';
+        if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
+          window.openDictationLaunch(dictationId, href, card, dictationTitle);
+        } else {
+          open(href, { cardEl: card });
+        }
       } catch (e2) {
       }
     }, true);
@@ -6755,7 +6764,16 @@
           if (!href) return;
           e.preventDefault();
           e.stopPropagation();
-          open(href, { cardEl: card });
+
+          // Если есть launch modal — используем её для выбора упражнения
+          const dictationId = Number(card.getAttribute('data-dictation-id'));
+          const title = card.querySelector('.short-title');
+          const dictationTitle = title ? String(title.textContent || '').trim() : '';
+          if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
+            window.openDictationLaunch(dictationId, href, card, dictationTitle);
+          } else {
+            open(href, { cardEl: card });
+          }
         }
       } catch (e2) {
       }
