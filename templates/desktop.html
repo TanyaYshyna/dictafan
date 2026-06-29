@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="/static/css/dictation_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/active_dictations_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/audio_cache_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/dictation_launch_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/model_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/language_selector.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
@@ -146,8 +147,8 @@
 {% block scripts %}
     {{ super() }}
     <script defer src="/static/js/dictation_kart.js?v={{ app_cache_revision }}"></script>
-    <script defer src="/static/js/dictation_launch_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="{{ url_for('static', filename='js/idb_manager.js') }}?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/dictation_launch_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/tasks_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/desktop_confirm_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/plan_tasks_modal.js?v={{ app_cache_revision }}"></script>
