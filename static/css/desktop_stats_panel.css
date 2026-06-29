@@ -1,5 +1,11 @@
 /* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / ДЕНЬГИ» ==================== */
 
+/* ---- Кольцевые диаграммы: цвета фона и активных дуг ---- */
+.stats-ring-money-bg { stroke: var(--color-stats-ring-money-bg, #f3e8f5); }
+.stats-ring-money     { stroke: var(--color-stats-ring-money, #ec4899); }
+.stats-ring-time-bg   { stroke: var(--color-stats-ring-time-bg, #fef3c7); }
+.stats-ring-time      { stroke: var(--color-stats-ring-time, #f59e0b); }
+
 /* ---- Контейнер панели (минимальный режим) ---- */
 .desktop-stats-panel {
     position: absolute;
