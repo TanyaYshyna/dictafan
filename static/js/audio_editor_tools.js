@@ -17,17 +17,25 @@
 // ============================================================================
 
 /**
- * Получить путь к аудио для указанного языка
+ * Получить blob URL аудио из draft cache для указанного языка и имени файла.
+ * Если файл не найден в draft cache, возвращает null.
  */
-function _getAudioPath(language) {
-    return `/static/data/temp/${currentDictation.id}/${language}/mp3_1`;
+function _getAudioUrl(filename, language) {
+    if (typeof getDraftAudioUrl === 'function') {
+        const url = getDraftAudioUrl(language, filename);
+        if (url) return url;
+    }
+    return null;
 }
 
 /**
- * Получить URL аудиофайла для воспроизведения
+ * Получить путь к аудио (для обратной совместимости — теперь возвращает blob URL или null)
  */
-function _getAudioUrl(filename, language) {
-    return `${_getAudioPath(language)}/${filename}`;
+function _getAudioPath(language) {
+    // В новой схеме нет "пути" на сервере — аудио живёт только в blob.
+    // Возвращаем пустую строку, чтобы сломать старый код, который пытается использовать temp-путь.
+    console.warn('⚠️ _getAudioPath устарел — используйте _getAudioUrl или getDraftAudioUrl');
+    return '';
 }
 
 /**
@@ -67,7 +75,7 @@ function _refreshLucideIcons() {
 
 /**
  * Получить информацию о текущем аудиофайле для обрезки
- * @returns {{filename: string, filepath: string, file: File|null}|null}
+ * @returns {{filename: string, blobUrl: string|null, file: File|null}|null}
  */
 function getCurrentAudioFileForScissors() {
     const audioMode = document.querySelector('input[name="audioMode"]:checked');
@@ -82,23 +90,19 @@ function getCurrentAudioFileForScissors() {
         return null;
     }
 
-    const serverFilePath = `${_getAudioPath(currentDictation.language_original)}/${filename}`;
-
-    const fileInput = document.getElementById('audioFileInput');
-    let file = null;
-    if (fileInput && fileInput.files && fileInput.files[0]) {
-        file = fileInput.files[0];
-    }
+    // Получаем blob URL из draft cache
+    const blobUrl = _getAudioUrl(filename, currentDictation.language_original);
 
     return {
         filename: filename,
-        filepath: serverFilePath,
-        file: file
+        blobUrl: blobUrl,
+        file: null
     };
 }
 
 /**
  * Обрезать аудиофайл ножницами (вызов серверного /cut-audio)
+ * Использует draft-mode: отправляет blob как base64, получает результат как base64.
  * @param {string} audioFileName - имя файла
  * @param {number} startTime - время начала в секундах
  * @param {number} endTime - время окончания в секундах
@@ -107,13 +111,30 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
     _showLoading('Обрезание аудиофайла...');
 
     try {
-        const filePath = `${_getAudioPath(currentDictation.language_original)}/${audioFileName}`;
+        // Получаем blob из draft cache
+        const blobUrl = _getAudioUrl(audioFileName, currentDictation.language_original);
+        if (!blobUrl) {
+            throw new Error(`Аудиофайл "${audioFileName}" не найден в draft cache`);
+        }
+
+        // Конвертируем blob в base64
+        const resp = await fetch(blobUrl);
+        const blob = await resp.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const audioB64 = btoa(binary);
+
         const response = await fetch('/cut-audio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filename: audioFileName,
-                filepath: filePath,
+                audio_b64: audioB64,
+                mime: blob.type || 'audio/mpeg',
                 start_time: startTime,
                 end_time: endTime,
                 language: currentDictation.language_original,
@@ -129,8 +150,28 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
         const data = await response.json();
 
         if (data.success) {
-            if (typeof loadWaveformForFile === 'function') {
-                loadWaveformForFile(data.filepath);
+            // Сервер вернул обрезанный файл как audio_b64 — сохраняем в draft cache
+            if (data.audio_b64) {
+                const binaryOut = atob(data.audio_b64);
+                const outBytes = new Uint8Array(binaryOut.length);
+                for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                const outBlob = new Blob([outBytes], { type: data.mime || blob.type || 'audio/mpeg' });
+
+                if (typeof putDraftAudioToCache === 'function') {
+                    await putDraftAudioToCache(
+                        currentDictation.id,
+                        currentDictation.language_original,
+                        audioFileName,
+                        outBlob,
+                        data.mime || blob.type || 'audio/mpeg'
+                    );
+                }
+
+                // Обновляем waveform из blob URL
+                const newBlobUrl = _getAudioUrl(audioFileName, currentDictation.language_original);
+                if (newBlobUrl && typeof loadWaveformForFile === 'function') {
+                    loadWaveformForFile(newBlobUrl);
+                }
             }
 
             // Приводим все кнопки воспроизведения к состоянию ready (play)
@@ -177,11 +218,11 @@ function handleScissorsFullMode() {
 
 /**
  * Обрезать аудиофайл для конкретной строки таблицы
+ * Использует draft-mode: отправляет blob как base64, получает результат как base64.
  * @param {HTMLElement} row - строка таблицы
  */
 function cutAudioFile(row) {
     const filename = row.dataset.filename;
-    const filepath = row.dataset.filepath;
     const startTime = parseFloat(row.querySelector('.start-input').value) || 0;
     const endTime = parseFloat(row.querySelector('.end-input').value) || 0;
 
@@ -189,12 +230,31 @@ function cutAudioFile(row) {
 
     (async () => {
         try {
+            // Получаем blob из draft cache
+            const lang = row.dataset.language || currentDictation.language_original;
+            const blobUrl = _getAudioUrl(filename, lang);
+            if (!blobUrl) {
+                throw new Error(`Аудиофайл "${filename}" не найден в draft cache`);
+            }
+
+            // Конвертируем blob в base64
+            const resp = await fetch(blobUrl);
+            const blob = await resp.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const audioB64 = btoa(binary);
+
             const payload = {
                 filename: filename,
-                filepath: filepath,
+                audio_b64: audioB64,
+                mime: blob.type || 'audio/mpeg',
                 start_time: startTime,
                 end_time: endTime,
-                language: currentDictation.language_original,
+                language: lang,
                 dictation_id: currentDictation.id
             };
 
@@ -211,6 +271,24 @@ function cutAudioFile(row) {
                 console.error('❌ Ошибка обрезания аудио:', data.error);
                 alert('Ошибка обрезания аудио: ' + (data.error || 'Неизвестная ошибка'));
                 return;
+            }
+
+            // Сервер вернул обрезанный файл как audio_b64 — сохраняем в draft cache
+            if (data.audio_b64) {
+                const binaryOut = atob(data.audio_b64);
+                const outBytes = new Uint8Array(binaryOut.length);
+                for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                const outBlob = new Blob([outBytes], { type: data.mime || blob.type || 'audio/mpeg' });
+
+                if (typeof putDraftAudioToCache === 'function') {
+                    await putDraftAudioToCache(
+                        currentDictation.id,
+                        lang,
+                        filename,
+                        outBlob,
+                        data.mime || blob.type || 'audio/mpeg'
+                    );
+                }
             }
 
             // Обновляем данные в строке
@@ -290,10 +368,9 @@ function handleAudioEnd() {
 
 /**
  * Разрезать аудио на предложения (равными частями) — "на 1000 кусков"
- * Вызывает серверный /split-audio
+ * Вызывает серверный /split-audio в draft-mode (audio_b64)
  */
 async function splitAudioIntoSentences() {
-    const filePath = `${_getAudioPath(currentDictation.language_original)}/${currentAudioFileName}`;
     console.log('✂️✂️✂️✂️✂️3✂️ Текущий аудиофайл:', currentAudioFileName);
 
     if (!workingData || !workingData.original || !workingData.original.sentences) {
@@ -366,13 +443,29 @@ async function splitAudioIntoSentences() {
             }
         }
 
-        // Отправляем запрос на сервер для разрезания аудио
+        // Получаем blob из draft cache и конвертируем в base64
+        const blobUrl = _getAudioUrl(currentAudioFileName, currentDictation.language_original);
+        if (!blobUrl) {
+            throw new Error(`Аудиофайл "${currentAudioFileName}" не найден в draft cache`);
+        }
+        const resp = await fetch(blobUrl);
+        const blob = await resp.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const audioB64 = btoa(binary);
+
+        // Отправляем запрос на сервер для разрезания аудио (draft-mode)
         const response = await fetch('/split-audio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filename: currentAudioFileName,
-                filepath: filePath,
+                audio_b64: audioB64,
+                mime: blob.type || 'audio/mpeg',
                 sentences: sentences.map(s => ({
                     key: s.key,
                     start_time: workingData.original.sentences.find(ws => ws.key === s.key)?.start || 0,
@@ -391,6 +484,30 @@ async function splitAudioIntoSentences() {
         const data = await response.json();
 
         if (data.success) {
+            // Сохраняем полученные сегменты в draft cache
+            if (Array.isArray(data.files)) {
+                for (const f of data.files) {
+                    if (!f || !f.filename || !f.audio_b64) continue;
+                    try {
+                        const binaryOut = atob(f.audio_b64);
+                        const outBytes = new Uint8Array(binaryOut.length);
+                        for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                        const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
+                        if (typeof putDraftAudioToCache === 'function') {
+                            await putDraftAudioToCache(
+                                currentDictation.id,
+                                currentDictation.language_original,
+                                f.filename,
+                                outBlob,
+                                f.mime || 'audio/mpeg'
+                            );
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ не удалось сохранить segment blob:', e);
+                    }
+                }
+            }
+
             if (typeof updateTableWithNewAudio === 'function') {
                 updateTableWithNewAudio();
             }
@@ -411,11 +528,11 @@ async function splitAudioIntoSentences() {
 
 /**
  * Разрезать аудио на предложения (построчная версия, из таблицы)
+ * Использует draft-mode: отправляет blob как base64, получает результат как base64.
  * @param {HTMLElement} row - строка таблицы
  */
 function splitAudioIntoSeentences(row) {
     const filename = row.dataset.filename;
-    const filepath = row.dataset.filepath;
     const startTime = parseFloat(row.querySelector('.start-input').value) || 0;
     const endTime = parseFloat(row.querySelector('.end-input').value) || 0;
 
@@ -430,9 +547,26 @@ function splitAudioIntoSeentences(row) {
                 language: currentDictation.language_original
             })).filter(s => s.key && s.end_time > s.start_time);
 
+            // Получаем blob из draft cache
+            const lang = row.dataset.language || currentDictation.language_original;
+            const blobUrl = _getAudioUrl(filename, lang);
+            if (!blobUrl) {
+                throw new Error(`Аудиофайл "${filename}" не найден в draft cache`);
+            }
+            const resp = await fetch(blobUrl);
+            const blob = await resp.blob();
+            const arrayBuffer = await blob.arrayBuffer();
+            const bytes = new Uint8Array(arrayBuffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            const audioB64 = btoa(binary);
+
             const payload = {
                 filename: filename,
-                filepath: filepath,
+                audio_b64: audioB64,
+                mime: blob.type || 'audio/mpeg',
                 dictation_id: currentDictation.id,
                 sentences: sentences
             };
@@ -545,39 +679,18 @@ async function smartSplitAudio() {
     _showLoading('🎤 Умная нарезка: распознавание аудио через Whisper...');
 
     try {
-        // 1. Получаем аудиофайл как Blob
-        const filePath = `${_getAudioPath(currentDictation.language_original)}/${currentAudioFileName}`;
-        
-        let audioBlob = null;
-        
-        // Пробуем получить из кэша draft audio
-        if (typeof getDraftAudioUrl === 'function') {
-            const draftUrl = getDraftAudioUrl(currentDictation.language_original, currentAudioFileName);
-            if (draftUrl) {
-                const resp = await fetch(draftUrl);
-                audioBlob = await resp.blob();
-            }
+        // 1. Получаем аудиофайл как Blob из draft cache
+        const draftUrl = typeof getDraftAudioUrl === 'function'
+            ? getDraftAudioUrl(currentDictation.language_original, currentAudioFileName)
+            : null;
+        if (!draftUrl) {
+            throw new Error(`Аудиофайл "${currentAudioFileName}" не найден в draft cache`);
         }
-
-        // Если не нашли в draft, пробуем загрузить с сервера
-        if (!audioBlob) {
-            const resp = await fetch(filePath);
-            if (!resp.ok) {
-                // Пробуем через audioManager
-                if (window.audioManager && typeof window.audioManager.resolvePlayableUrl === 'function') {
-                    const playableUrl = await window.audioManager.resolvePlayableUrl(filePath, 'dummy');
-                    if (playableUrl) {
-                        const resp2 = await fetch(playableUrl);
-                        audioBlob = await resp2.blob();
-                    }
-                }
-                if (!audioBlob) {
-                    throw new Error(`Не удалось загрузить аудиофайл: ${filePath}`);
-                }
-            } else {
-                audioBlob = await resp.blob();
-            }
+        const resp = await fetch(draftUrl);
+        if (!resp.ok) {
+            throw new Error(`Не удалось загрузить аудиофайл из draft cache: ${currentAudioFileName}`);
         }
+        const audioBlob = await resp.blob();
 
         console.log(`🎤 Загружен аудиофайл: ${audioBlob.size} байт`);
 
@@ -799,13 +912,23 @@ async function smartSplitAudio() {
             }
         }
 
-        // 7. Отправляем запрос на сервер для разрезания аудио
+        // 7. Конвертируем blob в base64 для отправки на сервер
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const audioB64 = btoa(binary);
+
+        // 8. Отправляем запрос на сервер для разрезания аудио (draft-mode: audio_b64)
         const response = await fetch('/split-audio', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 filename: currentAudioFileName,
-                filepath: filePath,
+                audio_b64: audioB64,
+                mime: audioBlob.type || 'audio/mpeg',
                 sentences: sentenceTimestamps.map(st => ({
                     key: st.key,
                     start_time: st.start,
@@ -825,11 +948,36 @@ async function smartSplitAudio() {
 
         if (data.success) {
             console.log('✅ Умная нарезка выполнена успешно');
+
+            // Сохраняем полученные audio_b64 сегменты в draft cache
+            if (Array.isArray(data.files)) {
+                for (const f of data.files) {
+                    if (!f || !f.filename || !f.audio_b64) continue;
+                    try {
+                        const binaryOut = atob(f.audio_b64);
+                        const outBytes = new Uint8Array(binaryOut.length);
+                        for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                        const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
+                        if (typeof putDraftAudioToCache === 'function') {
+                            await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, f.filename, outBlob, f.mime || 'audio/mpeg');
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ не удалось сохранить segment blob:', e);
+                    }
+                }
+            }
+
             if (typeof updateTableWithNewAudio === 'function') {
                 updateTableWithNewAudio();
             }
             if (typeof switchToSentenceMode === 'function') {
                 switchToSentenceMode();
+            }
+            if (typeof setDirtyFlags === 'function') {
+                setDirtyFlags({ audio: true });
+            }
+            if (typeof markAsUnsaved === 'function') {
+                markAsUnsaved();
             }
         } else {
             console.error('❌ Ошибка умной нарезки:', data.error);

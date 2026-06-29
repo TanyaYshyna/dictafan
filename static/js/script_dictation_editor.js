@@ -7502,56 +7502,39 @@ async function saveRecording() {
         // Создаем blob из записанных данных
         const blob = new Blob(recordedChunks, { type: blobType });
 
-        // Создаем FormData для отправки на сервер
-        const formData = new FormData();
-        formData.append('audio', blob, `${currentRecordingSentence.key}_en_mic.${fileExtension}`);
-        formData.append('dictation_id', currentDictation.id);
-        formData.append('language', currentDictation.language_original);
+        // Генерируем имя файла для микрофонной записи
+        const filename = `${currentRecordingSentence.key}_${currentDictation.language_original}_mic.${fileExtension}`;
 
-        // Показываем индикатор загрузки
-        showLoadingIndicator();
-
-        // Отправляем на сервер
-        const response = await fetch('/upload_mic_audio', {
-            method: 'POST',
-            body: formData
-        });
-
-        console.log('📤 Ответ сервера:', response.status, response.statusText);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Сохраняем в draft cache (только в памяти, без сервера)
+        if (typeof putDraftAudioToCache === 'function') {
+            await putDraftAudioToCache(
+                currentDictation.id,
+                currentDictation.language_original,
+                filename,
+                blob,
+                blobType
+            );
         }
 
-        const data = await response.json();
-        hideLoadingIndicator();
+        // Обновляем данные предложения
+        currentRecordingSentence.audio_mic = filename;
 
-        if (data.success) {
-            // Обновляем данные предложения
-            currentRecordingSentence.audio_mic = data.filename;
+        // Обновляем состояние кнопки микрофона в таблице
+        updateMicButtonState(currentRecordingSentence.key);
 
-            // Обновляем состояние кнопки микрофона в таблице
-            updateMicButtonState(currentRecordingSentence.key);
+        // Обновляем отображение
+        updateCurrentAudioInfoForMicMode();
 
-            // Обновляем отображение
-            updateCurrentAudioInfoForMicMode();
+        // Отмечаем что диктант изменен
+        currentDictation.isSaved = false;
+        setDirtyFlags({ audio: true });
 
-            // Отмечаем что диктант изменен
-            currentDictation.isSaved = false;
-            setDirtyFlags({ audio: true });
+        // Закрываем модальное окно
+        closeMicRecordModal();
 
-            // Закрываем модальное окно
-            closeMicRecordModal();
-
-            alert('Запись успешно сохранена!');
-
-        } else {
-            console.error('❌ Ошибка при сохранении записи:', data.error);
-            alert('Ошибка при сохранении записи: ' + data.error);
-        }
+        console.log(`✅ Микрофонная запись "${filename}" сохранена в draft cache (blob)`);
 
     } catch (error) {
-        hideLoadingIndicator();
         console.error('❌ Ошибка при сохранении записи:', error);
         alert('Ошибка при сохранении записи: ' + error.message);
     }
@@ -8044,10 +8027,10 @@ function uploadAudioFile(file, audioMode) {
         // Округляем до сотых, отбрасывая тысячные
         const durationFormatted = Math.floor(durationSeconds * 100) / 100;
 
-        // Освобождаем память
+        // Освобождаем временную ссылку (не путать с постоянной blob-ссылкой в draft cache)
         URL.revokeObjectURL(audioUrl);
 
-        // Продолжаем загрузку файла
+        // Продолжаем — теперь без отправки на сервер, всё в blob
         continueUpload(file, audioMode, durationFormatted, durationSeconds);
     });
 
@@ -8062,135 +8045,83 @@ function uploadAudioFile(file, audioMode) {
 }
 
 function continueUpload(file, audioMode, durationFormatted, duration) {
-    // Проверяем JWT токен
-    // Используем jwt_token (как в user_manager.js) или токен из UserManager
-    let token = null;
-    if (window.UM && window.UM.token) {
-        token = window.UM.token;
-    } else {
-        token = localStorage.getItem('jwt_token');
-    }
-    // console.log('🔑 JWT токен:', token ? 'есть' : 'отсутствует');
-    if (token) {
-        // Проверяем структуру JWT токена (должен содержать 3 части, разделенные точками)
-        const parts = token.split('.');
-        // console.log('🔑 JWT токен части:', parts.length, 'частей');
-        if (parts.length !== 3) {
-            console.error('❌ JWT токен неправильной структуры! Ожидается 3 части, получено:', parts.length);
-        } else {
+    hideLoadingIndicator();
+
+    try {
+        // Генерируем имя файла на основе оригинального
+        const origName = file.name || `audio_${Date.now()}.mp3`;
+        const filename = origName;
+
+        // Создаём blob и сохраняем в draft cache (только в памяти, без сервера)
+        const blob = file; // file уже является Blob
+
+        // Сохраняем в draft cache
+        if (typeof putDraftAudioToCache === 'function') {
+            putDraftAudioToCache(
+                currentDictation.id,
+                currentDictation.language_original,
+                filename,
+                blob,
+                file.type || 'audio/mpeg'
+            );
         }
-    } else {
-        console.warn('⚠️ JWT токен отсутствует в localStorage! Продолжаем без авторизации...');
-    }
 
-    // Создаем FormData для отправки файла
-    const formData = new FormData();
-    formData.append('audioFile', file);
-    formData.append('language', currentDictation.language_original);
-    formData.append('dictation_id', currentDictation.id);
-    formData.append('audioMode', audioMode);
+        // Обновляем workingData
+        switch (audioMode) {
+            case 'full':
+                workingData.original.audio_user_shared = filename;
+                workingData.original.audio_user_shared_start = 0;
+                workingData.original.audio_user_shared_end = duration;
 
-    if (audioMode === 'mic') {
-        const currentRow = document.querySelector('#sentences-table tbody tr.selected');
-        if (currentRow && currentRow.dataset && currentRow.dataset.key) {
-            formData.append('sentenceKey', currentRow.dataset.key);
-        }
-    }
-
-    for (let [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value);
-    }
-
-    // Отправляем файл на сервер
-    fetch('/upload-audio', {
-        method: 'POST',
-        // Временно убираем JWT токен для тестирования
-        // headers: {
-        //     'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        // },
-        body: formData
-    })
-        .then(response => {
-
-            // Получаем текст ответа независимо от статуса
-            return response.text().then(text => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}\nОтвет: ${text}`);
+                // Обновляем отображение с длительностью
+                const currentAudioInfo = document.getElementById('currentAudioInfo');
+                if (currentAudioInfo) {
+                    const durationText = durationFormatted ? ` (${durationFormatted}с)` : '';
+                    currentAudioInfo.textContent = `Аудио для волны: ${filename}${durationText}`;
                 }
-                return text;
-            });
-        })
-        .then(text => {
-            try {
-                return JSON.parse(text); // Пытаемся распарсить как JSON
-            } catch (e) {
-                console.error('❌ Ошибка парсинга JSON:', e);
-                console.error('❌ Текст ответа:', text);
-                throw new Error('Сервер вернул не JSON ответ');
-            }
-        })
-        .then(data => {
-            hideLoadingIndicator();
-            if (data.success) {
-                // Файл уже отображается в панели выбора
-                // Обновляем workingData.original
-                switch (audioMode) {
-                    case 'full':
-                        workingData.original.audio_user_shared = data.filename;
-                        workingData.original.audio_user_shared_start = 0;
-                        workingData.original.audio_user_shared_end = duration;
+
+                // Сбрасываем currentAudioFileName, чтобы гарантировать перезагрузку волны
+                currentAudioFileName = '';
+
+                // Загружаем волну из blob URL
+                const draftUrl = getDraftAudioUrl(currentDictation.language_original, filename);
+                if (draftUrl) {
+                    initWaveform(draftUrl);
+                } else {
+                    console.error('❌ Не удалось получить blob URL для загруженного файла');
+                }
+                break;
+
+            case 'mic':
+                const currentRow = document.querySelector('#sentences-table tbody tr.selected');
+                if (currentRow) {
+                    const key = currentRow.dataset.key;
+                    const sentence = workingData.original.sentences.find(s => s.key === key);
+                    if (sentence) {
+                        sentence.audio_mic = filename;
 
                         // Обновляем отображение с длительностью
                         const currentAudioInfo = document.getElementById('currentAudioInfo');
                         if (currentAudioInfo) {
                             const durationText = durationFormatted ? ` (${durationFormatted}с)` : '';
-                            currentAudioInfo.textContent = `Аудио для волны: ${data.filename}${durationText}`;
+                            currentAudioInfo.textContent = `Аудио для волны: ${filename}${durationText}`;
                         }
-
-                        // Обновляем текущее аудио
-                        // Сбрасываем currentAudioFileName, чтобы гарантировать перезагрузку волны
-                        // (даже если файл перезаписан с тем же именем)
-                        currentAudioFileName = '';
-
-                        // Загружаем волну через initWaveform с правильным путём от сервера
-                        // (data.filepath содержит актуальный путь к файлу в temp-папке)
-                        if (data.filepath) {
-                            initWaveform(data.filepath);
-                        }
-                        break;
-                    case 'mic':
-                        const currentRow = document.querySelector('#sentences-table tbody tr.selected');
-                        if (currentRow) {
-                            const key = currentRow.dataset.key;
-                            const sentence = workingData.original.sentences.find(s => s.key === key);
-                            sentence.audio_mic = data.filename;
-
-                            // Обновляем отображение с длительностью
-                            const currentAudioInfo = document.getElementById('currentAudioInfo');
-                            if (currentAudioInfo) {
-                                const durationText = durationFormatted ? ` (${durationFormatted}с)` : '';
-                                currentAudioInfo.textContent = `Аудио для волны: ${data.filename}${durationText}`;
-                            }
-                        }
-                        break;
+                    }
                 }
+                break;
+        }
 
-                // Отмечаем что диктант изменен
-                currentDictation.isSaved = false;
-                setDirtyFlags({ audio: true });
+        // Отмечаем что диктант изменен
+        currentDictation.isSaved = false;
+        setDirtyFlags({ audio: true });
 
-                // Автосохранение JSON удалено - данные только в workingData
+        console.log(`✅ Файл "${filename}" сохранён в draft cache (blob), режим: ${audioMode}`);
 
-            } else {
-                console.error('❌ Ошибка загрузки файла:', data.error);
-                alert('Ошибка загрузки файла: ' + data.error);
-            }
-        })
-        .catch(error => {
-            hideLoadingIndicator();
-            console.error('❌ Ошибка загрузки файла:', error);
-            alert('Ошибка загрузки файла');
-        });
+    } catch (error) {
+        hideLoadingIndicator();
+        console.error('❌ Ошибка загрузки файла:', error);
+        alert('Ошибка загрузки файла: ' + error.message);
+    }
 }
 
 
@@ -9252,14 +9183,14 @@ function updateCurrentSentenceInfo(sentence) {
 
 
 /**
- * Вырезать кусочек аудио из общего файла для конкретного предложения
+ * Вырезать кусочек аудио из общего файла для конкретного предложения (draft-mode: audio_b64)
  * @param {Object} sentence - объект предложения с полями start, end, key
  * @param {string} language - язык аудио
  * @param {string} sourceAudioFileName - имя исходного общего аудио файла
  * @returns {Promise<string|null>} - имя созданного файла или null при ошибке
  */
 async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
-    if (sentence.start === undefined || sentence.end === undefined || 
+    if (sentence.start === undefined || sentence.end === undefined ||
         sentence.start < 0 || sentence.end <= sentence.start) {
         console.warn('⚠️ Неверные значения start/end для предложения:', sentence.key);
         return null;
@@ -9271,10 +9202,33 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
     }
 
     try {
-        const filePath = `${getAudioPath(language)}/${sourceAudioFileName}`;
         const outputFileName = `${sentence.key}_${language}_user.mp3`;
-        
-        // Используем эндпоинт /split-audio с одним предложением для создания отдельного файла
+
+        // Получаем blob из draft cache
+        const draftUrl = typeof getDraftAudioUrl === 'function'
+            ? getDraftAudioUrl(language, sourceAudioFileName)
+            : null;
+        if (!draftUrl) {
+            console.error(`❌ Аудиофайл "${sourceAudioFileName}" не найден в draft cache`);
+            return null;
+        }
+        const resp = await fetch(draftUrl);
+        if (!resp.ok) {
+            console.error(`❌ Не удалось загрузить аудиофайл из draft cache: ${sourceAudioFileName}`);
+            return null;
+        }
+        const blob = await resp.blob();
+
+        // Конвертируем blob в base64
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.length; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        const audioB64 = btoa(binary);
+
+        // Используем эндпоинт /split-audio с одним предложением (draft-mode: audio_b64)
         const response = await fetch('/split-audio', {
             method: 'POST',
             headers: {
@@ -9282,7 +9236,8 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
             },
             body: JSON.stringify({
                 filename: sourceAudioFileName,
-                filepath: filePath,
+                audio_b64: audioB64,
+                mime: blob.type || 'audio/mpeg',
                 sentences: [{
                     key: sentence.key,
                     start_time: sentence.start,
@@ -9302,15 +9257,27 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
         const data = await response.json();
 
         if (data.success) {
-
-            // Проверяем разные возможные форматы ответа
             let filename = null;
-            
-            // Вариант 1: файлы в массиве files
+
+            // Ищем созданный файл в ответе (audio_b64 режим)
             if (data.files && Array.isArray(data.files) && data.files.length > 0) {
                 const createdFile = data.files.find(f => f.key === sentence.key);
                 if (createdFile && createdFile.filename) {
                     filename = createdFile.filename;
+                    // Сохраняем audio_b64 сегмент в draft cache
+                    if (createdFile.audio_b64) {
+                        try {
+                            const binaryOut = atob(createdFile.audio_b64);
+                            const outBytes = new Uint8Array(binaryOut.length);
+                            for (let i = 0; i < binaryOut.length; i++) outBytes[i] = binaryOut.charCodeAt(i);
+                            const outBlob = new Blob([outBytes], { type: createdFile.mime || 'audio/mpeg' });
+                            if (typeof putDraftAudioToCache === 'function') {
+                                await putDraftAudioToCache(currentDictation.id, language, createdFile.filename, outBlob, createdFile.mime || 'audio/mpeg');
+                            }
+                        } catch (e) {
+                            console.warn('⚠️ не удалось сохранить segment blob:', e);
+                        }
+                    }
                 }
             }
             
@@ -9328,14 +9295,12 @@ async function trimAudioForSentence(sentence, language, sourceAudioFileName) {
                 console.log(`✅ Вырезан кусочек для предложения ${sentence.key}: ${filename}`);
                 return filename;
             } else {
-                // Сервер вернул success: true, но не вернул имя файла - это ошибка на сервере
                 console.error('❌ ОШИБКА СЕРВЕРА: success=true, но имя файла отсутствует в ответе');
                 console.error('Ожидаемый ключ предложения:', sentence.key);
                 console.error('Полный ответ сервера:', JSON.stringify(data, null, 2));
                 return null;
             }
         } else {
-            // Сервер вернул success: false
             console.error('❌ Сервер вернул ошибку при вырезании аудио:', data.error || 'Неизвестная ошибка');
             return null;
         }
@@ -13009,7 +12974,15 @@ function loadWaveformForCurrentAudio(audioFile) {
 
     if (!audioFile) return;
 
-    const audioUrl = buildDictationAudioUrl(currentDictation && currentDictation.id, currentDictation.language_original, audioFile);
+    // Сначала проверяем draft cache (blob URL для несохранённых аудиофайлов)
+    let audioUrl = null;
+    if (typeof getDraftAudioUrl === 'function') {
+        audioUrl = getDraftAudioUrl(currentDictation.language_original, audioFile);
+    }
+    if (!audioUrl) {
+        // Если нет в draft cache, строим URL через API (для сохранённых диктантов)
+        audioUrl = buildDictationAudioUrl(currentDictation && currentDictation.id, currentDictation.language_original, audioFile);
+    }
 
     loadWaveformForFile(audioUrl);
 }

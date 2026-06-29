@@ -286,6 +286,7 @@
     "start_button": {
       "start": "СТАРТ",
       "continue": "Продолжаем!!!",
+      "new_start": "НОВЫЙ СТАРТ",
       "victory": "Победа! Ты красавчик!!!"
     },
     "start_modal": {

@@ -282,6 +282,7 @@
     "start_button": {
       "start": "ابدأ",
       "continue": "تابع!!!",
+      "new_start": "بداية جديدة",
       "victory": "النصر! أحسنت!!!"
     },
     "start_modal": {

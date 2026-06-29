@@ -286,6 +286,7 @@
     "start_button": {
       "start": "START",
       "continue": "Continue!!!",
+      "new_start": "NEW START",
       "victory": "Victory! Great job!!!"
     },
     "start_modal": {
