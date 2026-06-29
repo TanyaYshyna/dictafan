@@ -538,6 +538,7 @@ def api_get_dictation_sentences_simple(dictation_id):
             
             sentence = {
                 'sentence_key': sentence_key,
+                'position': orig_sentence.get('position'),
                 'text': orig_sentence.get('text', ''),
                 'audio': audio_url,
                 'audio_file': audio_file

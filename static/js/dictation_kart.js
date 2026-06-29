@@ -883,7 +883,7 @@ window.DictationKart = window.DictationKart || {
   buildMenuItems(context) {
     if (context === 'desk') {
       return [
-        { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment_new', labelFallback: 'Задания' },
+        { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment_new', labelFallback: 'Все упражнения' },
         { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
         { action: 'prefetch-dictation-cache', icon: 'download', labelKey: 'private_library.dictation_card_actions.cache', labelFallback: 'Скачать в кэш' },
         { action: 'edit-dictation', icon: 'pencil-ruler', labelKey: 'private_library.dictation_card_actions.edit', labelFallback: 'Редактировать' },
@@ -894,7 +894,7 @@ window.DictationKart = window.DictationKart || {
 
     return [
       { action: 'edit-dictation', icon: 'pencil-ruler', labelKey: 'private_library.dictation_card_actions.edit', labelFallback: 'Редактировать' },
-      { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment', labelFallback: 'Задания' },
+      { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment', labelFallback: 'Все упражнения' },
       { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
       { action: 'move-dictation', icon: 'folder-symlink', labelKey: 'private_library.dictation_card_actions.move', labelFallback: 'Переместить' },
       { action: 'delete-dictation', icon: 'trash-2', labelKey: 'private_library.dictation_card_actions.delete', labelFallback: 'Удалить', danger: true },

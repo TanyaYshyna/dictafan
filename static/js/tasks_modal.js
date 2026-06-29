@@ -153,14 +153,9 @@
     async function loadDictationSentencesForAssignmentModal(dictationId) {
       const id = Number(dictationId);
       if (!Number.isFinite(id) || id <= 0) return [];
-      const meta = await loadDictationMetaForAssignmentModal(id);
-      const langOrig = meta && meta.language_code ? String(meta.language_code) : 'en';
-      const url = `/api/dictation/${encodeURIComponent(`dict_${id}`)}/${encodeURIComponent(langOrig)}/${encodeURIComponent(langOrig)}/sentences`;
-      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
-      return sentences.filter(s => s && typeof s === 'object');
+      const res = await apiRequest(`/api/dictation/${encodeURIComponent(id)}/sentences`, { method: 'GET' });
+      if (!res || !res.success || !Array.isArray(res.sentences)) return [];
+      return res.sentences.filter(s => s && typeof s === 'object');
     }
 
     function getCreateAssignmentSentencesState(modal) {
@@ -747,6 +742,16 @@
               setCreateAssignmentExercisesState(modal, next);
               setCreateAssignmentExercisesDirty(modal, false);
               renderCreateAssignmentExercisesTable(modal);
+
+              // Инвалидируем кэш упражнений в IndexedDB, чтобы карточка диктанта не показывала устаревший список
+              try {
+                const idb = window.IdbManager;
+                if (idb && typeof idb.idbDelete === 'function') {
+                  const cacheKey = `exercises:${String(dictation_id)}`;
+                  idb.idbDelete('dictations', cacheKey).catch(() => {});
+                }
+              } catch (eCache) {
+              }
             } catch (e) {
               try { setCreateAssignmentExercisesDirty(modal, false); } catch (e2) { }
             }
