@@ -133,14 +133,22 @@
           flex-direction: column;
           position: relative;
         ">
-          <!-- Логотип -->
+          <!-- Шапка: логотип + название + закрыть -->
           <div style="
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 16px 20px 8px 20px;
+            gap: 12px;
+            padding: 16px 20px 12px 20px;
           ">
-            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 28px; width: auto; cursor: pointer;" onclick="window.location.href='/'" />
+            <img src="/static/icons/logo.svg" alt="DictaFan" style="height: 40px; width: auto; flex-shrink: 0; cursor: pointer;" onclick="window.location.href='/'" />
+            <div id="dictation-launch-title" style="
+              flex: 1;
+              min-width: 0;
+              font-size: 16px;
+              font-weight: 600;
+              color: #333;
+              line-height: 1.3;
+            "></div>
             <button type="button" id="dictation-launch-close" style="
               background: none;
               border: none;
@@ -151,19 +159,11 @@
               align-items: center;
               justify-content: center;
               border-radius: 8px;
+              flex-shrink: 0;
             " title="Закрыть">
               <i data-lucide="x" style="width: 22px; height: 22px;"></i>
             </button>
           </div>
-
-          <!-- Заголовок диктанта -->
-          <div id="dictation-launch-title" style="
-            padding: 4px 20px 12px 20px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #333;
-            line-height: 1.3;
-          "></div>
 
           <!-- Список -->
           <div style="padding: 0 12px 12px 12px; max-height: 50vh; overflow-y: auto;">
@@ -265,6 +265,17 @@
         if (!uniqueBySig.has(sig)) uniqueBySig.set(sig, ex);
       }
       const exerciseList = Array.from(uniqueBySig.values());
+
+      // Сортируем: "по всем" (пустые позиции) сверху, остальные по первому номеру позиции
+      exerciseList.sort((a, b) => {
+        const aPos = Array.isArray(a.positions) ? a.positions : [];
+        const bPos = Array.isArray(b.positions) ? b.positions : [];
+        const aEmpty = !aPos.length;
+        const bEmpty = !bPos.length;
+        if (aEmpty && !bEmpty) return -1;
+        if (!aEmpty && bEmpty) return 1;
+        return (aPos[0] || 0) - (bPos[0] || 0);
+      });
 
       for (const ex of exerciseList) {
         const pos = Array.isArray(ex.positions) ? ex.positions : [];
