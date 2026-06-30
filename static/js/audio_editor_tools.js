@@ -78,12 +78,6 @@ function _refreshLucideIcons() {
  * @returns {{filename: string, blobUrl: string|null, file: File|null}|null}
  */
 function getCurrentAudioFileForScissors() {
-    const audioMode = document.querySelector('input[name="audioMode"]:checked');
-    if (!audioMode || audioMode.value !== 'full') {
-        console.log('❌ Режим "отображать весь файл" не активен');
-        return null;
-    }
-
     const filename = currentAudioFileName;
     if (!filename) {
         console.error('❌ Имя файла не найдено');
@@ -111,10 +105,21 @@ async function trimAudioFile(audioFileName, startTime, endTime) {
     _showLoading('Обрезание аудиофайла...');
 
     try {
-        // Получаем blob из draft cache
-        const blobUrl = _getAudioUrl(audioFileName, currentDictation.language_original);
+        // Пытаемся получить blob из draft cache
+        let blobUrl = _getAudioUrl(audioFileName, currentDictation.language_original);
+
+        // Если нет в draft cache — скачиваем с сервера (уже сохранённый файл)
         if (!blobUrl) {
-            throw new Error(`Аудиофайл "${audioFileName}" не найден в draft cache`);
+            console.log(`📥 Аудиофайл "${audioFileName}" не найден в draft cache, скачиваю с сервера...`);
+            const serverUrl = await resolveEditorPlaybackAudioUrl(
+                currentDictation.id,
+                currentDictation.language_original,
+                audioFileName
+            );
+            if (!serverUrl) {
+                throw new Error(`Не удалось получить URL для аудиофайла "${audioFileName}"`);
+            }
+            blobUrl = serverUrl;
         }
 
         // Конвертируем blob в base64
@@ -230,11 +235,20 @@ function cutAudioFile(row) {
 
     (async () => {
         try {
-            // Получаем blob из draft cache
+            // Получаем blob из draft cache или скачиваем с сервера
             const lang = row.dataset.language || currentDictation.language_original;
-            const blobUrl = _getAudioUrl(filename, lang);
+            let blobUrl = _getAudioUrl(filename, lang);
             if (!blobUrl) {
-                throw new Error(`Аудиофайл "${filename}" не найден в draft cache`);
+                console.log(`📥 Аудиофайл "${filename}" не найден в draft cache, скачиваю с сервера...`);
+                const serverUrl = await resolveEditorPlaybackAudioUrl(
+                    currentDictation.id,
+                    lang,
+                    filename
+                );
+                if (!serverUrl) {
+                    throw new Error(`Не удалось получить URL для аудиофайла "${filename}"`);
+                }
+                blobUrl = serverUrl;
             }
 
             // Конвертируем blob в base64
@@ -443,10 +457,18 @@ async function splitAudioIntoSentences() {
             }
         }
 
-        // Получаем blob из draft cache и конвертируем в base64
-        const blobUrl = _getAudioUrl(currentAudioFileName, currentDictation.language_original);
+        // Получаем blob из draft cache или скачиваем с сервера
+        let blobUrl = _getAudioUrl(currentAudioFileName, currentDictation.language_original);
         if (!blobUrl) {
-            throw new Error(`Аудиофайл "${currentAudioFileName}" не найден в draft cache`);
+            console.log(`📥 Аудиофайл "${currentAudioFileName}" не найден в draft cache, скачиваю с сервера...`);
+            blobUrl = await resolveEditorPlaybackAudioUrl(
+                currentDictation.id,
+                currentDictation.language_original,
+                currentAudioFileName
+            );
+            if (!blobUrl) {
+                throw new Error(`Не удалось получить URL для аудиофайла "${currentAudioFileName}"`);
+            }
         }
         const resp = await fetch(blobUrl);
         const blob = await resp.blob();
@@ -547,11 +569,20 @@ function splitAudioIntoSeentences(row) {
                 language: currentDictation.language_original
             })).filter(s => s.key && s.end_time > s.start_time);
 
-            // Получаем blob из draft cache
+            // Получаем blob из draft cache или скачиваем с сервера
             const lang = row.dataset.language || currentDictation.language_original;
-            const blobUrl = _getAudioUrl(filename, lang);
+            let blobUrl = _getAudioUrl(filename, lang);
             if (!blobUrl) {
-                throw new Error(`Аудиофайл "${filename}" не найден в draft cache`);
+                console.log(`📥 Аудиофайл "${filename}" не найден в draft cache, скачиваю с сервера...`);
+                const serverUrl = await resolveEditorPlaybackAudioUrl(
+                    currentDictation.id,
+                    lang,
+                    filename
+                );
+                if (!serverUrl) {
+                    throw new Error(`Не удалось получить URL для аудиофайла "${filename}"`);
+                }
+                blobUrl = serverUrl;
             }
             const resp = await fetch(blobUrl);
             const blob = await resp.blob();
@@ -679,16 +710,24 @@ async function smartSplitAudio() {
     _showLoading('🎤 Умная нарезка: распознавание аудио через Whisper...');
 
     try {
-        // 1. Получаем аудиофайл как Blob из draft cache
-        const draftUrl = typeof getDraftAudioUrl === 'function'
+        // 1. Получаем аудиофайл как Blob из draft cache или скачиваем с сервера
+        let audioUrl = typeof getDraftAudioUrl === 'function'
             ? getDraftAudioUrl(currentDictation.language_original, currentAudioFileName)
             : null;
-        if (!draftUrl) {
-            throw new Error(`Аудиофайл "${currentAudioFileName}" не найден в draft cache`);
+        if (!audioUrl) {
+            console.log(`📥 Аудиофайл "${currentAudioFileName}" не найден в draft cache, скачиваю с сервера...`);
+            audioUrl = await resolveEditorPlaybackAudioUrl(
+                currentDictation.id,
+                currentDictation.language_original,
+                currentAudioFileName
+            );
+            if (!audioUrl) {
+                throw new Error(`Не удалось получить URL для аудиофайла "${currentAudioFileName}"`);
+            }
         }
-        const resp = await fetch(draftUrl);
+        const resp = await fetch(audioUrl);
         if (!resp.ok) {
-            throw new Error(`Не удалось загрузить аудиофайл из draft cache: ${currentAudioFileName}`);
+            throw new Error(`Не удалось загрузить аудиофайл: ${currentAudioFileName}`);
         }
         const audioBlob = await resp.blob();
 

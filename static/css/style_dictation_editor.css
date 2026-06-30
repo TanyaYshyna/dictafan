@@ -3471,3 +3471,162 @@ td.col-speaker {
     height: 300px;
   }
 }
+
+/* ========== СТИЛИ ДЛЯ НОВЫХ ТАБОВ АУДИО ========== */
+
+/* Таб "В мене є аудіо" */
+.my-audio-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.my-audio-content .waveform-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.my-audio-content .waveform-section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary, #666);
+    padding: 4px 8px;
+    background: var(--color-hover, #f0f0f0);
+    border-radius: 4px;
+    display: inline-block;
+    align-self: flex-start;
+}
+
+/* Контейнеры волн для my-audio */
+#audioWaveformShared,
+#audioWaveformSentence {
+    width: 100%;
+    height: 100px;
+    min-height: 100px;
+    border: 2px solid var(--color-audio-purple-primary, #8b5cf6);
+    border-radius: 8px;
+    background: var(--color-audio-purple-light, #f5f3ff);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Таб "Записати" */
+.record-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.record-content .waveform-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.record-content .waveform-section-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary, #666);
+    padding: 4px 8px;
+    background: var(--color-hover, #f0f0f0);
+    border-radius: 4px;
+    display: inline-block;
+    align-self: flex-start;
+}
+
+/* Контейнер волны для record */
+#audioWaveformRecord {
+    width: 100%;
+    height: 100px;
+    min-height: 100px;
+    border: 2px solid var(--color-audio-orange-primary, #f59e0b);
+    border-radius: 8px;
+    background: var(--color-audio-orange-light, #fffbeb);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Таб "Автозаповнення" */
+.autofill-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.autofill-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100px;
+    background: var(--color-hover, #f0f0f0);
+    border-radius: 8px;
+    border: 1px dashed var(--color-border-light, #ccc);
+}
+
+/* Кнопки управления на табе my-audio */
+.my-audio-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.my-audio-controls .time-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.my-audio-controls .time-controls input[type="text"] {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border-light, #ccc);
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Кнопки управления на табе record */
+.record-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.record-controls .time-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.record-controls .time-controls input[type="text"] {
+    width: 70px;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border-light, #ccc);
+    border-radius: 4px;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* Информация о текущем аудио для record */
+#currentAudioInfoRecord,
+#currentSentenceInfoRecord {
+    display: block;
+    font-size: 14px;
+    padding: 8px 12px;
+    background: var(--color-audio-orange-light, #fffbeb);
+    border-radius: 6px;
+    border-left: 4px solid var(--color-audio-orange-primary, #f59e0b);
+}
+
+/* Информация о текущем предложении для my-audio */
+#currentSentenceInfo {
+    display: block;
+    font-size: 14px;
+    padding: 8px 12px;
+    background: var(--color-audio-purple-light, #f5f3ff);
+    border-radius: 6px;
+    border-left: 4px solid var(--color-audio-purple-primary, #8b5cf6);
+}
