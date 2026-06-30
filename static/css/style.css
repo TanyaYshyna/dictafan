@@ -2098,3 +2098,78 @@ html[dir="rtl"] .topbar-save-group {
         width: 100%;
     }
 }
+
+/* ===== Баннер обновления сборки (build update notification) ===== */
+#dictafan-build-update-banner {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2147483646; /* чуть ниже статус-бара (2147483647) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    background: var(--color-button-yellow);
+    color: var(--color-button-text-yellow);
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(100%);
+    opacity: 0;
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    pointer-events: auto;
+    box-sizing: border-box;
+}
+
+#dictafan-build-update-banner.visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+.build-update-banner-message {
+    flex: 0 1 auto;
+    text-align: center;
+}
+
+.build-update-banner-btn {
+    flex: 0 0 auto;
+    cursor: pointer;
+    border: none;
+    background: var(--color-button-shadow-yellow);
+    color: var(--color-button-text-yellow);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 6px 16px;
+    border-radius: 8px;
+    transition: background 0.15s ease, opacity 0.15s ease;
+    white-space: nowrap;
+    opacity: 0.85;
+}
+
+.build-update-banner-btn:hover {
+    opacity: 1;
+}
+
+.build-update-banner-btn:active {
+    transform: translateY(1px);
+}
+
+.build-update-banner-close {
+    flex: 0 0 auto;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--color-button-text-yellow);
+    font-size: 20px;
+    line-height: 1;
+    padding: 0 4px;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+}
+
+.build-update-banner-close:hover {
+    opacity: 1;
+}

@@ -485,6 +485,13 @@ self.addEventListener('activate', (event) => {
     // Иначе после деплоя новый SW может удалить app shell (HTML/JS/CSS), и приложение перестанет
     // открываться офлайн до следующего успешного онлайн-прогрева.
     await self.clients.claim();
+
+    // Уведомляем все открытые страницы о том, что SW обновился
+    try {
+      const buildVersion = CACHE_VERSION;
+      await broadcastSwEvent('sw_build_update', { build: buildVersion });
+    } catch (e) {
+    }
   })());
 });
 

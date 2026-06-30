@@ -52,6 +52,8 @@
     <script>
         var __APP_BUILD_LOCAL = window.BuildHelpers.getAppBuild();
 
+        // Проверка обновления сборки: если версия изменилась с прошлого визита,
+        // показываем уведомление с кнопкой "Обновить" вместо жёсткого reload.
         if (window && window.BuildHelpers && typeof window.BuildHelpers.installBuildAutoReloader === 'function') {
             window.BuildHelpers.installBuildAutoReloader(__APP_BUILD_LOCAL, '{% block build_channel %}dictafan:build{% endblock %}');
         }

@@ -84,7 +84,8 @@
             persistentLog('build_reload', { prev: prev, next: v, reason: 'build_changed' });
           } catch (e) {
           }
-          location.reload();
+          // Вместо жёсткого location.reload() показываем уведомление
+          showBuildUpdateNotification(prev, v);
           return;
         }
 
@@ -99,6 +100,86 @@
           }
         }
       } catch (e) {
+      }
+    }
+
+    function _tBuild(key, fallback) {
+      try {
+        if (typeof window.I18n !== 'undefined' && typeof window.I18n.t === 'function') {
+          var v = window.I18n.t('build_update.' + key);
+          if (v && v !== 'build_update.' + key) return v;
+        }
+      } catch (e) {
+      }
+      return fallback;
+    }
+
+    function showBuildUpdateNotification(oldBuild, newBuild) {
+      try {
+        // Если уведомление уже показано — не дублируем
+        if (document.getElementById('dictafan-build-update-banner')) return;
+
+        var banner = document.createElement('div');
+        banner.id = 'dictafan-build-update-banner';
+        banner.setAttribute('role', 'alert');
+
+        var message = document.createElement('span');
+        message.className = 'build-update-banner-message';
+        message.textContent = _tBuild('available', 'Доступна новая версия');
+
+        var btn = document.createElement('button');
+        btn.className = 'build-update-banner-btn';
+        btn.textContent = _tBuild('reload', 'Обновить');
+        btn.addEventListener('click', function () {
+          try {
+            persistentLog('build_reload_manual', { from: oldBuild, to: newBuild });
+          } catch (e) {
+          }
+          location.reload();
+        });
+
+        var closeBtn = document.createElement('button');
+        closeBtn.className = 'build-update-banner-close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.setAttribute('aria-label', 'Закрыть');
+        closeBtn.addEventListener('click', function () {
+          try {
+            banner.style.opacity = '0';
+            banner.style.transform = 'translateY(100%)';
+            setTimeout(function () {
+              try {
+                if (banner.parentNode) banner.parentNode.removeChild(banner);
+              } catch (e) {
+              }
+            }, 300);
+          } catch (e) {
+          }
+        });
+
+        banner.appendChild(message);
+        banner.appendChild(btn);
+        banner.appendChild(closeBtn);
+        document.body.appendChild(banner);
+
+        // Анимация появления
+        requestAnimationFrame(function () {
+          banner.classList.add('visible');
+        });
+
+        // Также обновляем статус-бар
+        try {
+          if (typeof window.setSwBarInfo === 'function') {
+            window.setSwBarInfo('update', newBuild);
+          }
+        } catch (e) {
+        }
+      } catch (e) {
+        // Если что-то пошло не так — fallback на старый reload
+        try {
+          persistentLog('build_reload_fallback', { from: oldBuild, to: newBuild });
+        } catch (e2) {
+        }
+        location.reload();
       }
     }
 
@@ -140,6 +221,8 @@
     window.BuildHelpers = {
       getAppBuild: getAppBuild,
       installBuildAutoReloader: installBuildAutoReloader,
+      installBuildUpdateNotifier: installBuildAutoReloader,
+      showBuildUpdateNotification: showBuildUpdateNotification,
       withCacheBust: withCacheBust,
       withCacheBustVersion: withCacheBustVersion,
       reportBuildToStatusBar: reportBuildToStatusBar
@@ -188,6 +271,43 @@
 
     try {
       persistentLog('boot', { href: (location && location.href) ? String(location.href) : '' });
+    } catch (e) {
+    }
+
+    // Слушаем сообщения от Service Worker об обновлении
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', function (event) {
+          try {
+            var data = event && event.data ? event.data : {};
+            if (!data || data.type !== 'sw_build_update') return;
+            var payload = data.payload || {};
+            var newBuild = String(payload.build || '').trim();
+            if (!newBuild) return;
+            var currentBuild = String(window.__APP_BUILD || '').trim();
+            if (currentBuild && currentBuild === newBuild) return;
+            persistentLog('build_sw_notify', { from: currentBuild, to: newBuild });
+            showBuildUpdateNotification(currentBuild, newBuild);
+          } catch (e) {
+          }
+        });
+
+        // Если SW обновился и стал контролировать страницу — тоже сигнал
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          try {
+            persistentLog('build_controller_change', {});
+            // Не показываем уведомление сразу — installBuildAutoReloader уже сработает
+            // при следующей загрузке страницы. Но можем обновить статус-бар.
+            try {
+              if (typeof window.setSwBarInfo === 'function') {
+                window.setSwBarInfo('sw', 'updated');
+              }
+            } catch (e) {
+            }
+          } catch (e) {
+          }
+        });
+      }
     } catch (e) {
     }
   } catch (e) {
