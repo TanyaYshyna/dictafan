@@ -631,17 +631,40 @@ class WaveformCanvas {
 
     /**
      * Затемнить цвет на заданную величину (0 = без изменений, 1 = чёрный)
+     * Поддерживает форматы: rgb/rgba(...), #rgb, #rrggbb, #rrggbbaa
      */
     _darkenColor(color, amount) {
+        let r, g, b;
+
         // Парсим rgb/rgba строку
-        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (match) {
-            const r = Math.max(0, parseInt(match[1]) * (1 - amount));
-            const g = Math.max(0, parseInt(match[2]) * (1 - amount));
-            const b = Math.max(0, parseInt(match[3]) * (1 - amount));
-            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        const rgbMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (rgbMatch) {
+            r = parseInt(rgbMatch[1]);
+            g = parseInt(rgbMatch[2]);
+            b = parseInt(rgbMatch[3]);
+        } else {
+            // Парсим hex (#rgb, #rrggbb, #rrggbbaa)
+            const hex = color.replace('#', '');
+            if (hex.length >= 6) {
+                r = parseInt(hex.substring(0, 2), 16);
+                g = parseInt(hex.substring(2, 4), 16);
+                b = parseInt(hex.substring(4, 6), 16);
+            } else if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            } else {
+                return color;
+            }
         }
-        // Если не удалось распарсить, возвращаем как есть
+
+        if (r !== undefined && g !== undefined && b !== undefined) {
+            r = Math.max(0, Math.round(r * (1 - amount)));
+            g = Math.max(0, Math.round(g * (1 - amount)));
+            b = Math.max(0, Math.round(b * (1 - amount)));
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
         return color;
     }
 
