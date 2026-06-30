@@ -1551,10 +1551,8 @@ label[for="startTextInput"] {
     color: var(--color-text);
 }
 
-.sentence-text {
+.mic-sentence-text {
     font-size: 16px;
-    line-height: 0.8;
-    /* line-height: 1.5; */
     color: var(--color-text);
     min-height: 40px;
     padding: 8px;
@@ -1859,7 +1857,7 @@ label[for="startTextInput"] {
 .col-explanation {
     width: auto;
     min-width: 150px;
-    padding: 4px !important;
+    padding: 0 !important;
 }
 
 /* Колонки аудио воспроизведения - фиксированная ширина */
@@ -1908,17 +1906,20 @@ label[for="startTextInput"] {
     width: 100%;
     min-width: 150px;
     min-height: 14px;
-    /* min-height: 20px; */
     padding: 0;
     margin: 0;
-    border: 1px dashed #ccc;
+    border: none;
     border-radius: 0;
-    resize: vertical;
+    resize: none;
+    overflow: hidden;
     font-family: inherit;
-    font-size: 18px;
+    font-size: 14px;
+    line-height: 1.4;
     background: transparent;
     color: var(--color-text);
     box-sizing: border-box;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
 
 .sentence-text:focus {

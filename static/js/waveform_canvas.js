@@ -43,19 +43,19 @@ class WaveformCanvas {
         this.config = {
             // Цвета из CSS переменных
             waveColor: this.getCSSVariable('--color-button-text-purple'),
-            regionColor: this.getCSSVariable('--color-button-yellow'), // Более видимый оранжевый
+            regionColor: this.getCSSVariable('--color-button-yellow'),
             startMarkerColor: this.getCSSVariable('--color-button-text-yellow'),
             endMarkerColor: this.getCSSVariable('--color-button-text-yellow'),
             playheadColor: this.getCSSVariable('--color-button-text-pink'),
             backgroundColor: this.getCSSVariable('--color-button-purple'),
 
             // Размеры маркеров
-            markerWidth: 8,
-            markerHeight: 20,
-            playheadWidth: 2,
+            markerWidth: 14,
+            markerHeight: 28,
+            playheadWidth: 1,
 
             // Интерактивные зоны
-            hitZoneSize: 10
+            hitZoneSize: 16
         };
 
         // Обработчики событий
@@ -654,7 +654,8 @@ class WaveformCanvas {
         const endX = (this.region.end / this.duration) * this.width;
         const regionWidth = endX - startX;
 
-        this.ctx.fillStyle = this.config.regionColor;
+        // Полупрозрачная жёлтая заливка региона (как на mp3cut.net)
+        this.ctx.fillStyle = 'rgba(255, 200, 0, 0.15)';
         this.ctx.fillRect(startX, 0, regionWidth, this.height);
     }
 
@@ -712,27 +713,49 @@ class WaveformCanvas {
      * Рисование отдельного маркера
      */
     drawMarker(x, color, type) {
-        // Линия маркера
-        this.ctx.strokeStyle = color;
-        this.ctx.lineWidth = 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(x, 0);
-        this.ctx.lineTo(x, this.height);
-        this.ctx.stroke();
-
-        // Ручка маркера (сверху)
-        const handleY = 5;
         const handleWidth = this.config.markerWidth;
         const handleHeight = this.config.markerHeight;
+        const handleY = 6;
+        const radius = 6;
 
+        // Позиция ручки
+        const rectX = x - handleWidth / 2;
+        const rectY = handleY;
+        const rectW = handleWidth;
+        const rectH = handleHeight;
+
+        // Рисуем ручку маркера со скруглёнными углами
         this.ctx.fillStyle = color;
-        this.ctx.fillRect(x - handleWidth / 2, handleY, handleWidth, handleHeight);
+        this.ctx.beginPath();
 
-        // Добавляем визуальный индикатор типа
+        if (type === 'start') {
+            // Левый маркер: левые углы скруглённые, правые — прямые
+            this.ctx.moveTo(rectX + radius, rectY);
+            this.ctx.lineTo(rectX + rectW, rectY);
+            this.ctx.lineTo(rectX + rectW, rectY + rectH);
+            this.ctx.lineTo(rectX + radius, rectY + rectH);
+            this.ctx.quadraticCurveTo(rectX, rectY + rectH, rectX, rectY + rectH - radius);
+            this.ctx.lineTo(rectX, rectY + radius);
+            this.ctx.quadraticCurveTo(rectX, rectY, rectX + radius, rectY);
+        } else {
+            // Правый маркер: правые углы скруглённые, левые — прямые
+            this.ctx.moveTo(rectX, rectY);
+            this.ctx.lineTo(rectX + rectW - radius, rectY);
+            this.ctx.quadraticCurveTo(rectX + rectW, rectY, rectX + rectW, rectY + radius);
+            this.ctx.lineTo(rectX + rectW, rectY + rectH - radius);
+            this.ctx.quadraticCurveTo(rectX + rectW, rectY + rectH, rectX + rectW - radius, rectY + rectH);
+            this.ctx.lineTo(rectX, rectY + rectH);
+        }
+
+        this.ctx.closePath();
+        this.ctx.fill();
+
+        // Текст внутри ручки
         this.ctx.fillStyle = '#fff';
-        this.ctx.font = '12px Arial';
+        this.ctx.font = 'bold 13px Arial, sans-serif';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(type === 'start' ? 'S' : 'E', x, handleY + handleHeight / 2 + 4);
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(type === 'start' ? 'S' : 'E', x, rectY + rectH / 2);
     }
 
     /**
@@ -743,7 +766,7 @@ class WaveformCanvas {
 
         const x = (this.playheadPosition / this.duration) * this.width;
 
-        // Линия указателя воспроизведения
+        // Тонкая линия указателя воспроизведения
         this.ctx.strokeStyle = this.config.playheadColor;
         this.ctx.lineWidth = this.config.playheadWidth;
         this.ctx.beginPath();
@@ -751,15 +774,51 @@ class WaveformCanvas {
         this.ctx.lineTo(x, this.height);
         this.ctx.stroke();
 
-        // Треугольник указателя воспроизведения (сверху)
-        const triangleSize = 8;
+        // Floating label со временем (как на mp3cut.net)
+        const timeText = this._formatTime(this.playheadPosition);
+        const labelPadding = 6;
+        const labelHeight = 22;
+        const labelY = 4;
+
+        this.ctx.font = 'bold 12px Arial, sans-serif';
+        const textWidth = this.ctx.measureText(timeText).width;
+        const labelWidth = textWidth + labelPadding * 2;
+
+        // Скруглённый прямоугольник для label
+        const labelX = x - labelWidth / 2;
+        const labelRadius = 6;
+
         this.ctx.fillStyle = this.config.playheadColor;
         this.ctx.beginPath();
-        this.ctx.moveTo(x, 5);
-        this.ctx.lineTo(x - triangleSize / 2, 5 + triangleSize);
-        this.ctx.lineTo(x + triangleSize / 2, 5 + triangleSize);
+        this.ctx.moveTo(labelX + labelRadius, labelY);
+        this.ctx.lineTo(labelX + labelWidth - labelRadius, labelY);
+        this.ctx.quadraticCurveTo(labelX + labelWidth, labelY, labelX + labelWidth, labelY + labelRadius);
+        this.ctx.lineTo(labelX + labelWidth, labelY + labelHeight - labelRadius);
+        this.ctx.quadraticCurveTo(labelX + labelWidth, labelY + labelHeight, labelX + labelWidth - labelRadius, labelY + labelHeight);
+        this.ctx.lineTo(labelX + labelRadius, labelY + labelHeight);
+        this.ctx.quadraticCurveTo(labelX, labelY + labelHeight, labelX, labelY + labelHeight - labelRadius);
+        this.ctx.lineTo(labelX, labelY + labelRadius);
+        this.ctx.quadraticCurveTo(labelX, labelY, labelX + labelRadius, labelY);
         this.ctx.closePath();
         this.ctx.fill();
+
+        // Текст времени
+        this.ctx.fillStyle = '#fff';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText(timeText, x, labelY + labelHeight / 2);
+    }
+
+    /**
+     * Форматирование времени в мм:сс.сс
+     */
+    _formatTime(seconds) {
+        if (seconds < 0) seconds = 0;
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        const wholeSecs = Math.floor(secs);
+        const centiseconds = Math.floor((secs - wholeSecs) * 100);
+        return `${String(mins).padStart(2, '0')}:${String(wholeSecs).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`;
     }
 
     /**
@@ -922,22 +981,22 @@ class WaveformCanvas {
 
         const halfHitZone = this.config.hitZoneSize / 2;
 
-        // Проверяем указатель воспроизведения
-        const playheadX = (this.playheadPosition / this.duration) * this.width;
-        if (Math.abs(x - playheadX) <= halfHitZone && y <= 30) {
-            return { type: 'playhead', x: playheadX };
-        }
-
-        // Проверяем маркер начала
+        // Проверяем маркер начала (по всей высоте, т.к. маркеры теперь толще)
         const startX = (this.region.start / this.duration) * this.width;
-        if (Math.abs(x - startX) <= halfHitZone && y <= 30) {
+        if (Math.abs(x - startX) <= halfHitZone) {
             return { type: 'start', x: startX };
         }
 
         // Проверяем маркер конца
         const endX = (this.region.end / this.duration) * this.width;
-        if (Math.abs(x - endX) <= halfHitZone && y <= 30) {
+        if (Math.abs(x - endX) <= halfHitZone) {
             return { type: 'end', x: endX };
+        }
+
+        // Проверяем указатель воспроизведения (только в верхней части, где label)
+        const playheadX = (this.playheadPosition / this.duration) * this.width;
+        if (Math.abs(x - playheadX) <= halfHitZone && y <= 40) {
+            return { type: 'playhead', x: playheadX };
         }
 
         return null;

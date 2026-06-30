@@ -11432,6 +11432,8 @@ function createTableRow(key, originalSentence, translationSentence) {
 
     // Слушатель изменения текста оригинала
     textareaOriginal.addEventListener('input', function () {
+        // Авто-высота
+        autoResizeTextarea(this);
         // Обновляем текст в данных
         if (originalSentence) {
             let v = textareaOriginal.value;
@@ -11530,6 +11532,8 @@ function createTableRow(key, originalSentence, translationSentence) {
 
     // Слушатель изменения текста перевода
     textareaTranslation.addEventListener('input', function () {
+        // Авто-высота
+        autoResizeTextarea(this);
         // Обновляем текст в данных
         console.log('🔄1🔄🔄🔄🔄🔄🔄 textareaTranslation.value',textareaTranslation.value);
         if (translationSentence) {
@@ -12113,8 +12117,8 @@ async function initWaveform(audioUrl, containerId) {
         // Если это контейнер shared-файла (audioWaveformShared) — устанавливаем регион на весь файл
         if (containerId === 'audioWaveformShared' || !containerId) {
             setRegionToFullShared();
-        } else if (containerId === 'audioWaveformSentence' || containerId === 'audioWaveformRecord') {
-            // Для sentence и record — устанавливаем регион по выбранной строке
+        } else if (containerId === 'audioWaveformRecord') {
+            // Для record — устанавливаем регион по выбранной строке
             setRegionToSelectedSentence();
         } else {
             // Для других случаев — регион на всю длительность
@@ -12279,12 +12283,10 @@ function _resolveAudioUrl(audioFile) {
 }
 
 /**
- * Обновить волны на табе "В мене є аудіо":
- * - верхняя волна: общий файл (audio_user_shared)
- * - нижняя волна: текущее предложение
+ * Обновить волну на табе "В мене є аудіо":
+ * загружает общий файл (audio_user_shared)
  */
 async function updateMyAudioWaveforms() {
-    // Верхняя волна — общий файл
     const sharedFile = workingData?.original?.audio_user_shared;
     if (sharedFile) {
         const url = _resolveAudioUrl(sharedFile);
@@ -12293,22 +12295,6 @@ async function updateMyAudioWaveforms() {
             // Устанавливаем регион на весь файл
             if (window.waveformCanvas) {
                 setRegionToFullShared();
-            }
-        }
-    }
-
-    // Нижняя волна — текущее предложение
-    const selectedRow = document.querySelector('#sentences-table tbody tr.selected');
-    if (selectedRow) {
-        const key = selectedRow.dataset.key;
-        const sentence = workingData?.original?.sentences?.find(s => s.key === key);
-        if (sentence) {
-            const sentenceFile = sentence.audio_user || sentence.audio_user_shared;
-            if (sentenceFile) {
-                const url = _resolveAudioUrl(sentenceFile);
-                if (url) {
-                    await initWaveform(url, 'audioWaveformSentence');
-                }
             }
         }
     }
@@ -12414,4 +12400,14 @@ function getFieldDisplayName(fieldName) {
         'audio_mic': 'запись с микрофона'
     };
     return names[fieldName] || fieldName;
+}
+
+/**
+ * Автоматический resize textarea по содержимому
+ * Убирает полосу прокрутки — высота растёт под текст
+ */
+function autoResizeTextarea(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
 }
