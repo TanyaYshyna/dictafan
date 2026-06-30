@@ -748,6 +748,10 @@
       "title": "ادعم المشروع",
       "text": "إذا أعجبك DictaFan يمكنك دعم التطوير عبر monobank.",
       "open": "فتح الجرة"
+    },
+    "build_update": {
+      "available": "نسخة جديدة متاحة",
+      "reload": "تحديث"
     }
   }
 }

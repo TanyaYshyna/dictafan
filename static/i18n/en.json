@@ -750,6 +750,10 @@
       "title": "Support the project",
       "text": "If you like DictaFan, you can support development via monobank.",
       "open": "Open jar"
+    },
+    "build_update": {
+      "available": "A new version is available",
+      "reload": "Reload"
     }
   }
 }
