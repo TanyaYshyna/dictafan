@@ -48,6 +48,7 @@ class WaveformCanvas {
             endMarkerColor: this.getCSSVariable('--color-button-text-yellow'),
             playheadColor: this.getCSSVariable('--color-button-text-pink'),
             backgroundColor: this.getCSSVariable('--color-button-purple'),
+            panelBgColor: this.getCSSVariable('--color-panel-bg'),
 
             // Размеры маркеров
             markerWidth: 14,
@@ -412,8 +413,8 @@ class WaveformCanvas {
             if (this.region.end < this.region.start) {
                 const st = this.region.start;
                 this.region.start = this.region.end;
-                this.region.end = st
-            } else if (this.region.end = this.region.start) {
+                this.region.end = st;
+            } else if (this.region.end === this.region.start) {
                 this.region.start = 0;
                 this.region.end = this.duration || audioElement.duration || 0;
             }
@@ -589,30 +590,65 @@ class WaveformCanvas {
 
         // Рисуем волну если аудио загружено
         if (this.audioBuffer) {
-            // Сначала рисуем волну
+            // Волна снаружи региона затемнённая, внутри яркая
             this.drawWaveform();
 
+            // Жёлтый полупрозрачный прямоугольник региона поверх волны
             this.drawRegion();
-            this.drawWaveformOverRegion();
 
-            // Draw markers
+            // Маркеры
             this.drawMarkers();
 
-            // Draw playhead
+            // Playhead
             this.drawPlayhead();
         }
     }
 
     /**
      * Рисование фона
+     * Внутри региона — фиолетовый фон (цвет волны).
+     * Снаружи региона — чуть темнее фона (затемнённый фиолетовый).
      */
     drawBackground() {
-        this.ctx.fillStyle = this.config.backgroundColor;
+        if (this.duration === 0) {
+            this.ctx.fillStyle = this.config.backgroundColor;
+            this.ctx.fillRect(0, 0, this.width, this.height);
+            return;
+        }
+
+        const startX = (this.region.start / this.duration) * this.width;
+        const endX = (this.region.end / this.duration) * this.width;
+
+        // Снаружи региона — цвет панели (бежевый), чуть темнее
+        const darkPanelBg = this._darkenColor(this.config.panelBgColor, 0.15);
+        this.ctx.fillStyle = darkPanelBg;
         this.ctx.fillRect(0, 0, this.width, this.height);
+
+        // Внутри региона — фиолетовый фон (цвет волны)
+        this.ctx.fillStyle = this.config.backgroundColor;
+        this.ctx.fillRect(startX, 0, endX - startX, this.height);
+    }
+
+    /**
+     * Затемнить цвет на заданную величину (0 = без изменений, 1 = чёрный)
+     */
+    _darkenColor(color, amount) {
+        // Парсим rgb/rgba строку
+        const match = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (match) {
+            const r = Math.max(0, parseInt(match[1]) * (1 - amount));
+            const g = Math.max(0, parseInt(match[2]) * (1 - amount));
+            const b = Math.max(0, parseInt(match[3]) * (1 - amount));
+            return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+        }
+        // Если не удалось распарсить, возвращаем как есть
+        return color;
     }
 
     /**
      * Рисование аудио волны
+     * Снаружи региона — цвет панели (бежевый), чуть темнее.
+     * Внутри региона — яркий фиолетовый (цвет волны).
      */
     drawWaveform() {
         if (!this.audioBuffer) return;
@@ -621,8 +657,11 @@ class WaveformCanvas {
         const step = Math.ceil(data.length / this.width);
         const amp = this.height / 2;
 
-        this.ctx.fillStyle = this.config.waveColor;
-        this.ctx.beginPath();
+        const startX = (this.region.start / this.duration) * this.width;
+        const endX = (this.region.end / this.duration) * this.width;
+
+        // Затемнённый цвет панели для внешней части
+        const dimColor = this._darkenColor(this.config.panelBgColor, 0.3);
 
         for (let i = 0; i < this.width; i++) {
             let min = 1.0;
@@ -638,60 +677,31 @@ class WaveformCanvas {
             const y = (1 + min) * amp;
             const barHeight = Math.max(1, (max - min) * amp);
 
+            // Внутри региона — яркий цвет, снаружи — затемнённый цвет панели
+            if (x >= startX && x <= endX) {
+                this.ctx.fillStyle = this.config.waveColor;
+            } else {
+                this.ctx.fillStyle = dimColor;
+            }
             this.ctx.fillRect(x, y, 1, barHeight);
         }
     }
 
     /**
-     * Рисование наложения региона
+     * Рисование наложения региона — жёлтый прямоугольник на всю высоту
      */
     drawRegion() {
-        if (this.duration === 0) {
-            return;
-        }
+        if (this.duration === 0) return;
 
         const startX = (this.region.start / this.duration) * this.width;
         const endX = (this.region.end / this.duration) * this.width;
         const regionWidth = endX - startX;
 
-        // Полупрозрачная жёлтая заливка региона (как на mp3cut.net)
-        this.ctx.fillStyle = 'rgba(255, 200, 0, 0.15)';
+        // Жёлтый прямоугольник на всю высоту (цвет --color-button-shadow-yellow)
+        this.ctx.fillStyle = 'rgba(248, 205, 70, 0.15)';
         this.ctx.fillRect(startX, 0, regionWidth, this.height);
     }
 
-    /**
-     * Рисование волны поверх региона (чтобы волна была видна на цветном регионе)
-     */
-    drawWaveformOverRegion() {
-        if (!this.audioBuffer || this.duration === 0) return;
-
-        const data = this.audioBuffer.getChannelData(0);
-        const step = Math.ceil(data.length / this.width);
-        const amp = this.height / 2;
-
-        const startX = (this.region.start / this.duration) * this.width;
-        const endX = (this.region.end / this.duration) * this.width;
-
-        this.ctx.fillStyle = this.config.waveColor;
-        this.ctx.beginPath();
-
-        for (let i = Math.floor(startX); i < Math.ceil(endX); i++) {
-            let min = 1.0;
-            let max = -1.0;
-
-            for (let j = 0; j < step; j++) {
-                const datum = data[(i * step) + j];
-                if (datum < min) min = datum;
-                if (datum > max) max = datum;
-            }
-
-            const x = i;
-            const y = (1 + min) * amp;
-            const barHeight = Math.max(1, (max - min) * amp);
-
-            this.ctx.fillRect(x, y, 1, barHeight);
-        }
-    }
 
     /**
      * Рисование маркеров начала и конца
@@ -750,12 +760,17 @@ class WaveformCanvas {
         this.ctx.closePath();
         this.ctx.fill();
 
-        // Текст внутри ручки
+        // Три вертикальные точки внутри ручки
         this.ctx.fillStyle = '#fff';
-        this.ctx.font = 'bold 13px Arial, sans-serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(type === 'start' ? 'S' : 'E', x, rectY + rectH / 2);
+        const dotSize = 2.5;
+        const dotSpacing = 6;
+        const centerY = rectY + rectH / 2;
+        for (let i = -1; i <= 1; i++) {
+            const dotY = centerY + i * dotSpacing;
+            this.ctx.beginPath();
+            this.ctx.arc(x, dotY, dotSize, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
     }
 
     /**
