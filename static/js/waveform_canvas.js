@@ -82,6 +82,32 @@ class WaveformCanvas {
     /**
      * Получить значение CSS переменной
      */
+    /**
+     * Загружает ArrayBuffer из URL, используя XMLHttpRequest для blob: URL
+     * (чтобы гарантированно обойти перехватчик fetch в auth_interceptor.js)
+     * и fetch для обычных URL.
+     */
+    async _fetchArrayBuffer(url) {
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.responseType = 'arraybuffer';
+                xhr.onload = () => {
+                    if (xhr.status === 0 || xhr.status === 200) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`XHR failed with status ${xhr.status}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('XHR error'));
+                xhr.open('GET', url);
+                xhr.send();
+            });
+        }
+        const response = await fetch(url);
+        return response.arrayBuffer();
+    }
+
     getCSSVariable(variable) {
         return getComputedStyle(document.documentElement)
             .getPropertyValue(variable)
@@ -186,8 +212,7 @@ class WaveformCanvas {
             const audioUrl = audioElement.src;
 
             // Получаем и декодируем аудио
-            const response = await fetch(audioUrl);
-            const arrayBuffer = await response.arrayBuffer();
+            const arrayBuffer = await this._fetchArrayBuffer(audioUrl);
             this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
 
             const rawDurationEl = this.audioBuffer.duration || 0;
@@ -222,8 +247,7 @@ class WaveformCanvas {
             }
 
             // Получаем и декодируем аудио
-            const response = await fetch(audioUrl);
-            const arrayBuffer = await response.arrayBuffer();
+            const arrayBuffer = await this._fetchArrayBuffer(audioUrl);
             this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
 
             const rawDuration = this.audioBuffer.duration || 0;
