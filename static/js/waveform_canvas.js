@@ -41,18 +41,17 @@ class WaveformCanvas {
 
         // Конфигурация
         this.config = {
-            // Цвета из CSS переменных
-            waveColor: this.getCSSVariable('--color-button-text-purple'),
-            regionColor: this.getCSSVariable('--color-button-yellow'),
-            startMarkerColor: this.getCSSVariable('--color-button-text-yellow'),
-            endMarkerColor: this.getCSSVariable('--color-button-text-yellow'),
-            playheadColor: this.getCSSVariable('--color-button-text-pink'),
-            backgroundColor: this.getCSSVariable('--color-button-purple'),
-            panelBgColor: this.getCSSVariable('--color-panel-bg'),
+            // Цвета из CSS переменных (палитра --color-waveform-*)
+            waveColor: this.getCSSVariable('--color-waveform-wave-inside'),
+            regionColor: this.getCSSVariable('--color-waveform-region-overlay'),
+            startMarkerColor: this.getCSSVariable('--color-waveform-marker'),
+            endMarkerColor: this.getCSSVariable('--color-waveform-marker'),
+            playheadColor: this.getCSSVariable('--color-waveform-playhead'),
+            backgroundColor: this.getCSSVariable('--color-waveform-bg-inside'),
+            panelBgColor: this.getCSSVariable('--color-waveform-bg-outside'),
 
             // Размеры маркеров
             markerWidth: 14,
-            markerHeight: 28,
             playheadWidth: 1,
 
             // Интерактивные зоны
@@ -720,7 +719,7 @@ class WaveformCanvas {
         const endX = (this.region.end / this.duration) * this.width;
         const regionWidth = endX - startX;
 
-        // Жёлтый прямоугольник на всю высоту (цвет --color-button-shadow-yellow)
+        // Жёлтый прямоугольник на всю высоту (цвет --color-waveform-region-overlay, 15% opacity)
         this.ctx.fillStyle = 'rgba(248, 205, 70, 0.15)';
         this.ctx.fillRect(startX, 0, regionWidth, this.height);
     }
@@ -743,12 +742,12 @@ class WaveformCanvas {
     }
 
     /**
-     * Рисование отдельного маркера
+     * Рисование отдельного маркера (на всю высоту канваса)
      */
     drawMarker(x, color, type) {
         const handleWidth = this.config.markerWidth;
-        const handleHeight = this.config.markerHeight;
-        const handleY = 6;
+        const handleY = 0;
+        const handleHeight = this.height;
         const radius = 6;
 
         // Позиция ручки
@@ -783,8 +782,8 @@ class WaveformCanvas {
         this.ctx.closePath();
         this.ctx.fill();
 
-        // Три вертикальные точки внутри ручки
-        this.ctx.fillStyle = '#fff';
+        // Три вертикальные точки внутри ручки (по центру высоты канваса)
+        this.ctx.fillStyle = this.getCSSVariable('--color-waveform-marker-dots');
         const dotSize = 2.5;
         const dotSpacing = 6;
         const centerY = rectY + rectH / 2;

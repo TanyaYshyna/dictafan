@@ -4312,7 +4312,19 @@ async function handleAudioPlayback(event) {
                 console.warn('⚠️ Нет текущего файла под волной — воспроизведение отменено');
                 return;
             }
-            audioUrl = await resolveEditorPlaybackAudioUrl(currentDictation.id, language, file);
+
+            // Сначала пробуем найти blob URL в draft cache по оригинальному имени файла
+            const sharedFilename = workingData?.original?.audio_user_shared;
+            if (sharedFilename) {
+                const draftUrl = getDraftAudioUrl(language, sharedFilename);
+                if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+                    audioUrl = draftUrl;
+                } else {
+                    audioUrl = await resolveEditorPlaybackAudioUrl(currentDictation.id, language, file);
+                }
+            } else {
+                audioUrl = await resolveEditorPlaybackAudioUrl(currentDictation.id, language, file);
+            }
 
             // Не трогаем регион/волну из Play
         } else {
@@ -12085,7 +12097,15 @@ async function initWaveform(audioUrl, containerId) {
         const roundedDuration = Math.floor(duration * 100) / 100;
 
         // Обновляем currentAudioFileName для синхронизации с updateCurrentAudioWave
-        const fileName = audioUrl.split('/').pop();
+        // Для blob URL используем оригинальное имя файла из workingData
+        let fileName;
+        if (typeof audioUrl === 'string' && audioUrl.startsWith('blob:')) {
+            fileName = workingData?.original?.audio_user_shared
+                || workingData?.original?.audio_mic
+                || audioUrl.split('/').pop();
+        } else {
+            fileName = audioUrl.split('/').pop();
+        }
         if (fileName) {
             currentAudioFileName = fileName;
         }
