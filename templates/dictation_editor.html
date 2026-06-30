@@ -5,10 +5,10 @@
 {% block build_channel %}dictafan:build:dictation_editor{% endblock %}
 
 {% block page_head %}
-    <link rel="stylesheet" href="/static/css/style_dictation_editor.css">
+    <link rel="stylesheet" href="/static/css/style_dictation_editor.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
-    <script src="{{ url_for('static', filename='js/waveform_canvas.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/waveform_canvas.js') }}?v={{ app_cache_revision }}"></script>
 {% endblock %}
 
 {% block bootstrap_scripts %}
