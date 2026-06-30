@@ -11,14 +11,19 @@
 
     // Переопределяем fetch
     window.fetch = async function(...args) {
+        const url = args[0];
+        const urlString = typeof url === 'string' ? url : url?.url || '';
+
+        // Пропускаем blob: URL без перехвата — они не поддерживают заголовки авторизации
+        if (urlString.startsWith('blob:')) {
+            return originalFetch.apply(this, args);
+        }
+
         // Вызываем оригинальный fetch
         const response = await originalFetch.apply(this, args);
 
         // Проверяем статус 401 (Unauthorized)
         if (response.status === 401) {
-            // Проверяем, что это не запрос на логин или регистрацию
-            const url = args[0];
-            const urlString = typeof url === 'string' ? url : url?.url || '';
             
             if (urlString.includes('/api/login') || 
                 urlString.includes('/api/register')) {

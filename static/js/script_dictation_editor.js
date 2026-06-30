@@ -8708,7 +8708,10 @@ async function loadWaveformForFile(filepath) {
         window.waveformCanvas = waveformCanvas;
 
         // Загружаем аудио с cache-busting, чтобы видеть новое содержимое при том же имени
-        const url = `${filepath}${filepath.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+        // Для blob URL cache-busting не нужен и ломает загрузку
+        const url = (typeof filepath === 'string' && filepath.startsWith('blob:'))
+            ? filepath
+            : `${filepath}${filepath.includes('?') ? '&' : '?'}ts=${Date.now()}`;
         await waveformCanvas.loadAudio(url);
 
         // Настраиваем callback для обновления региона
@@ -12675,12 +12678,15 @@ async function initWaveform(audioUrl) {
             // безопасно игнорируем отсутствие AudioManager.players
         }
 
-        // Если нашли загруженное аудио, используем его, иначе загружаем по URL с cache-busting
+        // Если нашли загруженное аудио, используем его, иначе загружаем по URL
         if (audioElement) {
             await waveformCanvas.loadAudioFromElement(audioElement);
         } else {
-            const cacheBusted = `${audioUrl}${audioUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`;
-            await waveformCanvas.loadAudio(cacheBusted);
+            // Для blob URL cache-busting не нужен и ломает загрузку
+            const url = (typeof audioUrl === 'string' && audioUrl.startsWith('blob:'))
+                ? audioUrl
+                : `${audioUrl}${audioUrl.includes('?') ? '&' : '?'}ts=${Date.now()}`;
+            await waveformCanvas.loadAudio(url);
         }
 
 
