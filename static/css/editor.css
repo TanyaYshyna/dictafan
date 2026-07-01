@@ -54,6 +54,18 @@
     flex-shrink: 0;
 }
 
+/* Флаги: горизонтальное расположение (как в style_dictation_editor.css) */
+.editor-v2-panel .header-container #langPair .flag-pair-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-v2-panel .header-container #langPair .flag-pair-combo i[data-lucide] {
+    width: 18px;
+    height: 18px;
+}
+
 .editor-v2-panel .header-container h2 {
     margin: 0;
     font-size: 22px;
@@ -198,14 +210,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
+    gap: 0;  /* без промежутков между cover и кнопкой */
 }
 
 .editor-v2-panel .cover-display {
-    width: 120px;
-    height: 160px;
+    width: 160px;
+    height: 120px;
     border: 2px dashed var(--color-border-light, #ccc);
-    border-radius: 8px;
+    border-radius: 8px 8px 0 0;  /* верхние углы скругленные, нижние квадратные */
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -223,6 +235,14 @@
     display: flex;
     gap: 8px;
     align-items: center;
+}
+
+.editor-v2-panel .cover-upload .button-color-yellow {
+    height: 38px;
+    border-radius: 0 0 8px 8px;  /* верхние прямые, нижние скругленные */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Editor header layout (cover + fields side by side) */
@@ -269,22 +289,23 @@
     color: var(--color-text, #224156);
 }
 
-/* Level selector (custom dropdown) */
-.editor-v2-panel .level-select-group {
+/* Строка: en + название + уровень в одну строку */
+.editor-v2-panel .title-level-row {
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.editor-v2-panel .level-select-group .level-label {
-    font-size: 14px;
-    font-weight: 500;
-    white-space: nowrap;
+.editor-v2-panel .title-level-row .text-input {
+    flex: 1;
+    min-width: 0;
 }
 
+/* Level selector (custom dropdown) */
 .editor-v2-panel .custom-speed-select {
     position: relative;
     display: inline-block;
+    flex-shrink: 0;
 }
 
 .editor-v2-panel .custom-speed-select .speed-select-button {
@@ -345,7 +366,7 @@
 /* ========== РАДИО-КНОПКИ (Voice Mode) ========== */
 .editor-v2-panel .voice-mode-group {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 12px;
     padding-top: 8px;
     border-top: 1px solid var(--color-border-light, #eee);
@@ -356,12 +377,14 @@
     font-weight: 500;
     white-space: nowrap;
     color: var(--color-text, #224156);
+    padding-top: 2px;
 }
 
 .editor-v2-panel .voice-mode-options {
     display: flex;
-    gap: 16px;
-    align-items: center;
+    flex-direction: column;  /* колонка */
+    gap: 8px;
+    align-items: flex-start;
 }
 
 .editor-v2-panel .voice-mode-radio {
@@ -406,7 +429,4 @@
     border-color: var(--color-button-text-yellow, #f9c609);
 }
 
-/* ========== СКРЫТИЕ ТАБОВ ПО data-voice-mode ========== */
-.editor-v2-panel .tab-btn[data-voice-mode] {
-    /* По умолчанию скрыты, показываются через JS */
-}
+/* ========== ТАБЫ С data-voice-mode показываются/скрываются через JS ========== */

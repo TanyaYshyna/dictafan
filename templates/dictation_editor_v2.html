@@ -74,7 +74,7 @@
                 <button class="tab-btn" data-tab="voice-original-self" data-voice-mode="self">
                     <span>4. Озвучка оригінала (озвучу сам)</span>
                 </button>
-                <button class="tab-btn" data-tab="voice-translations" data-voice-mode="translation">
+                <button class="tab-btn" data-tab="voice-translations">
                     <span>5. Озвучка перекладу (авто)</span>
                 </button>
             </div>
@@ -102,12 +102,10 @@
                             </div>
                             <div class="editor-header-panel-2">
                                 <div id="category-path"></div>
-                                <div class="form-group-line">
-                                    <label style="color: var(--color-button-text-lightgreen);">{{ original_language }}:</label>
-                                    <input class="text-input" type="text" id="title" required>
-                                </div>
-                                <div class="form-group-line level-select-group">
-                                    <label for="levelSelectControl" class="level-label">Уровень:</label>
+                                <!-- Строка 1: en + название + уровень -->
+                                <div class="form-group-line title-level-row">
+                                    <label style="color: var(--color-button-text-lightgreen); white-space: nowrap;">{{ original_language }}:</label>
+                                    <input class="text-input" type="text" id="title" required placeholder="Название">
                                     <div id="levelSelectControl" class="custom-speed-select level-select">
                                         <button type="button" class="speed-select-button">
                                             <span class="level-select-value">{{ level or 'A1' }}</span>
@@ -124,13 +122,13 @@
                                         </ul>
                                     </div>
                                 </div>
+                                <!-- Строка 2: Посилання на матеріали автора -->
                                 <div class="form-group-line">
                                     <label for="dictation-author-materials-url-input">Посилання на матеріали автора</label>
                                     <input class="text-input" type="url" id="dictation-author-materials-url-input" placeholder="https://..." value="{{ author_materials_url or '' }}">
                                 </div>
-
-                                <!-- Радио-кнопки: способ озвучки -->
-                                <div class="form-group-line voice-mode-group">
+                                <!-- Радио-кнопки: способ озвучки (колонка) -->
+                                <div class="voice-mode-group">
                                     <label class="voice-mode-label">Озвучка:</label>
                                     <div class="voice-mode-options">
                                         <label class="voice-mode-radio">
