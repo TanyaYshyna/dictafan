@@ -3,18 +3,16 @@
    =================== */
 
 /* --- Topbar --- */
+/* Наследует базовый класс .topbar из style.css (margin: 10px; height: 60px; display: flex; align-items: center; gap: 10px).
+   Фона у topbar нет — он прозрачный, как на десктопе (фон страницы: var(--color-hover) = #eeede8). */
 .editor-v2-topbar {
-    display: flex;
-    align-items: center;
     justify-content: space-between;
     padding: 8px 16px;
-    background: var(--color-panel-bg, #fff);
-    border-bottom: 1px solid var(--color-border-light, rgba(255, 255, 255, 0.1));
     gap: 12px;
 }
 
 .editor-v2-topbar .logo {
-    height: 40px;
+    height: 5em;  /* как в style.css .logo — ровно как на десктопе */
     cursor: pointer;
 }
 
@@ -37,10 +35,11 @@
 }
 
 /* --- Panel --- */
+/* Наследует базовый класс .panel из style.css (width: 100%; padding: 20px 5vw; фон — var(--color-panel-bg)).
+   editor-v2-panel добавляет только центрирование контента. */
 .editor-v2-panel {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
 }
 
 .editor-v2-panel .header-container {
