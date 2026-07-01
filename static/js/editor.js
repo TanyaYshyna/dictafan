@@ -21,6 +21,10 @@
             this._setupLogoHandler();
             this._initLanguageFlags();
             this._setupTabs();
+            this._initFormFields();
+            this._initLevelSelector();
+            this._initVoiceModeRadios();
+            this._initCoverUpload();
         },
 
         _setupTopbar: function () {
@@ -89,21 +93,183 @@
                 const languageData = window.LanguageManager.getLanguageData();
                 if (!languageData) return;
 
+                // Нормализуем коды языков
                 const orig = this._normalizeLangCode(this.config.originalLanguage);
                 const tr = this._normalizeLangCode(this.config.translationLanguage);
 
+                // Проверяем, что коды есть в languageData
+                const validOrig = languageData[orig] ? orig : '';
+                const validTr = languageData[tr] ? tr : '';
+
                 container.innerHTML = '';
 
-                // Показываем пару флагов: оригинал → перевод
-                this.headerLangPairSelector = window.initLanguageSelector('langPair', {
-                    mode: 'flag-pair-fixed',
-                    currentLearning: orig,
-                    nativeLanguage: tr,
-                    languageData: languageData
-                });
+                if (!validOrig && !validTr) {
+                    console.warn('[editorV2] No valid language codes found for flags', { orig, tr });
+                    return;
+                }
+
+                // Если есть и оригинал и перевод — показываем пару
+                if (validOrig && validTr) {
+                    this.headerLangPairSelector = window.initLanguageSelector('langPair', {
+                        mode: 'flag-pair-fixed',
+                        currentLearning: validOrig,
+                        nativeLanguage: validTr,
+                        languageData: languageData
+                    });
+                } else if (validOrig) {
+                    // Только оригинал
+                    this.headerLangPairSelector = window.initLanguageSelector('langPair', {
+                        mode: 'flag-single',
+                        currentLearning: validOrig,
+                        nativeLanguage: validOrig,
+                        languageData: languageData
+                    });
+                }
             } catch (e) {
                 console.warn('[editorV2] _initLanguageFlags error', e);
             }
+        },
+
+        /**
+         * Инициализация полей формы из конфига
+         */
+        _initFormFields: function () {
+            // Заголовок
+            const titleInput = document.getElementById('title');
+            if (titleInput && this.config.title) {
+                titleInput.value = this.config.title;
+            }
+
+            // Ссылка на материалы автора
+            const authorUrlInput = document.getElementById('dictation-author-materials-url-input');
+            if (authorUrlInput && this.config.authorMaterialsUrl) {
+                authorUrlInput.value = this.config.authorMaterialsUrl;
+            }
+        },
+
+        /**
+         * Инициализация селектора уровня (кастомный dropdown)
+         * Аналог initLevelSelector из script_dictation_editor.js
+         */
+        _initLevelSelector: function () {
+            const control = document.getElementById('levelSelectControl');
+            if (!control) return;
+
+            const button = control.querySelector('.speed-select-button');
+            const valueSpan = control.querySelector('.level-select-value');
+            const options = control.querySelectorAll('.speed-options li');
+
+            if (!button || !valueSpan) return;
+
+            // Устанавливаем значение из конфига
+            const savedLevel = this.config.level || 'A1';
+            valueSpan.textContent = savedLevel;
+
+            // Отмечаем выбранный option
+            options.forEach(function (opt) {
+                if (opt.getAttribute('data-value') === savedLevel) {
+                    opt.classList.add('selected');
+                } else {
+                    opt.classList.remove('selected');
+                }
+            });
+
+            // Открытие/закрытие dropdown
+            button.addEventListener('click', function (e) {
+                e.stopPropagation();
+                control.classList.toggle('open');
+            });
+
+            // Выбор опции
+            options.forEach(function (opt) {
+                opt.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    const value = opt.getAttribute('data-value');
+                    valueSpan.textContent = value;
+
+                    options.forEach(function (o) { o.classList.remove('selected'); });
+                    opt.classList.add('selected');
+
+                    control.classList.remove('open');
+                });
+            });
+
+            // Закрытие по клику вне
+            document.addEventListener('click', function () {
+                control.classList.remove('open');
+            });
+        },
+
+        /**
+         * Инициализация радио-кнопок выбора режима озвучки
+         * и управление видимостью закладок 2-4
+         */
+        _initVoiceModeRadios: function () {
+            const radios = document.querySelectorAll('input[name="voiceMode"]');
+            if (!radios.length) return;
+
+            const updateTabVisibility = function (selectedValue) {
+                // Все табы с data-voice-mode
+                document.querySelectorAll('.tab-btn[data-voice-mode]').forEach(function (btn) {
+                    const mode = btn.getAttribute('data-voice-mode');
+                    if (mode === selectedValue) {
+                        btn.style.display = '';
+                    } else {
+                        btn.style.display = 'none';
+                    }
+                });
+
+                // Если активный таб сейчас скрыт — переключаемся на "Общие данные"
+                const activeTab = document.querySelector('.tab-btn.active');
+                if (activeTab && activeTab.style.display === 'none') {
+                    const generalTab = document.querySelector('.tab-btn[data-tab="general"]');
+                    if (generalTab) {
+                        generalTab.click();
+                    }
+                }
+            };
+
+            radios.forEach(function (radio) {
+                radio.addEventListener('change', function () {
+                    if (this.checked) {
+                        updateTabVisibility(this.value);
+                    }
+                });
+            });
+
+            // Инициализация при загрузке
+            var checkedRadio = document.querySelector('input[name="voiceMode"]:checked');
+            if (checkedRadio) {
+                updateTabVisibility(checkedRadio.value);
+            }
+        },
+
+        /**
+         * Инициализация загрузки обложки
+         */
+        _initCoverUpload: function () {
+            const uploadBtn = document.getElementById('coverUploadBtn');
+            const fileInput = document.getElementById('coverFile');
+            const coverImage = document.getElementById('coverImage');
+
+            if (!uploadBtn || !fileInput) return;
+
+            uploadBtn.addEventListener('click', function () {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function (e) {
+                const file = e.target.files && e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function (ev) {
+                    if (coverImage) {
+                        coverImage.src = ev.target.result;
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
         },
 
         /**

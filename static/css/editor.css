@@ -190,3 +190,223 @@
         padding: 15px;
     }
 }
+
+/* ========== СТИЛИ ДЛЯ ВКЛАДКИ "ОБЩИЕ ДАННЫЕ" ========== */
+
+/* Cover section */
+.editor-v2-panel .cover-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.editor-v2-panel .cover-display {
+    width: 120px;
+    height: 160px;
+    border: 2px dashed var(--color-border-light, #ccc);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-hover);
+}
+
+.editor-v2-panel .cover-display img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.editor-v2-panel .cover-upload {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Editor header layout (cover + fields side by side) */
+.editor-v2-panel .editor-header {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.editor-v2-panel .editor-header-panel-1 {
+    flex-shrink: 0;
+    min-width: 160px;
+}
+
+.editor-v2-panel .editor-header-panel-2 {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* Form groups */
+.editor-v2-panel .form-group-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-v2-panel .form-group-line label {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--color-text, #224156);
+}
+
+.editor-v2-panel .form-group-line .text-input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border-light, #ddd);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--color-panel-bg);
+    color: var(--color-text, #224156);
+}
+
+/* Level selector (custom dropdown) */
+.editor-v2-panel .level-select-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-v2-panel .level-select-group .level-label {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.editor-v2-panel .custom-speed-select {
+    position: relative;
+    display: inline-block;
+}
+
+.editor-v2-panel .custom-speed-select .speed-select-button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid var(--color-border-light, #ddd);
+    border-radius: 6px;
+    background: var(--color-panel-bg);
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--color-text, #224156);
+    min-width: 80px;
+}
+
+.editor-v2-panel .custom-speed-select .speed-select-button:hover {
+    border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.editor-v2-panel .custom-speed-select .speed-options {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 100;
+    min-width: 100%;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-border-light, #ddd);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    list-style: none;
+    margin: 4px 0 0;
+    padding: 4px 0;
+}
+
+.editor-v2-panel .custom-speed-select.open .speed-options {
+    display: block;
+}
+
+.editor-v2-panel .custom-speed-select .speed-options li {
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--color-text, #224156);
+    white-space: nowrap;
+}
+
+.editor-v2-panel .custom-speed-select .speed-options li:hover {
+    background: var(--color-hover);
+}
+
+.editor-v2-panel .custom-speed-select .speed-options li.selected {
+    background: var(--color-button-text-yellow, #f9c609);
+    color: #fff;
+}
+
+/* ========== РАДИО-КНОПКИ (Voice Mode) ========== */
+.editor-v2-panel .voice-mode-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border-light, #eee);
+}
+
+.editor-v2-panel .voice-mode-label {
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--color-text, #224156);
+}
+
+.editor-v2-panel .voice-mode-options {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.editor-v2-panel .voice-mode-radio {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--color-text, #224156);
+}
+
+.editor-v2-panel .voice-mode-radio input[type="radio"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--color-border-light, #bbb);
+    border-radius: 50%;
+    outline: none;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+}
+
+.editor-v2-panel .voice-mode-radio input[type="radio"]:checked {
+    border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.editor-v2-panel .voice-mode-radio input[type="radio"]:checked::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 8px;
+    height: 8px;
+    background: var(--color-button-text-yellow, #f9c609);
+    border-radius: 50%;
+}
+
+.editor-v2-panel .voice-mode-radio input[type="radio"]:hover {
+    border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+/* ========== СКРЫТИЕ ТАБОВ ПО data-voice-mode ========== */
+.editor-v2-panel .tab-btn[data-voice-mode] {
+    /* По умолчанию скрыты, показываются через JS */
+}

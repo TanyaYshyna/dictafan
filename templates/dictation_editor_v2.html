@@ -63,32 +63,117 @@
         <div id="settingsTabsPanel" class="settings-tabs-panel">
             <div class="tabs-header">
                 <button class="tab-btn active" data-tab="general">
-                    <span>Общие данные</span>
+                    <span>1. Загальні дані</span>
                 </button>
-                <button class="tab-btn" data-tab="voice-original">
-                    <span>Озвучка оригинала</span>
+                <button class="tab-btn" data-tab="voice-original-auto" data-voice-mode="auto">
+                    <span>2. Озвучка оригінала (авто)</span>
                 </button>
-                <button class="tab-btn" data-tab="voice-translations">
-                    <span>Озвучка переводов</span>
+                <button class="tab-btn" data-tab="voice-original-have" data-voice-mode="have">
+                    <span>3. Озвучка оригінала (є аудіо)</span>
+                </button>
+                <button class="tab-btn" data-tab="voice-original-self" data-voice-mode="self">
+                    <span>4. Озвучка оригінала (озвучу сам)</span>
+                </button>
+                <button class="tab-btn" data-tab="voice-translations" data-voice-mode="translation">
+                    <span>5. Озвучка перекладу (авто)</span>
                 </button>
             </div>
 
             <div class="tabs-body">
-                <!-- Вкладка: Общие данные -->
+                <!-- Вкладка 1: Общие данные -->
                 <div id="tab-general" class="tab-content active">
                     <div class="general-data-content">
-                        <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будут перенесены общие данные диктанта.</p>
+                        <div class="editor-header">
+                            <div class="editor-header-panel-1">
+                                <div class="cover-section">
+                                    <div class="cover-display">
+                                        <img id="coverImage" src="{{ cover_url }}"
+                                            data-default-cover="/static/data/covers/cover_{{ original_language }}.webp"
+                                            alt="Cover" />
+                                    </div>
+                                    <div class="cover-upload">
+                                        <input type="file" id="coverFile" accept="image/*" style="display: none;">
+                                        <button id="coverUploadBtn" class="button-color-yellow">
+                                            <i data-lucide="download"></i>
+                                            Загрузить
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="editor-header-panel-2">
+                                <div id="category-path"></div>
+                                <div class="form-group-line">
+                                    <label style="color: var(--color-button-text-lightgreen);">{{ original_language }}:</label>
+                                    <input class="text-input" type="text" id="title" required>
+                                </div>
+                                <div class="form-group-line level-select-group">
+                                    <label for="levelSelectControl" class="level-label">Уровень:</label>
+                                    <div id="levelSelectControl" class="custom-speed-select level-select">
+                                        <button type="button" class="speed-select-button">
+                                            <span class="level-select-value">{{ level or 'A1' }}</span>
+                                            <span class="speed-arrow" data-lucide="chevron-down"></span>
+                                        </button>
+                                        <ul class="speed-options">
+                                            {% set levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] %}
+                                            {% for option in levels %}
+                                            <li data-value="{{ option }}"
+                                                class="{% if (level or 'A1') == option %}selected{% endif %}">
+                                                {{ option }}
+                                            </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="form-group-line">
+                                    <label for="dictation-author-materials-url-input">Посилання на матеріали автора</label>
+                                    <input class="text-input" type="url" id="dictation-author-materials-url-input" placeholder="https://..." value="{{ author_materials_url or '' }}">
+                                </div>
+
+                                <!-- Радио-кнопки: способ озвучки -->
+                                <div class="form-group-line voice-mode-group">
+                                    <label class="voice-mode-label">Озвучка:</label>
+                                    <div class="voice-mode-options">
+                                        <label class="voice-mode-radio">
+                                            <input type="radio" name="voiceMode" value="auto" checked>
+                                            <span>Авто</span>
+                                        </label>
+                                        <label class="voice-mode-radio">
+                                            <input type="radio" name="voiceMode" value="have">
+                                            <span>Є аудіо</span>
+                                        </label>
+                                        <label class="voice-mode-radio">
+                                            <input type="radio" name="voiceMode" value="self">
+                                            <span>Озвучу сам</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Вкладка: Озвучка оригинала -->
-                <div id="tab-voice-original" class="tab-content">
+                <!-- Вкладка 2: Озвучка оригинала (авто) -->
+                <div id="tab-voice-original-auto" class="tab-content">
                     <div class="voice-content">
-                        <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будет перенесена озвучка оригинала.</p>
+                        <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будет перенесена автоматическая озвучка оригинала.</p>
                     </div>
                 </div>
 
-                <!-- Вкладка: Озвучка переводов -->
+                <!-- Вкладка 3: Озвучка оригинала (є аудіо) -->
+                <div id="tab-voice-original-have" class="tab-content">
+                    <div class="voice-content">
+                        <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будет перенесена озвучка оригинала (є аудіо).</p>
+                    </div>
+                </div>
+
+                <!-- Вкладка 4: Озвучка оригинала (озвучу сам) -->
+                <div id="tab-voice-original-self" class="tab-content">
+                    <div class="voice-content">
+                        <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будет перенесена озвучка оригинала (озвучу сам).</p>
+                    </div>
+                </div>
+
+                <!-- Вкладка 5: Озвучка перекладу (авто) -->
                 <div id="tab-voice-translations" class="tab-content">
                     <div class="voice-content">
                         <p style="opacity: 0.6; font-style: italic; padding: 20px;">Сюда будет перенесена озвучка переводов.</p>
@@ -112,6 +197,7 @@
                     level: '{{ level or "A1" }}',
                     title: '{{ title | e }}',
                     coverUrl: '{{ cover_url | e }}',
+                    authorMaterialsUrl: '{{ author_materials_url or "" }}',
                 });
             }
         });
