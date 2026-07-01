@@ -127,6 +127,17 @@ button:active {
     color: var(--color-text, #1f2933);
 }
 
+/* ========== USER NATIVE FLAG SMALL (из style.css) ========== */
+
+.user-native-flag-small {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: inline-block;
+    object-fit: cover;
+    margin-right: 6px;
+}
+
 /* ========== STREAK (из style.css) ========== */
 
 .streak {
@@ -715,7 +726,7 @@ button:active {
 
 .editor-v2-panel .form-group-line label {
     font-size: 14px;
-    font-weight: 600;
+    /* font-weight: 600; */
 }
 
 /* ========== ТАБЫ С data-voice-mode показываются/скрываются через JS ========== */
