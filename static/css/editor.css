@@ -36,12 +36,12 @@
 
 /* --- Panel --- */
 /* Наследует базовый класс .panel из style.css (width: 100%; padding: 20px 5vw; фон — var(--color-panel-bg)).
-   editor-v2-panel добавляет только центрирование контента. */
+   Растягиваем на всю ширину как в старом редакторе — убираем max-width и центрирование. */
 .editor-v2-panel {
-    max-width: 1200px;
-    margin: 0 auto;
+    /* растягивается на всю ширину за счёт .panel из style.css */
 }
 
+/* --- Header container (флаги + название + id) --- */
 .editor-v2-panel .header-container {
     display: flex;
     align-items: center;
@@ -50,20 +50,33 @@
     flex-wrap: wrap;
 }
 
+.editor-v2-panel .header-container #langPair {
+    flex-shrink: 0;
+}
+
 .editor-v2-panel .header-container h2 {
     margin: 0;
     font-size: 22px;
     font-weight: 600;
     color: var(--color-text, #224156);
+    flex: 1;
 }
 
 .editor-v2-panel .header-container #dictation-id {
     font-size: 13px;
     color: var(--color-text-secondary, #888);
     font-family: monospace;
+    margin-left: auto;  /* прижимаем вправо */
+    flex-shrink: 0;
 }
 
-/* --- Placeholder --- */
+/* --- Unsaved star --- */
+.unsaved-star {
+    color: var(--color-button-text-yellow, #f9c609);
+    font-weight: bold;
+}
+
+/* --- Placeholder (временный, пока модули не перенесены) --- */
 .editor-v2-placeholder {
     display: flex;
     align-items: center;
@@ -98,8 +111,82 @@
     color: var(--color-text-secondary, #888);
 }
 
-/* --- Unsaved star --- */
-.unsaved-star {
-    color: var(--color-button-text-yellow, #f9c609);
-    font-weight: bold;
+/* ========== СТИЛИ ПАНЕЛИ С ВКЛАДКАМИ ========== */
+/* Копия стилей из style_dictation_editor.css для независимости */
+.editor-v2-panel .settings-tabs-panel {
+    background: var(--color-panel-bg);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.editor-v2-panel .tabs-header {
+    display: flex;
+    gap: 0;
+    padding: 8px 8px 0 0;
+    background: var(--color-panel-bg);
+}
+
+.editor-v2-panel .tabs-body {
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-border-light);
+    border-radius: 0 8px 8px 8px;
+}
+
+.editor-v2-panel .tab-btn {
+    padding: 9px 20px;
+    background: var(--color-hover);
+    border: 1px solid var(--color-border-light);
+    color: var(--color-button-text-transparent);
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    position: relative;
+    z-index: 1;
+    border-bottom: 2px solid transparent;
+    margin-right: 4px;
+}
+
+.editor-v2-panel .tab-btn:hover {
+    color: var(--color-button-text-transparent);
+    background: var(--color-hover);
+    border: 1px solid var(--color-border-light);
+    border-bottom: 2px solid transparent;
+}
+
+.editor-v2-panel .tab-btn.active {
+    color: var(--color-button-text-transparent);
+    background: var(--color-panel-bg);
+    border-bottom: 2px solid var(--color-panel-bg);
+    margin-bottom: -1px;
+    z-index: 2;
+}
+
+.editor-v2-panel .tab-content {
+    display: none;
+    padding: 20px;
+}
+
+.editor-v2-panel .tab-content.active {
+    display: block;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .editor-v2-panel .tabs-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .editor-v2-panel .tab-btn {
+        flex: 1;
+        min-width: 100px;
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .editor-v2-panel .tab-content {
+        padding: 15px;
+    }
 }

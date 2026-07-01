@@ -10,6 +10,7 @@
 
     const editorV2 = {
         config: {},
+        headerLangPairSelector: null,
 
         init: function (config) {
             this.config = config || {};
@@ -18,6 +19,8 @@
             this._setupTopbar();
             this._setupUserSection();
             this._setupLogoHandler();
+            this._initLanguageFlags();
+            this._setupTabs();
         },
 
         _setupTopbar: function () {
@@ -71,6 +74,75 @@
                     window.location.href = '/';
                 });
             }
+        },
+
+        /**
+         * Инициализация флагов языка через LanguageManager / LanguageSelector
+         * Аналог renderHeaderLangPairWithManager из script_dictation_editor.js
+         */
+        _initLanguageFlags: function () {
+            try {
+                const container = document.getElementById('langPair');
+                if (!container) return;
+                if (!window.LanguageManager || typeof window.initLanguageSelector !== 'function') return;
+
+                const languageData = window.LanguageManager.getLanguageData();
+                if (!languageData) return;
+
+                const orig = this._normalizeLangCode(this.config.originalLanguage);
+                const tr = this._normalizeLangCode(this.config.translationLanguage);
+
+                container.innerHTML = '';
+
+                // Показываем пару флагов: оригинал → перевод
+                this.headerLangPairSelector = window.initLanguageSelector('langPair', {
+                    mode: 'flag-pair-fixed',
+                    currentLearning: orig,
+                    nativeLanguage: tr,
+                    languageData: languageData
+                });
+            } catch (e) {
+                console.warn('[editorV2] _initLanguageFlags error', e);
+            }
+        },
+
+        /**
+         * Переключение закладок
+         */
+        _setupTabs: function () {
+            const panel = document.querySelector('.editor-v2-panel');
+            if (!panel) return;
+
+            panel.querySelectorAll('.tab-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const tabName = btn.getAttribute('data-tab');
+
+                    // Деактивируем все кнопки и контенты
+                    panel.querySelectorAll('.tab-btn').forEach(function (b) {
+                        b.classList.remove('active');
+                    });
+                    panel.querySelectorAll('.tab-content').forEach(function (c) {
+                        c.classList.remove('active');
+                    });
+
+                    // Активируем выбранную
+                    btn.classList.add('active');
+                    var tabContent = document.getElementById('tab-' + tabName);
+                    if (tabContent) {
+                        tabContent.classList.add('active');
+                    }
+
+                    // Обновляем иконки Lucide
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons();
+                    }
+                });
+            });
+        },
+
+        _normalizeLangCode: function (code) {
+            if (!code) return '';
+            return String(code).toLowerCase().trim();
         },
 
         getConfig: function (key) {
