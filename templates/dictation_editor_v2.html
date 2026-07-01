@@ -4,6 +4,10 @@
 
 {% block build_channel %}dictafan:build:dictation_editor_v2{% endblock %}
 
+{% block base_styles %}
+    {# style.css не подключаем — все стили в editor.css #}
+{% endblock %}
+
 {% block page_head %}
     <link rel="stylesheet" href="/static/css/editor.css?v={{ app_cache_revision }}">
 {% endblock %}

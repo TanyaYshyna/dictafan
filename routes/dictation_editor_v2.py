@@ -102,7 +102,7 @@ def dictation_editor_v2(dictation_id, language_original, language_translation):
             except Exception as e:
                 logger.error(f"Ошибка загрузки диктанта {dictation_id}: {e}")
 
-        cover_url = get_cover_url_for_id(None, language_original)
+        cover_url = get_cover_url_for_id(dictation_id, language_original)
 
         return render_template(
             'dictation_editor_v2.html',
