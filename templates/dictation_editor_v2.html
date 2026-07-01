@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Новый редактор — {{ title or 'Редактирование диктанта' }}{% endblock %}
+
+{% block build_channel %}dictafan:build:dictation_editor_v2{% endblock %}
+
+{% block page_head %}
+    <link rel="stylesheet" href="/static/css/editor.css?v={{ app_cache_revision }}">
+{% endblock %}
+
+{% block topbar %}
+    <div class="topbar editor-v2-topbar">
+        <img src="/static/icons/logo.svg" class="logo" onclick="handleLogoClick()">
+        <div class="book-cover-wrapper" id="bookCoverWrapper" style="display: none;">
+            <img src="" alt="Обложка книги" class="book-cover-image" id="bookCoverImage">
+        </div>
+        <div class="topbar-actions">
+            <div class="user-section" id="user-section">
+                <button type="button" id="supportTopbarBtn" class="topbar-icon-btn" title="{{ t('support.topbar.title') }}">
+                    <i data-lucide="heart"></i>
+                </button>
+                <div class="username">
+                    <span class="user-avatar-small"></span>
+                    <span class="username-text"></span>
+                </div>
+                <button class="streak" title="Несгораемая сумма дней"><i data-lucide="flame"></i> <span class="streak-days">0</span></button>
+            </div>
+            <div class="button-group topbar-save-group">
+                <button id="saveBtn" class="topbar-icon-btn save-status-clean" title="Сохранить">
+                    <i data-lucide="save"></i>
+                </button>
+                <button id="exitToIndexBtn" class="topbar-icon-btn" title="Вернуться к списку диктантов">
+                    <i data-lucide="forward"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    <div class="panel editor-v2-panel">
+        <div class="header-container">
+            <div id="langPair" data-original="{{ original_language }}" data-translation="{{ translation_language }}">
+            </div>
+            <h2 id="dictation-name">
+                {% if title %}
+                    {{ title }}
+                {% else %}
+                    Новый редактор
+                {% endif %}
+                <span id="unsavedStar" class="unsaved-star" style="display: none;">*</span>
+            </h2>
+            <span id="dictation-id">id: {{ dictation_id }}</span>
+        </div>
+
+        <!-- Placeholder для будущих вкладок -->
+        <div class="editor-v2-placeholder">
+            <div class="editor-v2-placeholder-content">
+                <i data-lucide="construction" style="width: 48px; height: 48px; color: var(--color-button-text-yellow);"></i>
+                <h3>Новый редактор</h3>
+                <p>Сюда будут переноситься модули из старого редактора.</p>
+                <p class="editor-v2-meta">
+                    Диктант: <strong>{{ dictation_id }}</strong><br>
+                    Оригинал: <strong>{{ original_language }}</strong> → Перевод: <strong>{{ translation_language }}</strong><br>
+                    Уровень: <strong>{{ level or 'A1' }}</strong>
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+    {{ super() }}
+    <script src="{{ url_for('static', filename='js/editor.js') }}?v={{ app_cache_revision }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.editorV2 && typeof window.editorV2.init === 'function') {
+                window.editorV2.init({
+                    dictationId: '{{ dictation_id }}',
+                    originalLanguage: '{{ original_language }}',
+                    translationLanguage: '{{ translation_language }}',
+                    level: '{{ level or "A1" }}',
+                    title: '{{ title | e }}',
+                    coverUrl: '{{ cover_url | e }}',
+                });
+            }
+        });
+    </script>
+{% endblock %}

@@ -768,6 +768,15 @@ window.DictationKart = window.DictationKart || {
           }
         }
 
+        if (action === 'edit-dictation-v2') {
+          const editV2Url = String(btn.getAttribute('data-edit-v2-url') || '').trim();
+          if (editV2Url) {
+            closeMenu();
+            window.location.href = editV2Url;
+            return;
+          }
+        }
+
         closeMenu();
 
         try {
@@ -894,6 +903,7 @@ window.DictationKart = window.DictationKart || {
         { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
         { action: 'prefetch-dictation-cache', icon: 'download', labelKey: 'private_library.dictation_card_actions.cache', labelFallback: 'Скачать в кэш' },
         { action: 'edit-dictation', icon: 'pencil-ruler', labelKey: 'private_library.dictation_card_actions.edit', labelFallback: 'Редактировать' },
+        { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: null, labelFallback: 'Новый редактор' },
         { action: 'show-in-book', icon: 'book-marked', labelKey: 'private_library.dictation_card_actions.show_in_book', labelFallback: 'Показать в книге' },
         { action: 'remove-from-desk', icon: 'arrow-big-down-dash', labelKey: 'private_library.dictation_card_actions.remove_from_desk', labelFallback: 'Убрать со стола' },
       ];
@@ -901,6 +911,7 @@ window.DictationKart = window.DictationKart || {
 
     return [
       { action: 'edit-dictation', icon: 'pencil-ruler', labelKey: 'private_library.dictation_card_actions.edit', labelFallback: 'Редактировать' },
+      { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: null, labelFallback: 'Новый редактор' },
       { action: 'create-assignment', icon: 'clipboard-list', labelKey: 'private_library.dictation_card_actions.create_assignment', labelFallback: 'Все упражнения' },
       { action: 'plan-tasks', icon: 'calendar-plus', labelKey: 'private_library.dictation_card_actions.plan', labelFallback: 'Запланировать' },
       { action: 'move-dictation', icon: 'folder-symlink', labelKey: 'private_library.dictation_card_actions.move', labelFallback: 'Переместить' },
@@ -908,7 +919,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, langOriginal, coverUrl, availableTranslations }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -939,6 +950,9 @@ window.DictationKart = window.DictationKart || {
               if (it.action === 'edit-dictation') {
                 attrs.push(`type="button"`);
                 attrs.push(`data-edit-url="${window.escapeHtml(String(editUrl || ''))}"`);
+              } else if (it.action === 'edit-dictation-v2') {
+                attrs.push(`type="button"`);
+                attrs.push(`data-edit-v2-url="${window.escapeHtml(String(editV2Url || ''))}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -989,6 +1003,7 @@ window.DictationKart = window.DictationKart || {
     const langTranslation = pick.lang;
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+    const editV2Url = `/editor_v2/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
 
     const coverUrl = window.maybeCacheBustDictationCover ? window.maybeCacheBustDictationCover(item.cover_url) : (item.cover_url || '');
 
@@ -1005,6 +1020,7 @@ window.DictationKart = window.DictationKart || {
       dictationId,
       deskItemId: item.id,
       editUrl,
+      editV2Url,
       langOriginal,
       coverUrl,
       availableTranslations,
@@ -1062,6 +1078,7 @@ window.DictationKart = window.DictationKart || {
     const dbId = d.db_id || d.id;
 
     const editUrl = `/dictation_editor/${dictationId}/${langOriginal}/${langTranslation}`;
+    const editV2Url = `/editor_v2/${dictationId}/${langOriginal}/${langTranslation}`;
 
     const isOnDesk = window.isDictationOnDesk ? window.isDictationOnDesk(dbId) : false;
 
@@ -1073,6 +1090,7 @@ window.DictationKart = window.DictationKart || {
       dictationId: dbId,
       deskItemId: null,
       editUrl,
+      editV2Url,
       langOriginal,
       coverUrl,
       availableTranslations,
@@ -1148,6 +1166,7 @@ window.DictationKart = window.DictationKart || {
     const langTranslation = pick.lang;
     const openUrl = `/dictation/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
     const editUrl = `/dictation_editor/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
+    const editV2Url = `/editor_v2/${dictationIdFormatted}/${langOriginal}/${langTranslation}`;
 
     const coverUrl = window.maybeCacheBustDictationCover
       ? window.maybeCacheBustDictationCover(item.cover_url)
@@ -1203,6 +1222,7 @@ window.DictationKart = window.DictationKart || {
         dictationId,
         deskItemId: item.id,
         editUrl,
+        editV2Url,
         langOriginal,
         coverUrl,
         availableTranslations,
@@ -1244,6 +1264,7 @@ window.DictationKart = window.DictationKart || {
     const dictationId = d.dictation_id || `dict_${d.id}`;
     const dbId = d.db_id || d.id;
     const editUrl = `/dictation_editor/${dictationId}/${langOriginal}/${langTranslation}`;
+    const editV2Url = `/editor_v2/${dictationId}/${langOriginal}/${langTranslation}`;
 
     const isOnDesk = window.isDictationOnDesk ? window.isDictationOnDesk(dbId) : false;
     const sentencesCount = typeof d.sentences_count === 'number' ? d.sentences_count : (parseInt(d.sentences_count, 10) || 0);
@@ -1297,6 +1318,7 @@ window.DictationKart = window.DictationKart || {
         dictationId: dbId,
         deskItemId: null,
         editUrl,
+        editV2Url,
         langOriginal,
         coverUrl,
         availableTranslations,

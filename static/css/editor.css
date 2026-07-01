@@ -1,0 +1,106 @@
+/* ===================
+   НОВЫЙ РЕДАКТОР ДИКТАНТОВ (V2)
+   =================== */
+
+/* --- Topbar --- */
+.editor-v2-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--color-panel-bg, #fff);
+    border-bottom: 1px solid var(--color-border-light, rgba(255, 255, 255, 0.1));
+    gap: 12px;
+}
+
+.editor-v2-topbar .logo {
+    height: 40px;
+    cursor: pointer;
+}
+
+.editor-v2-topbar .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.editor-v2-topbar .user-section {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.editor-v2-topbar .topbar-save-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* --- Panel --- */
+.editor-v2-panel {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.editor-v2-panel .header-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.editor-v2-panel .header-container h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--color-text, #224156);
+}
+
+.editor-v2-panel .header-container #dictation-id {
+    font-size: 13px;
+    color: var(--color-text-secondary, #888);
+    font-family: monospace;
+}
+
+/* --- Placeholder --- */
+.editor-v2-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    border: 2px dashed var(--color-border-light, #ddd);
+    border-radius: 16px;
+    background: var(--color-panel-bg-secondary, rgba(255, 255, 255, 0.03));
+}
+
+.editor-v2-placeholder-content {
+    text-align: center;
+    padding: 40px;
+}
+
+.editor-v2-placeholder-content h3 {
+    margin: 16px 0 8px;
+    font-size: 20px;
+    color: var(--color-text, #224156);
+}
+
+.editor-v2-placeholder-content p {
+    margin: 4px 0;
+    color: var(--color-text-secondary, #888);
+    font-size: 14px;
+}
+
+.editor-v2-placeholder-content .editor-v2-meta {
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-text-secondary, #888);
+}
+
+/* --- Unsaved star --- */
+.unsaved-star {
+    color: var(--color-button-text-yellow, #f9c609);
+    font-weight: bold;
+}
