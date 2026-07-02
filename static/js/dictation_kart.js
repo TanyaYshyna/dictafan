@@ -770,6 +770,7 @@ window.DictationKart = window.DictationKart || {
 
         if (action === 'edit-dictation-v2') {
           closeMenu();
+          console.log('[dictation_kart] edit-dictation-v2 clicked, DictationEditorModal=', !!window.DictationEditorModal);
           try {
             const dictationId = btn.getAttribute('data-dictation-id') || '';
             const langOriginal = btn.getAttribute('data-lang-original') || '';
@@ -779,7 +780,10 @@ window.DictationKart = window.DictationKart || {
             const coverUrl = btn.getAttribute('data-cover-url') || '';
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
 
+            console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
+
             if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+              console.log('[dictation_kart] calling DictationEditorModal.open');
               window.DictationEditorModal.open({
                 dictationId: dictationId,
                 originalLanguage: langOriginal,
@@ -789,6 +793,8 @@ window.DictationKart = window.DictationKart || {
                 coverUrl: coverUrl,
                 authorMaterialsUrl: authorMaterialsUrl,
               });
+            } else {
+              console.warn('[dictation_kart] DictationEditorModal not available!');
             }
           } catch (e) {
             console.warn('[dictation_kart] edit-dictation-v2 error', e);
