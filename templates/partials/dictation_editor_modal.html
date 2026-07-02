@@ -7,9 +7,6 @@
       <div class="dictation-editor-modal__header-left">
         <img src="/static/icons/logo.svg" class="dictation-editor-modal__logo dictation-editor-modal__logo--full" alt="DictaFan" onclick="window.location.href='/'" />
         <img src="/static/icons/logo_min.svg" class="dictation-editor-modal__logo dictation-editor-modal__logo--min" alt="DictaFan" onclick="window.location.href='/'" />
-        <div class="dictation-editor-modal__cover-wrapper">
-          <img id="dictationEditorModalCover" class="dictation-editor-modal__cover" alt="" />
-        </div>
       </div>
 
       <div class="dictation-editor-modal__header-right">
@@ -19,6 +16,9 @@
         </div>
 
         <div class="dictation-editor-modal__header-actions">
+          <button id="dictationEditorModalSaveBtn" class="topbar-icon-btn" type="button" title="Сохранить" aria-label="Сохранить">
+            <i data-lucide="save"></i>
+          </button>
           <button id="dictationEditorModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
             <i data-lucide="x"></i>
           </button>

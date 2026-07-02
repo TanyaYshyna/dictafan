@@ -50,18 +50,21 @@
 
   function _setupUserSection() {
     try {
-      if (window.UM && typeof window.UM.renderUserSection === 'function') {
-        const avatarEl = document.getElementById('dictationEditorModalAvatar');
-        const usernameEl = document.getElementById('dictationEditorModalUsername');
-        if (avatarEl && usernameEl) {
-          const userData = window.UM.getUserData ? window.UM.getUserData() : null;
-          if (userData) {
-            if (userData.avatar_url) {
-              avatarEl.style.backgroundImage = 'url(' + escapeHtml(userData.avatar_url) + ')';
-            }
-            usernameEl.textContent = escapeHtml(userData.username || userData.email || '');
-          }
+      // Аватар — копируем из .user-avatar-small в topbar
+      const avatarEl = document.getElementById('dictationEditorModalAvatar');
+      if (avatarEl) {
+        const sourceAvatar = document.querySelector('.user-avatar-small');
+        if (sourceAvatar) {
+          const bg = sourceAvatar.style.backgroundImage || '';
+          if (bg) avatarEl.style.backgroundImage = bg;
         }
+      }
+
+      // Имя — копируем из .username-text в topbar
+      const usernameEl = document.getElementById('dictationEditorModalUsername');
+      if (usernameEl) {
+        const sourceName = document.querySelector('.username-text');
+        usernameEl.textContent = sourceName ? (sourceName.textContent || '').trim() : '';
       }
     } catch (e) {
       console.warn('[dictationEditorModal] userSection error', e);
