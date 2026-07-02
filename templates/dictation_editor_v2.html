@@ -189,6 +189,9 @@
 
 {% block scripts %}
     {{ super() }}
+    <script id="language-data" type="application/json">
+    {{ language_data | tojson | safe }}
+    </script>
     <script src="{{ url_for('static', filename='js/editor.js') }}?v={{ app_cache_revision }}"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function () {
