@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="/static/css/style_dictations_reports.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/user_profile_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_modal.css?v={{ app_cache_revision }}">
+    <link rel="stylesheet" href="/static/css/dictation_editor_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/active_dictations_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/audio_cache_modal.css?v={{ app_cache_revision }}">
     <link rel="stylesheet" href="/static/css/dictation_launch_modal.css?v={{ app_cache_revision }}">
@@ -137,6 +138,7 @@
     {% include 'partials/user_profile_modal.html' %}
 
     {% include 'partials/dictation_modal.html' %}
+    {% include 'partials/dictation_editor_modal.html' %}
 
     {% include 'partials/desktop_confirm_modal.html' %}
 
@@ -156,6 +158,7 @@
     <script defer src="/static/js/private_library_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/global_library_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="/static/js/dictation_modal.js?v={{ app_cache_revision }}"></script>
+    <script defer src="/static/js/dictation_editor_modal.js?v={{ app_cache_revision }}"></script>
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script type="module" id="transformers-loader">
         import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0';

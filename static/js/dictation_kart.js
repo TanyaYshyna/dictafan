@@ -769,12 +769,31 @@ window.DictationKart = window.DictationKart || {
         }
 
         if (action === 'edit-dictation-v2') {
-          const editV2Url = String(btn.getAttribute('data-edit-v2-url') || '').trim();
-          if (editV2Url) {
-            closeMenu();
-            window.location.href = editV2Url;
-            return;
+          closeMenu();
+          try {
+            const dictationId = btn.getAttribute('data-dictation-id') || '';
+            const langOriginal = btn.getAttribute('data-lang-original') || '';
+            const langTranslation = btn.getAttribute('data-lang-translation') || '';
+            const title = btn.getAttribute('data-title') || '';
+            const level = btn.getAttribute('data-level') || '';
+            const coverUrl = btn.getAttribute('data-cover-url') || '';
+            const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
+
+            if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+              window.DictationEditorModal.open({
+                dictationId: dictationId,
+                originalLanguage: langOriginal,
+                translationLanguage: langTranslation,
+                title: title,
+                level: level,
+                coverUrl: coverUrl,
+                authorMaterialsUrl: authorMaterialsUrl,
+              });
+            }
+          } catch (e) {
+            console.warn('[dictation_kart] edit-dictation-v2 error', e);
           }
+          return;
         }
 
         closeMenu();
@@ -919,7 +938,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -952,7 +971,12 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-edit-url="${window.escapeHtml(String(editUrl || ''))}"`);
               } else if (it.action === 'edit-dictation-v2') {
                 attrs.push(`type="button"`);
-                attrs.push(`data-edit-v2-url="${window.escapeHtml(String(editV2Url || ''))}"`);
+                attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
+                attrs.push(`data-lang-original="${window.escapeHtml(String(langOriginal || ''))}"`);
+                attrs.push(`data-lang-translation="${window.escapeHtml(String(langTranslation || ''))}"`);
+                attrs.push(`data-title="${window.escapeHtml(String(title || ''))}"`);
+                attrs.push(`data-level="${window.escapeHtml(String(level || ''))}"`);
+                attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -1024,6 +1048,9 @@ window.DictationKart = window.DictationKart || {
       langOriginal,
       coverUrl,
       availableTranslations,
+      title: item.title,
+      level: item.level,
+      langTranslation,
     });
 
     return `
@@ -1094,6 +1121,9 @@ window.DictationKart = window.DictationKart || {
       langOriginal,
       coverUrl,
       availableTranslations,
+      title: d.title,
+      level: d.level,
+      langTranslation,
     });
 
     return `
@@ -1226,6 +1256,9 @@ window.DictationKart = window.DictationKart || {
         langOriginal,
         coverUrl,
         availableTranslations,
+        title: item.title,
+        level: item.level,
+        langTranslation,
       });
     }
 
@@ -1322,6 +1355,9 @@ window.DictationKart = window.DictationKart || {
         langOriginal,
         coverUrl,
         availableTranslations,
+        title: d.title,
+        level: d.level,
+        langTranslation,
       });
     }
 

@@ -1,0 +1,137 @@
+<!-- dictation-editor-modal: редактор диктанта в модальном окне -->
+<div id="dictationEditorModal" class="dictation-editor-modal" style="display:none;">
+  <div class="dictation-editor-modal__content" role="dialog" aria-modal="true" aria-label="Редактор диктанта">
+    
+    <!-- ===== HEADER (как в dictation_modal) ===== -->
+    <div class="dictation-editor-modal__header">
+      <div class="dictation-editor-modal__header-left">
+        <img src="/static/icons/logo.svg" class="dictation-editor-modal__logo dictation-editor-modal__logo--full" alt="DictaFan" onclick="window.location.href='/'" />
+        <img src="/static/icons/logo_min.svg" class="dictation-editor-modal__logo dictation-editor-modal__logo--min" alt="DictaFan" onclick="window.location.href='/'" />
+        <div class="dictation-editor-modal__cover-wrapper">
+          <img id="dictationEditorModalCover" class="dictation-editor-modal__cover" alt="" />
+        </div>
+      </div>
+
+      <div class="dictation-editor-modal__header-right">
+        <div class="dictation-editor-modal__user" aria-hidden="true">
+          <span id="dictationEditorModalAvatar" class="user-avatar-small"></span>
+          <span id="dictationEditorModalUsername" class="dictation-editor-modal__username"></span>
+        </div>
+
+        <div class="dictation-editor-modal__header-actions">
+          <button id="dictationEditorModalCloseBtn" class="topbar-icon-btn" type="button" title="Закрыть" aria-label="Закрыть">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== BODY ===== -->
+    <div id="dictationEditorModalBody" class="dictation-editor-modal__body">
+
+      <!-- Шапка с флагами, названием, id -->
+      <div class="dictation-editor-modal__header-container">
+        <div id="editorModalLangPair" class="dictation-editor-modal__lang-pair"></div>
+        <h2 id="dictation-editor-modal-name">
+          <span id="dictationEditorModalTitle"></span>
+          <span class="unsaved-star" id="dictationEditorModalUnsavedStar" style="display:none;">*</span>
+        </h2>
+        <span id="dictation-editor-modal-id" class="dictation-editor-modal__id"></span>
+      </div>
+
+      <!-- Панель с закладками -->
+      <div class="dictation-editor-modal__tabs-panel">
+        <div class="dictation-editor-modal__tabs-header">
+          <button class="dictation-editor-modal__tab-btn active" data-tab="general" type="button">1. Общие данные</button>
+          <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-auto" data-voice-mode="auto" type="button" style="display:none;">2. Озвучка оригинала (авто)</button>
+          <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-have" data-voice-mode="have" type="button" style="display:none;">3. Озвучка оригинала (є аудіо)</button>
+          <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-self" data-voice-mode="self" type="button" style="display:none;">4. Озвучка оригинала (сам)</button>
+          <button class="dictation-editor-modal__tab-btn" data-tab="voice-translations" type="button">5. Озвучка перевода (авто)</button>
+        </div>
+
+        <div class="dictation-editor-modal__tabs-body">
+          <!-- Вкладка 1: Общие данные -->
+          <div id="tab-general" class="dictation-editor-modal__tab-content active">
+            <div class="dictation-editor-modal__general-data">
+              <div class="dictation-editor-modal__editor-header">
+                <div class="dictation-editor-modal__editor-header-panel-1">
+                  <div class="dictation-editor-modal__cover-section">
+                    <div class="dictation-editor-modal__cover-display">
+                      <img id="dictationEditorModalCoverImage" src="" alt="Cover" />
+                    </div>
+                    <div class="dictation-editor-modal__cover-upload">
+                      <button id="dictationEditorModalCoverUploadBtn" class="button-color-yellow" type="button">Загрузить обложку</button>
+                      <input type="file" id="dictationEditorModalCoverFile" accept="image/*" style="display:none;" />
+                    </div>
+                  </div>
+                </div>
+                <div class="dictation-editor-modal__editor-header-panel-2">
+                  <div class="dictation-editor-modal__form-group-line dictation-editor-modal__title-level-row">
+                    <label>en</label>
+                    <input type="text" id="dictationEditorModalTitleInput" class="text-input" placeholder="Название диктанта" />
+                    <div id="dictationEditorModalLevelSelect" class="custom-speed-select level-select">
+                      <button type="button" class="speed-select-button">
+                        <span class="level-select-value">A1</span>
+                        <i data-lucide="chevron-down"></i>
+                      </button>
+                      <ul class="speed-options">
+                        <li data-value="A1">A1</li>
+                        <li data-value="A2">A2</li>
+                        <li data-value="B1">B1</li>
+                        <li data-value="B2">B2</li>
+                        <li data-value="C1">C1</li>
+                        <li data-value="C2">C2</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div class="dictation-editor-modal__form-group-line">
+                    <label>Посилання на матеріали автора</label>
+                    <input type="text" id="dictationEditorModalAuthorUrl" class="text-input" placeholder="https://..." />
+                  </div>
+                  <div class="dictation-editor-modal__voice-mode-group">
+                    <span class="dictation-editor-modal__voice-mode-label">Режим озвучки:</span>
+                    <div class="dictation-editor-modal__voice-mode-options">
+                      <label class="dictation-editor-modal__voice-mode-radio">
+                        <input type="radio" name="editorModalVoiceMode" value="auto" checked />
+                        <span>Авто</span>
+                      </label>
+                      <label class="dictation-editor-modal__voice-mode-radio">
+                        <input type="radio" name="editorModalVoiceMode" value="have" />
+                        <span>Є аудіо</span>
+                      </label>
+                      <label class="dictation-editor-modal__voice-mode-radio">
+                        <input type="radio" name="editorModalVoiceMode" value="self" />
+                        <span>Озвучу сам</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Вкладка 2: Озвучка оригинала (авто) -->
+          <div id="tab-voice-original-auto" class="dictation-editor-modal__tab-content">
+            <p>Озвучка оригинала (авто) — будет реализовано позже</p>
+          </div>
+
+          <!-- Вкладка 3: Озвучка оригинала (є аудіо) -->
+          <div id="tab-voice-original-have" class="dictation-editor-modal__tab-content">
+            <p>Озвучка оригинала (є аудіо) — будет реализовано позже</p>
+          </div>
+
+          <!-- Вкладка 4: Озвучка оригинала (сам) -->
+          <div id="tab-voice-original-self" class="dictation-editor-modal__tab-content">
+            <p>Озвучка оригинала (сам) — будет реализовано позже</p>
+          </div>
+
+          <!-- Вкладка 5: Озвучка перевода (авто) -->
+          <div id="tab-voice-translations" class="dictation-editor-modal__tab-content">
+            <p>Озвучка перевода (авто) — будет реализовано позже</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
