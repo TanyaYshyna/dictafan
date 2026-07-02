@@ -283,7 +283,7 @@
     const modal = document.getElementById(MODAL_ID);
     if (!modal) return;
 
-    modal.style.display = '';
+    modal.style.display = 'flex';
 
     // Инициализация
     _setupUserSection();
