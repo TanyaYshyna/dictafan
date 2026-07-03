@@ -43,7 +43,7 @@ class WaveformCanvas {
         this.config = {
             // Цвета из CSS переменных (палитра --color-waveform-*)
             waveColor: this.getCSSVariable('--color-waveform-wave-inside'),
-            regionColor: this.getCSSVariable('--color-waveform-region-overlay'),
+            // regionColor: this.getCSSVariable('--color-waveform-region-overlay'),
             startMarkerColor: this.getCSSVariable('--color-waveform-marker'),
             endMarkerColor: this.getCSSVariable('--color-waveform-marker'),
             playheadColor: this.getCSSVariable('--color-waveform-playhead'),

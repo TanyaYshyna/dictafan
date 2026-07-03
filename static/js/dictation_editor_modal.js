@@ -1036,8 +1036,19 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          // Обновляем таблицу, если мы на закладке, где радио влияет на колонки
-          if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
+          // Авто-переключение на соответствующую закладку
+          var tabMap = {
+            'auto': 'voice-original-auto',
+            'have': 'voice-original-have',
+            'self': 'voice-original-self'
+          };
+          var targetTab = tabMap[this.value];
+          if (targetTab && state.currentTabName !== targetTab) {
+            var tabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="' + targetTab + '"]');
+            if (tabBtn && tabBtn.style.display !== 'none') {
+              tabBtn.click();
+            }
+          } else if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
             _applyTableViewForTab(state.currentTabName);
           }
         }
@@ -1295,21 +1306,16 @@
       return;
     }
 
-    if (window.AudioEditorTools && typeof window.AudioEditorTools.splitAudioIntoSeentences === 'function') {
-      window.AudioEditorTools.splitAudioIntoSeentences({ filename: _sharedAudioFilename });
-      return;
-    }
-
-    // Fallback: собираем предложения с start/end
+    // Собираем все предложения для разрезания
     var sentences = [];
     if (state.content) {
       var cores = state.content.getAllSentenceCores();
       cores.forEach(function (s) {
-        if (s.key && s.end && s.start && Number(s.end) > Number(s.start)) {
+        if (s.key) {
           sentences.push({
             key: s.key,
-            start_time: Number(s.start) || 0,
-            end_time: Number(s.end) || 0,
+            start_time: (s.start && Number(s.start)) ? Number(s.start) : 0,
+            end_time: (s.end && Number(s.end)) ? Number(s.end) : 0,
             language: state.config ? state.config.originalLanguage : ''
           });
         }
@@ -1317,7 +1323,7 @@
     }
 
     if (sentences.length === 0) {
-      alert('Нет предложений с заполненными start/end. Сначала укажите время для каждого предложения.');
+      alert('Нет предложений для разрезания');
       return;
     }
 
@@ -1345,6 +1351,8 @@
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
               sentence.audio_file = f.filename;
+              if (f.start != null) sentence.start = String(f.start);
+              if (f.end != null) sentence.end = String(f.end);
             }
           }
         }
@@ -1366,12 +1374,6 @@
       return;
     }
 
-    if (window.AudioEditorTools && typeof window.AudioEditorTools.smartSplit === 'function') {
-      window.AudioEditorTools.smartSplit({ filename: _sharedAudioFilename });
-      return;
-    }
-
-    // Fallback: используем серверный эндпоинт
     _smartSplitOnServer(_sharedAudioFilename);
   }
 
