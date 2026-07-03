@@ -38,8 +38,8 @@
         const audio_original = (s && s.audio_original != null) ? String(s.audio_original) : ((s && s.audio != null) ? String(s.audio) : '');
         const audio_translation = (s && s.audio_translation != null) ? String(s.audio_translation) : ((s && s.audio_tr != null) ? String(s.audio_tr) : '');
         // Редакторские поля (сохраняются как есть, без нормализации)
-        const audio_avto = (s && s.audio_avto != null) ? s.audio_avto : null;
-        const audio_user = (s && s.audio_user != null) ? s.audio_user : null;
+        const audio_avto = (s && s.audio_avto != null) ? s.audio_avto : (s && s.audio != null) ? s.audio : null;
+        const audio_file = (s && s.audio_file != null) ? s.audio_file : (s && s.audio_user != null) ? s.audio_user : null;
         const audio_mic = (s && s.audio_mic != null) ? s.audio_mic : null;
         const start = (s && s.start != null) ? String(s.start) : '';
         const end = (s && s.end != null) ? String(s.end) : '';
@@ -55,7 +55,7 @@
           audio_translation,
           // Редакторские поля
           audio_avto,
-          audio_user,
+          audio_file,
           audio_mic,
           start,
           end,

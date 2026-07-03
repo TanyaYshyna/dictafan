@@ -414,7 +414,7 @@
       tdOrig.textContent = s.text_original || '';
       tr.appendChild(tdOrig);
 
-      // Generate TTS (audio_avto) — кнопка a
+      // Generate TTS (audio) — кнопка o
       var tdGenTts = document.createElement('td');
       tdGenTts.className = 'col-generate-tts panel-editing-avto panel-create-audio';
       var genTtsBtn = document.createElement('button');
@@ -422,13 +422,13 @@
       genTtsBtn.className = 'audio-btn';
       genTtsBtn.dataset.key = key;
       genTtsBtn.dataset.lang = state.config?.originalLanguage || '';
-      genTtsBtn.dataset.field = 'audio_avto';
-      genTtsBtn.dataset.state = s.audio_avto ? 'ready' : 'creating';
+      genTtsBtn.dataset.field = 'audio';
+      genTtsBtn.dataset.state = s.audio ? 'ready' : 'creating';
       genTtsBtn.style.background = 'none';
       genTtsBtn.style.border = 'none';
       genTtsBtn.style.cursor = 'pointer';
       genTtsBtn.style.padding = '2px';
-      genTtsBtn.innerHTML = '<i data-lucide="' + (s.audio_avto ? 'play' : 'hammer') + '"></i>';
+      genTtsBtn.innerHTML = '<i data-lucide="' + (s.audio ? 'play' : 'hammer') + '"></i>';
       tdGenTts.appendChild(genTtsBtn);
       tr.appendChild(tdGenTts);
 
@@ -440,13 +440,13 @@
       playUserBtn.className = 'audio-btn';
       playUserBtn.dataset.key = key;
       playUserBtn.dataset.lang = state.config?.originalLanguage || '';
-      playUserBtn.dataset.field = 'audio_user';
-      playUserBtn.dataset.state = s.audio_user ? 'ready' : 'creating';
+      playUserBtn.dataset.field = 'audio_file';
+      playUserBtn.dataset.state = s.audio_file ? 'ready' : 'creating';
       playUserBtn.style.background = 'none';
       playUserBtn.style.border = 'none';
       playUserBtn.style.cursor = 'pointer';
       playUserBtn.style.padding = '2px';
-      playUserBtn.innerHTML = '<i data-lucide="' + (s.audio_user ? 'play' : 'hammer') + '"></i>';
+      playUserBtn.innerHTML = '<i data-lucide="' + (s.audio_file ? 'play' : 'hammer') + '"></i>';
       tdPlayAudio.appendChild(playUserBtn);
       tr.appendChild(tdPlayAudio);
 
@@ -813,8 +813,7 @@
       text_translation: '',
       audio_original: '',
       audio_translation: '',
-      audio_avto: null,
-      audio_user: null,
+      audio_file: null,
       audio_mic: null,
       start: '',
       end: '',
@@ -1313,7 +1312,7 @@
           if (state.content) {
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
-              sentence.audio_user = f.filename;
+              sentence.audio_file = f.filename;
             }
           }
         }
@@ -1371,7 +1370,7 @@
           if (state.content) {
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
-              sentence.audio_user = f.filename;
+              sentence.audio_file = f.filename;
               if (f.start != null) sentence.start = String(f.start);
               if (f.end != null) sentence.end = String(f.end);
             }
@@ -1479,8 +1478,7 @@
                 translation: s.text_translation || '',
                 audio: s.audio_original || '',
                 audio_tr: s.audio_translation || '',
-                audio_avto: s.audio_avto || null,
-                audio_user: s.audio_user || null,
+                audio_file: s.audio_file || null,
                 audio_mic: s.audio_mic || null,
                 start: s.start || '',
                 end: s.end || '',
@@ -1592,8 +1590,7 @@
             text_translation: s.translation || s.text_translation || '',
             audio_original: s.audio || s.audio_original || '',
             audio_translation: s.translation_audio || s.audio_tr || s.audio_translation || '',
-            audio_avto: s.audio_avto || null,
-            audio_user: s.audio_user || null,
+            audio_file: s.audio_file || null,
             audio_mic: s.audio_mic || null,
             start: s.start || '',
             end: s.end || '',

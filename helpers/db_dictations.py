@@ -884,7 +884,7 @@ def get_dictation_by_id(dictation_id):
 
 
 def add_sentence(dictation_id, language_code, sentence_key, text, explanation=None,
-                speaker=None, audio=None, audio_avto=None, audio_mic=None, audio_user=None,
+                speaker=None, audio=None, audio_mic=None, audio_file=None,
                 start=None, end=None, chain=False, checked=False, position=None):
     """
     Добавляет предложение к диктанту
@@ -896,10 +896,9 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
         text: Текст предложения
         explanation: Пояснение/подсказка
         speaker: ID спикера
-        audio: Основной аудио файл
-        audio_avto: Автоматический аудио файл
-        audio_mic: Микрофонный аудио файл
-        audio_user: Пользовательский аудио файл
+        audio: Оригинальное аудио (o)
+        audio_mic: Микрофонный аудио файл (m)
+        audio_file: Пользовательский аудио файл (f)
         start: Начало в секундах
         end: Конец в секундах
         chain: Цепочка
@@ -908,40 +907,28 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
     Returns:
         dict: Данные созданного предложения с полем 'id'
     """
+    from psycopg2.extras import RealDictCursor
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                INSERT INTO dictation_sentences 
+                INSERT INTO dictation_sentences
                 (dictation_id, language_code, sentence_key, text, explanation, speaker,
-                 audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 audio, audio_mic, audio_file, start, "end", chain, checked, position)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id, dictation_id, language_code, sentence_key, text, explanation,
-                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                          speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
             """, (dictation_id, language_code, sentence_key, text, explanation, speaker,
-                  audio, audio_avto, audio_mic, audio_user, start, end, chain, checked, position))
+                  audio, audio_mic, audio_file, start, end, chain, checked, position))
             
             row = cur.fetchone()
             conn.commit()
             
-            sentence = {
-                'id': row[0],
-                'dictation_id': row[1],
-                'language_code': row[2],
-                'sentence_key': row[3],
-                'text': row[4],
-                'explanation': row[5],
-                'speaker': row[6],
-                'audio': row[7],
-                'audio_avto': row[8],
-                'audio_mic': row[9],
-                'audio_user': row[10],
-                'start': float(row[11]) if row[11] is not None else None,
-                'end': float(row[12]) if row[12] is not None else None,
-                'chain': row[13],
-                'checked': row[14],
-                'position': row[15],
-            }
+            sentence = dict(row)
+            if sentence.get('start') is not None:
+                sentence['start'] = float(sentence['start'])
+            if sentence.get('end') is not None:
+                sentence['end'] = float(sentence['end'])
             
             return sentence
     except Exception as e:
@@ -952,7 +939,7 @@ def add_sentence(dictation_id, language_code, sentence_key, text, explanation=No
 
 
 def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
-                   audio=None, audio_avto=None, audio_mic=None, audio_user=None,
+                   audio=None, audio_mic=None, audio_file=None,
                    start=None, end=None, chain=None, checked=None, position=None):
     """
     Обновляет предложение
@@ -964,9 +951,10 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
     Returns:
         dict: Обновлённые данные предложения
     """
+    from psycopg2.extras import RealDictCursor
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             updates = []
             values = []
             
@@ -986,17 +974,13 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
                 updates.append("audio = %s")
                 values.append(audio)
             
-            if audio_avto is not None:
-                updates.append("audio_avto = %s")
-                values.append(audio_avto)
-            
             if audio_mic is not None:
                 updates.append("audio_mic = %s")
                 values.append(audio_mic)
             
-            if audio_user is not None:
-                updates.append("audio_user = %s")
-                values.append(audio_user)
+            if audio_file is not None:
+                updates.append("audio_file = %s")
+                values.append(audio_file)
             
             if start is not None:
                 updates.append("start = %s")
@@ -1025,11 +1009,11 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
             values.append(sentence_id)
             
             query = f"""
-                UPDATE dictation_sentences 
+                UPDATE dictation_sentences
                 SET {', '.join(updates)}
                 WHERE id = %s
                 RETURNING id, dictation_id, language_code, sentence_key, text, explanation,
-                          speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                          speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
             """
             
             cur.execute(query, values)
@@ -1039,24 +1023,11 @@ def update_sentence(sentence_id, text=None, explanation=None, speaker=None,
             if not row:
                 raise Exception(f"Sentence with id {sentence_id} not found")
             
-            sentence = {
-                'id': row[0],
-                'dictation_id': row[1],
-                'language_code': row[2],
-                'sentence_key': row[3],
-                'text': row[4],
-                'explanation': row[5],
-                'speaker': row[6],
-                'audio': row[7],
-                'audio_avto': row[8],
-                'audio_mic': row[9],
-                'audio_user': row[10],
-                'start': float(row[11]) if row[11] is not None else None,
-                'end': float(row[12]) if row[12] is not None else None,
-                'chain': row[13],
-                'checked': row[14],
-                'position': row[15],
-            }
+            sentence = dict(row)
+            if sentence.get('start') is not None:
+                sentence['start'] = float(sentence['start'])
+            if sentence.get('end') is not None:
+                sentence['end'] = float(sentence['end'])
             
             return sentence
     except Exception as e:
@@ -1076,12 +1047,13 @@ def get_sentence_by_id(sentence_id):
     Returns:
         dict: Данные предложения или None если не найдено
     """
+    from psycopg2.extras import RealDictCursor
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                       speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
                 FROM dictation_sentences
                 WHERE id = %s
             """, (sentence_id,))
@@ -1091,24 +1063,11 @@ def get_sentence_by_id(sentence_id):
             if not row:
                 return None
             
-            sentence = {
-                'id': row[0],
-                'dictation_id': row[1],
-                'language_code': row[2],
-                'sentence_key': row[3],
-                'text': row[4],
-                'explanation': row[5],
-                'speaker': row[6],
-                'audio': row[7],
-                'audio_avto': row[8],
-                'audio_mic': row[9],
-                'audio_user': row[10],
-                'start': float(row[11]) if row[11] is not None else None,
-                'end': float(row[12]) if row[12] is not None else None,
-                'chain': row[13],
-                'checked': row[14],
-                'position': row[15],
-            }
+            sentence = dict(row)
+            if sentence.get('start') is not None:
+                sentence['start'] = float(sentence['start'])
+            if sentence.get('end') is not None:
+                sentence['end'] = float(sentence['end'])
             
             return sentence
     except Exception as e:
@@ -1129,12 +1088,13 @@ def get_sentence_by_key(dictation_id, language_code, sentence_key):
     Returns:
         dict: Данные предложения или None если не найдено
     """
+    from psycopg2.extras import RealDictCursor
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
                 SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                       speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                       speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
                 FROM dictation_sentences
                 WHERE dictation_id = %s AND language_code = %s AND sentence_key = %s
             """, (dictation_id, language_code, sentence_key))
@@ -1144,24 +1104,11 @@ def get_sentence_by_key(dictation_id, language_code, sentence_key):
             if not row:
                 return None
             
-            sentence = {
-                'id': row[0],
-                'dictation_id': row[1],
-                'language_code': row[2],
-                'sentence_key': row[3],
-                'text': row[4],
-                'explanation': row[5],
-                'speaker': row[6],
-                'audio': row[7],
-                'audio_avto': row[8],
-                'audio_mic': row[9],
-                'audio_user': row[10],
-                'start': float(row[11]) if row[11] is not None else None,
-                'end': float(row[12]) if row[12] is not None else None,
-                'chain': row[13],
-                'checked': row[14],
-                'position': row[15],
-            }
+            sentence = dict(row)
+            if sentence.get('start') is not None:
+                sentence['start'] = float(sentence['start'])
+            if sentence.get('end') is not None:
+                sentence['end'] = float(sentence['end'])
             
             return sentence
     except Exception as e:
@@ -1181,13 +1128,14 @@ def get_dictation_sentences(dictation_id, language_code=None):
     Returns:
         list: Список предложений
     """
+    from psycopg2.extras import RealDictCursor
     conn = get_db_connection()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
             if language_code:
                 cur.execute("""
                     SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                           speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
                     FROM dictation_sentences
                     WHERE dictation_id = %s AND language_code = %s
                     ORDER BY position NULLS LAST, sentence_key
@@ -1195,7 +1143,7 @@ def get_dictation_sentences(dictation_id, language_code=None):
             else:
                 cur.execute("""
                     SELECT id, dictation_id, language_code, sentence_key, text, explanation,
-                           speaker, audio, audio_avto, audio_mic, audio_user, start, "end", chain, checked, position
+                           speaker, audio, audio_mic, audio_file, start, "end", chain, checked, position
                     FROM dictation_sentences
                     WHERE dictation_id = %s
                     ORDER BY language_code, position NULLS LAST, sentence_key
@@ -1205,24 +1153,11 @@ def get_dictation_sentences(dictation_id, language_code=None):
             
             sentences = []
             for row in rows:
-                sentence = {
-                    'id': row[0],
-                    'dictation_id': row[1],
-                    'language_code': row[2],
-                    'sentence_key': row[3],
-                    'text': row[4],
-                    'explanation': row[5],
-                    'speaker': row[6],
-                    'audio': row[7],
-                    'audio_avto': row[8],
-                    'audio_mic': row[9],
-                    'audio_user': row[10],
-                    'start': float(row[11]) if row[11] is not None else None,
-                    'end': float(row[12]) if row[12] is not None else None,
-                    'chain': row[13],
-                    'checked': row[14],
-                    'position': row[15],
-                }
+                sentence = dict(row)
+                if sentence.get('start') is not None:
+                    sentence['start'] = float(sentence['start'])
+                if sentence.get('end') is not None:
+                    sentence['end'] = float(sentence['end'])
                 sentences.append(sentence)
             
             return sentences

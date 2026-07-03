@@ -308,8 +308,7 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
             
             # Получаем все типы аудио для оригинала
             audio_o_file = orig_sentence.get('audio', '')
-            audio_a_file = orig_sentence.get('audio_avto', '')
-            audio_f_file = orig_sentence.get('audio_user', '')
+            audio_f_file = orig_sentence.get('audio_file', '')
             audio_m_file = orig_sentence.get('audio_mic', '')
             # Для перевода используем поле audio из данных перевода (язык lang_tr)
             audio_tr_file = translated.get('audio', '')
@@ -319,7 +318,6 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
                 current_app.logger.debug(f"🔍 [dictation] Предложение {sentence_key}: "
                     f"translated keys={list(translated.keys()) if translated else 'empty'}, "
                     f"audio={translated.get('audio', 'NONE')}, "
-                    f"audio_avto={translated.get('audio_avto', 'NONE')}, "
                     f"audio_tr_file={audio_tr_file}, "
                     f"lang_tr={lang_tr}")
             
@@ -445,8 +443,7 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             
             # Получаем все типы аудио для оригинала
             audio_o_file = orig_sentence.get('audio', '')
-            audio_a_file = orig_sentence.get('audio_avto', '')
-            audio_f_file = orig_sentence.get('audio_user', '')
+            audio_f_file = orig_sentence.get('audio_file', '')
             audio_m_file = orig_sentence.get('audio_mic', '')
             # Для перевода используем поле audio из данных перевода (язык lang_tr)
             audio_tr_file = translated.get('audio', '')
@@ -529,7 +526,7 @@ def api_get_dictation_sentences_simple(dictation_id):
         sentences = []
         for orig_sentence in original_sentences:
             sentence_key = orig_sentence.get('sentence_key', '')
-            audio_file = orig_sentence.get('audio') or orig_sentence.get('audio_avto') or ''
+            audio_file = orig_sentence.get('audio') or ''
             
             # Формируем URL для аудио
             audio_url = ''

@@ -1423,8 +1423,8 @@ async function createTranslationLanguage(lang) {
                     speaker: s.speaker || '1',
                     text: trText,
                     audio: audioFile,
-                    audio_avto: audioFile,
-                    audio_user: '',
+                    audio: audioFile,
+                    audio_file: '',
                     audio_mic: '',
                     start: 0,
                     end: 0,
@@ -1785,9 +1785,9 @@ async function cleanupStaleB2DictationAudio({ dictationId, token }) {
                 for (const s of sentences) {
                     if (!s) continue;
                     push(l, s.audio);
-                    push(l, s.audio_avto);
+                    push(l, s.audio);
                     push(l, s.audio_mic);
-                    push(l, s.audio_user);
+                    push(l, s.audio_file);
                 }
                 push(l, wd && wd.audio_user_shared);
             }
@@ -2099,8 +2099,8 @@ function mergeWorkingDataToDictationSentences(dictationId, langOrig, langTr) {
             text: String(s.text || ''),
             translation: String((t && t.text) ? t.text : ''),
             audio: extractAudioFilename(s.audio),
-            audio_a: extractAudioFilename(s.audio_avto),
-            audio_f: extractAudioFilename(s.audio_user),
+            audio_a: extractAudioFilename(s.audio),
+            audio_f: extractAudioFilename(s.audio_file),
             audio_m: extractAudioFilename(s.audio_mic),
             audio_tr: extractAudioFilename((t && t.audio) ? t.audio : null),
             completed_correctly: false,
@@ -4012,7 +4012,7 @@ function collectFinalAudioUrlsForPrefetch(dictationId) {
             const sentences = wd && Array.isArray(wd.sentences) ? wd.sentences : [];
             for (const s of sentences) {
                 if (!s) continue;
-                const candidates = [s.audio, s.audio_avto, s.audio_mic, s.audio_user];
+                const candidates = [s.audio, s.audio, s.audio_mic, s.audio_file];
                 for (const c of candidates) {
                     const u = buildDictationAudioUrl(dictationId, lang, c);
                     if (u) urls.push(u);
@@ -4151,9 +4151,9 @@ function hasAnyDraftAudioBlob() {
             for (const s of sentences) {
                 if (!s) continue;
                 if (hasDraftAudioUrl(l, s.audio)) return true;
-                if (hasDraftAudioUrl(l, s.audio_avto)) return true;
+                if (hasDraftAudioUrl(l, s.audio)) return true;
                 if (hasDraftAudioUrl(l, s.audio_mic)) return true;
-                if (hasDraftAudioUrl(l, s.audio_user)) return true;
+                if (hasDraftAudioUrl(l, s.audio_file)) return true;
             }
             if (hasDraftAudioUrl(l, wd && wd.audio_user_shared)) return true;
         }
@@ -4211,9 +4211,9 @@ async function commitDraftAudioBlobsToFinalCache(dictationId) {
                 for (const s of sentences) {
                     if (!s) continue;
                     pushCandidate(l, s.audio);
-                    pushCandidate(l, s.audio_avto);
+                    pushCandidate(l, s.audio);
                     pushCandidate(l, s.audio_mic);
-                    pushCandidate(l, s.audio_user);
+                    pushCandidate(l, s.audio_file);
                 }
                 pushCandidate(l, wd && wd.audio_user_shared);
             }
@@ -4287,7 +4287,7 @@ async function handleAudioPlayback(event) {
     const language = button.dataset.language; // 'en' или 'ru'
     const languageUrl = getAudioPath(language);
      
-    let fieldName = 'audio'; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
+    let fieldName = 'audio'; // 'audio', 'audio', 'audio_file', 'audio_mic', 'audio_user_shared'
     let nameAudioFile = 'audio.mp3';
     let sentence = {};
     let audioUrl = null;
@@ -4328,7 +4328,7 @@ async function handleAudioPlayback(event) {
 
             // Не трогаем регион/волну из Play
         } else {
-            fieldName = button.dataset.fieldName; // 'audio', 'audio_avto', 'audio_user', 'audio_mic', 'audio_user_shared'
+            fieldName = button.dataset.fieldName; // 'audio', 'audio', 'audio_file', 'audio_mic', 'audio_user_shared'
             nameAudioFile = sentence && sentence[fieldName];
 
             const needsRegenEarly = String(button.dataset.create || '') === 'true';
@@ -4495,7 +4495,7 @@ async function createAndPlayAudio(button, language, fieldName, languageUrl) {
         let nameAudioFile = null;
 
         // Если есть общий файл и start/end заданы — вырезаем кусочек
-        if (fieldName === 'audio_user' &&
+        if (fieldName === 'audio_file' &&
             sentence.start !== undefined && sentence.end !== undefined &&
             sentence.start >= 0 && sentence.end > sentence.start &&
             currentAudioFileName) { // есть общий файл
@@ -4562,8 +4562,8 @@ async function handleEditAllCreating() {
     const editAllBtn = document.getElementById('editAllCreatingBtn');
     if (!editAllBtn) return;
     
-    // Находим все кнопки с состоянием 'creating' и fieldName = 'audio_user'
-    const creatingButtons = document.querySelectorAll('button.audio-btn[data-field-name="audio_user"][data-state="creating"]');
+    // Находим все кнопки с состоянием 'creating' и fieldName = 'audio_file'
+    const creatingButtons = document.querySelectorAll('button.audio-btn[data-field-name="audio_file"][data-state="creating"]');
     
     if (creatingButtons.length === 0) {
         console.log('Нет строк с состоянием "creating" для редактирования');
@@ -4584,7 +4584,7 @@ async function handleEditAllCreating() {
             showLoadingIndicator(`Создание аудио ${i + 1} из ${creatingButtons.length}...`);
             
             try {
-                await createAndPlayAudio(button, language, 'audio_user', languageUrl);
+                await createAndPlayAudio(button, language, 'audio_file', languageUrl);
                 // Небольшая задержка между запросами, чтобы не перегружать сервер
                 await new Promise(resolve => setTimeout(resolve, 100));
             } catch (error) {
@@ -4610,8 +4610,8 @@ function updateEditAllCreatingButtonVisibility() {
     const editAllBtn = document.getElementById('editAllCreatingBtn');
     if (!editAllBtn) return;
     
-    // Находим все кнопки с состоянием 'creating' и fieldName = 'audio_user'
-    const creatingButtons = document.querySelectorAll('button.audio-btn[data-field-name="audio_user"][data-state="creating"]');
+    // Находим все кнопки с состоянием 'creating' и fieldName = 'audio_file'
+    const creatingButtons = document.querySelectorAll('button.audio-btn[data-field-name="audio_file"][data-state="creating"]');
     
     // Показываем кнопку только если есть строки с состоянием 'creating'
     // и если мы находимся в режиме, где видна колонка с кнопками
@@ -5873,14 +5873,14 @@ function getAudioFileForPattern(element, originalSentence, translationSentence) 
             fieldName = 'audio';
             break;
         case 'a': // автоматическое
-            filename = originalSentence?.audio_avto;
+            filename = originalSentence?.audio;
             language = language_original;
-            fieldName = 'audio_avto';
+            fieldName = 'audio';
             break;
         case 'f': // вырезанное из файла
-            filename = originalSentence?.audio_user;
+            filename = originalSentence?.audio_file;
             language = language_original;
-            fieldName = 'audio_user';
+            fieldName = 'audio_file';
             break;
         case 'm': // микрофон
             filename = originalSentence?.audio_mic;
@@ -5927,13 +5927,13 @@ function getReferenceAudioFile(pauseType, originalSentence, translationSentence)
                 language: currentDictation.language_original
             } : null);
         case 'a': // автоматическое
-            return originalSentence?.audio_avto ? {
-                filename: originalSentence.audio_avto,
+            return originalSentence?.audio ? {
+                filename: originalSentence.audio,
                 language: currentDictation.language_original
             } : null;
         case 'f': // вырезанное из файла
-            return originalSentence?.audio_user ? {
-                filename: originalSentence.audio_user,
+            return originalSentence?.audio_file ? {
+                filename: originalSentence.audio_file,
                 language: currentDictation.language_original
             } : null;
         case 'm': // микрофон
@@ -6790,8 +6790,8 @@ function addNewRow(referenceRow, position) {
             speaker: '1',
             text: '',
             audio: '',
-            audio_avto: '',
-            audio_user: '',
+            audio: '',
+            audio_file: '',
             audio_mic: '',
             start: 0,
             end: 0,
@@ -6807,8 +6807,8 @@ function addNewRow(referenceRow, position) {
             key: newKey,
             text: '',
             audio: '',
-            audio_avto: '',
-            audio_user: '',
+            audio: '',
+            audio_file: '',
             audio_mic: '',
             start: 0,
             end: 0,
@@ -7737,7 +7737,7 @@ function handleFieldChange(source, field, value, row = null) {
 
     // Устанавливаем состояние 'creating' для audioBtnOriginalUser в целевой строке
     if (targetRow) {
-        const audioBtnOriginalUser = targetRow.querySelector('button[data-field-name="audio_user"]');
+        const audioBtnOriginalUser = targetRow.querySelector('button[data-field-name="audio_file"]');
         if (audioBtnOriginalUser) {
             audioBtnOriginalUser.dataset.state = 'creating';
             setButtonState(audioBtnOriginalUser);
@@ -7986,7 +7986,7 @@ function splitAudioIntoSeentences(row) {
                         const outBlob = new Blob([outBytes], { type: f.mime || 'audio/mpeg' });
                         await putDraftAudioToCache(currentDictation.id, currentDictation.language_original, f.filename, outBlob, f.mime || 'audio/mpeg');
                         const sentence = workingData.original.sentences.find(s => s.key === f.key);
-                        if (sentence) sentence.audio_user = f.filename;
+                        if (sentence) sentence.audio_file = f.filename;
                     } catch (e) { console.warn('⚠️', e); }
                 }
                 rebuildSentencesTable();
@@ -8078,7 +8078,7 @@ function updateChain(rowKey, field, value) {
                     updateSentenceData(nextRowKey, 'original', 'start', newValue);
                     
                     // Устанавливаем состояние 'creating' для audioBtnOriginalUser в следующей строке
-                    const nextAudioBtnOriginalUser = nextRow.querySelector('button[data-field-name="audio_user"]');
+                    const nextAudioBtnOriginalUser = nextRow.querySelector('button[data-field-name="audio_file"]');
                     if (nextAudioBtnOriginalUser) {
                         nextAudioBtnOriginalUser.dataset.state = 'creating';
                         setButtonState(nextAudioBtnOriginalUser);
@@ -8108,7 +8108,7 @@ function updateChain(rowKey, field, value) {
                     updateSentenceData(prevRowKey, 'original', 'end', newValue);
                     
                     // Устанавливаем состояние 'creating' для audioBtnOriginalUser в предыдущей строке
-                    const prevAudioBtnOriginalUser = prevRow.querySelector('button[data-field-name="audio_user"]');
+                    const prevAudioBtnOriginalUser = prevRow.querySelector('button[data-field-name="audio_file"]');
                     if (prevAudioBtnOriginalUser) {
                         prevAudioBtnOriginalUser.dataset.state = 'creating';
                         setButtonState(prevAudioBtnOriginalUser);
@@ -8279,7 +8279,7 @@ async function splitAudioIntoSentences() {
                 workingData.original.sentences[si].start = startTime;
                 workingData.original.sentences[si].end = endTime;
                 workingData.original.sentences[si].chain = true;
-                workingData.original.sentences[si].audio_user = `${sentence.key}_${currentDictation.language_original}_user.mp3`;
+                workingData.original.sentences[si].audio_file = `${sentence.key}_${currentDictation.language_original}_user.mp3`;
             }
         }
         const response = await fetch('/split-audio', {
@@ -8429,7 +8429,7 @@ function selectSentenceRow(row) {
         // Таб "В мене є аудіо" — обновляем нижнюю волну (sentence)
         updateCurrentSentenceInfo(sentence);
         // Перезагружаем нижнюю волну для выбранного предложения
-        const sentenceFile = sentence.audio_user || sentence.audio_user_shared;
+        const sentenceFile = sentence.audio_file || sentence.audio_user_shared;
         if (sentenceFile) {
             const url = _resolveAudioUrl(sentenceFile);
             if (url) {
@@ -9855,8 +9855,8 @@ async function createDictationFromStart() {
                     position: (s && s.position !== undefined && s.position !== null) ? s.position : null,
                     text: '',
                     audio: '',
-                    audio_avto: '',
-                    audio_user: '',
+                    audio: '',
+                    audio_file: '',
                     audio_mic: '',
                     start: 0,
                     end: 0,
@@ -11054,8 +11054,8 @@ async function parseInputText(text, delimiter, isDialog, speakers, keyAllocatorO
             speaker: '1',
             text: original_line,
             audio: audio_originalFileName, //аудио которое будет в диктанте! Итоговое
-            audio_avto: audio_originalFileName, // автоперевод
-            audio_user: '', // отрезанный кусок
+            audio: audio_originalFileName, // автоперевод
+            audio_file: '', // отрезанный кусок
             audio_mic: '', // запись с микрофона
             // audio_user_shared: '', // источник для отрезанного куска
             start: 0,
@@ -11092,8 +11092,8 @@ async function parseInputText(text, delimiter, isDialog, speakers, keyAllocatorO
             speaker: '1',
             text: translation_line,
             audio: audio_translationFileName,
-            audio_avto: audio_translationFileName, // автоперевод
-            audio_user: '', // отрезанный кусок
+            audio: audio_translationFileName, // автоперевод
+            audio_file: '', // отрезанный кусок
             audio_mic: '', // запись с микрофона
             // audio_user_shared: '', // источник для отрезанного куска
             start: 0,
@@ -11641,10 +11641,10 @@ function createTableRow(key, originalSentence, translationSentence) {
     audioBtnOriginalAvto.className = 'audio-btn audio-btn-table state-ready';
     audioBtnOriginalAvto.innerHTML = '<i data-lucide="play"></i>';
     audioBtnOriginalAvto.dataset.language = currentDictation.language_original;
-    audioBtnOriginalAvto.dataset.fieldName = 'audio_avto';
+    audioBtnOriginalAvto.dataset.fieldName = 'audio';
     // audioBtnOriginalAvto.dataset.create === 'folse';
-    const originalAvtoFilename = originalSentence ? originalSentence.audio_avto : '';
-    state = (!originalSentence || !originalSentence.audio_avto) ? 'creating' : 'ready';
+    const originalAvtoFilename = originalSentence ? originalSentence.audio : '';
+    state = (!originalSentence || !originalSentence.audio) ? 'creating' : 'ready';
     audioBtnOriginalAvto.dataset.state = state;
     audioBtnOriginalAvto.dataset.originalState = state; // Сохраняем исходное состояние один раз
     setButtonState(audioBtnOriginalAvto);
@@ -11653,11 +11653,11 @@ function createTableRow(key, originalSentence, translationSentence) {
     generateTtsCell.appendChild(audioBtnOriginalAvto);
     row.appendChild(generateTtsCell);
 
-    // Колонка  AVTO2: Применить audio_avto
+    // Колонка  AVTO2: Применить audio
     const applyCellAvto = document.createElement('td');
     applyCellAvto.className = 'col-apply-avto panel-editing-avto';
     applyCellAvto.dataset.col_id = 'col-or-avto-apply';
-    applyCellAvto.dataset.fieldName = 'audio_avto';
+    applyCellAvto.dataset.fieldName = 'audio';
     // applyCellAvto.style.display = 'none'; // По умолчанию скрыта
     applyCellAvto.innerHTML = '<i data-lucide="arrow-big-left-dash"></i>';
     applyCellAvto.title = 'Применить автоперевод';
@@ -11719,9 +11719,9 @@ function createTableRow(key, originalSentence, translationSentence) {
     audioBtnOriginalUser.className = 'audio-btn audio-btn-table state-ready';
     audioBtnOriginalUser.innerHTML = '<i data-lucide="play"></i>';
     audioBtnOriginalUser.dataset.language = currentDictation.language_original;
-    audioBtnOriginalUser.dataset.fieldName = 'audio_user';
+    audioBtnOriginalUser.dataset.fieldName = 'audio_file';
     // audioBtnOriginalUser.dataset.create = 'folse';
-    state = (!originalSentence || !originalSentence.audio_user) ? 'creating' : 'ready';
+    state = (!originalSentence || !originalSentence.audio_file) ? 'creating' : 'ready';
     audioBtnOriginalUser.dataset.state = state;
     audioBtnOriginalUser.dataset.originalState = state; // Сохраняем исходное состояние один раз
     setButtonState(audioBtnOriginalUser);
@@ -11730,11 +11730,11 @@ function createTableRow(key, originalSentence, translationSentence) {
     playAudioUserCell.appendChild(audioBtnOriginalUser);
     row.appendChild(playAudioUserCell);
 
-    // Колонка  USER5: Применить audio_user
+    // Колонка  USER5: Применить audio_file
     const applyCellUser = document.createElement('td');
     applyCellUser.className = 'col-apply-user panel-editing-user';
     applyCellUser.dataset.col_id = 'col-or-user-apply';
-    applyCellUser.dataset.fieldName = 'audio_user';
+    applyCellUser.dataset.fieldName = 'audio_file';
     // applyCellUser.style.display = 'none'; // По умолчанию скрыта
     applyCellUser.innerHTML = '<i data-lucide="arrow-big-left-dash"></i>';
     applyCellUser.title = 'Применить запись пользователя';
@@ -11765,7 +11765,7 @@ function createTableRow(key, originalSentence, translationSentence) {
     generateAudioMicCell.appendChild(audioBtnAudioMic);
     row.appendChild(generateAudioMicCell);
 
-    // Колонка  MIC2: Применить audio_avto
+    // Колонка  MIC2: Применить audio
     const applyCellMic = document.createElement('td');
     applyCellMic.className = 'col-apply-avto panel-editing-mic';
     applyCellMic.dataset.col_id = 'col-or-mic-apply';
@@ -11911,8 +11911,8 @@ async function createAutoTranslation(originalText, translationTextarea, key) {
                         key: key,
                         text: translatedText,
                         audio: '',
-                        audio_avto: '',
-                        audio_user: '',
+                        audio: '',
+                        audio_file: '',
                         audio_mic: '',
                         start: 0,
                         end: 0,
@@ -12229,7 +12229,7 @@ function setupWaveformRegionCallback() {
             
             if (startChanged || endChanged) {
                 // Устанавливаем состояние 'creating' для audioBtnOriginalUser
-                const audioBtnOriginalUser = selectedRow.querySelector('button[data-field-name="audio_user"]');
+                const audioBtnOriginalUser = selectedRow.querySelector('button[data-field-name="audio_file"]');
                 if (audioBtnOriginalUser) {
                     const currentState = audioBtnOriginalUser.dataset.state;
                     const audioManagerButton = window.audioManager?.currentButton;
@@ -12415,8 +12415,8 @@ function updateApplyButtonsIndicators(sentenceKey, activeSourceField) {
  */
 function getFieldDisplayName(fieldName) {
     const names = {
-        'audio_avto': 'автоперевод',
-        'audio_user': 'запись пользователя',
+        'audio': 'автоперевод',
+        'audio_file': 'запись пользователя',
         'audio_mic': 'запись с микрофона'
     };
     return names[fieldName] || fieldName;

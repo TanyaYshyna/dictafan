@@ -303,7 +303,7 @@ def api_b2_cleanup_dictation_audio():
             for r in (rows or []):
                 try:
                     lang = (r.get('language_code') if isinstance(r, dict) else None) or ''
-                    for fld in ('audio', 'audio_avto', 'audio_mic', 'audio_user'):
+                    for fld in ('audio', 'audio_mic', 'audio_file'):
                         val = r.get(fld) if isinstance(r, dict) else None
                         if val:
                             _add(lang, val)
@@ -460,9 +460,8 @@ def dictation_editor(dictation_id, language_original, language_translation):
                         "explanation": sentence.get('explanation'),
                         "speaker": sentence.get('speaker'),
                         "audio": sentence.get('audio'),
-                        "audio_avto": sentence.get('audio_avto'),
                         "audio_mic": sentence.get('audio_mic'),
-                        "audio_user": sentence.get('audio_user'),
+                        "audio_file": sentence.get('audio_file'),
                         "start": sentence.get('start'),
                         "end": sentence.get('end'),
                         "chain": sentence.get('chain', False),
@@ -1448,18 +1447,16 @@ def save_dictation_final():
                     
                     # Normalize audio to filename-only before comparing / saving.
                     audio_in = _normalize_audio_filename(sentence.get('audio'))
-                    audio_avto_in = _normalize_audio_filename(sentence.get('audio_avto'))
                     audio_mic_in = _normalize_audio_filename(sentence.get('audio_mic'))
-                    audio_user_in = _normalize_audio_filename(sentence.get('audio_user'))
+                    audio_file_in = _normalize_audio_filename(sentence.get('audio_file'))
 
                     has_changes = (
                         old_sentence['text'] != sentence.get('text', '') or
                         old_sentence['explanation'] != sentence.get('explanation') or
                         old_sentence['speaker'] != sentence.get('speaker') or
                         (old_sentence.get('audio') or '') != audio_in or
-                        (old_sentence.get('audio_avto') or '') != audio_avto_in or
                         (old_sentence.get('audio_mic') or '') != audio_mic_in or
-                        (old_sentence.get('audio_user') or '') != audio_user_in or
+                        (old_sentence.get('audio_file') or '') != audio_file_in or
                         not float_eq(old_sentence['start'], sentence.get('start')) or
                         not float_eq(old_sentence['end'], sentence.get('end')) or
                         old_sentence['chain'] != sentence.get('chain', False) or
@@ -1469,9 +1466,8 @@ def save_dictation_final():
                     
                     if has_changes:
                         audio_final = audio_in
-                        audio_avto_final = audio_avto_in
                         audio_mic_final = audio_mic_in
-                        audio_user_final = audio_user_in
+                        audio_file_final = audio_file_in
                         # Обновляем только изменённые поля
                         update_sentence(
                             sentence_id=old_sentence['id'],
@@ -1479,9 +1475,8 @@ def save_dictation_final():
                             explanation=sentence.get('explanation'),
                             speaker=sentence.get('speaker'),
                             audio=audio_final,
-                            audio_avto=audio_avto_final,
                             audio_mic=audio_mic_final,
-                            audio_user=audio_user_final,
+                            audio_file=audio_file_final,
                             start=sentence.get('start'),
                             end=sentence.get('end'),
                             chain=sentence.get('chain', False),
@@ -1491,9 +1486,8 @@ def save_dictation_final():
                         updated_count += 1
                 else:
                     audio_final = _normalize_audio_filename(sentence.get('audio'))
-                    audio_avto_final = _normalize_audio_filename(sentence.get('audio_avto'))
                     audio_mic_final = _normalize_audio_filename(sentence.get('audio_mic'))
-                    audio_user_final = _normalize_audio_filename(sentence.get('audio_user'))
+                    audio_file_final = _normalize_audio_filename(sentence.get('audio_file'))
                     # Новое предложение - добавляем
                     add_sentence(
                         dictation_id=db_id,
@@ -1503,9 +1497,8 @@ def save_dictation_final():
                         explanation=sentence.get('explanation'),
                         speaker=sentence.get('speaker'),
                         audio=audio_final,
-                        audio_avto=audio_avto_final,
                         audio_mic=audio_mic_final,
-                        audio_user=audio_user_final,
+                        audio_file=audio_file_final,
                         start=sentence.get('start'),
                         end=sentence.get('end'),
                         chain=sentence.get('chain', False),
@@ -1589,7 +1582,7 @@ def save_dictation_final():
                 for s in (_lang_data.get('sentences') or []):
                     if not s or not isinstance(s, dict):
                         continue
-                    for fld in ('audio', 'audio_avto', 'audio_mic', 'audio_user'):
+                    for fld in ('audio', 'audio_mic', 'audio_file'):
                         base = _basename_from_value(s.get(fld)) if isinstance(s.get(fld), str) else None
                         if base:
                             keep_audio_names.add(base)
