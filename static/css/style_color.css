@@ -114,13 +114,13 @@ body {
   --color-audio-orange-medium: rgba(245, 158, 11, 0.2);  /* средний оранжевый */
 
   /* ========== ЦВЕТА ДЛЯ ВОЛНЫ (waveform_canvas.js) ========== */
-  --color-waveform-bg-inside: #c8c9fbff;             /* фиолетовый фон ВНУТРИ региона */
-  --color-waveform-bg-outside: #fdfdfdff;             /* бежевый фон СНАРУЖИ региона (panelBg) */
+  --color-waveform-bg-inside: #eeede8ff;            /* фиолетовый фон ВНУТРИ региона */
+  --color-waveform-bg-outside: rgb(247, 246, 245);            /* бежевый фон СНАРУЖИ региона (panelBg) */
   --color-waveform-wave-inside: rgb(63, 66, 147);     /* фиолетовый цвет столбиков волны ВНУТРИ региона */
-  --color-waveform-wave-outside: #fdfdfdff;           /* цвет столбиков волны СНАРУЖИ региона (темнее panelBg) */
+  --color-waveform-wave-outside: #eeede8ff;           /* цвет столбиков волны СНАРУЖИ региона (темнее panelBg) */
   --color-waveform-region-overlay: #f8cd46ff;         /* жёлтый полупрозрачный слой поверх региона */
-  --color-waveform-marker: rgb(252, 220, 113);          /* жёлтый цвет маркеров */
-  --color-waveform-marker-dots: #ffffff;              /* белый цвет точек на маркерах */
+  --color-waveform-marker: rgb(252, 235, 163);        /* жёлтый цвет маркеров */
+  --color-waveform-marker-dots: rgb(255, 198, 9);             /* белый цвет точек на маркерах */
   --color-waveform-playhead: rgb(176, 78, 88);               /* розовый цвет плейхеда */
 
   /* ========== ЦВЕТА ДЛЯ КОЛЕЦ СТАТИСТИКИ (desktop-stats-panel) ========== */
