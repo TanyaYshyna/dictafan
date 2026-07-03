@@ -527,22 +527,34 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--color-button-purple, #a78bfa);
-  border-radius: 6px;
-  background: var(--color-button-purple, #a78bfa);
-  color: #fff;
+  background-color: var(--color-button-purple);
+  color: var(--color-button-text-purple);
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 0 transparent;
+  transition: all 0.2s ease;
+  position: relative;
+  gap: 8px;
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
   line-height: 1;
   margin-left: auto;
   flex-shrink: 0;
+  border-radius: 6px;
 }
 
 .dictation-editor-modal__file-select-btn:hover {
-  opacity: 0.85;
-  border-color: var(--color-button-purple-dark, #7c3aed);
+  border: 1px solid var(--color-button-shadow-purple);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-purple);
+}
+
+.dictation-editor-modal__file-select-btn:focus {
+  outline: 2px solid var(--color-button-text-purple);
+  outline-offset: 2px;
+}
+
+.dictation-editor-modal__file-select-btn:active {
+  border: 1px solid var(--color-button-shadow-purple);
 }
 
 .dictation-editor-modal__waveform-section {
