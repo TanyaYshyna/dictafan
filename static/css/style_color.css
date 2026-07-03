@@ -115,7 +115,7 @@ body {
 
   /* ========== ЦВЕТА ДЛЯ ВОЛНЫ (waveform_canvas.js) ========== */
   --color-waveform-bg-inside: #eeede8ff;            /* фиолетовый фон ВНУТРИ региона */
-  --color-waveform-bg-outside: rgb(247, 246, 245);            /* бежевый фон СНАРУЖИ региона (panelBg) */
+  --color-waveform-bg-outside: #fdfdfdff;              /* бежевый фон СНАРУЖИ региона (panelBg) */
   --color-waveform-wave-inside: rgb(63, 66, 147);     /* фиолетовый цвет столбиков волны ВНУТРИ региона */
   --color-waveform-wave-outside: #eeede8ff;           /* цвет столбиков волны СНАРУЖИ региона (темнее panelBg) */
   --color-waveform-region-overlay: #f8cd46ff;         /* жёлтый полупрозрачный слой поверх региона */
