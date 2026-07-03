@@ -750,17 +750,6 @@
   display: table-cell !important;
 }
 
-/* Voice-mode: на general и voice-translations показываем a/f/m по радио */
-.dictation-editor-modal__sentences-table.voice-mode-auto .panel-editing-avto {
-  display: table-cell !important;
-}
-.dictation-editor-modal__sentences-table.voice-mode-have .panel-editing-user {
-  display: table-cell !important;
-}
-.dictation-editor-modal__sentences-table.voice-mode-self .panel-editing-mic {
-  display: table-cell !important;
-}
-
 /* Номер колонки */
 .dictation-editor-modal__sentences-table .col-number {
   width: 40px;

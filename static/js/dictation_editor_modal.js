@@ -270,9 +270,6 @@
       }
     });
 
-    // Убираем voice-mode классы
-    table.classList.remove('voice-mode-auto', 'voice-mode-have', 'voice-mode-self');
-
     // Определяем, какое радио выбрано (для закладок general и voice-translations)
     var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
     var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
@@ -283,39 +280,39 @@
       els.forEach(function (el) { el.style.display = 'table-cell'; });
     }
 
-    // Функция показать одну из a/f/m в зависимости от radio
-    function showAudioByVoiceMode() {
+    // Функция показать только аудио-кнопку (a/f/m) по радио (те, у кого есть panel-create-audio)
+    function showAudioBtnByVoiceMode() {
       if (voiceMode === 'auto') {
-        showCols('.panel-editing-avto');
+        showCols('.panel-editing-avto.panel-create-audio');
       } else if (voiceMode === 'have') {
-        showCols('.panel-editing-user');
+        showCols('.panel-editing-user.panel-create-audio');
       } else if (voiceMode === 'self') {
-        showCols('.panel-editing-mic');
+        showCols('.panel-editing-mic.panel-create-audio');
       }
     }
 
     if (tabName === 'general') {
-      // №, Оригинал, a/f/m (по радио), Перевод, t
+      // №, Оригинал, a/f/m (только аудио-кнопка по радио), Перевод, t
       showCols('.panel-original');
       showCols('.panel-translation');
-      showAudioByVoiceMode();
+      showAudioBtnByVoiceMode();
     } else if (tabName === 'voice-original-auto') {
-      // №, Оригинал, a
+      // №, Оригинал, a (все колонки группы avto)
       showCols('.panel-original');
       showCols('.panel-editing-avto');
     } else if (tabName === 'voice-original-have') {
-      // №, Оригинал, f, Start, End
+      // №, Оригинал, f, Start, End (все колонки группы user)
       showCols('.panel-original');
       showCols('.panel-editing-user');
     } else if (tabName === 'voice-original-self') {
-      // №, Оригинал, m
+      // №, Оригинал, m (все колонки группы mic)
       showCols('.panel-original');
       showCols('.panel-editing-mic');
     } else if (tabName === 'voice-translations') {
-      // №, Оригинал, a/f/m (по радио), Перевод, t
+      // №, Оригинал, a/f/m (только аудио-кнопка по радио), Перевод, t
       showCols('.panel-original');
       showCols('.panel-translation');
-      showAudioByVoiceMode();
+      showAudioBtnByVoiceMode();
     } else if (tabName === 'create-audio') {
       showCols('.panel-original');
       showCols('.panel-translation');
@@ -523,17 +520,6 @@
       tdExpl.textContent = s.explanation || '';
       tr.appendChild(tdExpl);
 
-      // Apply avto
-      var tdApplyAvto = document.createElement('td');
-      tdApplyAvto.className = 'col-apply-avto panel-editing-avto';
-      tdApplyAvto.title = 'Применить';
-      var applyAvtoIcon = document.createElement('i');
-      applyAvtoIcon.setAttribute('data-lucide', 'corner-down-left');
-      applyAvtoIcon.style.width = '16px';
-      applyAvtoIcon.style.height = '16px';
-      tdApplyAvto.appendChild(applyAvtoIcon);
-      tr.appendChild(tdApplyAvto);
-
       // Start
       var tdStart = document.createElement('td');
       tdStart.className = 'col-start panel-editing-user';
@@ -555,28 +541,6 @@
       endInput.dataset.key = key;
       tdEnd.appendChild(endInput);
       tr.appendChild(tdEnd);
-
-      // Apply user
-      var tdApplyUser = document.createElement('td');
-      tdApplyUser.className = 'col-apply-user panel-editing-user';
-      tdApplyUser.title = 'Применить';
-      var applyUserIcon = document.createElement('i');
-      applyUserIcon.setAttribute('data-lucide', 'arrow-big-left-dash');
-      applyUserIcon.style.width = '16px';
-      applyUserIcon.style.height = '16px';
-      tdApplyUser.appendChild(applyUserIcon);
-      tr.appendChild(tdApplyUser);
-
-      // Apply mic
-      var tdApplyMic = document.createElement('td');
-      tdApplyMic.className = 'col-apply-mic panel-editing-mic';
-      tdApplyMic.title = 'Применить';
-      var applyMicIcon = document.createElement('i');
-      applyMicIcon.setAttribute('data-lucide', 'arrow-big-left-dash');
-      applyMicIcon.style.width = '16px';
-      applyMicIcon.style.height = '16px';
-      tdApplyMic.appendChild(applyMicIcon);
-      tr.appendChild(tdApplyMic);
 
       // Scrolling
       var tdScroll = document.createElement('td');
