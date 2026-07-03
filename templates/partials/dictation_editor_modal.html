@@ -119,7 +119,53 @@
 
           <!-- Вкладка 3: Озвучка оригинала (є аудіо) -->
           <div id="tab-voice-original-have" class="dictation-editor-modal__tab-content">
-            <p>Озвучка оригинала (є аудіо) — будет реализовано позже</p>
+            <div class="dictation-editor-modal__have-audio-content">
+              <!-- Информация о файле -->
+              <div class="dictation-editor-modal__file-selection">
+                <span id="editorModalCurrentAudioInfo">Аудіо для хвилі: не вибрано</span>
+                <button type="button" id="editorModalSelectFileBtn" class="dictation-editor-modal__file-select-btn"
+                  title="Вибрати файл">...</button>
+              </div>
+
+              <!-- Волна -->
+              <div class="dictation-editor-modal__waveform-section">
+                <div id="editorModalWaveformContainer" class="dictation-editor-modal__waveform-container">
+                  <div id="editorModalAudioWaveform"></div>
+                </div>
+              </div>
+
+              <!-- Кнопки управления -->
+              <div class="dictation-editor-modal__have-audio-controls">
+                <button type="button" id="editorModalAudioPlayBtn" class="audio-btn"
+                  data-field-name="audio_user_shared" data-state="ready-shared"
+                  data-original-state="ready-shared">
+                  <i data-lucide="play"></i>
+                </button>
+                <div class="dictation-editor-modal__time-controls">
+                  <label for="editorModalAudioStartTime">Start:</label>
+                  <input type="number" id="editorModalAudioStartTime" step="0.01" min="0" placeholder="0.00">
+                  <label for="editorModalAudioEndTime">End:</label>
+                  <input type="number" id="editorModalAudioEndTime" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <button type="button" id="editorModalScissorsBtn" class="dictation-editor-modal__wave-btn"
+                  title="Вирізати фрагмент">
+                  <i data-lucide="scissors"></i>
+                </button>
+                <button type="button" id="editorModalSplitBtn" class="dictation-editor-modal__wave-btn"
+                  title="Розрізати аудіо на 1000 кусків">
+                  <i data-lucide="scissors"></i>
+                  <span>на 1000 кусків</span>
+                </button>
+                <button type="button" id="editorModalSmartSplitBtn" class="dictation-editor-modal__wave-btn dictation-editor-modal__wave-btn--yellow"
+                  title="Розумна нарізка з використанням Whisper">
+                  <i data-lucide="wand-2"></i>
+                  <span>Розумна нарізка</span>
+                </button>
+              </div>
+
+              <!-- Скрытый input для выбора файлов -->
+              <input type="file" id="editorModalAudioFileInput" accept="audio/*" style="display:none;">
+            </div>
           </div>
 
           <!-- Вкладка 4: Озвучка оригинала (сам) -->

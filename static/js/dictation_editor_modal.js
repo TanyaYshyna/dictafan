@@ -524,16 +524,6 @@
       tdEnd.appendChild(endInput);
       tr.appendChild(tdEnd);
 
-      // Chain
-      var tdChain = document.createElement('td');
-      tdChain.className = 'col-chain panel-editing-user';
-      var chainIcon = document.createElement('i');
-      chainIcon.setAttribute('data-lucide', 'link');
-      chainIcon.style.width = '16px';
-      chainIcon.style.height = '16px';
-      tdChain.appendChild(chainIcon);
-      tr.appendChild(tdChain);
-
       // Play audio (user) — кнопка
       var tdPlayAudio = document.createElement('td');
       tdPlayAudio.className = 'col-play-audio panel-editing-user panel-create-audio';
@@ -1087,8 +1077,7 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          var tabName = 'voice-original-' + this.value;
-          _applyTableViewForTab(tabName);
+          // Не меняем колонки здесь — это делает _setupTabs при клике на закладку
         }
       });
     });
@@ -1121,6 +1110,392 @@
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  /* ===== ВКЛАДКА "Є АУДІО" (voice-original-have) ===== */
+
+  /** @type {string|null} */
+  var _sharedAudioFilename = null;
+  /** @type {number|null} */
+  var _sharedAudioDuration = null;
+
+  function _initHaveAudioTab() {
+    var selectBtn = document.getElementById('editorModalSelectFileBtn');
+    var fileInput = document.getElementById('editorModalAudioFileInput');
+    var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
+
+    if (selectBtn && fileInput) {
+      selectBtn.addEventListener('click', function () {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener('change', function (e) {
+        var file = e.target.files && e.target.files[0];
+        if (!file) return;
+        _uploadSharedAudioFile(file);
+      });
+    }
+
+    // Кнопка "вырезать фрагмент" (ножницы)
+    var scissorsBtn = document.getElementById('editorModalScissorsBtn');
+    if (scissorsBtn) {
+      scissorsBtn.addEventListener('click', function () {
+        _handleScissorsCut();
+      });
+    }
+
+    // Кнопка "разрезать на 1000 кусков"
+    var splitBtn = document.getElementById('editorModalSplitBtn');
+    if (splitBtn) {
+      splitBtn.addEventListener('click', function () {
+        _handleSplitAudio();
+      });
+    }
+
+    // Кнопка "умная нарезка"
+    var smartSplitBtn = document.getElementById('editorModalSmartSplitBtn');
+    if (smartSplitBtn) {
+      smartSplitBtn.addEventListener('click', function () {
+        _handleSmartSplit();
+      });
+    }
+
+    // Поля start/end под волной
+    var startInput = document.getElementById('editorModalAudioStartTime');
+    var endInput = document.getElementById('editorModalAudioEndTime');
+    if (startInput) {
+      startInput.addEventListener('input', function () {
+        _syncWaveformRegion('start', parseFloat(this.value) || 0);
+      });
+    }
+    if (endInput) {
+      endInput.addEventListener('input', function () {
+        _syncWaveformRegion('end', parseFloat(this.value) || 0);
+      });
+    }
+
+    // Кнопка воспроизведения под волной
+    var playBtn = document.getElementById('editorModalAudioPlayBtn');
+    if (playBtn) {
+      playBtn.addEventListener('click', function (event) {
+        _handleSharedAudioPlayback(event);
+      });
+    }
+  }
+
+  function _uploadSharedAudioFile(file) {
+    var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
+    var audio = new Audio();
+    var audioUrl = URL.createObjectURL(file);
+
+    audio.addEventListener('loadedmetadata', function () {
+      var duration = audio.duration;
+      _sharedAudioFilename = file.name;
+      _sharedAudioDuration = duration;
+
+      if (audioInfo) {
+        var rounded = Math.floor(duration * 100) / 100;
+        audioInfo.textContent = 'Аудіо для хвилі: ' + file.name + ' (' + rounded + 'с)';
+      }
+
+      // Инициализируем волну
+      _initWaveform(audioUrl);
+
+      // Устанавливаем start/end на весь файл
+      var startInput = document.getElementById('editorModalAudioStartTime');
+      var endInput = document.getElementById('editorModalAudioEndTime');
+      if (startInput) startInput.value = '0';
+      if (endInput) endInput.value = duration.toFixed(2);
+
+      URL.revokeObjectURL(audioUrl);
+    });
+
+    audio.addEventListener('error', function () {
+      console.warn('[dictationEditorModal] Ошибка загрузки аудио');
+      URL.revokeObjectURL(audioUrl);
+    });
+
+    audio.src = audioUrl;
+  }
+
+  function _initWaveform(audioUrl) {
+    var container = document.getElementById('editorModalAudioWaveform');
+    if (!container) return;
+
+    // Проверяем, что WaveformCanvas загружен
+    if (typeof WaveformCanvas === 'undefined') {
+      console.warn('[dictationEditorModal] WaveformCanvas не загружен');
+      return;
+    }
+
+    // Уничтожаем старый экземпляр
+    if (window.editorModalWaveform) {
+      window.editorModalWaveform.destroy();
+      window.editorModalWaveform = null;
+    }
+
+    try {
+      var wf = new WaveformCanvas(container);
+      window.editorModalWaveform = wf;
+
+      // Подключаем к audioManager
+      var am = _ensureAudioManager();
+      if (am && typeof am.setWaveformCanvas === 'function') {
+        am.setWaveformCanvas(wf);
+      }
+
+      wf.loadAudio(audioUrl).then(function () {
+        var duration = wf.getDuration();
+        wf.setRegion(0, duration);
+      }).catch(function (err) {
+        console.warn('[dictationEditorModal] Waveform load error', err);
+      });
+
+      // Callback при изменении региона
+      wf.onRegionUpdate(function (region) {
+        var startInput = document.getElementById('editorModalAudioStartTime');
+        var endInput = document.getElementById('editorModalAudioEndTime');
+        if (startInput) startInput.value = region.start.toFixed(2);
+        if (endInput) endInput.value = region.end.toFixed(2);
+      });
+
+    } catch (e) {
+      console.warn('[dictationEditorModal] Waveform init error', e);
+    }
+  }
+
+  function _syncWaveformRegion(field, value) {
+    var wf = window.editorModalWaveform;
+    if (!wf) return;
+    var region = wf.getRegion();
+    if (!region) return;
+    if (field === 'start') {
+      wf.setRegion(value, region.end);
+    } else if (field === 'end') {
+      wf.setRegion(region.start, value);
+    }
+  }
+
+  function _handleSharedAudioPlayback(event) {
+    var button = event.currentTarget;
+    if (!button) return;
+
+    var am = _ensureAudioManager();
+    if (!am) return;
+
+    var currentState = button.dataset.state || 'ready-shared';
+
+    if (currentState === 'playing' || currentState === 'playing-shared') {
+      if (typeof am.pause === 'function') am.pause();
+      else if (typeof am.stop === 'function') am.stop();
+      _setButtonState(button, 'ready-shared');
+      return;
+    }
+
+    // Получаем URL для воспроизведения
+    var wf = window.editorModalWaveform;
+    if (!wf) return;
+
+    var audioUrl = null;
+    try {
+      audioUrl = wf.getAudioUrl();
+    } catch (e) {}
+
+    if (!audioUrl) return;
+
+    if (am.currentButton && am.currentButton !== button) {
+      if (typeof am.stop === 'function') am.stop();
+    }
+
+    if (typeof am.play === 'function') {
+      am.play(button, audioUrl, {
+        onEnd: function () {
+          _setButtonState(button, 'ready-shared');
+        }
+      });
+      _setButtonState(button, 'playing-shared');
+    }
+  }
+
+  function _handleScissorsCut() {
+    var startInput = document.getElementById('editorModalAudioStartTime');
+    var endInput = document.getElementById('editorModalAudioEndTime');
+    var start = parseFloat(startInput ? startInput.value : 0) || 0;
+    var end = parseFloat(endInput ? endInput.value : 0) || 0;
+
+    if (start >= end) {
+      alert('Время начала должно быть меньше времени окончания');
+      return;
+    }
+    if (!_sharedAudioFilename) {
+      alert('Не выбран аудиофайл для обрезки');
+      return;
+    }
+
+    // Используем AudioEditorTools если доступен
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.cutAudioFile === 'function') {
+      window.AudioEditorTools.cutAudioFile({ filename: _sharedAudioFilename, start: start, end: end });
+      return;
+    }
+
+    // Fallback: запрос к серверу
+    _cutAudioOnServer(_sharedAudioFilename, start, end);
+  }
+
+  async function _cutAudioOnServer(filename, start, end) {
+    try {
+      var response = await fetch('/cut-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          start_time: start,
+          end_time: end,
+          language: state.config ? state.config.originalLanguage : '',
+          dictation_id: state.config ? state.config.dictationId : ''
+        })
+      });
+      var data = await response.json();
+      if (data.success) {
+        _setDirtyFlags({ audio: true });
+      } else {
+        alert('Ошибка обрезки аудио');
+      }
+    } catch (e) {
+      console.error('[dictationEditorModal] cut error', e);
+      alert('Ошибка обрезки аудио');
+    }
+  }
+
+  function _handleSplitAudio() {
+    if (!_sharedAudioFilename) {
+      alert('Не выбран аудиофайл');
+      return;
+    }
+
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.splitAudioIntoSeentences === 'function') {
+      window.AudioEditorTools.splitAudioIntoSeentences({ filename: _sharedAudioFilename });
+      return;
+    }
+
+    // Fallback: собираем предложения с start/end
+    var sentences = [];
+    if (state.content) {
+      var cores = state.content.getAllSentenceCores();
+      cores.forEach(function (s) {
+        if (s.key && s.end && s.start && Number(s.end) > Number(s.start)) {
+          sentences.push({
+            key: s.key,
+            start_time: Number(s.start) || 0,
+            end_time: Number(s.end) || 0,
+            language: state.config ? state.config.originalLanguage : ''
+          });
+        }
+      });
+    }
+
+    if (sentences.length === 0) {
+      alert('Нет предложений с заполненными start/end. Сначала укажите время для каждого предложения.');
+      return;
+    }
+
+    _splitAudioOnServer(_sharedAudioFilename, sentences);
+  }
+
+  async function _splitAudioOnServer(filename, sentences) {
+    try {
+      var response = await fetch('/split-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          dictation_id: state.config ? state.config.dictationId : '',
+          sentences: sentences
+        })
+      });
+      var data = await response.json();
+      if (data.success && Array.isArray(data.files)) {
+        for (var i = 0; i < data.files.length; i++) {
+          var f = data.files[i];
+          if (!f || !f.filename || !f.audio_b64 || !f.key) continue;
+          // Обновляем sentence в DictationContent
+          if (state.content) {
+            var sentence = state.content.getSentence(f.key);
+            if (sentence) {
+              sentence.audio_user = f.filename;
+            }
+          }
+        }
+        _setDirtyFlags({ audio: true });
+        _renderTable();
+        _bindAudioPlaybackHandlers();
+      } else {
+        alert('Ошибка разрезания аудио');
+      }
+    } catch (e) {
+      console.error('[dictationEditorModal] split error', e);
+      alert('Ошибка разрезания аудио');
+    }
+  }
+
+  function _handleSmartSplit() {
+    if (!_sharedAudioFilename) {
+      alert('Не выбран аудиофайл');
+      return;
+    }
+
+    if (window.AudioEditorTools && typeof window.AudioEditorTools.smartSplit === 'function') {
+      window.AudioEditorTools.smartSplit({ filename: _sharedAudioFilename });
+      return;
+    }
+
+    // Fallback: используем серверный эндпоинт
+    _smartSplitOnServer(_sharedAudioFilename);
+  }
+
+  async function _smartSplitOnServer(filename) {
+    try {
+      var response = await fetch('/split-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: filename,
+          dictation_id: state.config ? state.config.dictationId : '',
+          smart: true,
+          language: state.config ? state.config.originalLanguage : '',
+          sentences: state.content ? state.content.getAllSentenceCores().map(function (s) {
+            return {
+              key: s.key,
+              text: s.text_original || '',
+              language: state.config ? state.config.originalLanguage : ''
+            };
+          }) : []
+        })
+      });
+      var data = await response.json();
+      if (data.success && Array.isArray(data.files)) {
+        for (var i = 0; i < data.files.length; i++) {
+          var f = data.files[i];
+          if (!f || !f.filename || !f.audio_b64 || !f.key) continue;
+          if (state.content) {
+            var sentence = state.content.getSentence(f.key);
+            if (sentence) {
+              sentence.audio_user = f.filename;
+              if (f.start != null) sentence.start = String(f.start);
+              if (f.end != null) sentence.end = String(f.end);
+            }
+          }
+        }
+        _setDirtyFlags({ audio: true });
+        _renderTable();
+        _bindAudioPlaybackHandlers();
+      } else {
+        alert('Ошибка умной нарезки');
+      }
+    } catch (e) {
+      console.error('[dictationEditorModal] smart split error', e);
+      alert('Ошибка умной нарезки');
+    }
   }
 
   function _setupTabs() {
@@ -1359,6 +1734,7 @@
     _initLevelSelector();
     _initVoiceModeRadios();
     _initCoverUpload();
+    _initHaveAudioTab();
     _setupTabs();
     _renderTable();
     _bindAudioPlaybackHandlers();
@@ -1384,6 +1760,14 @@
     state.content = null;
     state.currentDictation = null;
     state.dirtyFlags = { db: false, audio: false, cover: false };
+    _sharedAudioFilename = null;
+    _sharedAudioDuration = null;
+
+    // Уничтожаем waveform
+    if (window.editorModalWaveform) {
+      window.editorModalWaveform.destroy();
+      window.editorModalWaveform = null;
+    }
 
     const modal = document.getElementById(MODAL_ID);
     if (modal) {
