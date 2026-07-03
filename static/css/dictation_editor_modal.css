@@ -27,22 +27,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--color-panel-bg, #f5f3f0);
-  border-bottom: 1px solid var(--color-border-light, #e5e3df);
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-hover, #f8f9fa);
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
   flex-shrink: 0;
 }
 
 .dictation-editor-modal__header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .dictation-editor-modal__logo {
   height: 5em;
+  width: auto;
+  max-height: 80px;
   cursor: pointer;
-  vertical-align: middle;
 }
 
 .dictation-editor-modal__logo--min {
@@ -68,28 +71,50 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .dictation-editor-modal__user {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .dictation-editor-modal__username {
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--color-text, #1f2933);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 28vw;
 }
 
 .dictation-editor-modal__header-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  flex: 0 0 auto;
 }
 
 #dictationEditorModalSaveBtn {
   margin: 0 12px;
+}
+
+/* ===== ЗВЁЗДЫ НЕСОХРАНЁННЫХ ИЗМЕНЕНИЙ ===== */
+.dictation-editor-modal__header-container .unsaved-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 18px;
+  line-height: 1;
+  vertical-align: middle;
+  margin-left: 4px;
+  border-radius: 50%;
+  font-weight: bold;
 }
 
 /* ===== BODY ===== */

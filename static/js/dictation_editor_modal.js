@@ -1,6 +1,11 @@
 /**
  * dictation_editor_modal.js — Редактор диктанта в модальном окне
  * IIFE-паттерн, как dictation_modal.js
+ *
+ * Содержит:
+ * - Полный механизм audio playback (play/pause/hammer, audioManager)
+ * - Save system с dirty flags (db/audio/cover) и цветными звёздами
+ * - Таблицу предложений с управлением колонками
  */
 (function () {
   'use strict';
@@ -18,6 +23,8 @@
     currentTabName: 'general',
     currentDictation: null,
     audioManager: null,
+    /** @type {{ db: boolean, audio: boolean, cover: boolean }} */
+    dirtyFlags: { db: false, audio: false, cover: false },
   };
 
   /* ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===== */
@@ -29,7 +36,7 @@
 
   function escapeHtml(str) {
     if (!str) return '';
-    const div = document.createElement('div');
+    var div = document.createElement('div');
     div.appendChild(document.createTextNode(str));
     return div.innerHTML;
   }
@@ -59,10 +66,91 @@
     return null;
   }
 
+  /* ===== DIRTY FLAGS / SAVE SYSTEM ===== */
+
+  function _getDirtyFlags() {
+    return state.dirtyFlags || { db: false, audio: false, cover: false };
+  }
+
+  function _setDirtyFlags(next) {
+    if (!state.dirtyFlags) state.dirtyFlags = { db: false, audio: false, cover: false };
+    if (next.db === true) state.dirtyFlags.db = true;
+    if (next.db === false) state.dirtyFlags.db = false;
+    if (next.audio === true) state.dirtyFlags.audio = true;
+    if (next.audio === false) state.dirtyFlags.audio = false;
+    if (next.cover === true) state.dirtyFlags.cover = true;
+    if (next.cover === false) state.dirtyFlags.cover = false;
+    _updateUnsavedStar();
+  }
+
+  function _hasUnsavedChanges() {
+    var f = _getDirtyFlags();
+    return !!(f.db || f.audio || f.cover);
+  }
+
+  function _updateUnsavedStar() {
+    var flags = _getDirtyFlags();
+
+    var dbStar = document.getElementById('dictationEditorModalUnsavedStarDb');
+    if (dbStar) {
+      dbStar.style.display = flags.db ? 'inline-flex' : 'none';
+      dbStar.style.color = 'var(--color-button-text-lightgreen, #2ecc71)';
+      dbStar.title = 'Изменения в тексте/БД';
+    }
+
+    var audioStar = document.getElementById('dictationEditorModalUnsavedStarAudio');
+    if (audioStar) {
+      audioStar.style.display = flags.audio ? 'inline-flex' : 'none';
+      audioStar.style.color = 'var(--color-button-purple, #9b59b6)';
+      audioStar.title = 'Изменения в аудио';
+    }
+
+    var coverStar = document.getElementById('dictationEditorModalUnsavedStarCover');
+    if (coverStar) {
+      coverStar.style.display = flags.cover ? 'inline-flex' : 'none';
+      coverStar.style.color = 'var(--color-button-text-yellow, #f1c40f)';
+      coverStar.title = 'Изменения в обложке';
+    }
+  }
+
+  /* ===== SET BUTTON STATE (AUDIO PLAYBACK) ===== */
+
+  function _setButtonState(button, stateStr) {
+    if (!button) return;
+    if (stateStr) {
+      button.dataset.state = stateStr;
+    }
+    var s = button.dataset.state || 'ready';
+    var newIcon = '';
+    switch (s) {
+      case 'ready':
+      case 'ready-shared':
+        newIcon = 'play';
+        break;
+      case 'playing':
+      case 'playing-shared':
+        newIcon = 'pause';
+        break;
+      case 'creating':
+        newIcon = 'hammer';
+        break;
+      case 'creating_mic':
+        newIcon = 'mic';
+        break;
+      default:
+        newIcon = 'play';
+    }
+    button.innerHTML = '<i data-lucide="' + newIcon + '"></i>';
+    button.dataset.state = s;
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  }
+
   /* ===== РАБОТА С ТАБЛИЦЕЙ ===== */
 
   function _toggleColumnGroup(group) {
-    const table = document.getElementById(TABLE_ID);
+    var table = document.getElementById(TABLE_ID);
     if (!table) return;
     table.classList.remove('state-original-translation', 'state-original-editing');
     if (group === 'original') {
@@ -73,21 +161,21 @@
   }
 
   function _toggleCheckboxColumn(show) {
-    const header = document.querySelector('#' + TABLE_ID + ' th.col-checkbox-create-audio');
-    const cells = document.querySelectorAll('#' + TABLE_ID + ' td.col-checkbox-create-audio');
+    var header = document.querySelector('#' + TABLE_ID + ' th.col-checkbox-create-audio');
+    var cells = document.querySelectorAll('#' + TABLE_ID + ' td.col-checkbox-create-audio');
     if (header) {
       header.style.display = show ? 'table-cell' : 'none';
     }
     cells.forEach(function (cell) {
       cell.style.display = show ? 'table-cell' : 'none';
       if (show) {
-        const btn = cell.querySelector('.checkbox-btn');
+        var btn = cell.querySelector('.checkbox-btn');
         if (btn) {
-          const key = btn.dataset.key;
+          var key = btn.dataset.key;
           if (key && state.content) {
-            const sentence = state.content.getSentence(key);
-            const isChecked = sentence ? sentence.checked === true : false;
-            const icon = btn.querySelector('.checkbox-icon');
+            var sentence = state.content.getSentence(key);
+            var isChecked = sentence ? sentence.checked === true : false;
+            var icon = btn.querySelector('.checkbox-icon');
             if (icon) {
               icon.setAttribute('data-lucide', isChecked ? 'circle-check' : 'circle');
             }
@@ -101,7 +189,7 @@
   }
 
   function _toggleCreateAudioColumns(show) {
-    const table = document.getElementById(TABLE_ID);
+    var table = document.getElementById(TABLE_ID);
     if (!table) return;
 
     var setDisplay = function (el, value) {
@@ -336,13 +424,22 @@
       tdCheckbox.appendChild(checkboxBtn);
       tr.appendChild(tdCheckbox);
 
-      // Play original
+      // Play original — кнопка с data-state
       var tdPlayOrig = document.createElement('td');
       tdPlayOrig.className = 'col-play-original panel-original panel-create-audio';
-      tdPlayOrig.textContent = 'o';
-      tdPlayOrig.dataset.key = key;
-      tdPlayOrig.dataset.lang = state.config?.originalLanguage || '';
-      tdPlayOrig.dataset.field = 'audio_original';
+      var playOrigBtn = document.createElement('button');
+      playOrigBtn.type = 'button';
+      playOrigBtn.className = 'audio-btn';
+      playOrigBtn.dataset.key = key;
+      playOrigBtn.dataset.lang = state.config?.originalLanguage || '';
+      playOrigBtn.dataset.field = 'audio_original';
+      playOrigBtn.dataset.state = s.audio_original ? 'ready' : 'creating';
+      playOrigBtn.style.background = 'none';
+      playOrigBtn.style.border = 'none';
+      playOrigBtn.style.cursor = 'pointer';
+      playOrigBtn.style.padding = '2px';
+      playOrigBtn.innerHTML = '<i data-lucide="' + (s.audio_original ? 'play' : 'hammer') + '"></i>';
+      tdPlayOrig.appendChild(playOrigBtn);
       tr.appendChild(tdPlayOrig);
 
       // Перевод
@@ -351,13 +448,22 @@
       tdTrans.textContent = s.text_translation || '';
       tr.appendChild(tdTrans);
 
-      // Play translation
+      // Play translation — кнопка с data-state
       var tdPlayTrans = document.createElement('td');
       tdPlayTrans.className = 'col-play-translation panel-translation panel-create-audio';
-      tdPlayTrans.textContent = 't';
-      tdPlayTrans.dataset.key = key;
-      tdPlayTrans.dataset.lang = state.config?.translationLanguage || '';
-      tdPlayTrans.dataset.field = 'audio_translation';
+      var playTransBtn = document.createElement('button');
+      playTransBtn.type = 'button';
+      playTransBtn.className = 'audio-btn';
+      playTransBtn.dataset.key = key;
+      playTransBtn.dataset.lang = state.config?.translationLanguage || '';
+      playTransBtn.dataset.field = 'audio_translation';
+      playTransBtn.dataset.state = s.audio_translation ? 'ready' : 'creating';
+      playTransBtn.style.background = 'none';
+      playTransBtn.style.border = 'none';
+      playTransBtn.style.cursor = 'pointer';
+      playTransBtn.style.padding = '2px';
+      playTransBtn.innerHTML = '<i data-lucide="' + (s.audio_translation ? 'play' : 'hammer') + '"></i>';
+      tdPlayTrans.appendChild(playTransBtn);
       tr.appendChild(tdPlayTrans);
 
       // Explanation
@@ -367,13 +473,22 @@
       tdExpl.textContent = s.explanation || '';
       tr.appendChild(tdExpl);
 
-      // Generate TTS
+      // Generate TTS (audio_avto) — кнопка
       var tdGenTts = document.createElement('td');
       tdGenTts.className = 'col-generate-tts panel-editing-avto panel-create-audio';
-      tdGenTts.textContent = 'a';
-      tdGenTts.dataset.key = key;
-      tdGenTts.dataset.lang = state.config?.originalLanguage || '';
-      tdGenTts.dataset.field = 'audio_avto';
+      var genTtsBtn = document.createElement('button');
+      genTtsBtn.type = 'button';
+      genTtsBtn.className = 'audio-btn';
+      genTtsBtn.dataset.key = key;
+      genTtsBtn.dataset.lang = state.config?.originalLanguage || '';
+      genTtsBtn.dataset.field = 'audio_avto';
+      genTtsBtn.dataset.state = s.audio_avto ? 'ready' : 'creating';
+      genTtsBtn.style.background = 'none';
+      genTtsBtn.style.border = 'none';
+      genTtsBtn.style.cursor = 'pointer';
+      genTtsBtn.style.padding = '2px';
+      genTtsBtn.innerHTML = '<i data-lucide="' + (s.audio_avto ? 'play' : 'hammer') + '"></i>';
+      tdGenTts.appendChild(genTtsBtn);
       tr.appendChild(tdGenTts);
 
       // Apply avto
@@ -419,13 +534,22 @@
       tdChain.appendChild(chainIcon);
       tr.appendChild(tdChain);
 
-      // Play audio (user)
+      // Play audio (user) — кнопка
       var tdPlayAudio = document.createElement('td');
       tdPlayAudio.className = 'col-play-audio panel-editing-user panel-create-audio';
-      tdPlayAudio.textContent = 'f';
-      tdPlayAudio.dataset.key = key;
-      tdPlayAudio.dataset.lang = state.config?.originalLanguage || '';
-      tdPlayAudio.dataset.field = 'audio_user';
+      var playUserBtn = document.createElement('button');
+      playUserBtn.type = 'button';
+      playUserBtn.className = 'audio-btn';
+      playUserBtn.dataset.key = key;
+      playUserBtn.dataset.lang = state.config?.originalLanguage || '';
+      playUserBtn.dataset.field = 'audio_user';
+      playUserBtn.dataset.state = s.audio_user ? 'ready' : 'creating';
+      playUserBtn.style.background = 'none';
+      playUserBtn.style.border = 'none';
+      playUserBtn.style.cursor = 'pointer';
+      playUserBtn.style.padding = '2px';
+      playUserBtn.innerHTML = '<i data-lucide="' + (s.audio_user ? 'play' : 'hammer') + '"></i>';
+      tdPlayAudio.appendChild(playUserBtn);
       tr.appendChild(tdPlayAudio);
 
       // Apply user
@@ -439,13 +563,22 @@
       tdApplyUser.appendChild(applyUserIcon);
       tr.appendChild(tdApplyUser);
 
-      // Play audio (mic)
+      // Play audio (mic) — кнопка
       var tdPlayMic = document.createElement('td');
       tdPlayMic.className = 'col-play-audio panel-editing-mic panel-create-audio';
-      tdPlayMic.textContent = 'm';
-      tdPlayMic.dataset.key = key;
-      tdPlayMic.dataset.lang = state.config?.originalLanguage || '';
-      tdPlayMic.dataset.field = 'audio_mic';
+      var playMicBtn = document.createElement('button');
+      playMicBtn.type = 'button';
+      playMicBtn.className = 'audio-btn';
+      playMicBtn.dataset.key = key;
+      playMicBtn.dataset.lang = state.config?.originalLanguage || '';
+      playMicBtn.dataset.field = 'audio_mic';
+      playMicBtn.dataset.state = s.audio_mic ? 'ready' : 'creating';
+      playMicBtn.style.background = 'none';
+      playMicBtn.style.border = 'none';
+      playMicBtn.style.cursor = 'pointer';
+      playMicBtn.style.padding = '2px';
+      playMicBtn.innerHTML = '<i data-lucide="' + (s.audio_mic ? 'play' : 'hammer') + '"></i>';
+      tdPlayMic.appendChild(playMicBtn);
       tr.appendChild(tdPlayMic);
 
       // Apply mic
@@ -485,14 +618,24 @@
     _applyTableViewForTab(state.currentTabName);
   }
 
-  /* ===== ОБРАБОТКА АУДИО ===== */
+  /* ===== ОБРАБОТКА АУДИО (ПОЛНЫЙ МЕХАНИЗМ) ===== */
 
   function _resolveEditorPlaybackAudioUrl(dictationId, language, filename) {
     if (typeof resolveEditorPlaybackAudioUrl === 'function') {
       return resolveEditorPlaybackAudioUrl(dictationId, language, filename);
     }
     if (!filename) return null;
+    if (filename.startsWith('blob:') || filename.startsWith('http://') || filename.startsWith('https://') || filename.startsWith('/api/')) {
+      return filename;
+    }
     return '/api/audio/' + encodeURIComponent(dictationId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
+  }
+
+  function _getSentenceForButton(button) {
+    if (!button || !state.content) return null;
+    var key = button.dataset.key;
+    if (!key) return null;
+    return state.content.getSentence(key);
   }
 
   function _handleAudioPlayback(event) {
@@ -511,37 +654,56 @@
       return;
     }
 
-    if (typeof am.stop === 'function') {
-      am.stop();
-    }
+    var sentence = _getSentenceForButton(button);
+    var audioFilename = sentence ? (sentence[field] || null) : null;
+    var currentState = button.dataset.state || 'ready';
 
-    // Все аудио-поля теперь хранятся в DictationContent._sentences
-    var audioFilename = null;
-    if (state.content) {
-      var sentence = state.content.getSentence(key);
-      if (sentence) {
-        audioFilename = sentence[field] || null;
+    // Если audioManager уже играет с этой кнопки — ставим на паузу
+    if (currentState === 'playing' || currentState === 'playing-shared') {
+      if (typeof am.pause === 'function') {
+        am.pause();
+      } else if (typeof am.stop === 'function') {
+        am.stop();
       }
+      _setButtonState(button, 'ready');
+      return;
     }
 
+    // Если файла нет — переключаем в режим создания (молоток)
     if (!audioFilename) {
-      console.warn('[dictationEditorModal] No audio file for', key, field);
+      _setButtonState(button, 'creating');
+      // Здесь можно будет вызвать createAndPlayAudio в будущем
       return;
+    }
+
+    // Останавливаем предыдущее аудио, если оно играет с другой кнопки
+    if (am.currentButton && am.currentButton !== button) {
+      if (typeof am.stop === 'function') {
+        am.stop();
+      }
     }
 
     var audioUrl = _resolveEditorPlaybackAudioUrl(state.config.dictationId, lang, audioFilename);
     if (!audioUrl) return;
 
+    // Воспроизводим через audioManager
     if (typeof am.play === 'function') {
-      am.play(audioUrl, {
-        button: button,
-        onEnd: function () {}
+      am.play(button, audioUrl, {
+        onEnd: function () {
+          _setButtonState(button, 'ready');
+        }
       });
+      _setButtonState(button, 'playing');
     } else {
+      // Fallback: просто new Audio
       try {
         var audio = new Audio(audioUrl);
         audio.play().catch(function (err) {
           console.warn('[dictationEditorModal] Audio play error', err);
+        });
+        _setButtonState(button, 'playing');
+        audio.addEventListener('ended', function () {
+          _setButtonState(button, 'ready');
         });
       } catch (e) {
         console.warn('[dictationEditorModal] Audio creation error', e);
@@ -553,7 +715,7 @@
     var table = document.getElementById(TABLE_ID);
     if (!table) return;
 
-    var playButtons = table.querySelectorAll('.col-play-original, .col-play-translation, .col-generate-tts, .col-play-audio');
+    var playButtons = table.querySelectorAll('.audio-btn');
     playButtons.forEach(function (btn) {
       btn.removeEventListener('click', _handleAudioPlayback);
       btn.addEventListener('click', _handleAudioPlayback);
@@ -694,7 +856,6 @@
     });
     var newKey = 's_' + (maxKey + 1);
 
-    // Все поля в одном объекте — DictationContent._sentences
     var newSentence = {
       key: newKey,
       position: null,
@@ -715,13 +876,11 @@
     if (position === 'above' && selectedRow) {
       var index = Array.from(tbody.children).indexOf(selectedRow);
       state.content._sentences.splice(index, 0, newSentence);
-    } else if (position === 'below' && selectedRow) {
-      var index2 = Array.from(tbody.children).indexOf(selectedRow);
-      state.content._sentences.splice(index2 + 1, 0, newSentence);
     } else {
       state.content._sentences.push(newSentence);
     }
 
+    _setDirtyFlags({ db: true });
     _renderTable();
     _bindAudioPlaybackHandlers();
   }
@@ -741,6 +900,7 @@
       state.content._sentences.splice(index, 1);
     }
 
+    _setDirtyFlags({ db: true });
     _renderTable();
     _bindAudioPlaybackHandlers();
   }
@@ -895,6 +1055,7 @@
         options.forEach(function (o) { o.classList.remove('selected'); });
         opt.classList.add('selected');
         control.classList.remove('open');
+        _setDirtyFlags({ db: true });
       });
     });
 
@@ -926,7 +1087,6 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          // При смене режима озвучки переключаем видимость колонок в таблице
           var tabName = 'voice-original-' + this.value;
           _applyTableViewForTab(tabName);
         }
@@ -957,6 +1117,7 @@
       const reader = new FileReader();
       reader.onload = function (ev) {
         if (coverImage) coverImage.src = ev.target.result;
+        _setDirtyFlags({ cover: true });
       };
       reader.readAsDataURL(file);
     });
@@ -983,7 +1144,6 @@
           tabContent.classList.add('active');
         }
 
-        // Обновляем видимость колонок таблицы при переключении вкладок
         _applyTableViewForTab(tabName);
 
         if (typeof lucide !== 'undefined') {
@@ -993,6 +1153,144 @@
     });
   }
 
+  /* ===== SAVE SYSTEM ===== */
+
+  async function _handleSave() {
+    var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
+    if (!saveBtn) return;
+
+    saveBtn.disabled = true;
+    var originalHTML = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i data-lucide="loader-2"></i>';
+    if (typeof lucide !== 'undefined' && lucide.createIcons) {
+      lucide.createIcons();
+    }
+
+    try {
+      var flags = _getDirtyFlags();
+      var hasChanges = _hasUnsavedChanges();
+
+      if (!hasChanges) {
+        console.log('[dictationEditorModal] Нет изменений для сохранения');
+        return;
+      }
+
+      // Собираем данные для сохранения
+      var dictationId = state.config ? state.config.dictationId : null;
+      if (!dictationId) {
+        console.warn('[dictationEditorModal] Нет ID диктанта для сохранения');
+        return;
+      }
+
+      // Получаем токен
+      var token = null;
+      if (window.UM && window.UM.token) {
+        token = window.UM.token;
+      } else {
+        token = localStorage.getItem('jwt_token');
+      }
+
+      if (!token) {
+        console.warn('[dictationEditorModal] Нет токена авторизации');
+        return;
+      }
+
+      // Собираем предложения из DictationContent
+      var sentencesPayload = {};
+      if (state.content) {
+        var langOrig = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
+        var langTr = state.content.langTr || (state.config ? state.config.translationLanguage : '');
+        var allSentences = state.content.getAllSentenceCores();
+
+        if (langOrig) {
+          sentencesPayload[langOrig] = {
+            title: state.config ? state.config.title : '',
+            sentences: allSentences.map(function (s) {
+              return {
+                key: s.key,
+                position: s.position,
+                text: s.text_original || '',
+                translation: s.text_translation || '',
+                audio: s.audio_original || '',
+                audio_tr: s.audio_translation || '',
+                audio_avto: s.audio_avto || null,
+                audio_user: s.audio_user || null,
+                audio_mic: s.audio_mic || null,
+                start: s.start || '',
+                end: s.end || '',
+                checked: s.checked || false,
+                explanation: s.explanation || '',
+                speaker: s.speaker || '',
+              };
+            })
+          };
+        }
+      }
+
+      var saveData = {
+        id: dictationId,
+        temp_id: dictationId,
+        language_original: state.config ? state.config.originalLanguage : '',
+        language_translation: state.config ? state.config.translationLanguage : '',
+        title: state.config ? state.config.title : 'Без названия',
+        level: state.config ? (state.config.level || 'A1') : 'A1',
+        is_dialog: state.currentDictation ? !!state.currentDictation.is_dialog : false,
+        sentences: sentencesPayload,
+      };
+
+      // Этап 1: Сохраняем текст/БД (если dirty db)
+      if (flags.db) {
+        console.log('[dictationEditorModal] Сохраняю текст/БД...');
+        var dbResponse = await fetch('/save_dictation_final', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify(saveData)
+        });
+
+        if (dbResponse.ok) {
+          var dbResult = await dbResponse.json();
+          if (dbResult.success) {
+            _setDirtyFlags({ db: false });
+            console.log('[dictationEditorModal] Текст/БД сохранён');
+          } else {
+            console.error('[dictationEditorModal] Ошибка сохранения БД:', dbResult.error);
+          }
+        } else {
+          console.error('[dictationEditorModal] Ошибка HTTP при сохранении БД:', dbResponse.status);
+        }
+      }
+
+      // Этап 2: Сохраняем аудио (если dirty audio)
+      if (flags.audio) {
+        console.log('[dictationEditorModal] Сохраняю аудио...');
+        // Здесь будет вызов uploadAudioThenCleanupB2
+        // Пока просто сбрасываем флаг
+        _setDirtyFlags({ audio: false });
+      }
+
+      // Этап 3: Сохраняем обложку (если dirty cover)
+      if (flags.cover) {
+        console.log('[dictationEditorModal] Сохраняю обложку...');
+        // Здесь будет вызов uploadDictationCoverFromCacheToB2
+        // Пока просто сбрасываем флаг
+        _setDirtyFlags({ cover: false });
+      }
+
+      console.log('[dictationEditorModal] Сохранение завершено');
+    } catch (error) {
+      console.error('[dictationEditorModal] Ошибка сохранения:', error);
+    } finally {
+      saveBtn.innerHTML = originalHTML;
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
+      saveBtn.disabled = false;
+    }
+  }
+
   /* ===== OPEN / CLOSE ===== */
 
   function open(config) {
@@ -1000,9 +1298,9 @@
 
     state.config = config || {};
     state.isOpen = true;
+    state.dirtyFlags = { db: false, audio: false, cover: false };
 
-    // Создаём DictationContent — единый формат данных
-    // Все поля (включая редакторские) теперь сохраняются в DictationContent._sentences
+    // Создаём DictationContent
     var dictationId = config.dictationId || '';
     var langOrig = config.originalLanguage || '';
     var langTr = config.translationLanguage || '';
@@ -1016,7 +1314,6 @@
         sentences: rawSentences,
       });
     } else {
-      // Fallback: если DictationContent не загружен, создаём вручную
       state.content = {
         dictationId: dictationId,
         langOrig: langOrig,
@@ -1066,6 +1363,7 @@
     _renderTable();
     _bindAudioPlaybackHandlers();
     _setupTableControls();
+    _updateUnsavedStar();
 
     // Инициализируем AudioManager
     _ensureAudioManager();
@@ -1085,6 +1383,7 @@
     state.headerLangPairSelector = null;
     state.content = null;
     state.currentDictation = null;
+    state.dirtyFlags = { db: false, audio: false, cover: false };
 
     const modal = document.getElementById(MODAL_ID);
     if (modal) {
@@ -1099,6 +1398,12 @@
   function init() {
     _setupCloseButton();
     _setupOverlayClose();
+
+    // Кнопка сохранения
+    var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
+    if (saveBtn) {
+      saveBtn.addEventListener('click', _handleSave);
+    }
   }
 
   // Экспортируем в глобальную область
