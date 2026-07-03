@@ -527,20 +527,22 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid var(--color-border-light, #ddd);
+  border: 1px solid var(--color-button-purple, #a78bfa);
   border-radius: 6px;
-  background: var(--color-panel-bg, #fff);
-  color: var(--color-text, #224156);
+  background: var(--color-button-purple, #a78bfa);
+  color: #fff;
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
   line-height: 1;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .dictation-editor-modal__file-select-btn:hover {
-  background: var(--color-hover, #f0eeeb);
-  border-color: var(--color-border, #ccc);
+  opacity: 0.85;
+  border-color: var(--color-button-purple-dark, #7c3aed);
 }
 
 .dictation-editor-modal__waveform-section {
@@ -758,6 +760,22 @@
   display: none !important;
 }
 
+/* Режим "общие данные" + voice-mode: показываем a/f/m вместо o */
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-auto .panel-original,
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-have .panel-original,
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-self .panel-original {
+  display: none !important;
+}
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-auto .panel-editing-avto {
+  display: table-cell !important;
+}
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-have .panel-editing-user {
+  display: table-cell !important;
+}
+.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-self .panel-editing-mic {
+  display: table-cell !important;
+}
+
 /* Состояние: оригинал-редактирование */
 .dictation-editor-modal__sentences-table.state-original-editing .panel-original,
 .dictation-editor-modal__sentences-table.state-original-editing .col-number,
@@ -773,10 +791,6 @@
 
 .dictation-editor-modal__sentences-table.state-original-editing .panel-translation {
   display: none !important;
-}
-
-.dictation-editor-modal__sentences-table.state-original-editing .panel-translation.panel-create-audio {
-  display: table-cell !important;
 }
 
 /* Номер колонки */

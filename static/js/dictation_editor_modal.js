@@ -259,10 +259,18 @@
 
     state.currentTabName = tabName;
 
+    // Убираем voice-mode классы
+    table.classList.remove('voice-mode-auto', 'voice-mode-have', 'voice-mode-self');
+
     if (tabName === 'general' || tabName === 'dialog') {
       _toggleColumnGroup('translation');
       _toggleCheckboxColumn(false);
       _toggleCreateAudioColumns(false);
+
+      // На вкладке "общие данные" показываем a/f/m вместо o в зависимости от радио
+      var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+      var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
+      table.classList.add('voice-mode-' + voiceMode);
     } else if (tabName === 'voice-original-auto') {
       _toggleColumnGroup('original');
       var avtoColumns = table.querySelectorAll('.panel-editing-avto');
@@ -403,6 +411,78 @@
       tdOrig.textContent = s.text_original || '';
       tr.appendChild(tdOrig);
 
+      // Play original — кнопка o
+      var tdPlayOrig = document.createElement('td');
+      tdPlayOrig.className = 'col-play-original panel-original panel-create-audio';
+      var playOrigBtn = document.createElement('button');
+      playOrigBtn.type = 'button';
+      playOrigBtn.className = 'audio-btn';
+      playOrigBtn.dataset.key = key;
+      playOrigBtn.dataset.lang = state.config?.originalLanguage || '';
+      playOrigBtn.dataset.field = 'audio_original';
+      playOrigBtn.dataset.state = s.audio_original ? 'ready' : 'creating';
+      playOrigBtn.style.background = 'none';
+      playOrigBtn.style.border = 'none';
+      playOrigBtn.style.cursor = 'pointer';
+      playOrigBtn.style.padding = '2px';
+      playOrigBtn.innerHTML = '<i data-lucide="' + (s.audio_original ? 'play' : 'hammer') + '"></i>';
+      tdPlayOrig.appendChild(playOrigBtn);
+      tr.appendChild(tdPlayOrig);
+
+      // Generate TTS (audio_avto) — кнопка a
+      var tdGenTts = document.createElement('td');
+      tdGenTts.className = 'col-generate-tts panel-editing-avto panel-create-audio';
+      var genTtsBtn = document.createElement('button');
+      genTtsBtn.type = 'button';
+      genTtsBtn.className = 'audio-btn';
+      genTtsBtn.dataset.key = key;
+      genTtsBtn.dataset.lang = state.config?.originalLanguage || '';
+      genTtsBtn.dataset.field = 'audio_avto';
+      genTtsBtn.dataset.state = s.audio_avto ? 'ready' : 'creating';
+      genTtsBtn.style.background = 'none';
+      genTtsBtn.style.border = 'none';
+      genTtsBtn.style.cursor = 'pointer';
+      genTtsBtn.style.padding = '2px';
+      genTtsBtn.innerHTML = '<i data-lucide="' + (s.audio_avto ? 'play' : 'hammer') + '"></i>';
+      tdGenTts.appendChild(genTtsBtn);
+      tr.appendChild(tdGenTts);
+
+      // Play audio (user) — кнопка f
+      var tdPlayAudio = document.createElement('td');
+      tdPlayAudio.className = 'col-play-audio panel-editing-user panel-create-audio';
+      var playUserBtn = document.createElement('button');
+      playUserBtn.type = 'button';
+      playUserBtn.className = 'audio-btn';
+      playUserBtn.dataset.key = key;
+      playUserBtn.dataset.lang = state.config?.originalLanguage || '';
+      playUserBtn.dataset.field = 'audio_user';
+      playUserBtn.dataset.state = s.audio_user ? 'ready' : 'creating';
+      playUserBtn.style.background = 'none';
+      playUserBtn.style.border = 'none';
+      playUserBtn.style.cursor = 'pointer';
+      playUserBtn.style.padding = '2px';
+      playUserBtn.innerHTML = '<i data-lucide="' + (s.audio_user ? 'play' : 'hammer') + '"></i>';
+      tdPlayAudio.appendChild(playUserBtn);
+      tr.appendChild(tdPlayAudio);
+
+      // Play audio (mic) — кнопка m
+      var tdPlayMic = document.createElement('td');
+      tdPlayMic.className = 'col-play-audio panel-editing-mic panel-create-audio';
+      var playMicBtn = document.createElement('button');
+      playMicBtn.type = 'button';
+      playMicBtn.className = 'audio-btn';
+      playMicBtn.dataset.key = key;
+      playMicBtn.dataset.lang = state.config?.originalLanguage || '';
+      playMicBtn.dataset.field = 'audio_mic';
+      playMicBtn.dataset.state = s.audio_mic ? 'ready' : 'creating';
+      playMicBtn.style.background = 'none';
+      playMicBtn.style.border = 'none';
+      playMicBtn.style.cursor = 'pointer';
+      playMicBtn.style.padding = '2px';
+      playMicBtn.innerHTML = '<i data-lucide="' + (s.audio_mic ? 'play' : 'hammer') + '"></i>';
+      tdPlayMic.appendChild(playMicBtn);
+      tr.appendChild(tdPlayMic);
+
       // Чекбокс
       var tdCheckbox = document.createElement('td');
       tdCheckbox.className = 'col-checkbox-create-audio';
@@ -424,31 +504,13 @@
       tdCheckbox.appendChild(checkboxBtn);
       tr.appendChild(tdCheckbox);
 
-      // Play original — кнопка с data-state
-      var tdPlayOrig = document.createElement('td');
-      tdPlayOrig.className = 'col-play-original panel-original panel-create-audio';
-      var playOrigBtn = document.createElement('button');
-      playOrigBtn.type = 'button';
-      playOrigBtn.className = 'audio-btn';
-      playOrigBtn.dataset.key = key;
-      playOrigBtn.dataset.lang = state.config?.originalLanguage || '';
-      playOrigBtn.dataset.field = 'audio_original';
-      playOrigBtn.dataset.state = s.audio_original ? 'ready' : 'creating';
-      playOrigBtn.style.background = 'none';
-      playOrigBtn.style.border = 'none';
-      playOrigBtn.style.cursor = 'pointer';
-      playOrigBtn.style.padding = '2px';
-      playOrigBtn.innerHTML = '<i data-lucide="' + (s.audio_original ? 'play' : 'hammer') + '"></i>';
-      tdPlayOrig.appendChild(playOrigBtn);
-      tr.appendChild(tdPlayOrig);
-
       // Перевод
       var tdTrans = document.createElement('td');
       tdTrans.className = 'col-translation panel-translation';
       tdTrans.textContent = s.text_translation || '';
       tr.appendChild(tdTrans);
 
-      // Play translation — кнопка с data-state
+      // Play translation — кнопка t
       var tdPlayTrans = document.createElement('td');
       tdPlayTrans.className = 'col-play-translation panel-translation panel-create-audio';
       var playTransBtn = document.createElement('button');
@@ -472,24 +534,6 @@
       tdExpl.style.display = 'none';
       tdExpl.textContent = s.explanation || '';
       tr.appendChild(tdExpl);
-
-      // Generate TTS (audio_avto) — кнопка
-      var tdGenTts = document.createElement('td');
-      tdGenTts.className = 'col-generate-tts panel-editing-avto panel-create-audio';
-      var genTtsBtn = document.createElement('button');
-      genTtsBtn.type = 'button';
-      genTtsBtn.className = 'audio-btn';
-      genTtsBtn.dataset.key = key;
-      genTtsBtn.dataset.lang = state.config?.originalLanguage || '';
-      genTtsBtn.dataset.field = 'audio_avto';
-      genTtsBtn.dataset.state = s.audio_avto ? 'ready' : 'creating';
-      genTtsBtn.style.background = 'none';
-      genTtsBtn.style.border = 'none';
-      genTtsBtn.style.cursor = 'pointer';
-      genTtsBtn.style.padding = '2px';
-      genTtsBtn.innerHTML = '<i data-lucide="' + (s.audio_avto ? 'play' : 'hammer') + '"></i>';
-      tdGenTts.appendChild(genTtsBtn);
-      tr.appendChild(tdGenTts);
 
       // Apply avto
       var tdApplyAvto = document.createElement('td');
@@ -524,24 +568,6 @@
       tdEnd.appendChild(endInput);
       tr.appendChild(tdEnd);
 
-      // Play audio (user) — кнопка
-      var tdPlayAudio = document.createElement('td');
-      tdPlayAudio.className = 'col-play-audio panel-editing-user panel-create-audio';
-      var playUserBtn = document.createElement('button');
-      playUserBtn.type = 'button';
-      playUserBtn.className = 'audio-btn';
-      playUserBtn.dataset.key = key;
-      playUserBtn.dataset.lang = state.config?.originalLanguage || '';
-      playUserBtn.dataset.field = 'audio_user';
-      playUserBtn.dataset.state = s.audio_user ? 'ready' : 'creating';
-      playUserBtn.style.background = 'none';
-      playUserBtn.style.border = 'none';
-      playUserBtn.style.cursor = 'pointer';
-      playUserBtn.style.padding = '2px';
-      playUserBtn.innerHTML = '<i data-lucide="' + (s.audio_user ? 'play' : 'hammer') + '"></i>';
-      tdPlayAudio.appendChild(playUserBtn);
-      tr.appendChild(tdPlayAudio);
-
       // Apply user
       var tdApplyUser = document.createElement('td');
       tdApplyUser.className = 'col-apply-user panel-editing-user';
@@ -552,24 +578,6 @@
       applyUserIcon.style.height = '16px';
       tdApplyUser.appendChild(applyUserIcon);
       tr.appendChild(tdApplyUser);
-
-      // Play audio (mic) — кнопка
-      var tdPlayMic = document.createElement('td');
-      tdPlayMic.className = 'col-play-audio panel-editing-mic panel-create-audio';
-      var playMicBtn = document.createElement('button');
-      playMicBtn.type = 'button';
-      playMicBtn.className = 'audio-btn';
-      playMicBtn.dataset.key = key;
-      playMicBtn.dataset.lang = state.config?.originalLanguage || '';
-      playMicBtn.dataset.field = 'audio_mic';
-      playMicBtn.dataset.state = s.audio_mic ? 'ready' : 'creating';
-      playMicBtn.style.background = 'none';
-      playMicBtn.style.border = 'none';
-      playMicBtn.style.cursor = 'pointer';
-      playMicBtn.style.padding = '2px';
-      playMicBtn.innerHTML = '<i data-lucide="' + (s.audio_mic ? 'play' : 'hammer') + '"></i>';
-      tdPlayMic.appendChild(playMicBtn);
-      tr.appendChild(tdPlayMic);
 
       // Apply mic
       var tdApplyMic = document.createElement('td');
@@ -1077,7 +1085,14 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          // Не меняем колонки здесь — это делает _setupTabs при клике на закладку
+          // Если мы на вкладке "общие данные", обновляем voice-mode класс таблицы
+          if (state.currentTabName === 'general' || state.currentTabName === 'dialog') {
+            var table = document.getElementById(TABLE_ID);
+            if (table) {
+              table.classList.remove('voice-mode-auto', 'voice-mode-have', 'voice-mode-self');
+              table.classList.add('voice-mode-' + this.value);
+            }
+          }
         }
       });
     });
@@ -1136,14 +1151,6 @@
       });
     }
 
-    // Кнопка "вырезать фрагмент" (ножницы)
-    var scissorsBtn = document.getElementById('editorModalScissorsBtn');
-    if (scissorsBtn) {
-      scissorsBtn.addEventListener('click', function () {
-        _handleScissorsCut();
-      });
-    }
-
     // Кнопка "разрезать на 1000 кусков"
     var splitBtn = document.getElementById('editorModalSplitBtn');
     if (splitBtn) {
@@ -1160,20 +1167,6 @@
       });
     }
 
-    // Поля start/end под волной
-    var startInput = document.getElementById('editorModalAudioStartTime');
-    var endInput = document.getElementById('editorModalAudioEndTime');
-    if (startInput) {
-      startInput.addEventListener('input', function () {
-        _syncWaveformRegion('start', parseFloat(this.value) || 0);
-      });
-    }
-    if (endInput) {
-      endInput.addEventListener('input', function () {
-        _syncWaveformRegion('end', parseFloat(this.value) || 0);
-      });
-    }
-
     // Кнопка воспроизведения под волной
     var playBtn = document.getElementById('editorModalAudioPlayBtn');
     if (playBtn) {
@@ -1187,6 +1180,9 @@
     var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
     var audio = new Audio();
     var audioUrl = URL.createObjectURL(file);
+
+    // Сохраняем URL, чтобы освободить при закрытии
+    state._sharedAudioUrl = audioUrl;
 
     audio.addEventListener('loadedmetadata', function () {
       var duration = audio.duration;
@@ -1206,13 +1202,10 @@
       var endInput = document.getElementById('editorModalAudioEndTime');
       if (startInput) startInput.value = '0';
       if (endInput) endInput.value = duration.toFixed(2);
-
-      URL.revokeObjectURL(audioUrl);
     });
 
     audio.addEventListener('error', function () {
       console.warn('[dictationEditorModal] Ошибка загрузки аудио');
-      URL.revokeObjectURL(audioUrl);
     });
 
     audio.src = audioUrl;
@@ -1314,56 +1307,6 @@
         }
       });
       _setButtonState(button, 'playing-shared');
-    }
-  }
-
-  function _handleScissorsCut() {
-    var startInput = document.getElementById('editorModalAudioStartTime');
-    var endInput = document.getElementById('editorModalAudioEndTime');
-    var start = parseFloat(startInput ? startInput.value : 0) || 0;
-    var end = parseFloat(endInput ? endInput.value : 0) || 0;
-
-    if (start >= end) {
-      alert('Время начала должно быть меньше времени окончания');
-      return;
-    }
-    if (!_sharedAudioFilename) {
-      alert('Не выбран аудиофайл для обрезки');
-      return;
-    }
-
-    // Используем AudioEditorTools если доступен
-    if (window.AudioEditorTools && typeof window.AudioEditorTools.cutAudioFile === 'function') {
-      window.AudioEditorTools.cutAudioFile({ filename: _sharedAudioFilename, start: start, end: end });
-      return;
-    }
-
-    // Fallback: запрос к серверу
-    _cutAudioOnServer(_sharedAudioFilename, start, end);
-  }
-
-  async function _cutAudioOnServer(filename, start, end) {
-    try {
-      var response = await fetch('/cut-audio', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: filename,
-          start_time: start,
-          end_time: end,
-          language: state.config ? state.config.originalLanguage : '',
-          dictation_id: state.config ? state.config.dictationId : ''
-        })
-      });
-      var data = await response.json();
-      if (data.success) {
-        _setDirtyFlags({ audio: true });
-      } else {
-        alert('Ошибка обрезки аудио');
-      }
-    } catch (e) {
-      console.error('[dictationEditorModal] cut error', e);
-      alert('Ошибка обрезки аудио');
     }
   }
 
@@ -1762,6 +1705,12 @@
     state.dirtyFlags = { db: false, audio: false, cover: false };
     _sharedAudioFilename = null;
     _sharedAudioDuration = null;
+
+    // Освобождаем blob URL для shared audio
+    if (state._sharedAudioUrl) {
+      URL.revokeObjectURL(state._sharedAudioUrl);
+      state._sharedAudioUrl = null;
+    }
 
     // Уничтожаем waveform
     if (window.editorModalWaveform) {
