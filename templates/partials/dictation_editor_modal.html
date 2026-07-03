@@ -132,6 +132,85 @@
         </div>
       </div>
 
+      <!-- ===== ТАБЛИЦА ПРЕДЛОЖЕНИЙ ===== -->
+      <div class="dictation-editor-modal__table-section">
+        <!-- Группа кнопок управления таблицей -->
+        <div class="dictation-editor-modal__table-controls">
+          <button id="editorModalRefillTableBtn" class="dictation-editor-modal__table-control-btn refill-btn" type="button">
+            <i data-lucide="refresh-cw"></i> Перезаполнить
+          </button>
+
+          <div class="dictation-editor-modal__table-nav-group">
+            <button id="editorModalDeleteRowBtn" class="dictation-editor-modal__table-control-btn delete-btn" type="button" title="Удалить строку">
+              <i data-lucide="trash-2"></i>
+            </button>
+
+            <button id="editorModalAddRowBtn" class="dictation-editor-modal__table-control-btn add-btn" type="button" title="Добавить строку">
+              <i data-lucide="plus"></i>
+            </button>
+
+            <button id="editorModalToggleExplanationBtn" class="dictation-editor-modal__table-control-btn refill-btn" type="button" title="Показать/скрыть пояснение">
+              <i data-lucide="circle" class="toggle-explanation-icon"></i> Пояснение
+            </button>
+
+            <button id="editorModalPrevRowBtn" class="dictation-editor-modal__table-control-btn nav-btn" type="button" title="Предыдущая строка">
+              <i data-lucide="chevron-left"></i>
+            </button>
+
+            <div class="dictation-editor-modal__current-row-label">
+              <span id="editorModalCurrentRowNumber" contenteditable="true" inputmode="numeric" title="Введите номер строки и нажмите Enter">1</span>
+            </div>
+
+            <button id="editorModalNextRowBtn" class="dictation-editor-modal__table-control-btn nav-btn" type="button" title="Следующая строка">
+              <i data-lucide="chevron-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="dictation-editor-modal__sentences-table-wrapper">
+          <table id="editorModalSentencesTable" class="dictation-editor-modal__sentences-table">
+            <thead>
+              <tr>
+                <th class="col-number">№</th>
+                <th class="col-speaker" style="display: none;"><i data-lucide="user"></i></th>
+                <th class="col-original panel-original">Оригинал</th>
+                <th class="col-checkbox-create-audio" style="display: none;">
+                  <label class="checkbox-label" id="editorModalSelectAllCheckboxLabel" style="cursor: pointer;"></label>
+                </th>
+                <th class="col-play-original panel-original panel-create-audio">o</th>
+                <th class="col-translation panel-translation">Перевод</th>
+                <th class="col-play-translation panel-translation panel-create-audio">t</th>
+                <th class="col-explanation" style="display: none;">Пояснение</th>
+                <th class="col-generate-tts panel-editing-avto panel-create-audio">a</th>
+                <th class="col-apply-avto panel-editing-avto" title="Применить">
+                  <i data-lucide="corner-down-left"></i>
+                </th>
+                <th class="col-start panel-editing-user">Start</th>
+                <th class="col-end panel-editing-user">End</th>
+                <th class="col-chain panel-editing-user"><i data-lucide="link"></i></th>
+                <th class="col-play-audio panel-editing-user panel-create-audio">f
+                  <button id="editorModalEditAllCreatingBtn" class="dictation-editor-modal__button-header-edit-all"
+                    title="Отредактировать все отмеченные" style="display: none;">
+                    <i data-lucide="wand-2"></i>
+                  </button>
+                </th>
+                <th class="col-apply-user panel-editing-user" title="Применить">
+                  <i data-lucide="arrow-big-left-dash"></i>
+                </th>
+                <th class="col-play-audio panel-editing-mic panel-create-audio">m</th>
+                <th class="col-apply-mic panel-editing-mic" title="Применить">
+                  <i data-lucide="arrow-big-left-dash"></i>
+                </th>
+                <th class="col-scrolling"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Строки будут добавляться через JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>

@@ -37,6 +37,15 @@
         const text_translation = (s && s.text_translation != null) ? String(s.text_translation) : ((s && s.translation != null) ? String(s.translation) : '');
         const audio_original = (s && s.audio_original != null) ? String(s.audio_original) : ((s && s.audio != null) ? String(s.audio) : '');
         const audio_translation = (s && s.audio_translation != null) ? String(s.audio_translation) : ((s && s.audio_tr != null) ? String(s.audio_tr) : '');
+        // Редакторские поля (сохраняются как есть, без нормализации)
+        const audio_avto = (s && s.audio_avto != null) ? s.audio_avto : null;
+        const audio_user = (s && s.audio_user != null) ? s.audio_user : null;
+        const audio_mic = (s && s.audio_mic != null) ? s.audio_mic : null;
+        const start = (s && s.start != null) ? String(s.start) : '';
+        const end = (s && s.end != null) ? String(s.end) : '';
+        const checked = (s && s.checked === true) ? true : false;
+        const explanation = (s && s.explanation != null) ? String(s.explanation) : '';
+        const speaker = (s && s.speaker != null) ? String(s.speaker) : '';
         return {
           key,
           position: Number.isFinite(position) ? position : null,
@@ -44,6 +53,15 @@
           text_translation,
           audio_original,
           audio_translation,
+          // Редакторские поля
+          audio_avto,
+          audio_user,
+          audio_mic,
+          start,
+          end,
+          checked,
+          explanation,
+          speaker,
         };
       });
     }

@@ -77,8 +77,8 @@
 }
 
 .dictation-editor-modal__username {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--color-text, #1f2933);
 }
 
@@ -86,6 +86,10 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+#dictationEditorModalSaveBtn {
+  margin: 0 12px;
 }
 
 /* ===== BODY ===== */
@@ -475,5 +479,288 @@
 
   .dictation-editor-modal__editor-header-panel-1 {
     align-self: center;
+  }
+}
+
+/* ===== ТАБЛИЦА ПРЕДЛОЖЕНИЙ ===== */
+.dictation-editor-modal__table-section {
+  margin-top: 20px;
+}
+
+.dictation-editor-modal__table-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.dictation-editor-modal__table-control-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 8px;
+  background: var(--color-panel-bg, #fff);
+  color: var(--color-text, #224156);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.dictation-editor-modal__table-control-btn:hover {
+  background: var(--color-hover, #f0eeeb);
+  border-color: var(--color-border, #ccc);
+}
+
+.dictation-editor-modal__table-control-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+.dictation-editor-modal__table-control-btn.delete-btn:hover {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.dictation-editor-modal__table-control-btn.add-btn:hover {
+  color: #27ae60;
+  border-color: #27ae60;
+}
+
+.dictation-editor-modal__table-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.dictation-editor-modal__current-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  padding: 4px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text, #224156);
+  background: var(--color-hover, #f0eeeb);
+  border-radius: 6px;
+}
+
+.dictation-editor-modal__current-row-label span {
+  outline: none;
+  text-align: center;
+  min-width: 20px;
+}
+
+.dictation-editor-modal__sentences-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-light, #e5e3df);
+  border-radius: 8px;
+  background: var(--color-panel-bg, #fff);
+}
+
+/* ===== СТИЛИ ТАБЛИЦЫ ===== */
+.dictation-editor-modal__sentences-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  table-layout: auto;
+}
+
+.dictation-editor-modal__sentences-table th,
+.dictation-editor-modal__sentences-table td {
+  display: none;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border-light, #e5e3df);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dictation-editor-modal__sentences-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-hover-panel, #f7f6f5);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-button-text-transparent, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  z-index: 2;
+  border-bottom: 2px solid var(--color-border-light, #e5e3df);
+}
+
+/* Колонки, видимые по умолчанию */
+.dictation-editor-modal__sentences-table .panel-original,
+.dictation-editor-modal__sentences-table .panel-translation,
+.dictation-editor-modal__sentences-table .col-number,
+.dictation-editor-modal__sentences-table .col-scrolling {
+  display: table-cell !important;
+}
+
+/* Состояние: оригинал-перевод */
+.dictation-editor-modal__sentences-table.state-original-translation .panel-original,
+.dictation-editor-modal__sentences-table.state-original-translation .panel-translation,
+.dictation-editor-modal__sentences-table.state-original-translation .col-number,
+.dictation-editor-modal__sentences-table.state-original-translation .col-scrolling {
+  display: table-cell !important;
+}
+
+.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-avto,
+.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-user,
+.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-mic {
+  display: none !important;
+}
+
+/* Состояние: оригинал-редактирование */
+.dictation-editor-modal__sentences-table.state-original-editing .panel-original,
+.dictation-editor-modal__sentences-table.state-original-editing .col-number,
+.dictation-editor-modal__sentences-table.state-original-editing .col-scrolling {
+  display: table-cell !important;
+}
+
+.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-avto,
+.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-user,
+.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-mic {
+  display: none;
+}
+
+.dictation-editor-modal__sentences-table.state-original-editing .panel-translation {
+  display: none !important;
+}
+
+.dictation-editor-modal__sentences-table.state-original-editing .panel-translation.panel-create-audio {
+  display: table-cell !important;
+}
+
+/* Номер колонки */
+.dictation-editor-modal__sentences-table .col-number {
+  width: 40px;
+  text-align: center;
+  color: var(--color-button-text-transparent, #888);
+  font-weight: 500;
+}
+
+/* Колонка прокрутки */
+.dictation-editor-modal__sentences-table .col-scrolling {
+  width: 1px;
+  padding: 0;
+}
+
+/* Чекбоксы */
+.dictation-editor-modal__sentences-table .col-checkbox-create-audio {
+  width: 40px;
+  text-align: center;
+}
+
+/* Аудио-кнопки в таблице */
+.dictation-editor-modal__sentences-table .col-play-original,
+.dictation-editor-modal__sentences-table .col-play-translation,
+.dictation-editor-modal__sentences-table .col-generate-tts,
+.dictation-editor-modal__sentences-table .col-play-audio {
+  width: 36px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-button-text-transparent, #888);
+  transition: color 0.2s;
+}
+
+.dictation-editor-modal__sentences-table .col-play-original:hover,
+.dictation-editor-modal__sentences-table .col-play-translation:hover,
+.dictation-editor-modal__sentences-table .col-generate-tts:hover,
+.dictation-editor-modal__sentences-table .col-play-audio:hover {
+  color: var(--color-button-text-yellow, #f9c609);
+}
+
+/* Поля ввода в таблице */
+.dictation-editor-modal__sentences-table td.col-original,
+.dictation-editor-modal__sentences-table td.col-translation,
+.dictation-editor-modal__sentences-table td.col-explanation {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictation-editor-modal__sentences-table td.col-start,
+.dictation-editor-modal__sentences-table td.col-end {
+  width: 80px;
+}
+
+.dictation-editor-modal__sentences-table td.col-start input,
+.dictation-editor-modal__sentences-table td.col-end input {
+  width: 70px;
+  padding: 4px 6px;
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monospace;
+  text-align: center;
+  background: var(--color-panel-bg, #fff);
+  color: var(--color-text, #224156);
+}
+
+.dictation-editor-modal__sentences-table td.col-start input:focus,
+.dictation-editor-modal__sentences-table td.col-end input:focus {
+  border-color: var(--color-button-text-yellow, #f9c609);
+  outline: none;
+}
+
+/* Выделенная строка */
+.dictation-editor-modal__sentences-table tbody tr.selected {
+  background: var(--color-hover, #f0eeeb);
+}
+
+.dictation-editor-modal__sentences-table tbody tr:hover {
+  background: var(--color-hover, #f0eeeb);
+}
+
+/* Кнопка edit-all-creating */
+.dictation-editor-modal__button-header-edit-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-button-text-transparent, #888);
+}
+
+.dictation-editor-modal__button-header-edit-all:hover {
+  color: var(--color-button-text-yellow, #f9c609);
+}
+
+/* Чекбокс в шапке таблицы */
+#editorModalSelectAllCheckboxLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== АДАПТИВНОСТЬ ТАБЛИЦЫ ===== */
+@media (max-width: 768px) {
+  .dictation-editor-modal__sentences-table {
+    font-size: 12px;
+  }
+
+  .dictation-editor-modal__sentences-table th,
+  .dictation-editor-modal__sentences-table td {
+    padding: 6px 8px;
+  }
+
+  .dictation-editor-modal__table-controls {
+    gap: 8px;
+  }
+
+  .dictation-editor-modal__table-control-btn {
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }

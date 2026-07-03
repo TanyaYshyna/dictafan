@@ -779,19 +779,38 @@ window.DictationKart = window.DictationKart || {
             const level = btn.getAttribute('data-level') || '';
             const coverUrl = btn.getAttribute('data-cover-url') || '';
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
+            const isDialog = btn.getAttribute('data-is-dialog') === 'true';
 
             console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
 
             if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
               console.log('[dictation_kart] calling DictationEditorModal.open');
-              window.DictationEditorModal.open({
-                dictationId: dictationId,
-                originalLanguage: langOriginal,
-                translationLanguage: langTranslation,
-                title: title,
-                level: level,
-                coverUrl: coverUrl,
-                authorMaterialsUrl: authorMaterialsUrl,
+
+              // Загружаем предложения с сервера
+              var sentencesPromise = null;
+              if (window.DictationKart && typeof window.DictationKart._fetchSentencesFromServer === 'function') {
+                sentencesPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
+                  .then(function (sentences) { return sentences; })
+                  .catch(function (err) {
+                    console.warn('[dictation_kart] Failed to fetch sentences for editor', err);
+                    return [];
+                  });
+              } else {
+                sentencesPromise = Promise.resolve([]);
+              }
+
+              sentencesPromise.then(function (sentences) {
+                window.DictationEditorModal.open({
+                  dictationId: dictationId,
+                  originalLanguage: langOriginal,
+                  translationLanguage: langTranslation,
+                  title: title,
+                  level: level,
+                  coverUrl: coverUrl,
+                  authorMaterialsUrl: authorMaterialsUrl,
+                  is_dialog: isDialog,
+                  sentences: sentences,
+                });
               });
             } else {
               console.warn('[dictation_kart] DictationEditorModal not available!');
@@ -944,7 +963,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -983,6 +1002,7 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-title="${window.escapeHtml(String(title || ''))}"`);
                 attrs.push(`data-level="${window.escapeHtml(String(level || ''))}"`);
                 attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
+                attrs.push(`data-is-dialog="${isDialog ? 'true' : 'false'}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -1057,6 +1077,7 @@ window.DictationKart = window.DictationKart || {
       title: item.title,
       level: item.level,
       langTranslation,
+      isDialog: item.is_dialog,
     });
 
     return `
@@ -1130,6 +1151,7 @@ window.DictationKart = window.DictationKart || {
       title: d.title,
       level: d.level,
       langTranslation,
+      isDialog: d.is_dialog,
     });
 
     return `
@@ -1265,6 +1287,7 @@ window.DictationKart = window.DictationKart || {
         title: item.title,
         level: item.level,
         langTranslation,
+        isDialog: item.is_dialog,
       });
     }
 
@@ -1364,6 +1387,7 @@ window.DictationKart = window.DictationKart || {
         title: d.title,
         level: d.level,
         langTranslation,
+        isDialog: d.is_dialog,
       });
     }
 
