@@ -1307,25 +1307,37 @@
     }
 
     // Собираем все предложения для разрезания
-    var sentences = [];
-    if (state.content) {
-      var cores = state.content.getAllSentenceCores();
-      cores.forEach(function (s) {
-        if (s.key) {
-          sentences.push({
-            key: s.key,
-            start_time: (s.start && Number(s.start)) ? Number(s.start) : 0,
-            end_time: (s.end && Number(s.end)) ? Number(s.end) : 0,
-            language: state.config ? state.config.originalLanguage : ''
-          });
-        }
-      });
-    }
+    var cores = state.content ? state.content.getAllSentenceCores() : [];
+    var validCores = cores.filter(function (s) { return s.key; });
 
-    if (sentences.length === 0) {
+    if (validCores.length === 0) {
       alert('Нет предложений для разрезания');
       return;
     }
+
+    // Вычисляем start/end на основе длительности аудио (равные отрезки)
+    var totalDuration = _sharedAudioDuration || 0;
+    var segmentDuration = totalDuration / validCores.length;
+
+    var sentences = [];
+    validCores.forEach(function (s, index) {
+      var startTime = index === 0 ? 0 : (index * segmentDuration);
+      var endTime = (index + 1) * segmentDuration;
+      // Округляем до 2 знаков
+      startTime = Math.floor(startTime * 100) / 100;
+      endTime = Math.floor(endTime * 100) / 100;
+
+      // Сохраняем start/end в DictationContent
+      s.start = String(startTime);
+      s.end = String(endTime);
+
+      sentences.push({
+        key: s.key,
+        start_time: startTime,
+        end_time: endTime,
+        language: state.config ? state.config.originalLanguage : ''
+      });
+    });
 
     _splitAudioOnServer(_sharedAudioFilename, sentences);
   }
