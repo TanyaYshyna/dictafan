@@ -1162,6 +1162,20 @@
     var container = document.getElementById('editorModalAudioWaveform');
     if (!container) return;
 
+    // Проверяем, что контейнер имеет размеры
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+      console.warn('[dictationEditorModal] Контейнер waveform не видим, принудительно устанавливаем размеры');
+      container.style.width = '100%';
+      container.style.height = '100px';
+      container.style.minHeight = '100px';
+
+      // Если размеры все еще 0, откладываем инициализацию
+      if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+        console.warn('[dictationEditorModal] Не удалось установить размеры контейнера, откладываем инициализацию');
+        return;
+      }
+    }
+
     // Проверяем, что WaveformCanvas загружен
     if (typeof WaveformCanvas === 'undefined') {
       console.warn('[dictationEditorModal] WaveformCanvas не загружен');
@@ -1183,6 +1197,14 @@
       if (am && typeof am.setWaveformCanvas === 'function') {
         am.setWaveformCanvas(wf);
       }
+
+      // Callback при окончании воспроизведения — возвращаем кнопку в исходное состояние
+      wf.onPlaybackEnd(function () {
+        var playBtn = document.getElementById('editorModalAudioPlayBtn');
+        if (playBtn) {
+          _setButtonState(playBtn, 'ready-shared');
+        }
+      });
 
       wf.loadAudio(audioUrl).then(function () {
         var duration = wf.getDuration();
@@ -1220,41 +1242,51 @@
     var button = event.currentTarget;
     if (!button) return;
 
-    var am = _ensureAudioManager();
-    if (!am) return;
-
     var currentState = button.dataset.state || 'ready-shared';
 
+    // Если уже играет — останавливаем
     if (currentState === 'playing' || currentState === 'playing-shared') {
-      if (typeof am.pause === 'function') am.pause();
-      else if (typeof am.stop === 'function') am.stop();
+      var wf = window.editorModalWaveform;
+      if (wf && wf.currentAudio) {
+        try {
+          wf.currentAudio.pause();
+        } catch (e) {}
+      }
+      // Также останавливаем через audioManager
+      var am = _ensureAudioManager();
+      if (am) {
+        if (typeof am.pause === 'function') am.pause();
+        else if (typeof am.stop === 'function') am.stop();
+      }
       _setButtonState(button, 'ready-shared');
       return;
     }
 
-    // Получаем URL для воспроизведения
     var wf = window.editorModalWaveform;
     if (!wf) return;
 
-    var audioUrl = null;
-    try {
-      audioUrl = wf.getAudioUrl();
-    } catch (e) {}
-
+    // Используем сохранённый blob URL из state
+    var audioUrl = state._sharedAudioUrl;
     if (!audioUrl) return;
 
-    if (am.currentButton && am.currentButton !== button) {
+    // Останавливаем предыдущее воспроизведение audioManager, если оно есть
+    var am = _ensureAudioManager();
+    if (am && am.currentButton && am.currentButton !== button) {
       if (typeof am.stop === 'function') am.stop();
     }
 
-    if (typeof am.play === 'function') {
-      am.play(button, audioUrl, {
-        onEnd: function () {
-          _setButtonState(button, 'ready-shared');
-        }
-      });
-      _setButtonState(button, 'playing-shared');
-    }
+    // Создаём Audio элемент из blob URL и передаём волне для воспроизведения в рамках региона
+    var audio = new Audio(audioUrl);
+
+    // Устанавливаем кнопку в состояние "играет"
+    _setButtonState(button, 'playing-shared');
+
+    // Волна сама управляет воспроизведением: стартует с region.start, играет до region.end,
+    // вызывает onPlaybackEnd по окончании
+    wf.startPlayback(audio).catch(function (err) {
+      console.warn('[dictationEditorModal] Waveform playback error', err);
+      _setButtonState(button, 'ready-shared');
+    });
   }
 
   function _handleSplitAudio() {

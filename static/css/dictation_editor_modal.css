@@ -629,12 +629,24 @@
 
 .dictation-editor-modal__wave-btn--yellow {
   background: var(--color-button-yellow, #f9c609);
-  border-color: var(--color-button-yellow, #f9c609);
   color: var(--color-button-text-yellow, #fff);
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 0 transparent;
+  transition: all 0.2s ease;
+}
+
+.dictation-editor-modal__wave-btn--yellow:focus {
+  outline: 2px solid var(--color-button-text-yellow);
+  outline-offset: 2px;
 }
 
 .dictation-editor-modal__wave-btn--yellow:hover {
-  opacity: 0.9;
+  border: 1px solid var(--color-button-shadow-yellow);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-yellow);
+}
+
+.dictation-editor-modal__wave-btn--yellow:active {
+  border: 1px solid var(--color-button-shadow-yellow);
 }
 
 /* ===== ТАБЛИЦА ПРЕДЛОЖЕНИЙ ===== */
