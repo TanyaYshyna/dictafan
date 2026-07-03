@@ -738,59 +738,27 @@
   border-bottom: 2px solid var(--color-border-light, #e5e3df);
 }
 
-/* Колонки, видимые по умолчанию */
-.dictation-editor-modal__sentences-table .panel-original,
-.dictation-editor-modal__sentences-table .panel-translation,
+/* Все колонки скрыты по умолчанию (управляется через JS) */
+.dictation-editor-modal__sentences-table th,
+.dictation-editor-modal__sentences-table td {
+  display: none;
+}
+
+/* Базовые колонки, видимые всегда */
 .dictation-editor-modal__sentences-table .col-number,
 .dictation-editor-modal__sentences-table .col-scrolling {
   display: table-cell !important;
 }
 
-/* Состояние: оригинал-перевод */
-.dictation-editor-modal__sentences-table.state-original-translation .panel-original,
-.dictation-editor-modal__sentences-table.state-original-translation .panel-translation,
-.dictation-editor-modal__sentences-table.state-original-translation .col-number,
-.dictation-editor-modal__sentences-table.state-original-translation .col-scrolling {
+/* Voice-mode: на general и voice-translations показываем a/f/m по радио */
+.dictation-editor-modal__sentences-table.voice-mode-auto .panel-editing-avto {
   display: table-cell !important;
 }
-
-.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-avto,
-.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-user,
-.dictation-editor-modal__sentences-table.state-original-translation .panel-editing-mic {
-  display: none !important;
-}
-
-/* Режим "общие данные" + voice-mode: показываем a/f/m вместо o */
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-auto .panel-original,
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-have .panel-original,
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-self .panel-original {
-  display: none !important;
-}
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-auto .panel-editing-avto {
+.dictation-editor-modal__sentences-table.voice-mode-have .panel-editing-user {
   display: table-cell !important;
 }
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-have .panel-editing-user {
+.dictation-editor-modal__sentences-table.voice-mode-self .panel-editing-mic {
   display: table-cell !important;
-}
-.dictation-editor-modal__sentences-table.state-original-translation.voice-mode-self .panel-editing-mic {
-  display: table-cell !important;
-}
-
-/* Состояние: оригинал-редактирование */
-.dictation-editor-modal__sentences-table.state-original-editing .panel-original,
-.dictation-editor-modal__sentences-table.state-original-editing .col-number,
-.dictation-editor-modal__sentences-table.state-original-editing .col-scrolling {
-  display: table-cell !important;
-}
-
-.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-avto,
-.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-user,
-.dictation-editor-modal__sentences-table.state-original-editing .panel-editing-mic {
-  display: none;
-}
-
-.dictation-editor-modal__sentences-table.state-original-editing .panel-translation {
-  display: none !important;
 }
 
 /* Номер колонки */
@@ -814,7 +782,6 @@
 }
 
 /* Аудио-кнопки в таблице */
-.dictation-editor-modal__sentences-table .col-play-original,
 .dictation-editor-modal__sentences-table .col-play-translation,
 .dictation-editor-modal__sentences-table .col-generate-tts,
 .dictation-editor-modal__sentences-table .col-play-audio {
@@ -827,7 +794,6 @@
   transition: color 0.2s;
 }
 
-.dictation-editor-modal__sentences-table .col-play-original:hover,
 .dictation-editor-modal__sentences-table .col-play-translation:hover,
 .dictation-editor-modal__sentences-table .col-generate-tts:hover,
 .dictation-editor-modal__sentences-table .col-play-audio:hover {

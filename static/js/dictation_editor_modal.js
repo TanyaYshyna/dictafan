@@ -259,65 +259,71 @@
 
     state.currentTabName = tabName;
 
+    // Сбрасываем все колонки в display:none (кроме базовых: №, scrolling)
+    var allCols = table.querySelectorAll('th, td');
+    allCols.forEach(function (el) {
+      // Базовые колонки всегда visible
+      if (el.classList.contains('col-number') || el.classList.contains('col-scrolling')) {
+        el.style.display = 'table-cell';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+
     // Убираем voice-mode классы
     table.classList.remove('voice-mode-auto', 'voice-mode-have', 'voice-mode-self');
 
-    if (tabName === 'general' || tabName === 'dialog') {
-      _toggleColumnGroup('translation');
-      _toggleCheckboxColumn(false);
-      _toggleCreateAudioColumns(false);
+    // Определяем, какое радио выбрано (для закладок general и voice-translations)
+    var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+    var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
 
-      // На вкладке "общие данные" показываем a/f/m вместо o в зависимости от радио
-      var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
-      var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
-      table.classList.add('voice-mode-' + voiceMode);
-    } else if (tabName === 'voice-original-auto') {
-      _toggleColumnGroup('original');
-      var avtoColumns = table.querySelectorAll('.panel-editing-avto');
-      avtoColumns.forEach(function (col) { col.style.display = 'table-cell'; });
-      var userColumns = table.querySelectorAll('.panel-editing-user');
-      userColumns.forEach(function (col) { col.style.display = 'none'; });
-      var micColumns = table.querySelectorAll('.panel-editing-mic');
-      micColumns.forEach(function (col) { col.style.display = 'none'; });
-      _toggleCheckboxColumn(false);
-    } else if (tabName === 'voice-original-have') {
-      _toggleColumnGroup('original');
-      var userCols = table.querySelectorAll('.panel-editing-user');
-      userCols.forEach(function (col) { col.style.display = 'table-cell'; });
-      var micCols = table.querySelectorAll('.panel-editing-mic');
-      micCols.forEach(function (col) { col.style.display = 'none'; });
-      var avtoCols = table.querySelectorAll('.panel-editing-avto');
-      avtoCols.forEach(function (col) { col.style.display = 'none'; });
-      _toggleCheckboxColumn(false);
-    } else if (tabName === 'voice-original-self') {
-      _toggleColumnGroup('original');
-      var micCols2 = table.querySelectorAll('.panel-editing-mic');
-      micCols2.forEach(function (col) { col.style.display = 'table-cell'; });
-      var userCols2 = table.querySelectorAll('.panel-editing-user');
-      userCols2.forEach(function (col) { col.style.display = 'none'; });
-      var avtoCols2 = table.querySelectorAll('.panel-editing-avto');
-      avtoCols2.forEach(function (col) { col.style.display = 'none'; });
-      _toggleCheckboxColumn(false);
-    } else if (tabName === 'voice-translations') {
-      _toggleColumnGroup('translation');
-      _toggleCheckboxColumn(false);
-      _toggleCreateAudioColumns(false);
-    } else if (tabName === 'create-audio') {
-      if (table) {
-        table.classList.remove('state-original-translation', 'state-original-editing');
-        var origHeaders = table.querySelectorAll('th.panel-original');
-        var origCells = table.querySelectorAll('td.panel-original');
-        origHeaders.forEach(function (th) { th.style.display = 'table-cell'; });
-        origCells.forEach(function (td) { td.style.display = 'table-cell'; });
-        var transTextHeaders = table.querySelectorAll('th.col-translation');
-        var transTextCells = table.querySelectorAll('td.col-translation');
-        transTextHeaders.forEach(function (th) { th.style.display = 'table-cell'; });
-        transTextCells.forEach(function (td) { td.style.display = 'table-cell'; });
-      }
-      _toggleCheckboxColumn(true);
-      _toggleCreateAudioColumns(true);
+    // Функция показать колонки по селектору
+    function showCols(selector) {
+      var els = table.querySelectorAll(selector);
+      els.forEach(function (el) { el.style.display = 'table-cell'; });
     }
 
+    // Функция показать одну из a/f/m в зависимости от radio
+    function showAudioByVoiceMode() {
+      if (voiceMode === 'auto') {
+        showCols('.panel-editing-avto');
+      } else if (voiceMode === 'have') {
+        showCols('.panel-editing-user');
+      } else if (voiceMode === 'self') {
+        showCols('.panel-editing-mic');
+      }
+    }
+
+    if (tabName === 'general') {
+      // №, Оригинал, a/f/m (по радио), Перевод, t
+      showCols('.panel-original');
+      showCols('.panel-translation');
+      showAudioByVoiceMode();
+    } else if (tabName === 'voice-original-auto') {
+      // №, Оригинал, a
+      showCols('.panel-original');
+      showCols('.panel-editing-avto');
+    } else if (tabName === 'voice-original-have') {
+      // №, Оригинал, f, Start, End
+      showCols('.panel-original');
+      showCols('.panel-editing-user');
+    } else if (tabName === 'voice-original-self') {
+      // №, Оригинал, m
+      showCols('.panel-original');
+      showCols('.panel-editing-mic');
+    } else if (tabName === 'voice-translations') {
+      // №, Оригинал, a/f/m (по радио), Перевод, t
+      showCols('.panel-original');
+      showCols('.panel-translation');
+      showAudioByVoiceMode();
+    } else if (tabName === 'create-audio') {
+      showCols('.panel-original');
+      showCols('.panel-translation');
+      showCols('.panel-create-audio');
+      showCols('.col-checkbox-create-audio');
+    }
+
+    // Спикер — только для диалогов
     var showSpeaker = (tabName !== 'exercises') && (state.currentDictation && state.currentDictation.is_dialog);
     var speakerHeader = table.querySelector('th.col-speaker');
     if (speakerHeader) {
@@ -410,24 +416,6 @@
       tdOrig.className = 'col-original panel-original';
       tdOrig.textContent = s.text_original || '';
       tr.appendChild(tdOrig);
-
-      // Play original — кнопка o
-      var tdPlayOrig = document.createElement('td');
-      tdPlayOrig.className = 'col-play-original panel-original panel-create-audio';
-      var playOrigBtn = document.createElement('button');
-      playOrigBtn.type = 'button';
-      playOrigBtn.className = 'audio-btn';
-      playOrigBtn.dataset.key = key;
-      playOrigBtn.dataset.lang = state.config?.originalLanguage || '';
-      playOrigBtn.dataset.field = 'audio_original';
-      playOrigBtn.dataset.state = s.audio_original ? 'ready' : 'creating';
-      playOrigBtn.style.background = 'none';
-      playOrigBtn.style.border = 'none';
-      playOrigBtn.style.cursor = 'pointer';
-      playOrigBtn.style.padding = '2px';
-      playOrigBtn.innerHTML = '<i data-lucide="' + (s.audio_original ? 'play' : 'hammer') + '"></i>';
-      tdPlayOrig.appendChild(playOrigBtn);
-      tr.appendChild(tdPlayOrig);
 
       // Generate TTS (audio_avto) — кнопка a
       var tdGenTts = document.createElement('td');
@@ -1085,13 +1073,9 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          // Если мы на вкладке "общие данные", обновляем voice-mode класс таблицы
-          if (state.currentTabName === 'general' || state.currentTabName === 'dialog') {
-            var table = document.getElementById(TABLE_ID);
-            if (table) {
-              table.classList.remove('voice-mode-auto', 'voice-mode-have', 'voice-mode-self');
-              table.classList.add('voice-mode-' + this.value);
-            }
+          // Обновляем таблицу, если мы на закладке, где радио влияет на колонки
+          if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
+            _applyTableViewForTab(state.currentTabName);
           }
         }
       });
