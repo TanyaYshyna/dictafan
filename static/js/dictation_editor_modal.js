@@ -1167,6 +1167,26 @@
         _syncWaveformRegion(field, val);
       });
     });
+
+    // Ручной ввод в поля Start/End — синхронизация с волной
+    var startInput = document.getElementById('editorModalAudioStartTime');
+    var endInput = document.getElementById('editorModalAudioEndTime');
+    if (startInput) {
+      startInput.addEventListener('change', function () {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0) {
+          _syncWaveformRegion('start', val);
+        }
+      });
+    }
+    if (endInput) {
+      endInput.addEventListener('change', function () {
+        var val = parseFloat(this.value);
+        if (!isNaN(val) && val >= 0) {
+          _syncWaveformRegion('end', val);
+        }
+      });
+    }
   }
 
   function _uploadSharedAudioFile(file) {
