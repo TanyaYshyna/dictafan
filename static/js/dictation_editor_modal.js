@@ -646,7 +646,12 @@
     // Если файла нет — переключаем в режим создания (молоток)
     if (!audioFilename) {
       _setButtonState(button, 'creating');
-      // Здесь можно будет вызвать createAndPlayAudio в будущем
+      return;
+    }
+
+    // Если кнопка в состоянии 'creating' (молоток) — обрезаем аудио
+    if (currentState === 'creating') {
+      _handleCutAudioForSentence(button, sentence, lang, field);
       return;
     }
 
@@ -681,6 +686,207 @@
         });
       } catch (e) {
         console.warn('[dictationEditorModal] Audio creation error', e);
+      }
+    }
+  }
+
+  /**
+   * Обрезает исходное общее аудио по start/end предложения через /cut-audio,
+   * сохраняет результат в draft cache, обновляет sentence.audio_file и проигрывает.
+   */
+  async function _handleCutAudioForSentence(button, sentence, lang, field) {
+    if (!sentence) return;
+    if (!state._sharedAudioFile) {
+      console.warn('[dictationEditorModal] Нет shared audio file для обрезания');
+      return;
+    }
+
+    var startVal = parseFloat(sentence.start);
+    var endVal = parseFloat(sentence.end);
+    if (isNaN(startVal) || isNaN(endVal)) {
+      console.warn('[dictationEditorModal] Некорректные start/end для обрезания');
+      return;
+    }
+
+    var dictationId = state.config ? state.config.dictationId : '';
+    if (!dictationId) return;
+
+    _setButtonState(button, 'creating'); // Показываем молоток (загрузка)
+
+    try {
+      // Читаем shared audio file как base64
+      var file = state._sharedAudioFile;
+      var base64 = await _readFileAsBase64(file);
+
+      var body = {
+        dictation_id: dictationId,
+        filename: _sharedAudioFilename || 'audio.' + (file.name ? file.name.split('.').pop() : 'mp3'),
+        audio_b64: base64,
+        mime: file.type || 'audio/mpeg',
+        start_time: startVal,
+        end_time: endVal,
+        language: lang
+      };
+
+      var response = await fetch('/cut-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      var data = await response.json();
+      if (!data.success || !data.audio_b64) {
+        console.error('[dictationEditorModal] Ошибка обрезания аудио:', data.error);
+        return;
+      }
+
+      // Создаём blob из audio_b64
+      var binaryStr = atob(data.audio_b64);
+      var bytes = new Uint8Array(binaryStr.length);
+      for (var j = 0; j < binaryStr.length; j++) {
+        bytes[j] = binaryStr.charCodeAt(j);
+      }
+      var blob = new Blob([bytes], { type: data.mime || file.type || 'audio/mpeg' });
+
+      // Генерируем имя файла
+      var newFilename = 'cut_' + sentence.key + '_' + Date.now() + '.mp3';
+
+      // Сохраняем в draft cache
+      if (typeof putDraftAudioToCache === 'function') {
+        await putDraftAudioToCache(dictationId, lang, newFilename, blob, data.mime || file.type || 'audio/mpeg');
+      }
+
+      // Обновляем sentence
+      sentence.audio_file = newFilename;
+
+      // Устанавливаем dirty flags
+      _setDirtyFlags({ db: true, audio: true });
+
+      // Создаём blob URL для воспроизведения
+      var blobUrl = URL.createObjectURL(blob);
+      if (typeof setDraftAudioUrl === 'function') {
+        setDraftAudioUrl(lang, newFilename, blobUrl);
+      }
+
+      // Проигрываем
+      var am = _ensureAudioManager();
+      if (am && typeof am.play === 'function') {
+        am.play(button, blobUrl, {
+          onEnd: function () {
+            _setButtonState(button, 'ready');
+          }
+        });
+        _setButtonState(button, 'playing');
+      } else {
+        try {
+          var audio = new Audio(blobUrl);
+          audio.play().catch(function (err) {
+            console.warn('[dictationEditorModal] Audio play error', err);
+          });
+          _setButtonState(button, 'playing');
+          audio.addEventListener('ended', function () {
+            _setButtonState(button, 'ready');
+          });
+        } catch (e) {
+          console.warn('[dictationEditorModal] Audio creation error', e);
+        }
+      }
+    } catch (e) {
+      console.error('[dictationEditorModal] cut audio error', e);
+      _setButtonState(button, 'creating');
+    }
+  }
+
+  function _readFileAsBase64(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        var base64 = e.target.result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = function (e) {
+        reject(e);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Загружает все draft аудиофайлы из state.content на B2.
+   * Проходит по всем предложениям, проверяет есть ли файл в draft cache,
+   * и если есть — загружает на B2 через /api/b2/get_upload_url.
+   */
+  async function _uploadDraftAudioToB2(dictationId, token) {
+    if (!state.content || !dictationId || !token) return;
+
+    var lang = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
+    if (!lang) return;
+
+    var sentences = state.content.getAllSentenceCores();
+    var langCode = String(lang).toLowerCase().trim();
+
+    for (var i = 0; i < sentences.length; i++) {
+      var s = sentences[i];
+      var filename = s.audio_file;
+      if (!filename) continue;
+
+      // Проверяем, есть ли файл в draft cache (blob URL)
+      var draftUrl = null;
+      if (typeof getDraftAudioUrl === 'function') {
+        draftUrl = getDraftAudioUrl(langCode, filename);
+      }
+      if (!draftUrl) continue;
+
+      try {
+        // Получаем blob из blob URL
+        var blobResp = await fetch(draftUrl);
+        var blob = await blobResp.blob();
+        if (!blob || !blob.size) continue;
+
+        // Получаем upload URL от сервера
+        var uploadUrlResp = await fetch('/api/b2/get_upload_url', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token
+          },
+          body: JSON.stringify({
+            dictation_id: dictationId,
+            filename: filename,
+            language: langCode
+          })
+        });
+
+        var uploadUrlData = await uploadUrlResp.json();
+        if (!uploadUrlData.success || !uploadUrlData.uploadUrl) {
+          console.warn('[dictationEditorModal] B2 get_upload_url failed:', uploadUrlData);
+          continue;
+        }
+
+        // Загружаем файл на B2
+        var remotePath = 'dictations/' + dictationId + '/' + langCode + '/' + filename;
+        var b2Resp = await fetch(uploadUrlData.uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': uploadUrlData.uploadAuthToken,
+            'X-Bz-File-Name': encodeURIComponent(remotePath),
+            'Content-Type': blob.type || 'b2/x-auto',
+            'X-Bz-Content-Sha1': 'do_not_verify'
+          },
+          body: blob
+        });
+
+        if (b2Resp.ok) {
+          console.log('[dictationEditorModal] B2 upload success:', filename);
+          // Очищаем draft cache после успешной загрузки
+          if (typeof clearDraftAudioUrl === 'function') {
+            clearDraftAudioUrl(langCode, filename);
+          }
+        } else {
+          console.warn('[dictationEditorModal] B2 upload failed:', filename, b2Resp.status);
+        }
+      } catch (e) {
+        console.warn('[dictationEditorModal] B2 upload error for', filename, e);
       }
     }
   }
@@ -1165,10 +1371,12 @@
         // Синхронизируем регион волны
         var field = targetId === 'editorModalAudioStartTime' ? 'start' : 'end';
         _syncWaveformRegion(field, val);
+        // Синхронизируем с менеджером данных и лейблами таблицы
+        _syncStartEndToSentence(field, val);
       });
     });
 
-    // Ручной ввод в поля Start/End — синхронизация с волной
+    // Ручной ввод в поля Start/End — синхронизация с волной и данными
     var startInput = document.getElementById('editorModalAudioStartTime');
     var endInput = document.getElementById('editorModalAudioEndTime');
     if (startInput) {
@@ -1176,6 +1384,7 @@
         var val = parseFloat(this.value);
         if (!isNaN(val) && val >= 0) {
           _syncWaveformRegion('start', val);
+          _syncStartEndToSentence('start', val);
         }
       });
     }
@@ -1184,6 +1393,7 @@
         var val = parseFloat(this.value);
         if (!isNaN(val) && val >= 0) {
           _syncWaveformRegion('end', val);
+          _syncStartEndToSentence('end', val);
         }
       });
     }
@@ -1304,6 +1514,48 @@
     } else if (field === 'end') {
       wf.setRegion(region.start, value);
     }
+  }
+
+  /**
+   * Синхронизирует значение поля Start/End под волной с менеджером данных (state.content)
+   * и с лейблами в таблице. Если у предложения есть audio_file, меняет кнопку f на молоточек.
+   */
+  function _syncStartEndToSentence(field, value) {
+    var table = document.getElementById(TABLE_ID);
+    if (!table) return;
+    var selectedRow = table.querySelector('tbody tr.selected');
+    if (!selectedRow) return;
+
+    var key = selectedRow.dataset.key;
+    if (!key || !state.content) return;
+
+    var sentence = state.content.getSentence(key);
+    if (!sentence) return;
+
+    // Обновляем данные в менеджере
+    var strVal = (typeof value === 'number') ? value.toFixed(2) : String(value);
+    if (field === 'start') {
+      sentence.start = strVal;
+    } else if (field === 'end') {
+      sentence.end = strVal;
+    }
+
+    // Обновляем лейблы в таблице (прямое DOM-обновление)
+    var startLabel = selectedRow.querySelector('.col-start .time-label');
+    var endLabel = selectedRow.querySelector('.col-end .time-label');
+    if (startLabel) startLabel.textContent = sentence.start;
+    if (endLabel) endLabel.textContent = sentence.end;
+
+    // Если у предложения есть audio_file — меняем кнопку f на молоточек (creating)
+    if (sentence.audio_file) {
+      var playBtn = selectedRow.querySelector('.col-play-audio.panel-editing-user .audio-btn');
+      if (playBtn) {
+        _setButtonState(playBtn, 'creating');
+      }
+    }
+
+    // Устанавливаем dirty flags
+    _setDirtyFlags({ db: true, audio: true });
   }
 
   function _handleSharedAudioPlayback(event) {
@@ -1709,9 +1961,13 @@
       // Этап 2: Сохраняем аудио (если dirty audio)
       if (flags.audio) {
         console.log('[dictationEditorModal] Сохраняю аудио...');
-        // Здесь будет вызов uploadAudioThenCleanupB2
-        // Пока просто сбрасываем флаг
-        _setDirtyFlags({ audio: false });
+        try {
+          await _uploadDraftAudioToB2(dictationId, token);
+          _setDirtyFlags({ audio: false });
+          console.log('[dictationEditorModal] Аудио сохранено');
+        } catch (audioErr) {
+          console.error('[dictationEditorModal] Ошибка сохранения аудио:', audioErr);
+        }
       }
 
       // Этап 3: Сохраняем обложку (если dirty cover)

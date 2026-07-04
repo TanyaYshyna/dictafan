@@ -441,12 +441,16 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             sentence_key = orig_sentence['sentence_key']
             translated = translation_dict.get(sentence_key, {})
             
-            # Получаем все типы аудио для оригинала
+            # Получаем все типы аудио для оригинала (как имена файлов, не URL)
             audio_o_file = orig_sentence.get('audio', '')
             audio_f_file = orig_sentence.get('audio_file', '')
             audio_m_file = orig_sentence.get('audio_mic', '')
             # Для перевода используем поле audio из данных перевода (язык lang_tr)
             audio_tr_file = translated.get('audio', '')
+            
+            # start/end из БД
+            start_val = orig_sentence.get('start', '')
+            end_val = orig_sentence.get('end', '')
             
             # Формируем URL для аудио файлов
             sentence = {
@@ -456,9 +460,12 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
                 "translation": translated.get("text", ""),
                 "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
                 "audio_a": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
-                "audio_f": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_f_file) if audio_f_file else "",
-                "audio_m": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_m_file) if audio_m_file else "",
+                "audio_file": audio_f_file,  # имя файла, не URL
+                "audio_f": audio_f_file,      # для обратной совместимости
+                "audio_m": audio_m_file,      # имя файла, не URL
                 "audio_tr": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=effective_lang_tr, filename=audio_tr_file) if audio_tr_file else "",
+                "start": str(start_val) if start_val else '',
+                "end": str(end_val) if end_val else '',
                 "completed_correctly": False,
                 "speaker": orig_sentence.get("speaker"),
                 "explanation": translated.get("explanation", "")
