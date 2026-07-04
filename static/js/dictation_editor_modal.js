@@ -819,6 +819,13 @@
   async function _uploadDraftAudioToB2(dictationId, token) {
     if (!state.content || !dictationId || !token) return;
 
+    // Нормализуем dictationId: добавляем префикс dict_ если его нет
+    var normalizedId = String(dictationId || '').trim();
+    if (normalizedId && !normalizedId.startsWith('dict_')) {
+      normalizedId = 'dict_' + normalizedId;
+    }
+    dictationId = normalizedId;
+
     var lang = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
     if (!lang) return;
 
@@ -1922,9 +1929,15 @@
         }
       }
 
+      // Нормализуем dictationId: добавляем префикс dict_ если его нет
+      var normalizedId = String(dictationId || '').trim();
+      if (normalizedId && !normalizedId.startsWith('dict_')) {
+        normalizedId = 'dict_' + normalizedId;
+      }
+
       var saveData = {
-        id: dictationId,
-        temp_id: dictationId,
+        id: normalizedId,
+        temp_id: normalizedId,
         language_original: state.config ? state.config.originalLanguage : '',
         language_translation: state.config ? state.config.translationLanguage : '',
         title: state.config ? state.config.title : 'Без названия',
@@ -1962,7 +1975,7 @@
       if (flags.audio) {
         console.log('[dictationEditorModal] Сохраняю аудио...');
         try {
-          await _uploadDraftAudioToB2(dictationId, token);
+          await _uploadDraftAudioToB2(normalizedId, token);
           _setDirtyFlags({ audio: false });
           console.log('[dictationEditorModal] Аудио сохранено');
         } catch (audioErr) {
