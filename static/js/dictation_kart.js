@@ -144,10 +144,22 @@ window.DictationKart = window.DictationKart || {
     return `/api/dictation/${encodeURIComponent(d)}/${encodeURIComponent(lo)}/${encodeURIComponent(lt)}/sentences`;
   },
 
-  async _fetchSentencesFromServer(dictKey, langOrig, langTr) {
+  async _fetchSentencesFromServer(dictKey, langOrig, langTr, timeoutMs = 10000) {
     const url = this._buildSentencesUrl(dictKey, langOrig, langTr);
     if (!url) throw new Error('bad_sentences_url');
-    const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function () { controller.abort(); }, timeoutMs);
+
+    var res;
+    try {
+      res = await fetch(url, { method: 'GET', cache: 'no-store', signal: controller.signal });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      throw fetchErr;
+    }
+    clearTimeout(timeoutId);
+
     if (!res.ok) {
       if (res.status === 502 || res.status === 503) {
         throw new Error(`storage_unavailable_${res.status}`);
@@ -170,6 +182,34 @@ window.DictationKart = window.DictationKart || {
       return ak.localeCompare(bk);
     });
     return sentences;
+  },
+
+  /**
+   * Загружает предложения из IndexedDB cache (если есть).
+   * Ключ кеша: `${userId}:${dictKey}:${langOrig}:${langTr}`
+   */
+  async _loadSentencesFromCache(dictKey, langOrig, langTr) {
+    try {
+      const idb = window.IdbManager;
+      if (!idb || typeof idb.idbGet !== 'function') return null;
+      const userId = String(this._getDraftUserIdForKey());
+      const cacheKey = userId + ':' + dictKey + ':' + langOrig + ':' + langTr;
+      const cached = await idb.idbGet('dictations', cacheKey);
+      if (cached && Array.isArray(cached.sentences) && cached.sentences.length) {
+        return cached.sentences;
+      }
+      // Пробуем анонимный ключ
+      const anonKey = 'anon:' + dictKey + ':' + langOrig + ':' + langTr;
+      if (anonKey !== cacheKey) {
+        const anonCached = await idb.idbGet('dictations', anonKey);
+        if (anonCached && Array.isArray(anonCached.sentences) && anonCached.sentences.length) {
+          return anonCached.sentences;
+        }
+      }
+    } catch (e) {
+      console.warn('[dictation_kart] _loadSentencesFromCache error', e);
+    }
+    return null;
   },
 
   _collectAudioUrlsFromSentences({ dictKey, langOrig, langTr, sentences, includeOriginal = true, includeTranslation = true }) {
@@ -786,13 +826,27 @@ window.DictationKart = window.DictationKart || {
             if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
               console.log('[dictation_kart] calling DictationEditorModal.open');
 
-              // Загружаем предложения с сервера
+              // Загружаем предложения с сервера (с таймаутом 10 сек)
               var sentencesPromise = null;
               if (window.DictationKart && typeof window.DictationKart._fetchSentencesFromServer === 'function') {
                 sentencesPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
                   .then(function (sentences) { return sentences; })
                   .catch(function (err) {
                     console.warn('[dictation_kart] Failed to fetch sentences for editor', err);
+                    // Пробуем загрузить из IndexedDB cache
+                    if (window.DictationKart && typeof window.DictationKart._loadSentencesFromCache === 'function') {
+                      return window.DictationKart._loadSentencesFromCache(dictationId, langOriginal, langTranslation)
+                        .then(function (cachedSentences) {
+                          if (cachedSentences && cachedSentences.length) {
+                            console.log('[dictation_kart] Loaded sentences from cache, count:', cachedSentences.length);
+                            if (typeof window.DictationKart._showToast === 'function') {
+                              window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
+                            }
+                            return cachedSentences;
+                          }
+                          return [];
+                        });
+                    }
                     return [];
                   });
               } else {
