@@ -2105,6 +2105,80 @@ def split_audio_file():
         
         logger.info(f"Разрезание аудио: {filename} на {len(sentences)} предложений")
 
+        # --- SMART SPLIT: транскрибация через Whisper ---
+        is_smart = data.get('smart', False)
+        if is_smart:
+            logger.info("🧠 Smart split: транскрибируем аудио через Whisper...")
+            try:
+                from faster_whisper import WhisperModel
+                language_hint = data.get('language') or None
+                model = getattr(current_app, '_whisper_model_tiny', None)
+                if model is None:
+                    model = WhisperModel('tiny', device='cpu', compute_type='int8')
+                    setattr(current_app, '_whisper_model_tiny', model)
+
+                whisper_segments, info = model.transcribe(
+                    physical_path,
+                    language=language_hint,
+                    vad_filter=True,
+                )
+
+                # Собираем сегменты Whisper с текстом и временными метками
+                wsegments = []
+                for s in whisper_segments:
+                    try:
+                        t = (s.text or '').strip()
+                        if t:
+                            wsegments.append({
+                                'start': float(getattr(s, 'start', 0.0) or 0.0),
+                                'end': float(getattr(s, 'end', 0.0) or 0.0),
+                                'text': t.lower(),
+                            })
+                    except Exception:
+                        continue
+
+                logger.info(f"🧠 Whisper распознал {len(wsegments)} сегментов")
+
+                # Маппим предложения на сегменты Whisper по тексту
+                # Нормализуем текст предложений для сравнения
+                def _normalize_for_match(t):
+                    import re
+                    t = t.lower().strip()
+                    t = re.sub(r'[^\w\s]', '', t)
+                    t = re.sub(r'\s+', ' ', t).strip()
+                    return t
+
+                # Для каждого предложения ищем наилучший сегмент
+                import difflib
+                for sentence in sentences:
+                    key = sentence.get('key')
+                    sent_text = _normalize_for_match(sentence.get('text', ''))
+                    if not key or not sent_text:
+                        continue
+
+                    best_score = 0.0
+                    best_seg = None
+                    for ws in wsegments:
+                        ws_text = _normalize_for_match(ws['text'])
+                        score = difflib.SequenceMatcher(None, sent_text, ws_text).ratio()
+                        if score > best_score:
+                            best_score = score
+                            best_seg = ws
+
+                    if best_seg and best_score > 0.3:
+                        sentence['start_time'] = best_seg['start']
+                        sentence['end_time'] = best_seg['end']
+                        logger.info(f"🧠 Маппинг: key={key} score={best_score:.2f} start={best_seg['start']:.2f} end={best_seg['end']:.2f}")
+                    else:
+                        logger.warning(f"🧠 Не найден сегмент для key={key} text='{sent_text}' best_score={best_score:.2f}")
+
+            except ImportError:
+                logger.error("🧠 faster-whisper не установлен. Smart split недоступен.")
+                return jsonify({'success': False, 'error': 'faster-whisper не установлен на сервере'}), 500
+            except Exception as e:
+                logger.error(f"🧠 Ошибка Whisper: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': f'Ошибка транскрибации: {str(e)}'}), 500
+
         created_files = []
         try:
             import subprocess

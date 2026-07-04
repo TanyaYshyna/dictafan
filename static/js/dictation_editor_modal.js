@@ -1417,8 +1417,11 @@
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
               sentence.audio_file = f.filename;
-              if (f.start != null) sentence.start = String(f.start);
-              if (f.end != null) sentence.end = String(f.end);
+              // Сервер возвращает start_time / end_time
+              var st = f.start_time != null ? f.start_time : f.start;
+              var et = f.end_time != null ? f.end_time : f.end;
+              if (st != null) sentence.start = String(st);
+              if (et != null) sentence.end = String(et);
             }
           }
         }
@@ -1488,8 +1491,11 @@
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
               sentence.audio_file = f.filename;
-              if (f.start != null) sentence.start = String(f.start);
-              if (f.end != null) sentence.end = String(f.end);
+              // Сервер возвращает start_time / end_time
+              var st = f.start_time != null ? f.start_time : f.start;
+              var et = f.end_time != null ? f.end_time : f.end;
+              if (st != null) sentence.start = String(st);
+              if (et != null) sentence.end = String(et);
             }
           }
         }
