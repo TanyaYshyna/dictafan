@@ -350,8 +350,9 @@
     row.classList.add('selected');
     _updateCurrentRowNumber();
 
-    // Обновляем регионы волны при выборе строки
-    if (state.waveformCanvas) {
+    // Обновляем регионы волны и поля Start/End под волной при выборе строки
+    var wf = window.editorModalWaveform;
+    if (wf) {
       var key = row.dataset.key;
       if (key && state.content) {
         var cores = state.content.getAllSentenceCores();
@@ -362,8 +363,17 @@
             break;
           }
         }
-        if (found && found.start && found.end) {
-          state.waveformCanvas.setRegion(parseFloat(found.start), parseFloat(found.end));
+        if (found && found.start !== undefined && found.start !== '' && found.end !== undefined && found.end !== '') {
+          var startVal = parseFloat(found.start);
+          var endVal = parseFloat(found.end);
+          if (!isNaN(startVal) && !isNaN(endVal)) {
+            wf.setRegion(startVal, endVal);
+            // Также обновляем поля под волной
+            var startInput = document.getElementById('editorModalAudioStartTime');
+            var endInput = document.getElementById('editorModalAudioEndTime');
+            if (startInput) startInput.value = startVal.toFixed(2);
+            if (endInput) endInput.value = endVal.toFixed(2);
+          }
         }
       }
     }
