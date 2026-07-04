@@ -1429,9 +1429,10 @@
       });
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
+        var dictationId = state.config ? state.config.dictationId : '';
         for (var i = 0; i < data.files.length; i++) {
           var f = data.files[i];
-          if (!f || !f.filename || !f.audio_b64 || !f.key) continue;
+          if (!f || !f.filename || !f.key) continue;
           // Обновляем sentence в DictationContent
           if (state.content) {
             var sentence = state.content.getSentence(f.key);
@@ -1440,8 +1441,25 @@
               // Сервер возвращает start_time / end_time
               var st = f.start_time != null ? f.start_time : f.start;
               var et = f.end_time != null ? f.end_time : f.end;
-              if (st != null) sentence.start = String(st);
-              if (et != null) sentence.end = String(et);
+              if (st != null) sentence.start = (typeof st === 'number') ? st.toFixed(2) : String(st);
+              if (et != null) sentence.end = (typeof et === 'number') ? et.toFixed(2) : String(et);
+            }
+          }
+          // Сохраняем audio_b64 в draft cache для воспроизведения
+          if (f.audio_b64 && dictationId) {
+            try {
+              var binaryStr = atob(f.audio_b64);
+              var bytes = new Uint8Array(binaryStr.length);
+              for (var j = 0; j < binaryStr.length; j++) {
+                bytes[j] = binaryStr.charCodeAt(j);
+              }
+              var blob = new Blob([bytes], { type: f.mime || mime || 'audio/mpeg' });
+              var lang = state.config ? state.config.originalLanguage : '';
+              if (typeof putDraftAudioToCache === 'function') {
+                putDraftAudioToCache(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
+              }
+            } catch (e) {
+              console.warn('[dictationEditorModal] failed to cache audio blob', e);
             }
           }
         }
@@ -1504,9 +1522,10 @@
       });
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
+        var dictationId = state.config ? state.config.dictationId : '';
         for (var i = 0; i < data.files.length; i++) {
           var f = data.files[i];
-          if (!f || !f.filename || !f.audio_b64 || !f.key) continue;
+          if (!f || !f.filename || !f.key) continue;
           if (state.content) {
             var sentence = state.content.getSentence(f.key);
             if (sentence) {
@@ -1514,8 +1533,25 @@
               // Сервер возвращает start_time / end_time
               var st = f.start_time != null ? f.start_time : f.start;
               var et = f.end_time != null ? f.end_time : f.end;
-              if (st != null) sentence.start = String(st);
-              if (et != null) sentence.end = String(et);
+              if (st != null) sentence.start = (typeof st === 'number') ? st.toFixed(2) : String(st);
+              if (et != null) sentence.end = (typeof et === 'number') ? et.toFixed(2) : String(et);
+            }
+          }
+          // Сохраняем audio_b64 в draft cache для воспроизведения
+          if (f.audio_b64 && dictationId) {
+            try {
+              var binaryStr = atob(f.audio_b64);
+              var bytes = new Uint8Array(binaryStr.length);
+              for (var j = 0; j < binaryStr.length; j++) {
+                bytes[j] = binaryStr.charCodeAt(j);
+              }
+              var blob = new Blob([bytes], { type: f.mime || mime || 'audio/mpeg' });
+              var lang = state.config ? state.config.originalLanguage : '';
+              if (typeof putDraftAudioToCache === 'function') {
+                putDraftAudioToCache(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
+              }
+            } catch (e) {
+              console.warn('[dictationEditorModal] failed to cache audio blob', e);
             }
           }
         }
