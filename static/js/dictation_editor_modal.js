@@ -349,6 +349,24 @@
     table.querySelectorAll('tbody tr.selected').forEach(function (r) { r.classList.remove('selected'); });
     row.classList.add('selected');
     _updateCurrentRowNumber();
+
+    // Обновляем регионы волны при выборе строки
+    if (state.waveformCanvas) {
+      var key = row.dataset.key;
+      if (key && state.content) {
+        var cores = state.content.getAllSentenceCores();
+        var found = null;
+        for (var i = 0; i < cores.length; i++) {
+          if (cores[i].key === key) {
+            found = cores[i];
+            break;
+          }
+        }
+        if (found && found.start && found.end) {
+          state.waveformCanvas.setRegion(parseFloat(found.start), parseFloat(found.end));
+        }
+      }
+    }
   }
 
   function _updateCurrentRowNumber() {
@@ -523,23 +541,19 @@
       // Start
       var tdStart = document.createElement('td');
       tdStart.className = 'col-start panel-editing-user';
-      var startInput = document.createElement('input');
-      startInput.type = 'text';
-      startInput.value = s.start || '';
-      startInput.placeholder = '00:00';
-      startInput.dataset.key = key;
-      tdStart.appendChild(startInput);
+      var startLabel = document.createElement('span');
+      startLabel.className = 'time-label';
+      startLabel.textContent = s.start || '';
+      tdStart.appendChild(startLabel);
       tr.appendChild(tdStart);
 
       // End
       var tdEnd = document.createElement('td');
       tdEnd.className = 'col-end panel-editing-user';
-      var endInput = document.createElement('input');
-      endInput.type = 'text';
-      endInput.value = s.end || '';
-      endInput.placeholder = '00:00';
-      endInput.dataset.key = key;
-      tdEnd.appendChild(endInput);
+      var endLabel = document.createElement('span');
+      endLabel.className = 'time-label';
+      endLabel.textContent = s.end || '';
+      tdEnd.appendChild(endLabel);
       tr.appendChild(tdEnd);
 
       // Scrolling
@@ -1036,19 +1050,8 @@
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
-          // Авто-переключение на соответствующую закладку
-          var tabMap = {
-            'auto': 'voice-original-auto',
-            'have': 'voice-original-have',
-            'self': 'voice-original-self'
-          };
-          var targetTab = tabMap[this.value];
-          if (targetTab && state.currentTabName !== targetTab) {
-            var tabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="' + targetTab + '"]');
-            if (tabBtn && tabBtn.style.display !== 'none') {
-              tabBtn.click();
-            }
-          } else if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
+          // Обновляем таблицу, если мы на закладке, где радио влияет на колонки
+          if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
             _applyTableViewForTab(state.currentTabName);
           }
         }
@@ -1132,6 +1135,28 @@
         _handleSharedAudioPlayback(event);
       });
     }
+
+    // Стрелки для полей Start/End
+    document.querySelectorAll('.time-input-arrow').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var targetId = this.dataset.target;
+        var dir = this.dataset.dir;
+        var input = document.getElementById(targetId);
+        if (!input) return;
+        var step = parseFloat(input.step) || 0.01;
+        var val = parseFloat(input.value) || 0;
+        if (dir === 'up') {
+          val = Math.round((val + step) * 100) / 100;
+        } else {
+          val = Math.round((val - step) * 100) / 100;
+          if (val < 0) val = 0;
+        }
+        input.value = val.toFixed(2);
+        // Синхронизируем регион волны
+        var field = targetId === 'editorModalAudioStartTime' ? 'start' : 'end';
+        _syncWaveformRegion(field, val);
+      });
+    });
   }
 
   function _uploadSharedAudioFile(file) {

@@ -585,20 +585,78 @@
   color: var(--color-text, #224156);
 }
 
-.dictation-editor-modal__time-controls input[type="number"] {
-  width: 80px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border-light, #ddd);
-  border-radius: 4px;
-  font-size: 13px;
-  font-family: monospace;
-  background: var(--color-panel-bg, #fff);
-  color: var(--color-text, #224156);
+/* Группа полей Start/End под волной */
+.time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 
-.dictation-editor-modal__time-controls input[type="number"]:focus {
-  border-color: var(--color-button-text-yellow, #f9c609);
+.time-input-field {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--color-border-light, #ddd);
+  background: var(--color-panel-bg, #fff);
+  overflow: hidden;
+}
+
+.time-input-field input[type="number"] {
+  width: 70px;
+  padding: 8px 10px;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  background: transparent;
+  color: var(--color-text, #224156);
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.time-input-field input[type="number"]::-webkit-inner-spin-button,
+.time-input-field input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.time-input-field input[type="number"]:focus {
   outline: none;
+}
+
+.time-input-field .time-input-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-button-text-transparent, #888);
+  padding: 0;
+  margin: 0;
+  line-height: 1;
+}
+
+.time-input-field .time-input-arrow:hover {
+  color: var(--color-button-text-yellow, #f9c609);
+  background: var(--color-hover, #f0eeeb);
+}
+
+.time-input-field .time-input-arrow i {
+  width: 14px;
+  height: 14px;
+}
+
+/* Start: правые углы прямые */
+.time-input-field--start {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+/* End: левые углы прямые */
+.time-input-field--end {
+  border-radius: 0 6px 6px 0;
 }
 
 .dictation-editor-modal__wave-btn {
@@ -827,23 +885,17 @@
   width: 80px;
 }
 
-.dictation-editor-modal__sentences-table td.col-start input,
-.dictation-editor-modal__sentences-table td.col-end input {
+.dictation-editor-modal__sentences-table td.col-start .time-label,
+.dictation-editor-modal__sentences-table td.col-end .time-label {
+  display: inline-block;
   width: 70px;
   padding: 4px 6px;
-  border: 1px solid var(--color-border-light, #ddd);
-  border-radius: 4px;
   font-size: 13px;
   font-family: monospace;
   text-align: center;
-  background: var(--color-panel-bg, #fff);
   color: var(--color-text, #224156);
-}
-
-.dictation-editor-modal__sentences-table td.col-start input:focus,
-.dictation-editor-modal__sentences-table td.col-end input:focus {
-  border-color: var(--color-button-text-yellow, #f9c609);
-  outline: none;
+  background: var(--color-hover, #f0eeeb);
+  border-radius: 4px;
 }
 
 /* Выделенная строка */
