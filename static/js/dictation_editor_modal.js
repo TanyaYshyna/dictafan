@@ -1141,6 +1141,8 @@
 
     // Сохраняем URL, чтобы освободить при закрытии
     state._sharedAudioUrl = audioUrl;
+    // Сохраняем File объект для отправки на сервер при split
+    state._sharedAudioFile = file;
 
     audio.addEventListener('loadedmetadata', function () {
       var duration = audio.duration;
@@ -1306,6 +1308,12 @@
       return;
     }
 
+    var file = state._sharedAudioFile;
+    if (!file) {
+      alert('Файл не найден. Пожалуйста, выберите аудиофайл заново.');
+      return;
+    }
+
     // Собираем все предложения для разрезания
     var cores = state.content ? state.content.getAllSentenceCores() : [];
     var validCores = cores.filter(function (s) { return s.key; });
@@ -1339,19 +1347,30 @@
       });
     });
 
-    _splitAudioOnServer(_sharedAudioFilename, sentences);
+    // Читаем файл как base64 и отправляем на сервер
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var base64 = e.target.result.split(',')[1];
+      _splitAudioOnServer(_sharedAudioFilename, sentences, base64, file.type);
+    };
+    reader.readAsDataURL(file);
   }
 
-  async function _splitAudioOnServer(filename, sentences) {
+  async function _splitAudioOnServer(filename, sentences, audio_b64, mime) {
     try {
+      var body = {
+        filename: filename,
+        dictation_id: state.config ? state.config.dictationId : '',
+        sentences: sentences
+      };
+      if (audio_b64) {
+        body.audio_b64 = audio_b64;
+        body.mime = mime || 'audio/mpeg';
+      }
       var response = await fetch('/split-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: filename,
-          dictation_id: state.config ? state.config.dictationId : '',
-          sentences: sentences
-        })
+        body: JSON.stringify(body)
       });
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
@@ -1386,27 +1405,44 @@
       return;
     }
 
-    _smartSplitOnServer(_sharedAudioFilename);
+    var file = state._sharedAudioFile;
+    if (!file) {
+      alert('Файл не найден. Пожалуйста, выберите аудиофайл заново.');
+      return;
+    }
+
+    // Читаем файл как base64 и отправляем на сервер
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var base64 = e.target.result.split(',')[1];
+      _smartSplitOnServer(_sharedAudioFilename, base64, file.type);
+    };
+    reader.readAsDataURL(file);
   }
 
-  async function _smartSplitOnServer(filename) {
+  async function _smartSplitOnServer(filename, audio_b64, mime) {
     try {
+      var body = {
+        filename: filename,
+        dictation_id: state.config ? state.config.dictationId : '',
+        smart: true,
+        language: state.config ? state.config.originalLanguage : '',
+        sentences: state.content ? state.content.getAllSentenceCores().map(function (s) {
+          return {
+            key: s.key,
+            text: s.text_original || '',
+            language: state.config ? state.config.originalLanguage : ''
+          };
+        }) : []
+      };
+      if (audio_b64) {
+        body.audio_b64 = audio_b64;
+        body.mime = mime || 'audio/mpeg';
+      }
       var response = await fetch('/split-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filename: filename,
-          dictation_id: state.config ? state.config.dictationId : '',
-          smart: true,
-          language: state.config ? state.config.originalLanguage : '',
-          sentences: state.content ? state.content.getAllSentenceCores().map(function (s) {
-            return {
-              key: s.key,
-              text: s.text_original || '',
-              language: state.config ? state.config.originalLanguage : ''
-            };
-          }) : []
-        })
+        body: JSON.stringify(body)
       });
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
@@ -1697,6 +1733,7 @@
     state.dirtyFlags = { db: false, audio: false, cover: false };
     _sharedAudioFilename = null;
     _sharedAudioDuration = null;
+    state._sharedAudioFile = null;
 
     // Освобождаем blob URL для shared audio
     if (state._sharedAudioUrl) {
