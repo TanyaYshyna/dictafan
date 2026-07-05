@@ -466,7 +466,22 @@
       // Оригинал
       var tdOrig = document.createElement('td');
       tdOrig.className = 'col-original panel-original';
-      tdOrig.textContent = s.text_original || '';
+      var origInput = document.createElement('input');
+      origInput.type = 'text';
+      origInput.className = 'table-input';
+      origInput.value = s.text_original || '';
+      origInput.dataset.key = key;
+      origInput.dataset.field = 'text_original';
+      origInput.addEventListener('change', function () {
+        if (state.content) {
+          var sentence = state.content.getSentence(key);
+          if (sentence) {
+            sentence.text_original = this.value;
+            _setDirtyFlags({ db: true });
+          }
+        }
+      });
+      tdOrig.appendChild(origInput);
       tr.appendChild(tdOrig);
 
       // Generate TTS (audio) — кнопка o
@@ -547,7 +562,22 @@
       // Перевод
       var tdTrans = document.createElement('td');
       tdTrans.className = 'col-translation panel-translation';
-      tdTrans.textContent = s.text_translation || '';
+      var transInput = document.createElement('input');
+      transInput.type = 'text';
+      transInput.className = 'table-input';
+      transInput.value = s.text_translation || '';
+      transInput.dataset.key = key;
+      transInput.dataset.field = 'text_translation';
+      transInput.addEventListener('change', function () {
+        if (state.content) {
+          var sentence = state.content.getSentence(key);
+          if (sentence) {
+            sentence.text_translation = this.value;
+            _setDirtyFlags({ db: true });
+          }
+        }
+      });
+      tdTrans.appendChild(transInput);
       tr.appendChild(tdTrans);
 
       // Play translation — кнопка t
@@ -1416,6 +1446,9 @@
       var endInput = document.getElementById('editorModalAudioEndTime');
       if (startInput) startInput.value = '0';
       if (endInput) endInput.value = duration.toFixed(2);
+
+      // Помечаем, что есть несохранённые изменения (появился shared audio)
+      _setDirtyFlags({ db: true });
     });
 
     audio.addEventListener('error', function () {
@@ -1705,7 +1738,7 @@
             }
           }
         }
-        _setDirtyFlags({ audio: true });
+        _setDirtyFlags({ audio: true, db: true });
         _renderTable();
         _bindAudioPlaybackHandlers();
       } else {
@@ -1798,7 +1831,7 @@
             }
           }
         }
-        _setDirtyFlags({ audio: true });
+        _setDirtyFlags({ audio: true, db: true });
         _renderTable();
         _bindAudioPlaybackHandlers();
       } else {
