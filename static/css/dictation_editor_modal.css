@@ -549,6 +549,52 @@
   border: 1px solid var(--color-button-shadow-purple);
 }
 
+/* Панель над волной: название файла + текст + кнопка */
+.dictation-editor-modal__waveform-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background: var(--color-panel-bg, #fff);
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  min-height: 40px;
+}
+
+.dictation-editor-modal__waveform-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.dictation-editor-modal__waveform-filename {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #224156);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictation-editor-modal__waveform-sentence-text {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-secondary, #5a6b7a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dictation-editor-modal__waveform-info-actions {
+  flex-shrink: 0;
+}
+
 .dictation-editor-modal__waveform-section {
   margin-bottom: 12px;
 }

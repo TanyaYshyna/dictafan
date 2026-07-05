@@ -350,10 +350,29 @@
     row.classList.add('selected');
     _updateCurrentRowNumber();
 
+    // Обновляем панель над волной: текст текущей строки
+    var key = row.dataset.key;
+    if (key && state.content) {
+      var cores = state.content.getAllSentenceCores();
+      var found = null;
+      for (var i = 0; i < cores.length; i++) {
+        if (cores[i].key === key) {
+          found = cores[i];
+          break;
+        }
+      }
+      if (found) {
+        // Обновляем текст оригинала в панели над волной
+        var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
+        if (sentenceTextEl) {
+          sentenceTextEl.textContent = found.text_original || '—';
+        }
+      }
+    }
+
     // Обновляем регионы волны и поля Start/End под волной при выборе строки
     var wf = window.editorModalWaveform;
     if (wf) {
-      var key = row.dataset.key;
       if (key && state.content) {
         var cores = state.content.getAllSentenceCores();
         var found = null;
@@ -553,7 +572,7 @@
       tdStart.className = 'col-start panel-editing-user';
       var startLabel = document.createElement('span');
       startLabel.className = 'time-label';
-      startLabel.textContent = s.start || '';
+      startLabel.textContent = (s.start != null && s.start !== '') ? s.start : '';
       tdStart.appendChild(startLabel);
       tr.appendChild(tdStart);
 
@@ -562,7 +581,7 @@
       tdEnd.className = 'col-end panel-editing-user';
       var endLabel = document.createElement('span');
       endLabel.className = 'time-label';
-      endLabel.textContent = s.end || '';
+      endLabel.textContent = (s.end != null && s.end !== '') ? s.end : '';
       tdEnd.appendChild(endLabel);
       tr.appendChild(tdEnd);
 
@@ -602,7 +621,12 @@
     if (filename.startsWith('blob:') || filename.startsWith('http://') || filename.startsWith('https://') || filename.startsWith('/api/')) {
       return filename;
     }
-    return '/api/audio/' + encodeURIComponent(dictationId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
+    // Нормализуем dictationId: добавляем префикс dict_ если его нет
+    var normalizedId = String(dictationId || '').trim();
+    if (normalizedId && !normalizedId.startsWith('dict_')) {
+      normalizedId = 'dict_' + normalizedId;
+    }
+    return '/api/audio/' + encodeURIComponent(normalizedId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
   }
 
   function _getSentenceForButton(button) {
@@ -1320,6 +1344,7 @@
 
   function _initHaveAudioTab() {
     var selectBtn = document.getElementById('editorModalSelectFileBtn');
+    var selectBtn2 = document.getElementById('editorModalSelectFileBtn2');
     var fileInput = document.getElementById('editorModalAudioFileInput');
     var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
 
@@ -1327,7 +1352,16 @@
       selectBtn.addEventListener('click', function () {
         fileInput.click();
       });
+    }
 
+    // Вторая кнопка выбора файла (в панели над волной)
+    if (selectBtn2 && fileInput) {
+      selectBtn2.addEventListener('click', function () {
+        fileInput.click();
+      });
+    }
+
+    if (fileInput) {
       fileInput.addEventListener('change', function (e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -1415,6 +1449,12 @@
     state._sharedAudioUrl = audioUrl;
     // Сохраняем File объект для отправки на сервер при split
     state._sharedAudioFile = file;
+
+    // Обновляем название файла в панели над волной
+    var filenameEl = document.getElementById('editorModalWaveformFilename');
+    if (filenameEl) {
+      filenameEl.textContent = file.name;
+    }
 
     audio.addEventListener('loadedmetadata', function () {
       var duration = audio.duration;
@@ -2041,8 +2081,8 @@
             audio_translation: s.translation_audio || s.audio_tr || s.audio_translation || '',
             audio_file: s.audio_file || s.audio_f || null,
             audio_mic: s.audio_mic || s.audio_m || null,
-            start: s.start || '',
-            end: s.end || '',
+            start: (s.start != null && s.start !== '') ? s.start : '',
+            end: (s.end != null && s.end !== '') ? s.end : '',
             checked: s.checked || false,
             explanation: s.explanation || '',
             speaker: s.speaker || '',
@@ -2081,11 +2121,88 @@
     // Инициализируем AudioManager
     _ensureAudioManager();
 
+    // Пытаемся восстановить shared audio из данных предложений (после reopen)
+    _restoreSharedAudioFromSentences();
+
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
     }
 
     document.body.style.overflow = 'hidden';
+  }
+
+  /**
+   * Восстанавливает shared audio после повторного открытия редактора.
+   * Ищет первую строку с audio_file, пытается получить URL из draft cache
+   * или через серверный эндпоинт.
+   */
+  async function _restoreSharedAudioFromSentences() {
+    if (!state.content) return;
+    var cores = state.content.getAllSentenceCores();
+    if (!cores || !cores.length) return;
+
+    // Ищем первую строку с audio_file
+    var firstWithAudio = null;
+    for (var i = 0; i < cores.length; i++) {
+      if (cores[i].audio_file) {
+        firstWithAudio = cores[i];
+        break;
+      }
+    }
+    if (!firstWithAudio || !firstWithAudio.audio_file) return;
+
+    var filename = firstWithAudio.audio_file;
+    var lang = state.config?.originalLanguage || '';
+    var dictationId = state.config?.dictationId || '';
+
+    // Обновляем название файла в панели над волной
+    var filenameEl = document.getElementById('editorModalWaveformFilename');
+    if (filenameEl) {
+      filenameEl.textContent = filename;
+    }
+
+    // Обновляем текст первой строки в панели
+    var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
+    if (sentenceTextEl) {
+      sentenceTextEl.textContent = firstWithAudio.text_original || '—';
+    }
+
+    // Пробуем получить URL из draft cache
+    var audioUrl = null;
+    if (typeof getDraftAudioUrl === 'function') {
+      audioUrl = getDraftAudioUrl(lang, filename);
+    }
+
+    if (audioUrl) {
+      // Есть в draft cache — инициализируем волну
+      _initWaveform(audioUrl);
+      state._sharedAudioUrl = audioUrl;
+      var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
+      if (audioInfo) {
+        audioInfo.textContent = 'Аудіо для хвилі: ' + filename;
+      }
+      return;
+    }
+
+    // Пробуем загрузить с сервера
+    try {
+      var serverUrl = _resolveEditorPlaybackAudioUrl(dictationId, lang, filename);
+      if (serverUrl) {
+        var resp = await fetch(serverUrl);
+        if (resp.ok) {
+          var blob = await resp.blob();
+          var blobUrl = URL.createObjectURL(blob);
+          _initWaveform(blobUrl);
+          state._sharedAudioUrl = blobUrl;
+          var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
+          if (audioInfo) {
+            audioInfo.textContent = 'Аудіо для хвилі: ' + filename;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[dictationEditorModal] Не удалось восстановить shared audio', e);
+    }
   }
 
   function close() {
