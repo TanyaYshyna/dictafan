@@ -181,7 +181,10 @@ window.DictationKart = window.DictationKart || {
       const bk = b && b.key ? String(b.key) : '';
       return ak.localeCompare(bk);
     });
-    return sentences;
+    return {
+      sentences: sentences,
+      audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null
+    };
   },
 
   /**
@@ -830,7 +833,7 @@ window.DictationKart = window.DictationKart || {
               var sentencesPromise = null;
               if (window.DictationKart && typeof window.DictationKart._fetchSentencesFromServer === 'function') {
                 sentencesPromise = window.DictationKart._fetchSentencesFromServer(dictationId, langOriginal, langTranslation)
-                  .then(function (sentences) { return sentences; })
+                  .then(function (result) { return result; })
                   .catch(function (err) {
                     console.warn('[dictation_kart] Failed to fetch sentences for editor', err);
                     // Пробуем загрузить из IndexedDB cache
@@ -842,18 +845,20 @@ window.DictationKart = window.DictationKart || {
                             if (typeof window.DictationKart._showToast === 'function') {
                               window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
                             }
-                            return cachedSentences;
+                            return { sentences: cachedSentences, audio_user_shared: null };
                           }
-                          return [];
+                          return { sentences: [], audio_user_shared: null };
                         });
                     }
-                    return [];
+                    return { sentences: [], audio_user_shared: null };
                   });
               } else {
-                sentencesPromise = Promise.resolve([]);
+                sentencesPromise = Promise.resolve({ sentences: [], audio_user_shared: null });
               }
 
-              sentencesPromise.then(function (sentences) {
+              sentencesPromise.then(function (result) {
+                var sentences = result && Array.isArray(result.sentences) ? result.sentences : [];
+                var audio_user_shared = result ? result.audio_user_shared : null;
                 window.DictationEditorModal.open({
                   dictationId: dictationId,
                   originalLanguage: langOriginal,
@@ -864,6 +869,7 @@ window.DictationKart = window.DictationKart || {
                   authorMaterialsUrl: authorMaterialsUrl,
                   is_dialog: isDialog,
                   sentences: sentences,
+                  audio_user_shared: audio_user_shared,
                 });
               });
             } else {

@@ -473,9 +473,19 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             
             sentences.append(sentence)
         
+        # Получаем audio_user_shared из данных диктанта
+        audio_user_shared = None
+        try:
+            dictation_data = get_dictation_by_id(db_id)
+            if dictation_data:
+                audio_user_shared = dictation_data.get('audio_user_shared')
+        except Exception:
+            pass
+
         return jsonify({
             'success': True,
-            'sentences': sentences
+            'sentences': sentences,
+            'audio_user_shared': audio_user_shared
         })
         
     except Exception as e:

@@ -25,6 +25,14 @@
     audioManager: null,
     /** @type {{ db: boolean, audio: boolean, cover: boolean }} */
     dirtyFlags: { db: false, audio: false, cover: false },
+    /** Имя общего аудиофайла (shared audio), который загружен через "..." */
+    _sharedAudioFilename: null,
+    /** Длительность общего аудиофайла в секундах */
+    _sharedAudioDuration: null,
+    /** File объект общего аудиофайла */
+    _sharedAudioFile: null,
+    /** blob URL для waveform */
+    _sharedAudioUrl: null,
   };
 
   /* ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===== */
@@ -729,7 +737,7 @@
 
       var body = {
         dictation_id: dictationId,
-        filename: _sharedAudioFilename || 'audio.' + (file.name ? file.name.split('.').pop() : 'mp3'),
+        filename: state._sharedAudioFilename || 'audio.' + (file.name ? file.name.split('.').pop() : 'mp3'),
         audio_b64: base64,
         mime: file.type || 'audio/mpeg',
         start_time: startVal,
@@ -1291,11 +1299,6 @@
 
   /* ===== ВКЛАДКА "Є АУДІО" (voice-original-have) ===== */
 
-  /** @type {string|null} */
-  var _sharedAudioFilename = null;
-  /** @type {number|null} */
-  var _sharedAudioDuration = null;
-
   function _initHaveAudioTab() {
     var selectBtn = document.getElementById('editorModalSelectFileBtn');
     var fileInput = document.getElementById('editorModalAudioFileInput');
@@ -1402,8 +1405,8 @@
 
     audio.addEventListener('loadedmetadata', function () {
       var duration = audio.duration;
-      _sharedAudioFilename = file.name;
-      _sharedAudioDuration = duration;
+      state._sharedAudioFilename = file.name;
+      state._sharedAudioDuration = duration;
 
       // Инициализируем волну
       _initWaveform(audioUrl);
@@ -1596,7 +1599,7 @@
   }
 
   function _handleSplitAudio() {
-    if (!_sharedAudioFilename) {
+    if (!state._sharedAudioFilename) {
       alert('Не выбран аудиофайл');
       return;
     }
@@ -1617,7 +1620,7 @@
     }
 
     // Вычисляем start/end на основе длительности аудио (равные отрезки)
-    var totalDuration = _sharedAudioDuration || 0;
+    var totalDuration = state._sharedAudioDuration || 0;
     var segmentDuration = totalDuration / validCores.length;
 
     var sentences = [];
@@ -1644,7 +1647,7 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       var base64 = e.target.result.split(',')[1];
-      _splitAudioOnServer(_sharedAudioFilename, sentences, base64, file.type);
+      _splitAudioOnServer(state._sharedAudioFilename, sentences, base64, file.type);
     };
     reader.readAsDataURL(file);
   }
@@ -1715,7 +1718,7 @@
   }
 
   function _handleSmartSplit() {
-    if (!_sharedAudioFilename) {
+    if (!state._sharedAudioFilename) {
       alert('Не выбран аудиофайл');
       return;
     }
@@ -1730,7 +1733,7 @@
     var reader = new FileReader();
     reader.onload = function (e) {
       var base64 = e.target.result.split(',')[1];
-      _smartSplitOnServer(_sharedAudioFilename, base64, file.type);
+      _smartSplitOnServer(state._sharedAudioFilename, base64, file.type);
     };
     reader.readAsDataURL(file);
   }
@@ -1924,6 +1927,7 @@
         title: state.config ? state.config.title : 'Без названия',
         level: state.config ? (state.config.level || 'A1') : 'A1',
         is_dialog: state.currentDictation ? !!state.currentDictation.is_dialog : false,
+        audio_user_shared: state._sharedAudioFilename || null,
         sentences: sentencesPayload,
       };
 
@@ -2088,38 +2092,44 @@
 
   /**
    * Восстанавливает shared audio после повторного открытия редактора.
-   * Ищет первую строку с audio_file, пытается получить URL из draft cache
-   * или через серверный эндпоинт.
+   * Использует audio_user_shared из config (сохранённый в БД),
+   * загружает аудио через AudioManager.resolvePlayableUrl().
    */
   async function _restoreSharedAudioFromSentences() {
     if (!state.content) return;
-    var cores = state.content.getAllSentenceCores();
-    if (!cores || !cores.length) return;
 
-    // Ищем первую строку с audio_file
-    var firstWithAudio = null;
-    for (var i = 0; i < cores.length; i++) {
-      if (cores[i].audio_file) {
-        firstWithAudio = cores[i];
-        break;
+    // Берём имя shared audio файла из config (сохранён в БД как audio_user_shared)
+    var sharedFilename = state.config?.audio_user_shared || state._sharedAudioFilename;
+    if (!sharedFilename) {
+      // Если нет shared audio — пробуем восстановить из первого audio_file
+      var cores = state.content.getAllSentenceCores();
+      if (!cores || !cores.length) return;
+      var firstWithAudio = null;
+      for (var i = 0; i < cores.length; i++) {
+        if (cores[i].audio_file) {
+          firstWithAudio = cores[i];
+          break;
+        }
       }
+      if (!firstWithAudio || !firstWithAudio.audio_file) return;
+      sharedFilename = firstWithAudio.audio_file;
     }
-    if (!firstWithAudio || !firstWithAudio.audio_file) return;
 
-    var filename = firstWithAudio.audio_file;
     var lang = state.config?.originalLanguage || '';
     var dictationId = state.config?.dictationId || '';
 
     // Обновляем название файла в панели над волной
     var filenameEl = document.getElementById('editorModalWaveformFilename');
     if (filenameEl) {
-      filenameEl.textContent = filename;
+      filenameEl.textContent = sharedFilename;
     }
 
     // Обновляем текст первой строки в панели
+    var cores = state.content.getAllSentenceCores();
+    var firstWithAudio = cores ? cores.find(function (s) { return s.audio_file; }) : null;
     var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
     if (sentenceTextEl) {
-      sentenceTextEl.textContent = firstWithAudio.text_original || '—';
+      sentenceTextEl.textContent = (firstWithAudio && firstWithAudio.text_original) || '—';
     }
 
     // Пробуем получить URL через AudioManager (CacheStorage → fetch)
@@ -2127,11 +2137,12 @@
     if (!am) return;
 
     try {
-      var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, filename);
+      var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, sharedFilename);
       var playableUrl = await am.resolvePlayableUrl(canonicalUrl);
       if (playableUrl) {
         _initWaveform(playableUrl);
         state._sharedAudioUrl = playableUrl;
+        state._sharedAudioFilename = sharedFilename;
       }
     } catch (e) {
       console.warn('[dictationEditorModal] Не удалось восстановить shared audio', e);
@@ -2149,8 +2160,8 @@
     state.content = null;
     state.currentDictation = null;
     state.dirtyFlags = { db: false, audio: false, cover: false };
-    _sharedAudioFilename = null;
-    _sharedAudioDuration = null;
+    state._sharedAudioFilename = null;
+    state._sharedAudioDuration = null;
     state._sharedAudioFile = null;
 
     // Освобождаем blob URL для shared audio
