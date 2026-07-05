@@ -614,19 +614,32 @@
   /* ===== ОБРАБОТКА АУДИО (ПОЛНЫЙ МЕХАНИЗМ) ===== */
 
   function _resolveEditorPlaybackAudioUrl(dictationId, language, filename) {
-    if (typeof resolveEditorPlaybackAudioUrl === 'function') {
-      return resolveEditorPlaybackAudioUrl(dictationId, language, filename);
+    // Сначала пробуем глобальную функцию resolveEditorPlaybackAudioUrl (из script_dictation_editor.js),
+    // которая проверяет draft cache и строит правильный URL через buildDictationAudioUrl
+    if (typeof window.resolveEditorPlaybackAudioUrl === 'function') {
+      return window.resolveEditorPlaybackAudioUrl(dictationId, language, filename);
     }
     if (!filename) return null;
     if (filename.startsWith('blob:') || filename.startsWith('http://') || filename.startsWith('https://') || filename.startsWith('/api/')) {
       return filename;
     }
-    // Нормализуем dictationId: добавляем префикс dict_ если его нет
+    // Пробуем draft cache напрямую
+    if (typeof getDraftAudioUrl === 'function') {
+      var draftUrl = getDraftAudioUrl(language, filename);
+      if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
+        return draftUrl;
+      }
+    }
+    // Строим серверный URL через buildDictationAudioUrl если доступна
+    if (typeof buildDictationAudioUrl === 'function') {
+      return buildDictationAudioUrl(dictationId, language, filename);
+    }
+    // Fallback: нормализуем dictationId и строим /api/dictations/...
     var normalizedId = String(dictationId || '').trim();
     if (normalizedId && !normalizedId.startsWith('dict_')) {
       normalizedId = 'dict_' + normalizedId;
     }
-    return '/api/audio/' + encodeURIComponent(normalizedId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
+    return '/api/dictations/' + encodeURIComponent(normalizedId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
   }
 
   function _getSentenceForButton(button) {
@@ -2162,10 +2175,6 @@
       // Есть в draft cache — инициализируем волну
       _initWaveform(audioUrl);
       state._sharedAudioUrl = audioUrl;
-      var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
-      if (audioInfo) {
-        audioInfo.textContent = 'Аудіо для хвилі: ' + filename;
-      }
       return;
     }
 
@@ -2179,10 +2188,6 @@
           var blobUrl = URL.createObjectURL(blob);
           _initWaveform(blobUrl);
           state._sharedAudioUrl = blobUrl;
-          var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
-          if (audioInfo) {
-            audioInfo.textContent = 'Аудіо для хвилі: ' + filename;
-          }
         }
       }
     } catch (e) {
