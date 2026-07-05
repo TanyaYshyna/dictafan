@@ -1344,19 +1344,10 @@
 
   function _initHaveAudioTab() {
     var selectBtn = document.getElementById('editorModalSelectFileBtn');
-    var selectBtn2 = document.getElementById('editorModalSelectFileBtn2');
     var fileInput = document.getElementById('editorModalAudioFileInput');
-    var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
 
     if (selectBtn && fileInput) {
       selectBtn.addEventListener('click', function () {
-        fileInput.click();
-      });
-    }
-
-    // Вторая кнопка выбора файла (в панели над волной)
-    if (selectBtn2 && fileInput) {
-      selectBtn2.addEventListener('click', function () {
         fileInput.click();
       });
     }
@@ -1441,7 +1432,6 @@
   }
 
   function _uploadSharedAudioFile(file) {
-    var audioInfo = document.getElementById('editorModalCurrentAudioInfo');
     var audio = new Audio();
     var audioUrl = URL.createObjectURL(file);
 
@@ -1460,11 +1450,6 @@
       var duration = audio.duration;
       _sharedAudioFilename = file.name;
       _sharedAudioDuration = duration;
-
-      if (audioInfo) {
-        var rounded = Math.floor(duration * 100) / 100;
-        audioInfo.textContent = 'Аудіо для хвилі: ' + file.name + ' (' + rounded + 'с)';
-      }
 
       // Инициализируем волну
       _initWaveform(audioUrl);
