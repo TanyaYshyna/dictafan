@@ -613,35 +613,6 @@
 
   /* ===== ОБРАБОТКА АУДИО (ПОЛНЫЙ МЕХАНИЗМ) ===== */
 
-  function _resolveEditorPlaybackAudioUrl(dictationId, language, filename) {
-    // Сначала пробуем глобальную функцию resolveEditorPlaybackAudioUrl (из script_dictation_editor.js),
-    // которая проверяет draft cache и строит правильный URL через buildDictationAudioUrl
-    if (typeof window.resolveEditorPlaybackAudioUrl === 'function') {
-      return window.resolveEditorPlaybackAudioUrl(dictationId, language, filename);
-    }
-    if (!filename) return null;
-    if (filename.startsWith('blob:') || filename.startsWith('http://') || filename.startsWith('https://') || filename.startsWith('/api/')) {
-      return filename;
-    }
-    // Пробуем draft cache напрямую
-    if (typeof getDraftAudioUrl === 'function') {
-      var draftUrl = getDraftAudioUrl(language, filename);
-      if (draftUrl && typeof draftUrl === 'string' && draftUrl.startsWith('blob:')) {
-        return draftUrl;
-      }
-    }
-    // Строим серверный URL через buildDictationAudioUrl если доступна
-    if (typeof buildDictationAudioUrl === 'function') {
-      return buildDictationAudioUrl(dictationId, language, filename);
-    }
-    // Fallback: нормализуем dictationId и строим /api/dictations/...
-    var normalizedId = String(dictationId || '').trim();
-    if (normalizedId && !normalizedId.startsWith('dict_')) {
-      normalizedId = 'dict_' + normalizedId;
-    }
-    return '/api/dictations/' + encodeURIComponent(normalizedId) + '/' + encodeURIComponent(language) + '/' + encodeURIComponent(filename);
-  }
-
   function _getSentenceForButton(button) {
     if (!button || !state.content) return null;
     var key = button.dataset.key;
@@ -699,7 +670,7 @@
       }
     }
 
-    var audioUrl = _resolveEditorPlaybackAudioUrl(state.config.dictationId, lang, audioFilename);
+    var audioUrl = am.buildDictationAudioUrl(state.config.dictationId, lang, audioFilename);
     if (!audioUrl) return;
 
     // Воспроизводим через audioManager
@@ -729,7 +700,8 @@
 
   /**
    * Обрезает исходное общее аудио по start/end предложения через /cut-audio,
-   * сохраняет результат в draft cache, обновляет sentence.audio_file и проигрывает.
+   * сохраняет результат в CacheStorage через AudioManager,
+   * обновляет sentence.audio_file и проигрывает.
    */
   async function _handleCutAudioForSentence(button, sentence, lang, field) {
     if (!sentence) return;
@@ -788,9 +760,10 @@
       // Генерируем имя файла
       var newFilename = 'cut_' + sentence.key + '_' + Date.now() + '.mp3';
 
-      // Сохраняем в draft cache
-      if (typeof putDraftAudioToCache === 'function') {
-        await putDraftAudioToCache(dictationId, lang, newFilename, blob, data.mime || file.type || 'audio/mpeg');
+      // Сохраняем в CacheStorage через AudioManager (вместо draft cache)
+      var am = _ensureAudioManager();
+      if (am && typeof am.saveDictationAudioBlob === 'function') {
+        await am.saveDictationAudioBlob(dictationId, lang, newFilename, blob, data.mime || file.type || 'audio/mpeg');
       }
 
       // Обновляем sentence
@@ -799,23 +772,19 @@
       // Устанавливаем dirty flags
       _setDirtyFlags({ db: true, audio: true });
 
-      // Создаём blob URL для воспроизведения
-      var blobUrl = URL.createObjectURL(blob);
-      if (typeof setDraftAudioUrl === 'function') {
-        setDraftAudioUrl(lang, newFilename, blobUrl);
-      }
-
-      // Проигрываем
-      var am = _ensureAudioManager();
+      // Строим canonical URL через AudioManager и проигрываем
       if (am && typeof am.play === 'function') {
-        am.play(button, blobUrl, {
+        var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, newFilename);
+        am.play(button, canonicalUrl, {
           onEnd: function () {
             _setButtonState(button, 'ready');
           }
         });
         _setButtonState(button, 'playing');
       } else {
+        // Fallback: создаём blob URL напрямую
         try {
+          var blobUrl = URL.createObjectURL(blob);
           var audio = new Audio(blobUrl);
           audio.play().catch(function (err) {
             console.warn('[dictationEditorModal] Audio play error', err);
@@ -849,9 +818,9 @@
   }
 
   /**
-   * Загружает все draft аудиофайлы из state.content на B2.
-   * Проходит по всем предложениям, проверяет есть ли файл в draft cache,
-   * и если есть — загружает на B2 через /api/b2/get_upload_url.
+   * Загружает все аудиофайлы из CacheStorage на B2 через AudioManager.
+   * Собирает canonical URLs для всех audio_file в предложениях и передаёт
+   * в AudioManager.uploadDictationAudioFromCacheToB2().
    */
   async function _uploadDraftAudioToB2(dictationId, token) {
     if (!state.content || !dictationId || !token) return;
@@ -866,72 +835,44 @@
     var lang = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
     if (!lang) return;
 
+    var am = _ensureAudioManager();
+    if (!am || typeof am.uploadDictationAudioFromCacheToB2 !== 'function') {
+      console.warn('[dictationEditorModal] AudioManager.uploadDictationAudioFromCacheToB2 not available');
+      return;
+    }
+
     var sentences = state.content.getAllSentenceCores();
     var langCode = String(lang).toLowerCase().trim();
 
+    // Собираем canonical URLs для всех файлов, которые есть в предложениях
+    var urls = [];
     for (var i = 0; i < sentences.length; i++) {
       var s = sentences[i];
       var filename = s.audio_file;
       if (!filename) continue;
+      urls.push(am.buildDictationAudioUrl(dictationId, langCode, filename));
+    }
 
-      // Проверяем, есть ли файл в draft cache (blob URL)
-      var draftUrl = null;
-      if (typeof getDraftAudioUrl === 'function') {
-        draftUrl = getDraftAudioUrl(langCode, filename);
-      }
-      if (!draftUrl) continue;
+    if (urls.length === 0) return;
 
-      try {
-        // Получаем blob из blob URL
-        var blobResp = await fetch(draftUrl);
-        var blob = await blobResp.blob();
-        if (!blob || !blob.size) continue;
-
-        // Получаем upload URL от сервера
-        var uploadUrlResp = await fetch('/api/b2/get_upload_url', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token
-          },
-          body: JSON.stringify({
-            dictation_id: dictationId,
-            filename: filename,
-            language: langCode
-          })
-        });
-
-        var uploadUrlData = await uploadUrlResp.json();
-        if (!uploadUrlData.success || !uploadUrlData.uploadUrl) {
-          console.warn('[dictationEditorModal] B2 get_upload_url failed:', uploadUrlData);
-          continue;
+    try {
+      var result = await am.uploadDictationAudioFromCacheToB2({
+        dictationId: dictationId,
+        token: token,
+        urls: urls,
+        onUploaded: function (uploadedUrl) {
+          console.log('[dictationEditorModal] B2 upload success:', uploadedUrl);
+        },
+        onProgress: function (progress) {
+          // Можно добавить индикатор прогресса при необходимости
         }
+      });
 
-        // Загружаем файл на B2
-        var remotePath = 'dictations/' + dictationId + '/' + langCode + '/' + filename;
-        var b2Resp = await fetch(uploadUrlData.uploadUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': uploadUrlData.uploadAuthToken,
-            'X-Bz-File-Name': encodeURIComponent(remotePath),
-            'Content-Type': blob.type || 'b2/x-auto',
-            'X-Bz-Content-Sha1': 'do_not_verify'
-          },
-          body: blob
-        });
-
-        if (b2Resp.ok) {
-          console.log('[dictationEditorModal] B2 upload success:', filename);
-          // Очищаем draft cache после успешной загрузки
-          if (typeof clearDraftAudioUrl === 'function') {
-            clearDraftAudioUrl(langCode, filename);
-          }
-        } else {
-          console.warn('[dictationEditorModal] B2 upload failed:', filename, b2Resp.status);
-        }
-      } catch (e) {
-        console.warn('[dictationEditorModal] B2 upload error for', filename, e);
+      if (result && result.failed && result.failed.length > 0) {
+        console.warn('[dictationEditorModal] Некоторые файлы не загрузились на B2:', result.failed);
       }
+    } catch (e) {
+      console.warn('[dictationEditorModal] B2 upload error', e);
     }
   }
 
@@ -1727,6 +1668,7 @@
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
         var dictationId = state.config ? state.config.dictationId : '';
+        var am = _ensureAudioManager();
         for (var i = 0; i < data.files.length; i++) {
           var f = data.files[i];
           if (!f || !f.filename || !f.key) continue;
@@ -1742,7 +1684,7 @@
               if (et != null) sentence.end = (typeof et === 'number') ? et.toFixed(2) : String(et);
             }
           }
-          // Сохраняем audio_b64 в draft cache для воспроизведения
+          // Сохраняем audio_b64 в CacheStorage через AudioManager (вместо draft cache)
           if (f.audio_b64 && dictationId) {
             try {
               var binaryStr = atob(f.audio_b64);
@@ -1752,8 +1694,8 @@
               }
               var blob = new Blob([bytes], { type: f.mime || mime || 'audio/mpeg' });
               var lang = state.config ? state.config.originalLanguage : '';
-              if (typeof putDraftAudioToCache === 'function') {
-                putDraftAudioToCache(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
+              if (am && typeof am.saveDictationAudioBlob === 'function') {
+                await am.saveDictationAudioBlob(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
               }
             } catch (e) {
               console.warn('[dictationEditorModal] failed to cache audio blob', e);
@@ -1820,6 +1762,7 @@
       var data = await response.json();
       if (data.success && Array.isArray(data.files)) {
         var dictationId = state.config ? state.config.dictationId : '';
+        var am = _ensureAudioManager();
         for (var i = 0; i < data.files.length; i++) {
           var f = data.files[i];
           if (!f || !f.filename || !f.key) continue;
@@ -1834,7 +1777,7 @@
               if (et != null) sentence.end = (typeof et === 'number') ? et.toFixed(2) : String(et);
             }
           }
-          // Сохраняем audio_b64 в draft cache для воспроизведения
+          // Сохраняем audio_b64 в CacheStorage через AudioManager (вместо draft cache)
           if (f.audio_b64 && dictationId) {
             try {
               var binaryStr = atob(f.audio_b64);
@@ -1844,8 +1787,8 @@
               }
               var blob = new Blob([bytes], { type: f.mime || mime || 'audio/mpeg' });
               var lang = state.config ? state.config.originalLanguage : '';
-              if (typeof putDraftAudioToCache === 'function') {
-                putDraftAudioToCache(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
+              if (am && typeof am.saveDictationAudioBlob === 'function') {
+                await am.saveDictationAudioBlob(dictationId, lang, f.filename, blob, f.mime || mime || 'audio/mpeg');
               }
             } catch (e) {
               console.warn('[dictationEditorModal] failed to cache audio blob', e);
@@ -2056,7 +1999,21 @@
     var langTr = config.translationLanguage || '';
     var rawSentences = config.sentences || [];
 
-    if (typeof DictationContent !== 'undefined') {
+    // Пробуем получить content из DictationRuntime (если он уже загружен)
+    if (typeof DictationRuntime !== 'undefined' && DictationRuntime.getOrCreateContent) {
+      state.content = DictationRuntime.getOrCreateContent({
+        dictationId: dictationId,
+        langTr: langTr || langOrig,
+      });
+      // Если content уже существовал и в нём есть sentences — используем их,
+      // иначе устанавливаем sentences из config
+      if (rawSentences && rawSentences.length > 0) {
+        var existingCores = state.content.getAllSentenceCores();
+        if (!existingCores || existingCores.length === 0) {
+          state.content.setSentences(rawSentences);
+        }
+      }
+    } else if (typeof DictationContent !== 'undefined') {
       state.content = new DictationContent({
         dictationId: dictationId,
         langOrig: langOrig,
@@ -2165,30 +2122,16 @@
       sentenceTextEl.textContent = firstWithAudio.text_original || '—';
     }
 
-    // Пробуем получить URL из draft cache
-    var audioUrl = null;
-    if (typeof getDraftAudioUrl === 'function') {
-      audioUrl = getDraftAudioUrl(lang, filename);
-    }
+    // Пробуем получить URL через AudioManager (CacheStorage → fetch)
+    var am = _ensureAudioManager();
+    if (!am) return;
 
-    if (audioUrl) {
-      // Есть в draft cache — инициализируем волну
-      _initWaveform(audioUrl);
-      state._sharedAudioUrl = audioUrl;
-      return;
-    }
-
-    // Пробуем загрузить с сервера
     try {
-      var serverUrl = _resolveEditorPlaybackAudioUrl(dictationId, lang, filename);
-      if (serverUrl) {
-        var resp = await fetch(serverUrl);
-        if (resp.ok) {
-          var blob = await resp.blob();
-          var blobUrl = URL.createObjectURL(blob);
-          _initWaveform(blobUrl);
-          state._sharedAudioUrl = blobUrl;
-        }
+      var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, filename);
+      var playableUrl = await am.resolvePlayableUrl(canonicalUrl);
+      if (playableUrl) {
+        _initWaveform(playableUrl);
+        state._sharedAudioUrl = playableUrl;
       }
     } catch (e) {
       console.warn('[dictationEditorModal] Не удалось восстановить shared audio', e);
@@ -2201,6 +2144,8 @@
     state.isOpen = false;
     state.config = null;
     state.headerLangPairSelector = null;
+    // НЕ удаляем state.content из DictationRuntime — он может использоваться
+    // другими компонентами (DictationKart, DictationModal). Просто сбрасываем ссылку.
     state.content = null;
     state.currentDictation = null;
     state.dirtyFlags = { db: false, audio: false, cover: false };
