@@ -485,7 +485,7 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
         return jsonify({
             'success': True,
             'sentences': sentences,
-            'audio_user_shared': audio_user_shared
+            'audio_user_shared': audio_user_shared,
         })
         
     except Exception as e:

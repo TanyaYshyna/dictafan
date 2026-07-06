@@ -183,7 +183,7 @@ window.DictationKart = window.DictationKart || {
     });
     return {
       sentences: sentences,
-      audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null
+      audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null,
     };
   },
 
@@ -199,14 +199,20 @@ window.DictationKart = window.DictationKart || {
       const cacheKey = userId + ':' + dictKey + ':' + langOrig + ':' + langTr;
       const cached = await idb.idbGet('dictations', cacheKey);
       if (cached && Array.isArray(cached.sentences) && cached.sentences.length) {
-        return cached.sentences;
+        return {
+          sentences: cached.sentences,
+          audio_user_shared: cached.audio_user_shared || null
+        };
       }
       // Пробуем анонимный ключ
       const anonKey = 'anon:' + dictKey + ':' + langOrig + ':' + langTr;
       if (anonKey !== cacheKey) {
         const anonCached = await idb.idbGet('dictations', anonKey);
         if (anonCached && Array.isArray(anonCached.sentences) && anonCached.sentences.length) {
-          return anonCached.sentences;
+          return {
+            sentences: anonCached.sentences,
+            audio_user_shared: anonCached.audio_user_shared || null
+          };
         }
       }
     } catch (e) {
@@ -428,6 +434,7 @@ window.DictationKart = window.DictationKart || {
             langOrig: lo,
             langTr: lo,
             sentences,
+            audio_user_shared: sharedAudioFilename || null,
             updatedAt,
           });
         }
@@ -494,6 +501,7 @@ window.DictationKart = window.DictationKart || {
               langOrig: lo,
               langTr: lt,
               sentences,
+              audio_user_shared: sharedAudioFilename || null,
               updatedAt,
             });
           }
@@ -874,7 +882,6 @@ window.DictationKart = window.DictationKart || {
             const coverUrl = btn.getAttribute('data-cover-url') || '';
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
             const isDialog = btn.getAttribute('data-is-dialog') === 'true';
-            const audioOrder = btn.getAttribute('data-audio-order') || '';
 
             console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
 
@@ -891,13 +898,13 @@ window.DictationKart = window.DictationKart || {
                     // Пробуем загрузить из IndexedDB cache
                     if (window.DictationKart && typeof window.DictationKart._loadSentencesFromCache === 'function') {
                       return window.DictationKart._loadSentencesFromCache(dictationId, langOriginal, langTranslation)
-                        .then(function (cachedSentences) {
-                          if (cachedSentences && cachedSentences.length) {
-                            console.log('[dictation_kart] Loaded sentences from cache, count:', cachedSentences.length);
+                        .then(function (cachedResult) {
+                          if (cachedResult && Array.isArray(cachedResult.sentences) && cachedResult.sentences.length) {
+                            console.log('[dictation_kart] Loaded sentences from cache, count:', cachedResult.sentences.length);
                             if (typeof window.DictationKart._showToast === 'function') {
                                 window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
                               }
-                              return { sentences: cachedSentences, audio_user_shared: null };
+                              return { sentences: cachedResult.sentences, audio_user_shared: cachedResult.audio_user_shared };
                             }
                             return { sentences: [], audio_user_shared: null };
                         });
@@ -922,7 +929,6 @@ window.DictationKart = window.DictationKart || {
                   is_dialog: isDialog,
                   sentences: sentences,
                   audio_user_shared: audio_user_shared,
-                  audio_order: audioOrder,
                 });
               });
             } else {

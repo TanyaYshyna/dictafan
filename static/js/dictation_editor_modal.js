@@ -2145,6 +2145,21 @@
           if (dbResult.success) {
             _setDirtyFlags({ db: false });
             console.log('[dictationEditorModal] Текст/БД сохранён');
+
+            // Обновляем audio_order в state.config и в DictationContent,
+            // чтобы при повторном открытии (без перезагрузки страницы) радио выставилось правильно
+            if (state.config) {
+              state.config.audio_order = audioOrderValue;
+            }
+            if (state.content) {
+              state.content.audio_order = audioOrderValue;
+            }
+
+            // Обновляем audio_user_shared в DictationContent после сохранения,
+            // чтобы при повторном открытии (без перезагрузки страницы) shared audio восстановился
+            if (state.content) {
+              state.content.audio_user_shared = state._sharedAudioFilename || null;
+            }
           } else {
             console.error('[dictationEditorModal] Ошибка сохранения БД:', dbResult.error);
           }
@@ -2228,6 +2243,8 @@
     var langOrig = config.originalLanguage || '';
     var langTr = config.translationLanguage || '';
     var rawSentences = config.sentences || [];
+    var audioOrderFromConfig = config.audio_order || '';
+    var audioUserSharedFromConfig = config.audio_user_shared || null;
 
     // Пробуем получить content из DictationRuntime (если он уже загружен)
     if (typeof DictationRuntime !== 'undefined' && DictationRuntime.getOrCreateContent) {
@@ -2243,18 +2260,37 @@
           state.content.setSentences(rawSentences);
         }
       }
+      // Если content уже существовал и в нём есть audio_order — используем его
+      // как источник истины (приоритет над config)
+      if (state.content.audio_order !== undefined && state.content.audio_order !== null && state.content.audio_order !== '') {
+        state.config.audio_order = state.content.audio_order;
+      } else if (audioOrderFromConfig) {
+        // Если в content нет audio_order, но есть в config — сохраняем в content
+        state.content.audio_order = audioOrderFromConfig;
+      }
+      // Аналогично для audio_user_shared
+      if (state.content.audio_user_shared) {
+        state.config.audio_user_shared = state.content.audio_user_shared;
+        state._sharedAudioFilename = state.content.audio_user_shared;
+      } else if (audioUserSharedFromConfig) {
+        state.content.audio_user_shared = audioUserSharedFromConfig;
+      }
     } else if (typeof DictationContent !== 'undefined') {
       state.content = new DictationContent({
         dictationId: dictationId,
         langOrig: langOrig,
         langTr: langTr,
         sentences: rawSentences,
+        audio_order: audioOrderFromConfig,
+        audio_user_shared: audioUserSharedFromConfig,
       });
     } else {
       state.content = {
         dictationId: dictationId,
         langOrig: langOrig,
         langTr: langTr,
+        audio_order: audioOrderFromConfig,
+        audio_user_shared: audioUserSharedFromConfig,
         _sentences: rawSentences.map(function (s, i) {
           return {
             key: s.key || 's_' + i,

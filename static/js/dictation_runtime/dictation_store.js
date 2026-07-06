@@ -18,10 +18,12 @@
   }
 
   class DictationContent {
-    constructor({ dictationId, langOrig, langTr, sentences }) {
+    constructor({ dictationId, langOrig, langTr, sentences, audio_order, audio_user_shared }) {
       this.dictationId = dictationId;
       this.langOrig = langOrig;
       this.langTr = langTr;
+      this.audio_order = (audio_order !== null && audio_order !== undefined) ? String(audio_order) : '';
+      this.audio_user_shared = (audio_user_shared !== null && audio_user_shared !== undefined) ? String(audio_user_shared) : null;
       this._sentences = [];
       if (Array.isArray(sentences)) {
         this.setSentences(sentences);
@@ -85,6 +87,8 @@
         dictationId: this.dictationId,
         langOrig: this.langOrig,
         langTr: this.langTr,
+        audio_order: this.audio_order,
+        audio_user_shared: this.audio_user_shared,
         sentences: this._sentences,
       };
     }
