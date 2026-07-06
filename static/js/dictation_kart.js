@@ -1413,6 +1413,7 @@ window.DictationKart = window.DictationKart || {
         level: item.level,
         langTranslation,
         isDialog: item.is_dialog,
+        audioOrder: item.audio_order,
       });
     }
 
@@ -1513,6 +1514,7 @@ window.DictationKart = window.DictationKart || {
         level: d.level,
         langTranslation,
         isDialog: d.is_dialog,
+        audioOrder: d.audio_order,
       });
     }
 
