@@ -1298,6 +1298,8 @@
           if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
             _applyTableViewForTab(state.currentTabName);
           }
+          // Изменение режима голоса — это изменение в БД (voice_mode), зажигаем звезду
+          _setDirtyFlags({ db: true });
         }
       });
     });
@@ -1984,6 +1986,12 @@
         sentences: sentencesPayload,
       };
 
+      // Если есть shared audio filename, но db флаг не стоит — всё равно помечаем db dirty,
+      // чтобы audio_user_shared гарантированно сохранился в БД
+      if (state._sharedAudioFilename && !flags.db) {
+        flags.db = true;
+      }
+
       // Этап 1: Сохраняем текст/БД (если dirty db)
       if (flags.db) {
         console.log('[dictationEditorModal] Сохраняю текст/БД...');
@@ -2168,12 +2176,10 @@
       filenameEl.textContent = sharedFilename;
     }
 
-    // Обновляем текст первой строки в панели
-    var cores = state.content.getAllSentenceCores();
-    var firstWithAudio = cores ? cores.find(function (s) { return s.audio_file; }) : null;
+    // Показываем имя shared audio файла в лейбе вместо текста первого предложения
     var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
     if (sentenceTextEl) {
-      sentenceTextEl.textContent = (firstWithAudio && firstWithAudio.text_original) || '—';
+      sentenceTextEl.textContent = sharedFilename;
     }
 
     // Пробуем получить URL через AudioManager (CacheStorage → fetch)
