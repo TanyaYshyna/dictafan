@@ -184,6 +184,7 @@ window.DictationKart = window.DictationKart || {
     return {
       sentences: sentences,
       audio_user_shared: (data && data.audio_user_shared) ? String(data.audio_user_shared) : null,
+      audio_order: (data && data.audio_order) ? String(data.audio_order) : '',
     };
   },
 
@@ -882,6 +883,7 @@ window.DictationKart = window.DictationKart || {
             const coverUrl = btn.getAttribute('data-cover-url') || '';
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
             const isDialog = btn.getAttribute('data-is-dialog') === 'true';
+            const audioOrder = btn.getAttribute('data-audio-order') || '';
 
             console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
 
@@ -929,6 +931,7 @@ window.DictationKart = window.DictationKart || {
                   is_dialog: isDialog,
                   sentences: sentences,
                   audio_user_shared: audio_user_shared,
+                  audio_order: audioOrder,
                 });
               });
             } else {

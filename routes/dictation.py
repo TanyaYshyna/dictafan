@@ -486,6 +486,7 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             'success': True,
             'sentences': sentences,
             'audio_user_shared': audio_user_shared,
+            'audio_order': dictation_data.get('audio_order', '') if dictation_data else '',
         })
         
     except Exception as e:
