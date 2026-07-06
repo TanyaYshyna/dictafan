@@ -2339,11 +2339,25 @@
     _setupTableControls();
     _updateUnsavedStar();
 
+    // При открытии редактора всегда показываем первую закладку (Общие данные)
+    // Это гарантирует, что после reopen не останется активной закладка с озвучкой
+    var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
+    if (defaultTabBtn) {
+      defaultTabBtn.click();
+    }
+
     // Инициализируем AudioManager
     _ensureAudioManager();
 
     // Пытаемся восстановить shared audio из данных предложений (после reopen)
     _restoreSharedAudioFromSentences();
+
+    // После восстановления shared audio обновляем текст в панели над волной
+    // из первой (активной) строки таблицы, чтобы там не осталось имени файла
+    var firstRowAfterRestore = document.querySelector('#' + TABLE_ID + ' tbody tr');
+    if (firstRowAfterRestore) {
+      _selectSentenceRow(firstRowAfterRestore);
+    }
 
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
@@ -2377,11 +2391,10 @@
       filenameEl.textContent = sharedFilename;
     }
 
-    // Показываем имя shared audio файла в лейбе вместо текста первого предложения
-    var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
-    if (sentenceTextEl) {
-      sentenceTextEl.textContent = sharedFilename;
-    }
+    // НЕ пишем имя файла в editorModalWaveformSentenceText — это лейба для текста предложения.
+    // Имя файла уже отображается в editorModalWaveformFilename выше.
+    // editorModalWaveformSentenceText остаётся пустым; при клике на строку таблицы
+    // _selectSentenceRow() обновит его текстом выбранного предложения.
 
     // Пробуем получить URL через AudioManager (CacheStorage → fetch)
     var am = _ensureAudioManager();
