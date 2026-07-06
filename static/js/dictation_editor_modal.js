@@ -2195,6 +2195,7 @@
     }
 
     state.config = config || {};
+    console.log('[dictationEditorModal] open() config:', JSON.stringify(state.config));
     state.isOpen = true;
     state.dirtyFlags = { db: false, audio: false, cover: false };
 
