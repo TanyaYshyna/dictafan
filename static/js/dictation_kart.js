@@ -228,10 +228,35 @@ window.DictationKart = window.DictationKart || {
       const list = Array.isArray(sentences) ? sentences : [];
       for (const s of list) {
         if (!s || typeof s !== 'object') continue;
+        // Поля audio / audio_a — уже готовые URL (с сервера)
         const audio = s.audio != null ? String(s.audio || '').trim() : '';
+        const audioA = s.audio_a != null ? String(s.audio_a || '').trim() : '';
+        // Поля audio_tr — уже готовый URL для перевода
         const audioTr = s.audio_tr != null ? String(s.audio_tr || '').trim() : '';
-        if (includeOriginal && audio) urls.push(am.buildDictationAudioUrl(dictId, lo, audio));
-        if (includeTranslation && audioTr) urls.push(am.buildDictationAudioUrl(dictId, lt, audioTr));
+        // Поля audio_m / audio_mic — имена файлов микрофона, строим URL
+        const audioM = s.audio_m != null ? String(s.audio_m || '').trim() : '';
+        const audioMic = s.audio_mic != null ? String(s.audio_mic || '').trim() : '';
+        // Поля audio_f / audio_file — имена загруженных файлов, строим URL
+        const audioF = s.audio_f != null ? String(s.audio_f || '').trim() : '';
+        const audioFile = s.audio_file != null ? String(s.audio_file || '').trim() : '';
+
+        if (includeOriginal) {
+          if (audio) urls.push(audio);
+          else if (audioA) urls.push(audioA);
+          // audio_mic / audio_file — имена файлов, строим URL через AudioManager
+          const micName = audioMic || audioM;
+          if (micName) urls.push(am.buildDictationAudioUrl(dictId, lo, micName));
+          const fileName = audioFile || audioF;
+          if (fileName) urls.push(am.buildDictationAudioUrl(dictId, lo, fileName));
+        }
+        if (includeTranslation) {
+          if (audioTr) urls.push(audioTr);
+          // Для перевода тоже могут быть audio_mic / audio_file
+          const micNameTr = s.audio_mic_tr || s.audio_m_tr || '';
+          if (micNameTr) urls.push(am.buildDictationAudioUrl(dictId, lt, micNameTr));
+          const fileNameTr = s.audio_file_tr || s.audio_f_tr || '';
+          if (fileNameTr) urls.push(am.buildDictationAudioUrl(dictId, lt, fileNameTr));
+        }
       }
     } catch (e) {
     }
@@ -378,7 +403,9 @@ window.DictationKart = window.DictationKart || {
         } catch (e) {
         }
 
-        const sentences = await this._fetchSentencesFromServer(dictKey, lo, lo);
+        const sentencesResp = await this._fetchSentencesFromServer(dictKey, lo, lo);
+        const sentences = sentencesResp.sentences;
+        const sharedAudioFilename = sentencesResp.audio_user_shared;
         const keysToWrite = new Set();
         keysToWrite.add(`${userId}:${dictKey}:${lo}:${lo}`);
         keysToWrite.add(`anon:${dictKey}:${lo}:${lo}`);
@@ -415,6 +442,17 @@ window.DictationKart = window.DictationKart || {
           includeTranslation: false,
         });
         for (const u of audioUrls) allAudioUrls.push(u);
+
+        // Добавляем shared audio (audio_user_shared) — имя файла, строим URL
+        if (sharedAudioFilename) {
+          try {
+            const am = window.AudioManager;
+            if (am && typeof am.buildDictationAudioUrl === 'function') {
+              const sharedUrl = am.buildDictationAudioUrl(dictKey, lo, sharedAudioFilename);
+              if (sharedUrl) allAudioUrls.push(sharedUrl);
+            }
+          } catch (e) {}
+        }
       } catch (e) {
         const msg = e && e.message ? e.message : String(e);
         throw new Error(`cache_text_failed_${msg}`);
@@ -431,7 +469,9 @@ window.DictationKart = window.DictationKart || {
           } catch (e) {
           }
 
-          const sentences = await this._fetchSentencesFromServer(dictKey, lo, lt);
+          const sentencesResp = await this._fetchSentencesFromServer(dictKey, lo, lt);
+          const sentences = sentencesResp.sentences;
+          const sharedAudioFilename = sentencesResp.audio_user_shared;
           const keysToWrite = new Set();
           keysToWrite.add(`${userId}:${dictKey}:${lo}:${lt}`);
           keysToWrite.add(`anon:${dictKey}:${lo}:${lt}`);
@@ -468,6 +508,17 @@ window.DictationKart = window.DictationKart || {
             includeTranslation: true,
           });
           for (const u of audioUrls) allAudioUrls.push(u);
+
+          // Добавляем shared audio (audio_user_shared) — имя файла, строим URL
+          if (sharedAudioFilename) {
+            try {
+              const am = window.AudioManager;
+              if (am && typeof am.buildDictationAudioUrl === 'function') {
+                const sharedUrl = am.buildDictationAudioUrl(dictKey, lo, sharedAudioFilename);
+                if (sharedUrl) allAudioUrls.push(sharedUrl);
+              }
+            } catch (e) {}
+          }
         } catch (e) {
           const msg = e && e.message ? e.message : String(e);
           throw new Error(`cache_text_failed_${msg}`);

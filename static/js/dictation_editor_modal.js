@@ -1290,7 +1290,33 @@
       }
     };
 
+    // Сначала сбрасываем радио в значение из config (voice_mode диктанта),
+    // чтобы при открытии модалки для другого диктанта не оставалось выбранное радио от предыдущего.
+    var voiceMode = state.config ? state.config.voice_mode : null;
+    if (voiceMode) {
+      radios.forEach(function (radio) {
+        radio.checked = (radio.value === voiceMode);
+      });
+    } else {
+      // Если voice_mode не указан, выбираем радио "auto" по умолчанию
+      radios.forEach(function (radio) {
+        if (radio.value === 'auto') {
+          radio.checked = true;
+        } else {
+          radio.checked = false;
+        }
+      });
+    }
+
+    // Удаляем старые обработчики и вешаем новые (чтобы не было дублирования при повторном открытии)
+    // Просто заменяем через клонирование — но проще хранить ссылку.
+    // Используем подход: удаляем все старые listeners через замену элемента.
+    // Но чтобы не ломать DOM, просто будем вешать обработчик один раз в init().
+    // В _initVoiceModeRadios добавляем обработчики только если их ещё нет.
+    var handlerAttr = 'data-voice-mode-handler';
     radios.forEach(function (radio) {
+      if (radio.getAttribute(handlerAttr)) return; // уже есть обработчик
+      radio.setAttribute(handlerAttr, '1');
       radio.addEventListener('change', function () {
         if (this.checked) {
           updateTabVisibility(this.value);
@@ -1304,6 +1330,7 @@
       });
     });
 
+    // После сброса применяем видимость вкладок по выбранному значению
     const checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
     if (checkedRadio) {
       updateTabVisibility(checkedRadio.value);
@@ -1471,6 +1498,10 @@
       // db: true — имя файла нужно сохранить в БД (колонка audio_user_shared)
       // audio: true — сам аудиофайл нужно загрузить в B2
       _setDirtyFlags({ db: true, audio: true });
+
+      // Сохраняем файл в CacheStorage, чтобы _uploadDraftAudioToB2() мог его найти
+      // и чтобы после reopen resolvePlayableUrl() мог его восстановить
+      _cacheSharedAudioFile(file);
     });
 
     audio.addEventListener('error', function () {
@@ -1478,6 +1509,27 @@
     });
 
     audio.src = audioUrl;
+  }
+
+  /**
+   * Сохраняет shared audio файл в CacheStorage через AudioManager.
+   * Нужно для последующей загрузки в B2 и восстановления после reopen.
+   */
+  async function _cacheSharedAudioFile(file) {
+    var dictationId = state.config ? state.config.dictationId : '';
+    var lang = state.config ? state.config.originalLanguage : '';
+    var filename = state._sharedAudioFilename;
+    if (!dictationId || !lang || !filename || !file) return;
+
+    var am = _ensureAudioManager();
+    if (!am || typeof am.saveDictationAudioBlob !== 'function') return;
+
+    try {
+      await am.saveDictationAudioBlob(dictationId, lang, filename, file, file.type || 'audio/mpeg');
+      console.log('[dictationEditorModal] Shared audio сохранён в CacheStorage:', filename);
+    } catch (e) {
+      console.warn('[dictationEditorModal] Не удалось сохранить shared audio в CacheStorage', e);
+    }
   }
 
   function _initWaveform(audioUrl) {
@@ -1966,6 +2018,33 @@
             })
           };
         }
+
+        // ВАЖНО: также отправляем предложения на языке перевода, иначе сервер
+        // удалит их из БД (см. cleanup-логику save_dictation_final).
+        // Это фиксит баг: после сохранения пропадает язык перевода (два US флага)
+        // и сбрасываются флаги tr_*.
+        if (langTr && langTr !== langOrig) {
+          sentencesPayload[langTr] = {
+            title: '',
+            sentences: allSentences.map(function (s) {
+              return {
+                key: s.key,
+                position: s.position,
+                text: s.text_translation || '',
+                translation: s.text_original || '',
+                audio: s.audio_translation || '',
+                audio_tr: s.audio_original || '',
+                audio_file: null,
+                audio_mic: null,
+                start: s.start || '',
+                end: s.end || '',
+                checked: s.checked || false,
+                explanation: s.explanation || '',
+                speaker: s.speaker || '',
+              };
+            })
+          };
+        }
       }
 
       // Нормализуем dictationId: добавляем префикс dict_ если его нет
@@ -2052,11 +2131,39 @@
   /* ===== OPEN / CLOSE ===== */
 
   function open(config) {
-    if (state.isOpen) return;
+    // Если модалка уже открыта — сначала закрываем (чистим состояние),
+    // чтобы при повторном открытии для другого диктанта не осталось данных от предыдущего.
+    if (state.isOpen) {
+      close();
+    }
 
     state.config = config || {};
     state.isOpen = true;
     state.dirtyFlags = { db: false, audio: false, cover: false };
+
+    // Сбрасываем shared audio состояние (оно могло остаться от предыдущего открытия)
+    state._sharedAudioFilename = null;
+    state._sharedAudioUrl = null;
+    state._sharedAudioDuration = null;
+    state._sharedAudioFile = null;
+
+    // Сбрасываем waveform (уничтожаем предыдущий экземпляр если был)
+    if (window.editorModalWaveform) {
+      try {
+        window.editorModalWaveform.destroy();
+      } catch (e) {
+        // ignore
+      }
+      window.editorModalWaveform = null;
+    }
+
+    // Сбрасываем текст в панели waveform
+    var filenameEl = document.getElementById('editorModalWaveformFilename');
+    if (filenameEl) filenameEl.textContent = '';
+    var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
+    if (sentenceTextEl) sentenceTextEl.textContent = '';
+    var waveformContainer = document.getElementById('editorModalWaveform');
+    if (waveformContainer) waveformContainer.innerHTML = '';
 
     // Создаём DictationContent
     var dictationId = config.dictationId || '';
