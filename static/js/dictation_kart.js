@@ -895,11 +895,11 @@ window.DictationKart = window.DictationKart || {
                           if (cachedSentences && cachedSentences.length) {
                             console.log('[dictation_kart] Loaded sentences from cache, count:', cachedSentences.length);
                             if (typeof window.DictationKart._showToast === 'function') {
-                              window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
+                                window.DictationKart._showToast('Не вдалося завантажити дані з сервера. Використовується кеш.', { type: 'warning' });
+                              }
+                              return { sentences: cachedSentences, audio_user_shared: null };
                             }
-                            return { sentences: cachedSentences, audio_user_shared: null };
-                          }
-                          return { sentences: [], audio_user_shared: null };
+                            return { sentences: [], audio_user_shared: null };
                         });
                     }
                     return { sentences: [], audio_user_shared: null };
