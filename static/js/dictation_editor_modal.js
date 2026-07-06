@@ -891,6 +891,11 @@
       urls.push(am.buildDictationAudioUrl(dictationId, langCode, filename));
     }
 
+    // Добавляем shared audio файл, если он есть
+    if (state._sharedAudioFilename) {
+      urls.push(am.buildDictationAudioUrl(dictationId, langCode, state._sharedAudioFilename));
+    }
+
     if (urls.length === 0) return;
 
     try {
@@ -1344,6 +1349,8 @@
         var file = e.target.files && e.target.files[0];
         if (!file) return;
         _uploadSharedAudioFile(file);
+        // Сбрасываем value, чтобы можно было выбрать тот же файл повторно
+        fileInput.value = '';
       });
     }
 
@@ -1419,6 +1426,17 @@
   }
 
   function _uploadSharedAudioFile(file) {
+    // Освобождаем старый blob URL, если был
+    if (state._sharedAudioUrl && state._sharedAudioUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(state._sharedAudioUrl);
+    }
+
+    // Уничтожаем старый waveform, если есть
+    if (window.editorModalWaveform) {
+      window.editorModalWaveform.destroy();
+      window.editorModalWaveform = null;
+    }
+
     var audio = new Audio();
     var audioUrl = URL.createObjectURL(file);
 
@@ -1447,8 +1465,10 @@
       if (startInput) startInput.value = '0';
       if (endInput) endInput.value = duration.toFixed(2);
 
-      // Помечаем, что есть несохранённые изменения (появился shared audio)
-      _setDirtyFlags({ db: true });
+      // Помечаем, что есть несохранённые изменения:
+      // db: true — имя файла нужно сохранить в БД (колонка audio_user_shared)
+      // audio: true — сам аудиофайл нужно загрузить в B2
+      _setDirtyFlags({ db: true, audio: true });
     });
 
     audio.addEventListener('error', function () {
@@ -2127,6 +2147,7 @@
    * Восстанавливает shared audio после повторного открытия редактора.
    * Использует audio_user_shared из config (сохранённый в БД),
    * загружает аудио через AudioManager.resolvePlayableUrl().
+   * Если audio_user_shared пустой — ничего не показывает.
    */
   async function _restoreSharedAudioFromSentences() {
     if (!state.content) return;
@@ -2134,18 +2155,8 @@
     // Берём имя shared audio файла из config (сохранён в БД как audio_user_shared)
     var sharedFilename = state.config?.audio_user_shared || state._sharedAudioFilename;
     if (!sharedFilename) {
-      // Если нет shared audio — пробуем восстановить из первого audio_file
-      var cores = state.content.getAllSentenceCores();
-      if (!cores || !cores.length) return;
-      var firstWithAudio = null;
-      for (var i = 0; i < cores.length; i++) {
-        if (cores[i].audio_file) {
-          firstWithAudio = cores[i];
-          break;
-        }
-      }
-      if (!firstWithAudio || !firstWithAudio.audio_file) return;
-      sharedFilename = firstWithAudio.audio_file;
+      // Нет shared audio — ничего не показываем, не лезем в строки
+      return;
     }
 
     var lang = state.config?.originalLanguage || '';

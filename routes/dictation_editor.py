@@ -1334,7 +1334,8 @@ def save_dictation_final():
                 level=data.get("level", "A1"),
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
-                author_materials_url=data.get("author_materials_url")
+                author_materials_url=data.get("author_materials_url"),
+                audio_user_shared=data.get("audio_user_shared")
             )
         elif db_id:
             # Обновляем существующий диктант в БД
@@ -1345,7 +1346,8 @@ def save_dictation_final():
                 level=data.get("level"),
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
-                author_materials_url=data.get("author_materials_url")
+                author_materials_url=data.get("author_materials_url"),
+                audio_user_shared=data.get("audio_user_shared")
             )
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400
@@ -1566,18 +1568,22 @@ def save_dictation_final():
                 except Exception:
                     return None
 
+            # audio_user_shared приходит на верхнем уровне data (не внутри sentences[lang])
+            shared_name = data.get('audio_user_shared')
+            shared_base = _basename_from_value(shared_name) if isinstance(shared_name, str) else None
+            if shared_base:
+                keep_audio_names.add(shared_base)
+                # Добавляем для всех языков, т.к. общее аудио не привязано к конкретному языку
+                for _lang in (data.get('sentences') or {}).keys():
+                    if isinstance(_lang, str) and _lang.strip():
+                        keep_audio_relpaths.add(f"{_lang.strip()}/{shared_base}")
+
             for _lang, _lang_data in (data.get('sentences') or {}).items():
                 if not isinstance(_lang, str) or not _lang.strip():
                     continue
                 lang_code = _lang.strip()
                 if not _lang_data or not isinstance(_lang_data, dict):
                     continue
-
-                shared_name = _lang_data.get('audio_user_shared')
-                shared_base = _basename_from_value(shared_name) if isinstance(shared_name, str) else None
-                if shared_base:
-                    keep_audio_names.add(shared_base)
-                    keep_audio_relpaths.add(f"{lang_code}/{shared_base}")
 
                 for s in (_lang_data.get('sentences') or []):
                     if not s or not isinstance(s, dict):
