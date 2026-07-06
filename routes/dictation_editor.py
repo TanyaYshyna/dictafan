@@ -1441,6 +1441,11 @@ def save_dictation_final():
                     # Предложение существует - проверяем изменилось ли что-то
                     # Сравниваем числа с небольшой погрешностью (для float)
                     def float_eq(a, b):
+                        # Пустые строки считаем как None (нет значения)
+                        if a == '' or a is None:
+                            a = None
+                        if b == '' or b is None:
+                            b = None
                         if a is None and b is None:
                             return True
                         if a is None or b is None:
