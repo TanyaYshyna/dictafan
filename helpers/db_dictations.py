@@ -660,8 +660,9 @@ def set_dictation_translation_flags(dictation_id: int, flags: dict) -> None:
         conn.close()
 
 
-def update_dictation(dictation_id, title=None, language_code=None, level=None, 
-                    is_public=None, speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None, sentences_count=None):
+def update_dictation(dictation_id, title=None, language_code=None, level=None,
+                    is_public=None, speakers=None, audio_user_shared=None, title_translations=None, author_materials_url=None, sentences_count=None,
+                    audio_order=None):
     """
     Обновляет диктант в БД
     
@@ -676,6 +677,7 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
         sentences_count: Денормализованное количество предложений на языке оригинала (если None - не обновляется)
         title_translations: Новый словарь переводов заголовка (если None - не обновляется)
         author_materials_url: URL на материалы автора (если None - не обновляется)
+        audio_order: Режим озвучки: 'f' (файл), 'm' (микрофон), '' (авто). None — не обновлять.
     
     Returns:
         dict: Обновлённые данные диктанта
@@ -726,6 +728,11 @@ def update_dictation(dictation_id, title=None, language_code=None, level=None,
             if title_translations is not None:
                 updates.append("title_translations_json = %s")
                 values.append(json.dumps(title_translations) if title_translations else None)
+            
+            # audio_order: обновляем, если передано (даже пустая строка для сброса на авто)
+            if audio_order is not None:
+                updates.append("audio_order = %s")
+                values.append(audio_order)
             
             # author_materials_url всегда обновляется, если передано (даже None для очистки)
             if has_author_materials_url:

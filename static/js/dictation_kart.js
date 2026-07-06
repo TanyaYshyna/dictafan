@@ -874,6 +874,7 @@ window.DictationKart = window.DictationKart || {
             const coverUrl = btn.getAttribute('data-cover-url') || '';
             const authorMaterialsUrl = btn.getAttribute('data-author-materials-url') || '';
             const isDialog = btn.getAttribute('data-is-dialog') === 'true';
+            const audioOrder = btn.getAttribute('data-audio-order') || '';
 
             console.log('[dictation_kart] edit-dictation-v2 data:', { dictationId, langOriginal, langTranslation, title, level, coverUrl });
 
@@ -921,6 +922,7 @@ window.DictationKart = window.DictationKart || {
                   is_dialog: isDialog,
                   sentences: sentences,
                   audio_user_shared: audio_user_shared,
+                  audio_order: audioOrder,
                 });
               });
             } else {
@@ -1074,7 +1076,7 @@ window.DictationKart = window.DictationKart || {
     ];
   },
 
-  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog }) {
+  renderMenuHtml({ context, dictationId, deskItemId, editUrl, editV2Url, langOriginal, coverUrl, availableTranslations, title, level, langTranslation, isDialog, audioOrder }) {
     const items = this.buildMenuItems(context);
 
     const t = (key, fallback) => {
@@ -1114,6 +1116,7 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-level="${window.escapeHtml(String(level || ''))}"`);
                 attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
                 attrs.push(`data-is-dialog="${isDialog ? 'true' : 'false'}"`);
+                attrs.push(`data-audio-order="${window.escapeHtml(String(audioOrder || ''))}"`);
               } else if (it.action === 'remove-from-desk') {
                 attrs.push(`data-desk-item-id="${window.escapeHtml(String(deskItemId || ''))}"`);
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
@@ -1189,6 +1192,7 @@ window.DictationKart = window.DictationKart || {
       level: item.level,
       langTranslation,
       isDialog: item.is_dialog,
+      audioOrder: item.audio_order,
     });
 
     return `
@@ -1263,6 +1267,7 @@ window.DictationKart = window.DictationKart || {
       level: d.level,
       langTranslation,
       isDialog: d.is_dialog,
+      audioOrder: d.audio_order,
     });
 
     return `

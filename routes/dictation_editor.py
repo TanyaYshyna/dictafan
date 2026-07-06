@@ -1326,7 +1326,7 @@ def save_dictation_final():
             dictation_id = f"dict_{db_id}"
             logger.info(f"✅ Создан новый диктант в БД: dict_{db_id}")
             
-            # Обновляем диктант с полными данными (title, level, speakers, title_translations, author_materials_url)
+            # Обновляем диктант с полными данными (title, level, speakers, title_translations, author_materials_url, audio_order)
             update_dictation(
                 dictation_id=db_id,
                 title=data.get("title", "Новый диктант"),
@@ -1335,7 +1335,8 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
-                audio_user_shared=data.get("audio_user_shared")
+                audio_user_shared=data.get("audio_user_shared"),
+                audio_order=data.get("audio_order")
             )
         elif db_id:
             # Обновляем существующий диктант в БД
@@ -1347,7 +1348,8 @@ def save_dictation_final():
                 speakers=data.get("speakers", {}),
                 title_translations=data.get("title_translations", {}),
                 author_materials_url=data.get("author_materials_url"),
-                audio_user_shared=data.get("audio_user_shared")
+                audio_user_shared=data.get("audio_user_shared"),
+                audio_order=data.get("audio_order")
             )
         else:
             return jsonify({"success": False, "error": "Missing db_id - dictation not created in DB"}), 400

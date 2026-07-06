@@ -104,9 +104,10 @@ def api_desk_items():
                 COALESCE(d.tr_ar, FALSE) as tr_ar,
                 COALESCE(d.tr_pl, FALSE) as tr_pl,
                 COALESCE(d.sentences_count, 0) as sentences_count,
-                (SELECT DISTINCT language_code 
-                 FROM dictation_sentences 
-                 WHERE dictation_id = d.id AND language_code != d.language_code 
+                COALESCE(d.audio_order, '') as audio_order,
+                (SELECT DISTINCT language_code
+                 FROM dictation_sentences
+                 WHERE dictation_id = d.id AND language_code != d.language_code
                  LIMIT 1) as language_translation
             FROM desk_items di
             JOIN dictations d ON d.id = di.dictation_id
@@ -163,6 +164,7 @@ def api_desk_items():
                     "owner_id": row.get("owner_id"),
                     "level": row["level"],
                     "sentences_count": row["sentences_count"] or 0,
+                    "audio_order": row.get("audio_order") or '',
                     "cover_url": cover_url,
                     "tr_en": bool(row.get("tr_en")),
                     "tr_uk": bool(row.get("tr_uk")),

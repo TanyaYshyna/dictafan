@@ -934,17 +934,20 @@
 
   function _setupTableControls() {
     var prevBtn = document.getElementById('editorModalPrevRowBtn');
-    if (prevBtn) {
+    if (prevBtn && !prevBtn.getAttribute('data-table-control-handler')) {
+      prevBtn.setAttribute('data-table-control-handler', '1');
       prevBtn.addEventListener('click', _navigateToPreviousRow);
     }
 
     var nextBtn = document.getElementById('editorModalNextRowBtn');
-    if (nextBtn) {
+    if (nextBtn && !nextBtn.getAttribute('data-table-control-handler')) {
+      nextBtn.setAttribute('data-table-control-handler', '1');
       nextBtn.addEventListener('click', _navigateToNextRow);
     }
 
     var rowNumberSpan = document.getElementById('editorModalCurrentRowNumber');
-    if (rowNumberSpan) {
+    if (rowNumberSpan && !rowNumberSpan.getAttribute('data-table-control-handler')) {
+      rowNumberSpan.setAttribute('data-table-control-handler', '1');
       rowNumberSpan.addEventListener('keydown', function (event) {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -981,7 +984,8 @@
     }
 
     var addBtn = document.getElementById('editorModalAddRowBtn');
-    if (addBtn) {
+    if (addBtn && !addBtn.getAttribute('data-table-control-handler')) {
+      addBtn.setAttribute('data-table-control-handler', '1');
       addBtn.addEventListener('click', function () {
         if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
           window.DesktopConfirmModal.open({
@@ -1000,7 +1004,8 @@
     }
 
     var deleteBtn = document.getElementById('editorModalDeleteRowBtn');
-    if (deleteBtn) {
+    if (deleteBtn && !deleteBtn.getAttribute('data-table-control-handler')) {
+      deleteBtn.setAttribute('data-table-control-handler', '1');
       deleteBtn.addEventListener('click', function () {
         var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
         if (!selectedRow) return;
@@ -1020,7 +1025,8 @@
     }
 
     var toggleExplBtn = document.getElementById('editorModalToggleExplanationBtn');
-    if (toggleExplBtn) {
+    if (toggleExplBtn && !toggleExplBtn.getAttribute('data-table-control-handler')) {
+      toggleExplBtn.setAttribute('data-table-control-handler', '1');
       toggleExplBtn.addEventListener('click', function () {
         if (!state.currentDictation) state.currentDictation = {};
         state.currentDictation.show_explanation = !state.currentDictation.show_explanation;
@@ -1029,7 +1035,8 @@
     }
 
     var refillBtn = document.getElementById('editorModalRefillTableBtn');
-    if (refillBtn) {
+    if (refillBtn && !refillBtn.getAttribute('data-table-control-handler')) {
+      refillBtn.setAttribute('data-table-control-handler', '1');
       refillBtn.addEventListener('click', function () {
         if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
           window.DesktopConfirmModal.open({
@@ -1290,9 +1297,24 @@
       }
     };
 
-    // Сначала сбрасываем радио в значение из config (voice_mode диктанта),
-    // чтобы при открытии модалки для другого диктанта не оставалось выбранное радио от предыдущего.
+    // Сначала сбрасываем радио в значение из config.
+    // config.voice_mode может быть 'auto', 'have', 'self' (старый формат)
+    // или config.audio_order может быть 'f', 'm', '' (новый формат из БД).
+    // Маппинг: '' → 'auto', 'f' → 'have', 'm' → 'self'
     var voiceMode = state.config ? state.config.voice_mode : null;
+    var audioOrder = state.config ? state.config.audio_order : null;
+    
+    // Если audio_order задан (из БД), используем его как источник истины
+    if (audioOrder !== null && audioOrder !== undefined) {
+      if (audioOrder === 'f') {
+        voiceMode = 'have';
+      } else if (audioOrder === 'm') {
+        voiceMode = 'self';
+      } else {
+        voiceMode = 'auto';
+      }
+    }
+    
     if (voiceMode) {
       radios.forEach(function (radio) {
         radio.checked = (radio.value === voiceMode);
@@ -1344,21 +1366,27 @@
 
     if (!uploadBtn || !fileInput) return;
 
-    uploadBtn.addEventListener('click', function () {
-      fileInput.click();
-    });
+    if (!uploadBtn.getAttribute('data-cover-handler')) {
+      uploadBtn.setAttribute('data-cover-handler', '1');
+      uploadBtn.addEventListener('click', function () {
+        fileInput.click();
+      });
+    }
 
-    fileInput.addEventListener('change', function (e) {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
+    if (!fileInput.getAttribute('data-cover-handler')) {
+      fileInput.setAttribute('data-cover-handler', '1');
+      fileInput.addEventListener('change', function (e) {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = function (ev) {
-        if (coverImage) coverImage.src = ev.target.result;
-        _setDirtyFlags({ cover: true });
-      };
-      reader.readAsDataURL(file);
-    });
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+          if (coverImage) coverImage.src = ev.target.result;
+          _setDirtyFlags({ cover: true });
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   }
 
   /* ===== ВКЛАДКА "Є АУДІО" (voice-original-have) ===== */
@@ -1367,13 +1395,16 @@
     var selectBtn = document.getElementById('editorModalSelectFileBtn');
     var fileInput = document.getElementById('editorModalAudioFileInput');
 
-    if (selectBtn && fileInput) {
+    // Защита от дублирования обработчиков при повторных вызовах open()
+    if (selectBtn && fileInput && !selectBtn.getAttribute('data-have-audio-handler')) {
+      selectBtn.setAttribute('data-have-audio-handler', '1');
       selectBtn.addEventListener('click', function () {
         fileInput.click();
       });
     }
 
-    if (fileInput) {
+    if (fileInput && !fileInput.getAttribute('data-have-audio-handler')) {
+      fileInput.setAttribute('data-have-audio-handler', '1');
       fileInput.addEventListener('change', function (e) {
         var file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -1385,7 +1416,8 @@
 
     // Кнопка "разрезать на 1000 кусков"
     var splitBtn = document.getElementById('editorModalSplitBtn');
-    if (splitBtn) {
+    if (splitBtn && !splitBtn.getAttribute('data-have-audio-handler')) {
+      splitBtn.setAttribute('data-have-audio-handler', '1');
       splitBtn.addEventListener('click', function () {
         _handleSplitAudio();
       });
@@ -1393,7 +1425,8 @@
 
     // Кнопка "умная нарезка"
     var smartSplitBtn = document.getElementById('editorModalSmartSplitBtn');
-    if (smartSplitBtn) {
+    if (smartSplitBtn && !smartSplitBtn.getAttribute('data-have-audio-handler')) {
+      smartSplitBtn.setAttribute('data-have-audio-handler', '1');
       smartSplitBtn.addEventListener('click', function () {
         _handleSmartSplit();
       });
@@ -1401,7 +1434,8 @@
 
     // Кнопка воспроизведения под волной
     var playBtn = document.getElementById('editorModalAudioPlayBtn');
-    if (playBtn) {
+    if (playBtn && !playBtn.getAttribute('data-have-audio-handler')) {
+      playBtn.setAttribute('data-have-audio-handler', '1');
       playBtn.addEventListener('click', function (event) {
         _handleSharedAudioPlayback(event);
       });
@@ -1409,6 +1443,8 @@
 
     // Стрелки для полей Start/End
     document.querySelectorAll('.time-input-arrow').forEach(function (btn) {
+      if (btn.getAttribute('data-have-audio-handler')) return;
+      btn.setAttribute('data-have-audio-handler', '1');
       btn.addEventListener('click', function () {
         var targetId = this.dataset.target;
         var dir = this.dataset.dir;
@@ -1434,7 +1470,8 @@
     // Ручной ввод в поля Start/End — синхронизация с волной и данными
     var startInput = document.getElementById('editorModalAudioStartTime');
     var endInput = document.getElementById('editorModalAudioEndTime');
-    if (startInput) {
+    if (startInput && !startInput.getAttribute('data-have-audio-handler')) {
+      startInput.setAttribute('data-have-audio-handler', '1');
       startInput.addEventListener('change', function () {
         var val = parseFloat(this.value);
         if (!isNaN(val) && val >= 0) {
@@ -1443,7 +1480,8 @@
         }
       });
     }
-    if (endInput) {
+    if (endInput && !endInput.getAttribute('data-have-audio-handler')) {
+      endInput.setAttribute('data-have-audio-handler', '1');
       endInput.addEventListener('change', function () {
         var val = parseFloat(this.value);
         if (!isNaN(val) && val >= 0) {
@@ -1922,6 +1960,10 @@
     if (!panel) return;
 
     panel.querySelectorAll('.dictation-editor-modal__tab-btn').forEach(function (btn) {
+      // Защита от дублирования обработчиков при повторных вызовах open()
+      if (btn.getAttribute('data-tab-handler')) return;
+      btn.setAttribute('data-tab-handler', '1');
+
       btn.addEventListener('click', function () {
         const tabName = btn.getAttribute('data-tab');
 
@@ -2053,6 +2095,20 @@
         normalizedId = 'dict_' + normalizedId;
       }
 
+      // Определяем audio_order из выбранного радио
+      // Маппинг: 'auto' → '', 'have' → 'f', 'self' → 'm'
+      var selectedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+      var audioOrderValue = '';
+      if (selectedRadio) {
+        if (selectedRadio.value === 'have') {
+          audioOrderValue = 'f';
+        } else if (selectedRadio.value === 'self') {
+          audioOrderValue = 'm';
+        } else {
+          audioOrderValue = '';
+        }
+      }
+
       var saveData = {
         id: normalizedId,
         temp_id: normalizedId,
@@ -2062,6 +2118,7 @@
         level: state.config ? (state.config.level || 'A1') : 'A1',
         is_dialog: state.currentDictation ? !!state.currentDictation.is_dialog : false,
         audio_user_shared: state._sharedAudioFilename || null,
+        audio_order: audioOrderValue,
         sentences: sentencesPayload,
       };
 
@@ -2300,9 +2357,22 @@
         _initWaveform(playableUrl);
         state._sharedAudioUrl = playableUrl;
         state._sharedAudioFilename = sharedFilename;
+        return;
       }
     } catch (e) {
-      console.warn('[dictationEditorModal] Не удалось восстановить shared audio', e);
+      console.warn('[dictationEditorModal] Не удалось восстановить shared audio через кэш', e);
+    }
+
+    // Если не нашли в кэше — пробуем загрузить напрямую с сервера
+    try {
+      var directUrl = am.buildDictationAudioUrl(dictationId, lang, sharedFilename);
+      // Пробуем просто использовать canonical URL как playable (сервер отдаст файл)
+      _initWaveform(directUrl);
+      state._sharedAudioUrl = directUrl;
+      state._sharedAudioFilename = sharedFilename;
+      console.log('[dictationEditorModal] Shared audio восстановлен через прямой URL:', directUrl);
+    } catch (e2) {
+      console.warn('[dictationEditorModal] Не удалось восстановить shared audio даже через прямой URL', e2);
     }
   }
 
