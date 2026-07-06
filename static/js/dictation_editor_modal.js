@@ -2339,13 +2339,6 @@
     _setupTableControls();
     _updateUnsavedStar();
 
-    // При открытии редактора всегда показываем первую закладку (Общие данные)
-    // Это гарантирует, что после reopen не останется активной закладка с озвучкой
-    var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
-    if (defaultTabBtn) {
-      defaultTabBtn.click();
-    }
-
     // Инициализируем AudioManager
     _ensureAudioManager();
 
@@ -2357,6 +2350,53 @@
     var firstRowAfterRestore = document.querySelector('#' + TABLE_ID + ' tbody tr');
     if (firstRowAfterRestore) {
       _selectSentenceRow(firstRowAfterRestore);
+    }
+
+    // Переключаемся на правильную закладку в зависимости от режима audio_order.
+    // Если audio_order === 'f' (режим "э файл") — открываем закладку с волной,
+    // чтобы waveform могла корректно инициализироваться (wavesurfer не работает в скрытом контейнере).
+    // В остальных случаях — открываем первую закладку (Общие данные).
+    var audioOrder = state.config ? state.config.audio_order : null;
+    if (audioOrder === 'f') {
+      var haveTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-have"]');
+      if (haveTabBtn) {
+        haveTabBtn.click();
+      }
+      // После переключения на закладку с волной — синхронизируем регионы
+      // для текущей (первой) строки, если у неё есть start/end
+      var wf = window.editorModalWaveform;
+      if (wf) {
+        var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+        if (selectedRow) {
+          var key = selectedRow.dataset.key;
+          if (key && state.content) {
+            var cores = state.content.getAllSentenceCores();
+            var found = null;
+            for (var i = 0; i < cores.length; i++) {
+              if (cores[i].key === key) {
+                found = cores[i];
+                break;
+              }
+            }
+            if (found && found.start !== undefined && found.start !== '' && found.end !== undefined && found.end !== '') {
+              var startVal = parseFloat(found.start);
+              var endVal = parseFloat(found.end);
+              if (!isNaN(startVal) && !isNaN(endVal)) {
+                wf.setRegion(startVal, endVal);
+                var startInput = document.getElementById('editorModalAudioStartTime');
+                var endInput = document.getElementById('editorModalAudioEndTime');
+                if (startInput) startInput.value = startVal.toFixed(2);
+                if (endInput) endInput.value = endVal.toFixed(2);
+              }
+            }
+          }
+        }
+      }
+    } else {
+      var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
+      if (defaultTabBtn) {
+        defaultTabBtn.click();
+      }
     }
 
     if (typeof lucide !== 'undefined') {
