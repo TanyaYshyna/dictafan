@@ -1470,6 +1470,13 @@ def save_dictation_final():
                         audio_final = audio_in
                         audio_mic_final = audio_mic_in
                         audio_file_final = audio_file_in
+                        # Конвертируем пустые строки в None для numeric-полей start/end
+                        start_val = sentence.get('start')
+                        end_val = sentence.get('end')
+                        if start_val == '' or start_val is None:
+                            start_val = None
+                        if end_val == '' or end_val is None:
+                            end_val = None
                         # Обновляем только изменённые поля
                         update_sentence(
                             sentence_id=old_sentence['id'],
@@ -1479,8 +1486,8 @@ def save_dictation_final():
                             audio=audio_final,
                             audio_mic=audio_mic_final,
                             audio_file=audio_file_final,
-                            start=sentence.get('start'),
-                            end=sentence.get('end'),
+                            start=start_val,
+                            end=end_val,
                             chain=sentence.get('chain', False),
                             checked=sentence.get('checked', False),
                             position=sentence.get('position')
@@ -1490,6 +1497,13 @@ def save_dictation_final():
                     audio_final = _normalize_audio_filename(sentence.get('audio'))
                     audio_mic_final = _normalize_audio_filename(sentence.get('audio_mic'))
                     audio_file_final = _normalize_audio_filename(sentence.get('audio_file'))
+                    # Конвертируем пустые строки в None для numeric-полей start/end
+                    start_val = sentence.get('start')
+                    end_val = sentence.get('end')
+                    if start_val == '' or start_val is None:
+                        start_val = None
+                    if end_val == '' or end_val is None:
+                        end_val = None
                     # Новое предложение - добавляем
                     add_sentence(
                         dictation_id=db_id,
@@ -1501,8 +1515,8 @@ def save_dictation_final():
                         audio=audio_final,
                         audio_mic=audio_mic_final,
                         audio_file=audio_file_final,
-                        start=sentence.get('start'),
-                        end=sentence.get('end'),
+                        start=start_val,
+                        end=end_val,
                         chain=sentence.get('chain', False),
                         checked=sentence.get('checked', False),
                         position=sentence.get('position')
