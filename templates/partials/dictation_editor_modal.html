@@ -114,7 +114,28 @@
 
           <!-- Вкладка 2: Озвучка оригинала (авто) -->
           <div id="tab-voice-original-auto" class="dictation-editor-modal__tab-content">
-            <p>Озвучка оригинала (авто) — будет реализовано позже</p>
+            <div class="dictation-editor-modal__auto-audio-content">
+              <!-- Панель с текущей строкой и кнопкой для одной строки -->
+              <div class="dictation-editor-modal__auto-audio-info-bar">
+                <div class="dictation-editor-modal__auto-audio-sentence">
+                  <span class="dictation-editor-modal__auto-audio-label">Поточний рядок:</span>
+                  <span class="dictation-editor-modal__auto-audio-text" id="editorModalAutoSentenceText">—</span>
+                </div>
+                <button type="button" id="editorModalAutoGenerateBtn" class="dictation-editor-modal__auto-generate-btn"
+                  title="Переформувати аудіо для поточного рядка">
+                  <i data-lucide="hammer"></i>
+                </button>
+              </div>
+              <!-- Кнопка "Перезаполнить все" в правом нижнем углу -->
+              <div class="dictation-editor-modal__auto-audio-footer">
+                <button type="button" id="editorModalAutoRegenerateAllBtn" class="dictation-editor-modal__auto-regenerate-all-btn"
+                  title="Переформувати аудіо для всіх рядків">
+                  <i data-lucide="wand-2"></i>
+                  <i data-lucide="hammer"></i>
+                  <span>Перезаповнити все</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Вкладка 3: Озвучка оригинала (є аудіо) -->
