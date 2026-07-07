@@ -230,87 +230,44 @@
                 </div>
               </div>
 
-              <!-- Кнопки управления (ліворуч) + блок запису (праворуч) -->
-              <div class="dictation-editor-modal__self-audio-controls-row">
-                <div class="dictation-editor-modal__self-audio-controls">
-                  <button type="button" id="editorModalSelfAudioPlayBtn" class="audio-btn"
-                    data-field-name="audio_mic" data-state="ready"
-                    data-original-state="ready">
-                    <i data-lucide="play"></i>
-                  </button>
-                  <div class="dictation-editor-modal__time-controls">
-                    <div class="time-input-group">
-                      <div class="time-input-field time-input-field--start">
-                        <input type="number" id="editorModalSelfAudioStartTime" step="0.01" min="0" placeholder="0.00">
-                        <div class="time-input-arrows">
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="up" tabindex="-1">
-                            <i data-lucide="chevron-up"></i>
-                          </button>
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="down" tabindex="-1">
-                            <i data-lucide="chevron-down"></i>
-                          </button>
-                        </div>
+              <!-- Кнопки управления -->
+              <div class="dictation-editor-modal__self-audio-controls">
+                <button type="button" id="editorModalSelfAudioPlayBtn" class="audio-btn"
+                  data-field-name="audio_mic" data-state="ready"
+                  data-original-state="ready">
+                  <i data-lucide="play"></i>
+                </button>
+                <div class="dictation-editor-modal__time-controls">
+                  <div class="time-input-group">
+                    <div class="time-input-field time-input-field--start">
+                      <input type="number" id="editorModalSelfAudioStartTime" step="0.01" min="0" placeholder="0.00">
+                      <div class="time-input-arrows">
+                        <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="up" tabindex="-1">
+                          <i data-lucide="chevron-up"></i>
+                        </button>
+                        <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="down" tabindex="-1">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
                       </div>
-                      <div class="time-input-field time-input-field--end">
-                        <input type="number" id="editorModalSelfAudioEndTime" step="0.01" min="0" placeholder="0.00">
-                        <div class="time-input-arrows">
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="up" tabindex="-1">
-                            <i data-lucide="chevron-up"></i>
-                          </button>
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="down" tabindex="-1">
-                            <i data-lucide="chevron-down"></i>
-                          </button>
-                        </div>
+                    </div>
+                    <div class="time-input-field time-input-field--end">
+                      <input type="number" id="editorModalSelfAudioEndTime" step="0.01" min="0" placeholder="0.00">
+                      <div class="time-input-arrows">
+                        <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="up" tabindex="-1">
+                          <i data-lucide="chevron-up"></i>
+                        </button>
+                        <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="down" tabindex="-1">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
-                  <button type="button" id="editorModalSelfSplitBtn" class="dictation-editor-modal__wave-btn"
-                    title="Розрізати аудіо на 1000 рівних кусків">
-                    <i data-lucide="scissors"></i>
-                    <span>1000 =</span>
-                  </button>
-                  <button type="button" id="editorModalSelfSmartSplitBtn" class="dictation-editor-modal__wave-btn dictation-editor-modal__wave-btn--yellow"
-                    title="Розумна нарізка: розпізнає текст через Whisper та нарізає аудіо за фразами">
-                    <i data-lucide="scissors"></i>
-                    <i data-lucide="wand-2"></i>
-                    <span>Розумна нарізка</span>
-                  </button>
                 </div>
-
-                <!-- Блок запису з мікрофона -->
-                <div class="dictation-editor-modal__self-record-block">
-                  <div class="dictation-editor-modal__self-record-status">
-                    <div class="dictation-editor-modal__self-record-indicator" id="editorModalSelfRecordIndicator">
-                      <div class="dictation-editor-modal__self-record-dot"></div>
-                      <span id="editorModalSelfRecordStatusText">Готов до запису</span>
-                    </div>
-                    <div class="dictation-editor-modal__self-record-timer" id="editorModalSelfRecordTimer">00:00</div>
-                  </div>
-                  <div class="dictation-editor-modal__self-record-buttons">
-                    <button type="button" id="editorModalSelfStartRecordBtn" class="dictation-editor-modal__self-record-btn dictation-editor-modal__self-record-btn--record">
-                      <i data-lucide="mic"></i>
-                      <span>Записати</span>
-                    </button>
-                    <button type="button" id="editorModalSelfStopRecordBtn" class="dictation-editor-modal__self-record-btn dictation-editor-modal__self-record-btn--stop" style="display:none;">
-                      <i data-lucide="square"></i>
-                      <span>Стоп</span>
-                    </button>
-                  </div>
-                  <div class="dictation-editor-modal__self-record-playback" id="editorModalSelfRecordPlayback" style="display:none;">
-                    <button type="button" id="editorModalSelfPlayRecordBtn" class="dictation-editor-modal__self-record-btn dictation-editor-modal__self-record-btn--play">
-                      <i data-lucide="play"></i>
-                      <span>Прослухати</span>
-                    </button>
-                    <button type="button" id="editorModalSelfRerecordBtn" class="dictation-editor-modal__self-record-btn dictation-editor-modal__self-record-btn--rerecord">
-                      <i data-lucide="rotate-ccw"></i>
-                      <span>Перезаписати</span>
-                    </button>
-                    <button type="button" id="editorModalSelfSaveRecordBtn" class="dictation-editor-modal__self-record-btn dictation-editor-modal__self-record-btn--save">
-                      <i data-lucide="save"></i>
-                      <span>Зберегти</span>
-                    </button>
-                  </div>
-                </div>
+                <button type="button" id="editorModalSelfCutBtn" class="dictation-editor-modal__wave-btn"
+                  title="Обрізати аудіо за поточним Start/End">
+                  <i data-lucide="scissors"></i>
+                  <span>Обрізати</span>
+                </button>
               </div>
 
               <!-- Скрытый input для выбора файлов -->

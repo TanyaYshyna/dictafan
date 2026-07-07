@@ -317,11 +317,11 @@
     async function openDictationLaunch(dictationId, openUrl, cardEl, dictationTitle) {
       const id = Number(dictationId);
       if (!Number.isFinite(id) || id <= 0) {
-        // fallback — сразу открываем
+        // Если DictationModal не загружен — не пытаемся открыть старую страницу
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
         } else {
-          window.location.href = openUrl;
+          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
         }
         return;
       }
@@ -413,7 +413,7 @@
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
         } else {
-          window.location.href = openUrl;
+          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
         }
         return;
       }
