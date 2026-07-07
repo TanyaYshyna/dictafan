@@ -612,7 +612,7 @@ window.DictationKart = window.DictationKart || {
           if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
             window.openDictationLaunch(dictationId, href, cardEl, dictationTitle);
           } else {
-            window.location.href = href;
+            console.warn('[dictation_kart] openDictationLaunch не загружен, невозможно открыть диктант');
           }
         } catch (e2) {
         }
@@ -690,7 +690,7 @@ window.DictationKart = window.DictationKart || {
             window.DictationModal.open(href, { cardEl, subsetPositions: subsetPositions && subsetPositions.length ? subsetPositions : null });
             return;
           }
-          window.location.href = href;
+          console.warn('[dictation_kart] DictationModal не загружен, невозможно открыть диктант');
         } catch (e) {
         }
       };

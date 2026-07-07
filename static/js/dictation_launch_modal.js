@@ -304,7 +304,7 @@
           if (window.DictationModal && typeof window.DictationModal.open === 'function') {
             window.DictationModal.open(openUrl, { cardEl, subsetPositions: positions.length ? positions : null });
           } else {
-            window.location.href = openUrl;
+            console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
           }
         });
       });
