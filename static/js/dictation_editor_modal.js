@@ -377,6 +377,15 @@ function _selectSentenceRow(row) {
       if (autoSentenceTextEl) {
         autoSentenceTextEl.textContent = found.text_original || '—';
       }
+      // Обновляем лейбли на закладці "Озвучка оригинала (сам)"
+      var selfFilenameEl = document.getElementById('editorModalSelfFilename');
+      var selfSentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+      if (selfFilenameEl) {
+        selfFilenameEl.textContent = found.audio_mic || '—';
+      }
+      if (selfSentenceTextEl) {
+        selfSentenceTextEl.textContent = found.text_original || '—';
+      }
     }
   }
 
@@ -2470,6 +2479,12 @@ function open(config) {
   state._sharedAudioDuration = null;
   state._sharedAudioFile = null;
 
+  // Сбрасываем self audio состояние
+  state._selfAudioFilename = null;
+  state._selfAudioUrl = null;
+  state._selfAudioDuration = null;
+  state._selfAudioFile = null;
+
   // Сбрасываем waveform (уничтожаем предыдущий экземпляр если был)
   if (window.editorModalWaveform) {
     try {
@@ -2480,6 +2495,16 @@ function open(config) {
     window.editorModalWaveform = null;
   }
 
+  // Сбрасываем self waveform
+  if (window.editorModalSelfWaveform) {
+    try {
+      window.editorModalSelfWaveform.destroy();
+    } catch (e) {
+      // ignore
+    }
+    window.editorModalSelfWaveform = null;
+  }
+
   // Сбрасываем текст в панели waveform
   var filenameEl = document.getElementById('editorModalWaveformFilename');
   if (filenameEl) filenameEl.textContent = '';
@@ -2487,6 +2512,14 @@ function open(config) {
   if (sentenceTextEl) sentenceTextEl.textContent = '';
   var waveformContainer = document.getElementById('editorModalWaveform');
   if (waveformContainer) waveformContainer.innerHTML = '';
+
+  // Сбрасываем текст в панели self
+  var selfFilenameEl = document.getElementById('editorModalSelfFilename');
+  if (selfFilenameEl) selfFilenameEl.textContent = '';
+  var selfSentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+  if (selfSentenceTextEl) selfSentenceTextEl.textContent = '';
+  var selfWaveformContainer = document.getElementById('editorModalSelfAudioWaveform');
+  if (selfWaveformContainer) selfWaveformContainer.innerHTML = '';
 
   // Создаём DictationContent
   var dictationId = config.dictationId || '';
@@ -2584,6 +2617,7 @@ function open(config) {
   _initCoverUpload();
   _initHaveAudioTab();
   _initAutoAudioTab();
+  _initSelfAudioTab();
   _setupTabs();
   _renderTable();
   _bindAudioPlaybackHandlers();
@@ -2606,6 +2640,7 @@ function open(config) {
   // Переключаемся на правильную закладку в зависимости от режима audio_order.
   // Если audio_order === 'f' (режим "э файл") — открываем закладку с волной,
   // чтобы waveform могла корректно инициализироваться (wavesurfer не работает в скрытом контейнере).
+  // Если audio_order === 'm' (режим "сам") — открываем закладку с микрофоном.
   // В остальных случаях — открываем первую закладку (Общие данные).
   var audioOrder = state.config ? state.config.audio_order : null;
   if (audioOrder === 'f') {
@@ -2643,6 +2678,14 @@ function open(config) {
         }
       }
     }
+  } else if (audioOrder === 'm') {
+    // Режим "сам" — переключаемся на закладку voice-original-self
+    var selfTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-self"]');
+    if (selfTabBtn) {
+      selfTabBtn.click();
+    }
+    // Пытаемся восстановить self audio из данных первого предложения
+    _restoreSelfAudioFromSentences();
   } else {
     var defaultTabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
     if (defaultTabBtn) {
@@ -2717,6 +2760,85 @@ async function _restoreSharedAudioFromSentences() {
   }
 }
 
+/**
+ * Восстанавливает self audio (audio_mic) из данных предложений
+ * для текущей выбранной строки на закладке voice-original-self.
+ */
+async function _restoreSelfAudioFromSentences() {
+  if (!state.content) return;
+
+  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  if (!selectedRow) return;
+
+  var key = selectedRow.dataset.key;
+  if (!key) return;
+
+  var sentence = state.content.getSentence(key);
+  if (!sentence) return;
+
+  var micFilename = sentence.audio_mic || sentence.audio_m || null;
+  if (!micFilename) {
+    // Нет self audio — ничего не показываем
+    return;
+  }
+
+  var lang = state.config?.originalLanguage || '';
+  var dictationId = state.config?.dictationId || '';
+
+  // Обновляем лейблы
+  var filenameEl = document.getElementById('editorModalSelfFilename');
+  if (filenameEl) filenameEl.textContent = micFilename;
+  var sentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+  if (sentenceTextEl) sentenceTextEl.textContent = sentence.text_original || '—';
+
+  // Пробуем получить URL через AudioManager
+  var am = _ensureAudioManager();
+  if (!am) return;
+
+  try {
+    var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, micFilename);
+    var playableUrl = await am.resolvePlayableUrl(canonicalUrl);
+    if (playableUrl) {
+      _initSelfWaveform(playableUrl);
+      state._selfAudioUrl = playableUrl;
+      state._selfAudioFilename = micFilename;
+
+      // Устанавливаем start/end регионы, если есть
+      if (sentence.start !== undefined && sentence.start !== '' && sentence.end !== undefined && sentence.end !== '') {
+        var startVal = parseFloat(sentence.start);
+        var endVal = parseFloat(sentence.end);
+        if (!isNaN(startVal) && !isNaN(endVal)) {
+          var wf = window.editorModalSelfWaveform;
+          if (wf) {
+            // Даём время на загрузку waveform, потом устанавливаем регион
+            setTimeout(function () {
+              wf.setRegion(startVal, endVal);
+              var startInput = document.getElementById('editorModalSelfAudioStartTime');
+              var endInput = document.getElementById('editorModalSelfAudioEndTime');
+              if (startInput) startInput.value = startVal.toFixed(2);
+              if (endInput) endInput.value = endVal.toFixed(2);
+            }, 500);
+          }
+        }
+      }
+      return;
+    }
+  } catch (e) {
+    console.warn('[dictationEditorModal] Не удалось восстановить self audio через кэш', e);
+  }
+
+  // Если не нашли в кэше — пробуем загрузить напрямую с сервера
+  try {
+    var directUrl = am.buildDictationAudioUrl(dictationId, lang, micFilename);
+    _initSelfWaveform(directUrl);
+    state._selfAudioUrl = directUrl;
+    state._selfAudioFilename = micFilename;
+    console.log('[dictationEditorModal] Self audio восстановлен через прямой URL:', directUrl);
+  } catch (e2) {
+    console.warn('[dictationEditorModal] Не удалось восстановить self audio даже через прямой URL', e2);
+  }
+}
+
 function close() {
   if (!state.isOpen) return;
 
@@ -2738,11 +2860,63 @@ function close() {
     state._sharedAudioUrl = null;
   }
 
-  // Уничтожаем waveform
+  // Уничтожаем waveform для shared audio
   if (window.editorModalWaveform) {
     window.editorModalWaveform.destroy();
     window.editorModalWaveform = null;
   }
+
+  // ---- Очистка self audio состояния ----
+
+  // Сбрасываем self audio состояние
+  state._selfAudioFilename = null;
+  state._selfAudioDuration = null;
+  state._selfAudioFile = null;
+
+  // Освобождаем blob URL для self audio
+  if (state._selfAudioUrl) {
+    URL.revokeObjectURL(state._selfAudioUrl);
+    state._selfAudioUrl = null;
+  }
+
+  // Уничтожаем self waveform
+  if (window.editorModalSelfWaveform) {
+    window.editorModalSelfWaveform.destroy();
+    window.editorModalSelfWaveform = null;
+  }
+
+  // Сбрасываем состояние записи с микрофона
+  if (_selfMediaRecorder && _selfMediaRecorder.state === 'recording') {
+    try {
+      _selfMediaRecorder.stop();
+    } catch (e) { /* ignore */ }
+  }
+  _selfMediaRecorder = null;
+  _selfRecordedChunks = [];
+  _selfRecordingStartTime = null;
+  _stopSelfRecordingTimer();
+
+  // Сбрасываем UI self-закладки
+  var selfFilenameEl = document.getElementById('editorModalSelfFilename');
+  if (selfFilenameEl) selfFilenameEl.textContent = '';
+  var selfSentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+  if (selfSentenceTextEl) selfSentenceTextEl.textContent = '';
+  var selfWaveformContainer = document.getElementById('editorModalSelfAudioWaveform');
+  if (selfWaveformContainer) selfWaveformContainer.innerHTML = '';
+  var selfTimerEl = document.getElementById('editorModalSelfRecordTimer');
+  if (selfTimerEl) selfTimerEl.textContent = '00:00';
+  var selfStatusText = document.getElementById('editorModalSelfRecordStatusText');
+  if (selfStatusText) selfStatusText.textContent = 'Готов до запису';
+  var selfIndicator = document.getElementById('editorModalSelfRecordIndicator');
+  if (selfIndicator) selfIndicator.classList.remove('recording');
+  var selfStartBtn = document.getElementById('editorModalSelfStartRecordBtn');
+  if (selfStartBtn) selfStartBtn.style.display = 'inline-flex';
+  var selfStopBtn = document.getElementById('editorModalSelfStopRecordBtn');
+  if (selfStopBtn) selfStopBtn.style.display = 'none';
+  var selfPlaybackSection = document.getElementById('editorModalSelfRecordPlayback');
+  if (selfPlaybackSection) selfPlaybackSection.style.display = 'none';
+  var selfSaveBtn = document.getElementById('editorModalSelfSaveRecordBtn');
+  if (selfSaveBtn) selfSaveBtn.style.display = 'none';
 
   const modal = document.getElementById(MODAL_ID);
   if (modal) {
@@ -2750,6 +2924,771 @@ function close() {
   }
 
   document.body.style.overflow = '';
+}
+
+/* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
+
+/**
+ * Ініціалізує обробники для закладки "Озвучка оригинала (сам)".
+ */
+function _initSelfAudioTab() {
+  // Кнопка вибору файлу
+  var selectBtn = document.getElementById('editorModalSelfSelectFileBtn');
+  var fileInput = document.getElementById('editorModalSelfAudioFileInput');
+  if (selectBtn && fileInput && !selectBtn.getAttribute('data-self-audio-handler')) {
+    selectBtn.setAttribute('data-self-audio-handler', '1');
+    selectBtn.addEventListener('click', function () {
+      fileInput.click();
+    });
+  }
+  if (fileInput && !fileInput.getAttribute('data-self-audio-handler')) {
+    fileInput.setAttribute('data-self-audio-handler', '1');
+    fileInput.addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      _uploadSelfAudioFile(file);
+      fileInput.value = '';
+    });
+  }
+
+  // Кнопка Play під хвилею
+  var playBtn = document.getElementById('editorModalSelfAudioPlayBtn');
+  if (playBtn && !playBtn.getAttribute('data-self-audio-handler')) {
+    playBtn.setAttribute('data-self-audio-handler', '1');
+    playBtn.addEventListener('click', function (event) {
+      _handleSelfAudioPlayback(event);
+    });
+  }
+
+  // Кнопка "розрізати на 1000 кусків"
+  var splitBtn = document.getElementById('editorModalSelfSplitBtn');
+  if (splitBtn && !splitBtn.getAttribute('data-self-audio-handler')) {
+    splitBtn.setAttribute('data-self-audio-handler', '1');
+    splitBtn.addEventListener('click', function () {
+      _handleSelfSplitAudio();
+    });
+  }
+
+  // Кнопка "розумна нарізка"
+  var smartSplitBtn = document.getElementById('editorModalSelfSmartSplitBtn');
+  if (smartSplitBtn && !smartSplitBtn.getAttribute('data-self-audio-handler')) {
+    smartSplitBtn.setAttribute('data-self-audio-handler', '1');
+    smartSplitBtn.addEventListener('click', function () {
+      _handleSelfSmartSplit();
+    });
+  }
+
+  // Стрілки для полів Start/End
+  document.querySelectorAll('#tab-voice-original-self .time-input-arrow').forEach(function (btn) {
+    if (btn.getAttribute('data-self-audio-handler')) return;
+    btn.setAttribute('data-self-audio-handler', '1');
+    btn.addEventListener('click', function () {
+      var targetId = this.dataset.target;
+      var dir = this.dataset.dir;
+      var input = document.getElementById(targetId);
+      if (!input) return;
+      var step = parseFloat(input.step) || 0.01;
+      var val = parseFloat(input.value) || 0;
+      if (dir === 'up') {
+        val = Math.round((val + step) * 100) / 100;
+      } else {
+        val = Math.round((val - step) * 100) / 100;
+        if (val < 0) val = 0;
+      }
+      input.value = val.toFixed(2);
+      var field = targetId === 'editorModalSelfAudioStartTime' ? 'start' : 'end';
+      _syncSelfWaveformRegion(field, val);
+      _syncStartEndToSentence(field, val);
+    });
+  });
+
+  // Ручний ввід у поля Start/End
+  var startInput = document.getElementById('editorModalSelfAudioStartTime');
+  var endInput = document.getElementById('editorModalSelfAudioEndTime');
+  if (startInput && !startInput.getAttribute('data-self-audio-handler')) {
+    startInput.setAttribute('data-self-audio-handler', '1');
+    startInput.addEventListener('change', function () {
+      var val = parseFloat(this.value);
+      if (!isNaN(val) && val >= 0) {
+        _syncSelfWaveformRegion('start', val);
+        _syncStartEndToSentence('start', val);
+      }
+    });
+  }
+  if (endInput && !endInput.getAttribute('data-self-audio-handler')) {
+    endInput.setAttribute('data-self-audio-handler', '1');
+    endInput.addEventListener('change', function () {
+      var val = parseFloat(this.value);
+      if (!isNaN(val) && val >= 0) {
+        _syncSelfWaveformRegion('end', val);
+        _syncStartEndToSentence('end', val);
+      }
+    });
+  }
+
+  // Кнопки запису з мікрофона
+  var startRecordBtn = document.getElementById('editorModalSelfStartRecordBtn');
+  var stopRecordBtn = document.getElementById('editorModalSelfStopRecordBtn');
+  var playRecordBtn = document.getElementById('editorModalSelfPlayRecordBtn');
+  var rerecordBtn = document.getElementById('editorModalSelfRerecordBtn');
+  var saveRecordBtn = document.getElementById('editorModalSelfSaveRecordBtn');
+
+  if (startRecordBtn && !startRecordBtn.getAttribute('data-self-audio-handler')) {
+    startRecordBtn.setAttribute('data-self-audio-handler', '1');
+    startRecordBtn.addEventListener('click', _startSelfRecording);
+  }
+  if (stopRecordBtn && !stopRecordBtn.getAttribute('data-self-audio-handler')) {
+    stopRecordBtn.setAttribute('data-self-audio-handler', '1');
+    stopRecordBtn.addEventListener('click', _stopSelfRecording);
+  }
+  if (playRecordBtn && !playRecordBtn.getAttribute('data-self-audio-handler')) {
+    playRecordBtn.setAttribute('data-self-audio-handler', '1');
+    playRecordBtn.addEventListener('click', _playSelfRecording);
+  }
+  if (rerecordBtn && !rerecordBtn.getAttribute('data-self-audio-handler')) {
+    rerecordBtn.setAttribute('data-self-audio-handler', '1');
+    rerecordBtn.addEventListener('click', function () {
+      _resetSelfRecordingState();
+      _startSelfRecording();
+    });
+  }
+  if (saveRecordBtn && !saveRecordBtn.getAttribute('data-self-audio-handler')) {
+    saveRecordBtn.setAttribute('data-self-audio-handler', '1');
+    saveRecordBtn.addEventListener('click', _saveSelfRecording);
+  }
+}
+
+/* ---- Змінні стану для запису з мікрофона ---- */
+var _selfMediaRecorder = null;
+var _selfRecordedChunks = [];
+var _selfRecordingStartTime = null;
+var _selfRecordingTimer = null;
+
+/**
+ * Отримати підтримуваний mimeType для запису.
+ */
+function _getSelfSupportedMimeType() {
+  var types = [
+    'audio/mp4; codecs="mp4a.40.2"',
+    'audio/webm; codecs=opus',
+    'audio/webm'
+  ];
+  for (var i = 0; i < types.length; i++) {
+    if (MediaRecorder.isTypeSupported(types[i])) return types[i];
+  }
+  return '';
+}
+
+/**
+ * Оновити UI запису (показати/сховати кнопки).
+ */
+function _updateSelfRecordingUI(isRecording) {
+  var startBtn = document.getElementById('editorModalSelfStartRecordBtn');
+  var stopBtn = document.getElementById('editorModalSelfStopRecordBtn');
+  var indicator = document.getElementById('editorModalSelfRecordIndicator');
+  var statusText = document.getElementById('editorModalSelfRecordStatusText');
+
+  if (isRecording) {
+    if (startBtn) startBtn.style.display = 'none';
+    if (stopBtn) stopBtn.style.display = 'inline-flex';
+    if (indicator) indicator.classList.add('recording');
+    if (statusText) statusText.textContent = 'Запис...';
+  } else {
+    if (startBtn) startBtn.style.display = 'inline-flex';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (indicator) indicator.classList.remove('recording');
+    if (statusText) statusText.textContent = 'Запис завершено';
+  }
+}
+
+/**
+ * Запустити таймер запису.
+ */
+function _startSelfRecordingTimer() {
+  _selfRecordingTimer = setInterval(function () {
+    if (_selfRecordingStartTime) {
+      var elapsed = Date.now() - _selfRecordingStartTime;
+      var minutes = Math.floor(elapsed / 60000);
+      var seconds = Math.floor((elapsed % 60000) / 1000);
+      var timerEl = document.getElementById('editorModalSelfRecordTimer');
+      if (timerEl) {
+        timerEl.textContent = (minutes < 10 ? '0' : '') + minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+      }
+    }
+  }, 1000);
+}
+
+/**
+ * Зупинити таймер запису.
+ */
+function _stopSelfRecordingTimer() {
+  if (_selfRecordingTimer) {
+    clearInterval(_selfRecordingTimer);
+    _selfRecordingTimer = null;
+  }
+}
+
+/**
+ * Скинути стан запису.
+ */
+function _resetSelfRecordingState() {
+  var startBtn = document.getElementById('editorModalSelfStartRecordBtn');
+  var stopBtn = document.getElementById('editorModalSelfStopRecordBtn');
+  var playbackSection = document.getElementById('editorModalSelfRecordPlayback');
+  var saveBtn = document.getElementById('editorModalSelfSaveRecordBtn');
+  var indicator = document.getElementById('editorModalSelfRecordIndicator');
+  var statusText = document.getElementById('editorModalSelfRecordStatusText');
+  var timerEl = document.getElementById('editorModalSelfRecordTimer');
+
+  if (startBtn) startBtn.style.display = 'inline-flex';
+  if (stopBtn) stopBtn.style.display = 'none';
+  if (playbackSection) playbackSection.style.display = 'none';
+  if (saveBtn) saveBtn.style.display = 'none';
+  if (indicator) indicator.classList.remove('recording');
+  if (statusText) statusText.textContent = 'Готов до запису';
+  if (timerEl) timerEl.textContent = '00:00';
+
+  _selfRecordedChunks = [];
+  _selfRecordingStartTime = null;
+}
+
+/**
+ * Почати запис з мікрофона.
+ */
+async function _startSelfRecording() {
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100,
+        channelCount: 1,
+        latency: 0.01
+      }
+    });
+
+    var mimeType = _getSelfSupportedMimeType();
+    var options = {};
+    if (mimeType) options.mimeType = mimeType;
+
+    _selfMediaRecorder = new MediaRecorder(stream, options);
+    _selfRecordedChunks = [];
+
+    _selfMediaRecorder.ondataavailable = function (event) {
+      if (event.data.size > 0) {
+        _selfRecordedChunks.push(event.data);
+      }
+    };
+
+    _selfMediaRecorder.onstop = function () {
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      _showSelfPlaybackSection();
+    };
+
+    _selfMediaRecorder.start();
+    _selfRecordingStartTime = Date.now();
+
+    _updateSelfRecordingUI(true);
+    _startSelfRecordingTimer();
+
+  } catch (error) {
+    console.error('[dictationEditorModal] Помилка доступу до мікрофона:', error);
+    alert('Не вдалося отримати доступ до мікрофона. Перевірте дозволи браузера.');
+  }
+}
+
+/**
+ * Зупинити запис.
+ */
+function _stopSelfRecording() {
+  if (_selfMediaRecorder && _selfMediaRecorder.state === 'recording') {
+    _selfMediaRecorder.stop();
+    _updateSelfRecordingUI(false);
+    _stopSelfRecordingTimer();
+  }
+}
+
+/**
+ * Показати секцію відтворення після запису.
+ */
+function _showSelfPlaybackSection() {
+  var playbackSection = document.getElementById('editorModalSelfRecordPlayback');
+  var saveBtn = document.getElementById('editorModalSelfSaveRecordBtn');
+  if (playbackSection) playbackSection.style.display = 'flex';
+  if (saveBtn) saveBtn.style.display = 'inline-flex';
+}
+
+/**
+ * Відтворити записане аудіо.
+ */
+function _playSelfRecording() {
+  if (_selfRecordedChunks.length === 0) {
+    alert('Немає записаного аудіо для відтворення');
+    return;
+  }
+
+  var blobType = 'audio/webm';
+  if (_selfMediaRecorder && _selfMediaRecorder.mimeType) {
+    blobType = _selfMediaRecorder.mimeType.includes('mp4') ? 'audio/mp4' : 'audio/webm';
+  }
+
+  var blob = new Blob(_selfRecordedChunks, { type: blobType });
+  var audioUrl = URL.createObjectURL(blob);
+  var audio = new Audio(audioUrl);
+  audio.play();
+  audio.onended = function () {
+    URL.revokeObjectURL(audioUrl);
+  };
+}
+
+/**
+ * Зберегти запис у поточну строку (audio_mic).
+ */
+async function _saveSelfRecording() {
+  if (_selfRecordedChunks.length === 0) {
+    alert('Немає записаного аудіо для збереження');
+    return;
+  }
+
+  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  if (!selectedRow) {
+    alert('Не вибрано рядок для збереження');
+    return;
+  }
+
+  var key = selectedRow.dataset.key;
+  if (!key || !state.content) {
+    alert('Помилка: не знайдено даних для збереження');
+    return;
+  }
+
+  var sentence = state.content.getSentence(key);
+  if (!sentence) {
+    alert('Помилка: не знайдено речення');
+    return;
+  }
+
+  try {
+    var blobType = 'audio/webm';
+    if (_selfMediaRecorder && _selfMediaRecorder.mimeType) {
+      blobType = _selfMediaRecorder.mimeType.includes('mp4') ? 'audio/mp4' : 'audio/webm';
+    }
+
+    var fileExtension = blobType.includes('mp4') ? 'mp4' : 'webm';
+    var blob = new Blob(_selfRecordedChunks, { type: blobType });
+
+    var dictationId = state.config ? state.config.dictationId : '';
+    var lang = state.config ? state.config.originalLanguage : '';
+    var filename = key + '_' + lang + '_mic.' + fileExtension;
+
+    // Зберігаємо в CacheStorage через AudioManager
+    var am = _ensureAudioManager();
+    if (am && typeof am.saveDictationAudioBlob === 'function') {
+      await am.saveDictationAudioBlob(dictationId, lang, filename, blob, blobType);
+    }
+
+    // Оновлюємо дані речення
+    sentence.audio_mic = filename;
+
+    // Оновлюємо dirty flags
+    _setDirtyFlags({ db: true, audio: true });
+
+    // Оновлюємо кнопку в таблиці
+    var micBtn = selectedRow.querySelector('.col-play-audio.panel-editing-mic .audio-btn');
+    if (micBtn) {
+      micBtn.dataset.state = 'ready';
+      var icon = micBtn.querySelector('i[data-lucide]');
+      if (icon) icon.setAttribute('data-lucide', 'play');
+    }
+
+    // Оновлюємо лейбли на закладці self
+    var filenameEl = document.getElementById('editorModalSelfFilename');
+    if (filenameEl) filenameEl.textContent = filename;
+    var sentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+    if (sentenceTextEl) sentenceTextEl.textContent = sentence.text_original || '—';
+
+    // Ініціалізуємо хвилю для нового файлу
+    if (am && typeof am.resolvePlayableUrl === 'function') {
+      var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, filename);
+      var playableUrl = await am.resolvePlayableUrl(canonicalUrl);
+      if (playableUrl) {
+        _initSelfWaveform(playableUrl);
+        state._selfAudioUrl = playableUrl;
+        state._selfAudioFilename = filename;
+      }
+    }
+
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Скидаємо стан запису
+    _resetSelfRecordingState();
+
+    console.log('[dictationEditorModal] Мікрофонний запис збережено:', filename);
+  } catch (error) {
+    console.error('[dictationEditorModal] Помилка збереження запису:', error);
+    alert('Помилка при збереженні запису: ' + error.message);
+  }
+}
+
+/* ---- Завантаження файлу для self-закладки ---- */
+
+/**
+ * Завантажує аудіофайл для поточної строки (записує в audio_mic).
+ */
+function _uploadSelfAudioFile(file) {
+  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  if (!selectedRow) {
+    alert('Не вибрано рядок для завантаження файлу');
+    return;
+  }
+
+  var key = selectedRow.dataset.key;
+  if (!key || !state.content) return;
+
+  var sentence = state.content.getSentence(key);
+  if (!sentence) return;
+
+  // Освобождаем старий blob URL
+  if (state._selfAudioUrl && state._selfAudioUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(state._selfAudioUrl);
+  }
+
+  // Уничтожаем старую волну
+  if (window.editorModalSelfWaveform) {
+    window.editorModalSelfWaveform.destroy();
+    window.editorModalSelfWaveform = null;
+  }
+
+  var audioUrl = URL.createObjectURL(file);
+  state._selfAudioUrl = audioUrl;
+  state._selfAudioFile = file;
+
+  var dictationId = state.config ? state.config.dictationId : '';
+  var lang = state.config ? state.config.originalLanguage : '';
+  var filename = file.name;
+
+  // Оновлюємо лейбли
+  var filenameEl = document.getElementById('editorModalSelfFilename');
+  if (filenameEl) filenameEl.textContent = filename;
+  var sentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+  if (sentenceTextEl) sentenceTextEl.textContent = sentence.text_original || '—';
+
+  var audio = new Audio();
+  audio.addEventListener('loadedmetadata', function () {
+    var duration = audio.duration;
+    state._selfAudioFilename = filename;
+    state._selfAudioDuration = duration;
+
+    // Ініціалізуємо хвилю
+    _initSelfWaveform(audioUrl);
+
+    // Встановлюємо start/end на весь файл
+    var startInput = document.getElementById('editorModalSelfAudioStartTime');
+    var endInput = document.getElementById('editorModalSelfAudioEndTime');
+    if (startInput) startInput.value = '0';
+    if (endInput) endInput.value = duration.toFixed(2);
+
+    // Зберігаємо файл у CacheStorage
+    _cacheSelfAudioFile(file, filename);
+
+    // Помічаємо dirty
+    _setDirtyFlags({ db: true, audio: true });
+  });
+
+  audio.addEventListener('error', function () {
+    console.warn('[dictationEditorModal] Помилка завантаження аудіо для self');
+  });
+
+  audio.src = audioUrl;
+}
+
+/**
+ * Зберігає self audio файл у CacheStorage.
+ */
+async function _cacheSelfAudioFile(file, filename) {
+  var dictationId = state.config ? state.config.dictationId : '';
+  var lang = state.config ? state.config.originalLanguage : '';
+  if (!dictationId || !lang || !filename || !file) return;
+
+  var am = _ensureAudioManager();
+  if (!am || typeof am.saveDictationAudioBlob !== 'function') return;
+
+  try {
+    await am.saveDictationAudioBlob(dictationId, lang, filename, file, file.type || 'audio/mpeg');
+    console.log('[dictationEditorModal] Self audio збережено в CacheStorage:', filename);
+  } catch (e) {
+    console.warn('[dictationEditorModal] Не вдалося зберегти self audio в CacheStorage', e);
+  }
+}
+
+/* ---- Хвиля для self-закладки ---- */
+
+function _initSelfWaveform(audioUrl) {
+  var container = document.getElementById('editorModalSelfAudioWaveform');
+  if (!container) return;
+
+  if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+    container.style.width = '100%';
+    container.style.height = '100px';
+    container.style.minHeight = '100px';
+    if (container.offsetWidth === 0 || container.offsetHeight === 0) {
+      console.warn('[dictationEditorModal] Self waveform container not visible');
+      return;
+    }
+  }
+
+  if (typeof WaveformCanvas === 'undefined') {
+    console.warn('[dictationEditorModal] WaveformCanvas not loaded');
+    return;
+  }
+
+  if (window.editorModalSelfWaveform) {
+    window.editorModalSelfWaveform.destroy();
+    window.editorModalSelfWaveform = null;
+  }
+
+  try {
+    var wf = new WaveformCanvas(container);
+    window.editorModalSelfWaveform = wf;
+
+    var am = _ensureAudioManager();
+    if (am && typeof am.setWaveformCanvas === 'function') {
+      am.setWaveformCanvas(wf);
+    }
+
+    wf.onPlaybackEnd(function () {
+      var playBtn = document.getElementById('editorModalSelfAudioPlayBtn');
+      if (playBtn) {
+        _setButtonState(playBtn, 'ready');
+      }
+    });
+
+    wf.loadAudio(audioUrl).then(function () {
+      var duration = wf.getDuration();
+      wf.setRegion(0, duration);
+    }).catch(function (err) {
+      console.warn('[dictationEditorModal] Self waveform load error', err);
+    });
+
+    wf.onRegionUpdate(function (region) {
+      var startInput = document.getElementById('editorModalSelfAudioStartTime');
+      var endInput = document.getElementById('editorModalSelfAudioEndTime');
+      if (startInput) startInput.value = region.start.toFixed(2);
+      if (endInput) endInput.value = region.end.toFixed(2);
+    });
+
+  } catch (e) {
+    console.warn('[dictationEditorModal] Self waveform init error', e);
+  }
+}
+
+function _syncSelfWaveformRegion(field, value) {
+  var wf = window.editorModalSelfWaveform;
+  if (!wf) return;
+  var region = wf.getRegion();
+  if (!region) return;
+  if (field === 'start') {
+    wf.setRegion(value, region.end);
+  } else if (field === 'end') {
+    wf.setRegion(region.start, value);
+  }
+}
+
+/* ---- Відтворення shared audio на self-закладці ---- */
+
+function _handleSelfAudioPlayback(event) {
+  var button = event.currentTarget;
+  if (!button) return;
+
+  var currentState = button.dataset.state || 'ready';
+
+  if (currentState === 'playing' || currentState === 'playing-shared') {
+    var wf = window.editorModalSelfWaveform;
+    if (wf && wf.currentAudio) {
+      try { wf.currentAudio.pause(); } catch (e) { }
+    }
+    var am = _ensureAudioManager();
+    if (am) {
+      if (typeof am.pause === 'function') am.pause();
+      else if (typeof am.stop === 'function') am.stop();
+    }
+    _setButtonState(button, 'ready');
+    return;
+  }
+
+  var wf = window.editorModalSelfWaveform;
+  if (!wf) return;
+
+  var audioUrl = state._selfAudioUrl;
+  if (!audioUrl) return;
+
+  var am = _ensureAudioManager();
+  if (am && am.currentButton && am.currentButton !== button) {
+    if (typeof am.stop === 'function') am.stop();
+  }
+
+  var audio = new Audio(audioUrl);
+  _setButtonState(button, 'playing-shared');
+
+  wf.startPlayback(audio).catch(function (err) {
+    console.warn('[dictationEditorModal] Self waveform playback error', err);
+    _setButtonState(button, 'ready');
+  });
+}
+
+/* ---- Split/SmartSplit для self-закладки ---- */
+
+function _handleSelfSplitAudio() {
+  if (!state._selfAudioFilename) {
+    alert('Не вибрано аудіофайл');
+    return;
+  }
+
+  var file = state._selfAudioFile;
+  if (!file) {
+    alert('Файл не знайдено. Будь ласка, виберіть аудіофайл заново.');
+    return;
+  }
+
+  var cores = state.content ? state.content.getAllSentenceCores() : [];
+  var validCores = cores.filter(function (s) { return s.key; });
+
+  if (validCores.length === 0) {
+    alert('Немає речень для розрізання');
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = async function (e) {
+    var arrayBuffer = e.target.result;
+    var bytes = new Uint8Array(arrayBuffer);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    var audioB64 = btoa(binary);
+    var mime = file.type || 'audio/mpeg';
+
+    var sentences = validCores.map(function (s) {
+      return { key: s.key, position: s.position };
+    });
+
+    await _splitSelfAudioOnServer(state._selfAudioFilename, sentences, audioB64, mime);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function _splitSelfAudioOnServer(filename, sentences, audioB64, mime) {
+  var dictationId = state.config ? state.config.dictationId : '';
+  var lang = state.config ? state.config.originalLanguage : '';
+
+  var body = {
+    dictation_id: dictationId,
+    language: lang,
+    filename: filename,
+    sentences: sentences,
+    audio_b64: audioB64,
+    mime: mime,
+    field: 'audio_mic',
+  };
+
+  try {
+    var response = await fetch('/split-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var data = await response.json();
+    if (data.success) {
+      // Оновлюємо речення з сервера
+      if (data.sentences && state.content) {
+        for (var i = 0; i < data.sentences.length; i++) {
+          var srv = data.sentences[i];
+          var sentence = state.content.getSentence(srv.key);
+          if (sentence) {
+            if (srv.start !== undefined) sentence.start = String(srv.start);
+            if (srv.end !== undefined) sentence.end = String(srv.end);
+            if (srv.audio_mic) sentence.audio_mic = srv.audio_mic;
+          }
+        }
+        _setDirtyFlags({ db: true, audio: true });
+        _renderTable();
+      }
+      console.log('[dictationEditorModal] Self split успішно виконано');
+    } else {
+      console.error('[dictationEditorModal] Помилка self split:', data.error);
+      alert('Помилка розрізання: ' + (data.error || 'невідома помилка'));
+    }
+  } catch (e) {
+    console.error('[dictationEditorModal] Self split error', e);
+    alert('Помилка розрізання аудіо');
+  }
+}
+
+function _handleSelfSmartSplit() {
+  if (!state._selfAudioFilename) {
+    alert('Не вибрано аудіофайл');
+    return;
+  }
+
+  var file = state._selfAudioFile;
+  if (!file) {
+    alert('Файл не знайдено. Будь ласка, виберіть аудіофайл заново.');
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onload = async function (e) {
+    var arrayBuffer = e.target.result;
+    var bytes = new Uint8Array(arrayBuffer);
+    var binary = '';
+    for (var i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    var audioB64 = btoa(binary);
+    var mime = file.type || 'audio/mpeg';
+
+    await _smartSplitSelfOnServer(state._selfAudioFilename, audioB64, mime);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function _smartSplitSelfOnServer(filename, audioB64, mime) {
+  var dictationId = state.config ? state.config.dictationId : '';
+  var lang = state.config ? state.config.originalLanguage : '';
+
+  var body = {
+    dictation_id: dictationId,
+    language: lang,
+    filename: filename,
+    audio_b64: audioB64,
+    mime: mime,
+    field: 'audio_mic',
+  };
+
+  try {
+    var response = await fetch('/split-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    var data = await response.json();
+    if (data.success && data.sentences) {
+      if (state.content) {
+        state.content.setSentences(data.sentences);
+        _setDirtyFlags({ db: true, audio: true });
+        _renderTable();
+      }
+      console.log('[dictationEditorModal] Self smart split успішно виконано');
+    } else {
+      console.error('[dictationEditorModal] Помилка self smart split:', data.error);
+      alert('Помилка розумної нарізки: ' + (data.error || 'невідома помилка'));
+    }
+  } catch (e) {
+    console.error('[dictationEditorModal] Self smart split error', e);
+    alert('Помилка розумної нарізки');
+  }
 }
 
 /* ===== INIT ===== */
