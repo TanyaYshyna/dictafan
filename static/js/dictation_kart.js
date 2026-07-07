@@ -609,6 +609,7 @@ window.DictationKart = window.DictationKart || {
           const dictationId = Number(cardEl.getAttribute('data-dictation-id'));
           const title = cardEl.querySelector('.short-title');
           const dictationTitle = title ? String(title.textContent || '').trim() : '';
+          console.log('[1] dictation_kart: openDictationLaunch вызван, dictationId=' + dictationId + ', href=' + href);
           if (Number.isFinite(dictationId) && dictationId > 0 && typeof window.openDictationLaunch === 'function') {
             window.openDictationLaunch(dictationId, href, cardEl, dictationTitle);
           } else {

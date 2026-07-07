@@ -19,7 +19,7 @@
     '/static/js/outbox_batcher.js',
   ];
 
-  const state = {
+  const dictationModalState = {
     isOpen: false,
     currentUrl: null,
     depsLoaded: false,
@@ -37,7 +37,7 @@
 
   function startNewRewardCycle() {
     try {
-      state.rewardCycleId = (Number(state.rewardCycleId) || 0) + 1;
+      dictationModalState.rewardCycleId = (Number(dictationModalState.rewardCycleId) || 0) + 1;
     } catch (e) {
     }
   }
@@ -47,7 +47,7 @@
   /** Получить язык оригинала диктанта из текущего URL */
   function _getDictationLanguageCode() {
     try {
-      const url = state.currentUrl;
+      const url = dictationModalState.currentUrl;
       if (!url) return null;
       const parsed = parseDictationHref(url);
       return parsed ? parsed.langOriginal : null;
@@ -655,7 +655,7 @@
     }
 
     try {
-      state._pauseDisabled = true;
+      dictationModalState._pauseDisabled = true;
     } catch (e1b) {
     }
 
@@ -961,7 +961,7 @@
             const session = window.__dictationModalActiveSession;
             if (session) {
               renderStartModalSentencesTable(session);
-              state.startModalContext = 'success';
+              dictationModalState.startModalContext = 'success';
               showStartModal();
               updateNavigatorFromSession(session);
             }
@@ -1165,7 +1165,7 @@
         try {
           const session = window.__dictationModalActiveSession;
           if (session) {
-            try { state.dictationStarted = true; } catch (e0) {}
+            try { dictationModalState.dictationStarted = true; } catch (e0) {}
             // Устанавливаем дату и время начала диктанта (локальная дата+время)
             // dateStart устанавливается только если его нет — это позволяет различать:
             //   - Продолжить (continue): dateStart уже есть, не меняем
@@ -1254,8 +1254,8 @@
     if (typeof window.checkText !== 'function') {
       window.checkText = async () => {
         try {
-          if (!state.dictationStarted) {
-            console.log('[DM:checkText] state.dictationStarted=false → выход');
+          if (!dictationModalState.dictationStarted) {
+            console.log('[DM:checkText] dictationModalState.dictationStarted=false → выход');
             return;
           }
         } catch (e0) {
@@ -1302,14 +1302,14 @@
 
         let checker = null;
         try {
-          checker = state._typoChecker;
+          checker = dictationModalState._typoChecker;
         } catch (e2) {
         }
         if (!checker) {
           try {
             if (window.ПроверкаНаОшибки) {
               checker = new window.ПроверкаНаОшибки();
-              state._typoChecker = checker;
+              dictationModalState._typoChecker = checker;
             }
           } catch (e3) {
           }
@@ -1318,14 +1318,14 @@
 
         let renderer = null;
         try {
-          renderer = state._typoRenderer;
+          renderer = dictationModalState._typoRenderer;
         } catch (e10) {
         }
         if (!renderer) {
           try {
             if (window.РендерПроверки) {
               renderer = new window.РендерПроверки(checker);
-              state._typoRenderer = renderer;
+              dictationModalState._typoRenderer = renderer;
             }
           } catch (e11) {
           }
@@ -1421,7 +1421,7 @@
             if (!res.allCorrect) {
               correctAnswerDiv.style.display = 'block';
               try {
-                state._hideCorrectAnswerOnNextUserInput = true;
+                dictationModalState._hideCorrectAnswerOnNextUserInput = true;
               } catch (e0h) {
               }
             }
@@ -1502,13 +1502,13 @@
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
-                const cycleId = Number(state.rewardCycleId) || 0;
+                const cycleId = Number(dictationModalState.rewardCycleId) || 0;
                 const paidCycleId = Number(st && st._paidTextRewardCycleId) || 0;
 
                 let reward = 0;
                 const perfectNow = Number(st && st.number_of_perfect) || 0;
                 const correctedNow = Number(st && st.number_of_corrected) || 0;
-                console.log('[DM:checkText] РАСЧЁТ НАГРАДЫ: perfectNow=' + perfectNow + ' correctedNow=' + correctedNow + ' cycleId=' + (Number(state.rewardCycleId) || 0) + ' paidCycleId=' + (Number(st && st._paidTextRewardCycleId) || 0) + ' key=' + key + ' res.allCorrect=' + (res && res.allCorrect) + ' res.starOutcome=' + (res && res.starOutcome) + ' st.money_count=' + (st ? st.money_count : 'null') + ' st.money_earned=' + (st ? st.money_earned : 'null'));
+                console.log('[DM:checkText] РАСЧЁТ НАГРАДЫ: perfectNow=' + perfectNow + ' correctedNow=' + correctedNow + ' cycleId=' + (Number(dictationModalState.rewardCycleId) || 0) + ' paidCycleId=' + (Number(st && st._paidTextRewardCycleId) || 0) + ' key=' + key + ' res.allCorrect=' + (res && res.allCorrect) + ' res.starOutcome=' + (res && res.starOutcome) + ' st.money_count=' + (st ? st.money_count : 'null') + ' st.money_earned=' + (st ? st.money_earned : 'null'));
                 if (perfectNow >= 1) {
                   reward = getPricingValue('star_reward', 3);
                 } else if (correctedNow > 0) {
@@ -1642,7 +1642,7 @@
               const input = document.getElementById('userInput');
               if (input && typeof input.focus === 'function') {
                 try {
-                  state._skipNavigatorFocusOnce = true;
+                  dictationModalState._skipNavigatorFocusOnce = true;
                 } catch (e0skip) {
                 }
                 input.focus();
@@ -1652,7 +1652,7 @@
               const checkBtn = document.getElementById('checkBtn');
               if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
                 try {
-                  state._skipNavigatorFocusOnce = true;
+                  dictationModalState._skipNavigatorFocusOnce = true;
                 } catch (e0skip) {
                 }
                 checkBtn.focus();
@@ -1662,7 +1662,7 @@
               const checkBtn = document.getElementById('checkBtn');
               if (checkBtn && !checkBtn.disabled && typeof checkBtn.focus === 'function') {
                 try {
-                  state._skipNavigatorFocusOnce = true;
+                  dictationModalState._skipNavigatorFocusOnce = true;
                 } catch (e0skip) {
                 }
                 checkBtn.focus();
@@ -1675,7 +1675,7 @@
               const rb = document.getElementById('recordButton');
               if (rb && typeof rb.focus === 'function') {
                 try {
-                  state._skipNavigatorFocusOnce = true;
+                  dictationModalState._skipNavigatorFocusOnce = true;
                 } catch (e0x) {
                 }
                 rb.focus();
@@ -1684,7 +1684,7 @@
               const nb = document.getElementById('resultNextBtn');
               if (nb && !nb.disabled && typeof nb.focus === 'function') {
                 try {
-                  state._skipNavigatorFocusOnce = true;
+                  dictationModalState._skipNavigatorFocusOnce = true;
                 } catch (e0y) {
                 }
                 nb.focus();
@@ -1867,9 +1867,9 @@
     const showInputScriptNoticeOnce = (script) => {
       try {
         const now = Date.now();
-        const last = Number(state._lastScriptHintAt || 0) || 0;
+        const last = Number(dictationModalState._lastScriptHintAt || 0) || 0;
         if (now - last < 1500) return;
-        state._lastScriptHintAt = now;
+        dictationModalState._lastScriptHintAt = now;
       } catch (e0) {
       }
       try {
@@ -1884,13 +1884,13 @@
 
     const getChecker = () => {
       try {
-        if (state._typoChecker) return state._typoChecker;
+        if (dictationModalState._typoChecker) return dictationModalState._typoChecker;
       } catch (e0) {
       }
       try {
         if (window.ПроверкаНаОшибки) {
-          state._typoChecker = new window.ПроверкаНаОшибки();
-          return state._typoChecker;
+          dictationModalState._typoChecker = new window.ПроверкаНаОшибки();
+          return dictationModalState._typoChecker;
         }
       } catch (e1) {
       }
@@ -1928,8 +1928,8 @@
       }
 
       try {
-        if (state._hideCorrectAnswerOnNextUserInput) {
-          state._hideCorrectAnswerOnNextUserInput = false;
+        if (dictationModalState._hideCorrectAnswerOnNextUserInput) {
+          dictationModalState._hideCorrectAnswerOnNextUserInput = false;
           const correct = document.getElementById('correctAnswer');
           if (correct) {
             correct.textContent = '';
@@ -1976,7 +1976,7 @@
 
     input.addEventListener('paste', (event) => {
       try {
-        if (!state.dictationStarted) return;
+        if (!dictationModalState.dictationStarted) return;
         if (event) {
           event.preventDefault();
           event.stopPropagation();
@@ -2006,18 +2006,18 @@
 
   function clearInactivityTimer() {
     try {
-      if (state._inactivityTimer) clearTimeout(state._inactivityTimer);
+      if (dictationModalState._inactivityTimer) clearTimeout(dictationModalState._inactivityTimer);
     } catch (e) {
     }
-    state._inactivityTimer = null;
+    dictationModalState._inactivityTimer = null;
   }
 
   function clearAudioCheckTimer() {
     try {
-      if (state._audioCheckTimer) clearTimeout(state._audioCheckTimer);
+      if (dictationModalState._audioCheckTimer) clearTimeout(dictationModalState._audioCheckTimer);
     } catch (e) {
     }
-    state._audioCheckTimer = null;
+    dictationModalState._audioCheckTimer = null;
   }
 
   function clearAllRecordingTimers() {
@@ -2027,7 +2027,7 @@
 
   function resetInactivityTimer() {
     try {
-      if (!state.dictationStarted) return;
+      if (!dictationModalState.dictationStarted) return;
       const snap = getProgressTimerSnapshot();
       if (!snap || !snap.isRunning) {
         clearInactivityTimer();
@@ -2035,8 +2035,8 @@
       }
       clearInactivityTimer();
       if (isPauseModalOpen() || isStartModalOpen()) return;
-      const timeout = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
-      state._inactivityTimer = setTimeout(() => {
+      const timeout = Number(dictationModalState._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+      dictationModalState._inactivityTimer = setTimeout(() => {
         try {
           pauseGame(true);
         } catch (e) {
@@ -2049,10 +2049,10 @@
   function startAudioCheckTimer() {
     try {
       clearAudioCheckTimer();
-      state._audioCheckTimer = setTimeout(() => {
+      dictationModalState._audioCheckTimer = setTimeout(() => {
         try {
           // Таймер аудио сработал — проверяем аудио через панель распознавания
-          const panel = state._speechPanel;
+          const panel = dictationModalState._speechPanel;
           if (panel && typeof panel.stopRecording === 'function') {
             panel.stopRecording('audio_check');
           }
@@ -2065,8 +2065,8 @@
 
   function pauseGame(isInactivityPause = false) {
     try {
-      if (!state.dictationStarted) return;
-      if (state._pauseDisabled) return;
+      if (!dictationModalState.dictationStarted) return;
+      if (dictationModalState._pauseDisabled) return;
       const pauseModal = document.getElementById('pauseModal');
       if (!pauseModal) return;
       if (pauseModal.style.display === 'flex') return;
@@ -2080,7 +2080,7 @@
       if (isInactivityPause) {
         try {
           const p = getProgressPanelInstance();
-          const inactivityTime = Number(state._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
+          const inactivityTime = Number(dictationModalState._currentInactivityTimeout || 0) || INACTIVITY_TIMEOUT_DEFAULT;
           if (p && p.timerState) {
             p.timerState.dictationAccumulatedMs = Math.max(0, (Number(p.timerState.dictationAccumulatedMs) || 0) - inactivityTime);
           }
@@ -2093,7 +2093,7 @@
 
       // Останавливаем активную запись речи, если она идёт
       try {
-        const panel = state._speechPanel;
+        const panel = dictationModalState._speechPanel;
         if (panel && typeof panel.stopRecording === 'function') {
           panel.stopRecording('pause');
         }
@@ -2153,13 +2153,13 @@
 
     document.addEventListener('keydown', (event) => {
       try {
-        if (!state.isOpen) return;
+        if (!dictationModalState.isOpen) return;
         if (!event) return;
 
         if ((event.ctrlKey || event.metaKey) && (event.key === 'v' || event.key === 'V' || event.code === 'KeyV')) {
           const active = document.activeElement;
           const isUserInput = active && (active.id === 'userInput' || (active.closest && active.closest('#userInput')));
-          if (isUserInput && state.dictationStarted) {
+          if (isUserInput && dictationModalState.dictationStarted) {
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -2170,20 +2170,20 @@
 
         switch (event.code) {
           case 'Escape': {
-            if (!state.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) return;
             pauseGame(false);
             event.preventDefault();
             break;
           }
           case 'Digit1': {
-            if (!state.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) return;
             const visual = window.__dictationModalOriginalAudioVisual;
             if (visual && visual.playButton) visual.playButton.click();
             event.preventDefault();
             break;
           }
           case 'Digit2': {
-            if (!state.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) return;
             const btn = document.getElementById('translationPlayButton');
             if (btn) btn.click();
             event.preventDefault();
@@ -2235,7 +2235,7 @@
         window.__DICTATION_MODAL_VISIBILITY_PAUSE_BOUND = true;
         document.addEventListener('visibilitychange', () => {
           try {
-            if (!state.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) return;
             if (!document.hidden) return;
             if (isPauseModalOpen() || isStartModalOpen()) return;
             pauseGame(true);
@@ -2292,8 +2292,8 @@
       const st = session.getState(key);
       if (!st) return;
       const elapsed = session.getElapsedMs();
-      const prevAcc = Number(state._sentenceTimeAccumulatedAtStart) || 0;
-      const prevTimeCount = Number(state._sentencePreviousAccumulatedTime) || 0;
+      const prevAcc = Number(dictationModalState._sentenceTimeAccumulatedAtStart) || 0;
+      const prevTimeCount = Number(dictationModalState._sentencePreviousAccumulatedTime) || 0;
       if (elapsed > prevAcc) {
         const delta = elapsed - prevAcc;
         st.time_count = prevTimeCount + delta;
@@ -2315,14 +2315,14 @@
   function _initSentenceTime(session) {
     try {
       if (!session) return;
-      state._sentenceTimeAccumulatedAtStart = session.getElapsedMs();
+      dictationModalState._sentenceTimeAccumulatedAtStart = session.getElapsedMs();
       // Запоминаем уже накопленное время для этого предложения (если мы уже заходили в него)
       const key = session.getCurrentKey();
       if (key != null) {
         const st = session.getState(key);
-        state._sentencePreviousAccumulatedTime = Number(st && st.time_count) || 0;
+        dictationModalState._sentencePreviousAccumulatedTime = Number(st && st.time_count) || 0;
       } else {
-        state._sentencePreviousAccumulatedTime = 0;
+        dictationModalState._sentencePreviousAccumulatedTime = 0;
       }
     } catch (e) {
     }
@@ -2335,8 +2335,8 @@
    */
   function _saveSentenceTimeOnPageUnload() {
     try {
-      if (!state.isOpen) return;
-      if (!state.dictationStarted) return;
+      if (!dictationModalState.isOpen) return;
+      if (!dictationModalState.dictationStarted) return;
       const session = window.__dictationModalActiveSession;
       if (!session) return;
       // Сохраняем время текущего предложения
@@ -2431,7 +2431,7 @@
       let s = String(raw || '');
       // Keep spaces as characters; remove punctuation/diacritics/invisible.
       try {
-        const checker = state && state._typoChecker;
+        const checker = state && dictationModalState._typoChecker;
         if (checker && typeof checker.normalizeDictationInvisibleChars === 'function') {
           s = checker.normalizeDictationInvisibleChars(s);
         }
@@ -2822,8 +2822,8 @@
 
   function bindCoinExchangeModal(session) {
     try {
-      if (state._coinExchangeBound) return;
-      state._coinExchangeBound = true;
+      if (dictationModalState._coinExchangeBound) return;
+      dictationModalState._coinExchangeBound = true;
     } catch (e0) {
     }
 
@@ -2838,7 +2838,7 @@
 
     const open = (mode) => {
       try {
-        state._coinExchangeMode = mode;
+        dictationModalState._coinExchangeMode = mode;
         if (mode === 'text') {
           title.textContent = 'Обменять 3 текстовые активности на полузвезду?';
         } else {
@@ -2847,7 +2847,7 @@
 
         // Останавливаем активную запись речи, если она идёт
         try {
-          const panel = state._speechPanel;
+          const panel = dictationModalState._speechPanel;
           if (panel && typeof panel.stopRecording === 'function') {
             panel.stopRecording('exchange');
           }
@@ -2896,7 +2896,7 @@
       const st = getCurrentSentenceStateFromSession(session);
       if (!st) return;
 
-      const mode = String(state._coinExchangeMode || '');
+      const mode = String(dictationModalState._coinExchangeMode || '');
       if (mode !== 'text' && mode !== 'audio') return;
 
       if (mode === 'text') {
@@ -3093,17 +3093,17 @@
       }
 
       try {
-        if (allCompleted && state.dictationStarted && !state._completionShown) {
+        if (allCompleted && dictationModalState.dictationStarted && !dictationModalState._completionShown) {
           if (!isPauseModalOpen() && !isStartModalOpen()) {
             // Если выполнены все предложения диктанта — показываем окно успеха
             if (allDictationCompleted) {
-              state._completionShown = true;
+              dictationModalState._completionShown = true;
               showCompletionModal();
             } else {
               // Если выполнены только выбранные, но не все в диктанте —
               // проставляем completed для выполненных, checked для невыполненных
               // и показываем модалку выбора предложений
-              state._completionShown = true;
+              dictationModalState._completionShown = true;
               try {
                 _markCompletedAndShowStartModal(session);
               } catch (eMark) {
@@ -3149,7 +3149,7 @@
 
       // Показываем startModal с контекстом success
       renderStartModalSentencesTable(session);
-      state.startModalContext = 'success';
+      dictationModalState.startModalContext = 'success';
       showStartModal();
       updateNavigatorFromSession(session);
     } catch (e) {
@@ -3399,7 +3399,7 @@
   }
 
   function updateAudioPlayersFromSession(session) {
-    const started = !!state.dictationStarted;
+    const started = !!dictationModalState.dictationStarted;
     try {
       const startModal = document.getElementById('start-modal');
       if (startModal && (startModal.style.display === 'flex' || startModal.style.display === 'block')) {
@@ -3467,7 +3467,7 @@
             } catch (e0) {
             }
             try {
-              if (!state.dictationStarted) return;
+              if (!dictationModalState.dictationStarted) return;
               const u = String(btn.dataset.audioUrl || '').trim();
               if (!u) return;
               if (window.AudioManager && typeof window.AudioManager.play === 'function') {
@@ -3482,29 +3482,29 @@
     }
 
     try {
-      clearTimeout(state._startSequenceTimer);
+      clearTimeout(dictationModalState._startSequenceTimer);
     } catch (e4) {
     }
     try {
       if (started) {
-        const lastKey = (state && state._lastStartSequenceKey != null) ? String(state._lastStartSequenceKey) : '';
+        const lastKey = (state && dictationModalState._lastStartSequenceKey != null) ? String(dictationModalState._lastStartSequenceKey) : '';
         // Защита от повторного запуска: если ключ предложения совпадает с предыдущим — пропускаем.
         // Если ключ пустой, используем fallback-защиту через _startSequencePlayed флаг.
         if (sentenceKey) {
           if (sentenceKey === lastKey) {
             return;
           }
-          state._lastStartSequenceKey = sentenceKey;
-          state._startSequencePlayed = false;
+          dictationModalState._lastStartSequenceKey = sentenceKey;
+          dictationModalState._startSequencePlayed = false;
         } else {
           // Если ключ пустой, используем флаг _startSequencePlayed для защиты от повторного запуска
-          if (state._startSequencePlayed) {
+          if (dictationModalState._startSequencePlayed) {
             return;
           }
-          state._startSequencePlayed = true;
+          dictationModalState._startSequencePlayed = true;
         }
 
-        state._startSequenceTimer = setTimeout(() => {
+        dictationModalState._startSequenceTimer = setTimeout(() => {
           try {
             const seq = getPlaySequenceStartValue();
             playAudioSequence(seq, { originalUrl, translationUrl });
@@ -3525,7 +3525,7 @@
 
     let panel = null;
     try {
-      panel = state._speechPanel;
+      panel = dictationModalState._speechPanel;
     } catch (e1) {
     }
     // Если панель уже существует — не создаём новую, но всё равно обновляем
@@ -3648,7 +3648,7 @@
           }
         },
         });
-        state._speechPanel = panel;
+        dictationModalState._speechPanel = panel;
       } catch (e2) {
         return null;
       }
@@ -3716,7 +3716,7 @@
 
       visual.setOnPlayClick(() => {
         try {
-          if (!state.dictationStarted) return;
+          if (!dictationModalState.dictationStarted) return;
           const audioPath = visual.getCurrentAudioPath();
           if (!audioPath) return;
           if (window.AudioManager && typeof window.AudioManager.play === 'function') {
@@ -3840,7 +3840,7 @@
           updateNavigatorFromSession(session);
 
           try {
-            if (!state.dictationStarted) return;
+            if (!dictationModalState.dictationStarted) return;
             const view = getCurrentSentenceViewFromSession(session);
             if (!view) return;
 
@@ -4843,7 +4843,7 @@
 
   function isHeaderToggleProtectedState(state) {
     try {
-      const s = state && state.selection_state ? String(state.selection_state) : '';
+      const s = state && dictationModalState.selection_state ? String(dictationModalState.selection_state) : '';
       return s === 'completed';
     } catch (e) {
       return false;
@@ -5009,10 +5009,10 @@
     }
 
     try {
-      if (state.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
+      if (dictationModalState.dictationStarted && !isPauseModalOpen() && !isStartModalOpen()) {
         try {
-          if (state._skipNavigatorFocusOnce) {
-            state._skipNavigatorFocusOnce = false;
+          if (dictationModalState._skipNavigatorFocusOnce) {
+            dictationModalState._skipNavigatorFocusOnce = false;
             return;
           }
         } catch (e0x) {
@@ -5040,12 +5040,12 @@
       input.dataset.boundEnterToCheck = '1';
       input.addEventListener('keydown', (e) => {
         try {
-          if (!state.isOpen) {
-            console.log('[DM:bindEnterToCheck] state.isOpen=false → выход');
+          if (!dictationModalState.isOpen) {
+            console.log('[DM:bindEnterToCheck] dictationModalState.isOpen=false → выход');
             return;
           }
-          if (!state.dictationStarted) {
-            console.log('[DM:bindEnterToCheck] state.dictationStarted=false → выход');
+          if (!dictationModalState.dictationStarted) {
+            console.log('[DM:bindEnterToCheck] dictationModalState.dictationStarted=false → выход');
             return;
           }
           if (!e) return;
@@ -5304,7 +5304,7 @@
       if (!startBtn) return;
 
       const session = window.__dictationModalActiveSession;
-      const context = state.startModalContext || 'open';
+      const context = dictationModalState.startModalContext || 'open';
 
       if (context === 'success') {
         // Из окна успехов — "Новая игра" / "New game"
@@ -5631,7 +5631,7 @@
 
           // Обновляем иконку режима распознавания в панели диктанта
           try {
-            const panel = state._speechPanel;
+            const panel = dictationModalState._speechPanel;
             if (panel && typeof panel.setMode === 'function') {
               const normalized = speechRecMode.startsWith('route-off') ? 'route-off' : speechRecMode;
               panel.setMode(normalized);
@@ -5870,14 +5870,14 @@
         }
       } catch (e) {
       }
-      // Сбрасываем state.dictationStarted, чтобы при следующем старте всё началось заново
+      // Сбрасываем dictationModalState.dictationStarted, чтобы при следующем старте всё началось заново
       try {
-        state.dictationStarted = false;
+        dictationModalState.dictationStarted = false;
       } catch (e) {
       }
-      // Сбрасываем state._completionShown, чтобы окно успеха могло появиться снова
+      // Сбрасываем dictationModalState._completionShown, чтобы окно успеха могло появиться снова
       try {
-        state._completionShown = false;
+        dictationModalState._completionShown = false;
       } catch (e) {
       }
       // Сохраняем сессию в IDB после сброса прогресса
@@ -6230,11 +6230,11 @@
             if (!session) return;
             // Сохраняем время текущего предложения перед открытием таблицы
             // (updateStartModalSentenceRow вызывается внутри _saveSentenceTime)
-            if (state.dictationStarted) {
+            if (dictationModalState.dictationStarted) {
               _saveSentenceTime(session);
             }
             // Показываем модалку (она сама остановит таймер)
-            state.startModalContext = 'navigator';
+            dictationModalState.startModalContext = 'navigator';
             showStartModal();
           } catch (e1) {
           }
@@ -6371,7 +6371,7 @@
           }
           try {
             const s = window.__dictationModalActiveSession;
-            const ctx = state.startModalContext || 'open';
+            const ctx = dictationModalState.startModalContext || 'open';
 
             if (ctx === 'success') {
               // Из окна успехов или из модалки выбора после частичного выполнения
@@ -6392,8 +6392,8 @@
                 if (hasCompletedSentences) {
                   // Частичное выполнение: не сбрасываем прогресс completed-предложений,
                   // только сбрасываем флаги состояния
-                  try { state.dictationStarted = false; } catch (e) {}
-                  try { state._completionShown = false; } catch (e) {}
+                  try { dictationModalState.dictationStarted = false; } catch (e) {}
+                  try { dictationModalState._completionShown = false; } catch (e) {}
                   // Сбрасываем dateStart, чтобы startGame() установил новую дату
                   if (s) s.dateStart = null;
                 } else {
@@ -6423,11 +6423,11 @@
   }
 
   async function ensureDictationDepsLoaded() {
-    if (state.depsLoaded) return;
+    if (dictationModalState.depsLoaded) return;
     for (const src of DICTATION_SCRIPT_DEPS) {
       await ensureScript(src);
     }
-    state.depsLoaded = true;
+    dictationModalState.depsLoaded = true;
   }
 
   function cleanupPreviousDictationState() {
@@ -6488,7 +6488,7 @@
     // Закрытие по Escape — оставляем
     document.addEventListener('keydown', async (e) => {
       try {
-        if (!state.isOpen) return;
+        if (!dictationModalState.isOpen) return;
         if (e && e.key === 'Escape') await close();
       } catch (e2) {
       }
@@ -6496,12 +6496,20 @@
   }
 
   async function open(dictationUrl, opts = {}) {
-    if (state.opening) return;
-    state.opening = true;
+    console.log('[9] dictation_modal: open() вызван, url=' + dictationUrl);
+    if (dictationModalState.opening) {
+      console.log('[9a] dictation_modal: opening уже true, выход');
+      return;
+    }
+    dictationModalState.opening = true;
+    console.log('[10] dictation_modal: opening установлен');
 
     try {
       const modal = getModal();
-      if (!modal) return;
+      if (!modal) {
+        console.log('[10a] dictation_modal: modal не найден, выход');
+        return;
+      }
 
       try {
         const prev = getProgressPanelInstance();
@@ -6516,16 +6524,17 @@
       }
 
       try {
-        state.dictationStarted = false;
+        dictationModalState.dictationStarted = false;
       } catch (e0) {
       }
 
       try {
-        state._pauseDisabled = false;
+        dictationModalState._pauseDisabled = false;
       } catch (e0b) {
       }
 
       const parsed = parseDictationHref(dictationUrl);
+      console.log('[11] dictation_modal: parsed=' + (parsed ? JSON.stringify({dictationIdFormatted: parsed.dictationIdFormatted, langOriginal: parsed.langOriginal, langTranslation: parsed.langTranslation}) : 'null'));
 
       setUsername();
       setAvatar();
@@ -6534,7 +6543,8 @@
 
       modal.style.display = 'flex';
       modal.classList.add('show');
-      state.isOpen = true;
+      dictationModalState.isOpen = true;
+      console.log('[12] dictation_modal: modal показан');
 
       // Биндим сохранение времени предложения при закрытии/скрытии страницы
       try {
@@ -6559,7 +6569,7 @@
       }
 
       cleanupPreviousDictationState();
-      state.currentUrl = dictationUrl;
+      dictationModalState.currentUrl = dictationUrl;
 
       try {
         applyDictationMetaFromCard({ href: dictationUrl, cardEl: opts.cardEl || null });
@@ -6578,7 +6588,9 @@
       } catch (e) {
       }
 
+      console.log('[13] dictation_modal: ensureDictationDepsLoaded завершена');
       await ensureDictationDepsLoaded();
+      console.log('[14] dictation_modal: deps загружены');
 
       // Загружаем настройки схемы пользователя при открытии модалки диктанта
       try {
@@ -6613,6 +6625,8 @@
         }
       }
 
+      console.log('[15] dictation_modal: contentLoaded=' + contentLoaded);
+
       // Восстанавливаем сессию из IndexedDB ПОСЛЕ загрузки контента,
       // чтобы restoreFromIdb() мог сопоставить ключи предложений с контентом.
       // Если запустить restore до загрузки контента, все сессии будут пропущены
@@ -6625,9 +6639,11 @@
       } catch (eReset) {
       }
 
+      console.log('[16] dictation_modal: restoreFromIdb завершён');
       try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
         const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
+        console.log('[17] dictation_modal: session=' + (session ? 'создана' : 'null'));
         if (session) {
           // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
           // сбрасываем прогресс как при нажатии «всё по новой»
@@ -6643,7 +6659,7 @@
           } catch (e0) {
           }
           renderStartModalSentencesTable(session);
-          state.startModalContext = 'open';
+          dictationModalState.startModalContext = 'open';
           showStartModal();
           updateNavigatorFromSession(session);
 
@@ -6678,6 +6694,8 @@
         }
       } catch (e) {
       }
+
+      console.log('[18] dictation_modal: start modal показана');
 
       try {
         bindStartModalControls();
@@ -6747,9 +6765,11 @@
       } catch (e) {
       }
 
+      console.log('[19] dictation_modal: ProgressPanel создан');
       renderLucide(modal);
+      console.log('[20] dictation_modal: open() завершена');
     } finally {
-      state.opening = false;
+      dictationModalState.opening = false;
     }
   }
 
@@ -6772,7 +6792,7 @@
     }
 
     try {
-      state._pauseDisabled = false;
+      dictationModalState._pauseDisabled = false;
     } catch (e0) {
     }
     try {
@@ -6846,7 +6866,7 @@
       }
     }
 
-    state.isOpen = false;
+    dictationModalState.isOpen = false;
   }
 
   function patchDictationCardOpenHandler() {
