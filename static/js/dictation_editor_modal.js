@@ -7,9 +7,9 @@
  * - Таблицу предложений с управлением колонками
  */
 
-const MODAL_ID = 'dictationEditorModal';
-const BODY_ID = 'dictationEditorModalBody';
-const TABLE_ID = 'editorModalSentencesTable';
+var EDITOR_MODAL_ID = 'dictationEditorModal';
+var EDITOR_BODY_ID = 'dictationEditorModalBody';
+var EDITOR_EDITOR_TABLE_ID = 'editorModalSentencesTable';
 
 const state = {
   isOpen: false,
@@ -155,7 +155,7 @@ function _setButtonState(button, stateStr) {
 /* ===== РАБОТА С ТАБЛИЦЕЙ ===== */
 
 function _toggleColumnGroup(group) {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   table.classList.remove('state-original-translation', 'state-original-editing');
   if (group === 'original') {
@@ -166,8 +166,8 @@ function _toggleColumnGroup(group) {
 }
 
 function _toggleCheckboxColumn(show) {
-  var header = document.querySelector('#' + TABLE_ID + ' th.col-checkbox-create-audio');
-  var cells = document.querySelectorAll('#' + TABLE_ID + ' td.col-checkbox-create-audio');
+  var header = document.querySelector('#' + EDITOR_TABLE_ID + ' th.col-checkbox-create-audio');
+  var cells = document.querySelectorAll('#' + EDITOR_TABLE_ID + ' td.col-checkbox-create-audio');
   if (header) {
     header.style.display = show ? 'table-cell' : 'none';
   }
@@ -194,7 +194,7 @@ function _toggleCheckboxColumn(show) {
 }
 
 function _toggleCreateAudioColumns(show) {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
 
   var setDisplay = function (el, value) {
@@ -259,7 +259,7 @@ function _toggleCreateAudioColumns(show) {
 }
 
 function _applyTableViewForTab(tabName) {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
 
   state.currentTabName = tabName;
@@ -339,8 +339,8 @@ function _applyTableViewForTab(tabName) {
 
 function _updateExplanationColumnVisibility() {
   var showExplanation = state.currentDictation && state.currentDictation.show_explanation;
-  var headers = document.querySelectorAll('#' + TABLE_ID + ' th.col-explanation');
-  var cells = document.querySelectorAll('#' + TABLE_ID + ' td.col-explanation');
+  var headers = document.querySelectorAll('#' + EDITOR_TABLE_ID + ' th.col-explanation');
+  var cells = document.querySelectorAll('#' + EDITOR_TABLE_ID + ' td.col-explanation');
   headers.forEach(function (el) { el.style.display = showExplanation ? 'table-cell' : 'none'; });
   cells.forEach(function (el) { el.style.display = showExplanation ? 'table-cell' : 'none'; });
 }
@@ -349,7 +349,7 @@ function _updateExplanationColumnVisibility() {
 
 function _selectSentenceRow(row) {
   if (!row) return;
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   table.querySelectorAll('tbody tr.selected').forEach(function (r) { r.classList.remove('selected'); });
   row.classList.add('selected');
@@ -421,7 +421,7 @@ function _selectSentenceRow(row) {
 }
 
 function _updateCurrentRowNumber() {
-  var currentRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var currentRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   var rowNumberSpan = document.getElementById('editorModalCurrentRowNumber');
   if (currentRow && rowNumberSpan) {
     var rowNumber = currentRow.querySelector('.col-number')?.textContent || '1';
@@ -430,7 +430,7 @@ function _updateCurrentRowNumber() {
 }
 
 function _navigateToPreviousRow() {
-  var currentRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var currentRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   if (!currentRow) return;
   var prevRow = currentRow.previousElementSibling;
   if (prevRow) {
@@ -439,7 +439,7 @@ function _navigateToPreviousRow() {
 }
 
 function _navigateToNextRow() {
-  var currentRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var currentRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   if (!currentRow) return;
   var nextRow = currentRow.nextElementSibling;
   if (nextRow) {
@@ -450,7 +450,7 @@ function _navigateToNextRow() {
 /* ===== РЕНДЕРИНГ ТАБЛИЦЫ ===== */
 
 function _renderTable() {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   var tbody = table.querySelector('tbody');
   if (!tbody) return;
@@ -934,7 +934,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
 }
 
 function _bindAudioPlaybackHandlers() {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
 
   var playButtons = table.querySelectorAll('.audio-btn');
@@ -975,7 +975,7 @@ function _setupTableControls() {
     });
 
     rowNumberSpan.addEventListener('blur', function () {
-      var rows = Array.from(document.querySelectorAll('#' + TABLE_ID + ' tbody tr'));
+      var rows = Array.from(document.querySelectorAll('#' + EDITOR_TABLE_ID + ' tbody tr'));
       if (!rows.length) {
         rowNumberSpan.textContent = '1';
         return;
@@ -1021,7 +1021,7 @@ function _setupTableControls() {
   if (deleteBtn && !deleteBtn.getAttribute('data-table-control-handler')) {
     deleteBtn.setAttribute('data-table-control-handler', '1');
     deleteBtn.addEventListener('click', function () {
-      var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+      var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
       if (!selectedRow) return;
       if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
         window.DesktopConfirmModal.open({
@@ -1069,7 +1069,7 @@ function _setupTableControls() {
 }
 
 function _addNewRow(position) {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   var tbody = table.querySelector('tbody');
   if (!tbody) return;
@@ -1115,7 +1115,7 @@ function _addNewRow(position) {
 
 function _deleteRow(row) {
   if (!row) return;
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   var tbody = table.querySelector('tbody');
   if (!tbody) return;
@@ -1148,7 +1148,7 @@ function _setupCloseButton() {
 }
 
 function _setupOverlayClose() {
-  const modal = document.getElementById(MODAL_ID);
+  const modal = document.getElementById(EDITOR_MODAL_ID);
   if (modal) {
     modal.addEventListener('click', function (e) {
       if (e.target === modal) {
@@ -1519,7 +1519,7 @@ async function _handleGenerateTtsForSentence() {
   var lang = state.config ? state.config.originalLanguage : '';
 
   // Берём текущую выбранную строку
-  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   if (selectedRow) {
     key = selectedRow.dataset.key;
   }
@@ -1600,7 +1600,7 @@ async function _handleGenerateTtsForSentence() {
     _setDirtyFlags({ db: true, audio: true });
 
     // Обновляем иконку кнопки в таблице для этой строки
-    var ttsBtn = document.querySelector('#' + TABLE_ID + ' .col-generate-tts button[data-key="' + key + '"]');
+    var ttsBtn = document.querySelector('#' + EDITOR_TABLE_ID + ' .col-generate-tts button[data-key="' + key + '"]');
     if (ttsBtn) {
       ttsBtn.dataset.state = 'ready';
       var icon = ttsBtn.querySelector('i[data-lucide]');
@@ -1702,7 +1702,7 @@ async function _handleRegenerateAllTts() {
         sentence.audio = newFilename;
 
         // Обновляем иконку кнопки в таблице
-        var ttsBtn = document.querySelector('#' + TABLE_ID + ' .col-generate-tts button[data-key="' + cores[i].key + '"]');
+        var ttsBtn = document.querySelector('#' + EDITOR_TABLE_ID + ' .col-generate-tts button[data-key="' + cores[i].key + '"]');
         if (ttsBtn) {
           ttsBtn.dataset.state = 'ready';
           var icon = ttsBtn.querySelector('i[data-lucide]');
@@ -1917,7 +1917,7 @@ function _syncWaveformRegion(field, value) {
  * и с лейблами в таблице. Если у предложения есть audio_file, меняет кнопку f на молоточек.
  */
 function _syncStartEndToSentence(field, value) {
-  var table = document.getElementById(TABLE_ID);
+  var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
   var selectedRow = table.querySelector('tbody tr.selected');
   if (!selectedRow) return;
@@ -2606,7 +2606,7 @@ function open(config) {
     show_explanation: config.show_explanation || false,
   };
 
-  const modal = document.getElementById(MODAL_ID);
+  const modal = document.getElementById(EDITOR_MODAL_ID);
   if (!modal) return;
 
   modal.style.display = 'flex';
@@ -2635,7 +2635,7 @@ function open(config) {
 
   // После восстановления shared audio обновляем текст в панели над волной
   // из первой (активной) строки таблицы, чтобы там не осталось имени файла
-  var firstRowAfterRestore = document.querySelector('#' + TABLE_ID + ' tbody tr');
+  var firstRowAfterRestore = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr');
   if (firstRowAfterRestore) {
     _selectSentenceRow(firstRowAfterRestore);
   }
@@ -2655,7 +2655,7 @@ function open(config) {
     // для текущей (первой) строки, если у неё есть start/end
     var wf = window.editorModalWaveform;
     if (wf) {
-      var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+      var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
       if (selectedRow) {
         var key = selectedRow.dataset.key;
         if (key && state.content) {
@@ -2770,7 +2770,7 @@ async function _restoreSharedAudioFromSentences() {
 async function _restoreSelfAudioFromSentences() {
   if (!state.content) return;
 
-  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   if (!selectedRow) return;
 
   var key = selectedRow.dataset.key;
@@ -2986,7 +2986,7 @@ function close() {
   var selfWaveformContainer = document.getElementById('editorModalSelfAudioWaveform');
   if (selfWaveformContainer) selfWaveformContainer.innerHTML = '';
 
-  const modal = document.getElementById(MODAL_ID);
+  const modal = document.getElementById(EDITOR_MODAL_ID);
   if (modal) {
     modal.style.display = 'none';
   }
@@ -3092,7 +3092,7 @@ function _initSelfAudioTab() {
  * Завантажує аудіофайл для поточної строки (записує в audio_mic).
  */
 function _uploadSelfAudioFile(file) {
-  var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
   if (!selectedRow) {
     alert('Не вибрано рядок для завантаження файлу');
     return;
@@ -3356,7 +3356,7 @@ async function _handleSelfCutAudio() {
       var data = await response.json();
       if (data.success) {
         // Оновлюємо дані поточної строки
-        var selectedRow = document.querySelector('#' + TABLE_ID + ' tbody tr.selected');
+        var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
         if (selectedRow && state.content) {
           var key = selectedRow.dataset.key;
           var sentence = state.content.getSentence(key);
