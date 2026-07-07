@@ -508,31 +508,12 @@
   min-height: 100px;
 }
 
-/* Панель с текущей строкой и кнопкой */
+/* Панель с текущей строкой и кнопкой — без обводки */
 .dictation-editor-modal__auto-audio-info-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px;
-  background: var(--color-panel-bg, #fafafa);
-  border: 1px solid var(--color-border-light, #e0e0e0);
-  border-radius: 6px;
-}
-
-.dictation-editor-modal__auto-audio-sentence {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.dictation-editor-modal__auto-audio-label {
-  font-size: 13px;
-  color: var(--color-text-secondary, #666);
-  white-space: nowrap;
-  flex-shrink: 0;
+  padding: 4px 0;
 }
 
 .dictation-editor-modal__auto-audio-text {
@@ -541,30 +522,32 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 
 .dictation-editor-modal__auto-generate-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--color-border-light, #e0e0e0);
-  border-radius: 6px;
-  background: var(--color-button-yellow, #f9c609);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .dictation-editor-modal__auto-generate-btn:hover {
-  background: var(--color-hover, #f0eeeb);
-  border-color: var(--color-button-shadow-yellow, #d4a800);
+  opacity: 0.85;
 }
 
 .dictation-editor-modal__auto-generate-btn i {
-  width: 18px;
-  height: 18px;
+  width: 22px;
+  height: 22px;
 }
 
 /* Футер с кнопкой "Перезаполнить все" */
@@ -578,23 +561,24 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  border: 1px solid var(--color-border-light, #e0e0e0);
-  border-radius: 6px;
-  background: var(--color-button-yellow, #f9c609);
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.15s, border-color 0.15s;
+  font-weight: 500;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 .dictation-editor-modal__auto-regenerate-all-btn:hover {
-  background: var(--color-hover, #f0eeeb);
-  border-color: var(--color-button-shadow-yellow, #d4a800);
+  opacity: 0.85;
 }
 
 .dictation-editor-modal__auto-regenerate-all-btn i {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
 }
 
 /* ===== ВКЛАДКА "Є АУДІО" (voice-original-have) ===== */

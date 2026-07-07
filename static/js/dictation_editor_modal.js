@@ -1537,6 +1537,13 @@ async function _handleGenerateTtsForSentence() {
   btn.innerHTML = '<i data-lucide="loader-2"></i>';
   if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
 
+  var safeEmail = '';
+  try {
+    if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+      safeEmail = window.UM.getSafeEmail();
+    }
+  } catch (e) {}
+
   try {
     var response = await fetch('/generate_audio', {
       method: 'POST',
@@ -1547,6 +1554,7 @@ async function _handleGenerateTtsForSentence() {
         language: lang,
         filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
         tipe_audio: 'avto',
+        safe_email: safeEmail,
       })
     });
 
@@ -1625,6 +1633,13 @@ async function _handleRegenerateAllTts() {
   var successCount = 0;
   var errorCount = 0;
 
+  var safeEmail = '';
+  try {
+    if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+      safeEmail = window.UM.getSafeEmail();
+    }
+  } catch (e) {}
+
   try {
     for (var i = 0; i < cores.length; i++) {
       var sentence = state.content.getSentence(cores[i].key);
@@ -1646,6 +1661,7 @@ async function _handleRegenerateAllTts() {
             language: lang,
             filename_audio: 'tts_' + cores[i].key + '_' + Date.now() + '.mp3',
             tipe_audio: 'avto',
+            safe_email: safeEmail,
           })
         });
 

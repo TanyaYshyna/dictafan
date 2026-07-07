@@ -116,55 +116,36 @@
 
     function showBuildUpdateNotification(oldBuild, newBuild) {
       try {
-        // Если уведомление уже показано — не дублируем
-        if (document.getElementById('dictafan-build-update-banner')) return;
-
-        var banner = document.createElement('div');
-        banner.id = 'dictafan-build-update-banner';
-        banner.setAttribute('role', 'alert');
-
-        var message = document.createElement('span');
-        message.className = 'build-update-banner-message';
-        message.textContent = _tBuild('available', 'Доступна новая версия');
-
-        var btn = document.createElement('button');
-        btn.className = 'build-update-banner-btn';
-        btn.textContent = _tBuild('reload', 'Обновить');
-        btn.addEventListener('click', function () {
+        // Показываем модальное окно вместо жёлтого баннера
+        if (typeof window.DesktopConfirmModal !== 'undefined' &&
+            typeof window.DesktopConfirmModal.open === 'function') {
+          window.DesktopConfirmModal.open({
+            title: _tBuild('available', 'Доступна нова версія'),
+            showSave: true,
+            onSave: function () {
+              try {
+                persistentLog('build_reload_manual', { from: oldBuild, to: newBuild });
+              } catch (e) {
+              }
+              location.reload();
+            },
+            onDiscard: function () {
+              // Ничего не делаем, просто закрываем
+            },
+          });
+          // Меняем текст кнопок
+          var saveLabel = document.getElementById('desktopConfirmSaveLabel');
+          if (saveLabel) saveLabel.textContent = _tBuild('reload', 'Обновити');
+          var discardLabel = document.getElementById('desktopConfirmDiscardLabel');
+          if (discardLabel) discardLabel.textContent = _tBuild('later', 'Пізніше');
+        } else {
+          // Fallback если модалка недоступна
           try {
-            persistentLog('build_reload_manual', { from: oldBuild, to: newBuild });
+            persistentLog('build_reload_fallback', { from: oldBuild, to: newBuild });
           } catch (e) {
           }
           location.reload();
-        });
-
-        var closeBtn = document.createElement('button');
-        closeBtn.className = 'build-update-banner-close';
-        closeBtn.innerHTML = '&times;';
-        closeBtn.setAttribute('aria-label', 'Закрыть');
-        closeBtn.addEventListener('click', function () {
-          try {
-            banner.style.opacity = '0';
-            banner.style.transform = 'translateY(100%)';
-            setTimeout(function () {
-              try {
-                if (banner.parentNode) banner.parentNode.removeChild(banner);
-              } catch (e) {
-              }
-            }, 300);
-          } catch (e) {
-          }
-        });
-
-        banner.appendChild(message);
-        banner.appendChild(btn);
-        banner.appendChild(closeBtn);
-        document.body.appendChild(banner);
-
-        // Анимация появления
-        requestAnimationFrame(function () {
-          banner.classList.add('visible');
-        });
+        }
 
         // Также обновляем статус-бар
         try {
