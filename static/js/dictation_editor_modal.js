@@ -377,17 +377,8 @@ function _selectSentenceRow(row) {
       if (autoSentenceTextEl) {
         autoSentenceTextEl.textContent = found.text_original || '—';
       }
-      // Обновляем лейбли на закладці "Озвучка оригинала (сам)"
-      var selfFilenameEl = document.getElementById('editorModalSelfFilename');
-      var selfSentenceTextEl = document.getElementById('editorModalSelfSentenceText');
-      if (selfFilenameEl) {
-        selfFilenameEl.textContent = found.audio_mic || '—';
-      }
-      if (selfSentenceTextEl) {
-        selfSentenceTextEl.textContent = found.text_original || '—';
-      }
-
       // Загружаем self waveform для audio_mic текущей строки
+      // (функція сама оновлює лейбли над волною)
       _loadSelfAudioForRow(found);
     }
   }
@@ -2875,11 +2866,21 @@ async function _loadSelfAudioForRow(sentence) {
   if (startInput) startInput.value = '0';
   if (endInput) endInput.value = '0';
 
+  // Оновлюємо лейбли над волною
+  var selfFilenameEl = document.getElementById('editorModalSelfFilename');
+  var selfSentenceTextEl = document.getElementById('editorModalSelfSentenceText');
+  if (selfFilenameEl) {
+    selfFilenameEl.textContent = (sentence && sentence.audio_mic) ? sentence.audio_mic : '';
+  }
+  if (selfSentenceTextEl) {
+    selfSentenceTextEl.textContent = (sentence && sentence.text_original) ? sentence.text_original : '—';
+  }
+
   if (!sentence) return;
 
   var micFilename = sentence.audio_mic || sentence.audio_m || null;
   if (!micFilename) {
-    // Нет self audio — ничего не показываем
+    // Нет self audio — волна пустая (лейбли вже оновлено вище)
     return;
   }
 
@@ -3104,58 +3105,17 @@ function _uploadSelfAudioFile(file) {
   var sentence = state.content.getSentence(key);
   if (!sentence) return;
 
-  // Освобождаем старий blob URL
-  if (state._selfAudioUrl && state._selfAudioUrl.startsWith('blob:')) {
-    URL.revokeObjectURL(state._selfAudioUrl);
-  }
+  // Записуємо ім'я файлу в audio_mic поточної строки
+  sentence.audio_mic = file.name;
 
-  // Уничтожаем старую волну
-  if (window.editorModalSelfWaveform) {
-    window.editorModalSelfWaveform.destroy();
-    window.editorModalSelfWaveform = null;
-  }
+  // Зберігаємо файл у CacheStorage
+  _cacheSelfAudioFile(file, file.name);
 
-  var audioUrl = URL.createObjectURL(file);
-  state._selfAudioUrl = audioUrl;
-  state._selfAudioFile = file;
+  // Помічаємо dirty
+  _setDirtyFlags({ db: true, audio: true });
 
-  var dictationId = state.config ? state.config.dictationId : '';
-  var lang = state.config ? state.config.originalLanguage : '';
-  var filename = file.name;
-
-  // Оновлюємо лейбли
-  var filenameEl = document.getElementById('editorModalSelfFilename');
-  if (filenameEl) filenameEl.textContent = filename;
-  var sentenceTextEl = document.getElementById('editorModalSelfSentenceText');
-  if (sentenceTextEl) sentenceTextEl.textContent = sentence.text_original || '—';
-
-  var audio = new Audio();
-  audio.addEventListener('loadedmetadata', function () {
-    var duration = audio.duration;
-    state._selfAudioFilename = filename;
-    state._selfAudioDuration = duration;
-
-    // Ініціалізуємо хвилю
-    _initSelfWaveform(audioUrl);
-
-    // Встановлюємо start/end на весь файл
-    var startInput = document.getElementById('editorModalSelfAudioStartTime');
-    var endInput = document.getElementById('editorModalSelfAudioEndTime');
-    if (startInput) startInput.value = '0';
-    if (endInput) endInput.value = duration.toFixed(2);
-
-    // Зберігаємо файл у CacheStorage
-    _cacheSelfAudioFile(file, filename);
-
-    // Помічаємо dirty
-    _setDirtyFlags({ db: true, audio: true });
-  });
-
-  audio.addEventListener('error', function () {
-    console.warn('[dictationEditorModal] Помилка завантаження аудіо для self');
-  });
-
-  audio.src = audioUrl;
+  // Виконуємо процедуру "актуальна строка" — оновлюємо лейбли і волну
+  _loadSelfAudioForRow(sentence);
 }
 
 /**
