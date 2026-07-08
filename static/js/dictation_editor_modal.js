@@ -9,7 +9,7 @@
 
 var EDITOR_MODAL_ID = 'dictationEditorModal';
 var EDITOR_BODY_ID = 'dictationEditorModalBody';
-var EDITOR_EDITOR_TABLE_ID = 'editorModalSentencesTable';
+var EDITOR_TABLE_ID = 'editorModalSentencesTable';
 
 const state = {
   isOpen: false,
