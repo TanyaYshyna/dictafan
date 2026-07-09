@@ -273,7 +273,8 @@
             var currentBuild = String(window.__APP_BUILD || '').trim();
             if (currentBuild && currentBuild === newBuild) return;
             persistentLog('build_sw_notify', { from: currentBuild, to: newBuild });
-            showBuildUpdateNotification(currentBuild, newBuild);
+            // TODO: вернуть модалку уведомления об обновлении (showBuildUpdateNotification)
+            // пока отключено — слишком часто вылезает
           } catch (e) {
           }
         });

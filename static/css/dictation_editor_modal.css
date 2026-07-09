@@ -241,6 +241,7 @@
   padding: 16px;
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
 
 .dictation-editor-modal__tab-content.active {
@@ -312,6 +313,19 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Строка "Посилання на матеріали автора" — label сверху, input на всю ширину */
+.dictation-editor-modal__form-group-line--author-url {
+  flex-direction: column;
+  align-items: stretch;
+}
+.dictation-editor-modal__form-group-line--author-url label {
+  white-space: normal;
+}
+.dictation-editor-modal__form-group-line--author-url .text-input {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .dictation-editor-modal__form-group-line label {
@@ -428,6 +442,7 @@
   flex-direction: column;
   gap: 4px;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .dictation-editor-modal__voice-mode-radio {
@@ -495,7 +510,7 @@
   }
 
   .dictation-editor-modal__editor-header-panel-1 {
-    align-self: center;
+    align-self: flex-start;
   }
 }
 
@@ -1103,6 +1118,7 @@
 /* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
 .dictation-editor-modal__self-audio-content {
   padding: 16px;
+  overflow: auto;
 }
 
 /* Дві панелі під волною: ліва і права, при звуженні права йде вниз */
@@ -1214,12 +1230,15 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 
 .dictation-editor-modal__self-mic-file-row {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .dictation-editor-modal__self-mic-filename {
