@@ -270,6 +270,27 @@
                 </button>
               </div>
 
+              <!-- Блок запису з мікрофона (правий нижній кут) -->
+              <div class="dictation-editor-modal__self-mic-block">
+                <div class="dictation-editor-modal__self-mic-row">
+                  <span id="editorModalSelfRecordingIndicator" class="dictation-editor-modal__rec-indicator" disabled title="Индикатор записи">
+                    <i data-lucide="circle"></i>
+                  </span>
+                  <canvas id="editorModalSelfAudioVisualizer" class="dictation-editor-modal__audio-visualizer"></canvas>
+                  <button id="editorModalSelfRecordBtn" class="dictation-editor-modal__mic-btn" type="button" title="Записати">
+                    <span id="editorModalSelfRecordIcon"><i data-lucide="mic"></i></span>
+                  </button>
+                </div>
+                <div class="dictation-editor-modal__self-mic-actions">
+                  <button id="editorModalSelfPlayNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Прослухати записане" disabled>
+                    <i data-lucide="play"></i>
+                  </button>
+                  <button id="editorModalSelfApplyNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Застосувати записане" disabled>
+                    <i data-lucide="corner-down-left"></i>
+                  </button>
+                </div>
+              </div>
+
               <!-- Скрытый input для выбора файлов -->
               <input type="file" id="editorModalSelfAudioFileInput" accept="audio/*" style="display:none;">
             </div>

@@ -1103,6 +1103,7 @@
 /* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
 .dictation-editor-modal__self-audio-content {
   padding: 16px;
+  position: relative;
 }
 
 /* Кнопки керування (Play, Start/End, ножиці) */
@@ -1111,6 +1112,121 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+/* ===== Блок запису з мікрофона ===== */
+.dictation-editor-modal__self-mic-block {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.dictation-editor-modal__self-mic-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Індикатор запису (рожевий кружок) */
+.dictation-editor-modal__rec-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: transparent;
+  transition: all 0.2s;
+}
+.dictation-editor-modal__rec-indicator i {
+  width: 16px;
+  height: 16px;
+  color: var(--color-button-purple, #7c5cbf);
+  transition: color 0.2s;
+}
+.dictation-editor-modal__rec-indicator.active i {
+  color: #e84393;
+  animation: dictation-editor-modal-pulse 1s infinite;
+}
+
+@keyframes dictation-editor-modal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Візуалізатор (canvas зі стовпчиками) */
+.dictation-editor-modal__audio-visualizer {
+  width: 120px;
+  height: 40px;
+  border-radius: 6px;
+  background: var(--color-hover, #f0eeeb);
+}
+
+/* Кнопка запису (фіолетова) */
+.dictation-editor-modal__mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-button-purple, #7c5cbf);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+  flex-shrink: 0;
+}
+.dictation-editor-modal__mic-btn:hover {
+  background: var(--color-button-purple-hover, #6a4da8);
+}
+.dictation-editor-modal__mic-btn:active {
+  transform: scale(0.95);
+}
+.dictation-editor-modal__mic-btn.recording {
+  background: #e84393;
+  animation: dictation-editor-modal-pulse 1s infinite;
+}
+.dictation-editor-modal__mic-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+/* Кнопки дій під візуалізатором (play, apply) */
+.dictation-editor-modal__self-mic-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dictation-editor-modal__mic-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-button-purple, #7c5cbf);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+.dictation-editor-modal__mic-action-btn:hover:not(:disabled) {
+  background: var(--color-button-purple-hover, #6a4da8);
+}
+.dictation-editor-modal__mic-action-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.dictation-editor-modal__mic-action-btn i {
+  width: 16px;
+  height: 16px;
 }
 
 /* ===== АДАПТИВНОСТЬ ТАБЛИЦЫ ===== */

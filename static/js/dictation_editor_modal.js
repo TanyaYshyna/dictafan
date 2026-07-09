@@ -30,6 +30,36 @@ const state = {
   _sharedAudioFile: null,
   /** blob URL для waveform */
   _sharedAudioUrl: null,
+
+  // ---- Стан для self-закладки (voice-original-self) ----
+
+  /** blob URL для self waveform */
+  _selfAudioUrl: null,
+  /** Имя файла self audio (audio_mic) */
+  _selfAudioFilename: null,
+  /** Длительность self audio */
+  _selfAudioDuration: null,
+  /** File объект self audio */
+  _selfAudioFile: null,
+
+  /** Blob URL щойно записаного з мікрофона аудіо (audio_mic_new) */
+  _selfMicNewUrl: null,
+  /** File об'єкт щойно записаного аудіо */
+  _selfMicNewFile: null,
+  /** Чи йде запис зараз */
+  _selfMicRecording: false,
+  /** MediaRecorder для запису */
+  _selfMicRecorder: null,
+  /** Аудіо-візуалізатор (AnalyserNode) */
+  _selfMicAnalyser: null,
+  /** AudioContext для візуалізатора */
+  _selfMicAudioContext: null,
+  /** source для візуалізатора */
+  _selfMicSource: null,
+  /** RAF для візуалізатора */
+  _selfMicRaf: null,
+  /** MediaStream для запису */
+  _selfMicStream: null,
 };
 
 /* ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===== */
@@ -2987,6 +3017,36 @@ function close() {
   var selfWaveformContainer = document.getElementById('editorModalSelfAudioWaveform');
   if (selfWaveformContainer) selfWaveformContainer.innerHTML = '';
 
+  // ---- Очистка audio_mic_new (записане з мікрофона) ----
+
+  // Зупиняємо запис якщо він ще йде
+  if (state._selfMicRecording) {
+    _stopSelfMicRecording();
+  }
+  // Зупиняємо візуалізатор
+  _stopSelfMicVisualizer();
+  // Звільняємо blob URL
+  if (state._selfMicNewUrl) {
+    URL.revokeObjectURL(state._selfMicNewUrl);
+    state._selfMicNewUrl = null;
+  }
+  state._selfMicNewFile = null;
+  state._selfMicRecording = false;
+  state._selfMicRecorder = null;
+  state._selfMicStream = null;
+
+  // Скидаємо UI кнопок запису
+  var micRecordBtn = document.getElementById('editorModalSelfRecordBtn');
+  var micRecordIcon = document.getElementById('editorModalSelfRecordIcon');
+  var micIndicator = document.getElementById('editorModalSelfRecordingIndicator');
+  if (micRecordBtn) micRecordBtn.classList.remove('recording');
+  if (micRecordIcon) micRecordIcon.innerHTML = '<i data-lucide="mic"></i>';
+  if (micIndicator) micIndicator.classList.remove('active');
+  var playNewBtn = document.getElementById('editorModalSelfPlayNewBtn');
+  var applyNewBtn = document.getElementById('editorModalSelfApplyNewBtn');
+  if (playNewBtn) playNewBtn.disabled = true;
+  if (applyNewBtn) applyNewBtn.disabled = true;
+
   const modal = document.getElementById(EDITOR_MODAL_ID);
   if (modal) {
     modal.style.display = 'none';
@@ -3083,6 +3143,39 @@ function _initSelfAudioTab() {
         _syncSelfWaveformRegion('end', val);
         _syncStartEndToSentence('end', val);
       }
+    });
+  }
+
+  // ---- Кнопки запису з мікрофона ----
+
+  // Кнопка Record/Stop
+  var micRecordBtn = document.getElementById('editorModalSelfRecordBtn');
+  if (micRecordBtn && !micRecordBtn.getAttribute('data-self-audio-handler')) {
+    micRecordBtn.setAttribute('data-self-audio-handler', '1');
+    micRecordBtn.addEventListener('click', function () {
+      if (state._selfMicRecording) {
+        _stopSelfMicRecording();
+      } else {
+        _startSelfMicRecording();
+      }
+    });
+  }
+
+  // Кнопка Play (прослухати записане)
+  var playNewBtn = document.getElementById('editorModalSelfPlayNewBtn');
+  if (playNewBtn && !playNewBtn.getAttribute('data-self-audio-handler')) {
+    playNewBtn.setAttribute('data-self-audio-handler', '1');
+    playNewBtn.addEventListener('click', function () {
+      _playSelfMicNewAudio();
+    });
+  }
+
+  // Кнопка Apply (застосувати записане)
+  var applyNewBtn = document.getElementById('editorModalSelfApplyNewBtn');
+  if (applyNewBtn && !applyNewBtn.getAttribute('data-self-audio-handler')) {
+    applyNewBtn.setAttribute('data-self-audio-handler', '1');
+    applyNewBtn.addEventListener('click', function () {
+      _applySelfMicNewAudio();
     });
   }
 }
@@ -3339,6 +3432,260 @@ async function _handleSelfCutAudio() {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+/* ===== Запис з мікрофона для self-закладки ===== */
+
+/**
+ * Зупиняє візуалізатор (AnalyserNode + RAF).
+ */
+function _stopSelfMicVisualizer() {
+  if (state._selfMicRaf) {
+    cancelAnimationFrame(state._selfMicRaf);
+    state._selfMicRaf = null;
+  }
+  if (state._selfMicSource) {
+    try { state._selfMicSource.disconnect(); } catch (e) {}
+    state._selfMicSource = null;
+  }
+  if (state._selfMicAnalyser) {
+    try { state._selfMicAnalyser.disconnect(); } catch (e) {}
+    state._selfMicAnalyser = null;
+  }
+  if (state._selfMicAudioContext && state._selfMicAudioContext.state !== 'closed') {
+    try { state._selfMicAudioContext.close(); } catch (e) {}
+  }
+  state._selfMicAudioContext = null;
+}
+
+/**
+ * Малює стовпчики візуалізатора на canvas.
+ */
+function _drawSelfMicVisualizer() {
+  var canvas = document.getElementById('editorModalSelfAudioVisualizer');
+  if (!canvas) return;
+  var ac = state._selfMicAudioContext;
+  var analyser = state._selfMicAnalyser;
+  if (!ac || !analyser) return;
+
+  var ctx = canvas.getContext('2d');
+  var w = canvas.width;
+  var h = canvas.height;
+  var bufferLength = analyser.frequencyBinCount;
+  var dataArray = new Uint8Array(bufferLength);
+
+  function draw() {
+    if (!state._selfMicRecording) return;
+    state._selfMicRaf = requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(dataArray);
+    ctx.clearRect(0, 0, w, h);
+
+    var barCount = Math.min(bufferLength, 64);
+    var barWidth = (w / barCount) * 0.8;
+    var gap = (w / barCount) * 0.2;
+
+    for (var i = 0; i < barCount; i++) {
+      var value = dataArray[i] / 255;
+      var barHeight = value * h;
+      var x = i * (barWidth + gap);
+      ctx.fillStyle = '#7c5cbf';
+      ctx.fillRect(x, h - barHeight, barWidth, barHeight);
+    }
+  }
+  draw();
+}
+
+/**
+ * Запускає візуалізатор для MediaStream.
+ */
+function _startSelfMicVisualizer(stream) {
+  try {
+    var ac = new (window.AudioContext || window.webkitAudioContext)();
+    state._selfMicAudioContext = ac;
+    var source = ac.createMediaStreamSource(stream);
+    state._selfMicSource = source;
+    var analyser = ac.createAnalyser();
+    analyser.fftSize = 256;
+    state._selfMicAnalyser = analyser;
+    source.connect(analyser);
+    _drawSelfMicVisualizer();
+  } catch (e) {
+    console.warn('[dictationEditorModal] Visualizer init error', e);
+  }
+}
+
+/**
+ * Починає запис з мікрофона.
+ */
+async function _startSelfMicRecording() {
+  if (state._selfMicRecording) return;
+
+  try {
+    var stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state._selfMicStream = stream;
+
+    var recorder = new MediaRecorder(stream);
+    state._selfMicRecorder = recorder;
+    var chunks = [];
+
+    recorder.ondataavailable = function (e) {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    recorder.onstop = function () {
+      // Зупиняємо візуалізатор
+      state._selfMicRecording = false;
+      _stopSelfMicVisualizer();
+
+      // Зупиняємо треки
+      if (state._selfMicStream) {
+        state._selfMicStream.getTracks().forEach(function (t) { t.stop(); });
+        state._selfMicStream = null;
+      }
+
+      // Створюємо blob
+      var blob = new Blob(chunks, { type: 'audio/webm' });
+      state._selfMicNewFile = blob;
+
+      // Звільняємо старий blob URL
+      if (state._selfMicNewUrl) {
+        URL.revokeObjectURL(state._selfMicNewUrl);
+      }
+      state._selfMicNewUrl = URL.createObjectURL(blob);
+
+      // Оновлюємо UI
+      _updateSelfMicUiAfterRecording();
+
+      // Оновлюємо кнопки
+      var playBtn = document.getElementById('editorModalSelfPlayNewBtn');
+      var applyBtn = document.getElementById('editorModalSelfApplyNewBtn');
+      if (playBtn) playBtn.disabled = false;
+      if (applyBtn) applyBtn.disabled = false;
+    };
+
+    recorder.start();
+    state._selfMicRecording = true;
+
+    // Оновлюємо UI
+    var recordBtn = document.getElementById('editorModalSelfRecordBtn');
+    var recordIcon = document.getElementById('editorModalSelfRecordIcon');
+    var indicator = document.getElementById('editorModalSelfRecordingIndicator');
+    if (recordBtn) recordBtn.classList.add('recording');
+    if (recordIcon) recordIcon.innerHTML = '<i data-lucide="square"></i>';
+    if (indicator) indicator.classList.add('active');
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+
+    // Запускаємо візуалізатор
+    _startSelfMicVisualizer(stream);
+
+  } catch (e) {
+    console.error('[dictationEditorModal] Помилка доступу до мікрофона', e);
+    alert('Помилка доступу до мікрофона: ' + e.message);
+  }
+}
+
+/**
+ * Зупиняє запис з мікрофона.
+ */
+function _stopSelfMicRecording() {
+  if (!state._selfMicRecording || !state._selfMicRecorder) return;
+
+  try {
+    state._selfMicRecorder.stop();
+  } catch (e) {
+    console.warn('[dictationEditorModal] Помилка зупинки запису', e);
+  }
+
+  // UI оновлюється в onstop
+}
+
+/**
+ * Оновлює UI після завершення запису.
+ */
+function _updateSelfMicUiAfterRecording() {
+  var recordBtn = document.getElementById('editorModalSelfRecordBtn');
+  var recordIcon = document.getElementById('editorModalSelfRecordIcon');
+  var indicator = document.getElementById('editorModalSelfRecordingIndicator');
+  if (recordBtn) recordBtn.classList.remove('recording');
+  if (recordIcon) recordIcon.innerHTML = '<i data-lucide="mic"></i>';
+  if (indicator) indicator.classList.remove('active');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+/**
+ * Відтворює щойно записаний аудіофайл.
+ */
+function _playSelfMicNewAudio() {
+  if (!state._selfMicNewUrl) return;
+
+  var audio = new Audio(state._selfMicNewUrl);
+  audio.play().catch(function (e) {
+    console.warn('[dictationEditorModal] Помилка відтворення записаного аудіо', e);
+  });
+}
+
+/**
+ * Застосовує записаний аудіофайл до поточної строки:
+ * - копіює audio_mic_new → audio_mic
+ * - зберігає файл у CacheStorage
+ * - оновлює лейбли і волну
+ */
+async function _applySelfMicNewAudio() {
+  if (!state._selfMicNewFile || !state._selfMicNewUrl) return;
+
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
+  if (!selectedRow) {
+    alert('Не вибрано рядок');
+    return;
+  }
+
+  var key = selectedRow.dataset.key;
+  if (!key || !state.content) return;
+
+  var sentence = state.content.getSentence(key);
+  if (!sentence) return;
+
+  // Генеруємо ім'я файлу
+  var filename = 'mic_' + Date.now() + '.webm';
+
+  // Зберігаємо в CacheStorage
+  var am = _ensureAudioManager();
+  if (am && typeof am.saveDictationAudioBlob === 'function') {
+    try {
+      var dictationId = state.config ? state.config.dictationId : '';
+      var lang = state.config ? state.config.originalLanguage : '';
+      await am.saveDictationAudioBlob(dictationId, lang, filename, state._selfMicNewFile, 'audio/webm');
+    } catch (e) {
+      console.warn('[dictationEditorModal] Не вдалося зберегти записане аудіо в CacheStorage', e);
+    }
+  }
+
+  // Записуємо в sentence
+  sentence.audio_mic = filename;
+  sentence.start = '0';
+  sentence.end = '';
+
+  // Скидаємо audio_mic_new
+  if (state._selfMicNewUrl) {
+    URL.revokeObjectURL(state._selfMicNewUrl);
+    state._selfMicNewUrl = null;
+  }
+  state._selfMicNewFile = null;
+
+  // Оновлюємо кнопки
+  var playBtn = document.getElementById('editorModalSelfPlayNewBtn');
+  var applyBtn = document.getElementById('editorModalSelfApplyNewBtn');
+  if (playBtn) playBtn.disabled = true;
+  if (applyBtn) applyBtn.disabled = true;
+
+  // Помічаємо dirty
+  _setDirtyFlags({ db: true, audio: true });
+
+  // Оновлюємо таблицю (щоб змінилась іконка в колонці audio_mic)
+  _renderTable();
+
+  // Оновлюємо лейбли і волну для поточної строки
+  _loadSelfAudioForRow(sentence);
 }
 
 /* ===== INIT ===== */
