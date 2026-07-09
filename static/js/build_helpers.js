@@ -72,6 +72,8 @@
         }
 
         if (prev && prev !== v && !alreadyReloaded) {
+          // Користувач тільки що оновив сторінку вручну — він уже отримав нову версію.
+          // Не показуємо модалку, просто оновлюємо localStorage і sessionStorage.
           try {
             sessionStorage.setItem(onceKey, 'true');
           } catch (e) {
@@ -81,11 +83,9 @@
           } catch (e) {
           }
           try {
-            persistentLog('build_reload', { prev: prev, next: v, reason: 'build_changed' });
+            persistentLog('build_reload', { prev: prev, next: v, reason: 'manual_page_reload' });
           } catch (e) {
           }
-          // Вместо жёсткого location.reload() показываем уведомление
-          showBuildUpdateNotification(prev, v);
           return;
         }
 
@@ -96,6 +96,11 @@
           }
           try {
             persistentLog('build_set_initial', { next: v, key: k });
+          } catch (e) {
+          }
+        } else {
+          try {
+            localStorage.setItem(k, v);
           } catch (e) {
           }
         }

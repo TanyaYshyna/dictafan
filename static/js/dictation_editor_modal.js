@@ -3095,7 +3095,21 @@ function _updateSelfMicDropdown() {
   // Очищаємо dropdown
   dropdown.innerHTML = '';
 
-  if (state._selfMicFiles.length === 0) {
+  // Визначаємо rowKey поточної строки
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
+  var currentRowKey = selectedRow ? selectedRow.dataset.key : null;
+
+  // Фільтруємо файли тільки для поточної строки
+  var rowFiles = [];
+  var rowIndices = [];
+  state._selfMicFiles.forEach(function (entry, i) {
+    if (entry.rowKey === currentRowKey) {
+      rowFiles.push(entry);
+      rowIndices.push(i);
+    }
+  });
+
+  if (rowFiles.length === 0) {
     filenameEl.textContent = '—';
     dropdownBtn.disabled = true;
     dropdown.style.display = 'none';
@@ -3104,13 +3118,13 @@ function _updateSelfMicDropdown() {
 
   dropdownBtn.disabled = false;
 
-  // Будуємо список
-  state._selfMicFiles.forEach(function (entry, i) {
+  // Будуємо список тільки з файлів поточної строки
+  rowFiles.forEach(function (entry, j) {
     var item = document.createElement('div');
     item.className = 'dictation-editor-modal__self-mic-dropdown-item';
     item.textContent = entry.filename;
-    item.dataset.index = i;
-    if (i === state._selfMicSelectedIndex) {
+    item.dataset.index = rowIndices[j]; // зберігаємо глобальний індекс
+    if (rowIndices[j] === state._selfMicSelectedIndex) {
       item.classList.add('selected');
     }
     item.addEventListener('click', function () {
@@ -3123,9 +3137,11 @@ function _updateSelfMicDropdown() {
   var idx = state._selfMicSelectedIndex;
   if (idx >= 0 && idx < state._selfMicFiles.length) {
     filenameEl.textContent = state._selfMicFiles[idx].filename;
-  } else {
-    filenameEl.textContent = state._selfMicFiles[state._selfMicFiles.length - 1].filename;
-    state._selfMicSelectedIndex = state._selfMicFiles.length - 1;
+  } else if (rowFiles.length > 0) {
+    // Якщо вибраний індекс недійсний — вибираємо останній файл для цієї строки
+    var lastGlobalIdx = rowIndices[rowIndices.length - 1];
+    state._selfMicSelectedIndex = lastGlobalIdx;
+    filenameEl.textContent = state._selfMicFiles[lastGlobalIdx].filename;
   }
 }
 
@@ -3835,6 +3851,7 @@ async function _applySelfMicNewAudio() {
 
   // Оновлюємо таблицю (щоб змінилась іконка в колонці audio_mic)
   _renderTable();
+  _bindAudioPlaybackHandlers();
 
   // Оновлюємо лейбли і волну для поточної строки
   _loadSelfAudioForRow(sentence);
