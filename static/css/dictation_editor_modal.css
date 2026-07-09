@@ -1166,8 +1166,8 @@
 
 /* Візуалізатор (canvas зі стовпчиками) */
 .dictation-editor-modal__audio-visualizer {
-  width: 120px;
-  height: 40px;
+  width: 162px;
+  height: 44px;
   border-radius: 6px;
   background: var(--color-hover, #f0eeeb);
 }
