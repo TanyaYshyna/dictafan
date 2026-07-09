@@ -1103,28 +1103,34 @@
 /* ===== ВКЛАДКА "ОЗВУЧКА ОРИГІНАЛУ (САМ)" (voice-original-self) ===== */
 .dictation-editor-modal__self-audio-content {
   padding: 16px;
-  position: relative;
 }
 
-/* Кнопки керування (Play, Start/End, ножиці) */
-.dictation-editor-modal__self-audio-controls {
+/* Дві панелі під волною: ліва і права, при звуженні права йде вниз */
+.dictation-editor-modal__self-bottom-panels {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Ліва панель: Play + Start/End + ножиці */
+.dictation-editor-modal__self-left-panel {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-/* ===== Блок запису з мікрофона ===== */
-.dictation-editor-modal__self-mic-block {
-  position: absolute;
-  bottom: 12px;
-  right: 12px;
+/* Права панель: запис з мікрофона */
+.dictation-editor-modal__self-right-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 6px;
+  margin-left: auto;
 }
 
+/* Перший рядок правої панелі: індикатор + canvas + кнопка запису */
 .dictation-editor-modal__self-mic-row {
   display: flex;
   align-items: center;
@@ -1166,26 +1172,33 @@
   background: var(--color-hover, #f0eeeb);
 }
 
-/* Кнопка запису (фіолетова) */
+/* Кнопка запису (фіолетова, як "...") */
 .dictation-editor-modal__mic-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border: none;
-  border-radius: 50%;
-  background: var(--color-button-purple, #7c5cbf);
-  color: #fff;
+  width: 44px;
+  height: 44px;
+  background-color: var(--color-button-purple);
+  color: var(--color-button-text-purple);
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 0 transparent;
+  transition: all 0.2s ease;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  line-height: 1;
   flex-shrink: 0;
+  border-radius: 6px;
 }
 .dictation-editor-modal__mic-btn:hover {
-  background: var(--color-button-purple-hover, #6a4da8);
+  border: 1px solid var(--color-button-shadow-purple);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-purple);
+}
+.dictation-editor-modal__mic-btn:focus {
+  outline: 2px solid var(--color-button-text-purple);
+  outline-offset: 2px;
 }
 .dictation-editor-modal__mic-btn:active {
-  transform: scale(0.95);
+  border: 1px solid var(--color-button-shadow-purple);
 }
 .dictation-editor-modal__mic-btn.recording {
   background: #e84393;
@@ -1196,37 +1209,133 @@
   height: 20px;
 }
 
-/* Кнопки дій під візуалізатором (play, apply) */
+/* Другий рядок правої панелі: лейба + пагон + play + apply */
 .dictation-editor-modal__self-mic-actions {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+.dictation-editor-modal__self-mic-file-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dictation-editor-modal__self-mic-filename {
+  font-size: 13px;
+  color: var(--color-text, #224156);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Кнопка-пагон вниз (dropdown) */
+.dictation-editor-modal__mic-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-button-text-transparent, #888);
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.dictation-editor-modal__mic-dropdown-btn:hover:not(:disabled) {
+  border: 1px solid var(--color-button-shadow-purple);
+  box-shadow: 0 2px 0 0 var(--color-button-shadow-purple);
+}
+.dictation-editor-modal__mic-dropdown-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.dictation-editor-modal__mic-dropdown-btn i {
+  width: 14px;
+  height: 14px;
+}
+
+/* Випадаючий список записаних файлів */
+.dictation-editor-modal__self-mic-dropdown-wrapper {
+  position: relative;
+}
+
+.dictation-editor-modal__self-mic-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 180px;
+  background: #fff;
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  padding: 4px 0;
+}
+
+.dictation-editor-modal__self-mic-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: var(--color-text, #224156);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.dictation-editor-modal__self-mic-dropdown-item:hover {
+  background: var(--color-hover, #f0eeeb);
+}
+.dictation-editor-modal__self-mic-dropdown-item.active {
+  background: var(--color-hover, #f0eeeb);
+  font-weight: 600;
+}
+.dictation-editor-modal__self-mic-dropdown-item i {
+  width: 14px;
+  height: 14px;
+  color: var(--color-button-purple, #7c5cbf);
+}
+
+/* Кнопки дій (play, apply) — стиль як "..." */
 .dictation-editor-modal__mic-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 6px;
-  background: var(--color-button-purple, #7c5cbf);
-  color: #fff;
+  width: 44px;
+  height: 44px;
+  background-color: var(--color-button-purple);
+  color: var(--color-button-text-purple);
+  border: 1px solid transparent;
+  box-shadow: 0 0 0 0 transparent;
+  transition: all 0.2s ease;
   cursor: pointer;
-  transition: background 0.2s, opacity 0.2s;
+  line-height: 1;
   flex-shrink: 0;
+  border-radius: 6px;
 }
 .dictation-editor-modal__mic-action-btn:hover:not(:disabled) {
-  background: var(--color-button-purple-hover, #6a4da8);
+  border: 1px solid var(--color-button-shadow-purple);
+  box-shadow: 0 3px 0 0 var(--color-button-shadow-purple);
+}
+.dictation-editor-modal__mic-action-btn:focus {
+  outline: 2px solid var(--color-button-text-purple);
+  outline-offset: 2px;
+}
+.dictation-editor-modal__mic-action-btn:active {
+  border: 1px solid var(--color-button-shadow-purple);
 }
 .dictation-editor-modal__mic-action-btn:disabled {
   opacity: 0.4;
   cursor: default;
 }
 .dictation-editor-modal__mic-action-btn i {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
 }
 
 /* ===== АДАПТИВНОСТЬ ТАБЛИЦЫ ===== */
