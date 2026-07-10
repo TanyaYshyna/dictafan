@@ -1455,6 +1455,10 @@
 }
 
 #newDictationFillCreateBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
@@ -1474,6 +1478,11 @@
 #newDictationFillCreateBtn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+#newDictationFillCreateBtn i[data-lucide] {
+  width: 18px;
+  height: 18px;
 }
 
 #newDictationFillCloseBtn {
@@ -1500,27 +1509,43 @@
   height: 18px;
 }
 
-/* Row 2: Language flags row (en => ru) */
-.new-dictation-fill-modal__lang-row {
+/* Row 2: Two-panel layout */
+.new-dictation-fill-modal__two-panels {
   display: flex;
-  align-items: center;
   gap: 16px;
   margin-bottom: 12px;
   flex-shrink: 0;
-  flex-wrap: wrap;
+}
+
+.new-dictation-fill-modal__left-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .new-dictation-fill-modal__lang-pair {
   min-height: 36px;
-  flex: 1;
-  min-width: 200px;
+}
+
+/* Флаги в строку (en => ru) — как в других модалках */
+.new-dictation-fill-modal__lang-pair .flag-pair-combo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.new-dictation-fill-modal__lang-pair .flag-pair-combo i[data-lucide] {
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .new-dictation-fill-modal__delimiter-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .new-dictation-fill-modal__delimiter-row label {
@@ -1546,18 +1571,21 @@
   border-color: var(--color-primary, #3b82f6);
 }
 
-/* Row 3: Voice mode (как в редакторе) */
-.new-dictation-fill-modal__voice-mode-group {
+/* Right panel: Voice mode (как в редакторе) */
+.new-dictation-fill-modal__right-panel {
+  flex-shrink: 0;
+  min-width: 180px;
+}
+
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-group {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   padding-top: 6px;
   border-top: 1px solid var(--color-border-light, #eee);
-  margin-bottom: 12px;
-  flex-shrink: 0;
 }
 
-.new-dictation-fill-modal__voice-mode-label {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-label {
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -1565,7 +1593,7 @@
   padding-top: 0;
 }
 
-.new-dictation-fill-modal__voice-mode-options {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-options {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1573,7 +1601,7 @@
   flex-wrap: wrap;
 }
 
-.new-dictation-fill-modal__voice-mode-radio {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-radio {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1582,7 +1610,7 @@
   color: var(--color-text, #224156);
 }
 
-.new-dictation-fill-modal__voice-mode-radio input[type="radio"] {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-radio input[type="radio"] {
   appearance: none;
   -webkit-appearance: none;
   width: 18px;
@@ -1596,11 +1624,11 @@
   transition: border-color 0.2s;
 }
 
-.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked {
   border-color: var(--color-button-text-yellow, #f9c609);
 }
 
-.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked::after {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked::after {
   content: '';
   position: absolute;
   top: 3px;
@@ -1611,7 +1639,7 @@
   border-radius: 50%;
 }
 
-.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:hover {
+.new-dictation-fill-modal__right-panel .new-dictation-fill-modal__voice-mode-radio input[type="radio"]:hover {
   border-color: var(--color-button-text-yellow, #f9c609);
 }
 

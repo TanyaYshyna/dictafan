@@ -398,38 +398,44 @@
         <input type="text" id="newDictationFillTitle" placeholder="Назва диктанту...">
       </div>
       <div class="new-dictation-fill-modal__header-actions">
-        <button type="button" id="newDictationFillCreateBtn" class="btn btn-primary">Створити диктант</button>
+        <button type="button" id="newDictationFillCreateBtn" class="btn btn-primary">
+          <i data-lucide="wand"></i> Створити диктант
+        </button>
         <button type="button" id="newDictationFillCloseBtn" class="btn-close" title="Закрити">
           <i data-lucide="x"></i>
         </button>
       </div>
     </div>
 
-    <!-- Row 2: Language flags row (en => ru) -->
-    <div class="new-dictation-fill-modal__lang-row">
-      <div id="newDictationFillLangPair" class="new-dictation-fill-modal__lang-pair"></div>
-      <div class="new-dictation-fill-modal__delimiter-row">
-        <label for="newDictationFillDelimiter">Префікс перекладу:</label>
-        <input type="text" id="newDictationFillDelimiter" value="//" placeholder="//">
+    <!-- Row 2: Two-panel layout -->
+    <div class="new-dictation-fill-modal__two-panels">
+      <!-- Left panel: Language flags + translation prefix -->
+      <div class="new-dictation-fill-modal__left-panel">
+        <div id="newDictationFillLangPair" class="new-dictation-fill-modal__lang-pair"></div>
+        <div class="new-dictation-fill-modal__delimiter-row">
+          <label for="newDictationFillDelimiter">Префікс перекладу:</label>
+          <input type="text" id="newDictationFillDelimiter" value="//" placeholder="//">
+        </div>
       </div>
-    </div>
-
-    <!-- Row 3: Voice mode (как в редакторе) -->
-    <div class="new-dictation-fill-modal__voice-mode-group">
-      <span class="new-dictation-fill-modal__voice-mode-label">Режим озвучки:</span>
-      <div class="new-dictation-fill-modal__voice-mode-options">
-        <label class="new-dictation-fill-modal__voice-mode-radio">
-          <input type="radio" name="newDictationVoiceMode" value="auto" checked />
-          <span>Авто (а)</span>
-        </label>
-        <label class="new-dictation-fill-modal__voice-mode-radio">
-          <input type="radio" name="newDictationVoiceMode" value="file" />
-          <span>Є аудіо (f)</span>
-        </label>
-        <label class="new-dictation-fill-modal__voice-mode-radio">
-          <input type="radio" name="newDictationVoiceMode" value="self" />
-          <span>Озвучу сам (m)</span>
-        </label>
+      <!-- Right panel: Voice mode (как в редакторе) -->
+      <div class="new-dictation-fill-modal__right-panel">
+        <div class="new-dictation-fill-modal__voice-mode-group">
+          <span class="new-dictation-fill-modal__voice-mode-label">Режим озвучки:</span>
+          <div class="new-dictation-fill-modal__voice-mode-options">
+            <label class="new-dictation-fill-modal__voice-mode-radio">
+              <input type="radio" name="newDictationVoiceMode" value="auto" checked />
+              <span>Авто (а)</span>
+            </label>
+            <label class="new-dictation-fill-modal__voice-mode-radio">
+              <input type="radio" name="newDictationVoiceMode" value="file" />
+              <span>Є аудіо (f)</span>
+            </label>
+            <label class="new-dictation-fill-modal__voice-mode-radio">
+              <input type="radio" name="newDictationVoiceMode" value="self" />
+              <span>Озвучу сам (m)</span>
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 
