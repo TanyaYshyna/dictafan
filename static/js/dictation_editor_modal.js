@@ -3292,12 +3292,26 @@ function _handleSelfAudioPlayback(event) {
 /* ---- Cut (обрізка) для self-закладки ---- */
 
 /**
- * Обрізати аудіофайл за поточними Start/End значеннями.
- * Використовує /cut-audio на сервері.
+ * Обрізає self-аудіо за поточними Start/End регіонами.
+ * Бере файл з audio_mic поточної строки, завантажує через AudioManager.
  */
 async function _handleSelfCutAudio() {
-  if (!state._selfAudioFilename) {
-    alert('Не вибрано аудіофайл');
+  var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
+  if (!selectedRow || !state.content) {
+    alert('Не вибрано рядок');
+    return;
+  }
+
+  var key = selectedRow.dataset.key;
+  var sentence = state.content.getSentence(key);
+  if (!sentence) {
+    alert('Рядок не знайдено');
+    return;
+  }
+
+  var micFilename = sentence.audio_mic || sentence.audio_m || null;
+  if (!micFilename) {
+    alert('У цьому рядку немає аудіофайлу (audio_mic)');
     return;
   }
 
@@ -3312,14 +3326,42 @@ async function _handleSelfCutAudio() {
     return;
   }
 
-  var file = state._selfAudioFile;
-  if (!file) {
-    // Якщо файл не в пам'яті, але є filename — пробуємо через сервер
-    // (файл вже збережено в CacheStorage або на B2)
-    alert('Файл не знайдено в пам\'яті. Будь ласка, виберіть аудіофайл заново.');
+  var dictationId = state.config ? state.config.dictationId : '';
+  var lang = state.config ? state.config.originalLanguage : '';
+  if (!dictationId || !lang) {
+    alert('Не визначено диктант або мову');
     return;
   }
 
+  // Завантажуємо файл через AudioManager з CacheStorage
+  var am = _ensureAudioManager();
+  if (!am || typeof am.loadDictationAudioBlob !== 'function') {
+    alert('AudioManager недоступний');
+    return;
+  }
+
+  var blob;
+  try {
+    blob = await am.loadDictationAudioBlob(dictationId, lang, micFilename);
+  } catch (e) {
+    console.warn('[dictationEditorModal] Не вдалося завантажити файл з кешу', e);
+  }
+
+  if (!blob) {
+    // Спробуємо через fetch з сервера
+    try {
+      var url = am.buildDictationAudioUrl(dictationId, lang, micFilename);
+      var resp = await fetch(url);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      blob = await resp.blob();
+    } catch (e2) {
+      console.error('[dictationEditorModal] Не вдалося завантажити аудіофайл', e2);
+      alert('Не вдалося завантажити аудіофайл. Спробуйте вибрати файл заново.');
+      return;
+    }
+  }
+
+  // Конвертуємо blob в base64
   var reader = new FileReader();
   reader.onload = async function (e) {
     var arrayBuffer = e.target.result;
@@ -3329,15 +3371,12 @@ async function _handleSelfCutAudio() {
       binary += String.fromCharCode(bytes[i]);
     }
     var audioB64 = btoa(binary);
-    var mime = file.type || 'audio/mpeg';
-
-    var dictationId = state.config ? state.config.dictationId : '';
-    var lang = state.config ? state.config.originalLanguage : '';
+    var mime = blob.type || 'audio/webm';
 
     var body = {
       dictation_id: dictationId,
       language: lang,
-      filename: state._selfAudioFilename,
+      filename: micFilename,
       audio_b64: audioB64,
       mime: mime,
       start_time: startVal,
@@ -3353,16 +3392,16 @@ async function _handleSelfCutAudio() {
       var data = await response.json();
       if (data.success) {
         // Оновлюємо дані поточної строки
-        var selectedRow = document.querySelector('#' + EDITOR_TABLE_ID + ' tbody tr.selected');
-        if (selectedRow && state.content) {
-          var key = selectedRow.dataset.key;
-          var sentence = state.content.getSentence(key);
-          if (sentence) {
-            sentence.start = String(startVal);
-            sentence.end = String(endVal);
-            if (data.audio_mic) sentence.audio_mic = data.audio_mic;
+        if (state.content) {
+          var s = state.content.getSentence(key);
+          if (s) {
+            s.start = String(startVal);
+            s.end = String(endVal);
+            if (data.audio_mic) s.audio_mic = data.audio_mic;
             _setDirtyFlags({ db: true, audio: true });
             _renderTable();
+            // Оновлюємо волну з новим файлом
+            _loadSelfAudioForRow(s);
           }
         }
         console.log('[dictationEditorModal] Self cut успішно виконано');
@@ -3375,7 +3414,7 @@ async function _handleSelfCutAudio() {
       alert('Помилка обрізки аудіо');
     }
   };
-  reader.readAsArrayBuffer(file);
+  reader.readAsArrayBuffer(blob);
 }
 
 
