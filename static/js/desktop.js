@@ -858,7 +858,7 @@ window.Desktop = window.Desktop || {
     const tryInit = () => {
       try {
         if (!window.DesktopStatsPanel || typeof window.DesktopStatsPanel.init !== 'function') return false;
-        const container = document.querySelector('.desk-zone');
+        const container = document.querySelector('.topbar');
         if (!container) return false;
         window.DesktopStatsPanel.init(container);
         return true;

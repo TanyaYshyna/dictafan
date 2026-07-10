@@ -87,6 +87,7 @@
   padding: 8px 0;
   background: transparent;
   border: none;
+  border-right: 1px solid var(--color-border, #e2e8f0);
   border-radius: 0;
 }
 
@@ -162,7 +163,7 @@
 
 .page-index .desk-zone {
   background-image:
-    radial-gradient(rgba(0, 0, 0, var(--desk-dot-alpha, 0.08)) 1px, transparent 1px);
+    radial-gradient(var(--color-border, #e2e8f0) var(--desk-dot-alpha, 0.08) 1px, transparent 1px);
   background-size: calc(var(--desk-grid-step, 24px) * var(--desk-zoom, 1)) calc(var(--desk-grid-step, 24px) * var(--desk-zoom, 1));
   background-position: 0 0;
   transition: background-size 120ms ease;

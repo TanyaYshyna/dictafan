@@ -1,42 +1,36 @@
 /* ==================== ПАНЕЛЬ СТАТИСТИКИ «ВРЕМЯ / ДЕНЬГИ» ==================== */
 
 /* ---- Кольцевые диаграммы: цвета фона и активных дуг ---- */
-.stats-ring-money-bg { stroke: var(--color-stats-ring-money-bg, #f3e8f5); }
+.stats-ring-money-bg { stroke: var(--color-panel-bg, #f5f3f0); }
 .stats-ring-money     { stroke: var(--color-stats-ring-money, #ec4899); }
-.stats-ring-time-bg   { stroke: var(--color-stats-ring-time-bg, #fef3c7); }
+.stats-ring-time-bg   { stroke: var(--color-panel-bg, #f5f3f0); }
 .stats-ring-time      { stroke: var(--color-stats-ring-time, #f59e0b); }
 
-/* ---- Контейнер панели (минимальный режим) ---- */
+/* ---- Контейнер панели (в шапке) ---- */
 .desktop-stats-panel {
-    position: absolute;
-    /* По умолчанию ставим слева, но пользователь может перетащить */
-    top: 18px;
-    left: 18px;
-    z-index: 10;
-    background: var(--color-panel-bg, #fff);
-    border: 1px solid var(--color-border, #dee2e6);
-    border-radius: 14px;
-    padding: 8px;
-    width: 100px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0 8px;
     cursor: pointer;
     user-select: none;
-    transition: background 0.15s, box-shadow 0.15s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    touch-action: none; /* важно для drag-and-drop на touch */
+    height: 100%;
+    position: relative;
 }
 
 .desktop-stats-panel:hover {
-    background: var(--color-hover-bg, #f8f9fa);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    background: transparent;
 }
 
-/* ---- Кольцевые диаграммы ---- */
+/* ---- Кольцевые диаграммы (уменьшенные) ---- */
 .desktop-stats-rings {
     position: relative;
-    width: 84px;
-    height: 84px;
+    width: 60px;
+    height: 60px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -61,75 +55,94 @@
     gap: 0;
 }
 
-/* ---- Огонь + число в ряд ---- */
+/* ---- Огонь + число в центре колец ---- */
 .desktop-stats-fire-row {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 3px;
-    margin-top: 2px;
+    gap: 1px;
 }
 
 .desktop-stats-fire-row .stats-fire-icon {
     color: var(--color-button-text-orange);
-    width: 24px;
-    height: 24px;
+    width: 18px;
+    height: 18px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    /* Сдвиг иконки огня вверх-влево относительно числа */
-    transform: translate(-4px, 0px);
 }
 
 .desktop-stats-fire-row .stats-fire-icon i {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
 }
 
 .desktop-stats-fire-row .stats-streak-number {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 800;
     line-height: 1;
-    color: var(--color-button-text-gray, #1f2937);
+    color: var(--color-text, #1f2933);
 }
 
-/* ---- Время под центром ---- */
+/* ---- Инфо справа от колец: время сверху, деньги снизу ---- */
+.desktop-stats-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    min-width: 0;
+}
+
 .desktop-stats-time-row {
-    font-size: 16px;
-    font-weight: 800;
+    font-size: 13px;
+    font-weight: 700;
     line-height: 1.2;
-    color: var(--color-button-text-gray, #6b7280);
-    margin-top: 2px;
-    text-align: center;
+    color: var(--color-text, #1f2933);
     white-space: nowrap;
-}
-
-/* ---- Деньги под диаграммой ---- */
-.desktop-stats-money-row {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 3px;
-    margin-top: 4px;
-    font-size: 16px;
-    font-weight: 800;
-    line-height: 1.2;
-    color: var(--color-button-text-gray, #6b7280);
-    white-space: nowrap;
 }
 
-.desktop-stats-money-row .stats-money-icon {
-    color: var(--color-button-text-gray);
-    width: 16px;
-    height: 16px;
+.desktop-stats-time-row .stats-label-icon {
+    width: 12px;
+    height: 12px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    color: var(--color-text-secondary, #6b7280);
+    flex-shrink: 0;
+}
+
+.desktop-stats-time-row .stats-label-icon i {
+    width: 12px;
+    height: 12px;
+}
+
+.desktop-stats-money-row {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-text, #1f2933);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.desktop-stats-money-row .stats-money-icon {
+    width: 12px;
+    height: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary, #6b7280);
+    flex-shrink: 0;
 }
 
 .desktop-stats-money-row .stats-money-icon i {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
 }
 
 /* ---- Pull-tab (язычок) ---- */
@@ -137,23 +150,27 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 100%;
-    margin-top: 2px;
-    padding: 1px 0;
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
     color: var(--color-text-secondary, #6b7280);
     cursor: pointer;
     transition: color 0.15s;
     border: none;
     background: transparent;
+    padding: 0;
+    position: absolute;
+    right: 0;
+    bottom: 2px;
 }
 
 .desktop-stats-pull-tab:hover {
-    color: var(--color-text-primary, #1f2937);
+    color: var(--color-text, #1f2933);
 }
 
 .desktop-stats-pull-tab i {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     transition: transform 0.2s ease;
 }
 
@@ -161,15 +178,21 @@
     transform: rotate(180deg);
 }
 
-/* ---- Расширенная панель (выезжающая) ---- */
+/* ---- Расширенная панель (выпадающая) ---- */
 .desktop-stats-expanded {
     display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 220px;
+    background: var(--color-panel-bg, #fff);
+    border: 1px solid var(--color-border, #dee2e6);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 10px;
+    z-index: 10060;
     flex-direction: column;
     gap: 5px;
-    width: 100%;
-    padding-top: 5px;
-    border-top: 1px solid var(--color-border, #dee2e6);
-    margin-top: 3px;
 }
 
 .desktop-stats-expanded.open {
@@ -200,76 +223,25 @@
     color: #f97316;
 }
 
-.desktop-stats-row .stats-label {
-    flex: 0 0 auto;
-    color: var(--color-text-secondary, #6b7280);
-    font-size: 11px;
-    white-space: nowrap;
-}
-
-.desktop-stats-row .stats-value {
-    font-weight: 600;
-    white-space: nowrap;
-}
-
-.desktop-stats-row .stats-value.stats-value-plan {
-    font-weight: 400;
-    color: var(--color-text-secondary, #6b7280);
-    font-size: 11px;
-}
-
-.desktop-stats-row .stats-value.stats-value-overplan {
-    color: #16a34a;
-}
-
-.desktop-stats-row .stats-value.stats-value-underplan {
-    color: #dc2626;
-}
-
 .desktop-stats-separator {
     height: 1px;
     background: var(--color-border, #dee2e6);
     margin: 2px 0;
-    opacity: 0.6;
 }
 
-/* ---- Кнопка обновить ---- */
-.desktop-stats-refresh-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
+.stats-value-plan {
     color: var(--color-text-secondary, #6b7280);
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    padding: 0;
-    margin-left: auto;
 }
 
-.desktop-stats-refresh-btn:hover {
-    background: var(--color-hover-bg, #e9ecef);
-    color: var(--color-text-primary, #1f2937);
+.stats-value-overplan {
+    color: var(--color-button-text-lightgreen, #19a64a);
 }
 
-.desktop-stats-refresh-btn i {
-    width: 14px;
-    height: 14px;
-}
-
-.desktop-stats-refresh-btn:active i {
-    transform: rotate(90deg);
-    transition: transform 0.2s ease;
-}
-
-/* ---- Стрик-календарь (в расширенной панели) ---- */
+/* ---- Стрик-календарь ---- */
 .desktop-stats-view-streak {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
 }
 
 .desktop-stats-streak-header {
@@ -278,43 +250,63 @@
     gap: 6px;
     font-size: 12px;
     font-weight: 600;
-    color: var(--color-text-primary, #1f2937);
-}
-
-.desktop-stats-streak-header .stats-icon-fire {
-    color: #f97316;
+    color: var(--color-text, #1f2933);
 }
 
 .desktop-stats-streak-days {
     display: flex;
     flex-wrap: wrap;
-    gap: 2px;
-    max-width: 200px;
+    gap: 3px;
 }
 
 .desktop-stats-streak-day {
     width: 12px;
     height: 12px;
-    border-radius: 2px;
-    background: var(--color-border, #dee2e6);
-    flex: 0 0 auto;
+    border-radius: 3px;
+    background: var(--color-hover, #f0f0f0);
+    border: 1px solid var(--color-border, #e2e8f0);
 }
 
 .desktop-stats-streak-day.active {
-    background: #f97316;
+    background: var(--color-button-text-orange, #f97316);
+    border-color: var(--color-button-text-orange, #f97316);
 }
 
 .desktop-stats-streak-day.today {
-    outline: 2px solid var(--color-text-primary, #1f2937);
-    outline-offset: 1px;
+    border-color: var(--color-button-text-orange, #f97316);
 }
 
 .desktop-stats-streak-day.empty {
-    background: transparent;
+    opacity: 0.5;
 }
 
 .desktop-stats-streak-info {
-    font-size: 10px;
+    font-size: 11px;
     color: var(--color-text-secondary, #6b7280);
-    margin-top: 1px;
+    margin-top: 2px;
+}
+
+/* ---- Кнопка обновить ---- */
+.desktop-stats-refresh-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary, #6b7280);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.desktop-stats-refresh-btn:hover {
+    background: var(--color-hover, #f0f0f0);
+    color: var(--color-text, #1f2933);
+}
+
+.desktop-stats-refresh-btn i {
+    width: 14px;
+    height: 14px;
 }
