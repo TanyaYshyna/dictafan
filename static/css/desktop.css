@@ -238,7 +238,7 @@
   text-align: left;
   cursor: pointer;
   font-size: 14px;
-  color: var(--color-text, #1f2933);
+  color: var(--color-text-secondary, #6b7280);
   transition: background-color 0.2s ease;
 }
 

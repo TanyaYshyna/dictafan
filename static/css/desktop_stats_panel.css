@@ -10,12 +10,12 @@
 .desktop-stats-panel {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     flex-shrink: 0;
     background: transparent;
     border: none;
     border-radius: 0;
-    padding: 0 8px;
+    padding: 0;
     cursor: pointer;
     user-select: none;
     height: 100%;
@@ -26,7 +26,7 @@
     background: transparent;
 }
 
-/* ---- Кольцевые диаграммы (уменьшенные) ---- */
+/* ---- Кольцевые диаграммы (на весь 60x60, без отступов) ---- */
 .desktop-stats-rings {
     position: relative;
     width: 60px;
@@ -35,6 +35,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    margin: 0;
+    padding: 0;
 }
 
 .desktop-stats-rings svg {
@@ -81,7 +83,7 @@
     font-size: 14px;
     font-weight: 800;
     line-height: 1;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
 }
 
 /* ---- Инфо справа от колец: время сверху, деньги снизу ---- */
@@ -97,7 +99,7 @@
     font-size: 13px;
     font-weight: 700;
     line-height: 1.2;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
     white-space: nowrap;
     display: flex;
     align-items: center;
@@ -123,7 +125,7 @@
     font-size: 13px;
     font-weight: 700;
     line-height: 1.2;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
     white-space: nowrap;
     display: flex;
     align-items: center;

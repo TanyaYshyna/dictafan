@@ -405,54 +405,8 @@ class UserManager {
       hideActivity = false;
     }
 
-    // Build a compact activity badge (daily progress + streak) to avoid tall header rows
+    // user-activity-badge удалён (устаревший элемент)
     let activityBadge = null;
-    try {
-      const activityContainer = userInfo || userSection;
-      if (hideActivity) {
-        const existing = userSection.querySelector('.user-activity-badge');
-        if (existing) {
-          try { existing.remove(); } catch (e2) {}
-        }
-        activityBadge = null;
-      } else {
-      activityBadge = activityContainer.querySelector('.user-activity-badge');
-      if (!activityBadge) {
-        activityBadge = document.createElement('div');
-        activityBadge.className = 'user-activity-badge';
-        const usernameEl = activityContainer.querySelector('.username');
-        if (usernameEl && usernameEl.parentElement) {
-          let wrap = null;
-          try {
-            if (typeof usernameEl.closest === 'function') {
-              wrap = usernameEl.closest('.dropdown-menu-wrapper');
-            }
-          } catch (e) {
-            wrap = null;
-          }
-          if (wrap && wrap.parentElement === activityContainer) {
-            wrap.insertAdjacentElement('afterend', activityBadge);
-          } else {
-            usernameEl.insertAdjacentElement('afterend', activityBadge);
-          }
-        } else {
-          const logoutBtn = activityContainer.querySelector('#logoutBtn');
-          if (logoutBtn && logoutBtn.parentElement) {
-            logoutBtn.insertAdjacentElement('beforebegin', activityBadge);
-          } else {
-            activityContainer.appendChild(activityBadge);
-          }
-        }
-      }
-
-      // Move streak button inside the badge for consistent layout
-      const streakEl = userSection.querySelector('.streak');
-      if (streakEl && streakEl.parentElement !== activityBadge) {
-        activityBadge.appendChild(streakEl);
-      }
-      }
-    } catch (e) {
-    }
 
     // Daily activity plan: show as today/goal near username
     try {
@@ -471,9 +425,7 @@ class UserManager {
         if (!el) {
           el = document.createElement('span');
           el.className = 'daily-activity-progress';
-          if (activityBadge && !hideActivity) {
-            activityBadge.appendChild(el);
-          } else if (usernameElement && usernameElement.parentElement) {
+          if (usernameElement && usernameElement.parentElement) {
             usernameElement.parentElement.appendChild(el);
           }
         }
@@ -485,15 +437,6 @@ class UserManager {
           } else {
             el.textContent = '';
             el.style.display = 'none';
-          }
-        }
-
-        if (activityBadge) {
-          // unified hint for the whole badge
-          if (todayOk && goalOk) {
-            activityBadge.title = `План на день: ${todayTotal}/${goal}`;
-          } else {
-            activityBadge.title = 'План на день';
           }
         }
       }

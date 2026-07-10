@@ -832,7 +832,7 @@
   margin: 0;
   margin-top: 8px;
   font-weight: 700;
-  color: var(--color-text, #222);
+  color: var(--color-text-secondary, #6b7280);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1121,12 +1121,12 @@
   cursor: pointer;
   transition: background 0.2s ease, transform 0.2s ease;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  color: var(--color-text, #1f2933);
+  color: var(--color-text-secondary, #6b7280);
   text-decoration: none;
 }
 
 .short-action-btn:visited {
-  color: var(--color-text, #1f2933);
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .short-action-btn:hover {
@@ -2582,7 +2582,7 @@
   text-align: left;
   cursor: pointer;
   font-size: 14px;
-  color: var(--color-text, #1f2933);
+  color: var(--color-text-secondary, #6b7280);
   transition: background-color 0.2s ease;
 }
 
