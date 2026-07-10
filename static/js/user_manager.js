@@ -397,48 +397,11 @@ class UserManager {
       usernameElement.textContent = userData.username || 'Пользователь';
     }
 
-    let hideActivity = false;
+    // daily-activity-progress удалён (устаревший элемент)
     try {
-      const p = String(window.location && window.location.pathname ? window.location.pathname : '');
-      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor') || p.startsWith('/desktop');
-    } catch (e) {
-      hideActivity = false;
-    }
-
-    // user-activity-badge удалён (устаревший элемент)
-    let activityBadge = null;
-
-    // Daily activity plan: show as today/goal near username
-    try {
-      if (hideActivity) {
-        const existing = userSection.querySelector('.daily-activity-progress');
-        if (existing) {
-          try { existing.remove(); } catch (e2) {}
-        }
-      } else {
-        const todayTotal = Number(userData?.today_activity_total);
-        const goal = Number(userData?.daily_activity_goal);
-        const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;
-        const goalOk = Number.isFinite(goal) && goal > 0;
-
-        let el = userSection.querySelector('.daily-activity-progress');
-        if (!el) {
-          el = document.createElement('span');
-          el.className = 'daily-activity-progress';
-          if (usernameElement && usernameElement.parentElement) {
-            usernameElement.parentElement.appendChild(el);
-          }
-        }
-
-        if (el) {
-          if (todayOk && goalOk) {
-            el.textContent = `${todayTotal}/${goal}`;
-            el.style.display = 'inline';
-          } else {
-            el.textContent = '';
-            el.style.display = 'none';
-          }
-        }
+      const existing = userSection.querySelector('.daily-activity-progress');
+      if (existing) {
+        try { existing.remove(); } catch (e2) {}
       }
     } catch (e) {
     }
