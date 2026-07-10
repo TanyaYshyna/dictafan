@@ -2376,6 +2376,22 @@ async function _handleSave() {
       }
     }
 
+    // Читаем book_id из sessionStorage (устанавливается при создании нового диктанта
+    // через setDictationTargetBook() в desktop.js или book_modal.js)
+    var targetBookStr = null;
+    var targetBookId = null;
+    try {
+      targetBookStr = sessionStorage.getItem('dictationTargetBook');
+      if (targetBookStr) {
+        var parsed = JSON.parse(targetBookStr);
+        if (parsed && parsed.book_id != null) {
+          targetBookId = Number(parsed.book_id);
+        }
+      }
+    } catch (e) {
+      targetBookId = null;
+    }
+
     var saveData = {
       id: normalizedId,
       temp_id: normalizedId,
@@ -2387,6 +2403,7 @@ async function _handleSave() {
       audio_user_shared: state._sharedAudioFilename || null,
       audio_order: audioOrderValue,
       sentences: sentencesPayload,
+      book_id: targetBookId,
     };
 
     // Если есть shared audio filename, но db флаг не стоит — всё равно помечаем db dirty,
@@ -2706,6 +2723,16 @@ function open(config) {
   }
 
   document.body.style.overflow = 'hidden';
+
+  // Если это новый диктант — открываем fill modal поверх редактора
+  if (state.config && state.config.isNewDictation) {
+    // Даём редактору отрисоваться, затем открываем fill modal
+    setTimeout(function () {
+      if (window.NewDictationFillModal && typeof window.NewDictationFillModal.open === 'function') {
+        window.NewDictationFillModal.open(state.config);
+      }
+    }, 100);
+  }
 }
 
 /**
@@ -3473,6 +3500,570 @@ function init() {
   if (saveBtn) {
     saveBtn.addEventListener('click', _handleSave);
   }
+
+  // Обработчики кнопок fill modal
+  var fillCreateBtn = document.getElementById('newDictationFillCreateBtn');
+  if (fillCreateBtn) {
+    fillCreateBtn.addEventListener('click', function () {
+      if (window.NewDictationFillModal && typeof window.NewDictationFillModal.create === 'function') {
+        window.NewDictationFillModal.create();
+      }
+    });
+  }
+
+  var fillCloseBtn = document.getElementById('newDictationFillCloseBtn');
+  if (fillCloseBtn) {
+    fillCloseBtn.addEventListener('click', function () {
+      if (window.NewDictationFillModal && typeof window.NewDictationFillModal.close === 'function') {
+        window.NewDictationFillModal.close();
+      }
+    });
+  }
+
+  // Закрытие fill modal по клику вне его
+  var fillModal = document.getElementById('newDictationFillModal');
+  if (fillModal) {
+    fillModal.addEventListener('click', function (e) {
+      if (e.target === fillModal) {
+        if (window.NewDictationFillModal && typeof window.NewDictationFillModal.close === 'function') {
+          window.NewDictationFillModal.close();
+        }
+      }
+    });
+  }
+
+  // Закрытие fill modal по Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var fillModalEl = document.getElementById('newDictationFillModal');
+      if (fillModalEl && fillModalEl.style.display !== 'none') {
+        if (window.NewDictationFillModal && typeof window.NewDictationFillModal.close === 'function') {
+          window.NewDictationFillModal.close();
+        }
+      }
+    }
+  });
+}
+
+/* ============================================================
+   NewDictationFillModal — модальное окно начального заполнения
+   нового диктанта (открывается поверх DictationEditorModal)
+   ============================================================ */
+window.NewDictationFillModal = {
+  _editorConfig: null,
+  _languageSelector: null,
+  _initialVoiceMode: 'auto',
+  _currentVoiceMode: 'auto',
+
+  /**
+   * Открыть модальное окно начального заполнения.
+   * @param {Object} editorConfig — конфиг, переданный в DictationEditorModal.open()
+   */
+  open: function (editorConfig) {
+    this._editorConfig = editorConfig || {};
+    this._currentVoiceMode = 'auto';
+    this._initialVoiceMode = 'auto';
+
+    var modal = document.getElementById('newDictationFillModal');
+    if (!modal) return;
+
+    // Сброс полей
+    var titleInput = document.getElementById('newDictationFillTitle');
+    if (titleInput) titleInput.value = '';
+
+    var textEditor = document.getElementById('newDictationFillText');
+    if (textEditor) textEditor.innerHTML = '';
+
+    var delimiterInput = document.getElementById('newDictationFillDelimiter');
+    if (delimiterInput) delimiterInput.value = '//';
+
+    // Сброс ID
+    var idSpan = document.getElementById('newDictationFillId');
+    if (idSpan) idSpan.textContent = 'новий';
+
+    // Сброс radio
+    var autoRadio = document.querySelector('input[name="newDictationVoiceMode"][value="auto"]');
+    if (autoRadio) autoRadio.checked = true;
+    this._currentVoiceMode = 'auto';
+    this._initialVoiceMode = 'auto';
+
+    // Инициализация LanguageSelector
+    this._initLanguageSelector();
+
+    // Подсветка строк перевода
+    this._setupTextareaHighlighting();
+
+    // Показываем модалку
+    modal.style.display = 'flex';
+
+    // Lucide иконки
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons({ root: modal });
+    }
+
+    // Фокус на поле названия
+    if (titleInput) {
+      setTimeout(function () { titleInput.focus(); }, 100);
+    }
+  },
+
+  /**
+   * Закрыть модальное окно.
+   * Если voice mode изменился — вызываем _refillAndApply.
+   */
+  close: function () {
+    var modal = document.getElementById('newDictationFillModal');
+    if (!modal) return;
+
+    // Проверяем, изменился ли voice mode
+    var selectedRadio = document.querySelector('input[name="newDictationVoiceMode"]:checked');
+    var currentMode = selectedRadio ? selectedRadio.value : 'auto';
+    var modeChanged = (currentMode !== this._initialVoiceMode);
+
+    modal.style.display = 'none';
+
+    // Если radio изменился — перезаполняем и применяем
+    if (modeChanged) {
+      this._refillAndApply(currentMode);
+    }
+  },
+
+  /**
+   * Создать диктант из введённых данных.
+   */
+  create: async function () {
+    var self = this;
+
+    // Получаем текст
+    var textEditor = document.getElementById('newDictationFillText');
+    var rawText = textEditor ? (textEditor.innerText || textEditor.textContent || '') : '';
+    var text = rawText.trim();
+    if (!text) {
+      alert('Введіть текст диктанту');
+      return;
+    }
+
+    // Получаем разделитель
+    var delimiterInput = document.getElementById('newDictationFillDelimiter');
+    var delimiter = delimiterInput ? String(delimiterInput.value || '').trim() : '//';
+    if (!delimiter) delimiter = '//';
+
+    // Получаем языки
+    var langs = this._getSelectedLanguages();
+    var langOrig = langs.original;
+    var langTr = langs.translation;
+
+    if (!langOrig) {
+      alert('Виберіть мову оригіналу');
+      return;
+    }
+
+    // Получаем название
+    var titleInput = document.getElementById('newDictationFillTitle');
+    var title = titleInput ? String(titleInput.value || '').trim() : '';
+    if (!title) title = 'Без названия';
+
+    // Получаем voice mode
+    var selectedRadio = document.querySelector('input[name="newDictationVoiceMode"]:checked');
+    var voiceMode = selectedRadio ? selectedRadio.value : 'auto';
+
+    // Парсим текст на предложения
+    // Формат: оригинал, затем строка с делимитером + перевод
+    var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+    var origSentences = [];
+    var trSentences = [];
+    var keyCounter = 0;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      // Если строка начинается с делимитера — это строка перевода без оригинала (пропускаем)
+      if (line.startsWith(delimiter)) continue;
+
+      var key = String(keyCounter).padStart(3, '0');
+      keyCounter++;
+
+      var origSentence = {
+        key: key,
+        position: keyCounter,
+        text_original: line,
+        text_translation: '',
+        audio: '',
+        audio_original: '',
+        audio_translation: '',
+        audio_file: null,
+        audio_mic: null,
+        start: '',
+        end: '',
+        checked: false,
+        explanation: '',
+        speaker: '1',
+      };
+
+      // Проверяем следующую строку — может быть перевод
+      var trText = '';
+      if (i + 1 < lines.length && lines[i + 1].startsWith(delimiter)) {
+        trText = lines[i + 1].substring(delimiter.length).trim();
+        i++; // пропускаем строку перевода
+      }
+
+      var trSentence = {
+        key: key,
+        position: keyCounter,
+        text_original: trText,
+        text_translation: line,
+        audio: '',
+        audio_original: '',
+        audio_translation: '',
+        audio_file: null,
+        audio_mic: null,
+        start: '',
+        end: '',
+        checked: false,
+        explanation: '',
+        speaker: '1',
+      };
+
+      origSentences.push(origSentence);
+      trSentences.push(trSentence);
+    }
+
+    // Определяем audio_order по voice mode
+    var audioOrder = '';
+    if (voiceMode === 'file') {
+      audioOrder = 'f';
+    } else if (voiceMode === 'self') {
+      audioOrder = 'm';
+    } else {
+      audioOrder = '';
+    }
+
+    // Обновляем editorConfig
+    var config = this._editorConfig;
+    config.title = title;
+    config.originalLanguage = langOrig;
+    config.translationLanguage = langTr || '';
+    config.level = config.level || 'A1';
+    config.audio_order = audioOrder;
+
+    // Собираем sentences в формате DictationContent
+    var combinedSentences = [];
+    for (var j = 0; j < origSentences.length; j++) {
+      combinedSentences.push({
+        key: origSentences[j].key,
+        position: origSentences[j].position,
+        original: origSentences[j].text_original,
+        translation: trSentences[j] ? trSentences[j].text_original : '',
+        audio: '',
+        audio_original: '',
+        audio_translation: '',
+        audio_file: null,
+        audio_mic: null,
+        start: '',
+        end: '',
+        checked: false,
+        explanation: '',
+        speaker: '1',
+      });
+    }
+    config.sentences = combinedSentences;
+
+    // Закрываем fill modal
+    this.close();
+
+    // Обновляем редактор: переинициализируем с новыми данными
+    // Сохраняем флаг, что это новый диктант
+    config.isNewDictation = true;
+
+    // Переоткрываем редактор с обновлённым конфигом
+    // Но сначала нужно обновить state.config и перерисовать
+    if (typeof open === 'function') {
+      // Обновляем поля в уже открытом редакторе
+      _updateEditorFromFillConfig(config);
+    }
+
+    // Переключаем закладку в зависимости от voice mode
+    this._switchTabByVoiceMode(voiceMode);
+  },
+
+  /**
+   * Переключение закладки редактора в зависимости от voice mode.
+   */
+  _switchTabByVoiceMode: function (voiceMode) {
+    var tabBtn = null;
+    if (voiceMode === 'file') {
+      tabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-have"]');
+    } else if (voiceMode === 'self') {
+      tabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="voice-original-self"]');
+    } else {
+      tabBtn = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
+    }
+    if (tabBtn) {
+      tabBtn.click();
+    }
+  },
+
+  /**
+   * Перезаполнение и применение при изменении voice mode.
+   */
+  _refillAndApply: function (newMode) {
+    // Обновляем audio_order в config
+    if (this._editorConfig) {
+      if (newMode === 'file') {
+        this._editorConfig.audio_order = 'f';
+      } else if (newMode === 'self') {
+        this._editorConfig.audio_order = 'm';
+      } else {
+        this._editorConfig.audio_order = '';
+      }
+    }
+
+    // Переключаем закладку
+    this._switchTabByVoiceMode(newMode);
+
+    // Обновляем radio в редакторе, если они есть
+    var editorRadio = document.querySelector('input[name="editorModalVoiceMode"][value="' + newMode + '"]');
+    if (editorRadio) {
+      editorRadio.checked = true;
+      // Триггерим change event для обновления видимости закладок
+      var evt = document.createEvent('HTMLEvents');
+      evt.initEvent('change', true, false);
+      editorRadio.dispatchEvent(evt);
+    }
+  },
+
+  /**
+   * Получить выбранные языки из LanguageSelector.
+   */
+  _getSelectedLanguages: function () {
+    var result = { original: '', translation: '' };
+    try {
+      if (this._languageSelector && typeof this._languageSelector.getValues === 'function') {
+        var values = this._languageSelector.getValues();
+        if (values) {
+          result.original = values.currentLearning || '';
+          result.translation = values.nativeLanguage || '';
+        }
+      }
+    } catch (e) {
+      console.warn('[NewDictationFillModal] _getSelectedLanguages error', e);
+    }
+
+    // Fallback: читаем из data-атрибутов
+    if (!result.original) {
+      try {
+        var container = document.getElementById('newDictationFillLangPair');
+        if (container) {
+          var leftFlag = container.querySelector('.language-selector-flag-left');
+          if (leftFlag) {
+            result.original = leftFlag.getAttribute('data-lang') || '';
+          }
+        }
+      } catch (e) {}
+    }
+    if (!result.translation) {
+      try {
+        var container = document.getElementById('newDictationFillLangPair');
+        if (container) {
+          var rightFlag = container.querySelector('.language-selector-flag-right');
+          if (rightFlag) {
+            result.translation = rightFlag.getAttribute('data-lang') || '';
+          }
+        }
+      } catch (e) {}
+    }
+
+    return result;
+  },
+
+  /**
+   * Инициализация LanguageSelector для выбора пары языков.
+   */
+  _initLanguageSelector: function () {
+    var self = this;
+    var container = document.getElementById('newDictationFillLangPair');
+    if (!container) return;
+
+    var tryInit = function () {
+      try {
+        if (!window.LanguageManager || !window.LanguageManager.isInitialized) {
+          setTimeout(tryInit, 100);
+          return;
+        }
+
+        var languageData = window.LanguageManager.getLanguageData();
+        if (!languageData) {
+          setTimeout(tryInit, 100);
+          return;
+        }
+
+        // Язык по умолчанию: из профиля пользователя или 'en'
+        var defaultLearning = '';
+        try {
+          defaultLearning = (window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage))
+            ? String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage)
+            : '';
+        } catch (e) {
+          defaultLearning = '';
+        }
+        if (!defaultLearning) defaultLearning = 'en';
+
+        var nativeLang = 'ru';
+
+        var allLangs = Object.keys(languageData)
+          .map(function (x) { return String(x || '').toLowerCase(); })
+          .filter(Boolean);
+
+        var leftList = allLangs;
+        var rightList = allLangs.filter(function (x) { return x !== defaultLearning; });
+
+        container.innerHTML = '';
+
+        self._languageSelector = window.initLanguageSelector('newDictationFillLangPair', {
+          mode: 'flag-pair-dropdown-both',
+          currentLearning: defaultLearning,
+          nativeLanguage: nativeLang,
+          learningLanguages: leftList,
+          nativeLanguages: rightList,
+          languageData: languageData,
+          onLanguageChange: function (values) {
+            // При смене языка обновляем списки
+            try {
+              var leftV = values && values.currentLearning ? String(values.currentLearning).toLowerCase() : '';
+              var rightV = values && values.nativeLanguage ? String(values.nativeLanguage).toLowerCase() : '';
+              if (leftV && rightV === leftV) {
+                // Если выбрали одинаковые — сбрасываем правый
+                values.nativeLanguage = allLangs.find(function (x) { return x !== leftV; }) || 'ru';
+              }
+            } catch (e) {}
+          }
+        });
+      } catch (e) {
+        console.warn('[NewDictationFillModal] _initLanguageSelector error', e);
+        setTimeout(tryInit, 200);
+      }
+    };
+
+    tryInit();
+  },
+
+  /**
+   * Подсветка строк перевода в текстовом редакторе.
+   * Аналог setupTextareaHighlighting из script_dictation_editor.js
+   */
+  _setupTextareaHighlighting: function () {
+    var self = this;
+    var editor = document.getElementById('newDictationFillText');
+    if (!editor) return;
+
+    var isUpdating = false;
+
+    function updateHighlight() {
+      if (isUpdating) return;
+
+      var text = editor.innerText || editor.textContent;
+      var lines = text.split('\n');
+      var delimiterInput = document.getElementById('newDictationFillDelimiter');
+      var delimiter = delimiterInput ? (delimiterInput.value || '//') : '//';
+
+      var highlightedText = lines.map(function (line) {
+        if (line.trim().startsWith(delimiter)) {
+          return '<span class="line-translation">' + escapeHtml(line) + '</span>';
+        }
+        return escapeHtml(line);
+      }).join('\n');
+
+      // Сохраняем позицию курсора
+      var selection = window.getSelection();
+      var range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      var cursorOffset = range ? getCursorOffset(editor, range) : 0;
+
+      isUpdating = true;
+      editor.innerHTML = highlightedText;
+
+      // Восстанавливаем позицию курсора
+      if (cursorOffset !== null) {
+        setCursorAtOffset(editor, cursorOffset);
+      }
+      isUpdating = false;
+    }
+
+    editor.addEventListener('input', function () {
+      if (!isUpdating) {
+        setTimeout(updateHighlight, 10);
+      }
+    });
+
+    editor.addEventListener('paste', function (e) {
+      e.preventDefault();
+      var text = (e.clipboardData || window.clipboardData).getData('text');
+      document.execCommand('insertText', false, text);
+      setTimeout(updateHighlight, 10);
+    });
+
+    // Обработчик изменения разделителя
+    var delimiterInput = document.getElementById('newDictationFillDelimiter');
+    if (delimiterInput) {
+      delimiterInput.addEventListener('input', updateHighlight);
+    }
+
+    // Первоначальная подсветка
+    setTimeout(updateHighlight, 50);
+  },
+};
+
+/**
+ * Обновить редактор из конфига fill modal.
+ * Вызывается после create() для применения данных.
+ */
+function _updateEditorFromFillConfig(config) {
+  if (!config) return;
+
+  // Обновляем state.config
+  state.config = config;
+
+  // Обновляем заголовок
+  var nameEl = document.getElementById('dictation-editor-modal-name');
+  if (nameEl) {
+    nameEl.textContent = config.title || 'Новий диктант';
+  }
+
+  // Обновляем поле названия
+  var titleInput = document.querySelector('.dictation-editor-modal__title-level-row input[type="text"]');
+  if (titleInput) {
+    titleInput.value = config.title || '';
+  }
+
+  // Обновляем языки через LanguageSelector
+  if (config.originalLanguage || config.translationLanguage) {
+    try {
+      if (state.headerLangPairSelector && typeof state.headerLangPairSelector.setValues === 'function') {
+        state.headerLangPairSelector.setValues({
+          currentLearning: config.originalLanguage || '',
+          nativeLanguage: config.translationLanguage || '',
+        });
+      }
+    } catch (e) {
+      console.warn('[dictationEditorModal] _updateEditorFromFillConfig setValues error', e);
+    }
+  }
+
+  // Обновляем audio_order radio
+  var audioOrder = config.audio_order || '';
+  var radioValue = 'auto';
+  if (audioOrder === 'f') radioValue = 'have';
+  else if (audioOrder === 'm') radioValue = 'self';
+
+  var radio = document.querySelector('input[name="editorModalVoiceMode"][value="' + radioValue + '"]');
+  if (radio) {
+    radio.checked = true;
+    var evt = document.createEvent('HTMLEvents');
+    evt.initEvent('change', true, false);
+    radio.dispatchEvent(evt);
+  }
+
+  // Перерисовываем таблицу
+  _renderTable();
+  _updateUnsavedStar();
 }
 
 // Экспортируем в глобальную область

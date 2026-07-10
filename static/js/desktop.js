@@ -492,6 +492,52 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-new') {
+        (async () => {
+          try {
+            // Знайти workbook (робочу зошит) користувача
+            let wbId = window.__desktopWorkbookId;
+            if (!wbId) {
+              try {
+                const token = window.UM && window.UM.token ? window.UM.token : localStorage.getItem('jwt_token');
+                if (token) {
+                  const resp = await fetch('/library/api/user-books', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                  });
+                  const j = await resp.json();
+                  const own = (j && j.success) ? (j.own_books || []) : [];
+                  const wb = Array.isArray(own) ? own.find(function(b) { return b && b.is_workbook; }) : null;
+                  wbId = wb && wb.id ? Number(wb.id) : null;
+                  if (wbId) window.__desktopWorkbookId = wbId;
+                }
+              } catch (e0) {}
+            }
+            if (wbId) {
+              try {
+                sessionStorage.setItem('dictationTargetBook', JSON.stringify({ book_id: wbId }));
+              } catch (e1) {}
+            }
+            // Відкрити редактор для нового диктанта
+            if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+              window.DictationEditorModal.open({
+                isNewDictation: true,
+                dictationId: '',
+                originalLanguage: '',
+                translationLanguage: '',
+                title: '',
+                level: '',
+                coverUrl: '',
+                sentences: [],
+                audio_user_shared: null,
+                audio_order: '',
+              });
+            }
+          } catch (e) {
+            console.error('[desktop] desktop-new error', e);
+          }
+        })();
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }

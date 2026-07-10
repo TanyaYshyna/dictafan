@@ -1377,3 +1377,281 @@
     font-size: 12px;
   }
 }
+
+/* ===== NEW DICTATION FILL MODAL ===== */
+#newDictationFillModal {
+  position: fixed;
+  inset: 0;
+  z-index: 100310;
+  display: none;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+  align-items: center;
+  justify-content: center;
+}
+
+#newDictationFillModal .new-dictation-fill-modal__content {
+  position: relative;
+  width: min(90vw, 800px);
+  max-height: 85vh;
+  background: var(--color-panel-bg, #f5f3f0);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px 24px;
+}
+
+/* Row 1: Header */
+.new-dictation-fill-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.new-dictation-fill-modal__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.new-dictation-fill-modal__id-label {
+  font-size: 12px;
+  color: var(--color-text-secondary, #6b7280);
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+#newDictationFillTitle {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 6px;
+  font-size: 15px;
+  background: var(--color-input-bg, #fff);
+  color: var(--color-text, #1f2937);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+#newDictationFillTitle:focus {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+}
+
+.new-dictation-fill-modal__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+#newDictationFillCreateBtn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+#newDictationFillCreateBtn:hover {
+  background: var(--color-primary-hover, #2563eb);
+}
+
+#newDictationFillCreateBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+#newDictationFillCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary, #6b7280);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+#newDictationFillCloseBtn:hover {
+  background: var(--color-hover, #f3f4f6);
+  color: var(--color-text, #1f2937);
+}
+
+#newDictationFillCloseBtn i {
+  width: 18px;
+  height: 18px;
+}
+
+/* Row 2: Two-panel layout */
+.new-dictation-fill-modal__two-panels {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.new-dictation-fill-modal__left-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#newDictationFillLangPair {
+  min-height: 36px;
+}
+
+.new-dictation-fill-modal__delimiter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-dictation-fill-modal__delimiter-row label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+#newDictationFillDelimiter {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 4px;
+  font-size: 13px;
+  background: var(--color-input-bg, #fff);
+  color: var(--color-text, #1f2937);
+  outline: none;
+  text-align: center;
+  font-family: monospace;
+}
+
+#newDictationFillDelimiter:focus {
+  border-color: var(--color-primary, #3b82f6);
+}
+
+.new-dictation-fill-modal__right-panel {
+  flex-shrink: 0;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.new-dictation-fill-modal__right-panel > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text, #1f2937);
+}
+
+.new-dictation-fill-modal__voice-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.new-dictation-fill-modal__voice-modes .radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text, #1f2937);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.1s;
+}
+
+.new-dictation-fill-modal__voice-modes .radio-label:hover {
+  background: var(--color-hover, #f3f4f6);
+}
+
+.new-dictation-fill-modal__voice-modes .radio-label input[type="radio"] {
+  accent-color: var(--color-primary, #3b82f6);
+}
+
+/* Row 4: Text section */
+.new-dictation-fill-modal__text-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.new-dictation-fill-modal__text-section > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text, #1f2937);
+  flex-shrink: 0;
+}
+
+#newDictationFillText {
+  flex: 1;
+  min-height: 120px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  background: var(--color-input-bg, #fff);
+  color: var(--color-text, #1f2937);
+  outline: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+#newDictationFillText:focus {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.15);
+}
+
+#newDictationFillText:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-placeholder, #9ca3af);
+  pointer-events: none;
+}
+
+/* Подсветка строк перевода (аналог .line-translation из style_dictation_editor.css) */
+#newDictationFillText .line-translation {
+  color: var(--color-translation, #059669);
+}
+
+/* Стилизация скроллбара */
+#newDictationFillText::-webkit-scrollbar {
+  width: 6px;
+}
+
+#newDictationFillText::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#newDictationFillText::-webkit-scrollbar-thumb {
+  background: var(--color-border, #d1d5db);
+  border-radius: 3px;
+}
+
+#newDictationFillText::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary, #6b7280);
+}

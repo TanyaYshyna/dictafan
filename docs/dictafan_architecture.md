@@ -329,6 +329,8 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `100250` — `#desktopConfirmModal` (общее «закрыть/сохранить» для desktop-модалок на `/desktop`)
 - `100260` — `#exitModal` (универсальная модалка выхода/закрытия; должна быть выше всех)
 - `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
+- `100300` — `#dictationEditorModal` (редактор диктанта в модальном окне, группа `dictation_editor_modal.*`)
+- `100310` — `#newDictationFillModal` (начальное заполнение нового диктанта, открывается поверх `#dictationEditorModal`)
 - `200500` — `#auto-toast` (всплывающие уведомления)
 
 ## Service Worker

@@ -1260,7 +1260,21 @@
               if (id) setDictationTargetBook(id);
             } catch (e2) {
             }
-            window.location.href = '/dictation_editor/new';
+            // Відкрити редактор для нового диктанта
+            if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+              window.DictationEditorModal.open({
+                isNewDictation: true,
+                dictationId: '',
+                originalLanguage: '',
+                translationLanguage: '',
+                title: '',
+                level: '',
+                coverUrl: '',
+                sentences: [],
+                audio_user_shared: null,
+                audio_order: '',
+              });
+            }
             return;
           }
           if (action === 'edit-book') {
@@ -1350,6 +1364,22 @@
                 <i data-lucide="chevron-right"></i>
               </button>
               <span class="structure-item-title">${escapeHtml(sectionNumber)}${escapeHtml(String(section.title || ''))}</span>
+              <div class="dropdown-menu-wrapper" style="margin-left:auto;">
+                <button class="structure-item-menu-btn" type="button" title="Дії">
+                  <i data-lucide="more-vertical"></i>
+                </button>
+                <div class="dropdown-menu section-actions-menu" style="display:none;">
+                  <button class="dropdown-menu-item" data-action="section-add-group" type="button">
+                    <i data-lucide="folder-plus"></i> <span>Нова група</span>
+                  </button>
+                  <button class="dropdown-menu-item" data-action="section-add-dictation" type="button">
+                    <i data-lucide="plus"></i> <span>Новий диктант</span>
+                  </button>
+                  <button class="dropdown-menu-item" data-action="section-edit" type="button">
+                    <i data-lucide="edit-3"></i> <span>Редагувати розділ</span>
+                  </button>
+                </div>
+              </div>
             </div>
             <div class="structure-item-content" data-section-content-id="${escapeHtml(String(id))}" style="display: none;">
               <div class="structure-children" data-section-children-id="${escapeHtml(String(id))}"></div>
@@ -1363,6 +1393,87 @@
             for (const ch of children) {
               childWrap.appendChild(buildSectionNode(ch, (level || 0) + 1));
             }
+          }
+
+          // Додаємо обробники для меню "..."
+          const menuBtn = div.querySelector('.structure-item-menu-btn');
+          const menu = div.querySelector('.section-actions-menu');
+          if (menuBtn && menu) {
+            menuBtn.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              var isVisible = menu.classList.contains('show');
+              if (isVisible) {
+                menu.classList.remove('show');
+                menu.style.display = 'none';
+              } else {
+                menu.classList.add('show');
+                menu.style.display = 'block';
+                setTimeout(function() {
+                  var closeHandler = function(ev) {
+                    if (!menu.contains(ev.target) && !menuBtn.contains(ev.target)) {
+                      menu.classList.remove('show');
+                      menu.style.display = 'none';
+                      document.removeEventListener('click', closeHandler);
+                    }
+                  };
+                  document.addEventListener('click', closeHandler);
+                }, 0);
+              }
+            });
+
+            menu.addEventListener('click', function(e) {
+              var item = e.target.closest('.dropdown-menu-item');
+              if (!item) return;
+              e.preventDefault();
+              e.stopPropagation();
+              menu.classList.remove('show');
+              menu.style.display = 'none';
+
+              var action = item.getAttribute('data-action');
+              var sectionId = Number(section.id);
+              var bookId = (state && state.bookViewActiveBookId != null) ? Number(state.bookViewActiveBookId) : null;
+
+              if (action === 'section-add-group') {
+                // Нова група (підгрупа в поточній групі)
+                if (typeof openSectionModal === 'function') {
+                  openSectionModal(null, sectionId);
+                }
+                return;
+              }
+              if (action === 'section-add-dictation') {
+                // Новий диктант
+                try {
+                  if (bookId) {
+                    if (typeof setDictationTargetBook === 'function') {
+                      setDictationTargetBook(sectionId);
+                    }
+                  }
+                } catch (e2) {}
+                if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+                  window.DictationEditorModal.open({
+                    isNewDictation: true,
+                    dictationId: '',
+                    originalLanguage: '',
+                    translationLanguage: '',
+                    title: '',
+                    level: '',
+                    coverUrl: '',
+                    sentences: [],
+                    audio_user_shared: null,
+                    audio_order: '',
+                  });
+                }
+                return;
+              }
+              if (action === 'section-edit') {
+                // Редагувати розділ
+                if (typeof openSectionModal === 'function') {
+                  openSectionModal(section, bookId);
+                }
+                return;
+              }
+            });
           }
 
           return div;

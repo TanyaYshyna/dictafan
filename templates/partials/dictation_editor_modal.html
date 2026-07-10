@@ -387,3 +387,58 @@
     </div>
   </div>
 </div>
+
+<!-- new-dictation-fill-modal: начальное заполнение нового диктанта -->
+<div id="newDictationFillModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content new-dictation-fill-modal__content">
+    <!-- Row 1: Header -->
+    <div class="new-dictation-fill-modal__header">
+      <div class="new-dictation-fill-modal__header-left">
+        <span class="new-dictation-fill-modal__id-label">ID: <span id="newDictationFillId">новий</span></span>
+        <input type="text" id="newDictationFillTitle" placeholder="Назва диктанту...">
+      </div>
+      <div class="new-dictation-fill-modal__header-actions">
+        <button type="button" id="newDictationFillCreateBtn" class="btn btn-primary">Створити диктант</button>
+        <button type="button" id="newDictationFillCloseBtn" class="btn-close" title="Закрити">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Row 2: Two-panel layout -->
+    <div class="new-dictation-fill-modal__two-panels">
+      <!-- Left panel: Language flags + translation prefix -->
+      <div class="new-dictation-fill-modal__left-panel">
+        <div id="newDictationFillLangPair"></div>
+        <div class="new-dictation-fill-modal__delimiter-row">
+          <label for="newDictationFillDelimiter">Префікс перекладу:</label>
+          <input type="text" id="newDictationFillDelimiter" value="//" placeholder="//">
+        </div>
+      </div>
+      <!-- Right panel: Voice mode -->
+      <div class="new-dictation-fill-modal__right-panel">
+        <label>Режим озвучки:</label>
+        <div class="new-dictation-fill-modal__voice-modes">
+          <label class="radio-label">
+            <input type="radio" name="newDictationVoiceMode" value="auto" checked> Авто
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="newDictationVoiceMode" value="file"> Є файл
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="newDictationVoiceMode" value="self"> Запишу сам
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Text input -->
+    <div class="new-dictation-fill-modal__text-section">
+      <label for="newDictationFillText">Текст диктанту:</label>
+      <div id="newDictationFillText"
+           class="new-dictation-fill-modal__text-editor"
+           contenteditable="true"
+           data-placeholder="Введіть текст диктанту..."></div>
+    </div>
+  </div>
+</div>
