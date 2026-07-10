@@ -405,30 +405,31 @@
       </div>
     </div>
 
-    <!-- Row 2: Two-panel layout -->
-    <div class="new-dictation-fill-modal__two-panels">
-      <!-- Left panel: Language flags + translation prefix -->
-      <div class="new-dictation-fill-modal__left-panel">
-        <div id="newDictationFillLangPair"></div>
-        <div class="new-dictation-fill-modal__delimiter-row">
-          <label for="newDictationFillDelimiter">Префікс перекладу:</label>
-          <input type="text" id="newDictationFillDelimiter" value="//" placeholder="//">
-        </div>
+    <!-- Row 2: Language flags row (en => ru) -->
+    <div class="new-dictation-fill-modal__lang-row">
+      <div id="newDictationFillLangPair" class="new-dictation-fill-modal__lang-pair"></div>
+      <div class="new-dictation-fill-modal__delimiter-row">
+        <label for="newDictationFillDelimiter">Префікс перекладу:</label>
+        <input type="text" id="newDictationFillDelimiter" value="//" placeholder="//">
       </div>
-      <!-- Right panel: Voice mode -->
-      <div class="new-dictation-fill-modal__right-panel">
-        <label>Режим озвучки:</label>
-        <div class="new-dictation-fill-modal__voice-modes">
-          <label class="radio-label">
-            <input type="radio" name="newDictationVoiceMode" value="auto" checked> Авто
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="newDictationVoiceMode" value="file"> Є файл
-          </label>
-          <label class="radio-label">
-            <input type="radio" name="newDictationVoiceMode" value="self"> Запишу сам
-          </label>
-        </div>
+    </div>
+
+    <!-- Row 3: Voice mode (как в редакторе) -->
+    <div class="new-dictation-fill-modal__voice-mode-group">
+      <span class="new-dictation-fill-modal__voice-mode-label">Режим озвучки:</span>
+      <div class="new-dictation-fill-modal__voice-mode-options">
+        <label class="new-dictation-fill-modal__voice-mode-radio">
+          <input type="radio" name="newDictationVoiceMode" value="auto" checked />
+          <span>Авто (а)</span>
+        </label>
+        <label class="new-dictation-fill-modal__voice-mode-radio">
+          <input type="radio" name="newDictationVoiceMode" value="file" />
+          <span>Є аудіо (f)</span>
+        </label>
+        <label class="new-dictation-fill-modal__voice-mode-radio">
+          <input type="radio" name="newDictationVoiceMode" value="self" />
+          <span>Озвучу сам (m)</span>
+        </label>
       </div>
     </div>
 

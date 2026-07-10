@@ -3520,17 +3520,8 @@ function init() {
     });
   }
 
-  // Закрытие fill modal по клику вне его
-  var fillModal = document.getElementById('newDictationFillModal');
-  if (fillModal) {
-    fillModal.addEventListener('click', function (e) {
-      if (e.target === fillModal) {
-        if (window.NewDictationFillModal && typeof window.NewDictationFillModal.close === 'function') {
-          window.NewDictationFillModal.close();
-        }
-      }
-    });
-  }
+  // Закрытие fill modal по клику вне его — НЕ закрываем (только крестик и кнопка)
+  // (намеренно ничего не делаем)
 
   // Закрытие fill modal по Escape
   document.addEventListener('keydown', function (e) {
@@ -3669,7 +3660,9 @@ window.NewDictationFillModal = {
 
     // Парсим текст на предложения
     // Формат: оригинал, затем строка с делимитером + перевод
-    var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+    // Учитываем U+2028 (LINE SEPARATOR) как перенос строки
+    var normalizedText = text.replace(/\u2028/g, '\n');
+    var lines = normalizedText.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
     var origSentences = [];
     var trSentences = [];
     var keyCounter = 0;
@@ -3957,11 +3950,51 @@ window.NewDictationFillModal = {
 
     var isUpdating = false;
 
+    // Вспомогательные функции для сохранения/восстановления позиции курсора
+    function _getCursorOffset(el, range) {
+      var text = el.innerText || el.textContent || '';
+      var preCaretRange = range.cloneRange();
+      preCaretRange.selectNodeContents(el);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      return preCaretRange.toString().length;
+    }
+
+    function _setCursorAtOffset(el, offset) {
+      var sel = window.getSelection();
+      var charIndex = 0;
+      var node = el.firstChild;
+      while (node) {
+        if (node.nodeType === 3) { // text node
+          var nextCharIndex = charIndex + node.length;
+          if (offset >= charIndex && offset <= nextCharIndex) {
+            var range = document.createRange();
+            range.setStart(node, offset - charIndex);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return;
+          }
+          charIndex = nextCharIndex;
+        }
+        node = node.nextSibling;
+      }
+      // fallback: ставим в конец
+      try {
+        var range = document.createRange();
+        range.selectNodeContents(el);
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch (e) {}
+    }
+
     function updateHighlight() {
       if (isUpdating) return;
 
       var text = editor.innerText || editor.textContent;
-      var lines = text.split('\n');
+      // Заменяем U+2028 (LINE SEPARATOR) на \n для единообразия
+      var normalized = text.replace(/\u2028/g, '\n');
+      var lines = normalized.split('\n');
       var delimiterInput = document.getElementById('newDictationFillDelimiter');
       var delimiter = delimiterInput ? (delimiterInput.value || '//') : '//';
 
@@ -3975,14 +4008,14 @@ window.NewDictationFillModal = {
       // Сохраняем позицию курсора
       var selection = window.getSelection();
       var range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-      var cursorOffset = range ? getCursorOffset(editor, range) : 0;
+      var cursorOffset = range ? _getCursorOffset(editor, range) : 0;
 
       isUpdating = true;
       editor.innerHTML = highlightedText;
 
       // Восстанавливаем позицию курсора
       if (cursorOffset !== null) {
-        setCursorAtOffset(editor, cursorOffset);
+        _setCursorAtOffset(editor, cursorOffset);
       }
       isUpdating = false;
     }
@@ -3996,6 +4029,8 @@ window.NewDictationFillModal = {
     editor.addEventListener('paste', function (e) {
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData('text');
+      // Заменяем U+2028 на \n при вставке
+      text = text.replace(/\u2028/g, '\n');
       document.execCommand('insertText', false, text);
       setTimeout(updateHighlight, 10);
     });

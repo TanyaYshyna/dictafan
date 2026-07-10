@@ -1393,7 +1393,8 @@
 #newDictationFillModal .new-dictation-fill-modal__content {
   position: relative;
   width: min(90vw, 800px);
-  max-height: 85vh;
+  max-height: 95vh;
+  height: 90vh;
   background: var(--color-panel-bg, #f5f3f0);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0,0,0,0.3);
@@ -1457,17 +1458,17 @@
   padding: 8px 16px;
   border: none;
   border-radius: 6px;
-  background: var(--color-primary, #3b82f6);
-  color: #fff;
+  background: var(--color-button-yellow);
+  color: var(--color-button-text-yellow);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background 0.15s, opacity 0.15s;
 }
 
 #newDictationFillCreateBtn:hover {
-  background: var(--color-primary-hover, #2563eb);
+  opacity: 0.85;
 }
 
 #newDictationFillCreateBtn:disabled {
@@ -1499,30 +1500,27 @@
   height: 18px;
 }
 
-/* Row 2: Two-panel layout */
-.new-dictation-fill-modal__two-panels {
+/* Row 2: Language flags row (en => ru) */
+.new-dictation-fill-modal__lang-row {
   display: flex;
+  align-items: center;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
-.new-dictation-fill-modal__left-panel {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-#newDictationFillLangPair {
+.new-dictation-fill-modal__lang-pair {
   min-height: 36px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .new-dictation-fill-modal__delimiter-row {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .new-dictation-fill-modal__delimiter-row label {
@@ -1548,44 +1546,73 @@
   border-color: var(--color-primary, #3b82f6);
 }
 
-.new-dictation-fill-modal__right-panel {
-  flex-shrink: 0;
-  min-width: 180px;
+/* Row 3: Voice mode (как в редакторе) */
+.new-dictation-fill-modal__voice-mode-group {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-light, #eee);
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
-.new-dictation-fill-modal__right-panel > label {
-  font-size: 13px;
+.new-dictation-fill-modal__voice-mode-label {
+  font-size: 14px;
   font-weight: 500;
-  color: var(--color-text, #1f2937);
+  white-space: nowrap;
+  color: var(--color-text, #224156);
+  padding-top: 0;
 }
 
-.new-dictation-fill-modal__voice-modes {
+.new-dictation-fill-modal__voice-mode-options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.new-dictation-fill-modal__voice-modes .radio-label {
+.new-dictation-fill-modal__voice-mode-radio {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
-  color: var(--color-text, #1f2937);
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  transition: background 0.1s;
+  font-size: 14px;
+  color: var(--color-text, #224156);
 }
 
-.new-dictation-fill-modal__voice-modes .radio-label:hover {
-  background: var(--color-hover, #f3f4f6);
+.new-dictation-fill-modal__voice-mode-radio input[type="radio"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--color-border-light, #bbb);
+  border-radius: 50%;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: border-color 0.2s;
 }
 
-.new-dictation-fill-modal__voice-modes .radio-label input[type="radio"] {
-  accent-color: var(--color-primary, #3b82f6);
+.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked {
+  border-color: var(--color-button-text-yellow, #f9c609);
+}
+
+.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:checked::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 8px;
+  height: 8px;
+  background: var(--color-button-text-yellow, #f9c609);
+  border-radius: 50%;
+}
+
+.new-dictation-fill-modal__voice-mode-radio input[type="radio"]:hover {
+  border-color: var(--color-button-text-yellow, #f9c609);
 }
 
 /* Row 4: Text section */
@@ -1620,6 +1647,7 @@
   word-wrap: break-word;
   font-family: inherit;
   transition: border-color 0.15s;
+  tab-size: 4;
 }
 
 #newDictationFillText:focus {
@@ -1635,7 +1663,7 @@
 
 /* Подсветка строк перевода (аналог .line-translation из style_dictation_editor.css) */
 #newDictationFillText .line-translation {
-  color: var(--color-translation, #059669);
+  color: var(--color-button-text-orange, rgb(250, 147, 21));
 }
 
 /* Стилизация скроллбара */
