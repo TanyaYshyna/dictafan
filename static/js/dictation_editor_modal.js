@@ -3554,12 +3554,16 @@ window.NewDictationFillModal = {
    * @param {Object} editorConfig — конфиг, переданный в DictationEditorModal.open()
    */
   open: function (editorConfig) {
+    console.log('[NewDictationFillModal] open() called', editorConfig);
     this._editorConfig = editorConfig || {};
     this._currentVoiceMode = 'auto';
     this._initialVoiceMode = 'auto';
 
     var modal = document.getElementById('newDictationFillModal');
-    if (!modal) return;
+    if (!modal) {
+      console.warn('[NewDictationFillModal] modal element not found!');
+      return;
+    }
 
     // Сброс полей
     var titleInput = document.getElementById('newDictationFillTitle');
@@ -3626,9 +3630,11 @@ window.NewDictationFillModal = {
    * Создать диктант из введённых данных.
    */
   create: async function () {
+    console.log('[NewDictationFillModal] create() called');
     var self = this;
 
     try {
+      console.log('[NewDictationFillModal] create() getting text');
       // Получаем текст
       var textEditor = document.getElementById('newDictationFillText');
       var rawText = textEditor ? (textEditor.innerText || textEditor.textContent || '') : '';
