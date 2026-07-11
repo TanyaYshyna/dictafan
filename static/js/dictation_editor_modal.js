@@ -372,11 +372,13 @@ function _selectSentenceRow(row) {
   // Обновляем панель над волной: текст текущей строки
   var key = row.dataset.key;
   if (key && state.content) {
-    var cores = state.content.getAllSentenceCores();
+    var langBlocks = state.content.langBlocks;
+    var origBlock = langBlocks && langBlocks.length > 0 ? langBlocks[0] : null;
+    var origSentences = origBlock ? origBlock.sentences : [];
     var found = null;
-    for (var i = 0; i < cores.length; i++) {
-      if (cores[i].key === key) {
-        found = cores[i];
+    for (var i = 0; i < origSentences.length; i++) {
+      if (origSentences[i].key === key) {
+        found = origSentences[i];
         break;
       }
     }
@@ -384,12 +386,12 @@ function _selectSentenceRow(row) {
       // Обновляем текст оригинала в панели над волной
       var sentenceTextEl = document.getElementById('editorModalWaveformSentenceText');
       if (sentenceTextEl) {
-        sentenceTextEl.textContent = found.text_original || '—';
+        sentenceTextEl.textContent = found.text || '—';
       }
       // Обновляем текст текущей строки на закладке "Автозаполнение оригинала"
       var autoSentenceTextEl = document.getElementById('editorModalAutoSentenceText');
       if (autoSentenceTextEl) {
-        autoSentenceTextEl.textContent = found.text_original || '—';
+        autoSentenceTextEl.textContent = found.text || '—';
       }
       // Загружаем self waveform для audio_mic текущей строки
       // (функція сама оновлює лейбли над волною)
@@ -401,11 +403,13 @@ function _selectSentenceRow(row) {
   var wf = window.editorModalWaveform;
   if (wf) {
     if (key && state.content) {
-      var cores = state.content.getAllSentenceCores();
+      var langBlocks = state.content.langBlocks;
+      var origBlock = langBlocks && langBlocks.length > 0 ? langBlocks[0] : null;
+      var origSentences = origBlock ? origBlock.sentences : [];
       var found = null;
-      for (var i = 0; i < cores.length; i++) {
-        if (cores[i].key === key) {
-          found = cores[i];
+      for (var i = 0; i < origSentences.length; i++) {
+        if (origSentences[i].key === key) {
+          found = origSentences[i];
           break;
         }
       }
@@ -460,11 +464,21 @@ function _renderTable() {
   var tbody = table.querySelector('tbody');
   if (!tbody) return;
 
-  var cores = state.content ? state.content.getAllSentenceCores() : [];
+  // Получаем langBlocks: langBlocks[0] — оригинал, langBlocks[1] — перевод (если есть)
+  var langBlocks = state.content ? state.content.langBlocks : [];
+  var origBlock = langBlocks.length > 0 ? langBlocks[0] : null;
+  var trBlock = langBlocks.length > 1 ? langBlocks[1] : null;
+  var origSentences = origBlock ? origBlock.sentences : [];
+  var langOrig = origBlock ? origBlock.lang : (state.config?.originalLanguage || '');
+  var langTr = trBlock ? trBlock.lang : (state.config?.translationLanguage || '');
+
   tbody.innerHTML = '';
 
-  cores.forEach(function (s, index) {
+  origSentences.forEach(function (s, index) {
     var key = s.key || 's_' + index;
+
+    // Получаем предложение перевода по тому же ключу
+    var trSentence = trBlock ? trBlock.sentences.find(function (ts) { return ts.key === key; }) : null;
 
     var tr = document.createElement('tr');
     tr.dataset.key = key;
@@ -475,11 +489,11 @@ function _renderTable() {
     tdNum.textContent = index + 1;
     tr.appendChild(tdNum);
 
-    // Спикер
+    // Спикер (удалён из структуры, колонка скрыта)
     var tdSpeaker = document.createElement('td');
     tdSpeaker.className = 'col-speaker';
     tdSpeaker.style.display = 'none';
-    tdSpeaker.textContent = s.speaker || '';
+    tdSpeaker.textContent = '';
     tr.appendChild(tdSpeaker);
 
     // Оригинал
@@ -488,14 +502,15 @@ function _renderTable() {
     var origInput = document.createElement('input');
     origInput.type = 'text';
     origInput.className = 'table-input';
-    origInput.value = s.text_original || '';
+    origInput.value = s.text || '';
     origInput.dataset.key = key;
-    origInput.dataset.field = 'text_original';
+    origInput.dataset.field = 'text';
+    origInput.dataset.lang = langOrig;
     origInput.addEventListener('change', function () {
       if (state.content) {
-        var sentence = state.content.getSentence(key);
+        var sentence = state.content.getSentenceForLang(key, langOrig);
         if (sentence) {
-          sentence.text_original = this.value;
+          sentence.text = this.value;
           _setDirtyFlags({ db: true });
         }
       }
@@ -510,7 +525,7 @@ function _renderTable() {
     genTtsBtn.type = 'button';
     genTtsBtn.className = 'audio-btn';
     genTtsBtn.dataset.key = key;
-    genTtsBtn.dataset.lang = state.config?.originalLanguage || '';
+    genTtsBtn.dataset.lang = langOrig;
     genTtsBtn.dataset.field = 'audio';
     genTtsBtn.dataset.state = s.audio ? 'ready' : 'creating';
     genTtsBtn.style.background = 'none';
@@ -528,7 +543,7 @@ function _renderTable() {
     playUserBtn.type = 'button';
     playUserBtn.className = 'audio-btn';
     playUserBtn.dataset.key = key;
-    playUserBtn.dataset.lang = state.config?.originalLanguage || '';
+    playUserBtn.dataset.lang = langOrig;
     playUserBtn.dataset.field = 'audio_file';
     playUserBtn.dataset.state = s.audio_file ? 'ready' : 'creating';
     playUserBtn.style.background = 'none';
@@ -546,7 +561,7 @@ function _renderTable() {
     playMicBtn.type = 'button';
     playMicBtn.className = 'audio-btn';
     playMicBtn.dataset.key = key;
-    playMicBtn.dataset.lang = state.config?.originalLanguage || '';
+    playMicBtn.dataset.lang = langOrig;
     playMicBtn.dataset.field = 'audio_mic';
     playMicBtn.dataset.state = s.audio_mic ? 'ready' : 'creating';
     playMicBtn.style.background = 'none';
@@ -584,14 +599,15 @@ function _renderTable() {
     var transInput = document.createElement('input');
     transInput.type = 'text';
     transInput.className = 'table-input';
-    transInput.value = s.text_translation || '';
+    transInput.value = trSentence ? (trSentence.text || '') : '';
     transInput.dataset.key = key;
-    transInput.dataset.field = 'text_translation';
+    transInput.dataset.field = 'text';
+    transInput.dataset.lang = langTr;
     transInput.addEventListener('change', function () {
-      if (state.content) {
-        var sentence = state.content.getSentence(key);
+      if (state.content && langTr) {
+        var sentence = state.content.getSentenceForLang(key, langTr);
         if (sentence) {
-          sentence.text_translation = this.value;
+          sentence.text = this.value;
           _setDirtyFlags({ db: true });
         }
       }
@@ -599,21 +615,21 @@ function _renderTable() {
     tdTrans.appendChild(transInput);
     tr.appendChild(tdTrans);
 
-    // Play translation — кнопка t
+    // Play translation — кнопка t (показывает audio текущего языка перевода)
     var tdPlayTrans = document.createElement('td');
     tdPlayTrans.className = 'col-play-translation panel-translation panel-create-audio';
     var playTransBtn = document.createElement('button');
     playTransBtn.type = 'button';
     playTransBtn.className = 'audio-btn';
     playTransBtn.dataset.key = key;
-    playTransBtn.dataset.lang = state.config?.translationLanguage || '';
-    playTransBtn.dataset.field = 'audio_translation';
-    playTransBtn.dataset.state = s.audio_translation ? 'ready' : 'creating';
+    playTransBtn.dataset.lang = langTr;
+    playTransBtn.dataset.field = 'audio';
+    playTransBtn.dataset.state = (trSentence && trSentence.audio) ? 'ready' : 'creating';
     playTransBtn.style.background = 'none';
     playTransBtn.style.border = 'none';
     playTransBtn.style.cursor = 'pointer';
     playTransBtn.style.padding = '2px';
-    playTransBtn.innerHTML = '<i data-lucide="' + (s.audio_translation ? 'play' : 'hammer') + '"></i>';
+    playTransBtn.innerHTML = '<i data-lucide="' + ((trSentence && trSentence.audio) ? 'play' : 'hammer') + '"></i>';
     tdPlayTrans.appendChild(playTransBtn);
     tr.appendChild(tdPlayTrans);
 
@@ -889,7 +905,7 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   }
   dictationId = normalizedId;
 
-  var lang = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
+  var lang = (state.config ? state.config.originalLanguage : '');
   if (!lang) return;
 
   var am = _ensureAudioManager();
@@ -1082,36 +1098,43 @@ function _addNewRow(position) {
   var selectedRow = tbody.querySelector('tr.selected');
   if (!state.content) return;
 
-  var cores = state.content.getAllSentenceCores();
+  // Получаем langBlocks
+  var langBlocks = state.content.langBlocks;
+  if (!langBlocks || langBlocks.length === 0) return;
+
+  // Определяем максимальный ключ по первому блоку (оригинал)
+  var origBlock = langBlocks[0];
   var maxKey = 0;
-  cores.forEach(function (s) {
+  origBlock.sentences.forEach(function (s) {
     var num = parseInt(String(s.key).replace('s_', '') || '0', 10);
     if (num > maxKey) maxKey = num;
   });
   var newKey = 's_' + (maxKey + 1);
 
+  // Создаём новое предложение для каждого языка
   var newSentence = {
     key: newKey,
     position: null,
-    text_original: '',
-    text_translation: '',
-    audio_original: '',
-    audio_translation: '',
+    text: '',
+    audio: '',
     audio_file: null,
     audio_mic: null,
     start: '',
     end: '',
     checked: false,
     explanation: '',
-    speaker: '',
   };
 
-  if (position === 'above' && selectedRow) {
-    var index = Array.from(tbody.children).indexOf(selectedRow);
-    state.content._sentences.splice(index, 0, newSentence);
-  } else {
-    state.content._sentences.push(newSentence);
-  }
+  // Добавляем во все langBlocks
+  langBlocks.forEach(function (block) {
+    var sentenceCopy = JSON.parse(JSON.stringify(newSentence));
+    if (position === 'above' && selectedRow) {
+      var index = Array.from(tbody.children).indexOf(selectedRow);
+      block.sentences.splice(index, 0, sentenceCopy);
+    } else {
+      block.sentences.push(sentenceCopy);
+    }
+  });
 
   _setDirtyFlags({ db: true });
   _renderTable();
@@ -1128,9 +1151,15 @@ function _deleteRow(row) {
   var key = row.dataset.key;
   if (!state.content) return;
 
-  var index = state.content._sentences.findIndex(function (s) { return s.key === key; });
-  if (index !== -1) {
-    state.content._sentences.splice(index, 1);
+  // Удаляем предложение из всех langBlocks
+  var langBlocks = state.content.langBlocks;
+  if (langBlocks) {
+    langBlocks.forEach(function (block) {
+      var index = block.sentences.findIndex(function (s) { return s.key === key; });
+      if (index !== -1) {
+        block.sentences.splice(index, 1);
+      }
+    });
   }
 
   _setDirtyFlags({ db: true });
@@ -1539,7 +1568,7 @@ async function _handleGenerateTtsForSentence() {
     return;
   }
 
-  text = sentence.text_original;
+  text = sentence.text;
   if (!text) {
     console.warn('[dictationEditorModal] Пустой текст в предложении, нечего генерировать');
     return;
@@ -1662,7 +1691,7 @@ async function _handleRegenerateAllTts() {
       var sentence = state.content.getSentence(cores[i].key);
       if (!sentence) continue;
 
-      var text = sentence.text_original;
+      var text = sentence.text;
       if (!text) {
         errorCount++;
         continue;
@@ -2160,7 +2189,7 @@ async function _smartSplitOnServer(filename, audio_b64, mime) {
       sentences: state.content ? state.content.getAllSentenceCores().map(function (s) {
         return {
           key: s.key,
-          text: s.text_original || '',
+          text: s.text || '',
           language: state.config ? state.config.originalLanguage : ''
         };
       }) : []
@@ -2298,62 +2327,29 @@ async function _handleSave() {
       return;
     }
 
-    // Собираем предложения из DictationContent
-    var sentencesPayload = {};
+    // Собираем предложения из DictationContent в плоский массив с language_code
+    var sentencesPayload = [];
     if (state.content) {
-      var langOrig = state.content.langOrig || (state.config ? state.config.originalLanguage : '');
-      var langTr = state.content.langTr || (state.config ? state.config.translationLanguage : '');
-      var allSentences = state.content.getAllSentenceCores();
-
-      if (langOrig) {
-        sentencesPayload[langOrig] = {
-          title: state.config ? state.config.title : '',
-          sentences: allSentences.map(function (s) {
-            return {
-              key: s.key,
-              position: s.position,
-              text: s.text_original || '',
-              translation: s.text_translation || '',
-              audio: s.audio_original || '',
-              audio_tr: s.audio_translation || '',
-              audio_file: s.audio_file || null,
-              audio_mic: s.audio_mic || null,
-              start: s.start || '',
-              end: s.end || '',
-              checked: s.checked || false,
-              explanation: s.explanation || '',
-              speaker: s.speaker || '',
-            };
-          })
-        };
-      }
-
-      // ВАЖНО: также отправляем предложения на языке перевода, иначе сервер
-      // удалит их из БД (см. cleanup-логику save_dictation_final).
-      // Это фиксит баг: после сохранения пропадает язык перевода (два US флага)
-      // и сбрасываются флаги tr_*.
-      if (langTr && langTr !== langOrig) {
-        sentencesPayload[langTr] = {
-          title: '',
-          sentences: allSentences.map(function (s) {
-            return {
-              key: s.key,
-              position: s.position,
-              text: s.text_translation || '',
-              translation: s.text_original || '',
-              audio: s.audio_translation || '',
-              audio_tr: s.audio_original || '',
-              audio_file: null,
-              audio_mic: null,
-              start: s.start || '',
-              end: s.end || '',
-              checked: s.checked || false,
-              explanation: s.explanation || '',
-              speaker: s.speaker || '',
-            };
-          })
-        };
-      }
+      var langBlocks = state.content.langBlocks || [];
+      langBlocks.forEach(function (block) {
+        var lang = block.lang || '';
+        if (!lang) return;
+        block.sentences.forEach(function (s) {
+          sentencesPayload.push({
+            language_code: lang,
+            key: s.key,
+            position: s.position,
+            text: s.text || '',
+            audio: s.audio || '',
+            audio_file: s.audio_file || null,
+            audio_mic: s.audio_mic || null,
+            start: s.start || '',
+            end: s.end || '',
+            checked: s.checked || false,
+            explanation: s.explanation || '',
+          });
+        });
+      });
     }
 
     // Нормализуем dictationId: добавляем префикс dict_ если его нет
@@ -2558,68 +2554,133 @@ function open(config) {
   if (typeof DictationRuntime !== 'undefined' && DictationRuntime.getOrCreateContent) {
     state.content = DictationRuntime.getOrCreateContent({
       dictationId: dictationId,
-      langTr: langTr || langOrig,
     });
-    // Если content уже существовал и в нём есть sentences — используем их,
+    // Если content уже существовал и в нём есть langBlocks — используем их,
     // иначе устанавливаем sentences из config
     if (rawSentences && rawSentences.length > 0) {
-      var existingCores = state.content.getAllSentenceCores();
-      if (!existingCores || existingCores.length === 0) {
+      var existingBlocks = state.content.langBlocks;
+      var hasSentences = existingBlocks && existingBlocks.length > 0 &&
+        existingBlocks[0].sentences && existingBlocks[0].sentences.length > 0;
+      if (!hasSentences) {
         state.content.setSentences(rawSentences);
       }
     }
-    // Если content уже существовал и в нём есть audio_order — используем его
+    // Если content уже существовал и в нём есть audio_or_order — используем его
     // как источник истины (приоритет над config)
-    if (state.content.audio_order !== undefined && state.content.audio_order !== null && state.content.audio_order !== '') {
-      state.config.audio_order = state.content.audio_order;
+    if (state.content.audio_or_order !== undefined && state.content.audio_or_order !== null && state.content.audio_or_order !== '') {
+      state.config.audio_order = state.content.audio_or_order;
     } else if (audioOrderFromConfig) {
-      // Если в content нет audio_order, но есть в config — сохраняем в content
-      state.content.audio_order = audioOrderFromConfig;
+      // Если в content нет audio_or_order, но есть в config — сохраняем в content
+      state.content.audio_or_order = audioOrderFromConfig;
     }
-    // Аналогично для audio_user_shared
-    if (state.content.audio_user_shared) {
-      state.config.audio_user_shared = state.content.audio_user_shared;
-      state._sharedAudioFilename = state.content.audio_user_shared;
+    // Аналогично для audio_or_shared
+    if (state.content.audio_or_shared) {
+      state.config.audio_user_shared = state.content.audio_or_shared;
+      state._sharedAudioFilename = state.content.audio_or_shared;
     } else if (audioUserSharedFromConfig) {
-      state.content.audio_user_shared = audioUserSharedFromConfig;
+      state.content.audio_or_shared = audioUserSharedFromConfig;
     }
   } else if (typeof DictationContent !== 'undefined') {
+    // Группируем rawSentences по language_code в langBlocks
+    var langBlocks = [];
+    if (rawSentences && rawSentences.length > 0) {
+      var grouped = {};
+      rawSentences.forEach(function (s) {
+        var lc = s.language_code || '';
+        if (!lc) return;
+        if (!grouped[lc]) grouped[lc] = [];
+        grouped[lc].push(s);
+      });
+      langBlocks = Object.keys(grouped).map(function (lc) {
+        return { lang: lc, sentences: grouped[lc] };
+      });
+    } else {
+      // Если нет sentences, создаём пустые блоки для оригинального и переводного языков
+      if (langOrig) langBlocks.push({ lang: langOrig, sentences: [] });
+      if (langTr && langTr !== langOrig) langBlocks.push({ lang: langTr, sentences: [] });
+    }
     state.content = new DictationContent({
       dictationId: dictationId,
-      langOrig: langOrig,
-      langTr: langTr,
-      sentences: rawSentences,
-      audio_order: audioOrderFromConfig,
-      audio_user_shared: audioUserSharedFromConfig,
+      langBlocks: langBlocks,
+      audio_or_order: audioOrderFromConfig,
+      audio_or_shared: audioUserSharedFromConfig,
     });
   } else {
-    state.content = {
-      dictationId: dictationId,
-      langOrig: langOrig,
-      langTr: langTr,
-      audio_order: audioOrderFromConfig,
-      audio_user_shared: audioUserSharedFromConfig,
-      _sentences: rawSentences.map(function (s, i) {
-        return {
-          key: s.key || 's_' + i,
+    // Fallback: создаём простой объект с методами, совместимыми с новой структурой
+    var fallbackLangBlocks = [];
+    if (rawSentences && rawSentences.length > 0) {
+      var grouped = {};
+      rawSentences.forEach(function (s) {
+        var lc = s.language_code || '';
+        if (!lc) return;
+        if (!grouped[lc]) grouped[lc] = [];
+        grouped[lc].push({
+          key: s.key || 's_' + grouped[lc].length,
           position: s.position != null ? Number(s.position) : null,
-          text_original: s.original || s.text || s.text_original || '',
-          text_translation: s.translation || s.text_translation || '',
-          audio: s.audio_a || s.audio || s.audio_original || '',
-          audio_original: s.audio || s.audio_original || '',
-          audio_translation: s.translation_audio || s.audio_tr || s.audio_translation || '',
-          audio_file: s.audio_file || s.audio_f || null,
-          audio_mic: s.audio_mic || s.audio_m || null,
+          text: s.text || '',
+          audio: s.audio || '',
+          audio_file: s.audio_file || null,
+          audio_mic: s.audio_mic || null,
           start: (s.start != null && s.start !== '') ? s.start : '',
           end: (s.end != null && s.end !== '') ? s.end : '',
           checked: s.checked || false,
           explanation: s.explanation || '',
-          speaker: s.speaker || '',
-        };
-      }),
-      getAllSentenceCores: function () { return this._sentences.slice(); },
-      getSentence: function (key) { return this._sentences.find(function (s) { return s.key === String(key); }) || null; },
-      getAllKeys: function () { return this._sentences.map(function (s) { return s.key; }); },
+        });
+      });
+      fallbackLangBlocks = Object.keys(grouped).map(function (lc) {
+        return { lang: lc, sentences: grouped[lc] };
+      });
+    } else {
+      if (langOrig) fallbackLangBlocks.push({ lang: langOrig, sentences: [] });
+      if (langTr && langTr !== langOrig) fallbackLangBlocks.push({ lang: langTr, sentences: [] });
+    }
+    state.content = {
+      dictationId: dictationId,
+      audio_or_order: audioOrderFromConfig,
+      audio_or_shared: audioUserSharedFromConfig,
+      langBlocks: fallbackLangBlocks,
+      getAllSentenceCores: function () {
+        var orig = this.langBlocks[0];
+        return orig ? orig.sentences.slice() : [];
+      },
+      getSentence: function (key) {
+        var orig = this.langBlocks[0];
+        if (!orig) return null;
+        return orig.sentences.find(function (s) { return s.key === String(key); }) || null;
+      },
+      getSentenceForLang: function (key, lang) {
+        var block = this.langBlocks.find(function (b) { return b.lang === lang; });
+        if (!block) return null;
+        return block.sentences.find(function (s) { return s.key === String(key); }) || null;
+      },
+      getAllKeys: function () {
+        var orig = this.langBlocks[0];
+        return orig ? orig.sentences.map(function (s) { return s.key; }) : [];
+      },
+      setSentences: function (sentences) {
+        if (!Array.isArray(sentences)) return;
+        var grouped = {};
+        sentences.forEach(function (s) {
+          var lc = s.language_code || '';
+          if (!lc) return;
+          if (!grouped[lc]) grouped[lc] = [];
+          grouped[lc].push({
+            key: s.key || 's_' + grouped[lc].length,
+            position: s.position != null ? Number(s.position) : null,
+            text: s.text || '',
+            audio: s.audio || '',
+            audio_file: s.audio_file || null,
+            audio_mic: s.audio_mic || null,
+            start: (s.start != null && s.start !== '') ? s.start : '',
+            end: (s.end != null && s.end !== '') ? s.end : '',
+            checked: s.checked || false,
+            explanation: s.explanation || '',
+          });
+        });
+        this.langBlocks = Object.keys(grouped).map(function (lc) {
+          return { lang: lc, sentences: grouped[lc] };
+        });
+      },
     };
   }
 
@@ -2824,7 +2885,7 @@ async function _restoreSelfAudioFromSentences() {
   var filenameEl = document.getElementById('editorModalSelfFilename');
   if (filenameEl) filenameEl.textContent = micFilename;
   var sentenceTextEl = document.getElementById('editorModalSelfSentenceText');
-  if (sentenceTextEl) sentenceTextEl.textContent = sentence.text_original || '—';
+  if (sentenceTextEl) sentenceTextEl.textContent = sentence.text || '—';
 
   // Пробуем получить URL через AudioManager
   var am = _ensureAudioManager();
@@ -2914,7 +2975,7 @@ async function _loadSelfAudioForRow(sentence) {
     selfFilenameEl.textContent = (sentence && sentence.audio_mic) ? sentence.audio_mic : '';
   }
   if (selfSentenceTextEl) {
-    selfSentenceTextEl.textContent = (sentence && sentence.text_original) ? sentence.text_original : '—';
+    selfSentenceTextEl.textContent = (sentence && sentence.text) ? sentence.text : '—';
   }
 
   if (!sentence) return;
@@ -3502,17 +3563,7 @@ function init() {
   }
 
   // Обработчики кнопок fill modal
-  var fillCreateBtn = document.getElementById('newDictationFillCreateBtn');
-  if (fillCreateBtn) {
-    fillCreateBtn.addEventListener('click', function () {
-      if (window.NewDictationFillModal && typeof window.NewDictationFillModal.create === 'function') {
-        window.NewDictationFillModal.create().catch(function (err) {
-          console.error('[NewDictationFillModal] create error:', err);
-          alert('Помилка при створенні диктанту: ' + (err.message || err));
-        });
-      }
-    });
-  }
+  // Кнопка newDictationFillCreateBtn использует onclick в HTML, поэтому здесь не дублируем
 
   var fillCloseBtn = document.getElementById('newDictationFillCloseBtn');
   if (fillCloseBtn) {
@@ -3668,64 +3719,120 @@ window.NewDictationFillModal = {
       var selectedRadio = document.querySelector('input[name="newDictationVoiceMode"]:checked');
       var voiceMode = selectedRadio ? selectedRadio.value : 'auto';
 
-      // Парсим текст на предложения
+      // Определяем, нужно ли генерировать аудио (только для voiceMode === 'auto')
+      var shouldGenerateAudio = (voiceMode === 'auto');
+
+      // Парсим текст на предложения (по образу parseInputText из script_dictation_editor.js)
       var normalizedText = text.replace(/\u2028/g, '\n');
       var lines = normalizedText.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
-      var origSentences = [];
-      var trSentences = [];
+      // Плоский массив предложений с language_code
+      var flatSentences = [];
       var keyCounter = 0;
 
       for (var i = 0; i < lines.length; i++) {
         var line = lines[i];
+
+        // Пропускаем строки, начинающиеся с разделителя (это строки перевода, они обрабатываются ниже)
         if (line.startsWith(delimiter)) continue;
 
         var key = String(keyCounter).padStart(3, '0');
         keyCounter++;
 
-        var origSentence = {
-          key: key,
-          position: keyCounter,
-          text_original: line,
-          text_translation: '',
-          audio: '',
-          audio_original: '',
-          audio_translation: '',
-          audio_file: null,
-          audio_mic: null,
-          start: '',
-          end: '',
-          checked: false,
-          explanation: '',
-          speaker: '1',
-        };
+        // Оригинальный текст
+        var origText = line;
 
+        // Проверяем, есть ли перевод на следующей строке (начинается с delimiter)
         var trText = '';
+        var hasExplicitTranslation = false;
         if (i + 1 < lines.length && lines[i + 1].startsWith(delimiter)) {
           trText = lines[i + 1].substring(delimiter.length).trim();
           i++;
+          hasExplicitTranslation = true;
         }
 
-        var trSentence = {
+        // Если явного перевода нет, делаем автоперевод (если функция доступна и указан язык перевода)
+        if (!hasExplicitTranslation && langTr && typeof autoTranslate === 'function') {
+          try {
+            console.log('[NewDictationFillModal] auto-translating:', origText);
+            trText = await autoTranslate(origText, langOrig, langTr);
+          } catch (e) {
+            console.warn('[NewDictationFillModal] autoTranslate error:', e);
+            trText = '';
+          }
+        }
+
+        // Собираем explanation (строки // после текущего предложения)
+        var explanationText = '';
+        while (i + 1 < lines.length && lines[i + 1].startsWith('//')) {
+          var commentLine = lines[i + 1].substring(2).trim();
+          if (explanationText) {
+            explanationText += '\n' + commentLine;
+          } else {
+            explanationText = commentLine;
+          }
+          i++;
+        }
+
+        // Генерируем аудио для оригинала (только если voiceMode === 'auto' и функция доступна)
+        var audioOrig = '';
+        var audioTr = '';
+        if (shouldGenerateAudio && typeof generateAudioForSentence === 'function') {
+          try {
+            var tempOrigSentence = { key: key, text: origText, audio: '' };
+            await generateAudioForSentence(tempOrigSentence, langOrig);
+            audioOrig = tempOrigSentence.audio || '';
+            console.log('[NewDictationFillModal] generated audio for original:', key, audioOrig);
+          } catch (e) {
+            console.warn('[NewDictationFillModal] generateAudioForSentence error:', e);
+          }
+
+          // Генерируем аудио для перевода (если есть текст перевода)
+          if (trText) {
+            try {
+              var tempTrSentence = { key: key, text: trText, audio: '' };
+              await generateAudioForSentence(tempTrSentence, langTr);
+              audioTr = tempTrSentence.audio || '';
+              console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
+            } catch (e) {
+              console.warn('[NewDictationFillModal] generateAudioForSentence translation error:', e);
+            }
+          }
+        }
+
+        // Добавляем предложение оригинала с language_code
+        flatSentences.push({
+          language_code: langOrig,
           key: key,
           position: keyCounter,
-          text_original: trText,
-          text_translation: line,
-          audio: '',
-          audio_original: '',
-          audio_translation: '',
+          text: origText,
+          audio: audioOrig,
           audio_file: null,
           audio_mic: null,
           start: '',
           end: '',
           checked: false,
-          explanation: '',
-          speaker: '1',
-        };
+          explanation: explanationText,
+        });
 
-        origSentences.push(origSentence);
-        trSentences.push(trSentence);
+        // Добавляем предложение перевода с language_code (если есть текст перевода)
+        if (trText) {
+          flatSentences.push({
+            language_code: langTr,
+            key: key,
+            position: keyCounter,
+            text: trText,
+            audio: audioTr,
+            audio_file: null,
+            audio_mic: null,
+            start: '',
+            end: '',
+            checked: false,
+            explanation: '',
+          });
+        }
       }
 
+      // Определяем audio_order в зависимости от voice mode
       var audioOrder = '';
       if (voiceMode === 'file') {
         audioOrder = 'f';
@@ -3741,27 +3848,15 @@ window.NewDictationFillModal = {
       config.translationLanguage = langTr || '';
       config.level = config.level || 'A1';
       config.audio_order = audioOrder;
+      config.sentences = flatSentences;
 
-      var combinedSentences = [];
-      for (var j = 0; j < origSentences.length; j++) {
-        combinedSentences.push({
-          key: origSentences[j].key,
-          position: origSentences[j].position,
-          original: origSentences[j].text_original,
-          translation: trSentences[j] ? trSentences[j].text_original : '',
-          audio: '',
-          audio_original: '',
-          audio_translation: '',
-          audio_file: null,
-          audio_mic: null,
-          start: '',
-          end: '',
-          checked: false,
-          explanation: '',
-          speaker: '1',
-        });
+      // Обновляем state.content ДО закрытия fill-модалки,
+      // чтобы _renderTable() в _updateEditorFromFillConfig могла прочитать sentences
+      if (state.content) {
+        if (typeof state.content.setSentences === 'function') {
+          state.content.setSentences(flatSentences);
+        }
       }
-      config.sentences = combinedSentences;
 
       this.close();
 
@@ -4094,6 +4189,100 @@ function _updateEditorFromFillConfig(config) {
     var evt = document.createEvent('HTMLEvents');
     evt.initEvent('change', true, false);
     radio.dispatchEvent(evt);
+  }
+
+  // Если state.content был обнулён (например, после close()), восстанавливаем его из config.sentences
+  if (!state.content && config.sentences && config.sentences.length > 0) {
+    if (typeof DictationContent !== 'undefined') {
+      // Группируем config.sentences по language_code в langBlocks
+      var langBlocks = [];
+      var grouped = {};
+      config.sentences.forEach(function (s) {
+        var lc = s.language_code || '';
+        if (!lc) return;
+        if (!grouped[lc]) grouped[lc] = [];
+        grouped[lc].push(s);
+      });
+      langBlocks = Object.keys(grouped).map(function (lc) {
+        return { lang: lc, sentences: grouped[lc] };
+      });
+      state.content = new DictationContent({
+        dictationId: config.dictationId || '',
+        langBlocks: langBlocks,
+        audio_or_order: config.audio_order || '',
+      });
+    } else {
+      // Fallback: создаём простой объект с методами, совместимыми с новой структурой
+      var fallbackLangBlocks = [];
+      var grouped = {};
+      config.sentences.forEach(function (s) {
+        var lc = s.language_code || '';
+        if (!lc) return;
+        if (!grouped[lc]) grouped[lc] = [];
+        grouped[lc].push({
+          key: s.key || 's_' + grouped[lc].length,
+          position: s.position != null ? Number(s.position) : null,
+          text: s.text || '',
+          audio: s.audio || '',
+          audio_file: s.audio_file || null,
+          audio_mic: s.audio_mic || null,
+          start: (s.start != null && s.start !== '') ? s.start : '',
+          end: (s.end != null && s.end !== '') ? s.end : '',
+          checked: s.checked || false,
+          explanation: s.explanation || '',
+        });
+      });
+      fallbackLangBlocks = Object.keys(grouped).map(function (lc) {
+        return { lang: lc, sentences: grouped[lc] };
+      });
+      state.content = {
+        dictationId: config.dictationId || '',
+        audio_or_order: config.audio_order || '',
+        langBlocks: fallbackLangBlocks,
+        getAllSentenceCores: function () {
+          var orig = this.langBlocks[0];
+          return orig ? orig.sentences.slice() : [];
+        },
+        getSentence: function (key) {
+          var orig = this.langBlocks[0];
+          if (!orig) return null;
+          return orig.sentences.find(function (s) { return s.key === String(key); }) || null;
+        },
+        getSentenceForLang: function (key, lang) {
+          var block = this.langBlocks.find(function (b) { return b.lang === lang; });
+          if (!block) return null;
+          return block.sentences.find(function (s) { return s.key === String(key); }) || null;
+        },
+        getAllKeys: function () {
+          var orig = this.langBlocks[0];
+          return orig ? orig.sentences.map(function (s) { return s.key; }) : [];
+        },
+        setSentences: function (sentences) {
+          if (!Array.isArray(sentences)) return;
+          var grouped = {};
+          sentences.forEach(function (s) {
+            var lc = s.language_code || '';
+            if (!lc) return;
+            if (!grouped[lc]) grouped[lc] = [];
+            grouped[lc].push({
+              key: s.key || 's_' + grouped[lc].length,
+              position: s.position != null ? Number(s.position) : null,
+              text: s.text || '',
+              audio: s.audio || '',
+              audio_file: s.audio_file || null,
+              audio_mic: s.audio_mic || null,
+              start: (s.start != null && s.start !== '') ? s.start : '',
+              end: (s.end != null && s.end !== '') ? s.end : '',
+              checked: s.checked || false,
+              explanation: s.explanation || '',
+            });
+          });
+          this.langBlocks = Object.keys(grouped).map(function (lc) {
+            return { lang: lc, sentences: grouped[lc] };
+          });
+        },
+      };
+    }
   }
 
   // Перерисовываем таблицу

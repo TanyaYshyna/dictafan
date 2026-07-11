@@ -4355,25 +4355,23 @@
     }
   }
 
-  async function loadSentencesFromIndexedDb({ dictationId, langOrig, langTr }) {
+  async function loadSentencesFromIndexedDb({ dictationId }) {
     try {
       const idb = window.IdbManager;
       if (!idb || typeof idb.idbGet !== 'function' || typeof idb.openDraftDb !== 'function') return null;
 
       const dictId = String(dictationId || '').trim();
-      const lo = String(langOrig || '').trim();
-      const lt = String(langTr || '').trim();
-      if (!dictId || !lo || !lt) return null;
+      if (!dictId) return null;
 
       const rawUserId = String(getDraftUserIdForKey());
       const candidateKeys = [];
-      candidateKeys.push(`${rawUserId}:${dictId}:${lo}:${lt}`);
+      candidateKeys.push(`${rawUserId}:${dictId}`);
       try {
         const numericId = parseInt(dictId.replace(/^dict_/, ''), 10);
         if (Number.isFinite(numericId)) {
-          candidateKeys.push(`${rawUserId}:${numericId}:${lo}:${lt}`);
-          candidateKeys.push(`${rawUserId}:dict_${numericId}:${lo}:${lt}`);
-          candidateKeys.push(`anon:dict_${numericId}:${lo}:${lt}`);
+          candidateKeys.push(`${rawUserId}:${numericId}`);
+          candidateKeys.push(`${rawUserId}:dict_${numericId}`);
+          candidateKeys.push(`anon:dict_${numericId}`);
         }
       } catch (e) {
       }
@@ -4397,7 +4395,7 @@
               const cursor = req.result;
               if (!cursor) return resolve(null);
               const v = cursor.value;
-              if (v && v.dictationId === dictId && v.langOrig === lo && v.langTr === lt) {
+              if (v && v.dictationId === dictId) {
                 return resolve(v);
               }
               cursor.continue();
@@ -4420,15 +4418,14 @@
     }
   }
 
-  async function fetchSentencesFromServerAndCache({ dictationId, langOrig, langTr }) {
+  async function fetchSentencesFromServerAndCache({ dictationId }) {
     const dictId = String(dictationId || '').trim();
-    const lo = String(langOrig || '').trim();
-    const lt = String(langTr || '').trim();
-    if (!dictId || !lo || !lt) {
+    if (!dictId) {
       throw new Error('missing_dictation_params');
     }
 
-    const url = `/api/dictation/${encodeURIComponent(dictId)}/${encodeURIComponent(lo)}/${encodeURIComponent(lt)}/sentences`;
+    // Новый API возвращает все предложения всех языков плоским массивом
+    const url = `/api/dictation/${encodeURIComponent(dictId)}//sentences`;
     const response = await fetch(url, { method: 'GET', cache: 'no-store' });
     if (!response.ok) {
       const text = await response.text();
@@ -4454,12 +4451,10 @@
     const idb = window.IdbManager;
     if (idb && typeof idb.idbPut === 'function') {
       const userId = String(getDraftUserIdForKey());
-      const key = `${userId}:${dictId}:${lo}:${lt}`;
+      const key = `${userId}:${dictId}`;
       await idb.idbPut('dictations', {
         key,
         dictationId: dictId,
-        langOrig: lo,
-        langTr: lt,
         sentences,
         updatedAt: Date.now(),
       });
@@ -4483,10 +4478,9 @@
           };
           for (const s of sentences) {
             if (!s || typeof s !== 'object') continue;
-            const u1 = resolveAudioToUrl(s.audio, lo);
-            const u2 = resolveAudioToUrl(s.audio_tr, lt);
-            if (u1) audioUrls.push(u1);
-            if (u2) audioUrls.push(u2);
+            const lang = s.language_code || '';
+            const u = resolveAudioToUrl(s.audio, lang);
+            if (u) audioUrls.push(u);
           }
           const unique = Array.from(new Set(audioUrls.filter(Boolean)));
           if (unique.length) {
@@ -4501,16 +4495,14 @@
     return sentences;
   }
 
-  async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted, langOriginal, langTranslation }) {
+  async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted }) {
     const store = getRuntimeStore();
     if (!store) throw new Error('DictationRuntime_not_loaded');
 
     const dictationId = String(dictationIdFormatted || '').trim();
-    const langOrig = String(langOriginal || '').trim();
-    const langTr = String(langTranslation || '').trim();
-    if (!dictationId || !langOrig || !langTr) throw new Error('missing_dictation_params');
+    if (!dictationId) throw new Error('missing_dictation_params');
 
-    let sentences = await loadSentencesFromIndexedDb({ dictationId, langOrig, langTr });
+    let sentences = await loadSentencesFromIndexedDb({ dictationId });
     if (!Array.isArray(sentences) || sentences.length === 0) {
       try {
         if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
@@ -4531,7 +4523,7 @@
       }
 
       try {
-        await fetchSentencesFromServerAndCache({ dictationId, langOrig, langTr });
+        await fetchSentencesFromServerAndCache({ dictationId });
       } catch (e) {
         try {
           if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
@@ -4561,7 +4553,7 @@
         throw e;
       }
 
-      sentences = await loadSentencesFromIndexedDb({ dictationId, langOrig, langTr });
+      sentences = await loadSentencesFromIndexedDb({ dictationId });
       try {
         if (window.DesktopLoadingModal && typeof window.DesktopLoadingModal.hide === 'function') {
           window.DesktopLoadingModal.hide();
@@ -4581,7 +4573,7 @@
       throw new Error('empty_sentences');
     }
 
-    store.setContentSentences({ dictationId, langTr, sentences });
+    store.setContentSentences({ dictationId, sentences });
     return true;
   }
 
@@ -4590,11 +4582,10 @@
     if (!store) return null;
 
     const dictationId = String(parsed?.dictationIdFormatted || '').trim();
-    const langTr = String(parsed?.langTranslation || '').trim();
-    if (!dictationId || !langTr) return null;
+    if (!dictationId) return null;
 
     // Проверяем, что контент загружен и не пустой
-    const content = store.getContent({ dictationId, langTr });
+    const content = store.getContent({ dictationId });
     const allKeys = content ? content.getAllKeys() : [];
     if (!allKeys.length) {
       // Контент не загружен — не создаём сессию с пустыми данными
@@ -4603,7 +4594,6 @@
 
     const session = store.getOrCreateSession({
       dictationId,
-      langTr,
       exerciseId: null,
       subsetPositions,
       subsetSignature: null,

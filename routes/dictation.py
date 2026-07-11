@@ -384,7 +384,8 @@ def show_dictation(dictation_id, lang_orig, lang_tr):
 def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
     """
     API endpoint для загрузки предложений диктанта из БД.
-    Заменяет загрузку из JSON в HTML.
+    Возвращает все предложения всех языков одним плоским массивом,
+    где каждый объект содержит language_code.
     """
     try:
         # Извлекаем числовой ID из формата dict_<id>
@@ -394,91 +395,39 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
         # Извлекаем числовой ID
         db_id = int(dictation_id.replace('dict_', ''))
         
-        # Получаем предложения для языка оригинала из БД
-        original_sentences = get_dictation_sentences(db_id, lang_orig)
-        
-        # Получаем текущего пользователя (нужно для выбора языка перевода по умолчанию)
-        current_user = get_current_user()
-
-        # Выбираем язык перевода так же, как и в show_dictation
-        effective_lang_tr = (lang_tr or '').strip().lower()
-        try:
-            from helpers.db_dictations import get_dictation_translation_flags
-            flags = get_dictation_translation_flags(db_id) or {}
-            orig_norm = (lang_orig or '').strip().lower()
-            available_translations = sorted([
-                str(k).strip().lower()
-                for k, v in (flags or {}).items()
-                if v and k and str(k).strip().lower() and (not orig_norm or str(k).strip().lower() != orig_norm)
-            ])
-        except Exception:
-            available_translations = []
-
-        try:
-            user_native = (current_user or {}).get('native_language')
-            user_native = str(user_native).strip().lower() if user_native else ''
-        except Exception:
-            user_native = ''
-
-        if user_native and user_native in available_translations:
-            effective_lang_tr = user_native
-        elif effective_lang_tr and effective_lang_tr in available_translations:
-            pass
-        elif available_translations:
-            effective_lang_tr = available_translations[0]
-        else:
-            effective_lang_tr = (lang_orig or '').strip().lower()
-
-        # Получаем предложения для языка перевода из БД
-        translation_sentences = get_dictation_sentences(db_id, effective_lang_tr)
-        
-        # Создаем словарь переводов по ключу предложения
-        translation_dict = {s['sentence_key']: s for s in translation_sentences}
+        # Получаем ВСЕ предложения диктанта (все языки) из БД
+        all_sentences = get_dictation_sentences(db_id)
         
         # Формируем массив предложений в формате, ожидаемом фронтендом
         sentences = []
-        for orig_sentence in original_sentences:
-            sentence_key = orig_sentence['sentence_key']
-            translated = translation_dict.get(sentence_key, {})
+        for s in all_sentences:
+            lang_code = s.get('language_code', '')
+            audio_file = s.get('audio', '')
             
-            # Получаем все типы аудио для оригинала (как имена файлов, не URL)
-            audio_o_file = orig_sentence.get('audio', '')
-            audio_f_file = orig_sentence.get('audio_file', '')
-            audio_m_file = orig_sentence.get('audio_mic', '')
-            # Для перевода используем поле audio из данных перевода (язык lang_tr)
-            audio_tr_file = translated.get('audio', '')
-            
-            # start/end из БД
-            start_val = orig_sentence.get('start', '')
-            end_val = orig_sentence.get('end', '')
-            
-            # Формируем URL для аудио файлов
             sentence = {
-                "key": sentence_key,
-                "position": orig_sentence.get('position'),
-                "text": orig_sentence.get("text", ""),
-                "translation": translated.get("text", ""),
-                "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
-                "audio_a": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_orig, filename=audio_o_file) if audio_o_file else "",
-                "audio_file": audio_f_file,  # имя файла, не URL
-                "audio_f": audio_f_file,      # для обратной совместимости
-                "audio_m": audio_m_file,      # имя файла, не URL
-                "audio_tr": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=effective_lang_tr, filename=audio_tr_file) if audio_tr_file else "",
-                "start": str(start_val) if start_val else '',
-                "end": str(end_val) if end_val else '',
+                "key": s.get('sentence_key', ''),
+                "language_code": lang_code,
+                "position": s.get('position'),
+                "text": s.get("text", ""),
+                "explanation": s.get("explanation", ""),
+                "audio": url_for('dictation.api_get_dictation_audio_v2', dictation_id=dictation_id, lang=lang_code, filename=audio_file) if audio_file else "",
+                "audio_file": s.get('audio_file', ''),  # имя файла, не URL
+                "audio_mic": s.get('audio_mic', ''),     # имя файла, не URL
+                "start": str(s.get('start', '')) if s.get('start') is not None else '',
+                "end": str(s.get('end', '')) if s.get('end') is not None else '',
                 "completed_correctly": False,
-                "speaker": orig_sentence.get("speaker"),
-                "explanation": translated.get("explanation", "")
             }
             
             sentences.append(sentence)
         
-        # Получаем audio_user_shared из данных диктанта
+        # Получаем audio_user_shared и audio_order из данных диктанта
         audio_user_shared = None
+        audio_order = ''
         try:
             dictation_data = get_dictation_by_id(db_id)
             if dictation_data:
                 audio_user_shared = dictation_data.get('audio_user_shared')
+                audio_order = dictation_data.get('audio_order', '')
         except Exception:
             pass
 
@@ -486,7 +435,7 @@ def api_get_dictation_sentences(dictation_id, lang_orig, lang_tr):
             'success': True,
             'sentences': sentences,
             'audio_user_shared': audio_user_shared,
-            'audio_order': dictation_data.get('audio_order', '') if dictation_data else '',
+            'audio_order': audio_order,
         })
         
     except Exception as e:

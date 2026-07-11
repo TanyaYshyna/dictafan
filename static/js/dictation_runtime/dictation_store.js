@@ -18,78 +18,118 @@
   }
 
   class DictationContent {
-    constructor({ dictationId, langOrig, langTr, sentences, audio_order, audio_user_shared }) {
+    constructor({ dictationId, langBlocks, audio_or_order, audio_or_shared }) {
       this.dictationId = dictationId;
-      this.langOrig = langOrig;
-      this.langTr = langTr;
-      this.audio_order = (audio_order !== null && audio_order !== undefined) ? String(audio_order) : '';
-      this.audio_user_shared = (audio_user_shared !== null && audio_user_shared !== undefined) ? String(audio_user_shared) : null;
-      this._sentences = [];
-      if (Array.isArray(sentences)) {
-        this.setSentences(sentences);
+      this.audio_or_order = (audio_or_order !== null && audio_or_order !== undefined) ? String(audio_or_order) : '';
+      this.audio_or_shared = (audio_or_shared !== null && audio_or_shared !== undefined) ? String(audio_or_shared) : null;
+      this.langBlocks = [];
+      if (Array.isArray(langBlocks)) {
+        this.setLangBlocks(langBlocks);
       }
     }
 
+    /**
+     * Устанавливает langBlocks из массива блоков вида:
+     * [{ lang: 'en', sentences: [{ key, text, audio, ... }] }]
+     */
+    setLangBlocks(blocks) {
+      if (!Array.isArray(blocks)) return;
+      this.langBlocks = blocks.map((block) => {
+        const lang = block && block.lang ? String(block.lang) : '';
+        const rawSentences = Array.isArray(block.sentences) ? block.sentences : [];
+        const sentences = rawSentences.map((s, idx) => this._normalizeSentence(s, idx));
+        return { lang, sentences };
+      }).filter((b) => b.lang);
+    }
+
+    /**
+     * Устанавливает предложения из плоского массива с language_code.
+     * Группирует по language_code в langBlocks.
+     */
     setSentences(sentences) {
       if (!Array.isArray(sentences)) return;
-      this._sentences = sentences.map((s, idx) => {
-        const key = (s && s.key) ? String(s.key) : String(idx);
-        const position = (s && s.position != null) ? Number(s.position) : null;
-        const text_original = (s && s.text_original != null) ? String(s.text_original) : ((s && s.text != null) ? String(s.text) : ((s && s.original != null) ? String(s.original) : ''));
-        const text_translation = (s && s.text_translation != null) ? String(s.text_translation) : ((s && s.translation != null) ? String(s.translation) : '');
-        const audio_original = (s && s.audio_original != null) ? String(s.audio_original) : ((s && s.audio != null) ? String(s.audio) : '');
-        const audio_translation = (s && s.audio_translation != null) ? String(s.audio_translation) : ((s && s.audio_tr != null) ? String(s.audio_tr) : '');
-        // Редакторские поля (сохраняются как есть, без нормализации)
-        // audio — авто-озвучка (столбец A), приходит с сервера как audio_a
-        const audio = (s && s.audio_a != null) ? String(s.audio_a) : (s && s.audio_avto != null) ? String(s.audio_avto) : (s && s.audio != null) ? String(s.audio) : '';
-        const audio_file = (s && s.audio_file != null) ? s.audio_file : (s && s.audio_user != null) ? s.audio_user : null;
-        const audio_mic = (s && s.audio_mic != null) ? s.audio_mic : null;
-        const start = (s && s.start != null) ? String(s.start) : '';
-        const end = (s && s.end != null) ? String(s.end) : '';
-        const checked = (s && s.checked === true) ? true : false;
-        const explanation = (s && s.explanation != null) ? String(s.explanation) : '';
-        const speaker = (s && s.speaker != null) ? String(s.speaker) : '';
-        return {
-          key,
-          position: Number.isFinite(position) ? position : null,
-          text_original,
-          text_translation,
-          audio_original,
-          audio_translation,
-          // Редакторские поля
-          audio,
-          audio_file,
-          audio_mic,
-          start,
-          end,
-          checked,
-          explanation,
-          speaker,
-        };
-      });
+      const grouped = {};
+      for (const s of sentences) {
+        const lang = (s && s.language_code) ? String(s.language_code) : '';
+        if (!lang) continue;
+        if (!grouped[lang]) grouped[lang] = [];
+        grouped[lang].push(s);
+      }
+      this.langBlocks = Object.keys(grouped).map((lang) => ({
+        lang,
+        sentences: grouped[lang].map((s, idx) => this._normalizeSentence(s, idx)),
+      }));
     }
 
+    _normalizeSentence(s, idx) {
+      const key = (s && s.key) ? String(s.key) : String(idx);
+      const position = (s && s.position != null) ? Number(s.position) : null;
+      const text = (s && s.text != null) ? String(s.text) : '';
+      const audio = (s && s.audio != null) ? String(s.audio) : '';
+      const audio_file = (s && s.audio_file != null) ? s.audio_file : null;
+      const audio_mic = (s && s.audio_mic != null) ? s.audio_mic : null;
+      const start = (s && s.start != null) ? String(s.start) : '';
+      const end = (s && s.end != null) ? String(s.end) : '';
+      const checked = (s && s.checked === true) ? true : false;
+      const explanation = (s && s.explanation != null) ? String(s.explanation) : '';
+      return {
+        key,
+        position: Number.isFinite(position) ? position : null,
+        text,
+        audio,
+        audio_file,
+        audio_mic,
+        start,
+        end,
+        checked,
+        explanation,
+      };
+    }
+
+    /** Возвращает ключи предложений первого (оригинального) языка */
     getAllKeys() {
-      return this._sentences.map((s) => s.key);
+      const orig = this.langBlocks[0];
+      return orig ? orig.sentences.map((s) => s.key) : [];
     }
 
+    /** Возвращает все предложения первого (оригинального) языка */
     getAllSentenceCores() {
-      return this._sentences.slice();
+      const orig = this.langBlocks[0];
+      return orig ? orig.sentences.slice() : [];
     }
 
+    /** Ищет предложение по ключу в первом (оригинальном) языке */
     getSentence(key) {
       const k = String(key);
-      return this._sentences.find((s) => s.key === k) || null;
+      const orig = this.langBlocks[0];
+      if (!orig) return null;
+      return orig.sentences.find((s) => s.key === k) || null;
+    }
+
+    /** Возвращает предложение по ключу для указанного языка */
+    getSentenceForLang(key, lang) {
+      const k = String(key);
+      const block = this.langBlocks.find((b) => b.lang === lang);
+      if (!block) return null;
+      return block.sentences.find((s) => s.key === k) || null;
+    }
+
+    /** Возвращает блок для указанного языка */
+    getLangBlock(lang) {
+      return this.langBlocks.find((b) => b.lang === lang) || null;
+    }
+
+    /** Возвращает массив кодов языков */
+    getLanguages() {
+      return this.langBlocks.map((b) => b.lang);
     }
 
     toJSON() {
       return {
         dictationId: this.dictationId,
-        langOrig: this.langOrig,
-        langTr: this.langTr,
-        audio_order: this.audio_order,
-        audio_user_shared: this.audio_user_shared,
-        sentences: this._sentences,
+        audio_or_order: this.audio_or_order,
+        audio_or_shared: this.audio_or_shared,
+        langBlocks: this.langBlocks,
       };
     }
 
@@ -134,8 +174,7 @@
 
     get key() {
       const dictId = this.content ? this.content.dictationId : '';
-      const langTr = this.content ? this.content.langTr : '';
-      return _sessionKey(dictId, langTr, this.exerciseId, this.exerciseId ? null : this.subsetSignature);
+      return _sessionKey(dictId, '', this.exerciseId, this.exerciseId ? null : this.subsetSignature);
     }
 
     _ensureStateForKnownKeys() {
@@ -391,24 +430,25 @@
       this._maxSessions = 20;
     }
 
-    getOrCreateContent({ dictationId, langTr }) {
-      const key = dictationId + '::' + langTr;
+    /** Ключ контента теперь только по dictationId (без langTr) */
+    getOrCreateContent({ dictationId }) {
+      const key = dictationId;
       if (!this._contents.has(key)) {
-        this._contents.set(key, new DictationContent({ dictationId, langTr }));
+        this._contents.set(key, new DictationContent({ dictationId }));
       }
       return this._contents.get(key);
     }
 
-    setContentSentences({ dictationId, langTr, sentences }) {
-      const content = this.getOrCreateContent({ dictationId, langTr });
+    setContentSentences({ dictationId, sentences }) {
+      const content = this.getOrCreateContent({ dictationId });
       content.setSentences(sentences);
       return content;
     }
 
-    getOrCreateSession({ dictationId, langTr, exerciseId = null, subsetPositions = null, subsetSignature = null }) {
-      const content = this.getOrCreateContent({ dictationId, langTr });
+    getOrCreateSession({ dictationId, exerciseId = null, subsetPositions = null, subsetSignature = null }) {
+      const content = this.getOrCreateContent({ dictationId });
       const sig = subsetSignature || (subsetPositions ? _normalizeSubsetPositions(subsetPositions).join(',') : null);
-      const key = _sessionKey(dictationId, langTr, exerciseId, sig);
+      const key = _sessionKey(dictationId, '', exerciseId, sig);
       if (!this._sessions.has(key)) {
         const session = new DictationSession({
           content,
@@ -419,31 +459,28 @@
         this._evictIfNeeded(1);
       }
       const session = this._sessions.get(key);
-      // Если сессия уже существовала (например, восстановлена из IDB) и у неё нет activeKeys,
-      // а мы запрашиваем с subsetPositions — обновляем activeKeys при следующем вызове ensureDefaultSelection
       session.touch();
       return session;
     }
 
-    getContent({ dictationId, langTr }) {
-      const key = dictationId + '::' + langTr;
-      return this._contents.get(key) || null;
+    getContent({ dictationId }) {
+      return this._contents.get(dictationId) || null;
     }
 
-    getSession({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
-      const key = _sessionKey(dictationId, langTr, exerciseId, subsetSignature);
+    getSession({ dictationId, exerciseId = null, subsetSignature = null }) {
+      const key = _sessionKey(dictationId, '', exerciseId, subsetSignature);
       return this._sessions.get(key) || null;
     }
 
-    removeSession({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
-      const key = _sessionKey(dictationId, langTr, exerciseId, subsetSignature);
+    removeSession({ dictationId, exerciseId = null, subsetSignature = null }) {
+      const key = _sessionKey(dictationId, '', exerciseId, subsetSignature);
       this._sessions.delete(key);
     }
 
-    async removeSessionFromIdb({ dictationId, langTr, exerciseId = null, subsetSignature = null }) {
+    async removeSessionFromIdb({ dictationId, exerciseId = null, subsetSignature = null }) {
       try {
         if (!window.IdbManager || typeof window.IdbManager.idbDelete !== 'function') return;
-        const key = _sessionKey(dictationId, langTr, exerciseId, subsetSignature);
+        const key = _sessionKey(dictationId, '', exerciseId, subsetSignature);
         await window.IdbManager.idbDelete('sessions', key);
       } catch (e) {
         // silent
@@ -467,8 +504,6 @@
     }
 
     async persistToIdb() {
-      // Сериализуем вызовы: если persist уже выполняется, ждём его,
-      // чтобы не было гонок и потери данных при конкурентных вызовах.
       if (this._persistPromise) {
         try {
           await this._persistPromise;
@@ -489,12 +524,9 @@
         if (!window.IdbManager || typeof window.IdbManager.idbPut !== 'function') return;
         for (const [key, session] of this._sessions) {
           const data = session.toJSON();
-          // Сохраняем langTr отдельно, чтобы при восстановлении создать правильный контент
-          const langTr = session.content ? session.content.langTr : '';
           await window.IdbManager.idbPut('sessions', {
             key,
             dictationId: session.dictationId,
-            langTr: langTr,
             data: JSON.stringify(data),
             updatedAt: Date.now(),
           });
@@ -514,16 +546,10 @@
             const data = JSON.parse(rec.data);
             const dictId = data.dictationId || rec.dictationId;
             if (!dictId) continue;
-            // Используем langTr из записи, если есть, иначе из данных сессии
-            const langTr = String(rec.langTr || data.langTr || '').trim();
-            const content = this.getOrCreateContent({ dictationId: dictId, langTr });
-            // Если контент пустой (нет предложений) — не восстанавливаем сессию,
-            // она будет создана заново при открытии диктанта
+            const content = this.getOrCreateContent({ dictationId: dictId });
             const allKeys = content ? content.getAllKeys() : [];
             if (!allKeys.length) continue;
             const session = DictationSession.fromJSON(data, content);
-            // Используем ключ из IDB записи, чтобы при повторном открытии
-            // getOrCreateSession мог найти эту сессию по правильному ключу
             this._sessions.set(rec.key, session);
           } catch (e) {
             // skip corrupt record
