@@ -3506,7 +3506,10 @@ function init() {
   if (fillCreateBtn) {
     fillCreateBtn.addEventListener('click', function () {
       if (window.NewDictationFillModal && typeof window.NewDictationFillModal.create === 'function') {
-        window.NewDictationFillModal.create();
+        window.NewDictationFillModal.create().catch(function (err) {
+          console.error('[NewDictationFillModal] create error:', err);
+          alert('Помилка при створенні диктанту: ' + (err.message || err));
+        });
       }
     });
   }
@@ -3625,157 +3628,148 @@ window.NewDictationFillModal = {
   create: async function () {
     var self = this;
 
-    // Получаем текст
-    var textEditor = document.getElementById('newDictationFillText');
-    var rawText = textEditor ? (textEditor.innerText || textEditor.textContent || '') : '';
-    var text = rawText.trim();
-    if (!text) {
-      alert('Введіть текст диктанту');
-      return;
-    }
-
-    // Получаем разделитель
-    var delimiterInput = document.getElementById('newDictationFillDelimiter');
-    var delimiter = delimiterInput ? String(delimiterInput.value || '').trim() : '//';
-    if (!delimiter) delimiter = '//';
-
-    // Получаем языки
-    var langs = this._getSelectedLanguages();
-    var langOrig = langs.original;
-    var langTr = langs.translation;
-
-    if (!langOrig) {
-      alert('Виберіть мову оригіналу');
-      return;
-    }
-
-    // Получаем название
-    var titleInput = document.getElementById('newDictationFillTitle');
-    var title = titleInput ? String(titleInput.value || '').trim() : '';
-    if (!title) title = 'Без названия';
-
-    // Получаем voice mode
-    var selectedRadio = document.querySelector('input[name="newDictationVoiceMode"]:checked');
-    var voiceMode = selectedRadio ? selectedRadio.value : 'auto';
-
-    // Парсим текст на предложения
-    // Формат: оригинал, затем строка с делимитером + перевод
-    // Учитываем U+2028 (LINE SEPARATOR) как перенос строки
-    var normalizedText = text.replace(/\u2028/g, '\n');
-    var lines = normalizedText.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
-    var origSentences = [];
-    var trSentences = [];
-    var keyCounter = 0;
-
-    for (var i = 0; i < lines.length; i++) {
-      var line = lines[i];
-      // Если строка начинается с делимитера — это строка перевода без оригинала (пропускаем)
-      if (line.startsWith(delimiter)) continue;
-
-      var key = String(keyCounter).padStart(3, '0');
-      keyCounter++;
-
-      var origSentence = {
-        key: key,
-        position: keyCounter,
-        text_original: line,
-        text_translation: '',
-        audio: '',
-        audio_original: '',
-        audio_translation: '',
-        audio_file: null,
-        audio_mic: null,
-        start: '',
-        end: '',
-        checked: false,
-        explanation: '',
-        speaker: '1',
-      };
-
-      // Проверяем следующую строку — может быть перевод
-      var trText = '';
-      if (i + 1 < lines.length && lines[i + 1].startsWith(delimiter)) {
-        trText = lines[i + 1].substring(delimiter.length).trim();
-        i++; // пропускаем строку перевода
+    try {
+      // Получаем текст
+      var textEditor = document.getElementById('newDictationFillText');
+      var rawText = textEditor ? (textEditor.innerText || textEditor.textContent || '') : '';
+      var text = rawText.trim();
+      if (!text) {
+        alert('Введіть текст диктанту');
+        return;
       }
 
-      var trSentence = {
-        key: key,
-        position: keyCounter,
-        text_original: trText,
-        text_translation: line,
-        audio: '',
-        audio_original: '',
-        audio_translation: '',
-        audio_file: null,
-        audio_mic: null,
-        start: '',
-        end: '',
-        checked: false,
-        explanation: '',
-        speaker: '1',
-      };
+      // Получаем разделитель
+      var delimiterInput = document.getElementById('newDictationFillDelimiter');
+      var delimiter = delimiterInput ? String(delimiterInput.value || '').trim() : '//';
+      if (!delimiter) delimiter = '//';
 
-      origSentences.push(origSentence);
-      trSentences.push(trSentence);
+      // Получаем языки
+      var langs = this._getSelectedLanguages();
+      var langOrig = langs.original;
+      var langTr = langs.translation;
+
+      if (!langOrig) {
+        alert('Виберіть мову оригіналу');
+        return;
+      }
+
+      // Получаем название
+      var titleInput = document.getElementById('newDictationFillTitle');
+      var title = titleInput ? String(titleInput.value || '').trim() : '';
+      if (!title) title = 'Без названия';
+
+      // Получаем voice mode
+      var selectedRadio = document.querySelector('input[name="newDictationVoiceMode"]:checked');
+      var voiceMode = selectedRadio ? selectedRadio.value : 'auto';
+
+      // Парсим текст на предложения
+      var normalizedText = text.replace(/\u2028/g, '\n');
+      var lines = normalizedText.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+      var origSentences = [];
+      var trSentences = [];
+      var keyCounter = 0;
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (line.startsWith(delimiter)) continue;
+
+        var key = String(keyCounter).padStart(3, '0');
+        keyCounter++;
+
+        var origSentence = {
+          key: key,
+          position: keyCounter,
+          text_original: line,
+          text_translation: '',
+          audio: '',
+          audio_original: '',
+          audio_translation: '',
+          audio_file: null,
+          audio_mic: null,
+          start: '',
+          end: '',
+          checked: false,
+          explanation: '',
+          speaker: '1',
+        };
+
+        var trText = '';
+        if (i + 1 < lines.length && lines[i + 1].startsWith(delimiter)) {
+          trText = lines[i + 1].substring(delimiter.length).trim();
+          i++;
+        }
+
+        var trSentence = {
+          key: key,
+          position: keyCounter,
+          text_original: trText,
+          text_translation: line,
+          audio: '',
+          audio_original: '',
+          audio_translation: '',
+          audio_file: null,
+          audio_mic: null,
+          start: '',
+          end: '',
+          checked: false,
+          explanation: '',
+          speaker: '1',
+        };
+
+        origSentences.push(origSentence);
+        trSentences.push(trSentence);
+      }
+
+      var audioOrder = '';
+      if (voiceMode === 'file') {
+        audioOrder = 'f';
+      } else if (voiceMode === 'self') {
+        audioOrder = 'm';
+      } else {
+        audioOrder = '';
+      }
+
+      var config = this._editorConfig;
+      config.title = title;
+      config.originalLanguage = langOrig;
+      config.translationLanguage = langTr || '';
+      config.level = config.level || 'A1';
+      config.audio_order = audioOrder;
+
+      var combinedSentences = [];
+      for (var j = 0; j < origSentences.length; j++) {
+        combinedSentences.push({
+          key: origSentences[j].key,
+          position: origSentences[j].position,
+          original: origSentences[j].text_original,
+          translation: trSentences[j] ? trSentences[j].text_original : '',
+          audio: '',
+          audio_original: '',
+          audio_translation: '',
+          audio_file: null,
+          audio_mic: null,
+          start: '',
+          end: '',
+          checked: false,
+          explanation: '',
+          speaker: '1',
+        });
+      }
+      config.sentences = combinedSentences;
+
+      this.close();
+
+      config.isNewDictation = true;
+
+      if (typeof open === 'function') {
+        _updateEditorFromFillConfig(config);
+      }
+
+      this._switchTabByVoiceMode(voiceMode);
+    } catch (e) {
+      console.error('[NewDictationFillModal] create error:', e);
+      alert('Помилка при створенні диктанту: ' + (e.message || e));
     }
-
-    // Определяем audio_order по voice mode
-    var audioOrder = '';
-    if (voiceMode === 'file') {
-      audioOrder = 'f';
-    } else if (voiceMode === 'self') {
-      audioOrder = 'm';
-    } else {
-      audioOrder = '';
-    }
-
-    // Обновляем editorConfig
-    var config = this._editorConfig;
-    config.title = title;
-    config.originalLanguage = langOrig;
-    config.translationLanguage = langTr || '';
-    config.level = config.level || 'A1';
-    config.audio_order = audioOrder;
-
-    // Собираем sentences в формате DictationContent
-    var combinedSentences = [];
-    for (var j = 0; j < origSentences.length; j++) {
-      combinedSentences.push({
-        key: origSentences[j].key,
-        position: origSentences[j].position,
-        original: origSentences[j].text_original,
-        translation: trSentences[j] ? trSentences[j].text_original : '',
-        audio: '',
-        audio_original: '',
-        audio_translation: '',
-        audio_file: null,
-        audio_mic: null,
-        start: '',
-        end: '',
-        checked: false,
-        explanation: '',
-        speaker: '1',
-      });
-    }
-    config.sentences = combinedSentences;
-
-    // Закрываем fill modal
-    this.close();
-
-    // Обновляем редактор: переинициализируем с новыми данными
-    // Сохраняем флаг, что это новый диктант
-    config.isNewDictation = true;
-
-    // Переоткрываем редактор с обновлённым конфигом
-    // Но сначала нужно обновить state.config и перерисовать
-    if (typeof open === 'function') {
-      // Обновляем поля в уже открытом редакторе
-      _updateEditorFromFillConfig(config);
-    }
-
-    // Переключаем закладку в зависимости от voice mode
-    this._switchTabByVoiceMode(voiceMode);
   },
 
   /**
