@@ -3722,6 +3722,27 @@ window.NewDictationFillModal = {
       // Определяем, нужно ли генерировать аудио (только для voiceMode === 'auto')
       var shouldGenerateAudio = (voiceMode === 'auto');
 
+      // Получаем dictationId из конфига (для генерации аудио)
+      // Для нового диктанта dictationId может быть пустым — генерируем временный
+      var dictationId = this._editorConfig ? this._editorConfig.dictationId : '';
+      if (!dictationId) {
+        dictationId = 'dict_temp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+        console.log('[NewDictationFillModal] generated temp dictationId:', dictationId);
+        // Сохраняем временный ID в конфиг, чтобы _updateEditorFromFillConfig и _renderTable
+        // могли использовать его для построения URL аудио
+        if (this._editorConfig) {
+          this._editorConfig.dictationId = dictationId;
+        }
+      }
+
+      // Получаем safe_email для API запросов
+      var safeEmail = '';
+      try {
+        if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+          safeEmail = window.UM.getSafeEmail();
+        }
+      } catch (e) {}
+
       // Парсим текст на предложения (по образу parseInputText из script_dictation_editor.js)
       var normalizedText = text.replace(/\u2028/g, '\n');
       var lines = normalizedText.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
@@ -3750,11 +3771,26 @@ window.NewDictationFillModal = {
           hasExplicitTranslation = true;
         }
 
-        // Если явного перевода нет, делаем автоперевод (если функция доступна и указан язык перевода)
-        if (!hasExplicitTranslation && langTr && typeof autoTranslate === 'function') {
+        // Если явного перевода нет, делаем автоперевод через API /translate
+        if (!hasExplicitTranslation && langTr) {
           try {
             console.log('[NewDictationFillModal] auto-translating:', origText);
-            trText = await autoTranslate(origText, langOrig, langTr);
+            var trResp = await fetch('/translate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                text: origText,
+                language_original: langOrig,
+                language_translation: langTr,
+              })
+            });
+            var trData = await trResp.json();
+            if (trData.translation) {
+              trText = trData.translation;
+            } else {
+              console.warn('[NewDictationFillModal] translate API error:', trData.error);
+              trText = '';
+            }
           } catch (e) {
             console.warn('[NewDictationFillModal] autoTranslate error:', e);
             trText = '';
@@ -3773,15 +3809,43 @@ window.NewDictationFillModal = {
           i++;
         }
 
-        // Генерируем аудио для оригинала (только если voiceMode === 'auto' и функция доступна)
+        // Генерируем аудио для оригинала (только если voiceMode === 'auto')
         var audioOrig = '';
         var audioTr = '';
-        if (shouldGenerateAudio && typeof generateAudioForSentence === 'function') {
+        if (shouldGenerateAudio && dictationId) {
           try {
-            var tempOrigSentence = { key: key, text: origText, audio: '' };
-            await generateAudioForSentence(tempOrigSentence, langOrig);
-            audioOrig = tempOrigSentence.audio || '';
-            console.log('[NewDictationFillModal] generated audio for original:', key, audioOrig);
+            console.log('[NewDictationFillModal] generating audio for original:', key);
+            var genResp = await fetch('/generate_audio', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                dictation_id: dictationId,
+                text: origText,
+                language: langOrig,
+                filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
+                tipe_audio: 'avto',
+                safe_email: safeEmail,
+              })
+            });
+            var genData = await genResp.json();
+            if (genData.success && genData.audio_b64) {
+              // Сохраняем blob через AudioManager
+              var binaryStr = atob(genData.audio_b64);
+              var bytes = new Uint8Array(binaryStr.length);
+              for (var j = 0; j < binaryStr.length; j++) {
+                bytes[j] = binaryStr.charCodeAt(j);
+              }
+              var blob = new Blob([bytes], { type: genData.mime || 'audio/mpeg' });
+              var newFilename = genData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
+              var am = _ensureAudioManager();
+              if (am && typeof am.saveDictationAudioBlob === 'function') {
+                await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
+              }
+              audioOrig = newFilename;
+              console.log('[NewDictationFillModal] generated audio for original:', key, audioOrig);
+            } else {
+              console.warn('[NewDictationFillModal] generate_audio API error:', genData.error);
+            }
           } catch (e) {
             console.warn('[NewDictationFillModal] generateAudioForSentence error:', e);
           }
@@ -3789,10 +3853,37 @@ window.NewDictationFillModal = {
           // Генерируем аудио для перевода (если есть текст перевода)
           if (trText) {
             try {
-              var tempTrSentence = { key: key, text: trText, audio: '' };
-              await generateAudioForSentence(tempTrSentence, langTr);
-              audioTr = tempTrSentence.audio || '';
-              console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
+              console.log('[NewDictationFillModal] generating audio for translation:', key);
+              var genTrResp = await fetch('/generate_audio', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  dictation_id: dictationId,
+                  text: trText,
+                  language: langTr,
+                  filename_audio: 'tts_' + key + '_tr_' + Date.now() + '.mp3',
+                  tipe_audio: 'avto',
+                  safe_email: safeEmail,
+                })
+              });
+              var genTrData = await genTrResp.json();
+              if (genTrData.success && genTrData.audio_b64) {
+                var binaryStrTr = atob(genTrData.audio_b64);
+                var bytesTr = new Uint8Array(binaryStrTr.length);
+                for (var j2 = 0; j2 < binaryStrTr.length; j2++) {
+                  bytesTr[j2] = binaryStrTr.charCodeAt(j2);
+                }
+                var blobTr = new Blob([bytesTr], { type: genTrData.mime || 'audio/mpeg' });
+                var newFilenameTr = genTrData.filename || ('tts_' + key + '_tr_' + Date.now() + '.mp3');
+                var am2 = _ensureAudioManager();
+                if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
+                  await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
+                }
+                audioTr = newFilenameTr;
+                console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
+              } else {
+                console.warn('[NewDictationFillModal] generate_audio API error for translation:', genTrData.error);
+              }
             } catch (e) {
               console.warn('[NewDictationFillModal] generateAudioForSentence translation error:', e);
             }
