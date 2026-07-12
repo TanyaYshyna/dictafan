@@ -3930,16 +3930,8 @@ window.NewDictationFillModal = {
               var am = _ensureAudioManager();
               if (am && typeof am.saveDictationAudioBlob === 'function') {
                 var savedKey = await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
-                // saveDictationAudioBlob() теперь сам обновляет blob URL в _objectUrlByCanonicalUrl,
+                // saveDictationAudioBlob() сама создаёт blob URL в _objectUrlByCanonicalUrl,
                 // так что _handleAudioPlayback() сможет найти аудио без поиска в CacheStorage.
-                if (savedKey) {
-                  try {
-                    var objUrl = URL.createObjectURL(blob);
-                    am._setObjectUrlForCanonical(savedKey, objUrl);
-                  } catch (e) {
-                    console.warn('[NewDictationFillModal] pre-resolve audio URL error:', e);
-                  }
-                }
               }
               audioOrig = newFilename;
               console.log('[NewDictationFillModal] generated audio for original:', key, audioOrig);
@@ -3978,16 +3970,8 @@ window.NewDictationFillModal = {
                 var am2 = _ensureAudioManager();
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
                   var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
-                  // saveDictationAudioBlob() теперь сам обновляет blob URL в _objectUrlByCanonicalUrl,
-                  // но для гарантии также сохраняем через _setObjectUrlForCanonical().
-                  if (savedKeyTr) {
-                    try {
-                      var objUrlTr = URL.createObjectURL(blobTr);
-                      am2._setObjectUrlForCanonical(savedKeyTr, objUrlTr);
-                    } catch (e) {
-                      console.warn('[NewDictationFillModal] pre-resolve translation audio URL error:', e);
-                    }
-                  }
+                  // saveDictationAudioBlob() сама создаёт blob URL в _objectUrlByCanonicalUrl,
+                  // так что _handleAudioPlayback() сможет найти аудио без поиска в CacheStorage.
                 }
                 audioTr = newFilenameTr;
                 console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);

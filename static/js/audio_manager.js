@@ -1335,24 +1335,28 @@ class AudioManagerClass {
             if (!key) return '';
             if (!blob || !blob.size) return '';
 
-            const headers = new Headers();
-            headers.set('Content-Type', (mime || blob.type || 'audio/mpeg'));
-            headers.set('Cache-Control', 'no-store');
-
-            const cache = await this.openMediaCache();
-            if (!cache) return '';
-            await cache.put(key, new Response(blob, { status: 200, headers }));
-
-            // Если для этого ключа уже есть blob URL — обновляем его свежими данными,
-            // чтобы play() мог сразу использовать blob URL без поиска в CacheStorage.
-            // Если blob URL ещё не был создан — не создаём его здесь, чтобы избежать
-            // утечки памяти. Blob URL будет создан при первом вызове resolvePlayableUrl()
-            // или явно через _setObjectUrlForCanonical().
+            // Всегда создаём blob URL, чтобы play() мог сразу использовать его
+            // без поиска в CacheStorage. Это гарантирует, что свежесгенерированное
+            // аудио будет доступно для воспроизведения даже если CacheStorage недоступен.
+            const objUrl = URL.createObjectURL(blob);
             const prev = this._getObjectUrlForCanonical(key);
-            if (prev && prev.startsWith('blob:')) {
+            if (prev && prev.startsWith('blob:') && prev !== objUrl) {
                 try { URL.revokeObjectURL(prev); } catch (e) {}
-                const freshObjUrl = URL.createObjectURL(blob);
-                this._objectUrlByCanonicalUrl[key] = freshObjUrl;
+            }
+            this._objectUrlByCanonicalUrl[key] = objUrl;
+
+            // Сохраняем в CacheStorage (если доступен) для офлайн-доступа
+            try {
+                const headers = new Headers();
+                headers.set('Content-Type', (mime || blob.type || 'audio/mpeg'));
+                headers.set('Cache-Control', 'no-store');
+                const cache = await this.openMediaCache();
+                if (cache) {
+                    await cache.put(key, new Response(blob, { status: 200, headers }));
+                }
+            } catch (e) {
+                // CacheStorage может быть недоступен (квота, приватный режим и т.д.),
+                // но blob URL уже создан — аудио будет работать.
             }
 
             return key;
