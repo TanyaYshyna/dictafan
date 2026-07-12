@@ -3803,6 +3803,7 @@ window.NewDictationFillModal = {
       var langs = this._getSelectedLanguages();
       var langOrig = langs.original;
       var langTr = langs.translation;
+      console.log('[NewDictationFillModal] create() languages', { langOrig, langTr });
 
       if (!langOrig) {
         alert('Виберіть мову оригіналу');
@@ -3955,7 +3956,7 @@ window.NewDictationFillModal = {
           // Генерируем аудио для перевода (если есть текст перевода)
           if (trText) {
             try {
-              console.log('[NewDictationFillModal] generating audio for translation:', key);
+              console.log('[NewDictationFillModal] generating audio for translation:', key, { langTr, trText: trText.slice(0, 50) });
               var genTrResp = await fetch('/generate_audio', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
