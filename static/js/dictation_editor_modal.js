@@ -4323,10 +4323,11 @@ function _updateEditorFromFillConfig(config) {
   // Обновляем state.config
   state.config = config;
 
-  // Обновляем заголовок
-  var nameEl = document.getElementById('dictation-editor-modal-name');
-  if (nameEl) {
-    nameEl.textContent = config.title || 'Новий диктант';
+  // Обновляем заголовок — используем span#dictationEditorModalTitle,
+  // чтобы не уничтожить дочерние элементы (звёздочки unsaved-star)
+  var titleSpan = document.getElementById('dictationEditorModalTitle');
+  if (titleSpan) {
+    titleSpan.textContent = config.title || 'Новий диктант';
   }
 
   // Обновляем поле названия
@@ -4346,32 +4347,23 @@ function _updateEditorFromFillConfig(config) {
     idSpan.textContent = displayId || 'новий';
   }
 
-  // Обновляем языковые флаги под логотипом
-  if (config.originalLanguage || config.translationLanguage) {
-    var flagContainer = document.getElementById('dictation-editor-modal-lang-flags');
-    if (flagContainer) {
-      var origFlag = config.originalLanguage || '';
-      var trFlag = config.translationLanguage || '';
-      flagContainer.innerHTML = '';
-      if (origFlag) {
-        var img = document.createElement('img');
-        img.src = '/static/flags/' + origFlag + '.svg';
-        img.alt = origFlag;
-        img.className = 'lang-flag';
-        img.style.width = '20px';
-        img.style.height = '14px';
-        img.style.marginRight = '4px';
-        flagContainer.appendChild(img);
-      }
-      if (trFlag && trFlag !== origFlag) {
-        var img2 = document.createElement('img');
-        img2.src = '/static/flags/' + trFlag + '.svg';
-        img2.alt = trFlag;
-        img2.className = 'lang-flag';
-        img2.style.width = '20px';
-        img2.style.height = '14px';
-        flagContainer.appendChild(img2);
-      }
+  // Языковые флаги отображаются через LanguageSelector в #editorModalLangPair
+  // (инициализируется в _initLanguageFlags()). Код ниже удалён, т.к. элемента
+  // #dictation-editor-modal-lang-flags не существует в HTML-шаблоне.
+
+  // Устанавливаем статическую обложку-заглушку для языка (если нет загруженной обложки)
+  var coverImg = document.getElementById('dictationEditorModalCoverImage');
+  if (coverImg && (!coverImg.src || coverImg.src === window.location.href || coverImg.src.endsWith('/'))) {
+    var langForCover = config.originalLanguage || config.translationLanguage || '';
+    if (langForCover) {
+      // Пробуем статическую обложку для конкретного языка
+      coverImg.src = '/static/data/covers/cover_' + langForCover + '.webp';
+      coverImg.onerror = function () {
+        // Если нет обложки для языка — показываем общую заглушку
+        this.src = '/static/data/covers/cover.webp';
+      };
+    } else {
+      coverImg.src = '/static/data/covers/cover.webp';
     }
   }
 
@@ -4497,8 +4489,9 @@ function _updateEditorFromFillConfig(config) {
     }
   }
 
-  // Перерисовываем таблицу
+  // Перерисовываем таблицу и обновляем обработчики
   _renderTable();
+  _bindAudioPlaybackHandlers();
   _updateUnsavedStar();
 }
 
