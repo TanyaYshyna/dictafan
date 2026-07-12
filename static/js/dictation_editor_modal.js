@@ -1443,9 +1443,9 @@ function _initCoverUpload() {
       closeBtnId: 'crop-close',
       cancelBtnId: 'crop-cancel',
       confirmBtnId: 'crop-confirm',
-      aspectRatio: 1,
+      aspectRatio: 120 / 200,
       outputWidth: 200,
-      outputHeight: 200,
+      outputHeight: 120,
       outputType: 'image/webp',
       outputQuality: 0.85,
       onDirty: function () {
@@ -3915,6 +3915,20 @@ window.NewDictationFillModal = {
               var am = _ensureAudioManager();
               if (am && typeof am.saveDictationAudioBlob === 'function') {
                 await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
+                // Напрямую сохраняем blob URL в AudioManager, чтобы _handleAudioPlayback()
+                // мог найти аудио без поиска в CacheStorage (который может не сработать).
+                try {
+                  var canonicalUrl = am.buildDictationAudioUrl(dictationId, langOrig, newFilename);
+                  if (canonicalUrl) {
+                    var cacheKey = am._toCacheKey(canonicalUrl);
+                    if (cacheKey) {
+                      var objUrl = URL.createObjectURL(blob);
+                      am._objectUrlByCanonicalUrl[cacheKey] = objUrl;
+                    }
+                  }
+                } catch (e) {
+                  console.warn('[NewDictationFillModal] pre-resolve audio URL error:', e);
+                }
               }
               audioOrig = newFilename;
               console.log('[NewDictationFillModal] generated audio for original:', key, audioOrig);
@@ -3953,6 +3967,19 @@ window.NewDictationFillModal = {
                 var am2 = _ensureAudioManager();
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
                   await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
+                  // Напрямую сохраняем blob URL в AudioManager для аудио перевода
+                  try {
+                    var canonicalUrlTr = am2.buildDictationAudioUrl(dictationId, langTr, newFilenameTr);
+                    if (canonicalUrlTr) {
+                      var cacheKeyTr = am2._toCacheKey(canonicalUrlTr);
+                      if (cacheKeyTr) {
+                        var objUrlTr = URL.createObjectURL(blobTr);
+                        am2._objectUrlByCanonicalUrl[cacheKeyTr] = objUrlTr;
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('[NewDictationFillModal] pre-resolve translation audio URL error:', e);
+                  }
                 }
                 audioTr = newFilenameTr;
                 console.log('[NewDictationFillModal] generated audio for translation:', key, audioTr);
@@ -4167,7 +4194,16 @@ window.NewDictationFillModal = {
         }
         if (!defaultLearning) defaultLearning = 'en';
 
+        // Родной язык из профиля пользователя
         var nativeLang = 'ru';
+        try {
+          var userNative = window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang);
+          if (userNative) {
+            nativeLang = String(userNative).toLowerCase();
+          }
+        } catch (e) {
+          nativeLang = 'ru';
+        }
 
         var allLangs = Object.keys(languageData)
           .map(function (x) { return String(x || '').toLowerCase(); })
@@ -4368,6 +4404,12 @@ function _updateEditorFromFillConfig(config) {
   }
 
   // Обновляем языки через LanguageSelector
+  // Если LanguageSelector ещё не инициализирован (например, при создании нового диктанта
+  // open() был вызван с пустыми языками) — инициализируем его сейчас,
+  // когда языки уже известны из fill modal.
+  if (!state.headerLangPairSelector) {
+    _initLanguageFlags();
+  }
   if (config.originalLanguage || config.translationLanguage) {
     try {
       if (state.headerLangPairSelector && typeof state.headerLangPairSelector.setValues === 'function') {
