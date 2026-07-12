@@ -1130,6 +1130,17 @@ class AudioManagerClass {
         }
     }
 
+    /** Извлечь dictationId из URL вида /api/dictations/{dictationId}/... */
+    _extractDictationIdFromUrl(url) {
+        try {
+            const s = String(url || '').trim();
+            const m = s.match(/\/api\/dictations\/(dict_\w+)\//);
+            return m ? m[1] : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
     async ensureCachedResponse(url) {
         try {
             const u = this.normalizeMediaUrl(url);
@@ -1153,6 +1164,32 @@ class AudioManagerClass {
                 return false;
             }
             await cache.put(cacheKey, fetchRes.clone());
+
+            // Создаём blob URL для аудио активных диктантов.
+            // Активным считается диктант, который есть в пуле DictationRuntime.DictationSessionsStore.
+            // Это позволяет play() сразу использовать blob URL без fetch с сервера (который может вернуть 404,
+            // если B2 выключен или файл ещё не загружен).
+            const dictationId = this._extractDictationIdFromUrl(u);
+            const isActive = !!(dictationId && window.DictationRuntime &&
+                window.DictationRuntime.DictationSessionsStore &&
+                window.DictationRuntime.DictationSessionsStore._contents &&
+                window.DictationRuntime.DictationSessionsStore._contents.has(dictationId));
+
+            if (isActive) {
+                try {
+                    const blob = await fetchRes.clone().blob();
+                    if (blob && blob.size) {
+                        const prev = this._getObjectUrlForCanonical(cacheKey);
+                        if (prev && prev.startsWith('blob:')) {
+                            try { URL.revokeObjectURL(prev); } catch (e) {}
+                        }
+                        const freshObjUrl = URL.createObjectURL(blob);
+                        this._objectUrlByCanonicalUrl[cacheKey] = freshObjUrl;
+                    }
+                } catch (e) {
+                }
+            }
+
             return true;
         } catch (e) {
             return false;
@@ -1306,14 +1343,16 @@ class AudioManagerClass {
             if (!cache) return '';
             await cache.put(key, new Response(blob, { status: 200, headers }));
 
-            // Invalidate any previously-created objectURL for this key so the next play() gets fresh bytes.
-            try {
-                const prev = this._getObjectUrlForCanonical(key);
-                if (prev && prev.startsWith('blob:')) {
-                    try { URL.revokeObjectURL(prev); } catch (e) {}
-                    delete this._objectUrlByCanonicalUrl[key];
-                }
-            } catch (e) {
+            // Если для этого ключа уже есть blob URL — обновляем его свежими данными,
+            // чтобы play() мог сразу использовать blob URL без поиска в CacheStorage.
+            // Если blob URL ещё не был создан — не создаём его здесь, чтобы избежать
+            // утечки памяти. Blob URL будет создан при первом вызове resolvePlayableUrl()
+            // или явно через _setObjectUrlForCanonical().
+            const prev = this._getObjectUrlForCanonical(key);
+            if (prev && prev.startsWith('blob:')) {
+                try { URL.revokeObjectURL(prev); } catch (e) {}
+                const freshObjUrl = URL.createObjectURL(blob);
+                this._objectUrlByCanonicalUrl[key] = freshObjUrl;
             }
 
             return key;

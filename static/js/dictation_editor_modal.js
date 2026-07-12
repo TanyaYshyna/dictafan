@@ -746,7 +746,7 @@ function _handleAudioPlayback(event) {
   var audioUrl = am.buildDictationAudioUrl(state.config.dictationId, lang, audioFilename);
   if (!audioUrl) return;
 
-  // Пробуем найти blob URL напрямую в AudioManager (для свежесгенерированных аудио,
+  // Пробуем найти blob URL в AudioManager (для свежесгенерированных аудио,
   // которые ещё не сохранены на сервере). Если нашли — используем blob URL,
   // чтобы избежать 404 при попытке fetch.
   var blobUrl = '';
@@ -3930,9 +3930,8 @@ window.NewDictationFillModal = {
               var am = _ensureAudioManager();
               if (am && typeof am.saveDictationAudioBlob === 'function') {
                 var savedKey = await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
-                // Напрямую сохраняем blob URL в AudioManager, чтобы _handleAudioPlayback()
-                // мог найти аудио без поиска в CacheStorage (который может не сработать).
-                // Используем _setObjectUrlForCanonical() — штатный метод AudioManager.
+                // saveDictationAudioBlob() теперь сам обновляет blob URL в _objectUrlByCanonicalUrl,
+                // так что _handleAudioPlayback() сможет найти аудио без поиска в CacheStorage.
                 if (savedKey) {
                   try {
                     var objUrl = URL.createObjectURL(blob);
@@ -3979,7 +3978,8 @@ window.NewDictationFillModal = {
                 var am2 = _ensureAudioManager();
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
                   var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
-                  // Напрямую сохраняем blob URL в AudioManager для аудио перевода
+                  // saveDictationAudioBlob() теперь сам обновляет blob URL в _objectUrlByCanonicalUrl,
+                  // но для гарантии также сохраняем через _setObjectUrlForCanonical().
                   if (savedKeyTr) {
                     try {
                       var objUrlTr = URL.createObjectURL(blobTr);
