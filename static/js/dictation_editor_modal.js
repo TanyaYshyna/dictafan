@@ -690,6 +690,12 @@ function _getSentenceForButton(button) {
   if (!button || !state.content) return null;
   var key = button.dataset.key;
   if (!key) return null;
+  var lang = button.dataset.lang;
+  // Если указан язык — ищем предложение для этого языка,
+  // иначе возвращаем из первого языкового блока (оригинал).
+  if (lang) {
+    return state.content.getSentenceForLang(key, lang) || state.content.getSentence(key);
+  }
   return state.content.getSentence(key);
 }
 
