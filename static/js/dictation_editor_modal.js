@@ -4183,25 +4183,28 @@ window.NewDictationFillModal = {
           return;
         }
 
-        // Язык по умолчанию: из профиля пользователя или 'en'
-        var defaultLearning = '';
-        try {
-          defaultLearning = (window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage))
-            ? String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage)
-            : '';
-        } catch (e) {
-          defaultLearning = '';
-        }
-        if (!defaultLearning) defaultLearning = 'en';
-
-        // Родной язык из профиля пользователя
+        // Языки по умолчанию: из профиля пользователя
+        var defaultLearning = 'en';
         var nativeLang = 'ru';
         try {
-          var userNative = window.USER_LANGUAGE_DATA && (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang);
-          if (userNative) {
-            nativeLang = String(userNative).toLowerCase();
+          // Пробуем получить из USER_LANGUAGE_DATA (устанавливается на странице /library)
+          if (window.USER_LANGUAGE_DATA) {
+            if (window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage) {
+              defaultLearning = String(window.USER_LANGUAGE_DATA.currentLearning || window.USER_LANGUAGE_DATA.learning || window.USER_LANGUAGE_DATA.learningLanguage);
+            }
+            if (window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang) {
+              nativeLang = String(window.USER_LANGUAGE_DATA.nativeLanguage || window.USER_LANGUAGE_DATA.nativeLang).toLowerCase();
+            }
+          } else if (window.UM && typeof window.UM.getCurrentUser === 'function') {
+            // На desktop USER_LANGUAGE_DATA не установлен — читаем напрямую из UM
+            var user = window.UM.getCurrentUser();
+            if (user) {
+              if (user.current_learning) defaultLearning = String(user.current_learning).toLowerCase();
+              if (user.native_language) nativeLang = String(user.native_language).toLowerCase();
+            }
           }
         } catch (e) {
+          defaultLearning = 'en';
           nativeLang = 'ru';
         }
 

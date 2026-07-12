@@ -43,10 +43,8 @@ def get_app_cache_revision() -> str:
         base_dir = current_app.root_path
         candidates = [
             'sw.js',
-            os.path.join('static', 'js', 'private_library.js'),
             # os.path.join('static', 'js', 'script_dictation.js'),
             os.path.join('static', 'js', 'user_manager.js'),
-            os.path.join('static', 'css', 'style_private_library.css'),
             # os.path.join('static', 'css', 'style_dictation.css'),
         ]
         parts = []

@@ -293,27 +293,6 @@ def api_add_dictation_to_group_desks(dictation_id: int):
         return jsonify({"success": False, "error": str(exc)}), 500
 
 
-@library_bp.route("/private")
-@jwt_required()
-def private_library_page():
-    """
-    Страница приватной библиотеки пользователя:
-    - Мои книги (я создатель)
-    - Книги других авторов на моей полке
-    """
-    current_email = get_jwt_identity()
-    user = get_user_by_email(current_email)
-    if not user:
-        return jsonify({"success": False, "error": "User not found"}), 404
-
-    own_books, shelf_books = get_user_library_books(user["id"])
-    return render_template(
-        "private_library.html",
-        own_books=own_books,
-        shelf_books=shelf_books,
-    )
-
-
 @library_bp.route("/api/book", methods=["POST"])
 @jwt_required()
 def api_create_book():
