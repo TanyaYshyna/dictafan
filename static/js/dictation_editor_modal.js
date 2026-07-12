@@ -752,14 +752,18 @@ function _handleAudioPlayback(event) {
   var blobUrl = '';
   try {
     var cacheKey = am._toCacheKey(audioUrl);
+    console.log('[DEM] _handleAudioPlayback lookup', { audioUrl, cacheKey: cacheKey ? cacheKey.slice(0, 80) : '(empty)', lang, field, key });
     if (cacheKey) {
       blobUrl = am._getObjectUrlForCanonical(cacheKey);
+      console.log('[DEM] _handleAudioPlayback blobUrl found:', blobUrl ? blobUrl.slice(0, 60) : '(empty)');
     }
   } catch (e) {
     blobUrl = '';
+    console.warn('[DEM] _handleAudioPlayback lookup error:', e);
   }
 
   var playUrl = (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : audioUrl;
+  console.log('[DEM] _handleAudioPlayback playUrl:', playUrl.slice(0, 80));
 
   // Воспроизводим через audioManager
   if (typeof am.play === 'function') {

@@ -1332,8 +1332,9 @@ class AudioManagerClass {
         try {
             const url = this.buildDictationAudioUrl(dictationId, language, filename);
             const key = this._toCacheKey(url);
-            if (!key) return '';
-            if (!blob || !blob.size) return '';
+            console.log('[AudioManager] saveDictationAudioBlob', { dictationId, language, filename, key: key ? key.slice(0, 80) : '(empty)', blobSize: blob ? blob.size : 0 });
+            if (!key) { console.warn('[AudioManager] saveDictationAudioBlob: empty key'); return ''; }
+            if (!blob || !blob.size) { console.warn('[AudioManager] saveDictationAudioBlob: empty blob'); return ''; }
 
             // Всегда создаём blob URL, чтобы play() мог сразу использовать его
             // без поиска в CacheStorage. Это гарантирует, что свежесгенерированное
@@ -1344,6 +1345,7 @@ class AudioManagerClass {
                 try { URL.revokeObjectURL(prev); } catch (e) {}
             }
             this._objectUrlByCanonicalUrl[key] = objUrl;
+            console.log('[AudioManager] saveDictationAudioBlob: blob URL created', { key: key.slice(0, 80), objUrl });
 
             // Сохраняем в CacheStorage (если доступен) для офлайн-доступа
             try {
@@ -1353,14 +1355,15 @@ class AudioManagerClass {
                 const cache = await this.openMediaCache();
                 if (cache) {
                     await cache.put(key, new Response(blob, { status: 200, headers }));
+                    console.log('[AudioManager] saveDictationAudioBlob: saved to CacheStorage');
                 }
             } catch (e) {
-                // CacheStorage может быть недоступен (квота, приватный режим и т.д.),
-                // но blob URL уже создан — аудио будет работать.
+                console.warn('[AudioManager] saveDictationAudioBlob: CacheStorage error (non-fatal):', e);
             }
 
             return key;
         } catch (e) {
+            console.warn('[AudioManager] saveDictationAudioBlob: unexpected error:', e);
             return '';
         }
     }
