@@ -746,16 +746,31 @@ function _handleAudioPlayback(event) {
   var audioUrl = am.buildDictationAudioUrl(state.config.dictationId, lang, audioFilename);
   if (!audioUrl) return;
 
+  // Пробуем найти blob URL напрямую в AudioManager (для свежесгенерированных аудио,
+  // которые ещё не сохранены на сервере). Если нашли — используем blob URL,
+  // чтобы избежать 404 при попытке fetch.
+  var blobUrl = '';
+  try {
+    var cacheKey = am._toCacheKey(audioUrl);
+    if (cacheKey) {
+      blobUrl = am._getObjectUrlForCanonical(cacheKey);
+    }
+  } catch (e) {
+    blobUrl = '';
+  }
+
+  var playUrl = (blobUrl && blobUrl.startsWith('blob:')) ? blobUrl : audioUrl;
+
   // Воспроизводим через audioManager
   if (typeof am.play === 'function') {
-    am.play(button, audioUrl, function () {
+    am.play(button, playUrl, function () {
       _setButtonState(button, 'ready');
     });
     _setButtonState(button, 'playing');
   } else {
     // Fallback: просто new Audio
     try {
-      var audio = new Audio(audioUrl);
+      var audio = new Audio(playUrl);
       audio.play().catch(function (err) {
         console.warn('[dictationEditorModal] Audio play error', err);
       });
@@ -1443,7 +1458,7 @@ function _initCoverUpload() {
       closeBtnId: 'crop-close',
       cancelBtnId: 'crop-cancel',
       confirmBtnId: 'crop-confirm',
-      aspectRatio: 120 / 200,
+      aspectRatio: 200 / 120,
       outputWidth: 200,
       outputHeight: 120,
       outputType: 'image/webp',
@@ -3914,20 +3929,17 @@ window.NewDictationFillModal = {
               var newFilename = genData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
               var am = _ensureAudioManager();
               if (am && typeof am.saveDictationAudioBlob === 'function') {
-                await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
+                var savedKey = await am.saveDictationAudioBlob(dictationId, langOrig, newFilename, blob, genData.mime || 'audio/mpeg');
                 // Напрямую сохраняем blob URL в AudioManager, чтобы _handleAudioPlayback()
                 // мог найти аудио без поиска в CacheStorage (который может не сработать).
-                try {
-                  var canonicalUrl = am.buildDictationAudioUrl(dictationId, langOrig, newFilename);
-                  if (canonicalUrl) {
-                    var cacheKey = am._toCacheKey(canonicalUrl);
-                    if (cacheKey) {
-                      var objUrl = URL.createObjectURL(blob);
-                      am._objectUrlByCanonicalUrl[cacheKey] = objUrl;
-                    }
+                // Используем _setObjectUrlForCanonical() — штатный метод AudioManager.
+                if (savedKey) {
+                  try {
+                    var objUrl = URL.createObjectURL(blob);
+                    am._setObjectUrlForCanonical(savedKey, objUrl);
+                  } catch (e) {
+                    console.warn('[NewDictationFillModal] pre-resolve audio URL error:', e);
                   }
-                } catch (e) {
-                  console.warn('[NewDictationFillModal] pre-resolve audio URL error:', e);
                 }
               }
               audioOrig = newFilename;
@@ -3966,19 +3978,15 @@ window.NewDictationFillModal = {
                 var newFilenameTr = genTrData.filename || ('tts_' + key + '_tr_' + Date.now() + '.mp3');
                 var am2 = _ensureAudioManager();
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
-                  await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
+                  var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
                   // Напрямую сохраняем blob URL в AudioManager для аудио перевода
-                  try {
-                    var canonicalUrlTr = am2.buildDictationAudioUrl(dictationId, langTr, newFilenameTr);
-                    if (canonicalUrlTr) {
-                      var cacheKeyTr = am2._toCacheKey(canonicalUrlTr);
-                      if (cacheKeyTr) {
-                        var objUrlTr = URL.createObjectURL(blobTr);
-                        am2._objectUrlByCanonicalUrl[cacheKeyTr] = objUrlTr;
-                      }
+                  if (savedKeyTr) {
+                    try {
+                      var objUrlTr = URL.createObjectURL(blobTr);
+                      am2._setObjectUrlForCanonical(savedKeyTr, objUrlTr);
+                    } catch (e) {
+                      console.warn('[NewDictationFillModal] pre-resolve translation audio URL error:', e);
                     }
-                  } catch (e) {
-                    console.warn('[NewDictationFillModal] pre-resolve translation audio URL error:', e);
                   }
                 }
                 audioTr = newFilenameTr;
