@@ -20,6 +20,7 @@
 .dictation-kart--book-row.short-card {
   display: block;
   min-height: 0;
+  height: 120px;
 }
 
 .page-index .short-card.dictation-kart {
@@ -104,8 +105,8 @@
 .page-index .desk-card .dictation-kart-launch-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
-  right: auto;
+  left: auto;
+  right: 0;
   z-index: 200600;
   background-color: var(--color-panel-bg, #fff);
   border: 1px solid var(--color-border-light, #dee2e6);

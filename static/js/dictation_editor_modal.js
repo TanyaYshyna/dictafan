@@ -748,10 +748,8 @@ function _handleAudioPlayback(event) {
 
   // Воспроизводим через audioManager
   if (typeof am.play === 'function') {
-    am.play(button, audioUrl, {
-      onEnd: function () {
-        _setButtonState(button, 'ready');
-      }
+    am.play(button, audioUrl, function () {
+      _setButtonState(button, 'ready');
     });
     _setButtonState(button, 'playing');
   } else {
@@ -848,10 +846,8 @@ async function _handleCutAudioForSentence(button, sentence, lang, field) {
     // Строим canonical URL через AudioManager и проигрываем
     if (am && typeof am.play === 'function') {
       var canonicalUrl = am.buildDictationAudioUrl(dictationId, lang, newFilename);
-      am.play(button, canonicalUrl, {
-        onEnd: function () {
-          _setButtonState(button, 'ready');
-        }
+      am.play(button, canonicalUrl, function () {
+        _setButtonState(button, 'ready');
       });
       _setButtonState(button, 'playing');
     } else {
@@ -952,6 +948,20 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   } catch (e) {
     console.warn('[dictationEditorModal] B2 upload error', e);
   }
+}
+
+/**
+ * Конвертирует Blob в base64-строку (data URL).
+ * @param {Blob} blob
+ * @returns {Promise<string>}
+ */
+function _blobToBase64(blob) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onloadend = function () { resolve(reader.result); };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 function _bindAudioPlaybackHandlers() {
@@ -1268,8 +1278,16 @@ function _initFormFields() {
   }
 
   const idEl = document.getElementById('dictation-editor-modal-id');
-  if (idEl && state.config.dictationId) {
-    idEl.textContent = '#' + state.config.dictationId;
+  if (idEl) {
+    var displayId = state.config.dictationId || '';
+    if (displayId.startsWith('dict_')) {
+      displayId = '#' + displayId.replace('dict_', '');
+    } else if (displayId) {
+      displayId = '#' + displayId;
+    } else {
+      displayId = 'новий';
+    }
+    idEl.textContent = displayId;
   }
 
   const authorUrlInput = document.getElementById('dictationEditorModalAuthorUrl');
@@ -1408,31 +1426,31 @@ function _initVoiceModeRadios() {
 }
 
 function _initCoverUpload() {
-  const uploadBtn = document.getElementById('dictationEditorModalCoverUploadBtn');
-  const fileInput = document.getElementById('dictationEditorModalCoverFile');
-  const coverImage = document.getElementById('dictationEditorModalCoverImage');
+  // Используем CoverManager для выбора и кропа обложки
+  if (window.CoverManager && typeof window.CoverManager.bind === 'function') {
+    var uploadBtn = document.getElementById('dictationEditorModalCoverUploadBtn');
+    if (!uploadBtn) return;
+    // Защита от повторного биндинга
+    if (uploadBtn.getAttribute('data-cover-bound')) return;
+    uploadBtn.setAttribute('data-cover-bound', '1');
 
-  if (!uploadBtn || !fileInput) return;
-
-  if (!uploadBtn.getAttribute('data-cover-handler')) {
-    uploadBtn.setAttribute('data-cover-handler', '1');
-    uploadBtn.addEventListener('click', function () {
-      fileInput.click();
-    });
-  }
-
-  if (!fileInput.getAttribute('data-cover-handler')) {
-    fileInput.setAttribute('data-cover-handler', '1');
-    fileInput.addEventListener('change', function (e) {
-      const file = e.target.files && e.target.files[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = function (ev) {
-        if (coverImage) coverImage.src = ev.target.result;
+    window.CoverManager.bind({
+      fileInputId: 'dictationEditorModalCoverFile',
+      uploadBtnId: 'dictationEditorModalCoverUploadBtn',
+      previewImgId: 'dictationEditorModalCoverImage',
+      modalId: 'crop-modal',
+      cropImageId: 'crop-image',
+      closeBtnId: 'crop-close',
+      cancelBtnId: 'crop-cancel',
+      confirmBtnId: 'crop-confirm',
+      aspectRatio: 1,
+      outputWidth: 200,
+      outputHeight: 200,
+      outputType: 'image/webp',
+      outputQuality: 0.85,
+      onDirty: function () {
         _setDirtyFlags({ cover: true });
-      };
-      reader.readAsDataURL(file);
+      },
     });
   }
 }
@@ -2388,9 +2406,29 @@ async function _handleSave() {
       targetBookId = null;
     }
 
+    // Получаем db_id из config (если ID был зарезервирован на сервере)
+    var dbId = state.config ? state.config.dbId : null;
+
+    // Если обложка была изменена (dirty cover), получаем blob через CoverManager
+    // и конвертируем в base64 для передачи в save_dictation_final
+    var cover_b64 = null;
+    if (flags.cover) {
+      try {
+        if (window.CoverManager && typeof window.CoverManager.getCroppedBlob === 'function') {
+          var coverBlob = window.CoverManager.getCroppedBlob();
+          if (coverBlob) {
+            cover_b64 = await _blobToBase64(coverBlob);
+          }
+        }
+      } catch (e) {
+        console.warn('[dictationEditorModal] Не удалось получить blob обложки:', e);
+      }
+    }
+
     var saveData = {
       id: normalizedId,
       temp_id: normalizedId,
+      db_id: dbId,
       language_original: state.config ? state.config.originalLanguage : '',
       language_translation: state.config ? state.config.translationLanguage : '',
       title: state.config ? state.config.title : 'Без названия',
@@ -2400,6 +2438,7 @@ async function _handleSave() {
       audio_order: audioOrderValue,
       sentences: sentencesPayload,
       book_id: targetBookId,
+      cover_b64: cover_b64,
     };
 
     // Если есть shared audio filename, но db флаг не стоит — всё равно помечаем db dirty,
@@ -2440,6 +2479,39 @@ async function _handleSave() {
           if (state.content) {
             state.content.audio_user_shared = state._sharedAudioFilename || null;
           }
+
+          // Обновляем ID диктанта из ответа сервера (на случай, если это был новый диктант)
+          var newDictationId = dbResult.dictation_id;
+          if (newDictationId && state.config) {
+            var oldId = state.config.dictationId || '';
+            if (oldId !== newDictationId) {
+              console.log('[dictationEditorModal] Обновляю ID диктанта:', oldId, '->', newDictationId);
+              state.config.dictationId = newDictationId;
+              // Обновляем ID в DictationContent
+              if (state.content) {
+                state.content.dictationId = newDictationId;
+              }
+              // Обновляем отображение ID в UI
+              var idSpan = document.getElementById('dictation-editor-modal-id');
+              if (idSpan) {
+                var displayId = newDictationId.replace('dict_', '');
+                idSpan.textContent = '#' + displayId;
+              }
+            }
+            // Обновляем dbId в config (сервер мог создать новую запись в БД)
+            if (dbResult.id && (!state.config.dbId || state.config.dictationId !== oldId)) {
+              state.config.dbId = dbResult.id;
+            }
+          }
+
+          // Обновляем десктоп, если он есть (перезагружаем карточки)
+          try {
+            if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+              window.Desktop.loadDeskItems();
+            }
+          } catch (e) {
+            console.warn('[dictationEditorModal] Ошибка обновления десктопа:', e);
+          }
         } else {
           console.error('[dictationEditorModal] Ошибка сохранения БД:', dbResult.error);
         }
@@ -2448,11 +2520,15 @@ async function _handleSave() {
       }
     }
 
+    // После сохранения БД (если ID изменился) используем новый ID для аудио и обложки
+    var effectiveDictationId = state.config ? state.config.dictationId : normalizedId;
+    if (!effectiveDictationId) effectiveDictationId = normalizedId;
+
     // Этап 2: Сохраняем аудио (если dirty audio)
     if (flags.audio) {
       console.log('[dictationEditorModal] Сохраняю аудио...');
       try {
-        await _uploadDraftAudioToB2(normalizedId, token);
+        await _uploadDraftAudioToB2(effectiveDictationId, token);
         _setDirtyFlags({ audio: false });
         console.log('[dictationEditorModal] Аудио сохранено');
       } catch (audioErr) {
@@ -2460,11 +2536,9 @@ async function _handleSave() {
       }
     }
 
-    // Этап 3: Сохраняем обложку (если dirty cover)
+    // Обложка передаётся как cover_b64 внутри save_dictation_final (этап 1),
+    // поэтому отдельный этап для обложки не нужен.
     if (flags.cover) {
-      console.log('[dictationEditorModal] Сохраняю обложку...');
-      // Здесь будет вызов uploadDictationCoverFromCacheToB2
-      // Пока просто сбрасываем флаг
       _setDirtyFlags({ cover: false });
     }
 
@@ -3723,7 +3797,8 @@ window.NewDictationFillModal = {
       var shouldGenerateAudio = (voiceMode === 'auto');
 
       // Получаем dictationId из конфига (для генерации аудио)
-      // Для нового диктанта dictationId может быть пустым — генерируем временный
+      // Для нового диктанта ID уже должен быть зарезервирован на сервере (desktop.js вызывает /api/dictation/reserve_id)
+      // Если по какой-то причине ID нет — генерируем временный
       var dictationId = this._editorConfig ? this._editorConfig.dictationId : '';
       if (!dictationId) {
         dictationId = 'dict_temp_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
@@ -3955,6 +4030,12 @@ window.NewDictationFillModal = {
 
       if (typeof open === 'function') {
         _updateEditorFromFillConfig(config);
+      }
+
+      // Помечаем изменения как несохранённые, чтобы появились звёздочки
+      _setDirtyFlags({ db: true });
+      if (shouldGenerateAudio) {
+        _setDirtyFlags({ audio: true });
       }
 
       this._switchTabByVoiceMode(voiceMode);
@@ -4252,6 +4333,46 @@ function _updateEditorFromFillConfig(config) {
   var titleInput = document.querySelector('.dictation-editor-modal__title-level-row input[type="text"]');
   if (titleInput) {
     titleInput.value = config.title || '';
+  }
+
+  // Обновляем ID диктанта в UI (под логотипом)
+  var idSpan = document.getElementById('dictation-editor-modal-id');
+  if (idSpan) {
+    var displayId = config.dictationId || '';
+    // Показываем только числовую часть, если есть
+    if (displayId.startsWith('dict_')) {
+      displayId = displayId.replace('dict_', '');
+    }
+    idSpan.textContent = displayId || 'новий';
+  }
+
+  // Обновляем языковые флаги под логотипом
+  if (config.originalLanguage || config.translationLanguage) {
+    var flagContainer = document.getElementById('dictation-editor-modal-lang-flags');
+    if (flagContainer) {
+      var origFlag = config.originalLanguage || '';
+      var trFlag = config.translationLanguage || '';
+      flagContainer.innerHTML = '';
+      if (origFlag) {
+        var img = document.createElement('img');
+        img.src = '/static/flags/' + origFlag + '.svg';
+        img.alt = origFlag;
+        img.className = 'lang-flag';
+        img.style.width = '20px';
+        img.style.height = '14px';
+        img.style.marginRight = '4px';
+        flagContainer.appendChild(img);
+      }
+      if (trFlag && trFlag !== origFlag) {
+        var img2 = document.createElement('img');
+        img2.src = '/static/flags/' + trFlag + '.svg';
+        img2.alt = trFlag;
+        img2.className = 'lang-flag';
+        img2.style.width = '20px';
+        img2.style.height = '14px';
+        flagContainer.appendChild(img2);
+      }
+    }
   }
 
   // Обновляем языки через LanguageSelector

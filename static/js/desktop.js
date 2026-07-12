@@ -517,11 +517,33 @@ window.Desktop = window.Desktop || {
                 sessionStorage.setItem('dictationTargetBook', JSON.stringify({ book_id: wbId }));
               } catch (e1) {}
             }
+
+            // Резервируем ID диктанта на сервере
+            var reservedId = '';
+            var reservedDbId = null;
+            try {
+              var token = window.UM && window.UM.token ? window.UM.token : localStorage.getItem('jwt_token');
+              if (token) {
+                var reserveResp = await fetch('/api/dictation/reserve_id', {
+                  headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var reserveData = await reserveResp.json();
+                if (reserveData.success && reserveData.dictation_id) {
+                  reservedId = reserveData.dictation_id;
+                  reservedDbId = reserveData.id;
+                  console.log('[desktop] Зарезервирован ID диктанта:', reservedId);
+                }
+              }
+            } catch (e2) {
+              console.warn('[desktop] Ошибка резервирования ID диктанта:', e2);
+            }
+
             // Відкрити редактор для нового диктанта
             if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
               window.DictationEditorModal.open({
                 isNewDictation: true,
-                dictationId: '',
+                dictationId: reservedId,
+                dbId: reservedDbId,
                 originalLanguage: '',
                 translationLanguage: '',
                 title: '',

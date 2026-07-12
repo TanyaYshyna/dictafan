@@ -45,6 +45,63 @@ logger = logging.getLogger(__name__)
 editor_bp = Blueprint('dictation_editor', __name__)
 
 # ==============================================================
+# Резервирование ID для нового диктанта
+# ==============================================================
+@editor_bp.route('/api/dictation/reserve_id', methods=['GET'])
+@jwt_required()
+def reserve_dictation_id():
+    """Резервирует ID для нового диктанта.
+    
+    Создаёт запись в БД с временным статусом и возвращает
+    зарезервированный ID вида dict_<number>.
+    Это нужно, чтобы при открытии модального окна редактора
+    у нового диктанта уже был реальный ID (не dict_temp_*).
+    """
+    try:
+        from helpers.db import get_db_connection
+        import psycopg2
+        
+        current_email = get_jwt_identity()
+        user_db = get_user_by_email(current_email)
+        if not user_db or not user_db.get('id'):
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        user_id = user_db['id']
+        
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cur:
+                # Создаём запись в БД с минимальными данными
+                # Используем функцию nextval для получения следующего ID из sequence
+                cur.execute("""
+                    INSERT INTO dictations (title, language_code, owner_id, is_public, level)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                """, ('Новый диктант', 'en', user_id, False, 'A1'))
+                new_id = cur.fetchone()[0]
+                conn.commit()
+                
+                dictation_id = f"dict_{new_id}"
+                logger.info(f"✅ Зарезервирован ID диктанта: {dictation_id} для пользователя {user_id}")
+                
+                return jsonify({
+                    'success': True,
+                    'dictation_id': dictation_id,
+                    'id': new_id,
+                })
+        except psycopg2.Error as e:
+            conn.rollback()
+            logger.error(f"❌ Ошибка резервирования ID диктанта: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+        finally:
+            conn.close()
+    except Exception as e:
+        import traceback
+        logger.error(f"❌ Ошибка резервирования ID диктанта: {e}\n{traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==============================================================
 # транслятор
 translator = Translator()
 
@@ -385,6 +442,8 @@ def api_b2_cleanup_dictation_audio():
 # @generator_bp.route('/dictation_generator')
 # def dictation_generator():
 #     return render_template('dictation_editor.html')
+
+
 
 
 
@@ -866,6 +925,31 @@ def save_dictation_final():
         if not temp_path:
             logger.warning(f"⚠️ temp_path не определен для dictation_id={dictation_id}, temp_id={temp_dictation_id}, user_id={user_id}")
         
+        # Если в данных есть cover_b64 — сохраняем обложку во временную папку
+        # (пришла из редактора через CoverManager как base64 data URL)
+        cover_b64 = data.get('cover_b64')
+        if cover_b64 and isinstance(cover_b64, str) and cover_b64.startswith('data:'):
+            try:
+                # Создаём временную папку, если её ещё нет
+                if temp_path:
+                    os.makedirs(temp_path, exist_ok=True)
+                else:
+                    # Если temp_path не определён, создаём запасной
+                    temp_path = os.path.join('static', 'data', 'temp', str(user_id or '0'), temp_dictation_id)
+                    os.makedirs(temp_path, exist_ok=True)
+                
+                # Декодируем base64 (формат: data:image/webp;base64,<data>)
+                import base64
+                header, _, b64_data = cover_b64.partition(',')
+                if b64_data:
+                    cover_bytes = base64.b64decode(b64_data)
+                    cover_path = os.path.join(temp_path, 'cover.webp')
+                    with open(cover_path, 'wb') as f:
+                        f.write(cover_bytes)
+                    logger.info(f"✅ Обложка сохранена из cover_b64: {cover_path}")
+            except Exception as e:
+                logger.warning(f"⚠️ Не удалось сохранить cover_b64: {e}")
+        
         if temp_path and os.path.exists(temp_path):
             logger.info(f"📁 Копируем файлы из temp папки: {temp_path}")
             keep_rel_paths_posix = set()
@@ -990,6 +1074,7 @@ def save_dictation_final():
                 "success": True,
                 "message": "Dictation saved to DB and added to category",
                 "dictation_id": dictation_id,
+                "id": db_id,
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
@@ -1000,6 +1085,7 @@ def save_dictation_final():
                 "success": True,
                 "message": "Dictation saved to DB and added to book",
                 "dictation_id": dictation_id,
+                "id": db_id,
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
@@ -1011,6 +1097,7 @@ def save_dictation_final():
                 "success": True,
                 "message": "Dictation saved to DB",
                 "dictation_id": dictation_id,
+                "id": db_id,
                 "db_id": db_id,
                 "exercises_saved": exercises_saved,
                 "exercises_error": exercises_error,
