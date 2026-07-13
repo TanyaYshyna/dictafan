@@ -1124,6 +1124,35 @@ function _setupTableControls() {
   }
 }
 
+function _findFreeKey() {
+  if (!state.content) return 's_0';
+  var langBlocks = state.content.langBlocks;
+  if (!langBlocks || langBlocks.length === 0) return 's_0';
+
+  // Собираем все существующие ключи из первого блока (оригинал)
+  var origBlock = langBlocks[0];
+  var usedNumbers = [];
+  origBlock.sentences.forEach(function (s) {
+    var num = parseInt(String(s.key).replace('s_', '') || '0', 10);
+    if (!isNaN(num)) usedNumbers.push(num);
+  });
+
+  // Сортируем
+  usedNumbers.sort(function (a, b) { return a - b; });
+
+  // Ищем первый свободный номер
+  var freeNum = 0;
+  for (var i = 0; i < usedNumbers.length; i++) {
+    if (usedNumbers[i] === freeNum) {
+      freeNum++;
+    } else if (usedNumbers[i] > freeNum) {
+      break; // нашли дырку
+    }
+  }
+
+  return 's_' + freeNum;
+}
+
 function _addNewRow(position) {
   var table = document.getElementById(EDITOR_TABLE_ID);
   if (!table) return;
@@ -1137,43 +1166,216 @@ function _addNewRow(position) {
   var langBlocks = state.content.langBlocks;
   if (!langBlocks || langBlocks.length === 0) return;
 
-  // Определяем максимальный ключ по первому блоку (оригинал)
-  var origBlock = langBlocks[0];
-  var maxKey = 0;
-  origBlock.sentences.forEach(function (s) {
-    var num = parseInt(String(s.key).replace('s_', '') || '0', 10);
-    if (num > maxKey) maxKey = num;
-  });
-  var newKey = 's_' + (maxKey + 1);
+  // Открываем модальное окно добавления строки
+  _openAddRowModal(position, selectedRow);
+}
 
-  // Создаём новое предложение для каждого языка
-  var newSentence = {
-    key: newKey,
-    position: null,
-    text: '',
-    audio: '',
-    audio_file: null,
-    audio_mic: null,
-    start: '',
-    end: '',
-    checked: false,
-    explanation: '',
-  };
+function _openAddRowModal(position, selectedRow) {
+  var modal = document.getElementById('addRowModal');
+  if (!modal) return;
 
-  // Добавляем во все langBlocks
-  langBlocks.forEach(function (block) {
-    var sentenceCopy = JSON.parse(JSON.stringify(newSentence));
-    if (position === 'above' && selectedRow) {
-      var index = Array.from(tbody.children).indexOf(selectedRow);
-      block.sentences.splice(index, 0, sentenceCopy);
+  // Получаем языки перевода (все блоки кроме первого — оригинал)
+  var langBlocks = state.content ? state.content.langBlocks : [];
+  var translationLangs = [];
+  if (langBlocks.length > 1) {
+    for (var i = 1; i < langBlocks.length; i++) {
+      translationLangs.push(langBlocks[i].lang);
+    }
+  }
+
+  // Заполняем таблицу переводов
+  var tbody = document.querySelector('#addRowModalTranslationsTable tbody');
+  if (tbody) {
+    tbody.innerHTML = '';
+    if (translationLangs.length > 0) {
+      translationLangs.forEach(function (lang) {
+        var tr = document.createElement('tr');
+        var langTd = document.createElement('td');
+        langTd.textContent = lang;
+        var inputTd = document.createElement('td');
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'text-input';
+        input.placeholder = 'Перевод...';
+        input.dataset.lang = lang;
+        inputTd.appendChild(input);
+        tr.appendChild(langTd);
+        tr.appendChild(inputTd);
+        tbody.appendChild(tr);
+      });
     } else {
-      block.sentences.push(sentenceCopy);
+      var tr = document.createElement('tr');
+      var td = document.createElement('td');
+      td.setAttribute('colspan', '2');
+      td.textContent = 'Нет языков перевода';
+      td.style.textAlign = 'center';
+      td.style.color = '#888';
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    }
+  }
+
+  // Сбрасываем поле оригинала
+  var origInput = document.getElementById('addRowModalOrigInput');
+  if (origInput) origInput.value = '';
+
+  // Сохраняем позицию для создания
+  modal.dataset.position = position || 'below';
+  if (selectedRow) {
+    modal.dataset.selectedRowKey = selectedRow.dataset.key;
+  } else {
+    modal.dataset.selectedRowKey = '';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function _closeAddRowModal() {
+  var modal = document.getElementById('addRowModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function _handleAddRowCreate() {
+  var modal = document.getElementById('addRowModal');
+  if (!modal) return;
+
+  var position = modal.dataset.position || 'below';
+  var selectedRowKey = modal.dataset.selectedRowKey || '';
+
+  var origInput = document.getElementById('addRowModalOrigInput');
+  var origText = origInput ? origInput.value.trim() : '';
+
+  // Собираем переводы
+  var translations = {};
+  var translationInputs = document.querySelectorAll('#addRowModalTranslationsTable tbody input[type="text"]');
+  translationInputs.forEach(function (input) {
+    var lang = input.dataset.lang;
+    var text = input.value.trim();
+    if (lang && text) {
+      translations[lang] = text;
     }
   });
 
-  _setDirtyFlags({ db: true });
+  // Находим свободный ключ
+  var newKey = _findFreeKey();
+
+  var table = document.getElementById(EDITOR_TABLE_ID);
+  if (!table) return;
+  var tbody = table.querySelector('tbody');
+  if (!tbody) return;
+
+  var langBlocks = state.content.langBlocks;
+  if (!langBlocks || langBlocks.length === 0) return;
+
+  // Определяем индекс вставки
+  var insertIndex = -1;
+  if (selectedRowKey) {
+    var origBlock = langBlocks[0];
+    for (var i = 0; i < origBlock.sentences.length; i++) {
+      if (origBlock.sentences[i].key === selectedRowKey) {
+        insertIndex = i;
+        break;
+      }
+    }
+    if (position === 'below' && insertIndex >= 0) {
+      insertIndex = insertIndex + 1;
+    }
+  }
+
+  // Создаём новое предложение для каждого языка
+  langBlocks.forEach(function (block) {
+    var isOrig = (block === langBlocks[0]);
+    var sentence = {
+      key: newKey,
+      position: null,
+      text: isOrig ? origText : (translations[block.lang] || ''),
+      audio: '',
+      audio_file: null,
+      audio_mic: null,
+      start: '',
+      end: '',
+      checked: false,
+      explanation: '',
+    };
+
+    if (insertIndex >= 0 && insertIndex <= block.sentences.length) {
+      block.sentences.splice(insertIndex, 0, sentence);
+    } else {
+      block.sentences.push(sentence);
+    }
+  });
+
+  // Если включено авто — генерируем аудио для оригинала
+  var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+  var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
+  var dictationId = state.config ? state.config.dictationId : '';
+
+  if (voiceMode === 'auto' && origText && dictationId) {
+    _generateAudioForSentence(newKey, langBlocks[0].lang, origText, dictationId);
+  }
+
+  // Если включено авто — генерируем аудио для переводов
+  if (voiceMode === 'auto' && dictationId) {
+    Object.keys(translations).forEach(function (lang) {
+      var trText = translations[lang];
+      if (trText) {
+        _generateAudioForSentence(newKey, lang, trText, dictationId);
+      }
+    });
+  }
+
+  _closeAddRowModal();
+  _setDirtyFlags({ db: true, audio: voiceMode === 'auto' });
   _renderTable();
   _bindAudioPlaybackHandlers();
+}
+
+async function _generateAudioForSentence(key, lang, text, dictationId) {
+  try {
+    var safeEmail = '';
+    try {
+      if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+        safeEmail = window.UM.getSafeEmail();
+      }
+    } catch (e) {}
+
+    var response = await fetch('/generate_audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dictation_id: dictationId,
+        text: text,
+        language: lang,
+        filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
+        tipe_audio: 'avto',
+        safe_email: safeEmail,
+      })
+    });
+
+    var data = await response.json();
+    if (!data.success || !data.audio_b64) return;
+
+    var binaryStr = atob(data.audio_b64);
+    var bytes = new Uint8Array(binaryStr.length);
+    for (var j = 0; j < binaryStr.length; j++) {
+      bytes[j] = binaryStr.charCodeAt(j);
+    }
+    var blob = new Blob([bytes], { type: data.mime || 'audio/mpeg' });
+    var newFilename = data.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
+
+    var am = _ensureAudioManager();
+    if (am && typeof am.saveDictationAudioBlob === 'function') {
+      await am.saveDictationAudioBlob(dictationId, lang, newFilename, blob, data.mime || 'audio/mpeg');
+    }
+
+    // Обновляем sentence
+    var sentence = state.content.getSentenceForLang(key, lang);
+    if (sentence) {
+      sentence.audio = newFilename;
+    }
+  } catch (e) {
+    console.error('[dictationEditorModal] _generateAudioForSentence error', key, lang, e);
+  }
 }
 
 function _deleteRow(row) {
@@ -1205,6 +1407,316 @@ function _deleteRow(row) {
 function _refillTable() {
   _renderTable();
   _bindAudioPlaybackHandlers();
+}
+
+/* ===== УПРАВЛЕНИЕ ЯЗЫКАМИ ПЕРЕВОДА (вкладка 5) ===== */
+
+function _renderTranslationsTable() {
+  var tbody = document.querySelector('#editorModalTranslationsTable tbody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '';
+
+  var langBlocks = state.content ? state.content.langBlocks : [];
+  // Первый блок — оригинал, остальные — переводы
+  var translationLangs = [];
+  if (langBlocks.length > 1) {
+    for (var i = 1; i < langBlocks.length; i++) {
+      translationLangs.push(langBlocks[i].lang);
+    }
+  }
+
+  if (translationLangs.length === 0) {
+    var emptyRow = document.createElement('tr');
+    var emptyTd = document.createElement('td');
+    emptyTd.setAttribute('colspan', '2');
+    emptyTd.textContent = 'Нет языков перевода';
+    emptyTd.style.textAlign = 'center';
+    emptyTd.style.color = '#888';
+    emptyRow.appendChild(emptyTd);
+    tbody.appendChild(emptyRow);
+    return;
+  }
+
+  translationLangs.forEach(function (lang) {
+    var tr = document.createElement('tr');
+
+    var langTd = document.createElement('td');
+    langTd.textContent = lang;
+
+    var actionTd = document.createElement('td');
+    var deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'dictation-editor-modal__table-control-btn delete-btn';
+    deleteBtn.title = 'Удалить язык перевода';
+    deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
+    deleteBtn.addEventListener('click', function () {
+      _openRemoveTranslationModal(lang);
+    });
+    actionTd.appendChild(deleteBtn);
+
+    tr.appendChild(langTd);
+    tr.appendChild(actionTd);
+    tbody.appendChild(tr);
+  });
+
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons();
+  }
+}
+
+function _openAddTranslationModal() {
+  var modal = document.getElementById('addTranslationModal');
+  if (!modal) return;
+
+  // Получаем список уже добавленных языков перевода
+  var langBlocks = state.content ? state.content.langBlocks : [];
+  var existingLangs = {};
+  langBlocks.forEach(function (block) {
+    existingLangs[block.lang] = true;
+  });
+
+  var origLang = state.config ? state.config.originalLanguage : '';
+  var nativeLang = state.config ? state.config.translationLanguage : '';
+
+  // Создаём LanguageSelector для выбора языка
+  var selectorContainer = document.getElementById('addTranslationLangSelector');
+  if (!selectorContainer) return;
+
+  selectorContainer.innerHTML = '';
+
+  if (window.LanguageManager && typeof window.initLanguageSelector === 'function') {
+    var languageData = window.LanguageManager.getLanguageData();
+    if (languageData) {
+      // Фильтруем: показываем только языки, которых ещё нет в langBlocks
+      // и не равные оригинальному языку
+      var filteredData = {};
+      Object.keys(languageData).forEach(function (code) {
+        if (!existingLangs[code] && code !== origLang) {
+          filteredData[code] = languageData[code];
+        }
+      });
+
+      if (Object.keys(filteredData).length === 0) {
+        selectorContainer.textContent = 'Все доступные языки уже добавлены';
+        selectorContainer.style.color = '#888';
+        selectorContainer.style.textAlign = 'center';
+        selectorContainer.style.padding = '20px';
+        return;
+      }
+
+      var selector = window.initLanguageSelector('addTranslationLangSelector', {
+        mode: 'flag-single',
+        currentLearning: '',
+        nativeLanguage: nativeLang || origLang,
+        languageData: filteredData
+      });
+
+      // Сохраняем ссылку на селектор
+      modal._langSelector = selector;
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+
+function _closeAddTranslationModal() {
+  var modal = document.getElementById('addTranslationModal');
+  if (modal) {
+    modal.style.display = 'none';
+    modal._langSelector = null;
+  }
+}
+
+async function _handleAddTranslationConfirm() {
+  var modal = document.getElementById('addTranslationModal');
+  if (!modal) return;
+
+  var selector = modal._langSelector;
+  if (!selector || typeof selector.getValues !== 'function') return;
+
+  var values = selector.getValues();
+  var selectedLang = values.currentLearning || '';
+  if (!selectedLang) return;
+
+  // Проверяем, не добавлен ли уже этот язык
+  var langBlocks = state.content ? state.content.langBlocks : [];
+  var alreadyExists = langBlocks.some(function (block) { return block.lang === selectedLang; });
+  if (alreadyExists) {
+    alert('Язык "' + selectedLang + '" уже добавлен');
+    return;
+  }
+
+  // Добавляем новый блок языка в langBlocks
+  if (state.content && state.content.langBlocks) {
+    // Создаём пустые предложения для нового языка (по количеству предложений оригинала)
+    var origBlock = state.content.langBlocks[0];
+    var newSentences = [];
+    if (origBlock && origBlock.sentences) {
+      origBlock.sentences.forEach(function (s) {
+        newSentences.push({
+          key: s.key,
+          position: s.position,
+          text: '',
+          audio: '',
+          audio_file: null,
+          audio_mic: null,
+          start: '',
+          end: '',
+          checked: false,
+          explanation: '',
+        });
+      });
+    }
+    state.content.langBlocks.push({
+      lang: selectedLang,
+      sentences: newSentences
+    });
+  }
+
+  _closeAddTranslationModal();
+
+  // Автоматически переводим все строки на новый язык
+  var dictationId = state.config ? state.config.dictationId : '';
+  var origLang = state.config ? state.config.originalLanguage : '';
+  if (dictationId && origLang && origBlock && origBlock.sentences) {
+    var safeEmail = '';
+    try {
+      if (window.UM && typeof window.UM.getSafeEmail === 'function') {
+        safeEmail = window.UM.getSafeEmail();
+      }
+    } catch (e) {}
+
+    for (var i = 0; i < origBlock.sentences.length; i++) {
+      var s = origBlock.sentences[i];
+      if (s.text) {
+        try {
+          var trResp = await fetch('/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: s.text,
+              source_lang: origLang,
+              target_lang: selectedLang,
+            })
+          });
+          var trData = await trResp.json();
+          if (trData.success && trData.translated_text) {
+            // Находим соответствующее предложение в новом блоке
+            var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
+            if (newBlock) {
+              var targetSentence = newBlock.sentences.find(function (ns) { return ns.key === s.key; });
+              if (targetSentence) {
+                targetSentence.text = trData.translated_text;
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[dictationEditorModal] Translation error for', s.key, selectedLang, e);
+        }
+      }
+    }
+  }
+
+  // Автоозвучка для нового языка (если выбран режим "авто")
+  var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+  var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
+  if (voiceMode === 'auto' && dictationId) {
+    var newBlock = state.content.langBlocks.find(function (b) { return b.lang === selectedLang; });
+    if (newBlock && newBlock.sentences) {
+      for (var i = 0; i < newBlock.sentences.length; i++) {
+        var s = newBlock.sentences[i];
+        if (s.text) {
+          await _generateAudioForSentence(s.key, selectedLang, s.text, dictationId);
+        }
+      }
+    }
+  }
+
+  // Обновляем таблицу языков и основную таблицу
+  _renderTranslationsTable();
+  _renderTable();
+  _bindAudioPlaybackHandlers();
+  _setDirtyFlags({ db: true, audio: voiceMode === 'auto' });
+}
+
+function _openRemoveTranslationModal(langCode) {
+  if (typeof window.DesktopConfirmModal !== 'undefined' && window.DesktopConfirmModal.open) {
+    window.DesktopConfirmModal.open({
+      title: 'Удалить язык перевода',
+      message: 'Вы уверены, что хотите удалить язык "' + langCode + '" и все его переводы?',
+      buttons: [
+        {
+          text: 'Удалить',
+          class: 'modal-btn modal-btn-danger',
+          callback: function () {
+            _removeTranslationLanguage(langCode);
+          }
+        },
+        { text: 'Отмена', class: 'modal-btn modal-btn-secondary transparent' },
+      ]
+    });
+  } else {
+    if (confirm('Удалить язык "' + langCode + '" и все его переводы?')) {
+      _removeTranslationLanguage(langCode);
+    }
+  }
+}
+
+function _removeTranslationLanguage(langCode) {
+  if (!state.content || !state.content.langBlocks) return;
+
+  var index = -1;
+  for (var i = 0; i < state.content.langBlocks.length; i++) {
+    if (state.content.langBlocks[i].lang === langCode) {
+      index = i;
+      break;
+    }
+  }
+
+  if (index === -1) return;
+  if (index === 0) return; // Не удаляем оригинал
+
+  state.content.langBlocks.splice(index, 1);
+
+  _renderTranslationsTable();
+  _renderTable();
+  _bindAudioPlaybackHandlers();
+  _setDirtyFlags({ db: true });
+}
+
+/* ===== ВИДИМОСТЬ КНОПКИ "ПЕРЕЗАПОЛНИТЬ ВСЕ АВТО" ===== */
+
+function _updateAutoRegenerateAllBtnVisibility() {
+  var btn = document.getElementById('editorModalAutoRegenerateAllBtn');
+  if (!btn) return;
+
+  var checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
+  var voiceMode = checkedRadio ? checkedRadio.value : 'auto';
+
+  if (voiceMode !== 'auto') {
+    btn.style.display = 'none';
+    return;
+  }
+
+  // Проверяем, есть ли строки, требующие переформирования авто
+  var hasPending = false;
+  if (state.content) {
+    var cores = state.content.getAllSentenceCores();
+    if (cores && cores.length > 0) {
+      for (var i = 0; i < cores.length; i++) {
+        var s = cores[i];
+        // Строка требует авто если: есть текст, но нет audio (пустая строка)
+        // или audio не начинается с 'tts_' (не авто)
+        if (s.text && (!s.audio || !s.audio.startsWith('tts_'))) {
+          hasPending = true;
+          break;
+        }
+      }
+    }
+  }
+
+  btn.style.display = hasPending ? 'inline-flex' : 'none';
 }
 
 /* ===== ИНИЦИАЛИЗАЦИЯ ПОЛЕЙ ===== */
@@ -1258,31 +1770,49 @@ function _initLanguageFlags() {
     if (!languageData || !state.config) return;
 
     const orig = _normalizeLangCode(state.config.originalLanguage);
-    const tr = _normalizeLangCode(state.config.translationLanguage);
 
     const validOrig = languageData[orig] ? orig : '';
-    const validTr = languageData[tr] ? tr : '';
 
     container.innerHTML = '';
 
-    if (!validOrig && !validTr) {
-      console.warn('[dictationEditorModal] No valid language codes for flags', { orig, tr });
+    if (!validOrig) {
+      console.warn('[dictationEditorModal] No valid original language code', { orig });
       return;
     }
 
-    if (validOrig && validTr) {
-      state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
-        mode: 'flag-pair-fixed',
-        currentLearning: validOrig,
-        nativeLanguage: validTr,
-        languageData: languageData
-      });
-    } else if (validOrig) {
+    // Собираем все языки перевода из langBlocks (кроме первого — оригинала)
+    var translationLangs = [];
+    if (state.content && state.content.langBlocks && state.content.langBlocks.length > 1) {
+      for (var i = 1; i < state.content.langBlocks.length; i++) {
+        translationLangs.push(state.content.langBlocks[i].lang);
+      }
+    }
+
+    if (translationLangs.length === 0) {
+      // Если нет языков перевода — показываем только оригинал
       state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
         mode: 'flag-single',
         currentLearning: validOrig,
         nativeLanguage: validOrig,
         languageData: languageData
+      });
+    } else if (translationLangs.length === 1) {
+      // Один язык перевода — показываем пару флагов
+      var validTr = languageData[translationLangs[0]] ? translationLangs[0] : '';
+      state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
+        mode: 'flag-pair-fixed',
+        currentLearning: validOrig,
+        nativeLanguage: validTr || validOrig,
+        languageData: languageData
+      });
+    } else {
+      // Несколько языков перевода — показываем выпадающий список
+      state.headerLangPairSelector = window.initLanguageSelector('editorModalLangPair', {
+        mode: 'flag-pair-dropdown',
+        currentLearning: validOrig,
+        nativeLanguage: translationLangs[0], // первый язык по умолчанию
+        languageData: languageData,
+        rightDropdown: true, // правый флаг — выпадающий список
       });
     }
   } catch (e) {
@@ -1373,20 +1903,8 @@ function _initVoiceModeRadios() {
   const radios = document.querySelectorAll('input[name="editorModalVoiceMode"]');
   if (!radios.length) return;
 
-  const updateTabVisibility = function (selectedValue) {
-    document.querySelectorAll('.dictation-editor-modal__tab-btn[data-voice-mode]').forEach(function (btn) {
-      const mode = btn.getAttribute('data-voice-mode');
-      btn.style.display = (mode === selectedValue) ? '' : 'none';
-    });
-
-    const activeTab = document.querySelector('.dictation-editor-modal__tab-btn.active');
-    if (activeTab && activeTab.style.display === 'none') {
-      const generalTab = document.querySelector('.dictation-editor-modal__tab-btn[data-tab="general"]');
-      if (generalTab) {
-        generalTab.click();
-      }
-    }
-  };
+  // Радио больше не меняет видимость вкладок — только видимость колонок в таблице.
+  // Вкладка 4 (voice-original-self) удалена.
 
   // Сначала сбрасываем радио в значение из config.
   // config.voice_mode может быть 'auto', 'have', 'self' (старый формат)
@@ -1422,32 +1940,23 @@ function _initVoiceModeRadios() {
   }
 
   // Удаляем старые обработчики и вешаем новые (чтобы не было дублирования при повторном открытии)
-  // Просто заменяем через клонирование — но проще хранить ссылку.
-  // Используем подход: удаляем все старые listeners через замену элемента.
-  // Но чтобы не ломать DOM, просто будем вешать обработчик один раз в init().
-  // В _initVoiceModeRadios добавляем обработчики только если их ещё нет.
   var handlerAttr = 'data-voice-mode-handler';
   radios.forEach(function (radio) {
     if (radio.getAttribute(handlerAttr)) return; // уже есть обработчик
     radio.setAttribute(handlerAttr, '1');
     radio.addEventListener('change', function () {
       if (this.checked) {
-        updateTabVisibility(this.value);
         // Обновляем таблицу, если мы на закладке, где радио влияет на колонки
         if (state.currentTabName === 'general' || state.currentTabName === 'voice-translations') {
           _applyTableViewForTab(state.currentTabName);
         }
+        // Показываем/скрываем кнопку "Перезаполнить все авто" в шапке таблицы
+        _updateAutoRegenerateAllBtnVisibility();
         // Изменение режима голоса — это изменение в БД (voice_mode), зажигаем звезду
         _setDirtyFlags({ db: true });
       }
     });
   });
-
-  // После сброса применяем видимость вкладок по выбранному значению
-  const checkedRadio = document.querySelector('input[name="editorModalVoiceMode"]:checked');
-  if (checkedRadio) {
-    updateTabVisibility(checkedRadio.value);
-  }
 }
 
 function _initCoverUpload() {
@@ -2805,6 +3314,8 @@ function open(config) {
   _initSelfAudioTab();
   _setupTabs();
   _renderTable();
+  _renderTranslationsTable();
+  _updateAutoRegenerateAllBtnVisibility();
   _bindAudioPlaybackHandlers();
   _setupTableControls();
   _updateUnsavedStar();
@@ -3687,6 +4198,117 @@ function init() {
       }
     }
   });
+
+  // ---- Обработчики модального окна добавления языка перевода ----
+
+  var addTranslationBtn = document.getElementById('editorModalAddTranslationBtn');
+  if (addTranslationBtn) {
+    addTranslationBtn.addEventListener('click', _openAddTranslationModal);
+  }
+
+  var addTranslationConfirmBtn = document.getElementById('addTranslationModalAddBtn');
+  if (addTranslationConfirmBtn) {
+    addTranslationConfirmBtn.addEventListener('click', _handleAddTranslationConfirm);
+  }
+
+  var addTranslationCloseBtn = document.getElementById('addTranslationModalCloseBtn');
+  if (addTranslationCloseBtn) {
+    addTranslationCloseBtn.addEventListener('click', _closeAddTranslationModal);
+  }
+
+  // Закрытие addTranslationModal по Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var addModal = document.getElementById('addTranslationModal');
+      if (addModal && addModal.style.display !== 'none') {
+        _closeAddTranslationModal();
+      }
+    }
+  });
+
+  // ---- Обработчики модального окна добавления строки ----
+
+  var addRowCreateBtn = document.getElementById('addRowModalCreateBtn');
+  if (addRowCreateBtn) {
+    addRowCreateBtn.addEventListener('click', _handleAddRowCreate);
+  }
+
+  var addRowCloseBtn = document.getElementById('addRowModalCloseBtn');
+  if (addRowCloseBtn) {
+    addRowCloseBtn.addEventListener('click', _closeAddRowModal);
+  }
+
+  // Enter в поле оригинала → автоперевод
+  var addRowOrigInput = document.getElementById('addRowModalOrigInput');
+  if (addRowOrigInput) {
+    addRowOrigInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        // Заполняем таблицу переводов (автоперевод)
+        var text = addRowOrigInput.value.trim();
+        if (!text) return;
+        var origLang = state.config ? state.config.originalLanguage : '';
+        if (!origLang) return;
+        var langBlocks = state.content ? state.content.langBlocks : [];
+        if (!langBlocks || langBlocks.length < 2) return;
+        var translationLangs = [];
+        for (var i = 1; i < langBlocks.length; i++) {
+          translationLangs.push(langBlocks[i].lang);
+        }
+        if (translationLangs.length === 0) return;
+        var tbody = document.querySelector('#addRowModalTranslationsTable tbody');
+        if (!tbody) return;
+        var rows = tbody.querySelectorAll('tr');
+        rows.forEach(function (row) {
+          var langCode = row.dataset.lang;
+          if (!langCode) return;
+          var input = row.querySelector('input');
+          if (!input) return;
+          // Показываем индикатор загрузки
+          input.placeholder = 'Переклад...';
+          input.disabled = true;
+          fetch('/translate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: text,
+              source_lang: origLang,
+              target_lang: langCode,
+            }),
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.translated_text) {
+                input.value = data.translated_text;
+              }
+              input.disabled = false;
+              input.placeholder = '';
+            })
+            .catch(function () {
+              input.disabled = false;
+              input.placeholder = '';
+            });
+        });
+      }
+    });
+  }
+
+  // Закрытие addRowModal по Escape
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      var rowModal = document.getElementById('addRowModal');
+      if (rowModal && rowModal.style.display !== 'none') {
+        _closeAddRowModal();
+      }
+    }
+  });
+
+  // ---- Обработчик кнопки "Перезаполнить все авто" ----
+
+  var autoRegenerateBtn = document.getElementById('editorModalAutoRegenerateAllBtn');
+  if (autoRegenerateBtn) {
+    autoRegenerateBtn.addEventListener('click', _handleRegenerateAllTts);
+  }
 }
 
 /* ============================================================
@@ -4539,6 +5161,8 @@ function _updateEditorFromFillConfig(config) {
 
   // Перерисовываем таблицу и обновляем обработчики
   _renderTable();
+  _renderTranslationsTable();
+  _updateAutoRegenerateAllBtnVisibility();
   _bindAudioPlaybackHandlers();
   _updateUnsavedStar();
 }

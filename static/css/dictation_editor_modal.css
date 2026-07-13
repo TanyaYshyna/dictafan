@@ -1711,3 +1711,343 @@
 #newDictationFillText::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary, #6b7280);
 }
+
+/* ===== ВКЛАДКА 5: ЯЗЫКИ ПЕРЕВОДА (tab-voice-translations) ===== */
+.dictation-editor-modal__translations-content {
+  padding: 12px;
+}
+
+.dictation-editor-modal__translations-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.dictation-editor-modal__translations-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dictation-editor-modal__translations-table th,
+.dictation-editor-modal__translations-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+.dictation-editor-modal__translations-table th {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dictation-editor-modal__translations-table td:last-child {
+  width: 40px;
+  text-align: center;
+}
+
+.dictation-editor-modal__translations-table .delete-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary, #999);
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.dictation-editor-modal__translations-table .delete-lang-btn:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.08);
+}
+
+.dictation-editor-modal__translations-table .delete-lang-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===== МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ ЯЗЫКА ПЕРЕВОДА (addTranslationModal) ===== */
+#addTranslationModal {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 100260;
+}
+
+.add-translation-modal__content {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 480px;
+  width: calc(100% - 32px);
+  padding: 20px;
+}
+
+.add-translation-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.add-translation-modal__header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #224156);
+}
+
+.add-translation-modal__close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary, #999);
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.add-translation-modal__close-btn:hover {
+  color: var(--color-text, #224156);
+  background: var(--color-hover, #f0eeeb);
+}
+
+.add-translation-modal__close-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+.add-translation-modal__body {
+  margin-bottom: 20px;
+}
+
+.add-translation-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.add-translation-modal__add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.add-translation-modal__add-btn:hover {
+  background: var(--color-primary-hover, #2563eb);
+}
+
+.add-translation-modal__add-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===== МОДАЛЬНОЕ ОКНО ДОБАВЛЕНИЯ СТРОКИ (addRowModal) ===== */
+#addRowModal {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 100270;
+}
+
+.add-row-modal__content {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  max-width: 640px;
+  width: calc(100% - 32px);
+  padding: 20px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.add-row-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.add-row-modal__header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #224156);
+}
+
+.add-row-modal__close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary, #999);
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.add-row-modal__close-btn:hover {
+  color: var(--color-text, #224156);
+  background: var(--color-hover, #f0eeeb);
+}
+
+.add-row-modal__close-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+.add-row-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.add-row-modal__orig-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-row-modal__orig-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-row-modal__orig-row input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--color-text, #224156);
+  background: var(--color-panel-bg, #f9f9f9);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.add-row-modal__orig-row input:focus {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.add-row-modal__translations-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.add-row-modal__translations-section label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#addRowModalTranslationsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+#addRowModalTranslationsTable th,
+#addRowModalTranslationsTable td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-light, #e9ecef);
+}
+
+#addRowModalTranslationsTable th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+#addRowModalTranslationsTable td input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-light, #ddd);
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--color-text, #224156);
+  background: var(--color-panel-bg, #f9f9f9);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+#addRowModalTranslationsTable td input:focus {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.add-row-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.add-row-modal__create-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.add-row-modal__create-btn:hover {
+  background: var(--color-primary-hover, #2563eb);
+}
+
+.add-row-modal__create-btn i {
+  width: 16px;
+  height: 16px;
+}

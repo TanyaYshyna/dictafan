@@ -47,7 +47,6 @@
           <button class="dictation-editor-modal__tab-btn active" data-tab="general" type="button">1. Общие данные</button>
           <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-auto" data-voice-mode="auto" type="button" style="display:none;">2. Озвучка оригинала (авто)</button>
           <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-have" data-voice-mode="have" type="button" style="display:none;">3. Озвучка оригинала (є аудіо)</button>
-          <button class="dictation-editor-modal__tab-btn" data-tab="voice-original-self" data-voice-mode="self" type="button" style="display:none;">4. Озвучка оригинала (сам)</button>
           <button class="dictation-editor-modal__tab-btn" data-tab="voice-translations" type="button">5. Озвучка перевода (авто)</button>
         </div>
 
@@ -91,7 +90,7 @@
                     <input type="text" id="dictationEditorModalAuthorUrl" class="text-input" placeholder="https://..." />
                   </div>
                   <div class="dictation-editor-modal__voice-mode-group">
-                    <span class="dictation-editor-modal__voice-mode-label">Режим озвучки:</span>
+                    <span class="dictation-editor-modal__voice-mode-label">Режим озвучки оригинала:</span>
                     <div class="dictation-editor-modal__voice-mode-options">
                       <label class="dictation-editor-modal__voice-mode-radio">
                         <input type="radio" name="editorModalVoiceMode" value="auto" checked />
@@ -122,15 +121,6 @@
                   <i data-lucide="hammer"></i>
                 </button>
                 <span class="dictation-editor-modal__auto-audio-text" id="editorModalAutoSentenceText">—</span>
-              </div>
-              <!-- Кнопка "Перезаполнить все" в правом нижнем углу -->
-              <div class="dictation-editor-modal__auto-audio-footer">
-                <button type="button" id="editorModalAutoRegenerateAllBtn" class="dictation-editor-modal__auto-regenerate-all-btn"
-                  title="Переформувати аудіо для всіх рядків">
-                  <i data-lucide="wand-2"></i>
-                  <i data-lucide="hammer"></i>
-                  <span>Перезаповнити все</span>
-                </button>
               </div>
             </div>
           </div>
@@ -208,110 +198,27 @@
             </div>
           </div>
 
-          <!-- Вкладка 4: Озвучка оригинала (сам) -->
-          <div id="tab-voice-original-self" class="dictation-editor-modal__tab-content">
-            <div class="dictation-editor-modal__self-audio-content">
-              <!-- Панели над волной: слева — информация, справа — кнопка выбора файла -->
-              <div class="dictation-editor-modal__waveform-info-bar">
-                <div class="dictation-editor-modal__file-selection">
-                  <div class="dictation-editor-modal__waveform-filename" id="editorModalSelfFilename">—</div>
-                  <div class="dictation-editor-modal__waveform-sentence-text" id="editorModalSelfSentenceText">—</div>
-                </div>
-                <div class="dictation-editor-modal__waveform-info-actions">
-                  <button type="button" id="editorModalSelfSelectFileBtn" class="dictation-editor-modal__file-select-btn"
-                    title="Вибрати файл">...</button>
-                </div>
-              </div>
-
-              <!-- Волна -->
-              <div class="dictation-editor-modal__waveform-section">
-                <div id="editorModalSelfWaveformContainer" class="dictation-editor-modal__waveform-container">
-                  <div id="editorModalSelfAudioWaveform"></div>
-                </div>
-              </div>
-
-              <!-- Дві панелі під волною: ліва (керування хвилею) і права (запис) -->
-              <div class="dictation-editor-modal__self-bottom-panels">
-                <!-- Ліва панель: Play + Start/End + ножиці -->
-                <div class="dictation-editor-modal__self-left-panel">
-                  <button type="button" id="editorModalSelfAudioPlayBtn" class="audio-btn"
-                    data-field-name="audio_mic" data-state="ready"
-                    data-original-state="ready">
-                    <i data-lucide="play"></i>
-                  </button>
-                  <div class="dictation-editor-modal__time-controls">
-                    <div class="time-input-group">
-                      <div class="time-input-field time-input-field--start">
-                        <input type="number" id="editorModalSelfAudioStartTime" step="0.01" min="0" placeholder="0.00">
-                        <div class="time-input-arrows">
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="up" tabindex="-1">
-                            <i data-lucide="chevron-up"></i>
-                          </button>
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioStartTime" data-dir="down" tabindex="-1">
-                            <i data-lucide="chevron-down"></i>
-                          </button>
-                        </div>
-                      </div>
-                      <div class="time-input-field time-input-field--end">
-                        <input type="number" id="editorModalSelfAudioEndTime" step="0.01" min="0" placeholder="0.00">
-                        <div class="time-input-arrows">
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="up" tabindex="-1">
-                            <i data-lucide="chevron-up"></i>
-                          </button>
-                          <button type="button" class="time-input-arrow" data-target="editorModalSelfAudioEndTime" data-dir="down" tabindex="-1">
-                            <i data-lucide="chevron-down"></i>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <button type="button" id="editorModalSelfCutBtn" class="dictation-editor-modal__wave-btn"
-                    title="Обрізати аудіо за поточним Start/End">
-                    <i data-lucide="scissors"></i>
-                  </button>
-                </div>
-
-                <!-- Права панель: запис з мікрофона -->
-                <div class="dictation-editor-modal__self-right-panel">
-                  <!-- Перший рядок: індикатор + canvas + кнопка запису -->
-                  <div class="dictation-editor-modal__self-mic-row">
-                    <span id="editorModalSelfRecordingIndicator" class="dictation-editor-modal__rec-indicator" disabled title="Индикатор записи">
-                      <i data-lucide="circle"></i>
-                    </span>
-                    <canvas id="editorModalSelfAudioVisualizer" class="dictation-editor-modal__audio-visualizer"></canvas>
-                    <button id="editorModalSelfRecordBtn" class="dictation-editor-modal__mic-btn" type="button" title="Записати">
-                      <span id="editorModalSelfRecordIcon"><i data-lucide="mic"></i></span>
-                    </button>
-                  </div>
-                  <!-- Другий рядок: лейба + пагон вниз + play + apply -->
-                  <div class="dictation-editor-modal__self-mic-actions">
-                    <div class="dictation-editor-modal__self-mic-file-row">
-                      <span id="editorModalSelfMicFilename" class="dictation-editor-modal__self-mic-filename">—</span>
-                      <div class="dictation-editor-modal__self-mic-dropdown-wrapper">
-                        <button id="editorModalSelfMicDropdownBtn" class="dictation-editor-modal__mic-dropdown-btn" type="button" title="Список записаних файлів" disabled>
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                        <div id="editorModalSelfMicDropdown" class="dictation-editor-modal__self-mic-dropdown" style="display:none;"></div>
-                      </div>
-                    </div>
-                    <button id="editorModalSelfPlayNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Прослухати записане" disabled>
-                      <i data-lucide="play"></i>
-                    </button>
-                    <button id="editorModalSelfApplyNewBtn" class="dictation-editor-modal__mic-action-btn" type="button" title="Застосувати записане" disabled>
-                      <i data-lucide="corner-down-left"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Скрытый input для выбора файлов -->
-              <input type="file" id="editorModalSelfAudioFileInput" accept="audio/*" style="display:none;">
-            </div>
-          </div>
-
           <!-- Вкладка 5: Озвучка перевода (авто) -->
           <div id="tab-voice-translations" class="dictation-editor-modal__tab-content">
-            <p>Озвучка перевода (авто) — будет реализовано позже</p>
+            <div class="dictation-editor-modal__translations-content">
+              <div class="dictation-editor-modal__translations-toolbar">
+                <button type="button" id="editorModalAddTranslationBtn" class="dictation-editor-modal__table-control-btn add-btn"
+                  title="Добавить язык перевода">
+                  <i data-lucide="plus"></i>
+                </button>
+              </div>
+              <table id="editorModalTranslationsTable" class="dictation-editor-modal__translations-table">
+                <thead>
+                  <tr>
+                    <th>Язык перевода</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Строки через JS -->
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -358,7 +265,14 @@
                 <th class="col-number">№</th>
                 <th class="col-speaker" style="display: none;"><i data-lucide="user"></i></th>
                 <th class="col-original panel-original">Оригинал</th>
-                <th class="col-generate-tts panel-editing-avto panel-create-audio">a</th>
+                <th class="col-generate-tts panel-editing-avto panel-create-audio">
+                  a
+                  <button id="editorModalAutoRegenerateAllBtn" class="dictation-editor-modal__button-header-edit-all"
+                    title="Переформувати аудіо для всіх рядків" style="display: none;">
+                    <i data-lucide="wand-2"></i>
+                    <i data-lucide="hammer"></i>
+                  </button>
+                </th>
                 <th class="col-play-audio panel-editing-user panel-create-audio">f
                   <button id="editorModalEditAllCreatingBtn" class="dictation-editor-modal__button-header-edit-all"
                     title="Отредактировать все отмеченные" style="display: none;">
@@ -420,7 +334,7 @@
       <!-- Right panel: Voice mode (как в редакторе) -->
       <div class="new-dictation-fill-modal__right-panel">
         <div class="new-dictation-fill-modal__voice-mode-group">
-          <span class="new-dictation-fill-modal__voice-mode-label">Режим озвучки:</span>
+          <span class="new-dictation-fill-modal__voice-mode-label">Режим озвучки оригинала:</span>
           <div class="new-dictation-fill-modal__voice-mode-options">
             <label class="new-dictation-fill-modal__voice-mode-radio">
               <input type="radio" name="newDictationVoiceMode" value="auto" checked />
@@ -446,6 +360,58 @@
            class="new-dictation-fill-modal__text-editor"
            contenteditable="true"
            data-placeholder="Введіть текст диктанту..."></div>
+    </div>
+  </div>
+</div>
+
+<!-- add-translation-modal: добавление языка перевода -->
+<div id="addTranslationModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content add-translation-modal__content">
+    <div class="add-translation-modal__header">
+      <span>Добавить новый язык перевода?</span>
+      <button type="button" id="addTranslationModalCloseBtn" class="btn-close">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="add-translation-modal__body">
+      <div id="addTranslationLangSelector"></div>
+    </div>
+    <div class="add-translation-modal__footer">
+      <button type="button" id="addTranslationModalAddBtn" class="btn btn-primary">Добавить</button>
+    </div>
+  </div>
+</div>
+
+<!-- add-row-modal: добавление новой строки -->
+<div id="addRowModal" class="modal-overlay" style="display:none;">
+  <div class="modal-content add-row-modal__content">
+    <div class="add-row-modal__header">
+      <span>Добавить строку</span>
+      <button type="button" id="addRowModalCloseBtn" class="btn-close">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+    <div class="add-row-modal__body">
+      <div class="add-row-modal__orig-row">
+        <label>Оригинал:</label>
+        <input type="text" id="addRowModalOrigInput" class="text-input" placeholder="Текст оригинала" />
+      </div>
+      <div class="add-row-modal__translations-section">
+        <table id="addRowModalTranslationsTable">
+          <thead>
+            <tr>
+              <th>Язык</th>
+              <th>Перевод</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Строки через JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="add-row-modal__footer">
+      <button type="button" id="addRowModalCreateBtn" class="btn btn-primary">Создать</button>
     </div>
   </div>
 </div>

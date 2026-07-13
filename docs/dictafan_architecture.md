@@ -418,7 +418,7 @@ window.NewDictationFillModal = {
    - Сбрасывает shared/self audio состояние, waveform
    - Создаёт `DictationContent` (через `DictationRuntime.getOrCreateContent()` или `new DictationContent()`, или fallback-объект)
    - Показывает модалку (`modal.style.display = 'flex'`)
-   - Инициализирует все подсистемы: `_setupUserSection()`, `_initLanguageFlags()`, `_initFormFields()`, `_initLevelSelector()`, `_initVoiceModeRadios()`, `_initCoverUpload()`, `_initHaveAudioTab()`, `_initAutoAudioTab()`, `_initSelfAudioTab()`, `_setupTabs()`, `_renderTable()`, `_bindAudioPlaybackHandlers()`, `_setupTableControls()`
+   - Инициализирует все подсистемы: `_setupUserSection()`, `_initLanguageFlags()`, `_initFormFields()`, `_initLevelSelector()`, `_initVoiceModeRadios()`, `_initCoverUpload()`, `_initHaveAudioTab()`, `_initAutoAudioTab()`, `_initSelfAudioTab()`, `_setupTabs()`, `_renderTable()`, `_renderTranslationsTable()`, `_updateAutoRegenerateAllBtnVisibility()`, `_bindAudioPlaybackHandlers()`, `_setupTableControls()`
    - Инициализирует `AudioManager`
    - Восстанавливает shared/self audio из данных предложений
    - Переключает закладку согласно `audio_order`
@@ -474,33 +474,39 @@ const state = {
   - `general` — все колонки
   - `voice-original-auto` — скрыты audio_file, audio_mic
   - `voice-original-have` — показана audio_file, скрыта audio_mic
-  - `voice-original-self` — показана audio_mic, скрыта audio_file
 - Навигация: `_navigateToPreviousRow()`, `_navigateToNextRow()`, `_selectSentenceRow()`
-- Добавление/удаление строк: `_addNewRow(position)`, `_deleteRow(row)`
+- Добавление строк: `_addNewRow(position)` — открывает `#addRowModal` (модальное окно добавления строки)
+- Удаление строк: `_deleteRow(row)` — через `DesktopConfirmModal`
+- **Умный поиск ключа**: `_findFreeKey()` — находит наименьший незанятый числовой ключ (`s_0`, `s_1`, ...) среди существующих предложений
 
 ### Audio playback
 
 - Использует `AudioManager` (глобальный синглтон, инициализируется через `_ensureAudioManager()`)
-- Три режима:
+- Три режима (radio):
   - **auto** (закладка 2): TTS-генерация через `POST /generate_audio`, кнопки "Сгенерировать всё" и "Перегенерировать всё"
   - **have** (закладка 3): загрузка shared audio файла, waveform (wavesurfer), регионы (start/end), split/smart-split
-  - **self** (закладка 4): запись с микрофона через `UnifiedSpeechRecognition`, waveform, регионы, cut (ножницы)
+  - **self** (закладка 4 — удалена): запись с микрофона через `UnifiedSpeechRecognition` — функциональность сохранена, но отдельной закладки больше нет
 - Playback: `_handleAudioPlayback()` → `am.play(button, audioUrl, ...)`
-- Cut audio (ножницы на закладке 4): `_handleSelfCutAudio()` — получает `audio_mic` из текущего предложения, загружает blob через `AudioManager.loadDictationAudioBlob()` из CacheStorage, отправляет на `POST /cut-audio`, после cut перезагружает waveform через `_loadSelfAudioForRow()`
+- Cut audio: `_handleSelfCutAudio()` — получает `audio_mic` из текущего предложения, загружает blob через `AudioManager.loadDictationAudioBlob()` из CacheStorage, отправляет на `POST /cut-audio`, после cut перезагружает waveform через `_loadSelfAudioForRow()`
 
 ### Voice mode radios
 
 - Три radio: `auto` (значение `""`), `have` (значение `"f"`), `self` (значение `"m"`)
+- **Радио больше не управляет видимостью закладок** — все закладки (1, 2, 3, 5) всегда видны
 - При смене radio:
-  - Обновляется видимость закладок (tab visibility)
   - Вызывается `_applyTableViewForTab()` для переключения колонок таблицы
-  - Если выбран `self` — инициализируется `UnifiedSpeechRecognition` для записи с микрофона
+  - Показывается/скрывается кнопка "Перезаполнить все авто" (`#editorModalAutoRegenerateAllBtn`) через `_updateAutoRegenerateAllBtnVisibility()`
+  - Устанавливается dirty flag
+- Закладка 4 ("Озвучка оригинала (сам)") **удалена** — функциональность self audio сохранена, но отдельной закладки больше нет
 
 ### LanguageSelector
 
-- Инициализируется в `_initLanguageFlags()` через `window.initLanguageSelector('editorModalLangPair', { mode: 'flag-pair-dropdown-both', ... })`
+- Инициализируется в `_initLanguageFlags()` через `window.initLanguageSelector('editorModalLangPair', { mode: ... })`
 - Использует `window.LanguageManager` для получения данных о языках
-- Режим `flag-pair-dropdown-both`: два флага (оригинал и перевод) с выпадающими списками
+- Режим зависит от количества языков перевода:
+  - **0 языков перевода** (только оригинал): `flag-single` — только флаг оригинала
+  - **1 язык перевода**: `flag-pair-fixed` — два флага (оригинал и перевод) без выпадающих списков
+  - **2+ языков перевода**: `flag-pair-dropdown` с `rightDropdown: true` — левый флаг фиксирован (оригинал), правый — выпадающий список для выбора языка перевода
 
 ### DictationContent
 
@@ -526,6 +532,51 @@ const state = {
   4. При сохранении: `CoverManager.getCroppedBlob()` → `_blobToBase64()` → `cover_b64` в `saveData`
   5. Сервер (`save_dictation_final`) декодирует `cover_b64` и сохраняет как `cover.webp` в temp-папку
   6. Существующая логика копирует `cover.webp` из temp в финальную папку (`static/data/dictations/<dictation_id>/cover.webp`) и в B2 (`dictations_covers/<numeric_id>.webp`)
+
+### Управление языками перевода (вкладка 5)
+
+**Вкладка 5 "Озвучка перевода (авто)"** — таблица языков перевода с кнопками +/−.
+
+**`_renderTranslationsTable()`** — рендерит таблицу `#editorModalTranslationsTable`:
+- Каждая строка: название языка + кнопка удаления (мусорник)
+- Кнопка `+` (`#editorModalAddTranslationBtn`) — открывает `#addTranslationModal`
+
+**`_openAddTranslationModal()`** — открывает модальное окно добавления языка:
+- LanguageSelector с фильтром: только языки, которых ещё нет в `state.content.langBlocks`
+- Кнопка "Добавить" → `_handleAddTranslationConfirm()`
+
+**`_handleAddTranslationConfirm()`** — асинхронный процесс:
+1. Добавляет новый `langBlock` в `state.content.langBlocks`
+2. Для каждого существующего предложения (оригинал) делает автоперевод через `POST /translate`
+3. Для каждого перевода генерирует TTS-аудио через `POST /generate_audio`
+4. Сохраняет blob URL через `AudioManager._setObjectUrlForCanonical()`
+5. Обновляет таблицу языков (`_renderTranslationsTable()`) и флаги (`_initLanguageFlags()`)
+
+**`_openRemoveTranslationModal(langCode)`** — подтверждение удаления через `DesktopConfirmModal`
+
+**`_removeTranslationLanguage(langCode)`** — удаляет `langBlock` из `state.content.langBlocks`, обновляет таблицу и флаги
+
+### Модальное окно добавления строки (`#addRowModal`)
+
+Открывается при нажатии `+` в панели управления таблицей (вместо старого `DesktopConfirmModal`).
+
+**Структура:**
+- Поле ввода для текста оригинала
+- Enter в поле оригинала → автоперевод для всех языков перевода через `POST /translate`
+- Таблица `#addRowModalTranslationsTable` — строки для каждого языка перевода с полями ввода
+- Кнопка "Создать" → `_handleAddRowCreate()`
+
+**`_handleAddRowCreate()`**:
+1. Находит свободный ключ через `_findFreeKey()`
+2. Создаёт `sentence` для оригинала и для каждого языка перевода
+3. Если выбран режим `auto` — генерирует TTS-аудио через `_generateAudioForSentence()`
+4. Добавляет строку в таблицу через `_renderTable()`
+5. Закрывает модалку
+
+**`_generateAudioForSentence(key, lang, text, dictationId)`** — асинхронная генерация TTS:
+1. Вызывает `POST /generate_audio` с `{ dictation_id, lang, text, filename: "tts_{key}_{timestamp}.mp3" }`
+2. Сохраняет blob через `AudioManager.saveDictationAudioBlob()`
+3. Устанавливает blob URL через `AudioManager._setObjectUrlForCanonical()`
 
 ### NewDictationFillModal (начальное заполнение)
 
