@@ -315,10 +315,6 @@ function _applyTableViewForTab(tabName) {
     showCols('.panel-original');
     showCols('.panel-translation');
     showAudioBtnByVoiceMode();
-  } else if (tabName === 'voice-original-auto') {
-    // №, Оригинал, a (все колонки группы avto)
-    showCols('.panel-original');
-    showCols('.panel-editing-avto');
   } else if (tabName === 'voice-original-have') {
     // №, Оригинал, f, Start, End (все колонки группы user)
     showCols('.panel-original');
@@ -1907,7 +1903,6 @@ function _initVoiceModeRadios() {
   if (!radios.length) return;
 
   // Радио больше не меняет видимость вкладок — только видимость колонок в таблице.
-  // Вкладка 4 (voice-original-self) удалена.
 
   // Сначала сбрасываем радио в значение из config.
   // config.voice_mode может быть 'auto', 'have', 'self' (старый формат)
@@ -3338,7 +3333,6 @@ function open(config) {
   _initVoiceModeRadios();
   _initCoverUpload();
   _initHaveAudioTab();
-  _initAutoAudioTab();
   _initSelfAudioTab();
   _setupTabs();
   _renderTable();
