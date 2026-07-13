@@ -1636,6 +1636,12 @@ window.DictationKart = window.DictationKart || {
     } catch (e) {
     }
 
+    // Показываем тост
+    try {
+      this._showToast('Диктант додано на робочий стіл', { durationMs: 2200 });
+    } catch (e) {
+    }
+
     // Обновляем UI десктопа
     try {
       if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {

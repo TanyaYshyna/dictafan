@@ -4424,8 +4424,12 @@
       throw new Error('missing_dictation_params');
     }
 
-    // Новый API возвращает все предложения всех языков плоским массивом
-    const url = `/api/dictation/${encodeURIComponent(dictId)}//sentences`;
+    // Извлекаем числовой ID из формата "dict_40" или "40"
+    const numericMatch = dictId.match(/^dict_(\d+)$/);
+    const numericId = numericMatch ? numericMatch[1] : dictId;
+
+    // Используем простой endpoint, который принимает только ID диктанта
+    const url = `/api/dictation/${encodeURIComponent(numericId)}/sentences`;
     const response = await fetch(url, { method: 'GET', cache: 'no-store' });
     if (!response.ok) {
       const text = await response.text();

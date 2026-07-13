@@ -3038,24 +3038,38 @@ async function _handleSave() {
 
           // Добавляем диктант на рабочий стол (если это новый диктант)
           try {
+            // Пытаемся получить числовой ID диктанта из ответа сервера
             var newDbId = dbResult.id || dbResult.db_id;
+            // Если не нашли в ответе — пробуем извлечь из dictation_id
+            if (!newDbId && dbResult.dictation_id) {
+              var idStr = String(dbResult.dictation_id).replace('dict_', '');
+              var parsed = parseInt(idStr, 10);
+              if (!isNaN(parsed)) newDbId = parsed;
+            }
+            // Если всё ещё нет — используем state.config.dbId (зарезервированный ID)
+            if (!newDbId && state.config && state.config.dbId) {
+              newDbId = state.config.dbId;
+            }
             if (newDbId) {
-              fetch('/desk/api/items', {
+              var deskResp = await fetch('/desk/api/items', {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
                   'Authorization': 'Bearer ' + token
                 },
-                body: JSON.stringify({ dictation_id: newDbId })
-              }).then(function (resp) {
-                if (resp.ok) {
-                  console.log('[dictationEditorModal] Диктант добавлен на рабочий стол');
-                } else {
-                  console.warn('[dictationEditorModal] Не удалось добавить диктант на стол');
-                }
-              }).catch(function (e) {
-                console.warn('[dictationEditorModal] Ошибка добавления на стол:', e);
+                body: JSON.stringify({ dictation_id: Number(newDbId) })
               });
+              if (deskResp.ok) {
+                console.log('[dictationEditorModal] Диктант добавлен на рабочий стол');
+                // Показываем тост
+                try {
+                  if (window.DictationKart && typeof window.DictationKart._showToast === 'function') {
+                    window.DictationKart._showToast('Диктант додано на робочий стіл', { durationMs: 2200 });
+                  }
+                } catch (e) {}
+              } else {
+                console.warn('[dictationEditorModal] Не удалось добавить диктант на стол');
+              }
             }
           } catch (e) {
             console.warn('[dictationEditorModal] Ошибка добавления на стол:', e);

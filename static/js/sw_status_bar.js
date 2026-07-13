@@ -357,6 +357,54 @@
         queueInfo.id = BAR_ID + '__queueInfo';
         queueInfo.textContent = '';
 
+        // B2 Storage health check button
+        var b2HealthBtn = document.createElement('button');
+        b2HealthBtn.className = 'swbar-b2-health-btn';
+        b2HealthBtn.id = BAR_ID + '__b2Health';
+        b2HealthBtn.textContent = '☁ B2';
+        b2HealthBtn.title = 'Перевірити B2 сховище';
+        b2HealthBtn.style.pointerEvents = 'auto';
+        b2HealthBtn.style.cursor = 'pointer';
+        b2HealthBtn.style.background = 'none';
+        b2HealthBtn.style.border = 'none';
+        b2HealthBtn.style.padding = '0 4px';
+        b2HealthBtn.style.fontSize = '12px';
+        b2HealthBtn.style.fontFamily = 'inherit';
+        b2HealthBtn.style.color = 'inherit';
+        b2HealthBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var btn = e.currentTarget;
+          var origText = btn.textContent;
+          btn.textContent = '☁ ...';
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+          fetch('/api/b2/health', { method: 'GET', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var status = data && data.status;
+              if (status === 'ok') {
+                btn.textContent = '☁ ✅';
+              } else if (status === 'disabled') {
+                btn.textContent = '☁ ⚪';
+              } else {
+                btn.textContent = '☁ ❌';
+              }
+              setTimeout(function () {
+                btn.textContent = origText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              }, 3000);
+            })
+            .catch(function () {
+              btn.textContent = '☁ ❌';
+              setTimeout(function () {
+                btn.textContent = origText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              }, 3000);
+            });
+        });
+
         // Активные диктанты
         var activeDictEl = document.createElement('div');
         activeDictEl.className = 'swbar-active-dictations';
@@ -397,6 +445,7 @@
         leftWrap.appendChild(msg);
         leftWrap.appendChild(leftExtra);
         leftWrap.appendChild(activeDictEl);
+        leftWrap.appendChild(b2HealthBtn);
         leftWrap.appendChild(queueInfo);
         left.appendChild(leftWrap);
 

@@ -102,6 +102,22 @@ def reserve_dictation_id():
 
 
 # ==============================================================
+# API: список упражнений диктанта
+# ==============================================================
+@editor_bp.route('/api/dictation/<int:dictation_id>/exercises', methods=['GET'])
+@jwt_required()
+def api_get_dictation_exercises(dictation_id: int):
+    """Возвращает список упражнений для диктанта."""
+    try:
+        from helpers.db_dictations import list_dictation_exercises
+        exercises = list_dictation_exercises(dictation_id)
+        return jsonify({'success': True, 'exercises': exercises})
+    except Exception as e:
+        logger.error(f"Ошибка получения упражнений для диктанта {dictation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==============================================================
 # транслятор
 translator = Translator()
 
@@ -190,6 +206,32 @@ def generate_audio():
             "success": False,
             "error": f"Внутренняя ошибка сервера: {e}"
         }), 500
+
+
+# ==============================================================
+# B2 Storage health check (ручная проверка)
+# ==============================================================
+@editor_bp.route('/api/b2/health', methods=['GET'])
+def api_b2_health():
+    """Проверяет, работает ли B2 Storage. Не делает платных запросов к B2 API."""
+    try:
+        from helpers.b2_storage import b2_storage
+        if not b2_storage.enabled:
+            return jsonify({'success': True, 'status': 'disabled', 'message': 'B2 Storage отключён'})
+        
+        # Проверяем, инициализирован ли bucket (без платного запроса к API)
+        if b2_storage.bucket is not None:
+            return jsonify({'success': True, 'status': 'ok', 'message': 'B2 Storage работает'})
+        
+        # Пытаемся переинициализировать
+        ok = b2_storage._ensure_initialized()
+        if ok and b2_storage.bucket is not None:
+            return jsonify({'success': True, 'status': 'ok', 'message': 'B2 Storage работает (переинициализирован)'})
+        
+        return jsonify({'success': True, 'status': 'error', 'message': 'B2 Storage не инициализирован. Проверь ключи в переменных окружения.'})
+    except Exception as e:
+        logger.error(f"B2 health check error: {e}", exc_info=True)
+        return jsonify({'success': False, 'status': 'error', 'message': f'Ошибка: {e}'}), 500
 
 
 @editor_bp.route('/api/b2/get_upload_url', methods=['POST'])
