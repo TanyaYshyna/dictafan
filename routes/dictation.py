@@ -31,17 +31,42 @@ def _infer_lang_from_audio_filename(filename, fallback=''):
     return (fallback or '').strip().lower()
 
 
+def _try_send_local_audio(dictation_id, lang, filename):
+    """Пытается отдать аудиофайл из локальной папки static/data/dictations/.
+
+    Возвращает response или None, если файл не найден.
+    """
+    try:
+        local_dir = os.path.join('static', 'data', 'dictations', dictation_id, lang or '')
+        local_path = os.path.join(local_dir, secure_filename(filename or ''))
+        if os.path.exists(local_path) and os.path.isfile(local_path):
+            current_app.logger.info(
+                "[dictation_audio] local fallback OK dictation_id=%s lang=%s filename=%s",
+                dictation_id, lang, filename,
+            )
+            return send_from_directory(os.path.dirname(local_path), os.path.basename(local_path))
+    except Exception as e:
+        try:
+            current_app.logger.warning(
+                "[dictation_audio] local fallback error dictation_id=%s lang=%s filename=%s error=%s",
+                dictation_id, lang, filename, e,
+            )
+        except Exception:
+            pass
+    return None
+
+
 def _send_dictation_audio_from_b2(dictation_id, lang, filename):
-    """Получение аудио диктанта из B2.
+    """Получение аудио диктанта из B2 с fallback на локальные файлы.
 
     Ожидаемый путь в B2:
       dictations/<dictation_id>/<lang>/<filename>
     где dictation_id в формате dict_<id>.
+
+    Локальный fallback:
+      static/data/dictations/<dictation_id>/<lang>/<filename>
     """
     from helpers.b2_storage import b2_storage
-
-    if not b2_storage.enabled:
-        return jsonify({'error': 'B2 storage is disabled'}), 503
 
     if not dictation_id or not dictation_id.startswith('dict_') or dictation_id.startswith('dict_temp_'):
         return jsonify({'error': f'Invalid dictation_id: {dictation_id}'}), 400
@@ -64,10 +89,28 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     except Exception:
         pass
 
+    # Если B2 выключен — сразу пробуем локальный файл
+    if not b2_storage.enabled:
+        local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
+        if local_resp is not None:
+            return local_resp
+        return jsonify({'error': 'B2 storage is disabled and local file not found'}), 503
+
     remote_path = f"dictations/{dictation_id}/{safe_lang}/{safe_name}"
     try:
         exists = b2_storage.file_exists(remote_path, raise_on_error=True)
     except Exception:
+        # B2 недоступен — пробуем локальный файл
+        try:
+            current_app.logger.warning(
+                "[dictation_audio] B2 unavailable, trying local fallback dictation_id=%s lang=%s filename=%s",
+                dictation_id, safe_lang, safe_name,
+            )
+        except Exception:
+            pass
+        local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
+        if local_resp is not None:
+            return local_resp
         return jsonify({'error': 'B2 storage unavailable'}), 503
 
     if not exists:
@@ -77,6 +120,9 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
             try:
                 exists2 = b2_storage.file_exists(remote_path2, raise_on_error=True)
             except Exception:
+                local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
+                if local_resp is not None:
+                    return local_resp
                 return jsonify({'error': 'B2 storage unavailable'}), 503
             if exists2:
                 remote_path = remote_path2
@@ -96,7 +142,7 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     if not exists:
         try:
             current_app.logger.warning(
-                "[dictation_audio] NOT FOUND dictation_id=%s lang=%s filename=%s remote_path=%s",
+                "[dictation_audio] NOT FOUND in B2 dictation_id=%s lang=%s filename=%s remote_path=%s, trying local fallback",
                 dictation_id,
                 safe_lang,
                 safe_name,
@@ -104,6 +150,10 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
             )
         except Exception:
             pass
+        # Пробуем локальный файл
+        local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
+        if local_resp is not None:
+            return local_resp
         return jsonify({'error': 'Audio file not found'}), 404
 
     tmp = tempfile.NamedTemporaryFile(prefix='dict_audio_', suffix=f"_{safe_name}", delete=False)
@@ -114,7 +164,7 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
     if not ok:
         try:
             current_app.logger.warning(
-                "[dictation_audio] download failed dictation_id=%s remote_path=%s tmp_path=%s",
+                "[dictation_audio] download failed dictation_id=%s remote_path=%s tmp_path=%s, trying local fallback",
                 dictation_id,
                 remote_path,
                 tmp_path,
@@ -125,6 +175,10 @@ def _send_dictation_audio_from_b2(dictation_id, lang, filename):
             os.remove(tmp_path)
         except OSError:
             pass
+        # Пробуем локальный файл
+        local_resp = _try_send_local_audio(dictation_id, safe_lang, safe_name)
+        if local_resp is not None:
+            return local_resp
         return jsonify({'error': 'Failed to download audio from B2'}), 502
 
     @after_this_request
