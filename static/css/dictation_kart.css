@@ -17,6 +17,13 @@
   max-width: none;
 }
 
+.page-index .dictation-kart--book-row {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 auto;
+}
+
 .dictation-kart--book-row.short-card {
   display: block;
   min-height: 0;

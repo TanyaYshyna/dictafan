@@ -1061,6 +1061,69 @@ window.DictationKart = window.DictationKart || {
         }
       });
     });
+
+    // Обработчик для кнопки "добавить/убрать со стола" (toggle-desk-explicit)
+    var toggleDeskBtn = cardEl.querySelector('[data-action="toggle-desk-explicit"]');
+    if (toggleDeskBtn) {
+      toggleDeskBtn.addEventListener('click', async function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var dbId = toggleDeskBtn.getAttribute('data-dictation-id');
+        if (!dbId) return;
+        dbId = Number(dbId);
+        if (!Number.isFinite(dbId) || dbId <= 0) return;
+
+        var isOnDesk = window.DictationKart.isDictationOnDesk(dbId);
+        try {
+          if (isOnDesk) {
+            // Найти itemId для этого диктанта
+            var itemId = null;
+            try {
+              if (typeof window.idbGet === 'function') {
+                var cached = await window.idbGet('desk_items', 'latest');
+                var items = cached && Array.isArray(cached.items) ? cached.items : [];
+                for (var i = 0; i < items.length; i++) {
+                  if (Number(items[i].dictation_id) === dbId) {
+                    itemId = items[i].id;
+                    break;
+                  }
+                }
+              }
+            } catch (e) {
+            }
+            if (itemId) {
+              await window.DictationKart.removeFromDesk(itemId, dbId);
+            }
+          } else {
+            await window.DictationKart.addToDesk(dbId);
+          }
+          // Обновляем иконку и классы на карточке
+          var newIsOnDesk = window.DictationKart.isDictationOnDesk(dbId);
+          var icon = toggleDeskBtn.querySelector('i[data-lucide]');
+          if (icon) {
+            icon.setAttribute('data-lucide', newIsOnDesk ? 'arrow-big-down-dash' : 'arrow-big-up-dash');
+          }
+          try {
+            if (newIsOnDesk) {
+              cardEl.classList.add('short-card--on-desk');
+              cardEl.classList.remove('short-card--off-desk');
+            } else {
+              cardEl.classList.add('short-card--off-desk');
+              cardEl.classList.remove('short-card--on-desk');
+            }
+          } catch (e) {
+          }
+          try {
+            if (window.lucide && typeof window.lucide.createIcons === 'function') {
+              window.lucide.createIcons();
+            }
+          } catch (e) {
+          }
+        } catch (err) {
+          console.warn('[dictation_kart] toggle-desk error:', err);
+        }
+      });
+    }
   },
 
   buildMenuItems(context) {
@@ -1523,4 +1586,116 @@ window.DictationKart = window.DictationKart || {
     this._renderLucide(node);
     return node;
   },
+
+  /**
+   * Проверяет, находится ли диктант на рабочем столе.
+   * Читает из IDB кеша desk_items.
+   * @param {number|string} dbId - ID диктанта в БД
+   * @returns {boolean}
+   */
+  isDictationOnDesk(dbId) {
+    try {
+      // Синхронная проверка: читаем из памяти, если есть
+      if (Array.isArray(window.__deskItemIds)) {
+        return window.__deskItemIds.indexOf(Number(dbId)) !== -1;
+      }
+    } catch (e) {
+    }
+    return false;
+  },
+
+  /**
+   * Добавляет диктант на рабочий стол.
+   * @param {number|string} dbId - ID диктанта в БД
+   * @returns {Promise<object>}
+   */
+  async addToDesk(dbId) {
+    var token = (function () {
+      try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
+    })();
+    if (!token) throw new Error('No auth token');
+
+    var resp = await fetch('/desk/api/items', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ dictation_id: Number(dbId) })
+    });
+    var data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Failed to add to desk');
+
+    // Обновляем кеш ID диктантов на столе
+    try {
+      if (Array.isArray(window.__deskItemIds)) {
+        window.__deskItemIds.push(Number(dbId));
+      } else {
+        window.__deskItemIds = [Number(dbId)];
+      }
+    } catch (e) {
+    }
+
+    // Обновляем UI десктопа
+    try {
+      if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+        window.Desktop.loadDeskItems();
+      }
+    } catch (e) {
+    }
+
+    return data;
+  },
+
+  /**
+   * Убирает диктант с рабочего стола.
+   * @param {number|string} itemId - ID записи в desk_items
+   * @param {number|string} dictationId - ID диктанта
+   * @returns {Promise<object>}
+   */
+  async removeFromDesk(itemId, dictationId) {
+    var token = (function () {
+      try { return localStorage.getItem('jwt_token'); } catch (e) { return null; }
+    })();
+    if (!token) throw new Error('No auth token');
+
+    var resp = await fetch('/desk/api/item/' + Number(itemId), {
+      method: 'DELETE',
+      headers: {
+        'Authorization': 'Bearer ' + token
+      }
+    });
+    var data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Failed to remove from desk');
+
+    // Обновляем кеш ID диктантов на столе
+    try {
+      if (Array.isArray(window.__deskItemIds)) {
+        var idx = window.__deskItemIds.indexOf(Number(dictationId));
+        if (idx !== -1) window.__deskItemIds.splice(idx, 1);
+      }
+    } catch (e) {
+    }
+
+    // Обновляем UI десктопа
+    try {
+      if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+        window.Desktop.loadDeskItems();
+      }
+    } catch (e) {
+    }
+
+    return data;
+  },
+};
+
+// Глобальные функции для обратной совместимости
+window.isDictationOnDesk = function (dbId) {
+  return window.DictationKart.isDictationOnDesk(dbId);
+};
+window.addToDesk = function (dbId) {
+  return window.DictationKart.addToDesk(dbId);
+};
+window.removeFromDesk = function (itemId, dictationId) {
+  return window.DictationKart.removeFromDesk(itemId, dictationId);
 };

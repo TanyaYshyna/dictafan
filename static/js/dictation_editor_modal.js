@@ -1488,11 +1488,11 @@ function _openAddTranslationModal() {
   if (window.LanguageManager && typeof window.initLanguageSelector === 'function') {
     var languageData = window.LanguageManager.getLanguageData();
     if (languageData) {
-      // Фильтруем: показываем только языки, которых ещё нет в langBlocks
-      // и не равные оригинальному языку
+      // Фильтруем: показываем только языки, которых ещё нет в langBlocks,
+      // не равные оригинальному языку и не равные языку перевода (родному языку пользователя)
       var filteredData = {};
       Object.keys(languageData).forEach(function (code) {
-        if (!existingLangs[code] && code !== origLang) {
+        if (!existingLangs[code] && code !== origLang && code !== nativeLang) {
           filteredData[code] = languageData[code];
         }
       });
@@ -1505,10 +1505,13 @@ function _openAddTranslationModal() {
         return;
       }
 
+      // Берём первый доступный язык как значение по умолчанию для отображения флага
+      var availableCodes = Object.keys(filteredData);
+      var defaultLang = availableCodes.length > 0 ? availableCodes[0] : '';
       var selector = window.initLanguageSelector('addTranslationLangSelector', {
         mode: 'flag-single',
-        currentLearning: '',
-        nativeLanguage: nativeLang || origLang,
+        currentLearning: defaultLang,
+        nativeLanguage: defaultLang,
         languageData: filteredData
       });
 
@@ -3036,6 +3039,31 @@ async function _handleSave() {
             if (dbResult.id && (!state.config.dbId || state.config.dictationId !== oldId)) {
               state.config.dbId = dbResult.id;
             }
+          }
+
+          // Добавляем диктант на рабочий стол (если это новый диктант)
+          try {
+            var newDbId = dbResult.id || dbResult.db_id;
+            if (newDbId) {
+              fetch('/desk/api/items', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ dictation_id: newDbId })
+              }).then(function (resp) {
+                if (resp.ok) {
+                  console.log('[dictationEditorModal] Диктант добавлен на рабочий стол');
+                } else {
+                  console.warn('[dictationEditorModal] Не удалось добавить диктант на стол');
+                }
+              }).catch(function (e) {
+                console.warn('[dictationEditorModal] Ошибка добавления на стол:', e);
+              });
+            }
+          } catch (e) {
+            console.warn('[dictationEditorModal] Ошибка добавления на стол:', e);
           }
 
           // Обновляем десктоп, если он есть (перезагружаем карточки)

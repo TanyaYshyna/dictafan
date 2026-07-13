@@ -820,6 +820,12 @@ window.Desktop = window.Desktop || {
         }
       })();
       if (data && data.success && Array.isArray(data.items)) {
+        // Обновляем кеш ID диктантов на столе для isDictationOnDesk
+        try {
+          window.__deskItemIds = data.items.map(function (item) { return Number(item.dictation_id); }).filter(function (id) { return Number.isFinite(id) && id > 0; });
+        } catch (e) {
+        }
+
         this.renderDeskCards(data.items);
         try {
           if (typeof window.idbPut === 'function') {
