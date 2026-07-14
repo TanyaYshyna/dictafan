@@ -38,14 +38,59 @@
       const discardLabel = _getEl('desktopConfirmDiscardLabel');
       const saveLabel = _getEl('desktopConfirmSaveLabel');
       const closeX = _getEl('desktopConfirmModalClose');
+      const buttonsContainer = _getEl('desktopConfirmModalButtons');
 
       const title = opts && opts.title != null
         ? String(opts.title)
         : t('desktop.confirm.title', 'Сохранить изменения?');
       const showSave = !!(opts && opts.showSave);
+      const customButtons = opts && Array.isArray(opts.buttons) ? opts.buttons : null;
 
       if (titleEl) titleEl.textContent = title;
-      if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
+
+      // Если есть кастомные кнопки — показываем их, скрываем стандартные
+      if (customButtons && buttonsContainer) {
+        // Удаляем предыдущие кастомные кнопки (если были)
+        var existingCustom = buttonsContainer.querySelectorAll('.desktop-confirm-custom-btn');
+        existingCustom.forEach(function (el) { el.remove(); });
+
+        // Скрываем стандартные кнопки
+        if (saveBtn) saveBtn.style.display = 'none';
+        if (discardBtn) discardBtn.style.display = 'none';
+
+        // Создаём кастомные кнопки
+        customButtons.forEach(function (btnOpts) {
+          var btn = document.createElement('button');
+          btn.className = 'desktop-confirm-custom-btn';
+          if (btnOpts.type === 'danger') {
+            btn.classList.add('button-color-red');
+          } else if (btnOpts.type === 'primary') {
+            btn.classList.add('button-color-yellow');
+          } else {
+            btn.classList.add('button-color-lightgreen');
+          }
+          btn.textContent = btnOpts.text || '';
+          btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            _hide();
+            if (typeof btnOpts.onClick === 'function') {
+              btnOpts.onClick();
+            }
+          });
+          buttonsContainer.appendChild(btn);
+        });
+      } else {
+        // Стандартное поведение — показываем стандартные кнопки
+        if (saveBtn) saveBtn.style.display = showSave ? '' : 'none';
+        if (discardBtn) discardBtn.style.display = '';
+
+        // Удаляем предыдущие кастомные кнопки
+        if (buttonsContainer) {
+          var existingCustom = buttonsContainer.querySelectorAll('.desktop-confirm-custom-btn');
+          existingCustom.forEach(function (el) { el.remove(); });
+        }
+      }
 
       try {
         const label = t('desktop.confirm.exit', 'Выйти');
@@ -77,8 +122,14 @@
       }
 
       try {
-        if (showSave && saveBtn) saveBtn.focus();
-        else if (discardBtn) discardBtn.focus();
+        if (customButtons) {
+          var firstCustom = buttonsContainer && buttonsContainer.querySelector('.desktop-confirm-custom-btn');
+          if (firstCustom) firstCustom.focus();
+        } else if (showSave && saveBtn) {
+          saveBtn.focus();
+        } else if (discardBtn) {
+          discardBtn.focus();
+        }
       } catch (e) {
       }
     }
