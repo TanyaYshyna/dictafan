@@ -108,12 +108,14 @@ def reserve_dictation_id():
 @jwt_required()
 def api_get_dictation_exercises(dictation_id: int):
     """Возвращает список упражнений для диктанта."""
+    logger.info(f"📋 [exercises] Запрос упражнений для dictation_id={dictation_id}")
     try:
         from helpers.db_dictations import list_dictation_exercises
         exercises = list_dictation_exercises(dictation_id)
+        logger.info(f"📋 [exercises] Упражнения для dictation_id={dictation_id}: count={len(exercises)}, data={exercises}")
         return jsonify({'success': True, 'exercises': exercises})
     except Exception as e:
-        logger.error(f"Ошибка получения упражнений для диктанта {dictation_id}: {e}", exc_info=True)
+        logger.error(f"📋 [exercises] Ошибка получения упражнений для диктанта {dictation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

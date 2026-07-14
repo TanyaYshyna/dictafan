@@ -1070,6 +1070,98 @@ window.DictationKart = window.DictationKart || {
         }
 
         try {
+          if (action === 'delete-dictation') {
+            const dictationId = btn.getAttribute('data-dictation-id');
+            if (!dictationId) return;
+
+            // Показываем подтверждение
+            if (typeof window.DesktopConfirmModal !== 'undefined' && typeof window.DesktopConfirmModal.open === 'function') {
+              await new Promise(function (resolveConfirm) {
+                window.DesktopConfirmModal.open({
+                  title: 'Видалити диктант',
+                  message: 'Ви впевнені, що хочете видалити цей диктант? Цю дію неможливо скасувати.',
+                  buttons: [
+                    {
+                      text: 'Скасувати',
+                      type: 'secondary',
+                      onClick: function () { resolveConfirm(false); }
+                    },
+                    {
+                      text: 'Видалити',
+                      type: 'danger',
+                      onClick: function () { resolveConfirm(true); }
+                    }
+                  ],
+                  onClose: function () { resolveConfirm(false); }
+                });
+              });
+            } else {
+              // Fallback: просто confirm()
+              var confirmed = confirm('Ви впевнені, що хочете видалити цей диктант?');
+              if (!confirmed) return;
+            }
+
+            try {
+              var token = (window.UM && window.UM.token) || localStorage.getItem('jwt_token');
+              if (!token) {
+                this._showToast('Помилка: немає токена авторизації', { durationMs: 3000 });
+                return;
+              }
+
+              var deleteResp = await fetch('/api/dictations/' + encodeURIComponent(String(dictationId)), {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': 'Bearer ' + token
+                }
+              });
+
+              if (deleteResp.ok) {
+                var deleteResult = await deleteResp.json();
+                if (deleteResult && deleteResult.success) {
+                  this._showToast('Диктант видалено', { durationMs: 2200 });
+
+                  // Очищаем кеш SW для этого диктанта
+                  try {
+                    await this._swRequest('purgeDictation', { dictationId: dictationId });
+                  } catch (swErr) {
+                    console.warn('[dictation_kart] purgeDictation error:', swErr);
+                  }
+
+                  // Удаляем карточку из DOM
+                  try {
+                    var card = btn && btn.closest ? btn.closest('.short-card') : null;
+                    if (card && card.parentNode) {
+                      card.parentNode.removeChild(card);
+                    }
+                  } catch (domErr) {
+                    console.warn('[dictation_kart] remove card error:', domErr);
+                  }
+
+                  // Обновляем десктоп, если он есть
+                  try {
+                    if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+                      window.Desktop.loadDeskItems();
+                    }
+                  } catch (deskErr) {
+                    console.warn('[dictation_kart] loadDeskItems error:', deskErr);
+                  }
+                } else {
+                  var errMsg = (deleteResult && deleteResult.error) ? deleteResult.error : 'Не вдалося видалити диктант';
+                  this._showToast(errMsg, { durationMs: 3000 });
+                }
+              } else {
+                this._showToast('Помилка видалення диктанта (HTTP ' + deleteResp.status + ')', { durationMs: 3000 });
+              }
+            } catch (fetchErr) {
+              console.error('[dictation_kart] delete-dictation fetch error:', fetchErr);
+              this._showToast('Помилка з\'єднання', { durationMs: 3000 });
+            }
+            return;
+          }
+        } catch (e2) {
+        }
+
+        try {
           console.log('[dictation_kart] menu action', action);
         } catch (e2) {
         }
@@ -1150,6 +1242,7 @@ window.DictationKart = window.DictationKart || {
         { action: 'edit-dictation-v2', icon: 'sparkles', labelKey: null, labelFallback: 'Новый редактор' },
         { action: 'show-in-book', icon: 'book-marked', labelKey: 'private_library.dictation_card_actions.show_in_book', labelFallback: 'Показать в книге' },
         { action: 'remove-from-desk', icon: 'arrow-big-down-dash', labelKey: 'private_library.dictation_card_actions.remove_from_desk', labelFallback: 'Убрать со стола' },
+        { action: 'delete-dictation', icon: 'trash-2', labelKey: 'private_library.dictation_card_actions.delete', labelFallback: 'Удалить', danger: true },
       ];
     }
 

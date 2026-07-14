@@ -1332,7 +1332,7 @@ class AudioManagerClass {
         try {
             const url = this.buildDictationAudioUrl(dictationId, language, filename);
             const key = this._toCacheKey(url);
-            console.log('[AudioManager] saveDictationAudioBlob', { dictationId, language, filename, key: key ? key.slice(0, 80) : '(empty)', blobSize: blob ? blob.size : 0 });
+            console.log('[AudioManager] saveDictationAudioBlob', { dictationId, language, filename, key: key ? key.slice(0, 120) : '(empty)', blobSize: blob ? blob.size : 0, url: url ? url.slice(0, 120) : '(empty)' });
             if (!key) { console.warn('[AudioManager] saveDictationAudioBlob: empty key'); return ''; }
             if (!blob || !blob.size) { console.warn('[AudioManager] saveDictationAudioBlob: empty blob'); return ''; }
 
@@ -1551,6 +1551,7 @@ class AudioManagerClass {
                     }
                     if (!cached) {
                         cacheMiss += 1;
+                        console.log('[AudioManager] uploadDictationAudioFromCacheToB2: cacheMiss url=' + u.toString() + ' dictationId=' + dictationId + ' lang=' + lang + ' filename=' + filename);
                         continue;
                     }
                     cacheHit += 1;

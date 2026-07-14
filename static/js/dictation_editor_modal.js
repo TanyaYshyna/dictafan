@@ -948,7 +948,12 @@ async function _uploadDraftAudioToB2(dictationId, token) {
     urls.push(am.buildDictationAudioUrl(dictationId, langCode, state._sharedAudioFilename));
   }
 
-  if (urls.length === 0) return;
+  if (urls.length === 0) {
+    console.log('[dictationEditorModal] _uploadDraftAudioToB2: нет URL для загрузки (sentences.length=' + sentences.length + ')');
+    return;
+  }
+
+  console.log('[dictationEditorModal] _uploadDraftAudioToB2: dictationId=' + dictationId + ' lang=' + langCode + ' urls=' + JSON.stringify(urls));
 
   try {
     var result = await am.uploadDictationAudioFromCacheToB2({
@@ -963,8 +968,13 @@ async function _uploadDraftAudioToB2(dictationId, token) {
       }
     });
 
+    console.log('[dictationEditorModal] _uploadDraftAudioToB2 результат:', JSON.stringify(result));
+
     if (result && result.failed && result.failed.length > 0) {
       console.warn('[dictationEditorModal] Некоторые файлы не загрузились на B2:', result.failed);
+    }
+    if (result && result.cacheMiss && result.cacheMiss > 0) {
+      console.warn('[dictationEditorModal] cacheMiss=' + result.cacheMiss + ' — аудио не найдено в кеше!');
     }
   } catch (e) {
     console.warn('[dictationEditorModal] B2 upload error', e);
@@ -3015,9 +3025,9 @@ async function _handleSave() {
           // Обновляем ID диктанта из ответа сервера (на случай, если это был новый диктант)
           var newDictationId = dbResult.dictation_id;
           if (newDictationId && state.config) {
-            var oldId = state.config.dictationId || '';
-            if (oldId !== newDictationId) {
-              console.log('[dictationEditorModal] Обновляю ID диктанта:', oldId, '->', newDictationId);
+            var prevId = state.config.dictationId || '';
+            if (prevId !== newDictationId) {
+              console.log('[dictationEditorModal] Обновляю ID диктанта:', prevId, '->', newDictationId);
               state.config.dictationId = newDictationId;
               // Обновляем ID в DictationContent
               if (state.content) {
@@ -3031,7 +3041,7 @@ async function _handleSave() {
               }
             }
             // Обновляем dbId в config (сервер мог создать новую запись в БД)
-            if (dbResult.id && (!state.config.dbId || state.config.dictationId !== oldId)) {
+            if (dbResult.id && (!state.config.dbId || state.config.dictationId !== prevId)) {
               state.config.dbId = dbResult.id;
             }
           }
@@ -3091,7 +3101,7 @@ async function _handleSave() {
       }
     }
 
-    // После сохранения БД (если ID изменился) используем новый ID для аудио и обложки
+    // После сохранения БД используем актуальный ID для аудио и обложки
     var effectiveDictationId = state.config ? state.config.dictationId : normalizedId;
     if (!effectiveDictationId) effectiveDictationId = normalizedId;
 
