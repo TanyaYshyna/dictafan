@@ -686,8 +686,13 @@ window.DictationKart = window.DictationKart || {
       const openDictationModal = (subsetPositions) => {
         try {
           const href = thumb ? String(thumb.getAttribute('data-href') || '').trim() : '';
-          if (!href) return;
+          console.log('[1b] dictation_kart: openDictationModal, href=' + href + ', subsetPositions=' + (subsetPositions && subsetPositions.length ? subsetPositions.join(',') : 'null'));
+          if (!href) {
+            console.log('[1b] dictation_kart: href пустой, return');
+            return;
+          }
           if (window.DictationModal && typeof window.DictationModal.open === 'function') {
+            console.log('[1b] dictation_kart: вызываем DictationModal.open');
             window.DictationModal.open(href, { cardEl, subsetPositions: subsetPositions && subsetPositions.length ? subsetPositions : null });
             return;
           }
@@ -706,7 +711,9 @@ window.DictationKart = window.DictationKart || {
           }
 
           const dictationId = Number(cardEl.getAttribute('data-dictation-id'));
+          console.log('[1c] dictation_kart: launchBtn click, dictationId=' + dictationId);
           if (!Number.isFinite(dictationId) || dictationId <= 0) {
+            console.log('[1c] dictation_kart: dictationId <= 0, openDictationModal(null)');
             openDictationModal(null);
             return;
           }
@@ -715,6 +722,7 @@ window.DictationKart = window.DictationKart || {
           try {
             // Сначала проверяем кеш
             const cached = await this._loadExercisesFromCache(dictationId);
+            console.log('[1c] dictation_kart: exercises из кеша=' + (Array.isArray(cached) ? cached.length : 'N/A'));
             if (Array.isArray(cached) && cached.length) {
               exercises = cached.map((x) => ({
                 id: x && x.id != null ? x.id : null,
@@ -723,8 +731,11 @@ window.DictationKart = window.DictationKart || {
             } else {
               // Нет в кеше — грузим с сервера и сразу кешируем
               const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+              console.log('[1c] dictation_kart: загружаем exercises с сервера, url=' + url);
               const res = await fetch(url, { method: 'GET', cache: 'no-store' });
+              console.log('[1c] dictation_kart: exercises response status=' + (res ? res.status : 'N/A'));
               const data = res && res.ok ? await res.json() : null;
+              console.log('[1c] dictation_kart: exercises data.success=' + (data ? data.success : 'N/A') + ', exercises length=' + (data && Array.isArray(data.exercises) ? data.exercises.length : 'N/A'));
               const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
               exercises = raw.map((x) => {
                 const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : x.positions;
@@ -736,6 +747,7 @@ window.DictationKart = window.DictationKart || {
               }
             }
           } catch (e1) {
+            console.log('[1c] dictation_kart: exercises fetch error: ' + (e1 && e1.message ? e1.message : String(e1)));
             exercises = [];
           }
 
@@ -746,10 +758,12 @@ window.DictationKart = window.DictationKart || {
             if (!uniqueBySig.has(sig)) uniqueBySig.set(sig, ex);
           }
           const list = Array.from(uniqueBySig.values());
+          console.log('[1c] dictation_kart: exercises list.length=' + list.length);
 
           if (list.length <= 1) {
             const only = list[0];
             const pos = only && Array.isArray(only.positions) ? only.positions : [];
+            console.log('[1c] dictation_kart: list.length <= 1, openDictationModal с pos=' + (pos.length ? pos.join(',') : 'null'));
             openDictationModal(pos.length ? pos : null);
             return;
           }

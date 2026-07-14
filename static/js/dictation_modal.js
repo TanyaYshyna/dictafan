@@ -4356,12 +4356,19 @@
   }
 
   async function loadSentencesFromIndexedDb({ dictationId }) {
+    console.log('[DM:loadFromIdb] dictationId=' + dictationId);
     try {
       const idb = window.IdbManager;
-      if (!idb || typeof idb.idbGet !== 'function' || typeof idb.openDraftDb !== 'function') return null;
+      if (!idb || typeof idb.idbGet !== 'function' || typeof idb.openDraftDb !== 'function') {
+        console.log('[DM:loadFromIdb] IdbManager недоступен, return null');
+        return null;
+      }
 
       const dictId = String(dictationId || '').trim();
-      if (!dictId) return null;
+      if (!dictId) {
+        console.log('[DM:loadFromIdb] dictId пустой, return null');
+        return null;
+      }
 
       const rawUserId = String(getDraftUserIdForKey());
       const candidateKeys = [];
@@ -4375,16 +4382,19 @@
         }
       } catch (e) {
       }
+      console.log('[DM:loadFromIdb] candidateKeys=' + candidateKeys.join(', '));
 
       let cached = null;
       for (const key of candidateKeys) {
         cached = await idb.idbGet('dictations', key);
         const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
+        console.log('[DM:loadFromIdb] key=' + key + ', sentences=' + sentences.length);
         if (sentences.length) break;
         cached = null;
       }
 
       if (!cached) {
+        console.log('[DM:loadFromIdb] по ключам не найдено, ищем через cursor по dictationId=' + dictId);
         const db = await idb.openDraftDb();
         try {
           cached = await new Promise((resolve) => {
@@ -4408,38 +4418,53 @@
           } catch (e) {
           }
         }
+        console.log('[DM:loadFromIdb] cursor поиск: cached=' + (cached ? 'найден' : 'null'));
       }
 
       const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
-      if (!sentences.length) return null;
+      console.log('[DM:loadFromIdb] итого sentences=' + sentences.length);
+      if (!sentences.length) {
+        console.log('[DM:loadFromIdb] sentences пустой, return null');
+        return null;
+      }
       return sentences;
     } catch (e) {
+      console.log('[DM:loadFromIdb] ошибка: ' + (e && e.message ? e.message : String(e)));
       return null;
     }
   }
 
   async function fetchSentencesFromServerAndCache({ dictationId }) {
     const dictId = String(dictationId || '').trim();
+    console.log('[DM:fetchSentences] dictId=' + dictId);
     if (!dictId) {
+      console.log('[DM:fetchSentences] dictId пустой, throw');
       throw new Error('missing_dictation_params');
     }
 
     // Извлекаем числовой ID из формата "dict_40" или "40"
     const numericMatch = dictId.match(/^dict_(\d+)$/);
     const numericId = numericMatch ? numericMatch[1] : dictId;
+    console.log('[DM:fetchSentences] numericId=' + numericId);
 
     // Используем простой endpoint, который принимает только ID диктанта
     const url = `/api/dictation/${encodeURIComponent(numericId)}/sentences`;
+    console.log('[DM:fetchSentences] url=' + url);
     const response = await fetch(url, { method: 'GET', cache: 'no-store' });
+    console.log('[DM:fetchSentences] response.status=' + response.status);
     if (!response.ok) {
       const text = await response.text();
+      console.log('[DM:fetchSentences] НЕ OK, status=' + response.status + ', text=' + text.slice(0, 200));
       throw new Error(`fetch_sentences_failed_${response.status}_${text}`);
     }
     const data = await response.json();
+    console.log('[DM:fetchSentences] data.success=' + data?.success + ', sentences length=' + (data?.sentences?.length ?? 'N/A'));
     const sentences = (data && Array.isArray(data.sentences)) ? data.sentences : [];
     if (!sentences.length) {
+      console.log('[DM:fetchSentences] sentences пустой, throw');
       throw new Error('empty_sentences');
     }
+    console.log('[DM:fetchSentences] успешно загружено ' + sentences.length + ' предложений');
 
     sentences.sort((a, b) => {
       const ap = (a && a.position !== undefined && a.position !== null && isFinite(Number(a.position))) ? Number(a.position) : null;
@@ -4501,13 +4526,23 @@
 
   async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted }) {
     const store = getRuntimeStore();
-    if (!store) throw new Error('DictationRuntime_not_loaded');
+    console.log('[DM:ensureContent] dictationIdFormatted=' + dictationIdFormatted + ', store=' + (store ? 'есть' : 'null'));
+    if (!store) {
+      console.log('[DM:ensureContent] store отсутствует, throw');
+      throw new Error('DictationRuntime_not_loaded');
+    }
 
     const dictationId = String(dictationIdFormatted || '').trim();
-    if (!dictationId) throw new Error('missing_dictation_params');
+    console.log('[DM:ensureContent] dictationId=' + dictationId);
+    if (!dictationId) {
+      console.log('[DM:ensureContent] dictationId пустой, throw');
+      throw new Error('missing_dictation_params');
+    }
 
     let sentences = await loadSentencesFromIndexedDb({ dictationId });
+    console.log('[DM:ensureContent] из IndexedDb получено sentences=' + (Array.isArray(sentences) ? sentences.length : 'не массив'));
     if (!Array.isArray(sentences) || sentences.length === 0) {
+      console.log('[DM:ensureContent] sentences в кеше нет, загружаем с сервера');
       try {
         if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
           window.DesktopToast.show('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
@@ -4583,25 +4618,38 @@
 
   function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null) {
     const store = getRuntimeStore();
-    if (!store) return null;
-
-    const dictationId = String(parsed?.dictationIdFormatted || '').trim();
-    if (!dictationId) return null;
-
-    // Проверяем, что контент загружен и не пустой
-    const content = store.getContent({ dictationId });
-    const allKeys = content ? content.getAllKeys() : [];
-    if (!allKeys.length) {
-      // Контент не загружен — не создаём сессию с пустыми данными
+    console.log('[DM:getOrCreateSession] store=' + (store ? 'есть' : 'null') + ', parsed=' + (parsed ? JSON.stringify({dictationIdFormatted: parsed.dictationIdFormatted, langOriginal: parsed.langOriginal, langTranslation: parsed.langTranslation}) : 'null'));
+    if (!store) {
+      console.log('[DM:getOrCreateSession] store отсутствует, return null');
       return null;
     }
 
+    const dictationId = String(parsed?.dictationIdFormatted || '').trim();
+    console.log('[DM:getOrCreateSession] dictationId=' + dictationId);
+    if (!dictationId) {
+      console.log('[DM:getOrCreateSession] dictationId пустой, return null');
+      return null;
+    }
+
+    // Проверяем, что контент загружен и не пустой
+    const content = store.getContent({ dictationId });
+    console.log('[DM:getOrCreateSession] content=' + (content ? 'есть' : 'null'));
+    const allKeys = content ? content.getAllKeys() : [];
+    console.log('[DM:getOrCreateSession] allKeys.length=' + allKeys.length);
+    if (!allKeys.length) {
+      // Контент не загружен — не создаём сессию с пустыми данными
+      console.log('[DM:getOrCreateSession] allKeys пустой, return null (контент не загружен)');
+      return null;
+    }
+
+    console.log('[DM:getOrCreateSession] вызываем store.getOrCreateSession()');
     const session = store.getOrCreateSession({
       dictationId,
       exerciseId: null,
       subsetPositions,
       subsetSignature: null,
     });
+    console.log('[DM:getOrCreateSession] session=' + (session ? 'создана' : 'null'));
 
     try {
       const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
@@ -5344,10 +5392,16 @@
   }
 
   function showStartModal() {
+    console.log('[DM:showStartModal] вызван');
     try {
       const startModal = document.getElementById('start-modal');
-      if (!startModal) return;
+      console.log('[DM:showStartModal] startModal элемент=' + (startModal ? 'найден' : 'null'));
+      if (!startModal) {
+        console.log('[DM:showStartModal] start-modal не найден в DOM, return');
+        return;
+      }
       startModal.style.display = 'flex';
+      console.log('[DM:showStartModal] display=flex установлен');
       renderLucide(startModal);
 
       try {
@@ -6636,13 +6690,16 @@
       console.log('[16] dictation_modal: restoreFromIdb завершён');
       try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
+        console.log('[17a] dictation_modal: parsed=' + (parsed ? 'есть' : 'null') + ', contentLoaded=' + contentLoaded);
         const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
         console.log('[17] dictation_modal: session=' + (session ? 'создана' : 'null'));
         if (session) {
+          console.log('[17b] dictation_modal: session.completed=' + session.completed);
           // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
           // сбрасываем прогресс как при нажатии «всё по новой»
           try {
             if (session.completed === true) {
+              console.log('[17c] dictation_modal: session завершена, сбрасываем прогресс');
               await resetDictationProgressForSession(session);
             }
           } catch (eReset) {
@@ -6652,9 +6709,12 @@
             window.__dictationModalActiveSession = session;
           } catch (e0) {
           }
+          console.log('[17d] dictation_modal: вызываем renderStartModalSentencesTable');
           renderStartModalSentencesTable(session);
           dictationModalState.startModalContext = 'open';
+          console.log('[17e] dictation_modal: вызываем showStartModal');
           showStartModal();
+          console.log('[17f] dictation_modal: вызываем updateNavigatorFromSession');
           updateNavigatorFromSession(session);
 
           try {
