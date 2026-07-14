@@ -40,6 +40,12 @@
       const closeX = _getEl('desktopConfirmModalClose');
       const buttonsContainer = _getEl('desktopConfirmModalButtons');
 
+      // Элементы для обложки, названия и сообщения
+      const coverWrap = _getEl('desktopConfirmModalCoverWrap');
+      const coverImg = _getEl('desktopConfirmModalCoverImg');
+      const dictationTitleEl = _getEl('desktopConfirmModalDictationTitle');
+      const messageEl = _getEl('desktopConfirmModalMessage');
+
       const title = opts && opts.title != null
         ? String(opts.title)
         : t('desktop.confirm.title', 'Сохранить изменения?');
@@ -47,6 +53,36 @@
       const customButtons = opts && Array.isArray(opts.buttons) ? opts.buttons : null;
 
       if (titleEl) titleEl.textContent = title;
+
+      // Обложка диктанта
+      const coverUrl = opts && opts.coverUrl ? String(opts.coverUrl) : '';
+      if (coverWrap && coverImg) {
+        if (coverUrl) {
+          coverImg.src = coverUrl;
+          coverWrap.style.display = 'flex';
+        } else {
+          coverImg.src = '';
+          coverWrap.style.display = 'none';
+        }
+      }
+
+      // Название диктанта
+      const dictationTitle = opts && opts.dictationTitle ? String(opts.dictationTitle) : '';
+      if (dictationTitleEl) {
+        if (dictationTitle) {
+          dictationTitleEl.textContent = dictationTitle;
+          dictationTitleEl.style.display = 'block';
+        } else {
+          dictationTitleEl.textContent = '';
+          dictationTitleEl.style.display = 'none';
+        }
+      }
+
+      // Текст сообщения
+      const message = opts && opts.message != null ? String(opts.message) : '';
+      if (messageEl) {
+        messageEl.textContent = message;
+      }
 
       // Если есть кастомные кнопки — показываем их, скрываем стандартные
       if (customButtons && buttonsContainer) {

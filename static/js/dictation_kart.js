@@ -1074,21 +1074,22 @@ window.DictationKart = window.DictationKart || {
             const dictationId = btn.getAttribute('data-dictation-id');
             if (!dictationId) return;
 
+            // Читаем обложку и название из data-атрибутов кнопки
+            const coverUrl = btn.getAttribute('data-cover-url') || '';
+            const dictationTitle = btn.getAttribute('data-title') || '';
+
             // Показываем подтверждение
             if (typeof window.DesktopConfirmModal !== 'undefined' && typeof window.DesktopConfirmModal.open === 'function') {
               await new Promise(function (resolveConfirm) {
                 window.DesktopConfirmModal.open({
                   title: 'Видалити диктант',
                   message: 'Ви впевнені, що хочете видалити цей диктант? Цю дію неможливо скасувати.',
+                  coverUrl: coverUrl,
+                  dictationTitle: dictationTitle,
                   buttons: [
                     {
-                      text: 'Скасувати',
-                      type: 'secondary',
-                      onClick: function () { resolveConfirm(false); }
-                    },
-                    {
                       text: 'Видалити',
-                      type: 'danger',
+                      type: 'primary',
                       onClick: function () { resolveConfirm(true); }
                     }
                   ],
@@ -1303,6 +1304,10 @@ window.DictationKart = window.DictationKart || {
                 attrs.push(`data-lang-original="${window.escapeHtml(String(langOriginal || ''))}"`);
                 attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
                 attrs.push(`data-translation-langs="${window.escapeHtml(String((availableTranslations || []).join(','))) }"`);
+              } else if (it.action === 'delete-dictation') {
+                attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
+                attrs.push(`data-cover-url="${window.escapeHtml(String(coverUrl || ''))}"`);
+                attrs.push(`data-title="${window.escapeHtml(String(title || ''))}"`);
               } else {
                 attrs.push(`data-dictation-id="${window.escapeHtml(String(dictationId || ''))}"`);
               }

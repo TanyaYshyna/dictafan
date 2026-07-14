@@ -1,4 +1,44 @@
 /* desktop_confirm_modal.css */
+
+/* --- Тело модалки: обложка слева, название справа --- */
+.desktop-confirm-modal-body {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.desktop-confirm-modal-cover-wrap {
+  flex: 0 0 auto;
+}
+
+.desktop-confirm-modal-cover-img {
+  width: 200px;
+  height: 120px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+
+.desktop-confirm-modal-info {
+  flex: 1;
+  min-width: 0;
+}
+
+/* --- Название диктанта --- */
+.desktop-confirm-modal-dictation-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text, #222);
+  word-break: break-word;
+}
+
+/* --- Текст сообщения --- */
+.desktop-confirm-modal-message {
+  font-size: 14px;
+  color: var(--color-text-secondary, #555);
+  margin-top: 8px;
+}
+
 #desktopConfirmModal {
   position: fixed;
   inset: 0;
