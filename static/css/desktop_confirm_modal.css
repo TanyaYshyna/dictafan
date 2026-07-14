@@ -77,15 +77,11 @@
 }
 
 .desktop-confirm-modal-buttons {
+  display: flex;
+  flex-wrap: nowrap;
   margin-top: 20px;
   gap: 10px;
   justify-content: flex-end;
-}
-
-/* Кастомные кнопки (создаются динамически) — прижимаем вправо */
-.desktop-confirm-modal-buttons .desktop-confirm-custom-btn {
-  margin-left: auto !important;
-  margin-right: 0 !important;
 }
 
 .desktop-confirm-modal-buttons button {
