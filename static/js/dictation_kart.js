@@ -1459,7 +1459,7 @@ window.DictationKart = window.DictationKart || {
     });
 
     return `
-      <div class="short-card dictation-kart ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
+      <div class="short-card dictation-kart dictation-kart--book-row ${isOnDesk ? 'short-card--on-desk' : 'short-card--off-desk'}" data-dictation-id="${dbId}" data-action="toggle-desk" data-edit-url="${editUrl}">
         <div class="short-thumb">
           <img src="${coverUrl}" alt="${d.title || 'Обложка диктанта'}" loading="lazy" onerror="this.src='/static/data/covers/cover_en.webp'">
         </div>

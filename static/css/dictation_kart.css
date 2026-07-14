@@ -49,6 +49,7 @@
   margin: -12px -12px 0 -12px;
   border-radius: 14px 14px 0 0;
   overflow: hidden;
+  aspect-ratio: 5 / 3;
 }
 
 .page-index .desk-card .short-thumb img {
@@ -121,6 +122,17 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 200px;
   overflow: hidden;
+}
+
+/* Меню "..." (три точки) — прижимать к правому верхнему углу кнопки */
+.short-actions-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.short-actions-menu-wrapper .dropdown-menu {
+  left: auto;
+  right: 0;
 }
 
 .page-index .short-card.dictation-kart:hover {
