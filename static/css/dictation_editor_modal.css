@@ -1527,6 +1527,22 @@
 
 .new-dictation-fill-modal__lang-pair {
   min-height: 36px;
+  position: relative;
+}
+
+/* Дропдаун списка языков — левый нижний угол флага совпадает с левым верхним углом списка */
+.new-dictation-fill-modal__lang-pair .flag-pair-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  z-index: 1100;
+}
+
+.new-dictation-fill-modal__lang-pair .flag-pair-dropdown[data-side="left"] {
+  left: 0;
+}
+
+.new-dictation-fill-modal__lang-pair .flag-pair-dropdown[data-side="right"] {
+  right: 0;
 }
 
 /* Флаги в строку (en => ru) — как в других модалках */

@@ -311,10 +311,15 @@ function _applyTableViewForTab(tabName) {
   }
 
   if (tabName === 'general') {
-    // №, Оригинал, a/f/m (только аудио-кнопка по радио), Перевод, t
+    // №, Оригинал, a/f/m (только аудио-кнопка по радио)
     showCols('.panel-original');
-    showCols('.panel-translation');
     showAudioBtnByVoiceMode();
+    // Перевод и t показываем только если есть язык перевода
+    var langBlocks = state.content ? state.content.langBlocks : [];
+    var hasTranslation = langBlocks.length > 1;
+    if (hasTranslation) {
+      showCols('.panel-translation');
+    }
   } else if (tabName === 'voice-original-have') {
     // №, Оригинал, f, Start, End (все колонки группы user)
     showCols('.panel-original');
@@ -1748,7 +1753,9 @@ function _updateAutoRegenerateAllBtnVisibility() {
 function _setupCloseButton() {
   const closeBtn = document.getElementById('dictationEditorModalCloseBtn');
   if (closeBtn) {
-    closeBtn.addEventListener('click', close);
+    closeBtn.addEventListener('click', function () {
+      _maybeCloseWithPrompt();
+    });
   }
 }
 
@@ -1757,10 +1764,48 @@ function _setupOverlayClose() {
   if (modal) {
     modal.addEventListener('click', function (e) {
       if (e.target === modal) {
-        close();
+        _maybeCloseWithPrompt();
       }
     });
   }
+}
+
+/**
+ * Проверяет, есть ли несохранённые изменения.
+ * Если есть — показывает DesktopConfirmModal с 3 кнопками:
+ *   крестик = отмена (вернуться в модалку)
+ *   выйти без сохранения = close()
+ *   выйти с сохранением = _handleSave() затем close()
+ * Если изменений нет — закрывает сразу.
+ */
+function _maybeCloseWithPrompt() {
+  if (_hasUnsavedChanges()) {
+    if (typeof window.DesktopConfirmModal !== 'undefined' && typeof window.DesktopConfirmModal.open === 'function') {
+      window.DesktopConfirmModal.open({
+        showSave: true,
+        onDiscard: function () {
+          close();
+        },
+        onSave: async function () {
+          await _handleSave();
+          close();
+        },
+      });
+      return;
+    }
+    // fallback без универсальной модалки
+    var wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
+    if (wantSave) {
+      _handleSave().then(function () { close(); }).catch(function () { close(); });
+      return;
+    }
+    var wantDiscard = window.confirm('Выйти без сохранения?');
+    if (wantDiscard) {
+      close();
+    }
+    return;
+  }
+  close();
 }
 
 function _setupUserSection() {
@@ -4899,7 +4944,9 @@ window.NewDictationFillModal = {
           .filter(Boolean);
 
         var leftList = allLangs;
+        // Добавляем пустую строку "—" (без перевода) в начало списка языков перевода
         var rightList = allLangs.filter(function (x) { return x !== defaultLearning; });
+        rightList.unshift('');
 
         container.innerHTML = '';
 
@@ -4919,6 +4966,7 @@ window.NewDictationFillModal = {
                 // Если выбрали одинаковые — сбрасываем правый
                 values.nativeLanguage = allLangs.find(function (x) { return x !== leftV; }) || 'ru';
               }
+              // Если rightV пустой (выбран "—"), ничего не делаем — это валидное состояние "без перевода"
             } catch (e) {}
           }
         });
@@ -4939,6 +4987,10 @@ window.NewDictationFillModal = {
     var self = this;
     var editor = document.getElementById('newDictationFillText');
     if (!editor) return;
+
+    // Защита от повторного биндинга — при повторном open() не навешиваем дублирующие обработчики
+    if (editor.dataset.fillHighlightBound === '1') return;
+    editor.dataset.fillHighlightBound = '1';
 
     var isUpdating = false;
 

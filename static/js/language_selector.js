@@ -1495,11 +1495,13 @@ class LanguageSelector {
             </div>
         `;
 
-        const rightHtml = `
+        // Если правый язык пустой (выбран "—"), не показываем правый флаг и стрелку
+        const showRight = rightLang && rightLang !== '';
+        const rightHtml = showRight ? `
             <div class="flag-pair-side flag-pair-side--right" ${rightDropdown ? 'data-side="right"' : ''}>
                 ${this.createFlagElement(rightLang)}
             </div>
-        `;
+        ` : '';
 
         const leftDropdownHtml = leftDropdown
             ? `
@@ -1516,16 +1518,27 @@ class LanguageSelector {
             `
             : '';
 
+        // Для правого дропдауна: пустая строка (code === '') отображается как "—" без флага
         const rightDropdownHtml = rightDropdown
             ? `
                 <div class="header-selector-dropdown flag-pair-dropdown" data-side="right" style="display: none;">
                     <div class="header-dropdown-options">
-                        ${rightList.map(code => `
-                            <div class="header-dropdown-option ${code === rightLang ? 'selected' : ''}" data-side="right" data-value="${code}">
-                                ${this.createFlagElement(code)}
-                                <span class="header-option-text">${this.getLanguageName(code)}</span>
-                            </div>
-                        `).join('')}
+                        ${rightList.map(code => {
+                            if (code === '') {
+                                const selected = (!rightLang || rightLang === '') ? 'selected' : '';
+                                return `
+                                    <div class="header-dropdown-option ${selected}" data-side="right" data-value="">
+                                        <span class="header-option-text" style="color:#999;">—</span>
+                                    </div>
+                                `;
+                            }
+                            return `
+                                <div class="header-dropdown-option ${code === rightLang ? 'selected' : ''}" data-side="right" data-value="${code}">
+                                    ${this.createFlagElement(code)}
+                                    <span class="header-option-text">${this.getLanguageName(code)}</span>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `
@@ -1534,7 +1547,7 @@ class LanguageSelector {
         return `
             <div class="flag-pair-combo" data-mode="flag-pair-dropdown">
                 ${leftHtml}
-                <i data-lucide="arrow-big-right"></i>
+                ${showRight ? '<i data-lucide="arrow-big-right"></i>' : ''}
                 ${rightHtml}
             </div>
             ${leftDropdownHtml}
@@ -3113,7 +3126,7 @@ class LanguageSelector {
     }
 
     setValues(values) {
-        if (values.nativeLanguage) this.options.nativeLanguage = values.nativeLanguage;
+        if (values.nativeLanguage !== undefined) this.options.nativeLanguage = values.nativeLanguage;
         if (values.learningLanguages) this.options.learningLanguages = [...values.learningLanguages];
         if (values.currentLearning) this.options.currentLearning = values.currentLearning;
 
