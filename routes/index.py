@@ -561,9 +561,14 @@ def delete_dictation(dictation_id):
     removed_from_b2 = False
     if b2_storage.enabled:
         try:
+            # Нормализуем ID для B2: в B2 файлы лежат в папке dict_XX
+            b2_dictation_id = dictation_id
+            if not b2_dictation_id.startswith('dict_'):
+                b2_dictation_id = 'dict_' + b2_dictation_id
+
             # Удаляем все файлы диктанта в B2 по prefix (B2 не умеет папки, удаляем по одному)
             try:
-                deleted_media = b2_storage.delete_prefix(f"dictations/{dictation_id}/")
+                deleted_media = b2_storage.delete_prefix(f"dictations/{b2_dictation_id}/")
                 if deleted_media and deleted_media > 0:
                     removed_from_b2 = True
             except Exception:
