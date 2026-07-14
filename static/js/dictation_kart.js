@@ -272,7 +272,7 @@ window.DictationKart = window.DictationKart || {
 
   async _fetchExercisesFromServer(dictationId) {
     try {
-      const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+      const url = `/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
       const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       const data = res && res.ok ? await res.json() : null;
       const raw = data && data.success && Array.isArray(data.exercises) ? data.exercises : [];
@@ -730,7 +730,7 @@ window.DictationKart = window.DictationKart || {
               }));
             } else {
               // Нет в кеше — грузим с сервера и сразу кешируем
-              const url = `/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
+              const url = `/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`;
               console.log('[1c] dictation_kart: загружаем exercises с сервера, url=' + url);
               const res = await fetch(url, { method: 'GET', cache: 'no-store' });
               console.log('[1c] dictation_kart: exercises response status=' + (res ? res.status : 'N/A'));

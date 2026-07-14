@@ -72,6 +72,7 @@
 
     _normalizeSentence(s, idx) {
       const key = (s && s.key) ? String(s.key) : String(idx);
+      const lang = (s && s.language_code) ? String(s.language_code) : '';
       const position = (s && s.position != null) ? Number(s.position) : null;
       const text = (s && s.text != null) ? String(s.text) : '';
       const audio = (s && s.audio != null) ? String(s.audio) : '';
@@ -83,6 +84,7 @@
       const explanation = (s && s.explanation != null) ? String(s.explanation) : '';
       return {
         key,
+        lang,
         position: Number.isFinite(position) ? position : null,
         text,
         audio,
@@ -349,7 +351,41 @@
 
     getSentenceView(key) {
       if (!this.content) return null;
-      return this.content.getSentence(key);
+      // Берём предложение из оригинального языка (первый блок)
+      const origSentence = this.content.getSentence(key);
+      if (!origSentence) return null;
+
+      // Пытаемся найти предложение с таким же ключом в других языках (перевод)
+      let translationText = '';
+      const blocks = this.content.langBlocks || [];
+      if (blocks.length > 1) {
+        for (let i = 1; i < blocks.length; i++) {
+          const block = blocks[i];
+          if (!block || !Array.isArray(block.sentences)) continue;
+          const trSentence = block.sentences.find(function(s) { return s.key === String(key); });
+          if (trSentence && trSentence.text) {
+            translationText = String(trSentence.text);
+            break;
+          }
+        }
+      }
+
+      // Возвращаем обогащённый объект с text_original и text_translation
+      return {
+        key: origSentence.key,
+        lang: origSentence.lang,
+        position: origSentence.position,
+        text: origSentence.text,
+        text_original: String(origSentence.text || ''),
+        text_translation: translationText,
+        audio: origSentence.audio,
+        audio_file: origSentence.audio_file,
+        audio_mic: origSentence.audio_mic,
+        start: origSentence.start,
+        end: origSentence.end,
+        checked: origSentence.checked,
+        explanation: origSentence.explanation,
+      };
     }
 
     startTimer() {

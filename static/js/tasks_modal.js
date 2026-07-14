@@ -648,7 +648,7 @@
       setCreateAssignmentExercisesDirty(modal, false);
 
       try {
-        const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`, { method: 'GET' });
+        const res = await apiRequest(`/api/dictation/${encodeURIComponent(String(dictationId))}/exercises`, { method: 'GET' });
         const itemsRaw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
         const items = itemsRaw.map(normalizeExerciseItem);
         const st = getCreateAssignmentExercisesState(modal);
@@ -720,7 +720,7 @@
           const exSt = getCreateAssignmentExercisesState(modal);
           if (exSt && exSt.dirty === true) {
             const exercisesPayload = _getCreateAssignmentExercisesPayloadForSave(modal);
-            const reconcile = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
+            const reconcile = await apiRequest(`/api/dictation/${encodeURIComponent(String(dictation_id))}/exercises/reconcile`, {
               method: 'POST',
               body: JSON.stringify({ exercises: exercisesPayload }),
             });

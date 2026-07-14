@@ -345,7 +345,7 @@
           }
         }
         if (!exercises.length) {
-          const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
+          const res = await apiRequest(`/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
           const raw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
           exercises = raw.map((x) => {
             const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : (x && Array.isArray(x.positions) ? x.positions : []);

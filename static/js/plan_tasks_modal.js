@@ -603,7 +603,7 @@
       }
 
       try {
-        const exRes = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(dictationIdNum))}/exercises`, { method: 'GET' });
+        const exRes = await apiRequest(`/api/dictation/${encodeURIComponent(String(dictationIdNum))}/exercises`, { method: 'GET' });
         const exercises = (exRes && exRes.success && Array.isArray(exRes.exercises)) ? exRes.exercises : [];
         _setPlanTasksExercises(modal, exercises);
       } catch (e) {

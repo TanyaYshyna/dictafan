@@ -922,38 +922,53 @@ async function _uploadDraftAudioToB2(dictationId, token) {
   }
   dictationId = normalizedId;
 
-  var lang = (state.config ? state.config.originalLanguage : '');
-  if (!lang) return;
-
   var am = _ensureAudioManager();
   if (!am || typeof am.uploadDictationAudioFromCacheToB2 !== 'function') {
     console.warn('[dictationEditorModal] AudioManager.uploadDictationAudioFromCacheToB2 not available');
     return;
   }
 
-  var sentences = state.content.getAllSentenceCores();
-  var langCode = String(lang).toLowerCase().trim();
-
-  // Собираем canonical URLs для всех файлов, которые есть в предложениях
+  // Проходим по всем языковым блокам (оригинал + переводы)
+  var langBlocks = state.content.langBlocks || [];
   var urls = [];
-  for (var i = 0; i < sentences.length; i++) {
-    var s = sentences[i];
-    var filename = s.audio_file;
-    if (!filename) continue;
-    urls.push(am.buildDictationAudioUrl(dictationId, langCode, filename));
+
+  for (var b = 0; b < langBlocks.length; b++) {
+    var block = langBlocks[b];
+    if (!block || !block.lang || !Array.isArray(block.sentences)) continue;
+
+    var langCode = String(block.lang).toLowerCase().trim();
+    var sentences = block.sentences;
+
+    for (var i = 0; i < sentences.length; i++) {
+      var s = sentences[i];
+      // Собираем все возможные аудио поля: audio (TTS), audio_file (файл), audio_mic (микрофон)
+      var filenames = [];
+      if (s.audio) filenames.push(s.audio);
+      if (s.audio_file) filenames.push(s.audio_file);
+      if (s.audio_mic) filenames.push(s.audio_mic);
+
+      for (var f = 0; f < filenames.length; f++) {
+        var fn = filenames[f];
+        if (!fn) continue;
+        urls.push(am.buildDictationAudioUrl(dictationId, langCode, fn));
+      }
+    }
   }
 
-  // Добавляем shared audio файл, если он есть
+  // Добавляем shared audio файл, если он есть (всегда для оригинального языка)
   if (state._sharedAudioFilename) {
-    urls.push(am.buildDictationAudioUrl(dictationId, langCode, state._sharedAudioFilename));
+    var origLang = (state.config ? state.config.originalLanguage : '');
+    if (origLang) {
+      urls.push(am.buildDictationAudioUrl(dictationId, String(origLang).toLowerCase().trim(), state._sharedAudioFilename));
+    }
   }
 
   if (urls.length === 0) {
-    console.log('[dictationEditorModal] _uploadDraftAudioToB2: нет URL для загрузки (sentences.length=' + sentences.length + ')');
+    console.log('[dictationEditorModal] _uploadDraftAudioToB2: нет URL для загрузки (langBlocks=' + langBlocks.length + ')');
     return;
   }
 
-  console.log('[dictationEditorModal] _uploadDraftAudioToB2: dictationId=' + dictationId + ' lang=' + langCode + ' urls=' + JSON.stringify(urls));
+  console.log('[dictationEditorModal] _uploadDraftAudioToB2: dictationId=' + dictationId + ' urls=' + JSON.stringify(urls));
 
   try {
     var result = await am.uploadDictationAudioFromCacheToB2({
