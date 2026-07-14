@@ -85,6 +85,7 @@
 /* Кастомные кнопки (создаются динамически) — прижимаем вправо */
 .desktop-confirm-custom-btn {
   margin-left: auto;
+  margin-right: 0;
 }
 
 .desktop-confirm-modal-buttons button {

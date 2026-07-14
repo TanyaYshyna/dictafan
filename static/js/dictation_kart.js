@@ -1155,14 +1155,6 @@ window.DictationKart = window.DictationKart || {
                   console.warn('[dictation_kart] loadDeskItems error:', deskErr);
                 }
 
-                // Перезагружаем книгу/воркбук, если открыты
-                try {
-                  if (window.BookModal && typeof window.BookModal.closeView === 'function') {
-                    window.BookModal.closeView();
-                  }
-                } catch (bookErr) {
-                  console.warn('[dictation_kart] closeBookView error:', bookErr);
-                }
               } else {
                 var errMsg = (deleteResult && deleteResult.error) ? deleteResult.error : 'Не вдалося видалити диктант';
                 this._showToast(errMsg, { durationMs: 3000 });
