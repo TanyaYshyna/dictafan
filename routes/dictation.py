@@ -555,11 +555,13 @@ def api_get_dictation_sentences_simple(dictation_id):
                 audio_url = url_for('dictation.api_get_dictation_audio_v2', dictation_id=f"dict_{dictation_id}", lang=lang_orig, filename=audio_file)
             
             sentence = {
+                'key': sentence_key,
                 'sentence_key': sentence_key,
                 'position': orig_sentence.get('position'),
                 'text': orig_sentence.get('text', ''),
                 'audio': audio_url,
-                'audio_file': audio_file
+                'audio_file': audio_file,
+                'language_code': lang_orig
             }
             sentences.append(sentence)
         
