@@ -32,11 +32,12 @@
   word-break: break-word;
 }
 
-/* --- Текст сообщения --- */
+/* --- Текст сообщения (отдельной строкой под обложкой+названием) --- */
 .desktop-confirm-modal-message {
   font-size: 14px;
   color: var(--color-text-secondary, #555);
-  margin-top: 8px;
+  margin-top: 12px;
+  text-align: left;
 }
 
 #desktopConfirmModal {
@@ -62,7 +63,6 @@
   min-width: 320px;
   max-width: calc(100% - 32px);
   padding: 20px;
-  text-align: center;
 }
 
 .desktop-confirm-modal-header {
@@ -80,6 +80,11 @@
   margin-top: 20px;
   gap: 10px;
   justify-content: flex-end;
+}
+
+/* Кастомные кнопки (создаются динамически) — прижимаем вправо */
+.desktop-confirm-custom-btn {
+  margin-left: auto;
 }
 
 .desktop-confirm-modal-buttons button {

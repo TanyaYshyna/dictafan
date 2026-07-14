@@ -1116,42 +1116,56 @@ window.DictationKart = window.DictationKart || {
                 }
               });
 
-              if (deleteResp.ok) {
-                var deleteResult = await deleteResp.json();
-                if (deleteResult && deleteResult.success) {
-                  this._showToast('Диктант видалено', { durationMs: 2200 });
+              // Логируем ответ сервера для диагностики
+              var deleteResultText = await deleteResp.text();
+              console.log('[dictation_kart] delete response:', deleteResp.status, deleteResultText);
+              var deleteResult = null;
+              try {
+                deleteResult = JSON.parse(deleteResultText);
+              } catch (e) {
+                console.warn('[dictation_kart] delete response not JSON:', deleteResultText);
+              }
 
-                  // Очищаем кеш SW для этого диктанта
-                  try {
-                    await this._swRequest('purgeDictation', { dictationId: dictationId });
-                  } catch (swErr) {
-                    console.warn('[dictation_kart] purgeDictation error:', swErr);
-                  }
+              if (deleteResp.ok && deleteResult && deleteResult.success) {
+                this._showToast('Диктант видалено', { durationMs: 2200 });
 
-                  // Удаляем карточку из DOM
-                  try {
-                    var card = btn && btn.closest ? btn.closest('.short-card') : null;
-                    if (card && card.parentNode) {
-                      card.parentNode.removeChild(card);
-                    }
-                  } catch (domErr) {
-                    console.warn('[dictation_kart] remove card error:', domErr);
-                  }
+                // Очищаем кеш SW для этого диктанта
+                try {
+                  await this._swRequest('purgeDictation', { dictationId: dictationId });
+                } catch (swErr) {
+                  console.warn('[dictation_kart] purgeDictation error:', swErr);
+                }
 
-                  // Обновляем десктоп, если он есть
-                  try {
-                    if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
-                      window.Desktop.loadDeskItems();
-                    }
-                  } catch (deskErr) {
-                    console.warn('[dictation_kart] loadDeskItems error:', deskErr);
+                // Удаляем карточку из DOM
+                try {
+                  var card = btn && btn.closest ? btn.closest('.short-card') : null;
+                  if (card && card.parentNode) {
+                    card.parentNode.removeChild(card);
                   }
-                } else {
-                  var errMsg = (deleteResult && deleteResult.error) ? deleteResult.error : 'Не вдалося видалити диктант';
-                  this._showToast(errMsg, { durationMs: 3000 });
+                } catch (domErr) {
+                  console.warn('[dictation_kart] remove card error:', domErr);
+                }
+
+                // Обновляем десктоп, если он есть
+                try {
+                  if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
+                    window.Desktop.loadDeskItems();
+                  }
+                } catch (deskErr) {
+                  console.warn('[dictation_kart] loadDeskItems error:', deskErr);
+                }
+
+                // Перезагружаем книгу/воркбук, если открыты
+                try {
+                  if (window.BookModal && typeof window.BookModal.closeView === 'function') {
+                    window.BookModal.closeView();
+                  }
+                } catch (bookErr) {
+                  console.warn('[dictation_kart] closeBookView error:', bookErr);
                 }
               } else {
-                this._showToast('Помилка видалення диктанта (HTTP ' + deleteResp.status + ')', { durationMs: 3000 });
+                var errMsg = (deleteResult && deleteResult.error) ? deleteResult.error : 'Не вдалося видалити диктант';
+                this._showToast(errMsg, { durationMs: 3000 });
               }
             } catch (fetchErr) {
               console.error('[dictation_kart] delete-dictation fetch error:', fetchErr);
