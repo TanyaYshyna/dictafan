@@ -47,18 +47,27 @@
      * Группирует по language_code в langBlocks.
      */
     setSentences(sentences) {
-      if (!Array.isArray(sentences)) return;
+      console.log('[DictationContent:setSentences] sentences length=' + (Array.isArray(sentences) ? sentences.length : 'N/A'));
+      if (!Array.isArray(sentences)) {
+        console.log('[DictationContent:setSentences] не массив, return');
+        return;
+      }
       const grouped = {};
       for (const s of sentences) {
         const lang = (s && s.language_code) ? String(s.language_code) : '';
-        if (!lang) continue;
+        if (!lang) {
+          console.log('[DictationContent:setSentences] предложение без language_code, пропускаем');
+          continue;
+        }
         if (!grouped[lang]) grouped[lang] = [];
         grouped[lang].push(s);
       }
+      console.log('[DictationContent:setSentences] grouped keys=' + Object.keys(grouped).join(', ') + ', counts=' + Object.keys(grouped).map(function(k) { return k + ':' + grouped[k].length; }).join('; '));
       this.langBlocks = Object.keys(grouped).map((lang) => ({
         lang,
         sentences: grouped[lang].map((s, idx) => this._normalizeSentence(s, idx)),
       }));
+      console.log('[DictationContent:setSentences] langBlocks.length=' + this.langBlocks.length + ', langBlocks[0]=' + (this.langBlocks[0] ? this.langBlocks[0].lang + ':' + this.langBlocks[0].sentences.length : 'null'));
     }
 
     _normalizeSentence(s, idx) {
@@ -440,8 +449,11 @@
     }
 
     setContentSentences({ dictationId, sentences }) {
+      console.log('[DictationStore:setContentSentences] dictationId=' + dictationId + ', sentences length=' + (Array.isArray(sentences) ? sentences.length : 'N/A'));
       const content = this.getOrCreateContent({ dictationId });
+      console.log('[DictationStore:setContentSentences] content=' + (content ? 'есть' : 'null') + ', langBlocks before=' + (content ? content.langBlocks.length : 'N/A'));
       content.setSentences(sentences);
+      console.log('[DictationStore:setContentSentences] langBlocks after=' + content.langBlocks.length + ', allKeys=' + content.getAllKeys().length);
       return content;
     }
 
