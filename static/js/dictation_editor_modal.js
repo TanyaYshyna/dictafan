@@ -4647,7 +4647,7 @@ window.NewDictationFillModal = {
                   dictation_id: dictationId,
                   text: trText,
                   language: langTr,
-                  filename_audio: 'tts_' + key + '_tr_' + Date.now() + '.mp3',
+                  filename_audio: 'tts_' + key + '_' + Date.now() + '.mp3',
                   tipe_audio: 'avto',
                   safe_email: safeEmail,
                 })
@@ -4660,7 +4660,7 @@ window.NewDictationFillModal = {
                   bytesTr[j2] = binaryStrTr.charCodeAt(j2);
                 }
                 var blobTr = new Blob([bytesTr], { type: genTrData.mime || 'audio/mpeg' });
-                var newFilenameTr = genTrData.filename || ('tts_' + key + '_tr_' + Date.now() + '.mp3');
+                var newFilenameTr = genTrData.filename || ('tts_' + key + '_' + Date.now() + '.mp3');
                 var am2 = _ensureAudioManager();
                 if (am2 && typeof am2.saveDictationAudioBlob === 'function') {
                   var savedKeyTr = await am2.saveDictationAudioBlob(dictationId, langTr, newFilenameTr, blobTr, genTrData.mime || 'audio/mpeg');
