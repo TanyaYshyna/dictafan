@@ -83,9 +83,9 @@
 }
 
 /* Кастомные кнопки (создаются динамически) — прижимаем вправо */
-.desktop-confirm-custom-btn {
-  margin-left: auto;
-  margin-right: 0;
+.desktop-confirm-modal-buttons .desktop-confirm-custom-btn {
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 
 .desktop-confirm-modal-buttons button {
@@ -97,7 +97,6 @@
   justify-content: center;
   gap: 8px;
   line-height: 1;
-  margin: 6px;
   padding: 6px;
   white-space: nowrap;
 }
