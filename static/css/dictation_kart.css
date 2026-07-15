@@ -132,8 +132,9 @@
 
 .short-actions-menu-wrapper .dropdown-menu {
   left: auto;
-  right: 0;
+  right: -10px;
   z-index: 200600;
+  min-width: 180px;
 }
 
 .page-index .short-card.dictation-kart:hover {
