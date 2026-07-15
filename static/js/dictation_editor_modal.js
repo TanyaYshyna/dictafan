@@ -1792,7 +1792,9 @@ function _maybeCloseWithPrompt() {
           } catch (e) {
             console.error('[dictationEditorModal] _handleSave error in onSave:', e);
           }
+          console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: calling close(), state.isOpen=' + state.isOpen);
           close();
+          console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: close() completed');
         },
       });
       return;
@@ -3152,7 +3154,7 @@ async function _handleSave() {
           // Обновляем десктоп, если он есть (перезагружаем карточки)
           try {
             if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
-              window.Desktop.loadDeskItems();
+              await window.Desktop.loadDeskItems();
             }
           } catch (e) {
             console.warn('[dictationEditorModal] Ошибка обновления десктопа:', e);
@@ -3191,6 +3193,7 @@ async function _handleSave() {
   } catch (error) {
     console.error('[dictationEditorModal] Ошибка сохранения:', error);
   } finally {
+    console.log('[dictationEditorModal] _handleSave finally');
     saveBtn.innerHTML = originalHTML;
     if (typeof lucide !== 'undefined' && lucide.createIcons) {
       lucide.createIcons();
@@ -3756,8 +3759,12 @@ async function _loadSelfAudioForRow(sentence) {
 }
 
 function close() {
-  if (!state.isOpen) return;
+  if (!state.isOpen) {
+    console.log('[dictationEditorModal] close() пропущен: state.isOpen=false');
+    return;
+  }
 
+  console.log('[dictationEditorModal] close()');
   state.isOpen = false;
   state.config = null;
   state.headerLangPairSelector = null;
