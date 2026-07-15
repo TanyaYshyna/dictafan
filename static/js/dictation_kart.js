@@ -1146,8 +1146,12 @@ window.DictationKart = window.DictationKart || {
                   console.warn('[dictation_kart] remove card error:', domErr);
                 }
 
-                // Обновляем десктоп, если он есть
+                // Обновляем десктоп — удаляем диктант с десктопа
                 try {
+                  // Сначала очищаем IDB кэш desk_items, чтобы loadDeskItems не отрендерил старые данные
+                  if (typeof window.idbRemove === 'function') {
+                    window.idbRemove('desk_items', 'latest').catch(function () {});
+                  }
                   if (window.Desktop && typeof window.Desktop.loadDeskItems === 'function') {
                     window.Desktop.loadDeskItems();
                   }

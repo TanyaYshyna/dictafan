@@ -1787,7 +1787,11 @@ function _maybeCloseWithPrompt() {
           close();
         },
         onSave: async function () {
-          await _handleSave();
+          try {
+            await _handleSave();
+          } catch (e) {
+            console.error('[dictationEditorModal] _handleSave error in onSave:', e);
+          }
           close();
         },
       });
