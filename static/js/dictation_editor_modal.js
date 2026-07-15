@@ -1787,14 +1787,17 @@ function _maybeCloseWithPrompt() {
           close();
         },
         onSave: async function () {
+          var ok = false;
           try {
-            await _handleSave();
+            ok = await _handleSave();
           } catch (e) {
             console.error('[dictationEditorModal] _handleSave error in onSave:', e);
-          } finally {
-            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: calling close(), state.isOpen=' + state.isOpen);
+          }
+          if (ok) {
+            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: save ok, calling close(), state.isOpen=' + state.isOpen);
             close();
-            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: close() completed, state.isOpen=' + state.isOpen);
+          } else {
+            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: save failed or no changes, not closing');
           }
         },
       });
@@ -2916,7 +2919,7 @@ function _setupTabs() {
 
 async function _handleSave() {
   var saveBtn = document.getElementById('dictationEditorModalSaveBtn');
-  if (!saveBtn) return;
+  if (!saveBtn) return false;
 
   saveBtn.disabled = true;
   var originalHTML = saveBtn.innerHTML;
@@ -2925,20 +2928,22 @@ async function _handleSave() {
     lucide.createIcons();
   }
 
+  var saved = false;
+
   try {
     var flags = _getDirtyFlags();
     var hasChanges = _hasUnsavedChanges();
 
     if (!hasChanges) {
       console.log('[dictationEditorModal] Нет изменений для сохранения');
-      return;
+      return false;
     }
 
     // Собираем данные для сохранения
     var dictationId = state.config ? state.config.dictationId : null;
     if (!dictationId) {
       console.warn('[dictationEditorModal] Нет ID диктанта для сохранения');
-      return;
+      return false;
     }
 
     // Получаем токен
@@ -2951,7 +2956,7 @@ async function _handleSave() {
 
     if (!token) {
       console.warn('[dictationEditorModal] Нет токена авторизации');
-      return;
+      return false;
     }
 
     // Собираем предложения из DictationContent в плоский массив с language_code
@@ -3072,6 +3077,7 @@ async function _handleSave() {
         var dbResult = await dbResponse.json();
         if (dbResult.success) {
           _setDirtyFlags({ db: false });
+          saved = true;
           console.log('[dictationEditorModal] Текст/БД сохранён');
 
           // Обновляем audio_order в state.config и в DictationContent,
@@ -3201,6 +3207,8 @@ async function _handleSave() {
     }
     saveBtn.disabled = false;
   }
+
+  return saved;
 }
 
 /* ===== OPEN / CLOSE ===== */
