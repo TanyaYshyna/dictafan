@@ -779,7 +779,7 @@
 #book-view-modal .dictation-kart--book-row.short-card {
   padding: 0;
   height: 120px;
-  overflow: hidden;
+  overflow: visible;
   flex: none;
 }
 
