@@ -1791,10 +1791,11 @@ function _maybeCloseWithPrompt() {
             await _handleSave();
           } catch (e) {
             console.error('[dictationEditorModal] _handleSave error in onSave:', e);
+          } finally {
+            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: calling close(), state.isOpen=' + state.isOpen);
+            close();
+            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: close() completed, state.isOpen=' + state.isOpen);
           }
-          console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: calling close(), state.isOpen=' + state.isOpen);
-          close();
-          console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: close() completed');
         },
       });
       return;
