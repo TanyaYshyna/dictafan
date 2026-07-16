@@ -1597,7 +1597,10 @@ function initializeLanguageSelector() {
                 const a = nativeSelector && typeof nativeSelector.getValues === 'function' ? nativeSelector.getValues() : null;
                 const b = learningSelector && typeof learningSelector.getValues === 'function' ? learningSelector.getValues() : null;
                 const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
-                const learningLanguages = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : ((b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages);
+                const cLangs = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : null;
+                const bLangs = (b && b.learningLanguages) ? b.learningLanguages : null;
+                console.log('[languageSelector.getValues] c (learningList):', JSON.stringify(cLangs), 'b (learningSelector):', JSON.stringify(bLangs), 'original:', JSON.stringify(originalData.learning_languages));
+                const learningLanguages = cLangs || bLangs || originalData.learning_languages;
                 const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
                 const baseCurrent = fromSelector ? fromSelector : String(originalData.current_learning || '');
                 const safeCurrent = learningLanguages.includes(baseCurrent) ? baseCurrent : (learningLanguages[0] || baseCurrent);

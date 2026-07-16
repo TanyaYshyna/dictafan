@@ -1770,6 +1770,7 @@ class LanguageSelector {
                 const next = [...set];
                 next.sort();
                 this.options.learningLanguages = next;
+                console.log('[LanguageSelector][learning-flags] click lang:', lang, 'hasLang:', hasLang, 'next:', JSON.stringify(next));
 
                 const cur = String(this.options.currentLearning || '').trim().toLowerCase();
                 if (cur && !set.has(cur)) {
