@@ -2303,22 +2303,18 @@ async function saveProfile(options = {}) {
             audioSettingsPanel.setSettings(settingsToApply);
         }
 
-        // Синхронизируем LanguageSelector с новыми данными, чтобы checkForChanges не находил ложных расхождений
+        // Синхронизируем LanguageSelector с новыми данными (без перерисовки, чтобы не сбросить UI)
         try {
           const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
-          if (learningListSelector && typeof learningListSelector.setValues === 'function') {
-            learningListSelector.setValues({
-              learningLanguages: savedLearningLangs,
-              currentLearning: originalData.current_learning
-            });
+          if (learningListSelector && learningListSelector.options) {
+            learningListSelector.options.learningLanguages = [...savedLearningLangs];
+            learningListSelector.options.currentLearning = originalData.current_learning;
           }
-          if (learningSelector && typeof learningSelector.setValues === 'function') {
-            learningSelector.setValues({
-              learningLanguages: savedLearningLangs,
-              currentLearning: originalData.current_learning
-            });
+          if (learningSelector && learningSelector.options) {
+            learningSelector.options.learningLanguages = [...savedLearningLangs];
+            learningSelector.options.currentLearning = originalData.current_learning;
+            learningSelector.options.learningAvailableLanguages = [...savedLearningLangs];
           }
-          if (window.lucide) window.lucide.createIcons();
         } catch (e) { }
 
         if (formValues.password) document.getElementById('password').value = '';
