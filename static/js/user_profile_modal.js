@@ -1529,14 +1529,11 @@ function initializeLanguageSelector() {
         return;
     }
 
-    console.log('=== LOG #2: initializeLanguageSelector, _languageSelectorInitialized:', _languageSelectorInitialized, 'learningSelector:', !!learningSelector, 'learningListSelector:', !!learningListSelector);
-
     try {
         const languageData = window.LanguageManager.getLanguageData();
 
         // Если уже инициализированы — заменяем контейнеры на новые (это удаляет все старые обработчики событий)
         if (_languageSelectorInitialized && learningSelector && learningListSelector) {
-            console.log('=== LOG #2a: already initialized, replacing containers with new ones to remove old event listeners');
             
             // Создаём новые контейнеры-заменители
             const newNativeContainer = document.createElement('div');
@@ -1563,11 +1560,8 @@ function initializeLanguageSelector() {
         }
 
         if (_languageSelectorInitialized) {
-            console.log('=== LOG #2b: still initialized after check, returning early');
             return;
         }
-
-        console.log('=== LOG #3: Creating LanguageSelector instances, originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
 
         const nativeSelector = new LanguageSelector({
             container: nativeContainer,
@@ -1611,7 +1605,6 @@ function initializeLanguageSelector() {
                 currentLearning: originalData.current_learning,
                 languageData: languageData,
                 onLanguageChange: function (changeData) {
-                    console.log('=== LOG #4: learning-flags onChange fired, changeData.learningLanguages:', JSON.stringify(changeData && changeData.learningLanguages), 'this === learningListSelector?', this === learningListSelector);
                     try {
                         const langs = changeData && Array.isArray(changeData.learningLanguages) ? changeData.learningLanguages : null;
                         if (langs && learningSelector && learningSelector.options) {
@@ -1640,10 +1633,6 @@ function initializeLanguageSelector() {
                 const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
                 const cLangs = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : null;
                 const bLangs = (b && b.learningLanguages) ? b.learningLanguages : null;
-                console.log('=== LOG #5: getValues c(learningList):', JSON.stringify(cLangs), 'b(learningSelector):', JSON.stringify(bLangs), 'original:', JSON.stringify(originalData.learning_languages));
-                if (learningListSelector && learningListSelector.options) {
-                    console.log('=== LOG #5b: learningListSelector.options.learningLanguages:', JSON.stringify(learningListSelector.options.learningLanguages));
-                }
                 const learningLanguages = cLangs || bLangs || originalData.learning_languages;
                 const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
                 const baseCurrent = fromSelector ? fromSelector : String(originalData.current_learning || '');
@@ -1659,7 +1648,6 @@ function initializeLanguageSelector() {
         try { refreshLearningDropdownAvailable(); } catch (e) { }
         window.languageSelector = languageSelector;
         _languageSelectorInitialized = true;
-        console.log('=== LOG #6: initializeLanguageSelector completed, _languageSelectorInitialized set to true');
 
     } catch (error) {
         console.error('❌ Ошибка инициализации LanguageSelector:', error);
@@ -1907,7 +1895,6 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
 }
 
 function setUnsavedState(state) {
-    console.log('=== LOG #11: setUnsavedState called with:', state, 'hasUnsavedChanges was:', hasUnsavedChanges);
     hasUnsavedChanges = state;
     try { window.hasUnsavedChanges = state; } catch (e) { }
     const saveButton = document.getElementById('saveButton');
@@ -1919,7 +1906,6 @@ function setUnsavedState(state) {
     if (unsavedStar) unsavedStar.style.display = state ? 'inline-flex' : 'none';
     if (state) window.addEventListener('beforeunload', beforeUnloadHandler);
     else window.removeEventListener('beforeunload', beforeUnloadHandler);
-    console.log('=== LOG #11b: setUnsavedState done, hasUnsavedChanges:', hasUnsavedChanges, 'window.hasUnsavedChanges:', window.hasUnsavedChanges);
 }
 
 function beforeUnloadHandler(event) {
@@ -1935,7 +1921,6 @@ function getCurrentFormValues() {
         learningLanguages: originalData.learning_languages,
         currentLearning: originalData.current_learning
     };
-    console.log('=== LOG #9: getCurrentFormValues learning_languages:', JSON.stringify(languageValues.learningLanguages));
     const settings = getAudioSettingsFromDom();
     const audioSettings = {
         audio_start: settings.start || '',
@@ -2131,10 +2116,6 @@ async function saveProfile(options = {}) {
     const { afterSave } = options;
     const formValues = getCurrentFormValues();
 
-    console.log('=== LOG #20: saveProfile START, formValues.learning_languages:', JSON.stringify(formValues.learning_languages));
-    console.log('=== LOG #20b: saveProfile originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
-    console.log('=== LOG #20c: saveProfile hasUnsavedChanges:', hasUnsavedChanges);
-
     const hasAudioChanges = (
         (formValues.audio_start || '') !== (originalData.audio_start || '') ||
         (formValues.audio_exercise_mode || 'record') !== (originalData.audio_exercise_mode || 'record') ||
@@ -2145,7 +2126,6 @@ async function saveProfile(options = {}) {
         );
         
     if (!hasUnsavedChanges && !hasAudioChanges) {
-        console.log('[saveProfile] no changes, returning early');
         if (typeof afterSave === 'function') afterSave();
         return;
     }
@@ -2168,8 +2148,6 @@ async function saveProfile(options = {}) {
             learning_languages: formValues.learning_languages,
             current_learning: formValues.current_learning
         };
-        console.log('=== LOG #21: saveProfile updateData.learning_languages:', JSON.stringify(updateData.learning_languages));
-
         try {
             const flags = buildLearningFlagsFromLanguages(formValues.learning_languages);
             Object.assign(updateData, flags);
@@ -2209,7 +2187,6 @@ async function saveProfile(options = {}) {
         showInfo(profileT('profile.common.saving_changes', null, 'Сохраняем изменения…'));
 
         const updatedUser = await UM.updateProfile(updateData);
-        console.log('=== LOG #22: saveProfile updatedUser.learning_languages:', JSON.stringify(updatedUser && updatedUser.learning_languages));
 
         try {
             if (updatedUser && updatedUser.avatar) originalData.avatar = updatedUser.avatar;
@@ -2373,13 +2350,9 @@ async function saveProfile(options = {}) {
         // Синхронизируем LanguageSelector с новыми данными (без перерисовки, чтобы не сбросить UI)
         try {
           const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
-          console.log('=== LOG #23: saveProfile syncing LanguageSelector with:', JSON.stringify(savedLearningLangs));
           if (learningListSelector && learningListSelector.options) {
             learningListSelector.options.learningLanguages = [...savedLearningLangs];
             learningListSelector.options.currentLearning = originalData.current_learning;
-            console.log('=== LOG #23b: learningListSelector.options.learningLanguages set to:', JSON.stringify(learningListSelector.options.learningLanguages));
-          } else {
-            console.log('=== LOG #23c: learningListSelector not available for sync');
           }
           if (learningSelector && learningSelector.options) {
             learningSelector.options.learningLanguages = [...savedLearningLangs];
@@ -2391,9 +2364,7 @@ async function saveProfile(options = {}) {
         if (formValues.password) document.getElementById('password').value = '';
 
         passwordTouched = false;
-        console.log('=== LOG #24: saveProfile calling setUnsavedState(false)');
         setUnsavedState(false);
-        console.log('=== LOG #25: saveProfile after setUnsavedState(false), hasUnsavedChanges:', hasUnsavedChanges, 'window.hasUnsavedChanges:', window.hasUnsavedChanges);
         pendingAvatarBlob = null;
         showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
 
@@ -2410,7 +2381,6 @@ async function saveProfile(options = {}) {
 // ==================== HANDLE SAVE ====================
 
 async function handleSave() {
-    console.log('=== LOG #19: handleSave called');
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {
         saveButton.disabled = true;

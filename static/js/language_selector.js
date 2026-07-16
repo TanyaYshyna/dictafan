@@ -14,7 +14,6 @@ class LanguageSelector {
     static FLAG_SIZE_LARGE = { width: 30, height: 20 };
 
     constructor(options = {}) {
-        console.log('[LanguageSelector constructor] mode:', options.mode, 'container:', options.container ? options.container.id || 'unknown' : 'null');
         this.options = {
             container: null,
             mode: 'native-selector', // 'native-selector', 'learning-selector', 'learning-list', 'flag-combo', 'header-selector', 'profile-panels'
@@ -1770,9 +1769,7 @@ class LanguageSelector {
 
                 const next = [...set];
                 next.sort();
-                console.log('[LanguageSelector][learning-flags] BEFORE set, this.options.learningLanguages:', JSON.stringify(this.options.learningLanguages), 'this === learningListSelector?', this === (typeof learningListSelector !== 'undefined' ? learningListSelector : null));
                 this.options.learningLanguages = next;
-                console.log('[LanguageSelector][learning-flags] AFTER set, this.options.learningLanguages:', JSON.stringify(this.options.learningLanguages));
 
                 const cur = String(this.options.currentLearning || '').trim().toLowerCase();
                 if (cur && !set.has(cur)) {
@@ -3131,7 +3128,6 @@ class LanguageSelector {
             learningLanguages: [...this.options.learningLanguages],
             currentLearning: this.options.currentLearning
         };
-        console.log('[LanguageSelector.getValues] mode:', this.options.mode, 'learningLanguages:', JSON.stringify(this.options.learningLanguages));
         return result;
     }
 

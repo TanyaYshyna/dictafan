@@ -367,7 +367,6 @@ window.Desktop = window.Desktop || {
   },
 
   stubAction(name) {
-    console.log('=== LOG #0: stubAction called with:', name, 'stack:', new Error().stack?.split('\n').slice(2, 5).join(' | '));
     try {
       if (name === 'desktop-menu-profile') {
         try {
