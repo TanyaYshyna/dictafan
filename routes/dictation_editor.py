@@ -120,6 +120,30 @@ def api_get_dictation_exercises(dictation_id: int):
 
 
 # ==============================================================
+# API: reconcile упражнений диктанта (сохранение набора упражнений)
+# ==============================================================
+@editor_bp.route('/api/dictation/<int:dictation_id>/exercises/reconcile', methods=['POST'])
+@jwt_required()
+def api_reconcile_dictation_exercises(dictation_id: int):
+    """Сохраняет (reconcile) набор упражнений для диктанта."""
+    logger.info(f"📋 [exercises/reconcile] Запрос reconcile для dictation_id={dictation_id}")
+    try:
+        data = request.get_json(force=True) or {}
+        exercises_payload = data.get('exercises')
+        if exercises_payload is None:
+            return jsonify({'success': False, 'error': 'Missing exercises payload'}), 400
+
+        from helpers.db_dictations import reconcile_dictation_exercises, list_dictation_exercises
+        reconcile_dictation_exercises(int(dictation_id), exercises_payload)
+        exercises = list_dictation_exercises(int(dictation_id))
+        logger.info(f"📋 [exercises/reconcile] Упражнения для dictation_id={dictation_id} сохранены: count={len(exercises)}")
+        return jsonify({'success': True, 'exercises': exercises})
+    except Exception as e:
+        logger.error(f"📋 [exercises/reconcile] Ошибка reconcile для диктанта {dictation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==============================================================
 # транслятор
 translator = Translator()
 
