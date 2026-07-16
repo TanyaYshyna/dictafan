@@ -1978,7 +1978,7 @@ function loadUserData() {
         daily_time_plan: (() => {
             try {
                 const n = Number(userData.daily_time_plan);
-                return (Number.isFinite(n) && n >= 10) ? n : 10;
+                return (Number.isFinite(n) && n >= 1) ? n : 10;
             } catch (e) { return 10; }
         })(),
         daily_money_plan: (() => {
@@ -2174,7 +2174,7 @@ async function saveProfile(options = {}) {
             daily_time_plan: (() => {
                 try {
                     const n = Number(updatedUser && updatedUser.daily_time_plan);
-                    return (Number.isFinite(n) && n >= 10) ? n : (originalData.daily_time_plan ?? 10);
+                    return (Number.isFinite(n) && n >= 1) ? n : (originalData.daily_time_plan ?? 10);
                 } catch (e) { return (originalData.daily_time_plan ?? 10); }
             })(),
             daily_money_plan: (() => {

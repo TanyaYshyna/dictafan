@@ -17,9 +17,17 @@
   max-width: none;
 }
 
+.page-index .dictation-kart--book-row {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  flex: 1 1 auto;
+}
+
 .dictation-kart--book-row.short-card {
   display: block;
   min-height: 0;
+  height: 120px;
 }
 
 .page-index .short-card.dictation-kart {
@@ -33,7 +41,7 @@
   box-sizing: border-box;
   width: 180px;
   min-width: 180px;
-  flex: 0 0 180px;
+  flex: 0 0 120px;
 }
 
 .page-index .desk-card .short-thumb {
@@ -41,6 +49,7 @@
   margin: -12px -12px 0 -12px;
   border-radius: 14px 14px 0 0;
   overflow: hidden;
+  aspect-ratio: 5 / 3;
 }
 
 .page-index .desk-card .short-thumb img {
@@ -104,8 +113,8 @@
 .page-index .desk-card .dictation-kart-launch-menu {
   position: absolute;
   top: calc(100% + 6px);
-  left: 0;
-  right: auto;
+  left: auto;
+  right: 0;
   z-index: 200600;
   background-color: var(--color-panel-bg, #fff);
   border: 1px solid var(--color-border-light, #dee2e6);
@@ -113,6 +122,19 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 200px;
   overflow: hidden;
+}
+
+/* Меню "..." (три точки) — прижимать к правому верхнему углу кнопки */
+.short-actions-menu-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.short-actions-menu-wrapper .dropdown-menu {
+  left: auto;
+  right: -10px;
+  z-index: 200600;
+  min-width: 180px;
 }
 
 .page-index .short-card.dictation-kart:hover {

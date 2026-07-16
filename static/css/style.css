@@ -478,6 +478,7 @@ select {
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
 }
 
 .topbar-actions {
@@ -516,17 +517,7 @@ html[dir="rtl"] .topbar-save-group {
     flex-direction: row-reverse;
 }
 
-/* Compact activity badge in header: daily progress + streak */
-.user-activity-badge {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    position: relative;
-    padding: 0;
-}
-
+/* Daily activity progress: today/goal near username */
 .daily-activity-progress {
     font-size: 14px;
     font-weight: 800;
@@ -995,24 +986,24 @@ html[dir="rtl"] .topbar-save-group {
     align-items: center;
     gap: 4px; /* Уменьшено с 8px до 4px - сблизить аватар и имя */
     text-decoration: none;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
     font-size: 16px;
     font-weight: 600;
 }
 
 .username:visited {
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
 }
 
 .username:hover {
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
     opacity: 0.8;
 }
 
 .username-text {
     font-weight: 600;
     font-size: 16px;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
 }
 
 .panel-header {
@@ -1061,7 +1052,7 @@ html[dir="rtl"] .topbar-save-group {
     transition: background-color 0.2s;
     background: transparent;
     border: none;
-    color: var(--color-text, #1f2933);
+    color: var(--color-text-secondary, #6b7280);
     cursor: pointer;
 }
 

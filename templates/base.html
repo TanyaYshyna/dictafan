@@ -11,7 +11,9 @@
     <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.ico') }}?v={{ app_cache_revision }}">
 
+    {% block base_styles %}
     <link rel="stylesheet" href="/static/css/style.css?v={{ app_cache_revision }}">
+    {% endblock %}
     <link rel="stylesheet" href="/static/css/style_color.css?v={{ app_cache_revision }}">
 
     {% block page_head %}{% endblock %}

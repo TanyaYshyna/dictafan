@@ -36,14 +36,15 @@
             let sessionsCount = 0;
             if (store._sessions && typeof store._sessions.values === 'function') {
               for (const session of store._sessions.values()) {
-                if (session && session.content && session.content.key === content.key) {
+                if (session && session.content && session.content.dictationId === content.dictationId) {
                   sessionsCount++;
                 }
               }
             }
+            const languages = content.getLanguages ? content.getLanguages() : [];
             contents.push({
               dictationId: content.dictationId,
-              langTr: content.langTr,
+              languages: languages,
               sentencesCount: content.getAllKeys ? content.getAllKeys().length : 0,
               sessionsCount: sessionsCount,
               loadedAtMs: content.loadedAtMs || 0,
@@ -74,7 +75,7 @@
     let html = '';
     for (const d of dictations) {
       const title = `Диктант #${window.escapeHtml(d.dictationId)}`;
-      const langLabel = d.langTr ? `язык: ${window.escapeHtml(d.langTr)}` : '';
+      const langLabel = d.languages && d.languages.length > 0 ? `языки: ${d.languages.map(function(l){return window.escapeHtml(l);}).join(', ')}` : '';
       const sentencesLabel = `${d.sentencesCount} предложений`;
       const sessionsLabel = d.sessionsCount > 0 ? `${d.sessionsCount} сессий` : '';
 

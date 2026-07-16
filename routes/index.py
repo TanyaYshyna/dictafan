@@ -43,10 +43,8 @@ def get_app_cache_revision() -> str:
         base_dir = current_app.root_path
         candidates = [
             'sw.js',
-            os.path.join('static', 'js', 'private_library.js'),
             # os.path.join('static', 'js', 'script_dictation.js'),
             os.path.join('static', 'js', 'user_manager.js'),
-            os.path.join('static', 'css', 'style_private_library.css'),
             # os.path.join('static', 'css', 'style_dictation.css'),
         ]
         parts = []
@@ -501,70 +499,76 @@ def delete_dictation(dictation_id):
     removed_refs = remove_dictation_from_categories(categories_data, dictation_id)
     save_categories(categories_data)
 
-    # 2. Удаляем из БД (если dictation_id в формате dict_<id>)
+    # 2. Удаляем из БД (dictation_id может быть в формате "dict_41" или просто "41")
     removed_from_db = False
     removed_desk_refs = False
     removed_book_refs = False
-    if dictation_id.startswith('dict_'):
+    try:
+        # Пробуем извлечь числовой ID: убираем префикс dict_ если есть
+        db_id_str = dictation_id.replace('dict_', '')
+        db_id = int(db_id_str)
+
+        # Ownership check
         try:
-            db_id = int(dictation_id.replace('dict_', ''))
+            current_email = get_jwt_identity()
+            user = get_user_by_email(current_email) if current_email else None
+            if not user:
+                return jsonify({"success": False, "error": "User not found"}), 404
 
-            # Ownership check
-            try:
-                current_email = get_jwt_identity()
-                user = get_user_by_email(current_email) if current_email else None
-                if not user:
-                    return jsonify({"success": False, "error": "User not found"}), 404
+            d = get_dictation_by_id(db_id)
+            if not d:
+                return jsonify({"success": False, "error": "Dictation not found"}), 404
 
-                d = get_dictation_by_id(db_id)
-                if not d:
-                    return jsonify({"success": False, "error": "Dictation not found"}), 404
-
-                owner_id = d.get('owner_id')
-                if not owner_id or int(owner_id) != int(user.get('id')):
-                    return jsonify({"success": False, "error": "Forbidden"}), 403
-            except Exception as e:
-                logger.warning("delete_dictation ownership check failed: %s", e)
+            owner_id = d.get('owner_id')
+            if not owner_id or int(owner_id) != int(user.get('id')):
                 return jsonify({"success": False, "error": "Forbidden"}), 403
+        except Exception as e:
+            logger.warning("delete_dictation ownership check failed: %s", e)
+            return jsonify({"success": False, "error": "Forbidden"}), 403
 
-            # Remove references so the dictation cannot re-appear on any user's desk / in any book.
+        # Remove references so the dictation cannot re-appear on any user's desk / in any book.
+        try:
+            conn, cur = get_db_cursor()
             try:
-                conn, cur = get_db_cursor()
+                # Remove user progress/history from history_by_day
                 try:
-                    # Remove user progress/history from history_by_day
-                    try:
-                        cur.execute("DELETE FROM history_by_day WHERE dictation_id = %s", (db_id,))
-                    except Exception:
-                        pass
+                    cur.execute("DELETE FROM history_by_day WHERE dictation_id = %s", (db_id,))
+                except Exception:
+                    pass
 
-                    # Remove sentences explicitly in case DB is missing ON DELETE CASCADE.
-                    try:
-                        cur.execute("DELETE FROM dictation_sentences WHERE dictation_id = %s", (db_id,))
-                    except Exception:
-                        pass
+                # Remove sentences explicitly in case DB is missing ON DELETE CASCADE.
+                try:
+                    cur.execute("DELETE FROM dictation_sentences WHERE dictation_id = %s", (db_id,))
+                except Exception:
+                    pass
 
-                    cur.execute("DELETE FROM desk_items WHERE dictation_id = %s", (db_id,))
-                    removed_desk_refs = cur.rowcount > 0
-                    cur.execute("DELETE FROM book_dictations WHERE dictation_id = %s", (db_id,))
-                    removed_book_refs = cur.rowcount > 0
-                    conn.commit()
-                finally:
-                    cur.close()
-                    conn.close()
-            except Exception as e:
-                logger.warning("Не удалось удалить ссылки из desk_items/book_dictations: %s", e)
+                cur.execute("DELETE FROM desk_items WHERE dictation_id = %s", (db_id,))
+                removed_desk_refs = cur.rowcount > 0
+                cur.execute("DELETE FROM book_dictations WHERE dictation_id = %s", (db_id,))
+                removed_book_refs = cur.rowcount > 0
+                conn.commit()
+            finally:
+                cur.close()
+                conn.close()
+        except Exception as e:
+            logger.warning("Не удалось удалить ссылки из desk_items/book_dictations: %s", e)
 
-            removed_from_db = delete_dictation_from_db(db_id)
-        except (ValueError, Exception) as e:
-            logger.warning(f"Не удалось удалить из БД: {e}")
+        removed_from_db = delete_dictation_from_db(db_id)
+    except (ValueError, Exception) as e:
+        logger.warning(f"Не удалось удалить из БД: {e}")
 
     # 3. Удаляем файлы из B2 (если B2 включен)
     removed_from_b2 = False
     if b2_storage.enabled:
         try:
+            # Нормализуем ID для B2: в B2 файлы лежат в папке dict_XX
+            b2_dictation_id = dictation_id
+            if not b2_dictation_id.startswith('dict_'):
+                b2_dictation_id = 'dict_' + b2_dictation_id
+
             # Удаляем все файлы диктанта в B2 по prefix (B2 не умеет папки, удаляем по одному)
             try:
-                deleted_media = b2_storage.delete_prefix(f"dictations/{dictation_id}/")
+                deleted_media = b2_storage.delete_prefix(f"dictations/{b2_dictation_id}/")
                 if deleted_media and deleted_media > 0:
                     removed_from_b2 = True
             except Exception:

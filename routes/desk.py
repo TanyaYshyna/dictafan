@@ -1,5 +1,5 @@
 import logging
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, render_template, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from helpers.db_users import get_user_by_email
@@ -104,9 +104,10 @@ def api_desk_items():
                 COALESCE(d.tr_ar, FALSE) as tr_ar,
                 COALESCE(d.tr_pl, FALSE) as tr_pl,
                 COALESCE(d.sentences_count, 0) as sentences_count,
-                (SELECT DISTINCT language_code 
-                 FROM dictation_sentences 
-                 WHERE dictation_id = d.id AND language_code != d.language_code 
+                COALESCE(d.audio_order, '') as audio_order,
+                (SELECT DISTINCT language_code
+                 FROM dictation_sentences
+                 WHERE dictation_id = d.id AND language_code != d.language_code
                  LIMIT 1) as language_translation
             FROM desk_items di
             JOIN dictations d ON d.id = di.dictation_id
@@ -163,6 +164,7 @@ def api_desk_items():
                     "owner_id": row.get("owner_id"),
                     "level": row["level"],
                     "sentences_count": row["sentences_count"] or 0,
+                    "audio_order": row.get("audio_order") or '',
                     "cover_url": cover_url,
                     "tr_en": bool(row.get("tr_en")),
                     "tr_uk": bool(row.get("tr_uk")),
@@ -182,6 +184,54 @@ def api_desk_items():
         return jsonify({"success": True, "items": items})
     except Exception as exc:
         logger.error("Ошибка получения стола пользователя: %s", exc)
+        return jsonify({"success": False, "error": str(exc)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+
+@desk_bp.route("/api/items", methods=["POST"])
+@jwt_required()
+def api_add_desk_item():
+    """
+    Добавляет диктант на рабочий стол пользователя.
+    Ожидает JSON: { "dictation_id": <int> }
+    """
+    current_email = get_jwt_identity()
+    user = get_user_by_email(current_email)
+    if not user:
+        return jsonify({"success": False, "error": "User not found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    dictation_id = data.get("dictation_id")
+    if not dictation_id:
+        return jsonify({"success": False, "error": "Missing dictation_id"}), 400
+
+    try:
+        dictation_id = int(dictation_id)
+    except (ValueError, TypeError):
+        return jsonify({"success": False, "error": "dictation_id must be an integer"}), 400
+
+    conn, cur = get_db_cursor()
+    try:
+        # Проверяем, не добавлен ли уже этот диктант на стол
+        cur.execute(
+            "SELECT id FROM desk_items WHERE dictation_id = %s AND user_id = %s",
+            (dictation_id, user["id"]),
+        )
+        existing = cur.fetchone()
+        if existing:
+            return jsonify({"success": True, "message": "Already on desk", "id": existing["id"]})
+
+        cur.execute(
+            "INSERT INTO desk_items (dictation_id, user_id) VALUES (%s, %s) RETURNING id",
+            (dictation_id, user["id"]),
+        )
+        new_id = cur.fetchone()["id"]
+        conn.commit()
+        return jsonify({"success": True, "message": "Added to desk", "id": new_id})
+    except Exception as exc:
+        logger.error("Ошибка добавления диктанта на стол: %s", exc)
         return jsonify({"success": False, "error": str(exc)}), 500
     finally:
         cur.close()

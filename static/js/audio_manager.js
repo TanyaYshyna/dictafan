@@ -1130,6 +1130,17 @@ class AudioManagerClass {
         }
     }
 
+    /** Извлечь dictationId из URL вида /api/dictations/{dictationId}/... */
+    _extractDictationIdFromUrl(url) {
+        try {
+            const s = String(url || '').trim();
+            const m = s.match(/\/api\/dictations\/(dict_\w+)\//);
+            return m ? m[1] : '';
+        } catch (e) {
+            return '';
+        }
+    }
+
     async ensureCachedResponse(url) {
         try {
             const u = this.normalizeMediaUrl(url);
@@ -1153,6 +1164,32 @@ class AudioManagerClass {
                 return false;
             }
             await cache.put(cacheKey, fetchRes.clone());
+
+            // Создаём blob URL для аудио активных диктантов.
+            // Активным считается диктант, который есть в пуле DictationRuntime.DictationSessionsStore.
+            // Это позволяет play() сразу использовать blob URL без fetch с сервера (который может вернуть 404,
+            // если B2 выключен или файл ещё не загружен).
+            const dictationId = this._extractDictationIdFromUrl(u);
+            const isActive = !!(dictationId && window.DictationRuntime &&
+                window.DictationRuntime.DictationSessionsStore &&
+                window.DictationRuntime.DictationSessionsStore._contents &&
+                window.DictationRuntime.DictationSessionsStore._contents.has(dictationId));
+
+            if (isActive) {
+                try {
+                    const blob = await fetchRes.clone().blob();
+                    if (blob && blob.size) {
+                        const prev = this._getObjectUrlForCanonical(cacheKey);
+                        if (prev && prev.startsWith('blob:')) {
+                            try { URL.revokeObjectURL(prev); } catch (e) {}
+                        }
+                        const freshObjUrl = URL.createObjectURL(blob);
+                        this._objectUrlByCanonicalUrl[cacheKey] = freshObjUrl;
+                    }
+                } catch (e) {
+                }
+            }
+
             return true;
         } catch (e) {
             return false;
@@ -1295,29 +1332,38 @@ class AudioManagerClass {
         try {
             const url = this.buildDictationAudioUrl(dictationId, language, filename);
             const key = this._toCacheKey(url);
-            if (!key) return '';
-            if (!blob || !blob.size) return '';
+            console.log('[AudioManager] saveDictationAudioBlob', { dictationId, language, filename, key: key ? key.slice(0, 120) : '(empty)', blobSize: blob ? blob.size : 0, url: url ? url.slice(0, 120) : '(empty)' });
+            if (!key) { console.warn('[AudioManager] saveDictationAudioBlob: empty key'); return ''; }
+            if (!blob || !blob.size) { console.warn('[AudioManager] saveDictationAudioBlob: empty blob'); return ''; }
 
-            const headers = new Headers();
-            headers.set('Content-Type', (mime || blob.type || 'audio/mpeg'));
-            headers.set('Cache-Control', 'no-store');
+            // Всегда создаём blob URL, чтобы play() мог сразу использовать его
+            // без поиска в CacheStorage. Это гарантирует, что свежесгенерированное
+            // аудио будет доступно для воспроизведения даже если CacheStorage недоступен.
+            const objUrl = URL.createObjectURL(blob);
+            const prev = this._getObjectUrlForCanonical(key);
+            if (prev && prev.startsWith('blob:') && prev !== objUrl) {
+                try { URL.revokeObjectURL(prev); } catch (e) {}
+            }
+            this._objectUrlByCanonicalUrl[key] = objUrl;
+            console.log('[AudioManager] saveDictationAudioBlob: blob URL created', { key: key.slice(0, 80), objUrl });
 
-            const cache = await this.openMediaCache();
-            if (!cache) return '';
-            await cache.put(key, new Response(blob, { status: 200, headers }));
-
-            // Invalidate any previously-created objectURL for this key so the next play() gets fresh bytes.
+            // Сохраняем в CacheStorage (если доступен) для офлайн-доступа
             try {
-                const prev = this._getObjectUrlForCanonical(key);
-                if (prev && prev.startsWith('blob:')) {
-                    try { URL.revokeObjectURL(prev); } catch (e) {}
-                    delete this._objectUrlByCanonicalUrl[key];
+                const headers = new Headers();
+                headers.set('Content-Type', (mime || blob.type || 'audio/mpeg'));
+                headers.set('Cache-Control', 'no-store');
+                const cache = await this.openMediaCache();
+                if (cache) {
+                    await cache.put(key, new Response(blob, { status: 200, headers }));
+                    console.log('[AudioManager] saveDictationAudioBlob: saved to CacheStorage');
                 }
             } catch (e) {
+                console.warn('[AudioManager] saveDictationAudioBlob: CacheStorage error (non-fatal):', e);
             }
 
             return key;
         } catch (e) {
+            console.warn('[AudioManager] saveDictationAudioBlob: unexpected error:', e);
             return '';
         }
     }
@@ -1505,6 +1551,7 @@ class AudioManagerClass {
                     }
                     if (!cached) {
                         cacheMiss += 1;
+                        console.log('[AudioManager] uploadDictationAudioFromCacheToB2: cacheMiss url=' + u.toString() + ' dictationId=' + dictationId + ' lang=' + lang + ' filename=' + filename);
                         continue;
                     }
                     cacheHit += 1;

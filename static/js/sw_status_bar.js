@@ -29,6 +29,13 @@
       updateTimerId: null,
     };
 
+    // Активные диктанты (из DictationRuntime.DictationSessionsStore)
+    var activeDictationsState = {
+      dictationIds: [],
+      dropdownOpen: false,
+      updateTimerId: null,
+    };
+
     // Public page-published info shown on the right.
     // Example: setSwBarMeta('build: ...') or setSwBarInfo('release', '2026-03-11')
     var pageInfo = {
@@ -106,6 +113,66 @@
       }
     }
 
+    function getActiveDictationIds() {
+      try {
+        if (typeof window.DictationRuntime === 'undefined' ||
+            typeof window.DictationRuntime.DictationSessionsStore === 'undefined' ||
+            typeof window.DictationRuntime.DictationSessionsStore._contents === 'undefined') {
+          return [];
+        }
+        var contents = window.DictationRuntime.DictationSessionsStore._contents;
+        if (typeof contents.keys === 'function') {
+          return Array.from(contents.keys());
+        }
+        return [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function updateActiveDictations() {
+      try {
+        var ids = getActiveDictationIds();
+        activeDictationsState.dictationIds = ids;
+        renderActiveDictations();
+      } catch (e) {
+        console.warn('[SB] updateActiveDictations error:', e);
+      }
+    }
+
+    function renderActiveDictations() {
+      try {
+        var el = document.getElementById(BAR_ID + '__activeDictations');
+        if (!el) return;
+        var ids = activeDictationsState.dictationIds;
+        if (!ids || ids.length === 0) {
+          el.style.display = 'none';
+          return;
+        }
+        el.style.display = 'inline-flex';
+
+        // Кнопка-триггер: последний dictationId + иконка
+        var lastId = ids[ids.length - 1];
+        var trigger = el.querySelector('.swbar-active-dictations-trigger');
+        if (trigger) {
+          trigger.innerHTML = lastId + ' <span class="swbar-active-dictations-arrow" data-lucide="chevron-down"></span>';
+          try { window.renderLucide && window.renderLucide(trigger); } catch (e) {}
+        }
+
+        // Выпадающий список
+        var dropdown = el.querySelector('.swbar-active-dictations-dropdown');
+        if (dropdown) {
+          var items = [];
+          for (var i = 0; i < ids.length; i++) {
+            items.push('<div class="swbar-active-dictations-item">(' + (i + 1) + ') ' + ids[i] + '</div>');
+          }
+          dropdown.innerHTML = items.join('');
+        }
+      } catch (e) {
+        console.warn('[SB] renderActiveDictations error:', e);
+      }
+    }
+
     function startQueueInfoPolling() {
       try {
         if (queueInfoState.updateTimerId) {
@@ -117,6 +184,20 @@
         }, 5000); // обновление каждые 5 секунд
       } catch (e) {
         console.warn('[SB:109err] startQueueInfoPolling: ошибка', e);
+      }
+    }
+
+    function startActiveDictationsPolling() {
+      try {
+        if (activeDictationsState.updateTimerId) {
+          return;
+        }
+        updateActiveDictations();
+        activeDictationsState.updateTimerId = setInterval(function () {
+          updateActiveDictations();
+        }, 5000); // обновление каждые 5 секунд
+      } catch (e) {
+        console.warn('[SB] startActiveDictationsPolling error:', e);
       }
     }
 
@@ -194,7 +275,15 @@
           "#" + BAR_ID + " .swbar-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}" +
           "#" + BAR_ID + " .swbar-meta{opacity:0.75;}" +
           "#" + BAR_ID + " .swbar-btn{pointer-events:auto;cursor:pointer;border:1px solid rgba(0,0,0,0.18);background:rgba(255,255,255,0.7);color:rgba(0,0,0,0.8);border-radius:8px;padding:2px 8px;font-size:12px;line-height:18px;}" +
-          "#" + BAR_ID + " .swbar-btn:active{transform:translateY(1px);}"
+          "#" + BAR_ID + " .swbar-btn:active{transform:translateY(1px);}" +
+          "#" + BAR_ID + " .swbar-active-dictations{position:relative;display:none;align-items:center;flex:0 0 auto;white-space:nowrap;pointer-events:auto;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-trigger{cursor:pointer;border:1px solid rgba(0,0,0,0.18);background:rgba(255,255,255,0.7);color:rgba(0,0,0,0.8);border-radius:8px;padding:2px 8px;font-size:12px;line-height:18px;display:inline-flex;align-items:center;gap:4px;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-trigger:active{transform:translateY(1px);}" +
+          "#" + BAR_ID + " .swbar-active-dictations-arrow{display:inline-flex;width:14px;height:14px;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-dropdown{display:none;position:absolute;bottom:100%;left:0;margin-bottom:4px;background:rgba(240,240,240,0.98);border:1px solid rgba(0,0,0,0.15);border-radius:8px;padding:4px 0;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:2147483647;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-dropdown.open{display:block;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-item{padding:4px 12px;font-size:12px;line-height:1.4;color:rgba(0,0,0,0.8);cursor:default;}" +
+          "#" + BAR_ID + " .swbar-active-dictations-item:hover{background:rgba(0,0,0,0.06);}"
         ;
         document.head.appendChild(style);
       } catch (e) {
@@ -268,8 +357,95 @@
         queueInfo.id = BAR_ID + '__queueInfo';
         queueInfo.textContent = '';
 
+        // B2 Storage health check button
+        var b2HealthBtn = document.createElement('button');
+        b2HealthBtn.className = 'swbar-b2-health-btn';
+        b2HealthBtn.id = BAR_ID + '__b2Health';
+        b2HealthBtn.textContent = '☁ B2';
+        b2HealthBtn.title = 'Перевірити B2 сховище';
+        b2HealthBtn.style.pointerEvents = 'auto';
+        b2HealthBtn.style.cursor = 'pointer';
+        b2HealthBtn.style.background = 'none';
+        b2HealthBtn.style.border = 'none';
+        b2HealthBtn.style.padding = '0 4px';
+        b2HealthBtn.style.fontSize = '12px';
+        b2HealthBtn.style.fontFamily = 'inherit';
+        b2HealthBtn.style.color = 'inherit';
+        b2HealthBtn.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var btn = e.currentTarget;
+          var origText = btn.textContent;
+          btn.textContent = '☁ ...';
+          btn.disabled = true;
+          btn.style.opacity = '0.5';
+          fetch('/api/b2/health', { method: 'GET', cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              var status = data && data.status;
+              if (status === 'ok') {
+                btn.textContent = '☁ ✅';
+              } else if (status === 'disabled') {
+                btn.textContent = '☁ ⚪';
+              } else {
+                btn.textContent = '☁ ❌';
+              }
+              setTimeout(function () {
+                btn.textContent = origText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              }, 3000);
+            })
+            .catch(function () {
+              btn.textContent = '☁ ❌';
+              setTimeout(function () {
+                btn.textContent = origText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+              }, 3000);
+            });
+        });
+
+        // Активные диктанты
+        var activeDictEl = document.createElement('div');
+        activeDictEl.className = 'swbar-active-dictations';
+        activeDictEl.id = BAR_ID + '__activeDictations';
+        activeDictEl.style.display = 'none';
+
+        var trigger = document.createElement('span');
+        trigger.className = 'swbar-active-dictations-trigger';
+        trigger.innerHTML = ' <span class="swbar-active-dictations-arrow" data-lucide="chevron-down"></span>';
+        try { window.renderLucide && window.renderLucide(trigger); } catch (e) {}
+
+        var dropdown = document.createElement('div');
+        dropdown.className = 'swbar-active-dictations-dropdown';
+
+        // Клик по триггеру — открыть/закрыть dropdown
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var isOpen = dropdown.classList.contains('open');
+          // Закрыть все другие dropdown'ы
+          document.querySelectorAll('.swbar-active-dictations-dropdown.open').forEach(function (d) {
+            d.classList.remove('open');
+          });
+          if (!isOpen) {
+            dropdown.classList.add('open');
+          } else {
+            dropdown.classList.remove('open');
+          }
+        });
+
+        // Клик вне dropdown — закрыть
+        document.addEventListener('click', function () {
+          dropdown.classList.remove('open');
+        });
+
+        activeDictEl.appendChild(trigger);
+        activeDictEl.appendChild(dropdown);
+
         leftWrap.appendChild(msg);
         leftWrap.appendChild(leftExtra);
+        leftWrap.appendChild(activeDictEl);
+        leftWrap.appendChild(b2HealthBtn);
         leftWrap.appendChild(queueInfo);
         left.appendChild(leftWrap);
 
@@ -617,11 +793,13 @@
             ensureBar();
             hideLegacyBuildBadges();
             startQueueInfoPolling();
+            startActiveDictationsPolling();
           });
         } else {
           ensureBar();
           hideLegacyBuildBadges();
           startQueueInfoPolling();
+          startActiveDictationsPolling();
         }
       } catch (e) {
       }

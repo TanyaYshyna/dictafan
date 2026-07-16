@@ -304,7 +304,7 @@
           if (window.DictationModal && typeof window.DictationModal.open === 'function') {
             window.DictationModal.open(openUrl, { cardEl, subsetPositions: positions.length ? positions : null });
           } else {
-            window.location.href = openUrl;
+            console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
           }
         });
       });
@@ -315,17 +315,20 @@
      * Загружает упражнения и задания на сегодня, решает, показывать модалку или сразу открыть диктант.
      */
     async function openDictationLaunch(dictationId, openUrl, cardEl, dictationTitle) {
+      console.log('[2] dictation_launch_modal: openDictationLaunch вызван, dictationId=' + dictationId + ', openUrl=' + openUrl);
       const id = Number(dictationId);
       if (!Number.isFinite(id) || id <= 0) {
-        // fallback — сразу открываем
+        console.log('[2a] dictation_launch_modal: id <= 0, открываем напрямую');
+        // Если DictationModal не загружен — не пытаемся открыть старую страницу
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
         } else {
-          window.location.href = openUrl;
+          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
         }
         return;
       }
 
+      console.log('[3] dictation_launch_modal: начинаем загрузку упражнений для id=' + id);
       // 1. Загружаем упражнения
       let exercises = [];
       try {
@@ -342,7 +345,7 @@
           }
         }
         if (!exercises.length) {
-          const res = await apiRequest(`/dictation_editor/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
+          const res = await apiRequest(`/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
           const raw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
           exercises = raw.map((x) => {
             const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : (x && Array.isArray(x.positions) ? x.positions : []);
@@ -395,7 +398,7 @@
       }
       const exerciseList = Array.from(uniqueBySig.values());
 
-      try { console.log('[dictation_launch_modal] exercises count:', exerciseList.length, 'items:', exerciseList.map(e => ({id: e.id, pos: e.positions}))); } catch (e) {}
+      console.log('[4] dictation_launch_modal: exercises count=' + exerciseList.length + ', items=' + exerciseList.map(function(e) { return '{id:' + e.id + ',pos:[' + (e.positions||[]).join(',') + ']}'; }).join('; '));
 
       // Есть ли невыполненные задания от учителей
       const hasIncompleteTasks = todayTasks.some(t => {
@@ -404,19 +407,22 @@
         return done < required;
       });
 
-      try { console.log('[dictation_launch_modal] hasIncompleteTasks:', hasIncompleteTasks, 'todayTasks:', todayTasks.length); } catch (e) {}
+      console.log('[5] dictation_launch_modal: hasIncompleteTasks=' + hasIncompleteTasks + ', todayTasks count=' + todayTasks.length);
 
       // Если только "весь диктант" (или пусто) и нет заданий от учителя — сразу открываем
       const onlyFull = exerciseList.length === 0 || (exerciseList.length === 1 && !exerciseList[0].positions.length);
-      try { console.log('[dictation_launch_modal] onlyFull:', onlyFull, 'willShowModal:', !(onlyFull && !hasIncompleteTasks)); } catch (e) {}
+      console.log('[6] dictation_launch_modal: onlyFull=' + onlyFull + ', willShowModal=' + !(onlyFull && !hasIncompleteTasks));
       if (onlyFull && !hasIncompleteTasks) {
+        console.log('[7] dictation_launch_modal: открываем DictationModal.open напрямую');
         if (window.DictationModal && typeof window.DictationModal.open === 'function') {
           window.DictationModal.open(openUrl, { cardEl, subsetPositions: null });
         } else {
-          window.location.href = openUrl;
+          console.warn('[dictation_launch_modal] DictationModal не загружен, невозможно открыть диктант');
         }
         return;
       }
+
+      console.log('[8] dictation_launch_modal: показываем launch modal');
 
       // Извлекаем URL обложки из карточки
       let coverUrl = '';

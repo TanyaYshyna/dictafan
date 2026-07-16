@@ -8,16 +8,17 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 ## Объекты на удаление (план)
 
-- `templates/private_library.html`
-- `static/js/private_library.js`
-- `static/css/style_private_library.css`
-- `static/css/style_dictation.css`
+- ~~`templates/private_library.html`~~ **УДАЛЁН**
+- ~~`static/js/private_library.js`~~ **УДАЛЁН** (функциональность перенесена в `dictation_editor_modal.js`, `desktop.js`, `book_modal.js`)
+- ~~`static/css/style_private_library.css`~~ **УДАЛЁН**
+- ~~`static/css/style_dictation.css`~~ **УДАЛЁН**
+- ~~`static/js/script_dictation_editor.js`~~ **УДАЛЁН** (функциональность перенесена в `dictation_editor_modal.js`)
 - ~~`routes/user_routes.py` → `GET /user/profile` (страница профиля; заменить на модалку на `/desktop`)~~ **ГОТОВО**: роут перенаправляет на `index.index`
 - ~~`templates/user_profile_jwt.html`~~ **УДАЛЁН**
 - ~~`static/css/style_user_profile.css`~~ **УДАЛЁН** (стили перенесены в `user_profile_modal.css`)
 - ~~`static/js/script_user_profile.js`~~ **УДАЛЁН** (код перенесён в `user_profile_modal.js`)
-- `assignments`
-- `assignments_by_date`
+- ~~`assignments`~~ **УДАЛЁН**
+- ~~`assignments_by_date`~~ **УДАЛЁН**
 - ~~`history_activity`~~ **УДАЛЁН**: таблица удалена миграцией `migrations/drop_history_activity_and_history_successes.sql`. Все данные перенесены в `history_by_day`.
 - ~~`history_successes`~~ **УДАЛЁН**: таблица удалена миграцией `migrations/drop_history_activity_and_history_successes.sql`. Все данные перенесены в `history_by_day`.
 
@@ -145,25 +146,26 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 ## Frontend (JavaScript)
 
-### `static/js/script_dictation_editor.js`
+### ~~`static/js/script_dictation_editor.js`~~ **УДАЛЁН** → [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js)
 
-Роль:
+Старый page-код редактора диктанта (`script_dictation_editor.js`) **полностью удалён**. Вся функциональность перенесена в [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js) — модальное окно редактора, которое открывается на странице `/desktop`.
 
-- UI редактора: таблица предложений, переводы, переключение языков, Save
-- хранение **рабочего состояния** в памяти вкладки (`workingData`, `currentDictation`)
+Роль `dictation_editor_modal.js`:
+
+- UI редактора в модальном окне `#dictationEditorModal`: таблица предложений, переводы, переключение языков, Save
+- хранение **рабочего состояния** в замыкании модуля (`state`)
 - сбор payload на сохранение и вызов backend save
-- проигрывание аудио (менеджер аудио читает/записывает/проигрывает), разрезка аудио, запись аудио (это наверно тоже должен делать менеджер а не страница)
+- проигрывание аудио через `AudioManager`, разрезка аудио, запись аудио с микрофона
+- интеграция с `CoverManager` для загрузки обложек
+- интеграция с `NewDictationFillModal` для начального заполнения нового диктанта
 
 Важно:
 
-- В идеале этот файл **не должен** содержать тяжелую бизнес-логику хранения/кэша/аудио.
-- Он должен вызывать сервисы/менеджеры:
+- Файл **не использует** глобальные переменные страницы (`workingData`, `currentDictation`). Всё состояние хранится в локальном `state` внутри модуля.
+- Вызывает сервисы/менеджеры:
   - `AudioManager` (аудио)
-
-Правило про глобальные переменные:
-
-- Глобальное состояние страницы (например `workingData`, `currentDictation`) допускается только в page-коде `script_dictation_editor.js`.
-- Все остальные классы/модули должны получать данные через параметры/явные интерфейсы и **не должны** читать/писать `window.*`.
+  - `CoverManager` (обложки)
+  - `DictationRuntime` / `DictationContent` (контент диктанта)
  
 
 
@@ -240,7 +242,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `half_star_purchase_cost`
 - `audio_purchase_cost`
 
-Меню прайса (как показываем в UI по умолчанию на `/desktop`, `static/js/private_library.js`):
+Меню прайса (как показываем в UI по умолчанию на `/desktop`):
 
 - **Earn**
   - `Star reward` (`star_reward`) = `3`
@@ -290,19 +292,13 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 - Сейчас часть логики upload/commit может жить в page-коде. Это надо централизовать в `AudioManager` (см. TODO).
 
-### `static/js/private_library.js`
+### ~~`static/js/private_library.js`~~ **УДАЛЁН**
 
-Роль:
+Старый page-код приватной библиотеки и рабочего стола **полностью удалён**. Функциональность распределена:
 
-- UI приватной библиотеки и «рабочего стола» (desk): список книг/диктантов, добавление/удаление диктанта со стола.
-
-Важно:
-
-- При действии «добавить на рабочий стол» страница **не должна**:
-  - префетчить ассеты/аудио через Service Worker (`prefetchStrict`)
-  - сохранять контент диктанта/предложения в `IndexedDB`
-- Добавление на рабочий стол должно работать **только с серверной БД** (быстрый запрос add/remove + sync списка).
-- Любые операции «скачать/обновить оффлайн-кеш» должны быть вынесены в отдельное явное действие (например кнопка «обновить кеш») и выполняться на странице диктанта/редактора либо в отдельном контролируемом флоу.
+- [`static/js/desktop.js`](static/js/desktop.js) — рабочий стол (desk): карточки диктантов, drag-and-drop, меню, создание нового диктанта
+- [`static/js/book_modal.js`](static/js/book_modal.js) — модалка книги: просмотр разделов, добавление/удаление диктантов
+- [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js) — редактор диктанта
 
 ### Модальные окна на новом рабочем столе (`/desktop`)
 
@@ -329,7 +325,359 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 - `100250` — `#desktopConfirmModal` (общее «закрыть/сохранить» для desktop-модалок на `/desktop`)
 - `100260` — `#exitModal` (универсальная модалка выхода/закрытия; должна быть выше всех)
 - `100280` — `#crop-modal` (кроп обложки, используется `CoverManager`, группа `book_modal.*`)
+- `100300` — `#dictationEditorModal` (редактор диктанта в модальном окне, группа `dictation_editor_modal.*`)
+- `100310` — `#newDictationFillModal` (начальное заполнение нового диктанта, открывается поверх `#dictationEditorModal`)
 - `200500` — `#auto-toast` (всплывающие уведомления)
+
+### Высота шапки (topbar) и нижней строки (sw-status-bar)
+
+Эти значения используются в CSS для расчёта отступов layout'а рабочего стола.
+
+| Элемент | Высота | Где задаётся |
+|---------|--------|-------------|
+| **Шапка (topbar)** | `80px` | `static/css/style.css` — комментарий `/* 80px = высота header */`, используется в `.page-index .panel { min-height: calc(100vh - 80px) }` |
+| **Нижняя строка (sw-status-bar)** | динамическая, `--sw-status-bar-height` (типично ~28px) | `static/js/sw_status_bar.js` — `position: fixed; bottom: 0; padding: 6px 10px; font-size: 12px; line-height: 1.2;`. Высота вычисляется через `getBoundingClientRect().height` и записывается в CSS-переменную `--sw-status-bar-height` на `document.documentElement`. |
+
+**Важно**: Нижняя строка создаётся динамически скриптом `sw_status_bar.js`. Её высота не фиксирована, а вычисляется после рендера. Все CSS-расчёты должны использовать `var(--sw-status-bar-height, 28px)` с fallback 28px.
+
+Эти две высоты используются в layout рабочего стола:
+- `top: 80px` — для `position: fixed` элементов, которые должны начинаться после шапки (например, `.tool-palette.tool-palette--desk`)
+- `height: calc(100vh - 80px - var(--sw-status-bar-height, 28px))` — для элементов, растянутых между шапкой и нижней строкой
+
+## Редактор диктанта в модальном окне (`DictationEditorModal`)
+
+### Файлы
+
+| Файл | Роль |
+|------|------|
+| [`templates/partials/dictation_editor_modal.html`](templates/partials/dictation_editor_modal.html) | HTML-шаблон: структура модалки редактора + структура `#newDictationFillModal` |
+| [`static/css/dictation_editor_modal.css`](static/css/dictation_editor_modal.css) | Стили редактора и fill modal |
+| [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js) | Вся логика: открытие/закрытие, таблица предложений, audio playback, save, fill modal |
+
+### Глобальный API
+
+```js
+window.DictationEditorModal = {
+  open(config),    // Открыть редактор с переданным конфигом
+  close(),        // Закрыть редактор
+  init(),         // Инициализация (вызывается автоматически при DOMContentLoaded)
+};
+
+window.NewDictationFillModal = {
+  open(editorConfig),  // Открыть fill modal поверх редактора
+  close(),             // Закрыть fill modal (если voice mode изменился — переключить закладку)
+  create(),            // Спарсить текст, заполнить редактор, переключить закладку
+};
+```
+
+### Конфиг `open(config)`
+
+Параметр `config` — объект со следующими полями:
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `dictationId` | `string` | ID диктанта (например `"dict_123"`) |
+| `originalLanguage` | `string` | Код языка оригинала (например `"en"`) |
+| `translationLanguage` | `string` | Код языка перевода (например `"ru"`) |
+| `title` | `string` | Название диктанта |
+| `level` | `string` | Уровень сложности (`"A1"`, `"A2"`, ...) |
+| `coverUrl` | `string` | URL обложки |
+| `sentences` | `Array` | Массив предложений (см. формат ниже) |
+| `audio_user_shared` | `string|null` | Имя файла shared audio |
+| `audio_order` | `string` | Режим озвучки: `""` (авто), `"f"` (файл), `"m"` (сам) |
+| `is_dialog` | `boolean` | Флаг диалога |
+| `show_explanation` | `boolean` | Показывать колонку explanation |
+| `isNewDictation` | `boolean` | Если `true` — после открытия редактора поверх показывается `#newDictationFillModal` |
+
+Формат элемента `sentences`:
+
+```js
+{
+  key: "000",           // строковый ключ предложения (3 цифры)
+  position: 1,          // порядковый номер
+  original: "Hello",    // текст оригинала
+  translation: "Привет", // текст перевода
+  audio: "",            // имя файла аудио (оригинал)
+  audio_original: "",
+  audio_translation: "",
+  audio_file: null,     // имя файла для режима "файл"
+  audio_mic: null,      // имя файла для режима "сам"
+  start: "",            // время начала (для регионов waveform)
+  end: "",              // время конца
+  checked: false,
+  explanation: "",
+  speaker: "1",
+}
+```
+
+### Жизненный цикл
+
+1. **`open(config)`**:
+   - Если модалка уже открыта — сначала закрывает (чистит состояние)
+   - Сохраняет `config` в `state.config`
+   - Сбрасывает shared/self audio состояние, waveform
+   - Создаёт `DictationContent` (через `DictationRuntime.getOrCreateContent()` или `new DictationContent()`, или fallback-объект)
+   - Показывает модалку (`modal.style.display = 'flex'`)
+   - Инициализирует все подсистемы: `_setupUserSection()`, `_initLanguageFlags()`, `_initFormFields()`, `_initLevelSelector()`, `_initVoiceModeRadios()`, `_initCoverUpload()`, `_initHaveAudioTab()`, `_initAutoAudioTab()`, `_initSelfAudioTab()`, `_setupTabs()`, `_renderTable()`, `_renderTranslationsTable()`, `_updateAutoRegenerateAllBtnVisibility()`, `_bindAudioPlaybackHandlers()`, `_setupTableControls()`
+   - Инициализирует `AudioManager`
+   - Восстанавливает shared/self audio из данных предложений
+   - Переключает закладку согласно `audio_order`
+   - **Если `config.isNewDictation === true`** — через `setTimeout(100ms)` вызывает `window.NewDictationFillModal.open(config)`
+
+2. **`close()`**:
+   - Скрывает модалку
+   - Разблокирует скролл body
+   - Устанавливает `state.isOpen = false`
+
+3. **`_handleSave()`**:
+   - Проверяет dirty flags (`db`, `audio`, `cover`)
+   - Собирает `saveData`:
+     - `id`, `temp_id` — нормализованный ID диктанта
+     - `language_original`, `language_translation` — из config
+     - `title`, `level`, `is_dialog`
+     - `audio_user_shared` — из `state._sharedAudioFilename`
+     - `audio_order` — из выбранного radio
+     - `sentences` — объект вида `{ [langCode]: { title, sentences: [...] } }`
+     - **`book_id`** — читается из `sessionStorage['dictationTargetBook']` (устанавливается при создании нового диктанта через `setDictationTargetBook()`)
+     - **`cover_b64`** — если cover dirty, получает blob через `CoverManager.getCroppedBlob()`, конвертирует в base64 через `_blobToBase64()` и добавляет в saveData
+   - Этап 1: сохраняет текст/БД + cover через `POST /save_dictation_final` (cover передаётся как `cover_b64` в JSON)
+   - Этап 2: сохраняет аудио через `_uploadDraftAudioToB2()` (загрузка из CacheStorage в B2)
+   - После успешного save: сбрасывает dirty flags, обновляет `state.config.dictationId` из ответа сервера, вызывает `window.Desktop.loadDeskItems()` для обновления десктопа
+
+### Внутреннее состояние (`state`)
+
+```js
+const state = {
+  isOpen: false,
+  config: null,           // конфиг, переданный в open()
+  content: null,          // экземпляр DictationContent
+  currentDictation: {},   // { is_dialog, show_explanation }
+  dirtyFlags: { db: false, audio: false, cover: false },
+  headerLangPairSelector: null,  // экземпляр LanguageSelector
+  _sharedAudioFilename: null,
+  _sharedAudioUrl: null,
+  _sharedAudioDuration: null,
+  _sharedAudioFile: null,
+  _selfAudioFilename: null,
+  _selfAudioUrl: null,
+  _selfAudioDuration: null,
+  _selfAudioFile: null,
+  _micRecorder: null,     // экземпляр UnifiedSpeechRecognition
+};
+```
+
+### Таблица предложений
+
+- Рендерится функцией `_renderTable()` в `#editorModalSentencesTable`
+- Колонки: позиция, play/audio, оригинал, перевод, audio_file, audio_mic, start, end, chain, checked, explanation, speaker
+- Видимость колонок управляется `_applyTableViewForTab(tabName)`:
+  - `general` — все колонки
+  - `voice-original-auto` — скрыты audio_file, audio_mic
+  - `voice-original-have` — показана audio_file, скрыта audio_mic
+- Навигация: `_navigateToPreviousRow()`, `_navigateToNextRow()`, `_selectSentenceRow()`
+- Добавление строк: `_addNewRow(position)` — открывает `#addRowModal` (модальное окно добавления строки)
+- Удаление строк: `_deleteRow(row)` — через `DesktopConfirmModal`
+- **Умный поиск ключа**: `_findFreeKey()` — находит наименьший незанятый числовой ключ (`s_0`, `s_1`, ...) среди существующих предложений
+
+### Audio playback
+
+- Использует `AudioManager` (глобальный синглтон, инициализируется через `_ensureAudioManager()`)
+- Три режима (radio):
+  - **auto** (закладка 2): TTS-генерация через `POST /generate_audio`, кнопки "Сгенерировать всё" и "Перегенерировать всё"
+  - **have** (закладка 3): загрузка shared audio файла, waveform (wavesurfer), регионы (start/end), split/smart-split
+  - **self** (закладка 4 — удалена): запись с микрофона через `UnifiedSpeechRecognition` — функциональность сохранена, но отдельной закладки больше нет
+- Playback: `_handleAudioPlayback()` → `am.play(button, audioUrl, ...)`
+- Cut audio: `_handleSelfCutAudio()` — получает `audio_mic` из текущего предложения, загружает blob через `AudioManager.loadDictationAudioBlob()` из CacheStorage, отправляет на `POST /cut-audio`, после cut перезагружает waveform через `_loadSelfAudioForRow()`
+
+### Voice mode radios
+
+- Три radio: `auto` (значение `""`), `have` (значение `"f"`), `self` (значение `"m"`)
+- **Радио больше не управляет видимостью закладок** — все закладки (1, 2, 3, 5) всегда видны
+- При смене radio:
+  - Вызывается `_applyTableViewForTab()` для переключения колонок таблицы
+  - Показывается/скрывается кнопка "Перезаполнить все авто" (`#editorModalAutoRegenerateAllBtn`) через `_updateAutoRegenerateAllBtnVisibility()`
+  - Устанавливается dirty flag
+- Закладка 4 ("Озвучка оригинала (сам)") **удалена** — функциональность self audio сохранена, но отдельной закладки больше нет
+
+### LanguageSelector
+
+- Инициализируется в `_initLanguageFlags()` через `window.initLanguageSelector('editorModalLangPair', { mode: ... })`
+- Использует `window.LanguageManager` для получения данных о языках
+- Режим зависит от количества языков перевода:
+  - **0 языков перевода** (только оригинал): `flag-single` — только флаг оригинала
+  - **1 язык перевода**: `flag-pair-fixed` — два флага (оригинал и перевод) без выпадающих списков
+  - **2+ языков перевода**: `flag-pair-dropdown` с `rightDropdown: true` — левый флаг фиксирован (оригинал), правый — выпадающий список для выбора языка перевода
+
+### DictationContent
+
+Абстракция для хранения предложений диктанта. Может быть:
+- Экземпляром `DictationRuntime.getOrCreateContent()` (если DictationRuntime доступен)
+- Экземпляром `new DictationContent()` (если класс определён)
+- Fallback-объектом с методами `getAllSentenceCores()`, `getSentence(key)`, `getAllKeys()`, `setSentences()`
+
+### Dirty flags (система сохранения)
+
+- `state.dirtyFlags = { db: false, audio: false, cover: false }`
+- `_setDirtyFlags(next)` — устанавливает флаги и обновляет звёздочку
+- `_hasUnsavedChanges()` — проверяет, есть ли хотя бы один dirty флаг
+- `_updateUnsavedStar()` — обновляет визуальный индикатор (звёздочка у кнопки сохранения)
+- При сохранении:
+  1. Если `db` dirty → `POST /save_dictation_final` (включая `cover_b64` в JSON)
+  2. Если `audio` dirty → `_uploadDraftAudioToB2()`
+  3. Если `cover` dirty → cover передаётся как `cover_b64` внутри `save_dictation_final` (отдельного endpoint для cover нет)
+- **Флоу cover**:
+  1. Пользователь выбирает файл → `CoverManager.handleCoverSelect()` → открывается crop modal
+  2. После подтверждения crop → `CoverManager.handleCropConfirm()` → вызывает `onConfirm(blob)` и `onDirty()`
+  3. `onDirty()` устанавливает `dirtyFlags.cover = true`
+  4. При сохранении: `CoverManager.getCroppedBlob()` → `_blobToBase64()` → `cover_b64` в `saveData`
+  5. Сервер (`save_dictation_final`) декодирует `cover_b64` и сохраняет как `cover.webp` в temp-папку
+  6. Существующая логика копирует `cover.webp` из temp в финальную папку (`static/data/dictations/<dictation_id>/cover.webp`) и в B2 (`dictations_covers/<numeric_id>.webp`)
+
+### Управление языками перевода (вкладка 5)
+
+**Вкладка 5 "Озвучка перевода (авто)"** — таблица языков перевода с кнопками +/−.
+
+**`_renderTranslationsTable()`** — рендерит таблицу `#editorModalTranslationsTable`:
+- Каждая строка: название языка + кнопка удаления (мусорник)
+- Кнопка `+` (`#editorModalAddTranslationBtn`) — открывает `#addTranslationModal`
+
+**`_openAddTranslationModal()`** — открывает модальное окно добавления языка:
+- LanguageSelector с фильтром: только языки, которых ещё нет в `state.content.langBlocks`
+- Кнопка "Добавить" → `_handleAddTranslationConfirm()`
+
+**`_handleAddTranslationConfirm()`** — асинхронный процесс:
+1. Добавляет новый `langBlock` в `state.content.langBlocks`
+2. Для каждого существующего предложения (оригинал) делает автоперевод через `POST /translate`
+3. Для каждого перевода генерирует TTS-аудио через `POST /generate_audio`
+4. Сохраняет blob URL через `AudioManager._setObjectUrlForCanonical()`
+5. Обновляет таблицу языков (`_renderTranslationsTable()`) и флаги (`_initLanguageFlags()`)
+
+**`_openRemoveTranslationModal(langCode)`** — подтверждение удаления через `DesktopConfirmModal`
+
+**`_removeTranslationLanguage(langCode)`** — удаляет `langBlock` из `state.content.langBlocks`, обновляет таблицу и флаги
+
+### Модальное окно добавления строки (`#addRowModal`)
+
+Открывается при нажатии `+` в панели управления таблицей (вместо старого `DesktopConfirmModal`).
+
+**Структура:**
+- Поле ввода для текста оригинала
+- Enter в поле оригинала → автоперевод для всех языков перевода через `POST /translate`
+- Таблица `#addRowModalTranslationsTable` — строки для каждого языка перевода с полями ввода
+- Кнопка "Создать" → `_handleAddRowCreate()`
+
+**`_handleAddRowCreate()`**:
+1. Находит свободный ключ через `_findFreeKey()`
+2. Создаёт `sentence` для оригинала и для каждого языка перевода
+3. Если выбран режим `auto` — генерирует TTS-аудио через `_generateAudioForSentence()`
+4. Добавляет строку в таблицу через `_renderTable()`
+5. Закрывает модалку
+
+**`_generateAudioForSentence(key, lang, text, dictationId)`** — асинхронная генерация TTS:
+1. Вызывает `POST /generate_audio` с `{ dictation_id, lang, text, filename: "tts_{key}_{timestamp}.mp3" }`
+2. Сохраняет blob через `AudioManager.saveDictationAudioBlob()`
+3. Устанавливает blob URL через `AudioManager._setObjectUrlForCanonical()`
+
+### NewDictationFillModal (начальное заполнение)
+
+Открывается поверх `#dictationEditorModal` при создании нового диктанта (`isNewDictation: true`).
+
+**Структура HTML** (`#newDictationFillModal`):
+
+```
+┌─────────────────────────────────────────────────┐
+│ Row 1: Header                                   │
+│ [ID: новий] [Назва диктанту...] [Створити] [X] │
+├─────────────────────────────────────────────────┤
+│ Row 2: Two panels                               │
+│ ┌─ Left panel ───────────┐ ┌─ Right panel ───┐ │
+│ │ [🇺🇸 ▼] ↔ [🇷🇺 ▼]       │ │ Режим озвучки:  │ │
+│ │ Префікс перекладу: [//] │ │ ○ Авто          │ │
+│ └─────────────────────────┘ │ ○ Є файл        │ │
+│                              │ ○ Запишу сам    │ │
+│                              └─────────────────┘ │
+├─────────────────────────────────────────────────┤
+│ Row 4: Text section                             │
+│ Текст диктанту:                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Hello world                                 │ │
+│ │ //Привіт світ                               │ │
+│ │ How are you?                                │ │
+│ │ //Як справи?                                │ │
+│ └─────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────┘
+```
+
+**Методы `NewDictationFillModal`:**
+
+| Метод | Описание |
+|-------|----------|
+| `open(editorConfig)` | Сбрасывает поля, инициализирует LanguageSelector, включает подсветку строк перевода, показывает модалку |
+| `close()` | Скрывает модалку. Если voice mode изменился относительно `_initialVoiceMode` — вызывает `_refillAndApply()` |
+| `create()` | Парсит текст, заполняет `editorConfig`, вызывает `_updateEditorFromFillConfig()`, переключает закладку через `_switchTabByVoiceMode()` |
+| `_switchTabByVoiceMode(mode)` | Переключает закладку редактора: `auto` → general, `file` → voice-original-have, `self` → voice-original-self |
+| `_refillAndApply(newMode)` | Обновляет `audio_order` в config, переключает закладку, синхронизирует radio в редакторе |
+| `_getSelectedLanguages()` | Возвращает `{ original, translation }` из LanguageSelector |
+| `_initLanguageSelector()` | Инициализирует `window.initLanguageSelector('newDictationFillLangPair', { mode: 'flag-pair-dropdown-both', ... })` с языками по умолчанию из профиля пользователя |
+| `_setupTextareaHighlighting()` | Подсвечивает строки, начинающиеся с делимитера (например `//`), зелёным цветом (класс `.line-translation`) |
+
+**Алгоритм `create()`:**
+
+1. Получить текст из `#newDictationFillText`
+2. Получить делимитер из `#newDictationFillDelimiter`
+3. Получить языки из LanguageSelector
+4. Получить название из `#newDictationFillTitle`
+5. Получить voice mode из radio
+6. Разбить текст на строки, пропуская пустые
+7. Для каждой строки:
+   - Если строка начинается с делимитера — это перевод без оригинала (пропустить)
+   - Иначе — оригинал. Проверить следующую строку: если она начинается с делимитера — это перевод
+   - Создать объекты `origSentence` и `trSentence` с одинаковым key
+8. Определить `audio_order` по voice mode
+9. Обновить `editorConfig` (title, languages, sentences, audio_order)
+10. Вызвать `_updateEditorFromFillConfig(config)` — обновить заголовок, языки, radio, перерисовать таблицу
+11. Вызвать `_switchTabByVoiceMode(voiceMode)` — переключить закладку
+
+**`_updateEditorFromFillConfig(config)`:**
+
+- Обновляет `state.config`
+- Устанавливает текст заголовка в `#dictation-editor-modal-name`
+- Заполняет поле ввода названия
+- Обновляет LanguageSelector через `state.headerLangPairSelector.setValues()`
+- Устанавливает radio voice mode и триггерит `change` event
+- Вызывает `_renderTable()` и `_updateUnsavedStar()`
+
+### Точки входа для создания нового диктанта
+
+1. **Кнопка "+" на рабочем столе** (`data-action="desktop-new"`):
+   - [`static/js/desktop.js`](static/js/desktop.js:493) → `stubAction('desktop-new')`
+   - Находит workbook пользователя через `GET /library/api/user-books`
+   - Сохраняет `{ book_id: wbId }` в `sessionStorage['dictationTargetBook']`
+   - Вызывает `DictationEditorModal.open({ isNewDictation: true, ... })`
+
+2. **Модалка книги → "..." → "Додати диктант"**:
+   - [`static/js/book_modal.js`](static/js/book_modal.js:1257) → обработчик `add-dictation`
+   - Вызывает `setDictationTargetBook(bookId)` (сохраняет в `sessionStorage`)
+   - Вызывает `DictationEditorModal.open({ isNewDictation: true, ... })`
+
+3. **Модалка книги → разделы → "..." → "Новий диктант"**:
+   - [`static/js/book_modal.js`](static/js/book_modal.js:1351) → `buildSectionNode()` с меню
+   - Вызывает `setDictationTargetBook(sectionId)` (диктант добавляется в раздел)
+   - Вызывает `DictationEditorModal.open({ isNewDictation: true, ... })`
+
+### Механизм workbook (робочий зошит)
+
+- `setDictationTargetBook(bookId)` — сохраняет `{ book_id: Number(bookId) }` в `sessionStorage['dictationTargetBook']`
+- При сохранении диктанта (`_handleSave()`) — `book_id` читается из `sessionStorage` и добавляется в `saveData`
+- Сервер (`POST /save_dictation_final`) обрабатывает `book_id` и добавляет диктант в указанную книгу/раздел
+- После сохранения `sessionStorage['dictationTargetBook']` **не очищается** — может быть переиспользован при следующем создании
+
+### Z-index иерархия
+
+- `#dictationEditorModal`: `z-index: 100249` (в `static/css/desktop.css`)
+- `#dictationEditorModal.dictation-editor-modal`: `z-index: 100249` (в `static/css/dictation_editor_modal.css`)
+- `#newDictationFillModal`: `z-index: 100310` (в `static/css/dictation_editor_modal.css`)
+- Fill modal открывается **поверх** редактора, но **ниже** `#auto-toast` (200500)
 
 ## Service Worker
 
@@ -348,9 +696,44 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 - единая точка правды для UI-операций с обложками (выбор файла, crop modal, формирование `Blob` для upload, preview).
 
-Важно:
+**API `window.CoverManager`:**
 
-- Page-код (private library / dictation / editor / profile) не должен дублировать логику crop/preview.
+| Метод | Описание |
+|-------|----------|
+| `bind(config)` | Привязывает обработчики к элементам UI: file input, upload button, preview img, crop modal. Возвращает `{ unbind() }` |
+| `getCroppedBlob()` | Возвращает `Blob` обрезанного изображения (или `null`, если crop не выполнялся) |
+| `handleCoverSelect(event)` | Обработчик выбора файла — читает файл как data URL и открывает crop modal |
+| `openCropModal(imageSrc)` | Открывает crop modal с Cropper.js |
+| `handleCropConfirm()` | Подтверждает crop — создаёт canvas, формирует blob, вызывает `onConfirm(blob)` и `onDirty()` |
+| `closeCropModal(clearBlob)` | Закрывает crop modal |
+| `getCoverUrl(dictationId, languageCode)` | Строит URL обложки: `/api/dictations_covers/<id>.webp` |
+| `prefetchUrls(urls)` | Prefetch массивов URL через `fetch()` + CacheStorage |
+
+**Параметры `bind(config)`:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| `fileInputId` | `string` | ID `<input type="file">` |
+| `uploadBtnId` | `string` | ID кнопки загрузки |
+| `previewImgId` | `string` | ID `<img>` для preview |
+| `modalId` | `string` | ID crop modal |
+| `cropImageId` | `string` | ID `<img>` внутри crop modal |
+| `closeBtnId` | `string` | ID кнопки закрытия |
+| `cancelBtnId` | `string` | ID кнопки отмены |
+| `confirmBtnId` | `string` | ID кнопки подтверждения |
+| `aspectRatio` | `number` | Соотношение сторон (например `1` для квадрата) |
+| `outputWidth` | `number` | Ширина выходного изображения в px |
+| `outputHeight` | `number` | Высота выходного изображения в px |
+| `outputType` | `string` | MIME-тип (например `'image/webp'`) |
+| `outputQuality` | `number` | Качество (0-1) |
+| `onConfirm(blob)` | `function` | Колбэк при подтверждении crop |
+| `onDirty()` | `function` | Колбэк при изменении (устанавливает dirty flag) |
+
+**Важно:**
+
+- `CoverManager` **не загружает** обложку на сервер. Он только crops и предоставляет `Blob`.
+- Загрузка на сервер происходит внутри `_handleSave()` редактора: blob → base64 → `cover_b64` в `save_dictation_final`.
+- Page-код не должен дублировать логику crop/preview.
 - Экспортируемый глобальный объект: `window.CoverManager`.
 
 ### `static/js/idb_manager.js`
@@ -371,32 +754,9 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 # Поток данных: создание/редактирование текста и переводов
 
-## A) Загрузка редактора
+Редактор диктанта работает в модальном окне [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js). Данные передаются через `config` при вызове `open(config)`. Внутреннее состояние хранится в локальном `state` (не в глобальных переменных страницы).
 
-1) Backend отдаёт HTML редактора.
-2) В HTML присутствует `init-data` JSON (bootstrap-данные, встроенные сервером в страницу при первом рендере).
-3) Frontend:
-
-- выставляет `currentDictation.language_original`
-- выставляет `currentDictation.language_translation` (эффективный default)
-- заполняет `workingData.original` (оригинал)
-- заполняет `workingData.translations[lang]` для всех языков из `translations_data`
-
-## B) Создание/правка перевода
-
-1) Пользователь добавляет новый язык перевода.
-2) Frontend создаёт bucket `workingData.translations[newLang]`.
-3) UI:
-
-- таблица внизу должна отображать активный перевод
-- **шапка языков** должна синхронизироваться с активным переводом
-
-Текущее отклонение (БАГ):
-
-- таблица внизу меняется, а шапка продолжает показывать старый язык (русский).
-- это означает рассинхрон между:
-  - моделью `currentDictation.language_translation`
-  - и компонентом header/LanguageSelector
+**Важно**: старого page-кода с `workingData`/`currentDictation` больше нет. Все данные живут в `state.config` и `state.content` (экземпляр `DictationContent`).
 
 # Поток данных: аудио
 
@@ -421,7 +781,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 ### Как клиент загружает аудио в B2 без дублирования
 
-Сейчас реализовано в `static/js/script_dictation_editor.js` (позже это будет перенесено в `AudioManager`).
+Реализовано в [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js) (функция `_uploadDraftAudioToB2()`) и в [`static/js/audio_manager.js`](static/js/audio_manager.js) (метод `uploadDictationAudioFromCacheToB2()`).
 
 Алгоритм:
 
@@ -455,7 +815,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Реализация:
 
-1) После успешного `save_dictation_final` клиент собирает `keep_remote_paths` из текущего `workingData`:
+1) После успешного `save_dictation_final` клиент собирает `keep_remote_paths` из текущих данных редактора (`state.content`):
 
 - берутся поля `audio`, `audio_avto`, `audio_mic`, `audio_user` (и `audio_user_shared` если используется)
 - значения нормализуются до `filename` (basename)
@@ -488,24 +848,25 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 # Хранилища на клиенте
 
-## 1) Page-level переменные (состояние страницы)
+## 1) Локальное состояние модуля (редактор)
 
-- `currentDictation` — общие данные диктанта (id, языки, флаги, настройки).
-- `workingData` — данные по предложениям и переводам (массивы предложений по языкам).
-- `blob:` objectURL
+В [`dictation_editor_modal.js`](static/js/dictation_editor_modal.js) состояние хранится в замыкании модуля (`state`):
 
-Правило:
+- `state.config` — конфиг, переданный в `open()`
+- `state.content` — экземпляр `DictationContent` (предложения)
+- `state.dirtyFlags` — флаги несохранённых изменений
+- `state._sharedAudioFilename`, `state._sharedAudioUrl`, `state._selfAudioFilename`, `state._selfAudioUrl` — аудио-состояние
 
-- Не заводить параллельные глобальные переменные с теми же значениями (id/языки/активный перевод). Должен быть один источник истины для состояния страницы.
+**Важно**: глобальных переменных страницы (`workingData`, `currentDictation`) больше нет. Всё состояние инкапсулировано в модуле.
 
 Плюсы:
 
-- быстро
-- просто
+- изоляция: разные экземпляры не конфликтуют
+- нет риска случайного перезатирания из другого скрипта
 
 Минусы:
 
-- всё теряется при reload
+- всё теряется при reload (но редактор — модальное окно, не страница)
 
 ## 2) CacheStorage (Service Worker)
 
@@ -537,7 +898,7 @@ description: Dictation Editor Architecture (dataflow, caching, audio)
 
 Проблема сейчас:
 
-- BUILD-номер меняется «по файлам» (например в `script_dictation_editor.js`, `private_library.js` и т.д.).
+- BUILD-номер меняется «по файлам» (например в `dictation_editor_modal.js`, `dictation_modal.js` и т.д.).
 - Это приводит к:
   - дублированию
   - риску забыть обновить где-то
@@ -690,9 +1051,7 @@ Email-инвайты:
 
 ### Как ученик видит "План" (frontend)
 
-Файл: `static/js/private_library.js`.
-
-- UI показывает задания на выбранную дату.
+UI показывает задания на выбранную дату (реализовано в модалке "План").
 - Данные берутся из `GET /api/assignments/student/my?date=...`.
 - В ответе приходит список заданий, включающий:
   - `dictation_id`, `dictation_title`, `dictation_level`, `dictation_cover_url`
@@ -1340,15 +1699,18 @@ DO UPDATE SET
 # Приложение: карта файлов (минимальная)
 
 - Backend:
-  - `routes/dictation_editor.py`
-  - `routes/dictation.py`
-  - `helpers/db_dictations.py`
-  - `helpers/b2_storage.py` должен перестать работать с B2 должны остаться только файлы миграции (очистки хранилища) может вообще будем жить без него
-- Frontend:
-  - `static/js/script_dictation_editor.js`
-  - `static/js/audio_manager.js`
-  - `static/js/cover_manager.js`
-  - `static/js/idb_manager.js`
-  - `static/js/private_library.js`
+  - [`routes/dictation_editor.py`](routes/dictation_editor.py) — API редактора: save, translate, generate_audio, cut-audio, split-audio, reserve_id
+  - [`routes/dictation.py`](routes/dictation.py) — API диктанта: получение данных, аудио, транскрибация
+  - [`helpers/db_dictations.py`](helpers/db_dictations.py) — CRUD для диктантов/предложений
+  - [`helpers/b2_storage.py`](helpers/b2_storage.py) — B2 storage (может быть удалён в будущем)
+- Frontend (редактор):
+  - [`static/js/dictation_editor_modal.js`](static/js/dictation_editor_modal.js) — редактор диктанта в модальном окне (замена `script_dictation_editor.js`)
+  - [`static/js/audio_manager.js`](static/js/audio_manager.js) — управление аудио (воспроизведение, кэш, B2 upload)
+  - [`static/js/cover_manager.js`](static/js/cover_manager.js) — crop обложек
+  - [`static/js/idb_manager.js`](static/js/idb_manager.js) — IndexedDB abstraction
+- Frontend (desktop):
+  - [`static/js/desktop.js`](static/js/desktop.js) — рабочий стол (замена `private_library.js`)
+  - [`static/js/book_modal.js`](static/js/book_modal.js) — модалка книги
+  - [`static/js/dictation_modal.js`](static/js/dictation_modal.js) — модалка выполнения диктанта
 - Service Worker:
-  - `sw.js`
+  - [`sw.js`](sw.js)

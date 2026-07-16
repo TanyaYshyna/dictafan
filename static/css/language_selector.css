@@ -176,6 +176,12 @@
     flex: 0 0 auto;
 }
 
+.learning-flag-checkbox i[data-lucide],
+.learning-flag-checkbox svg {
+    width: 22px !important;
+    height: 22px !important;
+}
+
 .models-centric-test-recording {
     margin-top: 12px;
     display: flex;

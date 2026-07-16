@@ -492,6 +492,74 @@ window.Desktop = window.Desktop || {
         })();
         return;
       }
+      if (name === 'desktop-new') {
+        (async () => {
+          try {
+            // Знайти workbook (робочу зошит) користувача
+            let wbId = window.__desktopWorkbookId;
+            if (!wbId) {
+              try {
+                const token = window.UM && window.UM.token ? window.UM.token : localStorage.getItem('jwt_token');
+                if (token) {
+                  const resp = await fetch('/library/api/user-books', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                  });
+                  const j = await resp.json();
+                  const own = (j && j.success) ? (j.own_books || []) : [];
+                  const wb = Array.isArray(own) ? own.find(function(b) { return b && b.is_workbook; }) : null;
+                  wbId = wb && wb.id ? Number(wb.id) : null;
+                  if (wbId) window.__desktopWorkbookId = wbId;
+                }
+              } catch (e0) {}
+            }
+            if (wbId) {
+              try {
+                sessionStorage.setItem('dictationTargetBook', JSON.stringify({ book_id: wbId }));
+              } catch (e1) {}
+            }
+
+            // Резервируем ID диктанта на сервере
+            var reservedId = '';
+            var reservedDbId = null;
+            try {
+              var token = window.UM && window.UM.token ? window.UM.token : localStorage.getItem('jwt_token');
+              if (token) {
+                var reserveResp = await fetch('/api/dictation/reserve_id', {
+                  headers: { 'Authorization': 'Bearer ' + token }
+                });
+                var reserveData = await reserveResp.json();
+                if (reserveData.success && reserveData.dictation_id) {
+                  reservedId = reserveData.dictation_id;
+                  reservedDbId = reserveData.id;
+                  console.log('[desktop] Зарезервирован ID диктанта:', reservedId);
+                }
+              }
+            } catch (e2) {
+              console.warn('[desktop] Ошибка резервирования ID диктанта:', e2);
+            }
+
+            // Відкрити редактор для нового диктанта
+            if (window.DictationEditorModal && typeof window.DictationEditorModal.open === 'function') {
+              window.DictationEditorModal.open({
+                isNewDictation: true,
+                dictationId: reservedId,
+                dbId: reservedDbId,
+                originalLanguage: '',
+                translationLanguage: '',
+                title: '',
+                level: '',
+                coverUrl: '',
+                sentences: [],
+                audio_user_shared: null,
+                audio_order: '',
+              });
+            }
+          } catch (e) {
+            console.error('[desktop] desktop-new error', e);
+          }
+        })();
+        return;
+      }
       console.log('[desktop] action', name);
     } catch (e) {
     }
@@ -752,6 +820,12 @@ window.Desktop = window.Desktop || {
         }
       })();
       if (data && data.success && Array.isArray(data.items)) {
+        // Обновляем кеш ID диктантов на столе для isDictationOnDesk
+        try {
+          window.__deskItemIds = data.items.map(function (item) { return Number(item.dictation_id); }).filter(function (id) { return Number.isFinite(id) && id > 0; });
+        } catch (e) {
+        }
+
         this.renderDeskCards(data.items);
         try {
           if (typeof window.idbPut === 'function') {
@@ -812,7 +886,7 @@ window.Desktop = window.Desktop || {
     const tryInit = () => {
       try {
         if (!window.DesktopStatsPanel || typeof window.DesktopStatsPanel.init !== 'function') return false;
-        const container = document.querySelector('.desk-zone');
+        const container = document.querySelector('.topbar');
         if (!container) return false;
         window.DesktopStatsPanel.init(container);
         return true;

@@ -397,105 +397,11 @@ class UserManager {
       usernameElement.textContent = userData.username || 'Пользователь';
     }
 
-    let hideActivity = false;
+    // daily-activity-progress удалён (устаревший элемент)
     try {
-      const p = String(window.location && window.location.pathname ? window.location.pathname : '');
-      hideActivity = p.startsWith('/user/profile') || p.startsWith('/dictation_editor') || p.startsWith('/desktop');
-    } catch (e) {
-      hideActivity = false;
-    }
-
-    // Build a compact activity badge (daily progress + streak) to avoid tall header rows
-    let activityBadge = null;
-    try {
-      const activityContainer = userInfo || userSection;
-      if (hideActivity) {
-        const existing = userSection.querySelector('.user-activity-badge');
-        if (existing) {
-          try { existing.remove(); } catch (e2) {}
-        }
-        activityBadge = null;
-      } else {
-      activityBadge = activityContainer.querySelector('.user-activity-badge');
-      if (!activityBadge) {
-        activityBadge = document.createElement('div');
-        activityBadge.className = 'user-activity-badge';
-        const usernameEl = activityContainer.querySelector('.username');
-        if (usernameEl && usernameEl.parentElement) {
-          let wrap = null;
-          try {
-            if (typeof usernameEl.closest === 'function') {
-              wrap = usernameEl.closest('.dropdown-menu-wrapper');
-            }
-          } catch (e) {
-            wrap = null;
-          }
-          if (wrap && wrap.parentElement === activityContainer) {
-            wrap.insertAdjacentElement('afterend', activityBadge);
-          } else {
-            usernameEl.insertAdjacentElement('afterend', activityBadge);
-          }
-        } else {
-          const logoutBtn = activityContainer.querySelector('#logoutBtn');
-          if (logoutBtn && logoutBtn.parentElement) {
-            logoutBtn.insertAdjacentElement('beforebegin', activityBadge);
-          } else {
-            activityContainer.appendChild(activityBadge);
-          }
-        }
-      }
-
-      // Move streak button inside the badge for consistent layout
-      const streakEl = userSection.querySelector('.streak');
-      if (streakEl && streakEl.parentElement !== activityBadge) {
-        activityBadge.appendChild(streakEl);
-      }
-      }
-    } catch (e) {
-    }
-
-    // Daily activity plan: show as today/goal near username
-    try {
-      if (hideActivity) {
-        const existing = userSection.querySelector('.daily-activity-progress');
-        if (existing) {
-          try { existing.remove(); } catch (e2) {}
-        }
-      } else {
-        const todayTotal = Number(userData?.today_activity_total);
-        const goal = Number(userData?.daily_activity_goal);
-        const todayOk = Number.isFinite(todayTotal) && todayTotal >= 0;
-        const goalOk = Number.isFinite(goal) && goal > 0;
-
-        let el = userSection.querySelector('.daily-activity-progress');
-        if (!el) {
-          el = document.createElement('span');
-          el.className = 'daily-activity-progress';
-          if (activityBadge && !hideActivity) {
-            activityBadge.appendChild(el);
-          } else if (usernameElement && usernameElement.parentElement) {
-            usernameElement.parentElement.appendChild(el);
-          }
-        }
-
-        if (el) {
-          if (todayOk && goalOk) {
-            el.textContent = `${todayTotal}/${goal}`;
-            el.style.display = 'inline';
-          } else {
-            el.textContent = '';
-            el.style.display = 'none';
-          }
-        }
-
-        if (activityBadge) {
-          // unified hint for the whole badge
-          if (todayOk && goalOk) {
-            activityBadge.title = `План на день: ${todayTotal}/${goal}`;
-          } else {
-            activityBadge.title = 'План на день';
-          }
-        }
+      const existing = userSection.querySelector('.daily-activity-progress');
+      if (existing) {
+        try { existing.remove(); } catch (e2) {}
       }
     } catch (e) {
     }
