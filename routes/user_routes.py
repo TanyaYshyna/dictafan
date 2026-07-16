@@ -559,6 +559,7 @@ def api_update_profile():
             return jsonify({'error': 'User not found'}), 404
         
         updates = request.get_json()
+        print(f"[api_update_profile] received updates. learning_languages: {updates.get('learning_languages')}")
         
         # Формируем словарь для обновления
         db_updates = {}
@@ -608,12 +609,15 @@ def api_update_profile():
         
         # Обновляем данные в БД
         if db_updates:
+            print(f"[api_update_profile] db_updates keys: {list(db_updates.keys())}, learning_languages in db_updates: {'learning_languages' in db_updates}")
             updated_user = update_user(current_email, db_updates)
             if not updated_user:
                 return jsonify({'error': 'Failed to update user'}), 500
         else:
             updated_user = user_db
         
+        print(f"[api_update_profile] response learning_languages: {updated_user.get('learning_languages', [])}")
+
         # Формируем ответ (без password_hash)
         user_response = {
             'id': updated_user['id'],

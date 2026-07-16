@@ -1809,6 +1809,7 @@ function initializeTopbarControls() {
 function checkForChanges() {
 try { window.checkForChanges = checkForChanges; } catch (e) {}
     const currentValues = getCurrentFormValues();
+    console.log('[checkForChanges] current.learning_languages:', JSON.stringify(currentValues.learning_languages), 'original.learning_languages:', JSON.stringify(originalData.learning_languages));
 
     const avatarChanged = (() => {
         try {
@@ -1878,6 +1879,7 @@ function getCurrentFormValues() {
         learningLanguages: originalData.learning_languages,
         currentLearning: originalData.current_learning
     };
+    console.log('[getCurrentFormValues] learning_languages:', JSON.stringify(languageValues.learningLanguages));
     const settings = getAudioSettingsFromDom();
     const audioSettings = {
         audio_start: settings.start || '',
@@ -2071,6 +2073,10 @@ async function saveProfile(options = {}) {
     const { afterSave } = options;
     const formValues = getCurrentFormValues();
 
+    console.log('[saveProfile] formValues.learning_languages:', JSON.stringify(formValues.learning_languages));
+    console.log('[saveProfile] originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
+    console.log('[saveProfile] hasUnsavedChanges:', hasUnsavedChanges);
+
     const hasAudioChanges = (
         (formValues.audio_start || '') !== (originalData.audio_start || '') ||
         (formValues.audio_exercise_mode || 'record') !== (originalData.audio_exercise_mode || 'record') ||
@@ -2081,6 +2087,7 @@ async function saveProfile(options = {}) {
         );
         
     if (!hasUnsavedChanges && !hasAudioChanges) {
+        console.log('[saveProfile] no changes, returning early');
         if (typeof afterSave === 'function') afterSave();
         return;
     }
@@ -2103,6 +2110,7 @@ async function saveProfile(options = {}) {
             learning_languages: formValues.learning_languages,
             current_learning: formValues.current_learning
         };
+        console.log('[saveProfile] updateData.learning_languages:', JSON.stringify(updateData.learning_languages));
 
         try {
             const flags = buildLearningFlagsFromLanguages(formValues.learning_languages);
@@ -2143,6 +2151,7 @@ async function saveProfile(options = {}) {
         showInfo(profileT('profile.common.saving_changes', null, 'Сохраняем изменения…'));
 
         const updatedUser = await UM.updateProfile(updateData);
+        console.log('[saveProfile] updatedUser.learning_languages:', JSON.stringify(updatedUser && updatedUser.learning_languages));
 
         try {
             if (updatedUser && updatedUser.avatar) originalData.avatar = updatedUser.avatar;
@@ -2306,6 +2315,7 @@ async function saveProfile(options = {}) {
         // Синхронизируем LanguageSelector с новыми данными (без перерисовки, чтобы не сбросить UI)
         try {
           const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
+          console.log('[saveProfile] syncing LanguageSelector with:', JSON.stringify(savedLearningLangs));
           if (learningListSelector && learningListSelector.options) {
             learningListSelector.options.learningLanguages = [...savedLearningLangs];
             learningListSelector.options.currentLearning = originalData.current_learning;
@@ -2320,8 +2330,9 @@ async function saveProfile(options = {}) {
         if (formValues.password) document.getElementById('password').value = '';
 
         passwordTouched = false;
-        checkForChanges();
+        console.log('[saveProfile] calling setUnsavedState(false)');
         setUnsavedState(false);
+        console.log('[saveProfile] after setUnsavedState(false), hasUnsavedChanges:', hasUnsavedChanges);
         pendingAvatarBlob = null;
         showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
 
@@ -2332,7 +2343,6 @@ async function saveProfile(options = {}) {
         showError(profileT('profile.errors.save_failed', { message: String(error && error.message ? error.message : '') }, 'Ошибка сохранения: ' + (error && error.message ? error.message : '')));
     } finally {
         isSavingProfile = false;
-        checkForChanges();
     }
 }
 
