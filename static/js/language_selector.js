@@ -65,7 +65,8 @@ class LanguageSelector {
             btn.dataset.disabled = disabled ? '1' : '0';
             btn.setAttribute('aria-pressed', checked ? 'true' : 'false');
             btn.disabled = Boolean(disabled);
-            btn.innerHTML = `<span class="universal-choice-icon" aria-hidden="true"></span>`;
+            btn.innerHTML = `<i data-lucide="${checked ? 'circle-check-big' : 'circle'}"></i>`;
+            try { if (window.lucide) window.lucide.createIcons({ root: btn }); } catch (e) { }
         } catch (e) {
         }
     }
@@ -260,7 +261,11 @@ class LanguageSelector {
     }
 
     createLearningFlags() {
-        const selected = new Set(Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : []);
+        const selected = new Set(
+            (Array.isArray(this.options.learningLanguages) ? this.options.learningLanguages : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+        );
         const current = String(this.options.currentLearning || '').trim().toLowerCase();
         const languages = Object.keys(this.languageData || {});
 

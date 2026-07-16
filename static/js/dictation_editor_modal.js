@@ -1781,37 +1781,28 @@ function _setupOverlayClose() {
  * Если изменений нет — закрывает сразу.
  */
 function _maybeCloseWithPrompt() {
-  console.log('[dictationEditorModal] _maybeCloseWithPrompt called, hasUnsavedChanges=' + _hasUnsavedChanges() + ', state.isOpen=' + state.isOpen);
   if (_hasUnsavedChanges()) {
     if (typeof window.DesktopConfirmModal !== 'undefined' && typeof window.DesktopConfirmModal.open === 'function') {
-      console.log('[dictationEditorModal] _maybeCloseWithPrompt: opening DesktopConfirmModal');
       window.DesktopConfirmModal.open({
         showSave: true,
         onDiscard: function () {
-          console.log('[dictationEditorModal] DesktopConfirmModal onDiscard: calling _closeEditorModal()');
           _closeEditorModal();
         },
         onSave: async function () {
-          console.log('[dictationEditorModal] DesktopConfirmModal onSave: starting _handleSave()');
           var ok = false;
           try {
             ok = await _handleSave();
-            console.log('[dictationEditorModal] DesktopConfirmModal onSave: _handleSave() returned ok=' + ok);
           } catch (e) {
             console.error('[dictationEditorModal] _handleSave error in onSave:', e);
           }
           if (ok) {
-            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: save ok, calling _closeEditorModal(), state.isOpen=' + state.isOpen);
             _closeEditorModal();
-          } else {
-            console.log('[dictationEditorModal] _maybeCloseWithPrompt onSave: save failed or no changes, not closing');
           }
         },
       });
       return;
     }
     // fallback без универсальной модалки
-    console.log('[dictationEditorModal] _maybeCloseWithPrompt: fallback confirm');
     var wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
     if (wantSave) {
       _handleSave().then(function () { _closeEditorModal(); }).catch(function () { _closeEditorModal(); });
@@ -1823,7 +1814,6 @@ function _maybeCloseWithPrompt() {
     }
     return;
   }
-  console.log('[dictationEditorModal] _maybeCloseWithPrompt: no unsaved changes, closing directly');
   _closeEditorModal();
 }
 
@@ -3777,13 +3767,9 @@ async function _loadSelfAudioForRow(sentence) {
 }
 
 function _closeEditorModal() {
-  console.log('[dictationEditorModal] _closeEditorModal() called, state.isOpen=' + state.isOpen);
   if (!state.isOpen) {
-    console.log('[dictationEditorModal] _closeEditorModal() пропущен: state.isOpen=false');
     return;
   }
-
-  console.log('[dictationEditorModal] _closeEditorModal() executing');
   state.isOpen = false;
   state.config = null;
   state.headerLangPairSelector = null;
