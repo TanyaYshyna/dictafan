@@ -14,6 +14,7 @@ class LanguageSelector {
     static FLAG_SIZE_LARGE = { width: 30, height: 20 };
 
     constructor(options = {}) {
+        console.log('[LanguageSelector constructor] mode:', options.mode, 'container:', options.container ? options.container.id || 'unknown' : 'null');
         this.options = {
             container: null,
             mode: 'native-selector', // 'native-selector', 'learning-selector', 'learning-list', 'flag-combo', 'header-selector', 'profile-panels'
