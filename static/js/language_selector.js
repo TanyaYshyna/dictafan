@@ -3124,11 +3124,13 @@ class LanguageSelector {
     }
 
     getValues() {
-        return {
+        const result = {
             nativeLanguage: this.options.nativeLanguage,
             learningLanguages: [...this.options.learningLanguages],
             currentLearning: this.options.currentLearning
         };
+        console.log('[LanguageSelector.getValues] mode:', this.options.mode, 'learningLanguages:', JSON.stringify(this.options.learningLanguages));
+        return result;
     }
 
     setValues(values) {

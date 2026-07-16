@@ -1600,6 +1600,10 @@ function initializeLanguageSelector() {
                 const cLangs = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : null;
                 const bLangs = (b && b.learningLanguages) ? b.learningLanguages : null;
                 console.log('[languageSelector.getValues] c (learningList):', JSON.stringify(cLangs), 'b (learningSelector):', JSON.stringify(bLangs), 'original:', JSON.stringify(originalData.learning_languages));
+                // Проверяем, совпадает ли learningListSelector.options.learningLanguages с тем, что вернул getValues
+                if (learningListSelector && learningListSelector.options) {
+                    console.log('[languageSelector.getValues] learningListSelector.options.learningLanguages:', JSON.stringify(learningListSelector.options.learningLanguages));
+                }
                 const learningLanguages = cLangs || bLangs || originalData.learning_languages;
                 const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
                 const baseCurrent = fromSelector ? fromSelector : String(originalData.current_learning || '');
