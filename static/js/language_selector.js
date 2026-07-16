@@ -1769,8 +1769,9 @@ class LanguageSelector {
 
                 const next = [...set];
                 next.sort();
+                console.log('[LanguageSelector][learning-flags] BEFORE set, this.options.learningLanguages:', JSON.stringify(this.options.learningLanguages), 'this === learningListSelector?', this === (typeof learningListSelector !== 'undefined' ? learningListSelector : null));
                 this.options.learningLanguages = next;
-                console.log('[LanguageSelector][learning-flags] click lang:', lang, 'hasLang:', hasLang, 'next:', JSON.stringify(next));
+                console.log('[LanguageSelector][learning-flags] AFTER set, this.options.learningLanguages:', JSON.stringify(this.options.learningLanguages));
 
                 const cur = String(this.options.currentLearning || '').trim().toLowerCase();
                 if (cur && !set.has(cur)) {
