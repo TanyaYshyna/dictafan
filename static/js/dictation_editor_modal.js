@@ -1823,7 +1823,8 @@ function _maybeCloseWithPrompt() {
     }
     return;
   }
-  console.log('[dictationEditorModal] _maybeCloseWithPrompt: no unsaved changes, closing directly');
+  console.log('[dictationEditorModal] _maybeCloseWithPrompt: no unsaved changes, closing directly, calling close()');
+  console.trace('[dictationEditorModal] _maybeCloseWithPrompt trace');
   close();
 }
 
@@ -3777,12 +3778,13 @@ async function _loadSelfAudioForRow(sentence) {
 }
 
 function close() {
+  console.log('[dictationEditorModal] close() called, state.isOpen=' + state.isOpen);
   if (!state.isOpen) {
     console.log('[dictationEditorModal] close() пропущен: state.isOpen=false');
     return;
   }
 
-  console.log('[dictationEditorModal] close()');
+  console.log('[dictationEditorModal] close() executing');
   state.isOpen = false;
   state.config = null;
   state.headerLangPairSelector = null;
