@@ -1520,9 +1520,9 @@ async function telegramApiRequest(path, options = {}) {
 let _languageSelectorInitialized = false;
 
 function initializeLanguageSelector() {
-    const nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
-    const learningContainer = document.getElementById('learningLanguageSelectorContainer');
-    const learningListContainer = document.getElementById('learningLanguagesListContainer');
+    let nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
+    let learningContainer = document.getElementById('learningLanguageSelectorContainer');
+    let learningListContainer = document.getElementById('learningLanguagesListContainer');
 
     if (!nativeContainer || !learningContainer) {
         console.error('❌ Контейнеры для LanguageSelector не найдены');
@@ -1534,17 +1534,31 @@ function initializeLanguageSelector() {
     try {
         const languageData = window.LanguageManager.getLanguageData();
 
-        // Если уже инициализированы — просто обновляем options и перерисовываем
+        // Если уже инициализированы — заменяем контейнеры на новые (это удаляет все старые обработчики событий)
         if (_languageSelectorInitialized && learningSelector && learningListSelector) {
-            console.log('=== LOG #2a: already initialized, clearing containers and recreating');
-            const opts = {
-                nativeLanguage: originalData.native_language,
-                learningLanguages: originalData.learning_languages,
-                currentLearning: originalData.current_learning,
-            };
-            nativeContainer.innerHTML = '';
-            learningContainer.innerHTML = '';
-            if (learningListContainer) learningListContainer.innerHTML = '';
+            console.log('=== LOG #2a: already initialized, replacing containers with new ones to remove old event listeners');
+            
+            // Создаём новые контейнеры-заменители
+            const newNativeContainer = document.createElement('div');
+            newNativeContainer.id = 'nativeLanguageSelectorContainer';
+            newNativeContainer.className = nativeContainer.className;
+            nativeContainer.parentNode.replaceChild(newNativeContainer, nativeContainer);
+            nativeContainer = newNativeContainer;
+
+            const newLearningContainer = document.createElement('div');
+            newLearningContainer.id = 'learningLanguageSelectorContainer';
+            newLearningContainer.className = learningContainer.className;
+            learningContainer.parentNode.replaceChild(newLearningContainer, learningContainer);
+            learningContainer = newLearningContainer;
+
+            if (learningListContainer) {
+                const newLearningListContainer = document.createElement('div');
+                newLearningListContainer.id = 'learningLanguagesListContainer';
+                newLearningListContainer.className = learningListContainer.className;
+                learningListContainer.parentNode.replaceChild(newLearningListContainer, learningListContainer);
+                learningListContainer = newLearningListContainer;
+            }
+            
             _languageSelectorInitialized = false;
         }
 
