@@ -16,6 +16,7 @@ let pendingAvatarBlob = null;
 let passwordTouched = false;
 
 let learningListSelector = null;
+let learningSelector = null;
 
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
@@ -1538,7 +1539,7 @@ function initializeLanguageSelector() {
             onLanguageChange: function () { checkForChanges(); }
         });
 
-        const learningSelector = new LanguageSelector({
+        learningSelector = new LanguageSelector({
             container: learningContainer,
             mode: 'learning-selector',
             nativeLanguage: originalData.native_language,
@@ -1817,11 +1818,20 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
         } catch (e) { return !!pendingAvatarBlob; }
     })();
 
+    const normalizeLangs = (langs) => {
+        try {
+            return (Array.isArray(langs) ? langs : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+                .sort();
+        } catch (e) { return []; }
+    };
+
     const diffs = {
         username: currentValues.username !== originalData.username,
         password: passwordTouched && currentValues.password !== '',
         native_language: currentValues.native_language !== originalData.native_language,
-        learning_languages: JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages),
+        learning_languages: JSON.stringify(normalizeLangs(currentValues.learning_languages)) !== JSON.stringify(normalizeLangs(originalData.learning_languages)),
         current_learning: currentValues.current_learning !== originalData.current_learning,
         avatar: avatarChanged,
         audio_start: currentValues.audio_start !== (originalData.audio_start || ''),
@@ -1953,11 +1963,20 @@ function loadUserData() {
         } catch (e2) { return 'record'; }
     })();
 
+    const normalizeLangs = (langs) => {
+        try {
+            return (Array.isArray(langs) ? langs : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+                .sort();
+        } catch (e) { return []; }
+    };
+
     originalData = {
         username: userData.username,
         email: userData.email,
         native_language: userData.native_language || 'ru',
-        learning_languages: userData.learning_languages || ['en'],
+        learning_languages: normalizeLangs(userData.learning_languages).length ? normalizeLangs(userData.learning_languages) : ['en'],
         current_learning: userData.current_learning || userData.learning_languages?.[0] || 'en',
         avatar: userData.avatar || {},
         audio_start: userData.audio_start || '',
@@ -2152,11 +2171,20 @@ async function saveProfile(options = {}) {
             if (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) assignmentHistoryRetentionDaysAfterSave = n;
         } catch (e) { }
 
+        const normalizeLangs = (langs) => {
+            try {
+                return (Array.isArray(langs) ? langs : [])
+                    .map(x => String(x || '').trim().toLowerCase())
+                    .filter(Boolean)
+                    .sort();
+            } catch (e) { return []; }
+        };
+
         originalData = {
             ...originalData,
             username: updatedUser.username,
             native_language: updatedUser.native_language,
-            learning_languages: updatedUser.learning_languages,
+            learning_languages: normalizeLangs(updatedUser.learning_languages),
             current_learning: updatedUser.current_learning,
             audio_start: audioSettings.audio_start,
             audio_exercise_mode: audioSettings.audio_exercise_mode,
@@ -2275,6 +2303,24 @@ async function saveProfile(options = {}) {
             audioSettingsPanel.setSettings(settingsToApply);
         }
 
+        // Синхронизируем LanguageSelector с новыми данными, чтобы checkForChanges не находил ложных расхождений
+        try {
+          const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
+          if (learningListSelector && typeof learningListSelector.setValues === 'function') {
+            learningListSelector.setValues({
+              learningLanguages: savedLearningLangs,
+              currentLearning: originalData.current_learning
+            });
+          }
+          if (learningSelector && typeof learningSelector.setValues === 'function') {
+            learningSelector.setValues({
+              learningLanguages: savedLearningLangs,
+              currentLearning: originalData.current_learning
+            });
+          }
+          if (window.lucide) window.lucide.createIcons();
+        } catch (e) { }
+
         if (formValues.password) document.getElementById('password').value = '';
 
         passwordTouched = false;
@@ -2314,6 +2360,8 @@ async function handleSave() {
         }
     }
 }
+try { window.handleSave = handleSave; } catch (e) { }
+try { window.saveProfile = saveProfile; } catch (e) { }
 
 // ==================== BIND PROFILE TEST RECORDING ====================
 
