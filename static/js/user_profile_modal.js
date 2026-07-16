@@ -189,6 +189,7 @@ async function checkAppCacheRevision() {
 // ==================== UI LANGUAGE SELECTOR ====================
 
 function initializeUiLangSelector() {
+    console.log('=== LOG #14: initializeUiLangSelector');
     const container = document.getElementById('uiLangSelectorContainer');
     if (!container) return;
     const supported = ['en', 'uk', 'ru', 'ar'];
@@ -1516,6 +1517,8 @@ async function telegramApiRequest(path, options = {}) {
 
 // ==================== LANGUAGE SELECTOR ====================
 
+let _languageSelectorInitialized = false;
+
 function initializeLanguageSelector() {
     const nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
     const learningContainer = document.getElementById('learningLanguageSelectorContainer');
@@ -1526,8 +1529,31 @@ function initializeLanguageSelector() {
         return;
     }
 
+    console.log('=== LOG #2: initializeLanguageSelector, _languageSelectorInitialized:', _languageSelectorInitialized, 'learningSelector:', !!learningSelector, 'learningListSelector:', !!learningListSelector);
+
     try {
         const languageData = window.LanguageManager.getLanguageData();
+
+        // Если уже инициализированы — просто обновляем options и перерисовываем
+        if (_languageSelectorInitialized && learningSelector && learningListSelector) {
+            console.log('=== LOG #2a: already initialized, clearing containers and recreating');
+            const opts = {
+                nativeLanguage: originalData.native_language,
+                learningLanguages: originalData.learning_languages,
+                currentLearning: originalData.current_learning,
+            };
+            nativeContainer.innerHTML = '';
+            learningContainer.innerHTML = '';
+            if (learningListContainer) learningListContainer.innerHTML = '';
+            _languageSelectorInitialized = false;
+        }
+
+        if (_languageSelectorInitialized) {
+            console.log('=== LOG #2b: still initialized after check, returning early');
+            return;
+        }
+
+        console.log('=== LOG #3: Creating LanguageSelector instances, originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
 
         const nativeSelector = new LanguageSelector({
             container: nativeContainer,
@@ -1571,6 +1597,7 @@ function initializeLanguageSelector() {
                 currentLearning: originalData.current_learning,
                 languageData: languageData,
                 onLanguageChange: function (changeData) {
+                    console.log('=== LOG #4: learning-flags onChange fired, changeData.learningLanguages:', JSON.stringify(changeData && changeData.learningLanguages), 'this === learningListSelector?', this === learningListSelector);
                     try {
                         const langs = changeData && Array.isArray(changeData.learningLanguages) ? changeData.learningLanguages : null;
                         if (langs && learningSelector && learningSelector.options) {
@@ -1599,10 +1626,9 @@ function initializeLanguageSelector() {
                 const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
                 const cLangs = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : null;
                 const bLangs = (b && b.learningLanguages) ? b.learningLanguages : null;
-                console.log('[languageSelector.getValues] c (learningList):', JSON.stringify(cLangs), 'b (learningSelector):', JSON.stringify(bLangs), 'original:', JSON.stringify(originalData.learning_languages));
-                // Проверяем, совпадает ли learningListSelector.options.learningLanguages с тем, что вернул getValues
+                console.log('=== LOG #5: getValues c(learningList):', JSON.stringify(cLangs), 'b(learningSelector):', JSON.stringify(bLangs), 'original:', JSON.stringify(originalData.learning_languages));
                 if (learningListSelector && learningListSelector.options) {
-                    console.log('[languageSelector.getValues] learningListSelector.options.learningLanguages:', JSON.stringify(learningListSelector.options.learningLanguages));
+                    console.log('=== LOG #5b: learningListSelector.options.learningLanguages:', JSON.stringify(learningListSelector.options.learningLanguages));
                 }
                 const learningLanguages = cLangs || bLangs || originalData.learning_languages;
                 const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
@@ -1618,6 +1644,8 @@ function initializeLanguageSelector() {
 
         try { refreshLearningDropdownAvailable(); } catch (e) { }
         window.languageSelector = languageSelector;
+        _languageSelectorInitialized = true;
+        console.log('=== LOG #6: initializeLanguageSelector completed, _languageSelectorInitialized set to true');
 
     } catch (error) {
         console.error('❌ Ошибка инициализации LanguageSelector:', error);
@@ -1631,6 +1659,7 @@ function initializeLanguageSelector() {
 let languageModelsSelector = null;
 
 function initializeLanguageModelsSelector() {
+    console.log('=== LOG #15: initializeLanguageModelsSelector');
     const container = document.getElementById('languageSelectorModelsContainer');
     if (!container) {
         console.error('❌ Контейнер для LanguageModelsSelector не найден');
@@ -1760,6 +1789,7 @@ async function initializeAudioSettings() {
 // ==================== FORM LISTENERS ====================
 
 function setupFormListeners() {
+    console.log('=== LOG #17: setupFormListeners');
     const inputs = ['username', 'password'];
     inputs.forEach(id => {
         const el = document.getElementById(id);
@@ -1774,6 +1804,7 @@ function setupFormListeners() {
 // ==================== TOPBAR CONTROLS ====================
 
 function initializeTopbarControls() {
+    console.log('=== LOG #16: initializeTopbarControls');
     const avatarButton = document.getElementById('avatarUploadButton');
     const avatarInput = document.getElementById('avatarUpload');
     try {
@@ -1806,7 +1837,7 @@ function initializeTopbarControls() {
         const saveButton = document.getElementById('saveButton');
         if (saveButton && saveButton.dataset && !saveButton.dataset.boundClick) {
             saveButton.dataset.boundClick = '1';
-            saveButton.addEventListener('click', async () => { await handleSave(); });
+            saveButton.addEventListener('click', async () => { console.log('=== LOG #18: saveButton clicked'); await handleSave(); });
         }
     } catch (e) { }
 }
@@ -1816,7 +1847,7 @@ function initializeTopbarControls() {
 function checkForChanges() {
 try { window.checkForChanges = checkForChanges; } catch (e) {}
     const currentValues = getCurrentFormValues();
-    console.log('[checkForChanges] current.learning_languages:', JSON.stringify(currentValues.learning_languages), 'original.learning_languages:', JSON.stringify(originalData.learning_languages));
+    console.log('=== LOG #10: checkForChanges current.learning_languages:', JSON.stringify(currentValues.learning_languages), 'original.learning_languages:', JSON.stringify(originalData.learning_languages));
 
     const avatarChanged = (() => {
         try {
@@ -1857,10 +1888,12 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
     };
 
     const hasChanges = Object.values(diffs).some(Boolean);
+    console.log('=== LOG #12: checkForChanges result hasChanges:', hasChanges, 'diffs:', JSON.stringify(diffs));
     setUnsavedState(hasChanges);
 }
 
 function setUnsavedState(state) {
+    console.log('=== LOG #11: setUnsavedState called with:', state, 'hasUnsavedChanges was:', hasUnsavedChanges);
     hasUnsavedChanges = state;
     try { window.hasUnsavedChanges = state; } catch (e) { }
     const saveButton = document.getElementById('saveButton');
@@ -1872,6 +1905,7 @@ function setUnsavedState(state) {
     if (unsavedStar) unsavedStar.style.display = state ? 'inline-flex' : 'none';
     if (state) window.addEventListener('beforeunload', beforeUnloadHandler);
     else window.removeEventListener('beforeunload', beforeUnloadHandler);
+    console.log('=== LOG #11b: setUnsavedState done, hasUnsavedChanges:', hasUnsavedChanges, 'window.hasUnsavedChanges:', window.hasUnsavedChanges);
 }
 
 function beforeUnloadHandler(event) {
@@ -1887,7 +1921,7 @@ function getCurrentFormValues() {
         learningLanguages: originalData.learning_languages,
         currentLearning: originalData.current_learning
     };
-    console.log('[getCurrentFormValues] learning_languages:', JSON.stringify(languageValues.learningLanguages));
+    console.log('=== LOG #9: getCurrentFormValues learning_languages:', JSON.stringify(languageValues.learningLanguages));
     const settings = getAudioSettingsFromDom();
     const audioSettings = {
         audio_start: settings.start || '',
@@ -1949,6 +1983,7 @@ function getCurrentFormValues() {
 
 function loadUserData() {
     const userData = UM.userData;
+    console.log('=== LOG #7: loadUserData, UM.userData.learning_languages:', JSON.stringify(userData && userData.learning_languages));
 
     let assignmentHistoryRetentionDays = 7;
     try {
@@ -2017,6 +2052,7 @@ function loadUserData() {
             } catch (e) { return 100; }
         })(),
     };
+    console.log('=== LOG #8: loadUserData originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
 
     try {
         originalData.learning_flags = extractLearningFlagsFromUser(userData);
@@ -2081,9 +2117,9 @@ async function saveProfile(options = {}) {
     const { afterSave } = options;
     const formValues = getCurrentFormValues();
 
-    console.log('[saveProfile] formValues.learning_languages:', JSON.stringify(formValues.learning_languages));
-    console.log('[saveProfile] originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
-    console.log('[saveProfile] hasUnsavedChanges:', hasUnsavedChanges);
+    console.log('=== LOG #20: saveProfile START, formValues.learning_languages:', JSON.stringify(formValues.learning_languages));
+    console.log('=== LOG #20b: saveProfile originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
+    console.log('=== LOG #20c: saveProfile hasUnsavedChanges:', hasUnsavedChanges);
 
     const hasAudioChanges = (
         (formValues.audio_start || '') !== (originalData.audio_start || '') ||
@@ -2118,7 +2154,7 @@ async function saveProfile(options = {}) {
             learning_languages: formValues.learning_languages,
             current_learning: formValues.current_learning
         };
-        console.log('[saveProfile] updateData.learning_languages:', JSON.stringify(updateData.learning_languages));
+        console.log('=== LOG #21: saveProfile updateData.learning_languages:', JSON.stringify(updateData.learning_languages));
 
         try {
             const flags = buildLearningFlagsFromLanguages(formValues.learning_languages);
@@ -2159,7 +2195,7 @@ async function saveProfile(options = {}) {
         showInfo(profileT('profile.common.saving_changes', null, 'Сохраняем изменения…'));
 
         const updatedUser = await UM.updateProfile(updateData);
-        console.log('[saveProfile] updatedUser.learning_languages:', JSON.stringify(updatedUser && updatedUser.learning_languages));
+        console.log('=== LOG #22: saveProfile updatedUser.learning_languages:', JSON.stringify(updatedUser && updatedUser.learning_languages));
 
         try {
             if (updatedUser && updatedUser.avatar) originalData.avatar = updatedUser.avatar;
@@ -2323,10 +2359,13 @@ async function saveProfile(options = {}) {
         // Синхронизируем LanguageSelector с новыми данными (без перерисовки, чтобы не сбросить UI)
         try {
           const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
-          console.log('[saveProfile] syncing LanguageSelector with:', JSON.stringify(savedLearningLangs));
+          console.log('=== LOG #23: saveProfile syncing LanguageSelector with:', JSON.stringify(savedLearningLangs));
           if (learningListSelector && learningListSelector.options) {
             learningListSelector.options.learningLanguages = [...savedLearningLangs];
             learningListSelector.options.currentLearning = originalData.current_learning;
+            console.log('=== LOG #23b: learningListSelector.options.learningLanguages set to:', JSON.stringify(learningListSelector.options.learningLanguages));
+          } else {
+            console.log('=== LOG #23c: learningListSelector not available for sync');
           }
           if (learningSelector && learningSelector.options) {
             learningSelector.options.learningLanguages = [...savedLearningLangs];
@@ -2338,9 +2377,9 @@ async function saveProfile(options = {}) {
         if (formValues.password) document.getElementById('password').value = '';
 
         passwordTouched = false;
-        console.log('[saveProfile] calling setUnsavedState(false)');
+        console.log('=== LOG #24: saveProfile calling setUnsavedState(false)');
         setUnsavedState(false);
-        console.log('[saveProfile] after setUnsavedState(false), hasUnsavedChanges:', hasUnsavedChanges);
+        console.log('=== LOG #25: saveProfile after setUnsavedState(false), hasUnsavedChanges:', hasUnsavedChanges, 'window.hasUnsavedChanges:', window.hasUnsavedChanges);
         pendingAvatarBlob = null;
         showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
 
@@ -2357,6 +2396,7 @@ async function saveProfile(options = {}) {
 // ==================== HANDLE SAVE ====================
 
 async function handleSave() {
+    console.log('=== LOG #19: handleSave called');
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {
         saveButton.disabled = true;
@@ -2644,7 +2684,11 @@ function initializeActivityPlanButtons() {
     });
 }
 
+let _profileInitCount = 0;
+
 async function initUserProfilePageOrModal() {
+    _profileInitCount++;
+    console.log('=== LOG #1: initUserProfilePageOrModal called, count:', _profileInitCount, 'stack:', new Error().stack?.split('\n').slice(2, 6).join(' | '));
     if (!window.UM) {
         console.error('[profile] window.UM не найден');
         showError(profileT('profile.errors.load_failed', { message: 'UserManager не найден' }, 'Ошибка загрузки профиля: UserManager не найден'));
@@ -2681,11 +2725,17 @@ async function initUserProfilePageOrModal() {
             if (window.I18n && typeof window.I18n.ensureLoaded === 'function') await window.I18n.ensureLoaded();
         } catch (e) { }
 
+        console.log('=== LOG #1a: calling initializeUiLangSelector');
         initializeUiLangSelector();
+        console.log('=== LOG #1b: calling loadUserData');
         loadUserData();
+        console.log('=== LOG #1c: calling initializeLanguageSelector');
         initializeLanguageSelector();
+        console.log('=== LOG #1d: calling initializeLanguageModelsSelector');
         initializeLanguageModelsSelector();
+        console.log('=== LOG #1e: calling initializeAudioSettings');
         await initializeAudioSettings();
+        console.log('=== LOG #1f: calling initializeGroupsSection');
         initializeGroupsSection();
         initializeProfileSectionToggles();
         initializeActivityPlanButtons();

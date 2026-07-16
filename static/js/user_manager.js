@@ -680,6 +680,7 @@ class UserManager {
   }
 
   async updateProfile(updateData) {
+    console.log('=== LOG #30: UM.updateProfile called with learning_languages:', JSON.stringify(updateData.learning_languages));
     try {
       let prevAvatar = null;
       let prevAvatarUploaded = '';
@@ -704,6 +705,7 @@ class UserManager {
 
       if (response.ok) {
         const updatedUser = await response.json();
+        console.log('=== LOG #31: UM.updateProfile response learning_languages:', JSON.stringify(updatedUser && updatedUser.user && updatedUser.user.learning_languages));
         this.userData = updatedUser.user;
         try {
           if (prevAvatar && (!this.userData.avatar || typeof this.userData.avatar !== 'object')) {

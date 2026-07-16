@@ -367,6 +367,7 @@ window.Desktop = window.Desktop || {
   },
 
   stubAction(name) {
+    console.log('=== LOG #0: stubAction called with:', name, 'stack:', new Error().stack?.split('\n').slice(2, 5).join(' | '));
     try {
       if (name === 'desktop-menu-profile') {
         try {
@@ -728,6 +729,11 @@ window.Desktop = window.Desktop || {
         e.preventDefault();
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
+
+        // Исключаем действия, которые уже обрабатываются в initUserMenu/initAdminMenu
+        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache') {
+          return;
+        }
 
         if (action === 'desktop-home') {
           try {
