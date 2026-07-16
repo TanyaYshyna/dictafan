@@ -80,31 +80,69 @@ def api_desk_items():
 
     conn, cur = get_db_cursor()
     try:
+        # Динамически определяем, какие колонки есть в таблицах,
+        # чтобы запрос не падал с 500, если какая-то миграция не была применена.
         cur.execute(
             """
+            SELECT column_name, table_name
+            FROM information_schema.columns
+            WHERE (table_name = 'dictations'
+              AND column_name IN ('tr_en','tr_uk','tr_sv','tr_be','tr_ru',
+                                  'tr_de','tr_fr','tr_es','tr_it','tr_tr',
+                                  'tr_ar','tr_pl','sentences_count','audio_order'))
+              OR (table_name = 'desk_items'
+              AND column_name IN ('planned_date'))
+            """
+        )
+        existing_cols = {}
+        for row in (cur.fetchall() or []):
+            tbl = row["table_name"]
+            col = row["column_name"]
+            if tbl not in existing_cols:
+                existing_cols[tbl] = set()
+            existing_cols[tbl].add(col)
+
+        dictation_cols = existing_cols.get("dictations", set())
+        desk_items_cols = existing_cols.get("desk_items", set())
+
+        # Строим SELECT-выражения для tr_* колонок
+        tr_cols_sql = []
+        for lang in ["en","uk","sv","be","ru","de","fr","es","it","tr","ar","pl"]:
+            col = f"tr_{lang}"
+            if col in dictation_cols:
+                tr_cols_sql.append(f"COALESCE(d.{col}, FALSE) AS {col}")
+            else:
+                tr_cols_sql.append(f"FALSE AS {col}")
+
+        sentences_count_sql = (
+            "COALESCE(d.sentences_count, 0) AS sentences_count"
+            if "sentences_count" in dictation_cols
+            else "0 AS sentences_count"
+        )
+        audio_order_sql = (
+            "COALESCE(d.audio_order, '') AS audio_order"
+            if "audio_order" in dictation_cols
+            else "'' AS audio_order"
+        )
+        planned_date_sql = (
+            "di.planned_date"
+            if "planned_date" in desk_items_cols
+            else "NULL AS planned_date"
+        )
+
+        query = f"""
             SELECT
                 di.id,
                 di.dictation_id,
                 di.created_at,
-                di.planned_date,
+                {planned_date_sql},
                 d.title,
                 d.language_code,
                 d.owner_id,
                 d.level,
-                COALESCE(d.tr_en, FALSE) as tr_en,
-                COALESCE(d.tr_uk, FALSE) as tr_uk,
-                COALESCE(d.tr_sv, FALSE) as tr_sv,
-                COALESCE(d.tr_be, FALSE) as tr_be,
-                COALESCE(d.tr_ru, FALSE) as tr_ru,
-                COALESCE(d.tr_de, FALSE) as tr_de,
-                COALESCE(d.tr_fr, FALSE) as tr_fr,
-                COALESCE(d.tr_es, FALSE) as tr_es,
-                COALESCE(d.tr_it, FALSE) as tr_it,
-                COALESCE(d.tr_tr, FALSE) as tr_tr,
-                COALESCE(d.tr_ar, FALSE) as tr_ar,
-                COALESCE(d.tr_pl, FALSE) as tr_pl,
-                COALESCE(d.sentences_count, 0) as sentences_count,
-                COALESCE(d.audio_order, '') as audio_order,
+                {', '.join(tr_cols_sql)},
+                {sentences_count_sql},
+                {audio_order_sql},
                 (SELECT DISTINCT language_code
                  FROM dictation_sentences
                  WHERE dictation_id = d.id AND language_code != d.language_code
@@ -113,9 +151,8 @@ def api_desk_items():
             JOIN dictations d ON d.id = di.dictation_id
             WHERE di.user_id = %s
             ORDER BY di.created_at DESC
-            """,
-            (user["id"],),
-        )
+        """
+        cur.execute(query, (user["id"],))
         rows = cur.fetchall()
 
         items = []

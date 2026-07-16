@@ -150,12 +150,17 @@
       return res.dictation;
     }
 
-    async function loadDictationSentencesForAssignmentModal(dictationId) {
+    async function loadDictationSentencesForAssignmentModal(dictationId, originalLanguageCode) {
       const id = Number(dictationId);
       if (!Number.isFinite(id) || id <= 0) return [];
       const res = await apiRequest(`/api/dictation/${encodeURIComponent(id)}/sentences`, { method: 'GET' });
       if (!res || !res.success || !Array.isArray(res.sentences)) return [];
-      return res.sentences.filter(s => s && typeof s === 'object');
+      let sentences = res.sentences.filter(s => s && typeof s === 'object');
+      // Фильтруем только предложения оригинального языка (не переводы)
+      if (originalLanguageCode) {
+        sentences = sentences.filter(s => String(s.language_code || '') === String(originalLanguageCode));
+      }
+      return sentences;
     }
 
     function getCreateAssignmentSentencesState(modal) {
@@ -609,8 +614,12 @@
       const idInput = document.getElementById('create-assignment-dictation-id');
       if (idInput) idInput.value = String(dictationId || '');
 
+      let dictationLanguageCode = null;
       try {
         const meta = await loadDictationMetaForAssignmentModal(dictationId);
+        if (meta && meta.language_code) {
+          dictationLanguageCode = String(meta.language_code);
+        }
         const titleEl = document.getElementById('create-assignment-dictation-title');
         const coverImg = document.getElementById('create-assignment-cover-img');
         const metaEl = document.getElementById('create-assignment-cover-meta');
@@ -636,7 +645,7 @@
       }
 
       try {
-        const sentences = await loadDictationSentencesForAssignmentModal(dictationId);
+        const sentences = await loadDictationSentencesForAssignmentModal(dictationId, dictationLanguageCode);
         setCreateAssignmentSentencesState(modal, { sentences, selectedPositions: null });
         renderCreateAssignmentSentencesTable(modal);
       } catch (e) {
