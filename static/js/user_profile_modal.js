@@ -1855,6 +1855,7 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
 
 function setUnsavedState(state) {
     hasUnsavedChanges = state;
+    try { window.hasUnsavedChanges = state; } catch (e) { }
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {
         if (isSavingProfile) saveButton.disabled = true;
