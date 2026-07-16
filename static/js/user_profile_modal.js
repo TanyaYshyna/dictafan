@@ -16,6 +16,7 @@ let pendingAvatarBlob = null;
 let passwordTouched = false;
 
 let learningListSelector = null;
+let learningSelector = null;
 
 let profileTestRecorder = null;
 let profileTestMediaStream = null;
@@ -188,6 +189,7 @@ async function checkAppCacheRevision() {
 // ==================== UI LANGUAGE SELECTOR ====================
 
 function initializeUiLangSelector() {
+    console.log('=== LOG #14: initializeUiLangSelector');
     const container = document.getElementById('uiLangSelectorContainer');
     if (!container) return;
     const supported = ['en', 'uk', 'ru', 'ar'];
@@ -1515,10 +1517,12 @@ async function telegramApiRequest(path, options = {}) {
 
 // ==================== LANGUAGE SELECTOR ====================
 
+let _languageSelectorInitialized = false;
+
 function initializeLanguageSelector() {
-    const nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
-    const learningContainer = document.getElementById('learningLanguageSelectorContainer');
-    const learningListContainer = document.getElementById('learningLanguagesListContainer');
+    let nativeContainer = document.getElementById('nativeLanguageSelectorContainer');
+    let learningContainer = document.getElementById('learningLanguageSelectorContainer');
+    let learningListContainer = document.getElementById('learningLanguagesListContainer');
 
     if (!nativeContainer || !learningContainer) {
         console.error('❌ Контейнеры для LanguageSelector не найдены');
@@ -1527,6 +1531,37 @@ function initializeLanguageSelector() {
 
     try {
         const languageData = window.LanguageManager.getLanguageData();
+
+        // Если уже инициализированы — заменяем контейнеры на новые (это удаляет все старые обработчики событий)
+        if (_languageSelectorInitialized && learningSelector && learningListSelector) {
+            
+            // Создаём новые контейнеры-заменители
+            const newNativeContainer = document.createElement('div');
+            newNativeContainer.id = 'nativeLanguageSelectorContainer';
+            newNativeContainer.className = nativeContainer.className;
+            nativeContainer.parentNode.replaceChild(newNativeContainer, nativeContainer);
+            nativeContainer = newNativeContainer;
+
+            const newLearningContainer = document.createElement('div');
+            newLearningContainer.id = 'learningLanguageSelectorContainer';
+            newLearningContainer.className = learningContainer.className;
+            learningContainer.parentNode.replaceChild(newLearningContainer, learningContainer);
+            learningContainer = newLearningContainer;
+
+            if (learningListContainer) {
+                const newLearningListContainer = document.createElement('div');
+                newLearningListContainer.id = 'learningLanguagesListContainer';
+                newLearningListContainer.className = learningListContainer.className;
+                learningListContainer.parentNode.replaceChild(newLearningListContainer, learningListContainer);
+                learningListContainer = newLearningListContainer;
+            }
+            
+            _languageSelectorInitialized = false;
+        }
+
+        if (_languageSelectorInitialized) {
+            return;
+        }
 
         const nativeSelector = new LanguageSelector({
             container: nativeContainer,
@@ -1538,7 +1573,7 @@ function initializeLanguageSelector() {
             onLanguageChange: function () { checkForChanges(); }
         });
 
-        const learningSelector = new LanguageSelector({
+        learningSelector = new LanguageSelector({
             container: learningContainer,
             mode: 'learning-selector',
             nativeLanguage: originalData.native_language,
@@ -1596,7 +1631,9 @@ function initializeLanguageSelector() {
                 const a = nativeSelector && typeof nativeSelector.getValues === 'function' ? nativeSelector.getValues() : null;
                 const b = learningSelector && typeof learningSelector.getValues === 'function' ? learningSelector.getValues() : null;
                 const c = learningListSelector && typeof learningListSelector.getValues === 'function' ? learningListSelector.getValues() : null;
-                const learningLanguages = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : ((b && b.learningLanguages) ? b.learningLanguages : originalData.learning_languages);
+                const cLangs = (c && Array.isArray(c.learningLanguages)) ? c.learningLanguages : null;
+                const bLangs = (b && b.learningLanguages) ? b.learningLanguages : null;
+                const learningLanguages = cLangs || bLangs || originalData.learning_languages;
                 const fromSelector = (b && b.currentLearning) ? String(b.currentLearning) : '';
                 const baseCurrent = fromSelector ? fromSelector : String(originalData.current_learning || '');
                 const safeCurrent = learningLanguages.includes(baseCurrent) ? baseCurrent : (learningLanguages[0] || baseCurrent);
@@ -1610,6 +1647,7 @@ function initializeLanguageSelector() {
 
         try { refreshLearningDropdownAvailable(); } catch (e) { }
         window.languageSelector = languageSelector;
+        _languageSelectorInitialized = true;
 
     } catch (error) {
         console.error('❌ Ошибка инициализации LanguageSelector:', error);
@@ -1623,6 +1661,7 @@ function initializeLanguageSelector() {
 let languageModelsSelector = null;
 
 function initializeLanguageModelsSelector() {
+    console.log('=== LOG #15: initializeLanguageModelsSelector');
     const container = document.getElementById('languageSelectorModelsContainer');
     if (!container) {
         console.error('❌ Контейнер для LanguageModelsSelector не найден');
@@ -1752,6 +1791,7 @@ async function initializeAudioSettings() {
 // ==================== FORM LISTENERS ====================
 
 function setupFormListeners() {
+    console.log('=== LOG #17: setupFormListeners');
     const inputs = ['username', 'password'];
     inputs.forEach(id => {
         const el = document.getElementById(id);
@@ -1766,6 +1806,7 @@ function setupFormListeners() {
 // ==================== TOPBAR CONTROLS ====================
 
 function initializeTopbarControls() {
+    console.log('=== LOG #16: initializeTopbarControls');
     const avatarButton = document.getElementById('avatarUploadButton');
     const avatarInput = document.getElementById('avatarUpload');
     try {
@@ -1798,7 +1839,7 @@ function initializeTopbarControls() {
         const saveButton = document.getElementById('saveButton');
         if (saveButton && saveButton.dataset && !saveButton.dataset.boundClick) {
             saveButton.dataset.boundClick = '1';
-            saveButton.addEventListener('click', async () => { await handleSave(); });
+            saveButton.addEventListener('click', async () => { console.log('=== LOG #18: saveButton clicked'); await handleSave(); });
         }
     } catch (e) { }
 }
@@ -1808,6 +1849,7 @@ function initializeTopbarControls() {
 function checkForChanges() {
 try { window.checkForChanges = checkForChanges; } catch (e) {}
     const currentValues = getCurrentFormValues();
+    console.log('=== LOG #10: checkForChanges current.learning_languages:', JSON.stringify(currentValues.learning_languages), 'original.learning_languages:', JSON.stringify(originalData.learning_languages));
 
     const avatarChanged = (() => {
         try {
@@ -1817,11 +1859,20 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
         } catch (e) { return !!pendingAvatarBlob; }
     })();
 
+    const normalizeLangs = (langs) => {
+        try {
+            return (Array.isArray(langs) ? langs : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+                .sort();
+        } catch (e) { return []; }
+    };
+
     const diffs = {
         username: currentValues.username !== originalData.username,
         password: passwordTouched && currentValues.password !== '',
         native_language: currentValues.native_language !== originalData.native_language,
-        learning_languages: JSON.stringify(currentValues.learning_languages) !== JSON.stringify(originalData.learning_languages),
+        learning_languages: JSON.stringify(normalizeLangs(currentValues.learning_languages)) !== JSON.stringify(normalizeLangs(originalData.learning_languages)),
         current_learning: currentValues.current_learning !== originalData.current_learning,
         avatar: avatarChanged,
         audio_start: currentValues.audio_start !== (originalData.audio_start || ''),
@@ -1839,11 +1890,13 @@ try { window.checkForChanges = checkForChanges; } catch (e) {}
     };
 
     const hasChanges = Object.values(diffs).some(Boolean);
+    console.log('=== LOG #12: checkForChanges result hasChanges:', hasChanges, 'diffs:', JSON.stringify(diffs));
     setUnsavedState(hasChanges);
 }
 
 function setUnsavedState(state) {
     hasUnsavedChanges = state;
+    try { window.hasUnsavedChanges = state; } catch (e) { }
     const saveButton = document.getElementById('saveButton');
     if (saveButton) {
         if (isSavingProfile) saveButton.disabled = true;
@@ -1929,6 +1982,7 @@ function getCurrentFormValues() {
 
 function loadUserData() {
     const userData = UM.userData;
+    console.log('=== LOG #7: loadUserData, UM.userData.learning_languages:', JSON.stringify(userData && userData.learning_languages));
 
     let assignmentHistoryRetentionDays = 7;
     try {
@@ -1953,11 +2007,20 @@ function loadUserData() {
         } catch (e2) { return 'record'; }
     })();
 
+    const normalizeLangs = (langs) => {
+        try {
+            return (Array.isArray(langs) ? langs : [])
+                .map(x => String(x || '').trim().toLowerCase())
+                .filter(Boolean)
+                .sort();
+        } catch (e) { return []; }
+    };
+
     originalData = {
         username: userData.username,
         email: userData.email,
         native_language: userData.native_language || 'ru',
-        learning_languages: userData.learning_languages || ['en'],
+        learning_languages: normalizeLangs(userData.learning_languages).length ? normalizeLangs(userData.learning_languages) : ['en'],
         current_learning: userData.current_learning || userData.learning_languages?.[0] || 'en',
         avatar: userData.avatar || {},
         audio_start: userData.audio_start || '',
@@ -1988,6 +2051,7 @@ function loadUserData() {
             } catch (e) { return 100; }
         })(),
     };
+    console.log('=== LOG #8: loadUserData originalData.learning_languages:', JSON.stringify(originalData.learning_languages));
 
     try {
         originalData.learning_flags = extractLearningFlagsFromUser(userData);
@@ -2084,7 +2148,6 @@ async function saveProfile(options = {}) {
             learning_languages: formValues.learning_languages,
             current_learning: formValues.current_learning
         };
-
         try {
             const flags = buildLearningFlagsFromLanguages(formValues.learning_languages);
             Object.assign(updateData, flags);
@@ -2152,11 +2215,20 @@ async function saveProfile(options = {}) {
             if (Number.isFinite(n) && (n === 0 || n === 7 || n === 30)) assignmentHistoryRetentionDaysAfterSave = n;
         } catch (e) { }
 
+        const normalizeLangs = (langs) => {
+            try {
+                return (Array.isArray(langs) ? langs : [])
+                    .map(x => String(x || '').trim().toLowerCase())
+                    .filter(Boolean)
+                    .sort();
+            } catch (e) { return []; }
+        };
+
         originalData = {
             ...originalData,
             username: updatedUser.username,
             native_language: updatedUser.native_language,
-            learning_languages: updatedUser.learning_languages,
+            learning_languages: normalizeLangs(updatedUser.learning_languages),
             current_learning: updatedUser.current_learning,
             audio_start: audioSettings.audio_start,
             audio_exercise_mode: audioSettings.audio_exercise_mode,
@@ -2275,10 +2347,23 @@ async function saveProfile(options = {}) {
             audioSettingsPanel.setSettings(settingsToApply);
         }
 
+        // Синхронизируем LanguageSelector с новыми данными (без перерисовки, чтобы не сбросить UI)
+        try {
+          const savedLearningLangs = Array.isArray(originalData.learning_languages) ? originalData.learning_languages : [];
+          if (learningListSelector && learningListSelector.options) {
+            learningListSelector.options.learningLanguages = [...savedLearningLangs];
+            learningListSelector.options.currentLearning = originalData.current_learning;
+          }
+          if (learningSelector && learningSelector.options) {
+            learningSelector.options.learningLanguages = [...savedLearningLangs];
+            learningSelector.options.currentLearning = originalData.current_learning;
+            learningSelector.options.learningAvailableLanguages = [...savedLearningLangs];
+          }
+        } catch (e) { }
+
         if (formValues.password) document.getElementById('password').value = '';
 
         passwordTouched = false;
-        checkForChanges();
         setUnsavedState(false);
         pendingAvatarBlob = null;
         showSuccess(profileT('profile.common.profile_saved', null, 'Профиль успешно сохранен!'));
@@ -2290,7 +2375,6 @@ async function saveProfile(options = {}) {
         showError(profileT('profile.errors.save_failed', { message: String(error && error.message ? error.message : '') }, 'Ошибка сохранения: ' + (error && error.message ? error.message : '')));
     } finally {
         isSavingProfile = false;
-        checkForChanges();
     }
 }
 
@@ -2314,6 +2398,8 @@ async function handleSave() {
         }
     }
 }
+try { window.handleSave = handleSave; } catch (e) { }
+try { window.saveProfile = saveProfile; } catch (e) { }
 
 // ==================== BIND PROFILE TEST RECORDING ====================
 
@@ -2582,7 +2668,11 @@ function initializeActivityPlanButtons() {
     });
 }
 
+let _profileInitCount = 0;
+
 async function initUserProfilePageOrModal() {
+    _profileInitCount++;
+    console.log('=== LOG #1: initUserProfilePageOrModal called, count:', _profileInitCount, 'stack:', new Error().stack?.split('\n').slice(2, 6).join(' | '));
     if (!window.UM) {
         console.error('[profile] window.UM не найден');
         showError(profileT('profile.errors.load_failed', { message: 'UserManager не найден' }, 'Ошибка загрузки профиля: UserManager не найден'));
@@ -2619,11 +2709,17 @@ async function initUserProfilePageOrModal() {
             if (window.I18n && typeof window.I18n.ensureLoaded === 'function') await window.I18n.ensureLoaded();
         } catch (e) { }
 
+        console.log('=== LOG #1a: calling initializeUiLangSelector');
         initializeUiLangSelector();
+        console.log('=== LOG #1b: calling loadUserData');
         loadUserData();
+        console.log('=== LOG #1c: calling initializeLanguageSelector');
         initializeLanguageSelector();
+        console.log('=== LOG #1d: calling initializeLanguageModelsSelector');
         initializeLanguageModelsSelector();
+        console.log('=== LOG #1e: calling initializeAudioSettings');
         await initializeAudioSettings();
+        console.log('=== LOG #1f: calling initializeGroupsSection');
         initializeGroupsSection();
         initializeProfileSectionToggles();
         initializeActivityPlanButtons();

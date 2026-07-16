@@ -66,6 +66,14 @@
       "label": "Daily activity goal:",
       "help": "Used to display today's progress in the header (e.g. 78/100)."
     },
+    "activity_plan": {
+      "time": "Time",
+      "minutes": "min",
+      "money": "Money",
+      "coins": "coins",
+      "increase": "Increase",
+      "decrease": "Decrease"
+    },
     "audio": {
       "explanations": {
         "label": "Legend:",

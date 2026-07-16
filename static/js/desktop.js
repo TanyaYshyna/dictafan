@@ -388,6 +388,25 @@ window.Desktop = window.Desktop || {
               closeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                // Проверяем несохранённые изменения
+                try {
+                  if (window.hasUnsavedChanges) {
+                    if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.open === 'function') {
+                      window.DesktopConfirmModal.open({
+                        title: window.profileT ? window.profileT('profile.common.unsaved_title', null, 'Несохранённые изменения') : 'Несохранённые изменения',
+                        message: window.profileT ? window.profileT('profile.common.unsaved_message', null, 'У вас есть несохранённые изменения. Выйти без сохранения?') : 'У вас есть несохранённые изменения. Выйти без сохранения?',
+                        showSave: true,
+                        onDiscard: function () { close(); },
+                        onSave: function () {
+                          if (window.saveProfile && typeof window.saveProfile === 'function') {
+                            window.saveProfile({ afterSave: close });
+                          }
+                        }
+                      });
+                      return;
+                    }
+                  }
+                } catch (e2) { }
                 close();
               });
             }
@@ -397,11 +416,32 @@ window.Desktop = window.Desktop || {
           try {
             if (modal.dataset.boundOverlay !== '1') {
               modal.dataset.boundOverlay = '1';
+              const confirmClose = () => {
+                try {
+                  if (window.hasUnsavedChanges) {
+                    if (window.DesktopConfirmModal && typeof window.DesktopConfirmModal.open === 'function') {
+                      window.DesktopConfirmModal.open({
+                        title: window.profileT ? window.profileT('profile.common.unsaved_title', null, 'Несохранённые изменения') : 'Несохранённые изменения',
+                        message: window.profileT ? window.profileT('profile.common.unsaved_message', null, 'У вас есть несохранённые изменения. Выйти без сохранения?') : 'У вас есть несохранённые изменения. Выйти без сохранения?',
+                        showSave: true,
+                        onDiscard: function () { close(); },
+                        onSave: function () {
+                          if (window.saveProfile && typeof window.saveProfile === 'function') {
+                            window.saveProfile({ afterSave: close });
+                          }
+                        }
+                      });
+                      return;
+                    }
+                  }
+                } catch (e) { }
+                close();
+              };
               modal.addEventListener('click', (e) => {
-                if (e && e.target === modal) close();
+                if (e && e.target === modal) confirmClose();
               });
               document.addEventListener('keydown', (e) => {
-                if (e && e.key === 'Escape') close();
+                if (e && e.key === 'Escape') confirmClose();
               });
             }
           } catch (e3) {
@@ -688,6 +728,11 @@ window.Desktop = window.Desktop || {
         e.preventDefault();
         e.stopPropagation();
         const action = btn.getAttribute('data-action');
+
+        // Исключаем действия, которые уже обрабатываются в initUserMenu/initAdminMenu
+        if (action === 'desktop-menu-profile' || action === 'desktop-admin-active-dictations' || action === 'desktop-admin-audio-cache') {
+          return;
+        }
 
         if (action === 'desktop-home') {
           try {

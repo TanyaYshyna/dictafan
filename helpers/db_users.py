@@ -742,10 +742,12 @@ def update_user(email: str, updates: dict) -> Optional[dict]:
         
         # Обновляем языки обучения если указаны
         if 'learning_languages' in updates:
+            print(f"[db_users.update_user] learning_languages in updates: {updates['learning_languages']}")
             # Удаляем старые языки
             cur.execute("DELETE FROM user_learning_languages WHERE user_id = %s", (user_id,))
             # Добавляем новые
             for lang_code in updates['learning_languages']:
+                print(f"[db_users.update_user] inserting lang_code: {lang_code}")
                 cur.execute(
                     """
                     INSERT INTO user_learning_languages (user_id, language_code)
