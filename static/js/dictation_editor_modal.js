@@ -1754,6 +1754,7 @@ function _setupCloseButton() {
   const closeBtn = document.getElementById('dictationEditorModalCloseBtn');
   if (closeBtn) {
     closeBtn.addEventListener('click', function () {
+      console.log('[dictationEditorModal] closeBtn clicked');
       _maybeCloseWithPrompt();
     });
   }
@@ -1764,6 +1765,7 @@ function _setupOverlayClose() {
   if (modal) {
     modal.addEventListener('click', function (e) {
       if (e.target === modal) {
+        console.log('[dictationEditorModal] overlay clicked');
         _maybeCloseWithPrompt();
       }
     });
@@ -1779,17 +1781,22 @@ function _setupOverlayClose() {
  * Если изменений нет — закрывает сразу.
  */
 function _maybeCloseWithPrompt() {
+  console.log('[dictationEditorModal] _maybeCloseWithPrompt called, hasUnsavedChanges=' + _hasUnsavedChanges() + ', state.isOpen=' + state.isOpen);
   if (_hasUnsavedChanges()) {
     if (typeof window.DesktopConfirmModal !== 'undefined' && typeof window.DesktopConfirmModal.open === 'function') {
+      console.log('[dictationEditorModal] _maybeCloseWithPrompt: opening DesktopConfirmModal');
       window.DesktopConfirmModal.open({
         showSave: true,
         onDiscard: function () {
+          console.log('[dictationEditorModal] DesktopConfirmModal onDiscard: calling close()');
           close();
         },
         onSave: async function () {
+          console.log('[dictationEditorModal] DesktopConfirmModal onSave: starting _handleSave()');
           var ok = false;
           try {
             ok = await _handleSave();
+            console.log('[dictationEditorModal] DesktopConfirmModal onSave: _handleSave() returned ok=' + ok);
           } catch (e) {
             console.error('[dictationEditorModal] _handleSave error in onSave:', e);
           }
@@ -1804,6 +1811,7 @@ function _maybeCloseWithPrompt() {
       return;
     }
     // fallback без универсальной модалки
+    console.log('[dictationEditorModal] _maybeCloseWithPrompt: fallback confirm');
     var wantSave = window.confirm('Есть несохранённые изменения. Сохранить и выйти?');
     if (wantSave) {
       _handleSave().then(function () { close(); }).catch(function () { close(); });
@@ -1815,6 +1823,7 @@ function _maybeCloseWithPrompt() {
     }
     return;
   }
+  console.log('[dictationEditorModal] _maybeCloseWithPrompt: no unsaved changes, closing directly');
   close();
 }
 
