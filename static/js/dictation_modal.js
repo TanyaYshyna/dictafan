@@ -989,6 +989,11 @@
     }
   }
 
+  /**
+   * Сбрасывает UI предложения (поле ввода, подсветку ошибок, кнопки) на основе состояния сессии.
+   * _textAttemptCount НЕ сбрасывается — он восстанавливается из st (сохраняется между вызовами).
+   * @param {Object} session - сессия диктанта
+   */
   function resetSentenceUiFromSession(session) {
     try {
       // If user navigates to an already completed sentence, show it as completed instead of
@@ -1075,20 +1080,22 @@
     try {
       const view = getCurrentSentenceViewFromSession(session);
       if (view) {
-        console.log('[DM:resetSentenceUiFromSession] СБРОС view._textAttemptCount с ' + (view._textAttemptCount) + ' до 0, key=' + (view.key));
-        view._textAttemptCount = 0;
+        // Восстанавливаем _textAttemptCount из st (сохраняется между вызовами).
+        // Не сбрасываем в 0 даже при повторе — иначе analyze() подумает,
+        // что это первая попытка, и выдаст starOutcome='perfect' вместо 'half' или null.
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          if (st && st._textAttemptCount != null) {
+            view._textAttemptCount = Number(st._textAttemptCount) || 0;
+          }
+        } catch (e0a_restore) {
+        }
       }
     } catch (e0a) {
     }
 
-    try {
-      const st = getCurrentSentenceStateFromSession(session);
-      if (st) {
-        console.log('[DM:resetSentenceUiFromSession] СБРОС st._textAttemptCount с ' + (st._textAttemptCount) + ' до 0');
-        st._textAttemptCount = 0;
-      }
-    } catch (e0b) {
-    }
+    // _textAttemptCount в st НЕ сбрасываем — он сохраняется между навигацией и повторами.
+    // Сброс происходит только при старте нового диктанта (resetDictationProgressForSession).
 
     try {
       const view = getCurrentSentenceViewFromSession(session);
@@ -1331,8 +1338,23 @@
           }
         }
 
-        const prevPerfect = Number(view.number_of_perfect) || 0;
-        const prevCorrected = Number(view.number_of_corrected) || 0;
+        // prevPerfect/prevCorrected читаем из st (сохраняется между вызовами),
+        // т.к. view пересоздаётся при каждом getSentenceView().
+        let prevPerfect = 0;
+        let prevCorrected = 0;
+        try {
+          const st = getCurrentSentenceStateFromSession(session);
+          if (st) {
+            prevPerfect = Number(st.number_of_perfect) || 0;
+            prevCorrected = Number(st.number_of_corrected) || 0;
+          } else {
+            prevPerfect = Number(view.number_of_perfect) || 0;
+            prevCorrected = Number(view.number_of_corrected) || 0;
+          }
+        } catch (ePC) {
+          prevPerfect = Number(view.number_of_perfect) || 0;
+          prevCorrected = Number(view.number_of_corrected) || 0;
+        }
 
         let requiredPassedStarHalf = null;
         try {
@@ -1344,17 +1366,27 @@
         }
 
         let totalMistakeCount = 0;
+        let textAttemptCount = 0;
         try {
           const st = getCurrentSentenceStateFromSession(session);
-          if (st) totalMistakeCount = Number(st.mistake_count) || 0;
+          if (st) {
+            totalMistakeCount = Number(st.mistake_count) || 0;
+            // _textAttemptCount хранится в st (сохраняется между вызовами),
+            // т.к. view пересоздаётся при каждом getSentenceView().
+            // Берём из st, с fallback на view для обратной совместимости.
+            textAttemptCount = Number(st._textAttemptCount) || Number(view._textAttemptCount) || 0;
+          } else {
+            textAttemptCount = Number(view._textAttemptCount) || 0;
+          }
         } catch (eMC) {
+          textAttemptCount = Number(view._textAttemptCount) || 0;
         }
 
         const res = checker.analyze({
           originalText,
           userText,
           langOriginal: langOrig,
-          textAttemptCount: Number(view._textAttemptCount) || 0,
+          textAttemptCount,
           prevPerfect,
           prevCorrected,
           requiredPassedStarHalf,
@@ -1460,6 +1492,12 @@
         try {
           if (!res.allCorrect) {
             view._textAttemptCount = (Number(view._textAttemptCount) || 0) + 1;
+            // Сразу сохраняем в st, т.к. view пересоздаётся при каждом getSentenceView()
+            try {
+              const stForAttempt = session && view && view.key != null ? session.getState(String(view.key)) : null;
+              if (stForAttempt) stForAttempt._textAttemptCount = view._textAttemptCount;
+            } catch (e14b) {
+            }
           }
         } catch (e14) {
         }
