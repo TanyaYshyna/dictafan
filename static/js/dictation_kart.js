@@ -869,12 +869,13 @@ window.DictationKart = window.DictationKart || {
         });
 
         // Закрываем меню перышка, если открыто
-        if (launchMenu) {
-          try {
-            launchMenu.classList.remove('show');
-            launchMenu.style.display = 'none';
-          } catch (e0) {}
-        }
+        try {
+          const lm = cardEl.querySelector('.dictation-kart-launch-menu');
+          if (lm) {
+            lm.classList.remove('show');
+            lm.style.display = 'none';
+          }
+        } catch (e0) {}
 
         menu.classList.add('show');
         menu.style.display = 'block';
