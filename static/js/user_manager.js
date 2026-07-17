@@ -65,8 +65,6 @@ class UserManager {
   // Инициализация пользователя
   async init() {
     try {
-      console.log('🔄 Инициализация UserManager, токен:', this.token ? 'есть' : 'нет');
-
       if (this.token) {
         console.log('🔐 Валидируем токен...');
         this.userData = await this.validateToken(this.token);

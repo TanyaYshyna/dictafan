@@ -4618,38 +4618,29 @@
 
   function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null) {
     const store = getRuntimeStore();
-    console.log('[DM:getOrCreateSession] store=' + (store ? 'есть' : 'null') + ', parsed=' + (parsed ? JSON.stringify({dictationIdFormatted: parsed.dictationIdFormatted, langOriginal: parsed.langOriginal, langTranslation: parsed.langTranslation}) : 'null'));
     if (!store) {
-      console.log('[DM:getOrCreateSession] store отсутствует, return null');
       return null;
     }
 
     const dictationId = String(parsed?.dictationIdFormatted || '').trim();
-    console.log('[DM:getOrCreateSession] dictationId=' + dictationId);
     if (!dictationId) {
-      console.log('[DM:getOrCreateSession] dictationId пустой, return null');
       return null;
     }
 
     // Проверяем, что контент загружен и не пустой
     const content = store.getContent({ dictationId });
-    console.log('[DM:getOrCreateSession] content=' + (content ? 'есть' : 'null'));
     const allKeys = content ? content.getAllKeys() : [];
-    console.log('[DM:getOrCreateSession] allKeys.length=' + allKeys.length);
     if (!allKeys.length) {
       // Контент не загружен — не создаём сессию с пустыми данными
-      console.log('[DM:getOrCreateSession] allKeys пустой, return null (контент не загружен)');
       return null;
     }
 
-    console.log('[DM:getOrCreateSession] вызываем store.getOrCreateSession()');
     const session = store.getOrCreateSession({
       dictationId,
       exerciseId: null,
       subsetPositions,
       subsetSignature: null,
     });
-    console.log('[DM:getOrCreateSession] session=' + (session ? 'создана' : 'null'));
 
     try {
       const hasSubset = Array.isArray(subsetPositions) && subsetPositions.length > 0;
@@ -6544,18 +6535,14 @@
   }
 
   async function open(dictationUrl, opts = {}) {
-    console.log('[9] dictation_modal: open() вызван, url=' + dictationUrl);
-    if (dictationModalState.opening) {
-      console.log('[9a] dictation_modal: opening уже true, выход');
+     if (dictationModalState.opening) {
       return;
     }
     dictationModalState.opening = true;
-    console.log('[10] dictation_modal: opening установлен');
 
     try {
       const modal = getModal();
       if (!modal) {
-        console.log('[10a] dictation_modal: modal не найден, выход');
         return;
       }
 
@@ -6582,8 +6569,7 @@
       }
 
       const parsed = parseDictationHref(dictationUrl);
-      console.log('[11] dictation_modal: parsed=' + (parsed ? JSON.stringify({dictationIdFormatted: parsed.dictationIdFormatted, langOriginal: parsed.langOriginal, langTranslation: parsed.langTranslation}) : 'null'));
-
+ 
       setUsername();
       setAvatar();
       bindHeaderButtons();
@@ -6592,7 +6578,6 @@
       modal.style.display = 'flex';
       modal.classList.add('show');
       dictationModalState.isOpen = true;
-      console.log('[12] dictation_modal: modal показан');
 
       // Биндим сохранение времени предложения при закрытии/скрытии страницы
       try {
@@ -6636,10 +6621,8 @@
       } catch (e) {
       }
 
-      console.log('[13] dictation_modal: ensureDictationDepsLoaded завершена');
       await ensureDictationDepsLoaded();
-      console.log('[14] dictation_modal: deps загружены');
-
+ 
       // Загружаем настройки схемы пользователя при открытии модалки диктанта
       try {
         loadPlaySequenceStartFromUser();
@@ -6673,8 +6656,6 @@
         }
       }
 
-      console.log('[15] dictation_modal: contentLoaded=' + contentLoaded);
-
       // Восстанавливаем сессию из IndexedDB ПОСЛЕ загрузки контента,
       // чтобы restoreFromIdb() мог сопоставить ключи предложений с контентом.
       // Если запустить restore до загрузки контента, все сессии будут пропущены
@@ -6687,20 +6668,15 @@
       } catch (eReset) {
       }
 
-      console.log('[16] dictation_modal: restoreFromIdb завершён');
-      try {
+       try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
-        console.log('[17a] dictation_modal: parsed=' + (parsed ? 'есть' : 'null') + ', contentLoaded=' + contentLoaded);
         const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
-        console.log('[17] dictation_modal: session=' + (session ? 'создана' : 'null'));
         if (session) {
-          console.log('[17b] dictation_modal: session.completed=' + session.completed);
           // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
           // сбрасываем прогресс как при нажатии «всё по новой»
           try {
             if (session.completed === true) {
-              console.log('[17c] dictation_modal: session завершена, сбрасываем прогресс');
-              await resetDictationProgressForSession(session);
+               await resetDictationProgressForSession(session);
             }
           } catch (eReset) {
           }
@@ -6709,12 +6685,9 @@
             window.__dictationModalActiveSession = session;
           } catch (e0) {
           }
-          console.log('[17d] dictation_modal: вызываем renderStartModalSentencesTable');
           renderStartModalSentencesTable(session);
           dictationModalState.startModalContext = 'open';
-          console.log('[17e] dictation_modal: вызываем showStartModal');
           showStartModal();
-          console.log('[17f] dictation_modal: вызываем updateNavigatorFromSession');
           updateNavigatorFromSession(session);
 
           try {
@@ -6748,8 +6721,6 @@
         }
       } catch (e) {
       }
-
-      console.log('[18] dictation_modal: start modal показана');
 
       try {
         bindStartModalControls();
@@ -6819,9 +6790,7 @@
       } catch (e) {
       }
 
-      console.log('[19] dictation_modal: ProgressPanel создан');
       renderLucide(modal);
-      console.log('[20] dictation_modal: open() завершена');
     } finally {
       dictationModalState.opening = false;
     }
