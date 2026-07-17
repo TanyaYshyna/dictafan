@@ -331,8 +331,9 @@
       console.log('[3] dictation_launch_modal: начинаем загрузку упражнений для id=' + id);
       // 1. Загружаем упражнения
       let exercises = [];
+
+      // Сначала из кэша (если ошибка кэша — не фатально, продолжаем)
       try {
-        // Сначала из кэша
         const idb = window.IdbManager;
         if (idb && typeof idb.idbGet === 'function') {
           const cacheKey = `exercises:${String(id)}`;
@@ -344,17 +345,23 @@
             }));
           }
         }
-        if (!exercises.length) {
+      } catch (e) {
+        try { console.warn('[dictation_launch_modal] cache load error (non-fatal):', e); } catch (e2) {}
+      }
+
+      // Если в кэше нет — загружаем с сервера
+      if (!exercises.length) {
+        try {
           const res = await apiRequest(`/api/dictation/${encodeURIComponent(String(id))}/exercises`, { method: 'GET' });
           const raw = (res && res.success && Array.isArray(res.exercises)) ? res.exercises : [];
           exercises = raw.map((x) => {
             const p = x && typeof x.positions === 'string' ? (() => { try { return JSON.parse(x.positions); } catch (e) { return []; } })() : (x && Array.isArray(x.positions) ? x.positions : []);
             return { id: x && x.id != null ? x.id : null, positions: normalizePositions(p) };
           });
+        } catch (e) {
+          try { console.warn('[dictation_launch_modal] server load error:', e); } catch (e2) {}
+          exercises = [];
         }
-      } catch (e) {
-        try { console.warn('[dictation_launch_modal] load exercises error:', e); } catch (e2) {}
-        exercises = [];
       }
 
       // 2. Загружаем задания на сегодня

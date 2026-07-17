@@ -1,3 +1,22 @@
+// Локальный escapeHtml на случай, если window.escapeHtml ещё не определён
+function _localEscapeHtml(s) {
+  try {
+    return String(s ?? '')
+      .replace(/&/g, '&')
+      .replace(/</g, '<')
+      .replace(/>/g, '>')
+      .replace(/"/g, '"')
+      .replace(/'/g, '&#x27;');
+  } catch (e) {
+    return '';
+  }
+}
+
+function _escapeHtml(s) {
+  if (typeof window.escapeHtml === 'function') return window.escapeHtml(s);
+  return _localEscapeHtml(s);
+}
+
 window.DictationKart = window.DictationKart || {
   _createElementFromHtml(html) {
     const wrap = document.createElement('div');
@@ -774,9 +793,9 @@ window.DictationKart = window.DictationKart || {
               const sig = pos.length ? pos.join(',') : '';
               const label = positionsToLabel(pos);
               return `
-                <button class="dropdown-menu-item" type="button" data-action="launch-assignment-item" data-positions="${window.escapeHtml(sig)}">
+                <button class="dropdown-menu-item" type="button" data-action="launch-assignment-item" data-positions="${_escapeHtml(sig)}">
                   <i data-lucide="play"></i>
-                  <span>${window.escapeHtml(label)}</span>
+                  <span>${_escapeHtml(label)}</span>
                 </button>
               `;
             }).join('');

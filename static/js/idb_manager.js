@@ -3,9 +3,11 @@
     return;
   }
 
+  const DB_VERSION = 2;
+
   async function openDraftDb() {
     return await new Promise((resolve, reject) => {
-      const req = indexedDB.open('dictafan_drafts');
+      const req = indexedDB.open('dictafan_drafts', DB_VERSION);
       req.onupgradeneeded = () => {
         const db = req.result;
         try {
