@@ -1080,22 +1080,17 @@
     try {
       const view = getCurrentSentenceViewFromSession(session);
       if (view) {
-        // Восстанавливаем _textAttemptCount из st (сохраняется между вызовами).
-        // Не сбрасываем в 0 даже при повторе — иначе analyze() подумает,
-        // что это первая попытка, и выдаст starOutcome='perfect' вместо 'half' или null.
+        // Сбрасываем _textAttemptCount — повтор = новый цикл набора текста.
+        // Пользователь начинает вводить текст заново, поэтому счётчик попыток обнуляется.
+        view._textAttemptCount = 0;
         try {
           const st = getCurrentSentenceStateFromSession(session);
-          if (st && st._textAttemptCount != null) {
-            view._textAttemptCount = Number(st._textAttemptCount) || 0;
-          }
-        } catch (e0a_restore) {
+          if (st) st._textAttemptCount = 0;
+        } catch (e0a_reset) {
         }
       }
     } catch (e0a) {
     }
-
-    // _textAttemptCount в st НЕ сбрасываем — он сохраняется между навигацией и повторами.
-    // Сброс происходит только при старте нового диктанта (resetDictationProgressForSession).
 
     try {
       const view = getCurrentSentenceViewFromSession(session);
@@ -1535,8 +1530,27 @@
 
             try {
               if (res && res.allCorrect) {
-                st.number_of_perfect = res.nextPerfect;
-                st.number_of_corrected = res.nextCorrected;
+                // Берём максимум из предыдущего и нового результата.
+                // Звезда > полузвезды > активности.
+                // Если уже была звезда — оставляем звезду.
+                // Если была полузвезда, а новый результат не звезда — оставляем полузвезду.
+                const hadPerfect = Number(st.number_of_perfect) >= 1;
+                const hadCorrected = Number(st.number_of_corrected) > 0;
+                const newPerfect = Number(res.nextPerfect) || 0;
+                const newCorrected = Number(res.nextCorrected) || 0;
+
+                if (hadPerfect) {
+                  // Уже есть звезда — ничего не меняем
+                } else if (hadCorrected && newPerfect < 1) {
+                  // Была полузвезда, новый результат не звезда — оставляем полузвезду
+                  st.number_of_corrected = 1;
+                  st.number_of_perfect = 0;
+                } else {
+                  // Новый результат выше или равен предыдущему
+                  st.number_of_perfect = newPerfect;
+                  st.number_of_corrected = newCorrected;
+                }
+
                 const prevOutcome = st && st._lastStarOutcome != null ? String(st._lastStarOutcome) : '';
                 const nextOutcome = res.starOutcome != null ? String(res.starOutcome) : '';
 
