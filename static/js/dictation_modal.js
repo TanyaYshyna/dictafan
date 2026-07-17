@@ -1398,7 +1398,7 @@
           starOutcome: res?.starOutcome,
           nextPerfect: res?.nextPerfect,
           nextCorrected: res?.nextCorrected,
-        }), 'view._textAttemptCount=' + (view._textAttemptCount) + ' view.key=' + (view ? view.key : 'null'));
+        }), 'textAttemptCount=' + textAttemptCount + ' totalMistakeCount=' + totalMistakeCount + ' view._textAttemptCount=' + (view._textAttemptCount) + ' view.key=' + (view ? view.key : 'null'));
 
         try {
           const notice = document.getElementById('userInputNotice');
@@ -5895,6 +5895,7 @@
         st.audio_activity50_count = 0;
         st.money_count = 0;
         st.money_earned = 0;
+        st._textAttemptCount = 0;
         st.text_exchange_half_star = false;
         st.audio_exchange_mic = false;
         st.all_audio_completed = false;
