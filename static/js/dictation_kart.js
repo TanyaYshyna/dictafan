@@ -659,6 +659,7 @@ window.DictationKart = window.DictationKart || {
       const openLaunchMenu = () => {
         try {
           if (!launchMenu) return;
+          // Закрываем другие выпадающие списки на этой карточке
           document.querySelectorAll('.dictation-kart-launch-menu').forEach((m) => {
             try {
               if (m !== launchMenu) {
@@ -668,6 +669,15 @@ window.DictationKart = window.DictationKart || {
             } catch (e0) {
             }
           });
+          // Закрываем меню "...", если открыто
+          const actionsMenu = cardEl.querySelector('.short-card-actions-menu:not(.dictation-kart-launch-menu)');
+          if (actionsMenu) {
+            try {
+              actionsMenu.classList.remove('show');
+              actionsMenu.style.display = 'none';
+            } catch (e0) {}
+          }
+          cardEl.classList.remove('short-card--menu-open');
           launchMenu.classList.add('show');
           launchMenu.style.display = 'block';
           this._renderLucide(launchMenu);
@@ -779,14 +789,7 @@ window.DictationKart = window.DictationKart || {
           const list = Array.from(uniqueBySig.values());
           console.log('[1c] dictation_kart: exercises list.length=' + list.length);
 
-          if (list.length <= 1) {
-            const only = list[0];
-            const pos = only && Array.isArray(only.positions) ? only.positions : [];
-            console.log('[1c] dictation_kart: list.length <= 1, openDictationModal с pos=' + (pos.length ? pos.join(',') : 'null'));
-            openDictationModal(pos.length ? pos : null);
-            return;
-          }
-
+          // Перышко ВСЕГДА показывает выпадающий список со всеми упражнениями
           try {
             launchMenu.innerHTML = list.map((ex) => {
               const pos = Array.isArray(ex.positions) ? ex.positions : [];
@@ -864,6 +867,14 @@ window.DictationKart = window.DictationKart || {
           } catch (e0) {
           }
         });
+
+        // Закрываем меню перышка, если открыто
+        if (launchMenu) {
+          try {
+            launchMenu.classList.remove('show');
+            launchMenu.style.display = 'none';
+          } catch (e0) {}
+        }
 
         menu.classList.add('show');
         menu.style.display = 'block';
