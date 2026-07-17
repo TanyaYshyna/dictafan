@@ -230,6 +230,21 @@
         }
       };
 
+
+      this._rec.callbacks.onFinalTranscript = (text) => {
+        try {
+          try {
+            if (this.els.userAudioAnswer) {
+              this.els.userAudioAnswer.textContent = text;
+            }
+          } catch (e) {
+          }
+          const pct = this._computeMatchPercentASR(this._expectedText, text);
+          this._setPercent(pct);
+        } catch (e) {
+        }
+      };
+
       this._rec.callbacks.onPercentUpdate = (percent) => {
         this._setPercent(percent);
       };

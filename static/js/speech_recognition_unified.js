@@ -493,6 +493,15 @@
       return this._audioBlob;
     }
 
+    _isAndroidChrome() {
+      try {
+        var ua = navigator.userAgent || '';
+        return ua.indexOf('Android') !== -1 && ua.indexOf('Chrome') !== -1 && ua.indexOf('Edg') === -1;
+      } catch (e) {
+        return false;
+      }
+    }
+
     /* ========== WebSpeech (режим recognition) ========== */
 
     _initWebSpeech() {
@@ -524,7 +533,7 @@
         if (mySessionId !== self._sessionId) return;
 
         var mrState = (self._mediaRecorder && self._mediaRecorder.state) ? String(self._mediaRecorder.state) : '';
-        if (!self.state.isRecording && !self._isFinalizing && mrState !== 'recording') return;
+        if (!self.state.isRecording && !self._isFinalizing && (self._mediaRecorder === null || mrState !== 'recording')) return;
         var interim = '';
         var finalText = '';
         for (var i = event.resultIndex; i < event.results.length; i++) {
