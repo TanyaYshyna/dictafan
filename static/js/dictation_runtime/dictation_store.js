@@ -357,20 +357,27 @@
 
       // Пытаемся найти предложение с таким же ключом в других языках (перевод)
       let translationText = '';
+      let translationAudio = '';
       const blocks = this.content.langBlocks || [];
       if (blocks.length > 1) {
         for (let i = 1; i < blocks.length; i++) {
           const block = blocks[i];
           if (!block || !Array.isArray(block.sentences)) continue;
           const trSentence = block.sentences.find(function(s) { return s.key === String(key); });
-          if (trSentence && trSentence.text) {
-            translationText = String(trSentence.text);
+          if (trSentence) {
+            if (trSentence.text) {
+              translationText = String(trSentence.text);
+            }
+            // Также получаем аудио перевода (если есть)
+            if (trSentence.audio) {
+              translationAudio = String(trSentence.audio);
+            }
             break;
           }
         }
       }
 
-      // Возвращаем обогащённый объект с text_original и text_translation
+      // Возвращаем обогащённый объект с text_original, text_translation и audio_translation
       return {
         key: origSentence.key,
         lang: origSentence.lang,
@@ -378,6 +385,7 @@
         text: origSentence.text,
         text_original: String(origSentence.text || ''),
         text_translation: translationText,
+        audio_translation: translationAudio,
         audio: origSentence.audio,
         audio_file: origSentence.audio_file,
         audio_mic: origSentence.audio_mic,
