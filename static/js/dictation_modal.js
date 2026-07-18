@@ -1486,8 +1486,10 @@
 
         try {
           if (!res.allCorrect) {
-            view._textAttemptCount = (Number(view._textAttemptCount) || 0) + 1;
-            // Сразу сохраняем в st, т.к. view пересоздаётся при каждом getSentenceView()
+            // Читаем из st (персистентное состояние), т.к. view пересоздаётся при каждом getSentenceView()
+            const currentAttemptCount = Number(st._textAttemptCount) || Number(view._textAttemptCount) || 0;
+            view._textAttemptCount = currentAttemptCount + 1;
+            // Сразу сохраняем в st
             try {
               const stForAttempt = session && view && view.key != null ? session.getState(String(view.key)) : null;
               if (stForAttempt) stForAttempt._textAttemptCount = view._textAttemptCount;
