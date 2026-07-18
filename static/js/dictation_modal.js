@@ -991,7 +991,7 @@
 
   /**
    * Сбрасывает UI предложения (поле ввода, подсветку ошибок, кнопки) на основе состояния сессии.
-   * _textAttemptCount НЕ сбрасывается — он восстанавливается из st (сохраняется между вызовами).
+   * mistake_count_current сбрасывается в 0 (см. строку ~1064).
    * @param {Object} session - сессия диктанта
    */
   function resetSentenceUiFromSession(session) {
@@ -1075,21 +1075,6 @@
       const st = getCurrentSentenceStateFromSession(session);
       if (st) st._textAllCorrect = false;
     } catch (e0y) {
-    }
-
-    try {
-      const view = getCurrentSentenceViewFromSession(session);
-      if (view) {
-        // Сбрасываем _textAttemptCount — повтор = новый цикл набора текста.
-        // Пользователь начинает вводить текст заново, поэтому счётчик попыток обнуляется.
-        view._textAttemptCount = 0;
-        try {
-          const st = getCurrentSentenceStateFromSession(session);
-          if (st) st._textAttemptCount = 0;
-        } catch (e0a_reset) {
-        }
-      }
-    } catch (e0a) {
     }
 
     try {
@@ -1276,7 +1261,7 @@
 
         const view = getCurrentSentenceViewFromSession(session);
         if (!view) return;
-        console.log('[DM:checkText] view.key=' + (view ? view.key : 'null') + ' view._textAttemptCount=' + (view._textAttemptCount) + ' view.number_of_perfect=' + (view.number_of_perfect) + ' view.number_of_corrected=' + (view.number_of_corrected) + ' view._textAllCorrect=' + (view._textAllCorrect));
+        console.log('[DM:checkText] view.key=' + (view ? view.key : 'null') + ' view.number_of_perfect=' + (view.number_of_perfect) + ' view.number_of_corrected=' + (view.number_of_corrected) + ' view._textAllCorrect=' + (view._textAllCorrect));
 
         // Если текст уже засчитан как правильный (allCorrect), не даём
         // повторно запускать проверку — это предотвращает дублирование
@@ -1366,15 +1351,12 @@
           const st = getCurrentSentenceStateFromSession(session);
           if (st) {
             totalMistakeCount = Number(st.mistake_count) || 0;
-            // _textAttemptCount хранится в st (сохраняется между вызовами),
-            // т.к. view пересоздаётся при каждом getSentenceView().
-            // Берём из st, с fallback на view для обратной совместимости.
-            textAttemptCount = Number(st._textAttemptCount) || Number(view._textAttemptCount) || 0;
-          } else {
-            textAttemptCount = Number(view._textAttemptCount) || 0;
+            // Используем mistake_count_current — он уже правильно инкрементируется
+            // при каждой проверке с ошибками (см. строки ~1472-1476) и сбрасывается
+            // в 0 при повторе (см. строку ~1064).
+            textAttemptCount = Number(st.mistake_count_current) || 0;
           }
         } catch (eMC) {
-          textAttemptCount = Number(view._textAttemptCount) || 0;
         }
 
         const res = checker.analyze({
@@ -1393,7 +1375,7 @@
           starOutcome: res?.starOutcome,
           nextPerfect: res?.nextPerfect,
           nextCorrected: res?.nextCorrected,
-        }), 'textAttemptCount=' + textAttemptCount + ' totalMistakeCount=' + totalMistakeCount + ' view._textAttemptCount=' + (view._textAttemptCount) + ' view.key=' + (view ? view.key : 'null'));
+        }), 'textAttemptCount=' + textAttemptCount + ' totalMistakeCount=' + totalMistakeCount + ' view.key=' + (view ? view.key : 'null'));
 
         try {
           const notice = document.getElementById('userInputNotice');
@@ -1482,21 +1464,6 @@
             }
           }
         } catch (e6) {
-        }
-
-        try {
-          if (!res.allCorrect) {
-            // Читаем из st (персистентное состояние), т.к. view пересоздаётся при каждом getSentenceView()
-            const currentAttemptCount = Number(st._textAttemptCount) || Number(view._textAttemptCount) || 0;
-            view._textAttemptCount = currentAttemptCount + 1;
-            // Сразу сохраняем в st
-            try {
-              const stForAttempt = session && view && view.key != null ? session.getState(String(view.key)) : null;
-              if (stForAttempt) stForAttempt._textAttemptCount = view._textAttemptCount;
-            } catch (e14b) {
-            }
-          }
-        } catch (e14) {
         }
 
         try {
@@ -1623,11 +1590,6 @@
               }
             } catch (e0b) {
             }
-            try {
-              if (view && view._textAttemptCount != null) st._textAttemptCount = view._textAttemptCount;
-            } catch (e1) {
-            }
-
             try {
               // Rewards are paid in the block above (res.allCorrect), once per reward cycle.
             } catch (e2) {
@@ -5911,7 +5873,6 @@
         st.audio_activity50_count = 0;
         st.money_count = 0;
         st.money_earned = 0;
-        st._textAttemptCount = 0;
         st.text_exchange_half_star = false;
         st.audio_exchange_mic = false;
         st.all_audio_completed = false;
