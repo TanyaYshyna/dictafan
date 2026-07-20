@@ -83,7 +83,12 @@ def _upsert_history_by_day(
     successes_delta: int = 0,
     activity_count_delta: int = 0,
     money_dt_delta: int = 0,
-) -> None:
+) -> int:
+    """Upsert в history_by_day и возвращает id записи.
+
+    После upsert обновляет number_successes — нарастающий итог successes
+    для данного (user_id, dictation_id, positions) на дату date_fact.
+    """
     positions_arr = _normalize_selected_sentence_positions(positions)
     # Если date_start не передан, используем date_fact
     if date_start is None:
@@ -126,6 +131,7 @@ def _upsert_history_by_day(
             dictation_language_code = COALESCE(history_by_day.dictation_language_code, EXCLUDED.dictation_language_code),
             date_start = COALESCE(history_by_day.date_start, EXCLUDED.date_start),
             updated_at = CURRENT_TIMESTAMP
+        RETURNING id
         """,
         (
             int(user_id),
@@ -147,6 +153,194 @@ def _upsert_history_by_day(
             int(money_dt_delta or 0),
         ),
     )
+    row = cur.fetchone()
+    hbd_id = int(row[0]) if row else 0
+
+    # Обновляем number_successes — нарастающий итог successes
+    # для данного (user_id, dictation_id, positions) на дату date_fact
+    if successes_delta != 0:
+        _recalc_number_successes(cur, int(user_id), int(dictation_id), positions_arr, date_fact)
+
+    return hbd_id
+
+
+def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr: list, up_to_date) -> None:
+    """Пересчитать number_successes для (user_id, dictation_id, positions) на дату up_to_date.
+
+    number_successes = сумма successes по всем записям с date_fact <= up_to_date,
+    отсортированным по created_at.
+    """
+    cur.execute(
+        """
+        WITH cumulative AS (
+            SELECT
+                id,
+                SUM(successes) OVER (
+                    PARTITION BY user_id, dictation_id, positions
+                    ORDER BY date_fact ASC, created_at ASC
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS running_total
+            FROM history_by_day
+            WHERE user_id = %s
+              AND dictation_id = %s
+              AND positions = %s
+              AND date_fact <= %s
+            ORDER BY date_fact ASC, created_at ASC
+        )
+        UPDATE history_by_day hbd
+        SET
+            number_successes = c.running_total,
+            updated_at = CURRENT_TIMESTAMP
+        FROM cumulative c
+        WHERE hbd.id = c.id
+          AND c.running_total != COALESCE(hbd.number_successes, 0)
+        """,
+        (user_id, dictation_id, positions_arr, up_to_date),
+    )
+
+
+def _upsert_history_current(cur, user_id: int, dictation_id: int, positions_arr: list) -> None:
+    """Обновить или создать запись в history_current для (user_id, dictation_id, positions).
+
+    number_successes = полная сумма successes из history_by_day для этого упражнения.
+    """
+    cur.execute(
+        """
+        INSERT INTO history_current (user_id, dictation_id, positions, number_successes, created_at, updated_at)
+        SELECT
+            %s AS user_id,
+            %s AS dictation_id,
+            %s AS positions,
+            COALESCE(SUM(successes), 0) AS number_successes,
+            CURRENT_TIMESTAMP AS created_at,
+            CURRENT_TIMESTAMP AS updated_at
+        FROM history_by_day
+        WHERE user_id = %s
+          AND dictation_id = %s
+          AND positions = %s
+        ON CONFLICT (user_id, dictation_id, positions)
+        DO UPDATE SET
+            number_successes = (
+                SELECT COALESCE(SUM(successes), 0)
+                FROM history_by_day
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+            ),
+            updated_at = CURRENT_TIMESTAMP
+        """,
+        (user_id, dictation_id, positions_arr,
+         user_id, dictation_id, positions_arr,
+         user_id, dictation_id, positions_arr),
+    )
+
+
+def get_history_current(user_id: int, dictation_id: int, positions=None) -> int:
+    """Получить number_successes из history_current для упражнения.
+
+    Если записи нет — возвращает 0.
+    """
+    positions_arr = _normalize_selected_sentence_positions(positions)
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT number_successes
+                FROM history_current
+                WHERE user_id = %s
+                  AND dictation_id = %s
+                  AND positions = %s
+                """,
+                (user_id, dictation_id, positions_arr),
+            )
+            row = cur.fetchone()
+            return int(row[0]) if row else 0
+    except Exception as e:
+        print(f'❌ [HISTORY_CURRENT] Ошибка получения: {e}')
+        return 0
+    finally:
+        conn.close()
+
+
+def get_history_current_bulk(user_id: int, dictation_ids: list[int]) -> dict:
+    """Получить number_successes для нескольких диктантов (full, positions=[]).
+
+    Returns:
+        dict: {dictation_id: number_successes, ...}
+    """
+    if not dictation_ids:
+        return {}
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT dictation_id, number_successes
+                FROM history_current
+                WHERE user_id = %s
+                  AND dictation_id = ANY(%s)
+                  AND positions = %s
+                """,
+                (user_id, dictation_ids, []),
+            )
+            rows = cur.fetchall()
+            result = {int(did): int(ns) for did, ns in rows}
+            # Добавляем 0 для тех, чего нет
+            for did in dictation_ids:
+                if did not in result:
+                    result[did] = 0
+            return result
+    except Exception as e:
+        print(f'❌ [HISTORY_CURRENT] Ошибка получения bulk: {e}')
+        return {did: 0 for did in dictation_ids}
+    finally:
+        conn.close()
+
+
+def recalc_history_current_for_user(user_id: int) -> None:
+    """Пересчитать все записи history_current для пользователя из history_by_day."""
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Удаляем старые записи для пользователя
+            cur.execute(
+                "DELETE FROM history_current WHERE user_id = %s",
+                (user_id,),
+            )
+            # Вставляем заново из агрегации history_by_day
+            cur.execute(
+                """
+                INSERT INTO history_current (user_id, dictation_id, positions, number_successes, created_at, updated_at)
+                SELECT
+                    user_id,
+                    dictation_id,
+                    positions,
+                    SUM(successes) AS number_successes,
+                    MIN(created_at) AS created_at,
+                    MAX(updated_at) AS updated_at
+                FROM history_by_day
+                WHERE user_id = %s
+                GROUP BY user_id, dictation_id, positions
+                """,
+                (user_id,),
+            )
+            conn.commit()
+    except Exception as e:
+        conn.rollback()
+        print(f'❌ [HISTORY_CURRENT] Ошибка пересчёта для пользователя {user_id}: {e}')
+        raise
+    finally:
+        conn.close()
+    row = cur.fetchone()
+    hbd_id = int(row[0]) if row else 0
+
+    # Обновляем number_successes — нарастающий итог successes
+    # для данного (user_id, dictation_id, positions) на дату date_fact
+    if successes_delta != 0:
+        _recalc_number_successes(cur, int(user_id), int(dictation_id), positions_arr, date_fact)
+
+    return hbd_id
 
 
 def add_activity(user_id, dictation_id, type_activity, number=1, date_override=None, dictation_language_code=None, selected_sentence_positions=None, lead_time_ms=None):
@@ -834,6 +1028,14 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 money_dt_delta=0,
             )
 
+            # Обновляем history_current — актуальное количество побед для этого упражнения
+            _upsert_history_current(
+                cur,
+                user_id=int(user_id),
+                dictation_id=int(dictation_id),
+                positions_arr=positions_for_hbd,
+            )
+
             conn.commit()
 
             success = {
@@ -927,7 +1129,7 @@ def get_activities_by_date(user_id, dictation_id, date):
 
 def get_success_count(user_id, dictation_id):
     """
-    Получает количество успешных завершений диктанта для пользователя из history_by_day
+    Получает количество успешных завершений диктанта для пользователя из history_current
     
     Args:
         user_id: ID пользователя
@@ -947,8 +1149,8 @@ def get_success_count(user_id, dictation_id):
     try:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT COALESCE(SUM(successes), 0)
-                FROM history_by_day
+                SELECT number_successes
+                FROM history_current
                 WHERE user_id = %s
                   AND dictation_id = %s
                   AND positions = %s
@@ -963,7 +1165,7 @@ def get_success_count(user_id, dictation_id):
 
 
 def get_success_count_for_subset(user_id, dictation_id, selected_sentence_positions):
-    """Count successful completions for an exact assignment subset from history_by_day.
+    """Count successful completions for an exact assignment subset from history_current.
 
     Args:
         user_id: ID пользователя
@@ -986,8 +1188,8 @@ def get_success_count_for_subset(user_id, dictation_id, selected_sentence_positi
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT COALESCE(SUM(successes), 0)
-                FROM history_by_day
+                SELECT number_successes
+                FROM history_current
                 WHERE user_id = %s
                   AND dictation_id = %s
                   AND positions = %s
@@ -1005,7 +1207,7 @@ def get_success_count_for_subset(user_id, dictation_id, selected_sentence_positi
 
 def get_success_counts_for_dictations(user_id, dictation_ids):
     """
-    Получает количество успешных завершений для нескольких диктантов из history_by_day
+    Получает количество успешных завершений для нескольких диктантов из history_current
     
     Args:
         user_id: ID пользователя
@@ -1042,15 +1244,14 @@ def get_success_counts_for_dictations(user_id, dictation_ids):
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Используем ANY для поиска по списку ID
-            # Считаем successes для full dictation (positions = '{}')
+            # Берём из history_current (быстрая таблица-кэш)
+            # Для full dictation (positions = '{}')
             cur.execute("""
-                SELECT dictation_id, COALESCE(SUM(successes), 0) as count
-                FROM history_by_day
+                SELECT dictation_id, number_successes
+                FROM history_current
                 WHERE user_id = %s
                   AND dictation_id = ANY(%s)
                   AND positions = %s
-                GROUP BY dictation_id
             """, (user_id, numeric_ids, []))
             
             rows = cur.fetchall()

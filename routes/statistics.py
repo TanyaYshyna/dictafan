@@ -15,7 +15,7 @@ from helpers.db_history import (
     get_success_count_for_subset,
     get_activity_lead_time_by_day_range,
     get_activity_lead_time_year_bounds,
-    get_successes_sum_from_history_by_day,
+    get_history_current,
     check_and_save_dictation_record,
     get_dictation_record,
     get_all_dictation_records,
@@ -708,9 +708,9 @@ def teacher_report_send():
         completion_count_value = None
     if completion_count_value is None:
         try:
-            # Используем history_by_day.successes с учётом selected_sentence_positions
+            # Используем history_current (быстрая таблица-кэш) с учётом selected_sentence_positions
             selected_sentence_positions = data.get('selected_sentence_positions')
-            completion_count_value = get_successes_sum_from_history_by_day(
+            completion_count_value = get_history_current(
                 int(user.get('id')), int(dictation_int), selected_sentence_positions
             )
         except Exception:
@@ -2395,10 +2395,10 @@ def get_success_counts():
 def get_success_count_subset():
     """Return completion count for an exercise (dictation + sentence positions).
 
-    Counts sum of successes from history_by_day for this dictation_id and positions.
+    Counts from history_current (быстрая таблица-кэш) для этого dictation_id и positions.
     Used for medal display in dictation header.
 
-    NOTE: Данные берутся из history_by_day.successes.
+    NOTE: Данные берутся из history_current (кэш history_by_day.successes).
     """
     try:
         current_email = get_jwt_identity()
@@ -2416,8 +2416,8 @@ def get_success_count_subset():
 
         user_id = int(user['id'])
 
-        # Считаем сумму successes из history_by_day для этого упражнения
-        total = get_successes_sum_from_history_by_day(user_id, dictation_id, selected_sentence_positions)
+        # Берём из history_current (быстрая таблица-кэш)
+        total = get_history_current(user_id, dictation_id, selected_sentence_positions)
 
         return jsonify({'success': True, 'count': total})
     except Exception as e:
