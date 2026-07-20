@@ -572,8 +572,47 @@
   }
 
   /**
-   * Загрузить completionCount из БД (если есть интернет) и обновить сессию + медальку.
-   * Если интернета нет — используем то, что уже есть в сессии.
+   * Получить ключ для кеша history_current в localStorage.
+   */
+  function _historyCurrentCacheKey(userId, dictationId, positions) {
+    const posStr = Array.isArray(positions) ? positions.join(',') : '';
+    return `history_current:${userId}:${dictationId}:${posStr}`;
+  }
+
+  /**
+   * Сохранить completionCount в localStorage (кеш для офлайн-режима).
+   */
+  function _cacheCompletionCount(userId, dictationId, positions, count) {
+    try {
+      const key = _historyCurrentCacheKey(userId, dictationId, positions);
+      const entry = {
+        count: Number(count) || 0,
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(key, JSON.stringify(entry));
+    } catch (e) {
+      // localStorage может быть переполнен
+    }
+  }
+
+  /**
+   * Прочитать completionCount из localStorage (кеш для офлайн-режима).
+   */
+  function _getCachedCompletionCount(userId, dictationId, positions) {
+    try {
+      const key = _historyCurrentCacheKey(userId, dictationId, positions);
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const entry = JSON.parse(raw);
+      return Number(entry.count) || 0;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Загрузить completionCount из БД (через history_current) и обновить сессию + медальку.
+   * Если интернета нет — используем кеш localStorage, затем session.completionCount.
    */
   async function loadCompletionCount(session) {
     if (!session) return;
@@ -604,9 +643,36 @@
       const count = Number(data.count) || 0;
       session.completionCount = count;
       updateMedalDisplay(count);
+
+      // Кешируем в localStorage для офлайн-доступа
+      try {
+        const userId = window.UM?.userId || null;
+        if (userId) {
+          _cacheCompletionCount(userId, dictationId, selectedSentencePositions, count);
+        }
+      } catch (eCache) {
+        // не критично
+      }
     } catch (e) {
-      // Если нет интернета — оставляем session.completionCount как есть
-      updateMedalDisplay(session.completionCount || 0);
+      // Если нет интернета — пробуем кеш localStorage
+      let cachedCount = null;
+      try {
+        const dictationId = getCurrentDictationIdForDb();
+        const selectedSentencePositions = _getSelectedSentencePositions(session);
+        const userId = window.UM?.userId || null;
+        if (userId && dictationId) {
+          cachedCount = _getCachedCompletionCount(userId, dictationId, selectedSentencePositions);
+        }
+      } catch (eCache) {
+        // ignore
+      }
+      if (cachedCount != null) {
+        session.completionCount = cachedCount;
+        updateMedalDisplay(cachedCount);
+      } else {
+        // Оставляем session.completionCount как есть
+        updateMedalDisplay(session.completionCount || 0);
+      }
     }
   }
   function showCompletionModal() {
@@ -679,6 +745,18 @@
         session.completionCount = (Number(session.completionCount) || 0) + 1;
         completionCountAfter = session.completionCount;
         updateMedalDisplay(session.completionCount);
+
+        // Обновляем кеш в localStorage
+        try {
+          const userId = window.UM?.userId || null;
+          const dictationId = getCurrentDictationIdForDb();
+          const selectedSentencePositions = _getSelectedSentencePositions(session);
+          if (userId && dictationId) {
+            _cacheCompletionCount(userId, dictationId, selectedSentencePositions, session.completionCount);
+          }
+        } catch (eCache) {
+          // не критично
+        }
       }
     } catch (eCc) {
     }
