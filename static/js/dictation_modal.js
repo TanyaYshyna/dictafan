@@ -1137,6 +1137,13 @@
     } catch (e0completed) {
     }
 
+    // Если мы сбрасываем UI для нового предложения (не выполненного),
+    // возобновляем таймер — он мог быть остановлен при завершении предыдущего предложения.
+    try {
+      _resumeDictationTimer();
+    } catch (eResume) {
+    }
+
     try {
       const st = getCurrentSentenceStateFromSession(session);
       if (st) {
@@ -2911,26 +2918,9 @@
     } catch (e) {
     }
 
-    // Обновляем состояние кнопки "Проверить-повторить" при навигации
-    try {
-      // В режимах p3 и p4 кнопка проверки скрыта, не обновляем её состояние
-      if (mode !== 'audio-only-no-hint' && mode !== 'audio-only-hint') {
-        const lastAllCorrect = !!(st && st._textAllCorrect);
-        if (perfect >= 1) {
-          setCheckButtonState('star');
-        } else if (corrected > 0 && lastAllCorrect) {
-          setCheckButtonState('half');
-        } else if (corrected > 0 && !lastAllCorrect) {
-          // corrected > 0, но текст сброшен (повтор) — показываем ready
-          setCheckButtonState('ready');
-        } else if (textCoins > 0 && lastAllCorrect) {
-          setCheckButtonState('repeat_activity');
-        } else {
-          setCheckButtonState('ready');
-        }
-      }
-    } catch (e) {
-    }
+    // Состояние кнопки "Проверить-повторить" НЕ обновляется здесь.
+    // Эту кнопку устанавливает только checkText() на основе результата проверки текста.
+    // Аудио-процедура (onRecognitionComplete) не должна влиять на кнопку "Проверить".
 
     try {
       updateNextButtonVisibilityFromSession(session);
