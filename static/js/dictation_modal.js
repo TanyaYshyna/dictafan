@@ -1139,7 +1139,12 @@
 
     try {
       const st = getCurrentSentenceStateFromSession(session);
-      if (st) st.mistake_count_current = 0;
+      if (st) {
+        st.mistake_count_current = 0;
+        // Сбрасываем audio_activity50_count при смене предложения,
+        // чтобы счётчик 50-80% записей начинался с 0 для нового предложения.
+        st.audio_activity50_count = 0;
+      }
     } catch (e0) {
     }
 
@@ -1645,6 +1650,18 @@
 
                 if (nextOutcome && nextOutcome !== prevOutcome) {
                   st._lastStarOutcome = nextOutcome;
+                }
+
+                // После обновления результата текста проверяем, выполнен ли
+                // академический минимум для предложения. Если да — обновляем
+                // кнопку "Далее" и ставим таймер на паузу.
+                try {
+                  const completion = computeSentenceCompletionState(st);
+                  if (completion.textOk && completion.audioOk) {
+                    updateNextButtonVisibilityFromSession(session);
+                    _pauseDictationTimer();
+                  }
+                } catch (eComp) {
                 }
               }
             } catch (e0star) {
@@ -2750,10 +2767,12 @@
       const btn = document.getElementById('resultNextBtn');
       if (!btn) return;
       let st = null;
+      let usedKey = null;
       try {
         const view = getCurrentSentenceViewFromSession(session);
         if (view && view.key != null && session && typeof session.getState === 'function') {
-          st = session.getState(String(view.key));
+          usedKey = String(view.key);
+          st = session.getState(usedKey);
         }
       } catch (e0s) {
       }
@@ -2764,10 +2783,15 @@
         btn.classList.add('button-color-gray');
         return;
       }
+      const perfect = Number(st.number_of_perfect) || 0;
+      const corrected = Number(st.number_of_corrected) || 0;
+      const audioDone = Number(st.number_of_audio) || 0;
       const { textOk, audioOk, requiresAudio } = computeSentenceCompletionState(st);
 
       // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
       const canNext = !!(textOk && audioOk);
+
+      console.log('[DM:updateNextButtonVisibility] key=' + usedKey + ' perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' textOk=' + textOk + ' audioOk=' + audioOk + ' canNext=' + canNext);
 
       btn.disabled = !canNext;
       btn.classList.remove('button-color-yellow', 'button-color-gray');
@@ -3684,7 +3708,8 @@
               try {
                 _add = getPricingValue('audio_activity_reward', 1);
                 console.log('[DM:onRecognitionComplete] _add (audio_activity_reward)=' + _add);
-                st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
+                // audio_activity50_count НЕ увеличивается при ok=true (≥80%).
+                // Этот счётчик только для записей 50-80% (см. ветку else if ниже).
                 st.money_count = (Number(st.money_count) || 0) + _add;
                 st.money_earned = (Number(st.money_earned) || 0) + _add;
                 console.log('[DM:onRecognitionComplete] ПОСЛЕ НАЧИСЛЕНИЯ: st.money_count=' + st.money_count + ' st.money_earned=' + st.money_earned);
@@ -3697,6 +3722,17 @@
               // Аудио: символы и ошибки не добавляются (0, 0)
               const haResult = await handleActivity('audio', st, _key, session, _add, 0, 0);
               console.log('[DM:onRecognitionComplete] after handleActivity, haResult=' + haResult);
+
+              // После успешного аудио проверяем, выполнен ли академический минимум.
+              // Если да — обновляем кнопку "Далее" и ставим таймер на паузу.
+              try {
+                const completion = computeSentenceCompletionState(st);
+                if (completion.textOk && completion.audioOk) {
+                  updateNextButtonVisibilityFromSession(session);
+                  _pauseDictationTimer();
+                }
+              } catch (eCompAudio) {
+              }
             } else if (pct >= 50) {
               console.log('[DM:onRecognitionComplete] else if pct>=50: pct=' + pct);
               st.audio_activity50_count = (Number(st.audio_activity50_count) || 0) + 1;
