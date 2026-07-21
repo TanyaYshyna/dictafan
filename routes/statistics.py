@@ -1108,6 +1108,7 @@ def save_activity():
         activity_date = data.get('date')  # опционально: YYYY-MM-DD
         dictation_language_code = data.get('dictation_language_code')
         selected_sentence_positions = data.get('selected_sentence_positions')
+        date_start = data.get('date_start')  # опционально: YYYY-MM-DD HH:MM:SS (идентификатор сессии)
 
         perfect_count = data.get('perfect_count')
         corrected_count = data.get('corrected_count')
@@ -1165,6 +1166,7 @@ def save_activity():
                 date_override=activity_date,
                 dictation_language_code=dictation_language_code,
                 selected_sentence_positions=selected_sentence_positions,
+                date_start=date_start,
             )
         else:
             activity = add_activity(

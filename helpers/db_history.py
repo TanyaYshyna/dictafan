@@ -167,8 +167,8 @@ def _upsert_history_by_day(
 def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr: list, up_to_date) -> None:
     """Пересчитать number_successes для (user_id, dictation_id, positions) на дату up_to_date.
 
-    number_successes = сумма successes по всем записям с date_fact <= up_to_date,
-    отсортированным по created_at.
+    number_successes = порядковый номер выполнения в рамках одного дня (date_fact),
+    т.е. для каждого дня нумерация начинается с 1.
     """
     cur.execute(
         """
@@ -176,8 +176,8 @@ def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr
             SELECT
                 id,
                 SUM(successes) OVER (
-                    PARTITION BY user_id, dictation_id, positions
-                    ORDER BY date_fact ASC, created_at ASC
+                    PARTITION BY user_id, dictation_id, positions, date_fact
+                    ORDER BY created_at ASC
                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                 ) AS running_total
             FROM history_by_day
@@ -670,6 +670,7 @@ def add_activity_bulk(
     date_override=None,
     dictation_language_code=None,
     selected_sentence_positions=None,
+    date_start=None,
 ):
     if isinstance(dictation_id, str):
         if dictation_id.startswith('dict_'):
@@ -706,6 +707,21 @@ def add_activity_bulk(
                 target_date = datetime.now().date()
         else:
             target_date = date_override
+
+    # date_plan = дата начала сессии (из date_start, без времени), если date_start передан
+    # date_fact = сегодня (фактический день выполнения)
+    if date_start is not None:
+        if isinstance(date_start, str):
+            try:
+                date_start_clean = date_start.strip()
+                # Извлекаем только дату из строки вида "YYYY-MM-DD HH:MM:SS"
+                date_plan = datetime.fromisoformat(date_start_clean[:10]).date()
+            except Exception:
+                date_plan = target_date
+        else:
+            date_plan = target_date
+    else:
+        date_plan = target_date
 
     try:
         perfect_count_int = int(perfect_count or 0)
@@ -784,8 +800,9 @@ def add_activity_bulk(
                 dictation_language_code=dictation_language_code,
                 dictation_id=int(dictation_id),
                 positions=selected_sentence_positions_arr,
-                date_plan=target_date,
+                date_plan=date_plan,
                 date_fact=target_date,
+                date_start=date_start,
                 perfect_delta=int(perfect_count_int or 0),
                 corrected_delta=int(corrected_count_int or 0),
                 audio_delta=int(audio_count_int or 0),
@@ -1041,21 +1058,25 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
         with conn.cursor() as cur:
             teacher_id = _resolve_teacher_id(cur, int(user_id), source_group_id)
             date_fact = datetime.now().date()
-            date_plan = date_fact
 
-            # date_start: если передан — используем его (теперь TIMESTAMP, может быть с временем), иначе date_fact
+            # date_start: если передан — используем его (TIMESTAMP с временем), иначе date_fact
             if date_start is not None:
                 try:
                     if isinstance(date_start, str):
                         ds = date_start.strip()
                         # PostgreSQL сам сконвертирует строку в TIMESTAMP
                         date_start_parsed = ds
+                        # date_plan = дата начала сессии (из date_start, без времени)
+                        date_plan = datetime.fromisoformat(ds[:10]).date()
                     else:
                         date_start_parsed = date_start
+                        date_plan = date_fact
                 except Exception:
                     date_start_parsed = date_fact
+                    date_plan = date_fact
             else:
                 date_start_parsed = date_fact
+                date_plan = date_fact
 
             # Нормализуем selected_sentence_positions для history_by_day
             positions_for_hbd = _normalize_selected_sentence_positions(selected_sentence_positions)
