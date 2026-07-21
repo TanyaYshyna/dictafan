@@ -244,20 +244,17 @@ def _upsert_history_current(
     *,
     mistake_count: int = 0,
     lead_time: int = 0,
-    id_record: int,
 ) -> None:
     """Обновить или создать запись в history_current для (user_id, dictation_id, positions).
 
     Обновляет:
       - number_successes = полная сумма successes из history_by_day для этого упражнения
-      - mistake_count, lead_time, id_record — данные рекорда
-
-    Первое выполнение диктанта всегда становится рекордом, поэтому id_record обязателен.
+      - mistake_count, lead_time — данные рекорда
     """
     cur.execute(
         """
         INSERT INTO history_current (user_id, dictation_id, positions, number_successes,
-                                     mistake_count, lead_time, id_record,
+                                     mistake_count, lead_time,
                                      created_at, updated_at)
         SELECT
             %s AS user_id,
@@ -266,7 +263,6 @@ def _upsert_history_current(
             COALESCE(SUM(successes), 0) AS number_successes,
             %s AS mistake_count,
             %s AS lead_time,
-            %s AS id_record,
             CURRENT_TIMESTAMP AS created_at,
             CURRENT_TIMESTAMP AS updated_at
         FROM history_by_day
@@ -284,11 +280,10 @@ def _upsert_history_current(
             ),
             mistake_count = EXCLUDED.mistake_count,
             lead_time = EXCLUDED.lead_time,
-            id_record = EXCLUDED.id_record,
             updated_at = CURRENT_TIMESTAMP
         """,
         (user_id, dictation_id, positions_arr,
-         int(mistake_count or 0), int(lead_time or 0), int(id_record),
+         int(mistake_count or 0), int(lead_time or 0),
          user_id, dictation_id, positions_arr,
          user_id, dictation_id, positions_arr),
     )
@@ -360,8 +355,9 @@ def get_history_current_bulk(user_id: int, dictation_ids: list[int]) -> dict:
 def recalc_history_current_for_user(user_id: int) -> None:
     """Пересчитать все записи history_current для пользователя из history_by_day.
 
-    Также заполняет поля рекорда (mistake_count, lead_time, id_record)
-    из dictation_records.
+    Поля рекорда (mistake_count, lead_time) не заполняются при пересчёте —
+    они будут установлены при следующем прохождении диктанта
+    через check_and_save_dictation_record().
     """
     conn = get_db_connection()
     try:
@@ -371,28 +367,24 @@ def recalc_history_current_for_user(user_id: int) -> None:
                 "DELETE FROM history_current WHERE user_id = %s",
                 (user_id,),
             )
-            # Вставляем заново из агрегации history_by_day + LEFT JOIN dictation_records
+            # Вставляем заново из агрегации history_by_day
             cur.execute(
                 """
                 INSERT INTO history_current (user_id, dictation_id, positions, number_successes,
-                                             mistake_count, lead_time, id_record,
+                                             mistake_count, lead_time,
                                              created_at, updated_at)
                 SELECT
                     hbd.user_id,
                     hbd.dictation_id,
                     hbd.positions,
                     SUM(hbd.successes) AS number_successes,
-                    COALESCE(dr.mistake_count, 0) AS mistake_count,
-                    COALESCE(dr.lead_time, 0) AS lead_time,
-                    dr.id AS id_record,
+                    0 AS mistake_count,
+                    0 AS lead_time,
                     MIN(hbd.created_at) AS created_at,
                     MAX(hbd.updated_at) AS updated_at
                 FROM history_by_day hbd
-                LEFT JOIN dictation_records dr ON dr.user_id = hbd.user_id
-                    AND dr.dictation_id = hbd.dictation_id
-                    AND dr.positions = hbd.positions
                 WHERE hbd.user_id = %s
-                GROUP BY hbd.user_id, hbd.dictation_id, hbd.positions, dr.mistake_count, dr.lead_time, dr.id
+                GROUP BY hbd.user_id, hbd.dictation_id, hbd.positions
                 """,
                 (user_id,),
             )
@@ -1453,14 +1445,13 @@ def check_and_save_dictation_record(
 ) -> dict:
     """
     Проверяет, является ли текущий результат рекордом для пользователя по диктанту.
-    Если да — сохраняет/обновляет запись в dictation_records И в history_current.
+    Если да — сохраняет/обновляет запись в history_current.
 
     Критерий рекорда:
       1) Минимальное количество ошибок (mistake_count)
       2) Если ошибок столько же (или 0) — минимальное время (lead_time)
 
-    Теперь рекорд читается из history_current (поля mistake_count, lead_time),
-    а при установке нового рекорда обновляются и dictation_records, и history_current.
+    Рекорд читается и сохраняется в history_current (поля mistake_count, lead_time).
 
     Args:
         user_id: ID пользователя
@@ -1518,125 +1509,32 @@ def check_and_save_dictation_record(
                 # иначе — не рекорд
 
             if is_record:
-                # Вставляем или обновляем рекорд в dictation_records
-                cur.execute(
-                    """
-                    INSERT INTO dictation_records (
-                        user_id, dictation_id, positions, date_of_victory,
-                        perfect_count, corrected_count, audio_count, activity_count,
-                        lead_time, mistake_count, monenumber_of_characters, money_dt_count,
-                        created_at, updated_at
-                    )
-                    VALUES (%s, %s, %s, CURRENT_TIMESTAMP, %s, %s, %s, %s, %s, %s, %s, %s,
-                            CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                    ON CONFLICT (user_id, dictation_id, positions)
-                    DO UPDATE SET
-                        date_of_victory = CURRENT_TIMESTAMP,
-                        perfect_count = EXCLUDED.perfect_count,
-                        corrected_count = EXCLUDED.corrected_count,
-                        audio_count = EXCLUDED.audio_count,
-                        activity_count = EXCLUDED.activity_count,
-                        lead_time = EXCLUDED.lead_time,
-                        mistake_count = EXCLUDED.mistake_count,
-                        monenumber_of_characters = EXCLUDED.monenumber_of_characters,
-                        money_dt_count = EXCLUDED.money_dt_count,
-                        updated_at = CURRENT_TIMESTAMP
-                    RETURNING
-                        id, user_id, dictation_id, positions, date_of_victory,
-                        perfect_count, corrected_count, audio_count, activity_count,
-                        lead_time, mistake_count, monenumber_of_characters, money_dt_count
-                    """,
-                    (
-                        int(user_id),
-                        int(dictation_id),
-                        positions_arr,
-                        int(perfect_count or 0),
-                        int(corrected_count or 0),
-                        int(audio_count or 0),
-                        int(activity_count or 0),
-                        int(lead_time or 0),
-                        int(mistake_count or 0),
-                        int(monenumber_of_characters or 0),
-                        int(money_dt_count or 0),
-                    ),
+                # Обновляем history_current с новым рекордом
+                _upsert_history_current(
+                    cur,
+                    user_id=int(user_id),
+                    dictation_id=int(dictation_id),
+                    positions_arr=positions_arr,
+                    mistake_count=int(mistake_count or 0),
+                    lead_time=int(lead_time or 0),
                 )
-                dr_row = cur.fetchone()
-
-                if dr_row:
-                    record_id = int(dr_row[0])
-                    record_data = {
-                        'id': record_id,
-                        'user_id': int(dr_row[1]),
-                        'dictation_id': int(dr_row[2]),
-                        'positions': list(dr_row[3]) if dr_row[3] else [],
-                        'date_of_victory': dr_row[4].isoformat() if hasattr(dr_row[4], 'isoformat') else str(dr_row[4]),
-                        'perfect_count': int(dr_row[5] or 0),
-                        'corrected_count': int(dr_row[6] or 0),
-                        'audio_count': int(dr_row[7] or 0),
-                        'activity_count': int(dr_row[8] or 0),
-                        'lead_time': int(dr_row[9] or 0),
-                        'mistake_count': int(dr_row[10] or 0),
-                        'monenumber_of_characters': int(dr_row[11] or 0),
-                        'money_dt_count': int(dr_row[12] or 0),
-                    }
-
-                    # Обновляем history_current с новым рекордом
-                    _upsert_history_current(
-                        cur,
-                        user_id=int(user_id),
-                        dictation_id=int(dictation_id),
-                        positions_arr=positions_arr,
-                        mistake_count=int(mistake_count or 0),
-                        lead_time=int(lead_time or 0),
-                        id_record=record_id,
-                    )
-                else:
-                    record_data = None
 
                 conn.commit()
 
                 return {
                     'is_record': True,
-                    'record': record_data,
+                    'record': {
+                        'mistake_count': int(mistake_count or 0),
+                        'lead_time': int(lead_time or 0),
+                    },
                     'is_first': is_first,
                 }
             else:
-                # Не рекорд — возвращаем существующий рекорд из dictation_records
-                # (полные данные рекорда). hc_row гарантированно есть, id_record NOT NULL.
-                cur.execute(
-                    """
-                    SELECT
-                        id, user_id, dictation_id, positions, date_of_victory,
-                        perfect_count, corrected_count, audio_count, activity_count,
-                        lead_time, mistake_count, monenumber_of_characters, money_dt_count
-                    FROM history_current hc
-                    JOIN dictation_records dr ON dr.id = hc.id_record
-                    WHERE hc.user_id = %s
-                      AND hc.dictation_id = %s
-                      AND hc.positions = %s
-                    """,
-                    (int(user_id), int(dictation_id), positions_arr),
-                )
-                existing = cur.fetchone()
-
-                if existing:
-                    record_data = {
-                        'id': int(existing[0]),
-                        'user_id': int(existing[1]),
-                        'dictation_id': int(existing[2]),
-                        'positions': list(existing[3]) if existing[3] else [],
-                        'date_of_victory': existing[4].isoformat() if hasattr(existing[4], 'isoformat') else str(existing[4]),
-                        'perfect_count': int(existing[5] or 0),
-                        'corrected_count': int(existing[6] or 0),
-                        'audio_count': int(existing[7] or 0),
-                        'activity_count': int(existing[8] or 0),
-                        'lead_time': int(existing[9] or 0),
-                        'mistake_count': int(existing[10] or 0),
-                        'monenumber_of_characters': int(existing[11] or 0),
-                        'money_dt_count': int(existing[12] or 0),
-                    }
-                else:
-                    record_data = None
+                # Не рекорд — возвращаем существующий рекорд из history_current
+                record_data = {
+                    'mistake_count': int(hc_row[0] or 0),
+                    'lead_time': int(hc_row[1] or 0),
+                }
 
                 return {
                     'is_record': False,
@@ -1662,7 +1560,7 @@ def check_and_save_dictation_record(
 def get_dictation_record(user_id: int, dictation_id: int, positions=None) -> dict | None:
     """Получить текущий рекорд пользователя по диктанту.
 
-    Читает id_record из history_current, затем полные данные из dictation_records.
+    Читает mistake_count и lead_time напрямую из history_current.
 
     Args:
         user_id: ID пользователя
@@ -1677,10 +1575,11 @@ def get_dictation_record(user_id: int, dictation_id: int, positions=None) -> dic
     conn = get_db_connection()
     try:
         with conn.cursor() as cur:
-            # Сначала получаем id_record из history_current
             cur.execute(
                 """
-                SELECT id_record
+                SELECT
+                    mistake_count,
+                    lead_time
                 FROM history_current
                 WHERE user_id = %s
                   AND dictation_id = %s
@@ -1688,45 +1587,19 @@ def get_dictation_record(user_id: int, dictation_id: int, positions=None) -> dic
                 """,
                 (int(user_id), int(dictation_id), positions_arr),
             )
-            hc_row = cur.fetchone()
-
-            if not hc_row:
-                return None
-
-            # Получаем полные данные рекорда из dictation_records по id_record
-            cur.execute(
-                """
-                SELECT
-                    id, user_id, dictation_id, positions, date_of_victory,
-                    perfect_count, corrected_count, audio_count, activity_count,
-                    lead_time, mistake_count, monenumber_of_characters, money_dt_count
-                FROM dictation_records
-                WHERE id = %s
-                """,
-                (int(hc_row[0]),),
-            )
             row = cur.fetchone()
 
             if not row:
                 return None
 
             return {
-                'id': int(row[0]),
-                'user_id': int(row[1]),
-                'dictation_id': int(row[2]),
-                'positions': list(row[3]) if row[3] else [],
-                'date_of_victory': row[4].isoformat() if hasattr(row[4], 'isoformat') else str(row[4]),
-                'perfect_count': int(row[5] or 0),
-                'corrected_count': int(row[6] or 0),
-                'audio_count': int(row[7] or 0),
-                'activity_count': int(row[8] or 0),
-                'lead_time': int(row[9] or 0),
-                'mistake_count': int(row[10] or 0),
-                'monenumber_of_characters': int(row[11] or 0),
-                'money_dt_count': int(row[12] or 0),
+                'dictation_id': dictation_id,
+                'positions': positions_arr,
+                'mistake_count': int(row[0] or 0),
+                'lead_time': int(row[1] or 0),
             }
     except Exception as e:
-        print(f'❌ [DICTATION_RECORDS] Ошибка получения рекорда: {e}')
+        print(f'❌ [HISTORY_CURRENT] Ошибка получения рекорда: {e}')
         return None
     finally:
         conn.close()
@@ -1735,7 +1608,7 @@ def get_dictation_record(user_id: int, dictation_id: int, positions=None) -> dic
 def get_all_dictation_records(user_id: int) -> list[dict]:
     """Получить все рекорды пользователя по всем диктантам.
 
-    Через JOIN history_current → dictation_records по id_record.
+    Читает mistake_count и lead_time напрямую из history_current.
     Возвращает только те упражнения, где есть рекорд.
 
     Args:
@@ -1743,9 +1616,7 @@ def get_all_dictation_records(user_id: int) -> list[dict]:
 
     Returns:
         list[dict] — список рекордов, каждый с полями:
-          dictation_id, positions, perfect_count, corrected_count,
-          audio_count, activity_count, lead_time, mistake_count,
-          monenumber_of_characters, money_dt_count
+          dictation_id, positions, lead_time, mistake_count
     """
     conn = get_db_connection()
     try:
@@ -1753,13 +1624,12 @@ def get_all_dictation_records(user_id: int) -> list[dict]:
             cur.execute(
                 """
                 SELECT
-                    dr.dictation_id, dr.positions,
-                    dr.perfect_count, dr.corrected_count, dr.audio_count, dr.activity_count,
-                    dr.lead_time, dr.mistake_count, dr.monenumber_of_characters, dr.money_dt_count
-                FROM history_current hc
-                JOIN dictation_records dr ON dr.id = hc.id_record
-                WHERE hc.user_id = %s
-                ORDER BY dr.dictation_id, dr.positions
+                    dictation_id, positions,
+                    mistake_count, lead_time
+                FROM history_current
+                WHERE user_id = %s
+                  AND (mistake_count IS NOT NULL OR lead_time IS NOT NULL)
+                ORDER BY dictation_id, positions
                 """,
                 (int(user_id),),
             )
@@ -1769,18 +1639,12 @@ def get_all_dictation_records(user_id: int) -> list[dict]:
                 result.append({
                     'dictation_id': int(row[0]),
                     'positions': list(row[1]) if row[1] else [],
-                    'perfect_count': int(row[2] or 0),
-                    'corrected_count': int(row[3] or 0),
-                    'audio_count': int(row[4] or 0),
-                    'activity_count': int(row[5] or 0),
-                    'lead_time': int(row[6] or 0),
-                    'mistake_count': int(row[7] or 0),
-                    'monenumber_of_characters': int(row[8] or 0),
-                    'money_dt_count': int(row[9] or 0),
+                    'mistake_count': int(row[2] or 0),
+                    'lead_time': int(row[3] or 0),
                 })
             return result
     except Exception as e:
-        print(f'❌ [DICTATION_RECORDS] Ошибка получения всех рекордов: {e}')
+        print(f'❌ [HISTORY_CURRENT] Ошибка получения всех рекордов: {e}')
         return []
     finally:
         conn.close()
