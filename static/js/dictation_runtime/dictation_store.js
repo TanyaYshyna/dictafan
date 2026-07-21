@@ -493,11 +493,8 @@
     }
 
     setContentSentences({ dictationId, sentences }) {
-      console.log('[DictationStore:setContentSentences] dictationId=' + dictationId + ', sentences length=' + (Array.isArray(sentences) ? sentences.length : 'N/A'));
       const content = this.getOrCreateContent({ dictationId });
-      console.log('[DictationStore:setContentSentences] content=' + (content ? 'есть' : 'null') + ', langBlocks before=' + (content ? content.langBlocks.length : 'N/A'));
       content.setSentences(sentences);
-      console.log('[DictationStore:setContentSentences] langBlocks after=' + content.langBlocks.length + ', allKeys=' + content.getAllKeys().length);
       return content;
     }
 

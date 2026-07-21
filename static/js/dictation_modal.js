@@ -2807,7 +2807,6 @@
       // Кнопка "Далее" всегда видна, но доступна только когда textOk && audioOk
       const canNext = !!(textOk && audioOk);
 
-      console.log('[DM:updateNextButtonVisibility] key=' + usedKey + ' perfect=' + perfect + ' corrected=' + corrected + ' audioDone=' + audioDone + ' requiresAudio=' + requiresAudio + ' textOk=' + textOk + ' audioOk=' + audioOk + ' canNext=' + canNext);
 
       btn.disabled = !canNext;
       btn.classList.remove('button-color-yellow', 'button-color-gray');
@@ -4466,17 +4465,14 @@
   }
 
   async function loadSentencesFromIndexedDb({ dictationId }) {
-    console.log('[DM:loadFromIdb] dictationId=' + dictationId);
     try {
       const idb = window.IdbManager;
       if (!idb || typeof idb.idbGet !== 'function' || typeof idb.openDraftDb !== 'function') {
-        console.log('[DM:loadFromIdb] IdbManager недоступен, return null');
         return null;
       }
 
       const dictId = String(dictationId || '').trim();
       if (!dictId) {
-        console.log('[DM:loadFromIdb] dictId пустой, return null');
         return null;
       }
 
@@ -4492,19 +4488,16 @@
         }
       } catch (e) {
       }
-      console.log('[DM:loadFromIdb] candidateKeys=' + candidateKeys.join(', '));
 
       let cached = null;
       for (const key of candidateKeys) {
         cached = await idb.idbGet('dictations', key);
         const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
-        console.log('[DM:loadFromIdb] key=' + key + ', sentences=' + sentences.length);
         if (sentences.length) break;
         cached = null;
       }
 
       if (!cached) {
-        console.log('[DM:loadFromIdb] по ключам не найдено, ищем через cursor по dictationId=' + dictId);
         const db = await idb.openDraftDb();
         try {
           cached = await new Promise((resolve) => {
@@ -4528,18 +4521,14 @@
           } catch (e) {
           }
         }
-        console.log('[DM:loadFromIdb] cursor поиск: cached=' + (cached ? 'найден' : 'null'));
       }
 
       const sentences = cached && Array.isArray(cached.sentences) ? cached.sentences : [];
-      console.log('[DM:loadFromIdb] итого sentences=' + sentences.length);
       if (!sentences.length) {
-        console.log('[DM:loadFromIdb] sentences пустой, return null');
         return null;
       }
       return sentences;
     } catch (e) {
-      console.log('[DM:loadFromIdb] ошибка: ' + (e && e.message ? e.message : String(e)));
       return null;
     }
   }
@@ -4636,23 +4625,18 @@
 
   async function ensureDictationContentLoadedToRuntime({ dictationIdFormatted }) {
     const store = getRuntimeStore();
-    console.log('[DM:ensureContent] dictationIdFormatted=' + dictationIdFormatted + ', store=' + (store ? 'есть' : 'null'));
+    console.log(' dictationIdFormatted=' + dictationIdFormatted + ', store=' + (store ? 'есть' : 'null'));
     if (!store) {
-      console.log('[DM:ensureContent] store отсутствует, throw');
-      throw new Error('DictationRuntime_not_loaded');
+     throw new Error('DictationRuntime_not_loaded');
     }
 
     const dictationId = String(dictationIdFormatted || '').trim();
-    console.log('[DM:ensureContent] dictationId=' + dictationId);
     if (!dictationId) {
-      console.log('[DM:ensureContent] dictationId пустой, throw');
       throw new Error('missing_dictation_params');
     }
 
     let sentences = await loadSentencesFromIndexedDb({ dictationId });
-    console.log('[DM:ensureContent] из IndexedDb получено sentences=' + (Array.isArray(sentences) ? sentences.length : 'не массив'));
     if (!Array.isArray(sentences) || sentences.length === 0) {
-      console.log('[DM:ensureContent] sentences в кеше нет, загружаем с сервера');
       try {
         if (window.DesktopToast && typeof window.DesktopToast.show === 'function') {
           window.DesktopToast.show('Данных нет в кеше. Загружаю из интернета…', 'info', 2500);
@@ -5493,16 +5477,12 @@
   }
 
   function showStartModal() {
-    console.log('[DM:showStartModal] вызван');
     try {
       const startModal = document.getElementById('start-modal');
-      console.log('[DM:showStartModal] startModal элемент=' + (startModal ? 'найден' : 'null'));
       if (!startModal) {
-        console.log('[DM:showStartModal] start-modal не найден в DOM, return');
-        return;
+       return;
       }
       startModal.style.display = 'flex';
-      console.log('[DM:showStartModal] display=flex установлен');
       renderLucide(startModal);
 
       try {
