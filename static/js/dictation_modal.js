@@ -614,16 +614,26 @@
    * Загрузить completionCount из БД (через history_current) и обновить сессию + медальку.
    * Если интернета нет — используем кеш localStorage, затем session.completionCount.
    */
+  /**
+   * Загрузить количество завершений (completionCount) для текущего диктанта.
+   *
+   * Режимы работы (приоритет актуальной информации):
+   * 1. Если есть интернет — запрашиваем с сервера (БД), кешируем в localStorage.
+   * 2. Если сервер недоступен (network error) — используем кеш localStorage.
+   * 3. Если кеша нет — оставляем текущее значение session.completionCount.
+   */
   async function loadCompletionCount(session) {
     if (!session) return;
-    try {
-      const dictationId = getCurrentDictationIdForDb();
-      if (!dictationId) return;
+    const dictationId = getCurrentDictationIdForDb();
+    if (!dictationId) return;
 
+    const selectedSentencePositions = _getSelectedSentencePositions(session);
+    const userId = window.UM?.userId || null;
+
+    try {
       const token = window.UM?.token || localStorage.getItem('jwt_token');
       if (!token) return;
 
-      const selectedSentencePositions = _getSelectedSentencePositions(session);
       const body = { dictation_id: dictationId };
       if (Array.isArray(selectedSentencePositions) && selectedSentencePositions.length > 0) {
         body.selected_sentence_positions = selectedSentencePositions;
@@ -637,43 +647,36 @@
         },
         body: JSON.stringify(body),
       });
-      if (!resp.ok) return;
 
-      const data = await resp.json();
-      const count = Number(data.count) || 0;
-      session.completionCount = count;
-      updateMedalDisplay(count);
+      if (resp.ok) {
+        const data = await resp.json();
+        const count = Number(data.count) || 0;
+        session.completionCount = count;
+        updateMedalDisplay(count);
 
-      // Кешируем в localStorage для офлайн-доступа
-      try {
-        const userId = window.UM?.userId || null;
+        // Кешируем в localStorage для офлайн-доступа
         if (userId) {
           _cacheCompletionCount(userId, dictationId, selectedSentencePositions, count);
         }
-      } catch (eCache) {
-        // не критично
+        return;
       }
+      // Если сервер вернул ошибку — не обновляем, пробуем кеш ниже
     } catch (e) {
-      // Если нет интернета — пробуем кеш localStorage
-      let cachedCount = null;
-      try {
-        const dictationId = getCurrentDictationIdForDb();
-        const selectedSentencePositions = _getSelectedSentencePositions(session);
-        const userId = window.UM?.userId || null;
-        if (userId && dictationId) {
-          cachedCount = _getCachedCompletionCount(userId, dictationId, selectedSentencePositions);
-        }
-      } catch (eCache) {
-        // ignore
-      }
+      // Нет интернета — пробуем кеш localStorage
+    }
+
+    // Режим 2: сервер недоступен — используем кеш localStorage
+    if (userId) {
+      const cachedCount = _getCachedCompletionCount(userId, dictationId, selectedSentencePositions);
       if (cachedCount != null) {
         session.completionCount = cachedCount;
         updateMedalDisplay(cachedCount);
-      } else {
-        // Оставляем session.completionCount как есть
-        updateMedalDisplay(session.completionCount || 0);
+        return;
       }
     }
+
+    // Режим 3: ничего нет — оставляем текущее значение
+    updateMedalDisplay(session.completionCount || 0);
   }
   function showCompletionModal() {
     const completionModal = document.getElementById('completionModal');
@@ -984,6 +987,7 @@
             money_earned: totalMoneyEarned,
             time_ms: totalTimeMs,
             completion_count: 1,
+            completion_count_after: completionCountAfter,
             dictation_language_code: dictationLanguageCode,
             sentences_data: sentencesData,
             completed_at_ms: nowMs,
@@ -2227,9 +2231,12 @@
       }
 
       pauseModal.style.display = 'flex';
+      // Ставим фокус на кнопку "Продолжить" после того, как модалка отрисовалась
       try {
-        const resumeBtn = document.getElementById('resumeBtn');
-        if (resumeBtn) resumeBtn.focus();
+        requestAnimationFrame(() => {
+          const resumeBtn = document.getElementById('resumeBtn');
+          if (resumeBtn) resumeBtn.focus();
+        });
       } catch (e) {
       }
     } catch (e) {
@@ -6830,7 +6837,7 @@
 
           // Загружаем completionCount из БД и обновляем медальку в шапке
           try {
-            loadCompletionCount(session);
+            await loadCompletionCount(session);
           } catch (eCc) {
           }
 

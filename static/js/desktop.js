@@ -770,6 +770,48 @@ window.Desktop = window.Desktop || {
           return;
         }
 
+        if (action === 'desktop-recalc-history') {
+          (async () => {
+            try {
+              const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+              if (!token) return;
+              const resp = await fetch('/api/statistics/success/recalc', {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Content-Type': 'application/json',
+                },
+              });
+              const data = resp.ok ? await resp.json() : null;
+              if (data && data.success) {
+                // Очищаем кеш history_current в localStorage
+                try {
+                  const keysToRemove = [];
+                  for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('history_current:')) {
+                      keysToRemove.push(key);
+                    }
+                  }
+                  keysToRemove.forEach((k) => localStorage.removeItem(k));
+                } catch (e) {}
+                // Перезагружаем карточки стола, чтобы обновились медальки
+                this.loadDeskItems().catch(() => {});
+                if (typeof window.DictationKart._showToast === 'function') {
+                  window.DictationKart._showToast('history_current пересчитан', { durationMs: 2000 });
+                }
+              } else {
+                if (typeof window.DictationKart._showToast === 'function') {
+                  window.DictationKart._showToast('Ошибка пересчёта history_current', { durationMs: 3000 });
+                }
+              }
+            } catch (e) {
+              console.warn('[desktop] recalc history error', e);
+            }
+          })();
+          return;
+        }
+
         this.stubAction(action);
       });
     });
@@ -827,6 +869,13 @@ window.Desktop = window.Desktop || {
     container.appendChild(grid);
     this.renderLucide(container);
     this.applyDeskLayoutIfNeeded();
+    // Загружаем медальки для карточек
+    try {
+      if (window.DictationKart && typeof window.DictationKart.loadCardMedals === 'function') {
+        window.DictationKart.loadCardMedals();
+      }
+    } catch (e) {
+    }
   },
 
   async loadDeskItems() {

@@ -787,6 +787,10 @@ window.DictationKart = window.DictationKart || {
                 <button class="dropdown-menu-item" type="button" data-action="launch-assignment-item" data-positions="${_escapeHtml(sig)}">
                   <i data-lucide="play"></i>
                   <span>${_escapeHtml(label)}</span>
+                  <span class="launch-menu-medal" data-dictation-id="${dictationId}" data-positions="${_escapeHtml(sig)}" style="margin-left:auto;display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--color-button-gray);">
+                    <i data-lucide="medal" style="width:14px;height:14px;"></i>
+                    <span class="launch-menu-medal-count">...</span>
+                  </span>
                 </button>
               `;
             }).join('');
@@ -794,6 +798,62 @@ window.DictationKart = window.DictationKart || {
           }
 
           openLaunchMenu();
+
+          // Асинхронно загружаем количество завершений для каждого упражнения
+          (async () => {
+            try {
+              const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+              if (!token) return;
+              const medalSpans = launchMenu.querySelectorAll('.launch-menu-medal');
+              if (!medalSpans.length) return;
+              // Для каждого упражнения делаем запрос
+              for (const span of medalSpans) {
+                const dId = Number(span.getAttribute('data-dictation-id'));
+                const posStr = String(span.getAttribute('data-positions') || '').trim();
+                const positions = posStr ? posStr.split(',').map(Number).filter((x) => Number.isFinite(x) && x > 0) : [];
+                try {
+                  const resp = await fetch('/api/statistics/success/count_subset', {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': 'Bearer ' + token,
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      dictation_id: dId,
+                      selected_sentence_positions: positions.length ? positions : null,
+                    }),
+                  });
+                  if (resp.ok) {
+                    const data = await resp.json();
+                    const count = Number(data.count) || 0;
+                    const countEl = span.querySelector('.launch-menu-medal-count');
+                    if (countEl) countEl.textContent = String(count);
+                    if (count > 0) {
+                      span.style.color = 'var(--color-gold, #f59e0b)';
+                    }
+                  }
+                } catch (e) {
+                  // Если нет интернета — пробуем кеш localStorage
+                  try {
+                    const userId = window.UM?.userId || null;
+                    if (userId) {
+                      const cacheKey = 'history_current:' + userId + ':' + dId + ':' + (positions.length ? positions.join(',') : '');
+                      const cached = localStorage.getItem(cacheKey);
+                      if (cached) {
+                        const entry = JSON.parse(cached);
+                        const count = Number(entry.count) || 0;
+                        const countEl = span.querySelector('.launch-menu-medal-count');
+                        if (countEl) countEl.textContent = String(count);
+                        if (count > 0) {
+                          span.style.color = 'var(--color-gold, #f59e0b)';
+                        }
+                      }
+                    }
+                  } catch (e2) {}
+                }
+              }
+            } catch (e) {}
+          })();
         });
 
         launchMenu.addEventListener('click', (e) => {
@@ -1410,7 +1470,12 @@ window.DictationKart = window.DictationKart || {
       <div class="short-card dictation-kart desk-card" data-dictation-id="${dictationId}" data-desk-item-id="${item.id}">
         <div class="short-thumb" data-href="${openUrl}" data-lang-notice="${window.escapeHtml(noticeMessage)}" role="link" tabindex="0">
           <img src="${coverSrc}" data-cover-url="${coverUrl || ''}" alt="" class="short-cover" loading="${coverLoading}" decoding="async" draggable="false" onerror="this.onerror=null;this.src='/static/data/covers/cover_en.webp'">
-          <div class="card-progress-stats"></div>
+          <div class="card-progress-stats">
+            <span class="card-medal-badge" data-dictation-id="${dictationId}" style="display:none;">
+              <i data-lucide="medal" style="width:14px;height:14px;"></i>
+              <span class="card-medal-count">0</span>
+            </span>
+          </div>
         </div>
         <h3 class="short-title" title="${window.escapeHtml(item.title || 'Без названия')}">${item.title || 'Без названия'}</h3>
 
@@ -1599,6 +1664,12 @@ window.DictationKart = window.DictationKart || {
 
     const stats = node.querySelector('.short-stats');
     if (stats) stats.setAttribute('data-dictation-id', String(dictationId || ''));
+
+    // Устанавливаем dictation-id на медальку в правом верхнем углу
+    const medalBadge = node.querySelector('.card-medal-badge');
+    if (medalBadge) {
+      medalBadge.setAttribute('data-dictation-id', String(dictationId || ''));
+    }
 
     const menuSlot = node.querySelector('[data-slot="menu"]');
     if (menuSlot) {
@@ -1830,6 +1901,89 @@ window.DictationKart = window.DictationKart || {
     }
 
     return data;
+  },
+
+  /**
+   * Загружает количество завершений для медалек на всех карточках рабочего стола.
+   * Вызывается после renderDeskCards().
+   */
+  async loadCardMedals() {
+    try {
+      const badges = document.querySelectorAll('.card-medal-badge');
+      if (!badges.length) return;
+
+      const token = (() => { try { return localStorage.getItem('jwt_token'); } catch (e) { return null; } })();
+      if (!token) return;
+
+      // Собираем все dictation_id
+      const ids = [];
+      const badgeMap = {};
+      badges.forEach((badge) => {
+        const id = Number(badge.getAttribute('data-dictation-id'));
+        if (Number.isFinite(id) && id > 0) {
+          ids.push(id);
+          if (!badgeMap[id]) badgeMap[id] = [];
+          badgeMap[id].push(badge);
+        }
+      });
+
+      if (!ids.length) return;
+
+      // Запрашиваем counts для всех диктантов одним запросом
+      try {
+        const resp = await fetch('/api/statistics/success/count', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + token,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ dictation_ids: ids }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.success && data.counts) {
+            for (const dictIdStr in data.counts) {
+              const count = Number(data.counts[dictIdStr]) || 0;
+              const list = badgeMap[Number(dictIdStr)];
+              if (list) {
+                list.forEach((badge) => {
+                  const countEl = badge.querySelector('.card-medal-count');
+                  if (countEl) countEl.textContent = String(count);
+                  badge.style.display = count > 0 ? 'inline-flex' : 'none';
+                });
+              }
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        // Нет интернета — пробуем кеш
+      }
+
+      // Режим 2: нет интернета — пробуем localStorage кеш
+      const userId = window.UM?.userId || null;
+      if (!userId) return;
+      for (const id of ids) {
+        const cacheKey = 'history_current:' + userId + ':' + id + ':';
+        try {
+          const cached = localStorage.getItem(cacheKey);
+          if (cached) {
+            const entry = JSON.parse(cached);
+            const count = Number(entry.count) || 0;
+            const list = badgeMap[id];
+            if (list) {
+              list.forEach((badge) => {
+                const countEl = badge.querySelector('.card-medal-count');
+                if (countEl) countEl.textContent = String(count);
+                badge.style.display = count > 0 ? 'inline-flex' : 'none';
+              });
+            }
+          }
+        } catch (e) {}
+      }
+    } catch (e) {
+      console.warn('[DictationKart] loadCardMedals error', e);
+    }
   },
 };
 
