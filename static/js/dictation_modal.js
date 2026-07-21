@@ -1565,7 +1565,9 @@
             } else if (res.starOutcome === 'half' || res.starOutcome === 'corrected') {
               setCheckButtonState('half');
             } else {
-              setCheckButtonState('ready');
+              // Текст исправлен, но результат — activity (2+ проверок с ошибками).
+              // Показываем оранжевую кнопку "Повторить набор текста".
+              setCheckButtonState('repeat_activity');
             }
           } else {
             setCheckButtonState('ready');
