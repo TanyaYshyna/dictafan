@@ -19,6 +19,7 @@ from helpers.db_history import (
     check_and_save_dictation_record,
     get_dictation_record,
     get_all_dictation_records,
+    recalc_history_current_for_user,
 )
 from helpers.db_telegram import (
     filter_manual_teacher_chat_ids,
@@ -2125,7 +2126,7 @@ def save_success():
         error_words = data.get('error_words')
         completed_at_ms = data.get('completed_at_ms')
         completed_at_tz_offset_min = data.get('completed_at_tz_offset_min')
-        completion_count_after = data.get('completion_count_after')
+        completion_count = data.get('completion_count') or data.get('completion_count_after')
         selected_sentence_positions_raw = data.get('selected_sentence_positions')
         # Нормализуем positions для INTEGER[]
         try:
@@ -2196,6 +2197,7 @@ def save_success():
             dictation_language_code=dictation_language_code,
             started_at=started_at,
             date_start=date_start,
+            completion_count=completion_count,
         )
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
@@ -2425,6 +2427,34 @@ def get_success_count_subset():
         import traceback
         traceback.print_exc()
         return jsonify({'error': 'Ошибка получения количества завершений для поднабора'}), 500
+
+
+@statistics_bp.route('/success/recalc', methods=['POST'])
+@jwt_required()
+def recalc_history_current():
+    """Пересчитать history_current из history_by_day для текущего пользователя.
+    
+    Удаляет все записи history_current пользователя и пересоздаёт их
+    агрегацией из history_by_day + dictation_records.
+    """
+    try:
+        current_email = get_jwt_identity()
+        user = get_user_by_email(current_email)
+        if not user:
+            return jsonify({'error': 'Пользователь не найден'}), 404
+        
+        user_id = int(user['id'])
+        recalc_history_current_for_user(user_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'history_current пересчитан'
+        })
+    except Exception as e:
+        print(f'❌ [RECALC_HISTORY_CURRENT] Ошибка: {e}')
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Ошибка пересчёта history_current'}), 500
 
 
 @statistics_bp.route('/dictation-report/data', methods=['POST'])
