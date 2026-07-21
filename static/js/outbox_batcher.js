@@ -304,20 +304,13 @@
           record: {
             dictation_id: dictationId,
             positions: currentPositions,
-            perfect_count: Number(currentPayload.perfect_count) || 0,
-            corrected_count: Number(currentPayload.corrected_count) || 0,
-            audio_count: Number(currentPayload.audio_count) || 0,
-            activity_count: Number(currentPayload.attempts_total) || 0,
             lead_time: currentTime,
             mistake_count: currentMistakes,
-            monenumber_of_characters: Number(currentPayload.monenumber_of_characters) || 0,
-            money_dt_count: Number(currentPayload.money_earned) || 0,
           },
         };
       }
 
       // Ищем лучший результат среди всех success (исключая текущий)
-      let bestPayload = currentPayload;
       let bestMistakes = currentMistakes;
       let bestTime = currentTime;
 
@@ -328,7 +321,6 @@
 
         const isBetter = (m < bestMistakes) || (m === bestMistakes && t < bestTime);
         if (isBetter) {
-          bestPayload = p;
           bestMistakes = m;
           bestTime = t;
         }
@@ -342,14 +334,8 @@
         record: isRecord ? {
           dictation_id: dictationId,
           positions: currentPositions,
-          perfect_count: Number(bestPayload.perfect_count) || 0,
-          corrected_count: Number(bestPayload.corrected_count) || 0,
-          audio_count: Number(bestPayload.audio_count) || 0,
-          activity_count: Number(bestPayload.attempts_total) || 0,
           lead_time: bestTime,
           mistake_count: bestMistakes,
-          monenumber_of_characters: Number(bestPayload.monenumber_of_characters) || 0,
-          money_dt_count: Number(bestPayload.money_earned) || 0,
         } : null,
       };
     } catch (e) {
@@ -574,14 +560,8 @@
                 const updatedPayload = {
                   dictation_id: serverRecord.dictation_id || row.payload.dictation_id,
                   positions: serverRecord.positions || row.payload.positions,
-                  perfect_count: serverRecord.perfect_count || 0,
-                  corrected_count: serverRecord.corrected_count || 0,
-                  audio_count: serverRecord.audio_count || 0,
-                  activity_count: serverRecord.activity_count || 0,
                   lead_time: serverRecord.lead_time || 0,
                   mistake_count: serverRecord.mistake_count || 0,
-                  monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
-                  money_dt_count: serverRecord.money_dt_count || 0,
                 };
                 // Обновляем record в IndexedDB актуальными данными с сервера
                 // (запись остаётся как кеш для офлайн-доступа)
@@ -765,14 +745,8 @@
         payload: {
           dictation_id: serverRecord.dictation_id || dictationId,
           positions: serverRecord.positions || pos,
-          perfect_count: serverRecord.perfect_count || 0,
-          corrected_count: serverRecord.corrected_count || 0,
-          audio_count: serverRecord.audio_count || 0,
-          activity_count: serverRecord.activity_count || 0,
           lead_time: serverRecord.lead_time || 0,
           mistake_count: serverRecord.mistake_count || 0,
-          monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
-          money_dt_count: serverRecord.money_dt_count || 0,
         },
       });
 
@@ -826,14 +800,8 @@
           payload: {
             dictation_id: serverRecord.dictation_id,
             positions: serverRecord.positions || pos,
-            perfect_count: serverRecord.perfect_count || 0,
-            corrected_count: serverRecord.corrected_count || 0,
-            audio_count: serverRecord.audio_count || 0,
-            activity_count: serverRecord.activity_count || 0,
             lead_time: serverRecord.lead_time || 0,
             mistake_count: serverRecord.mistake_count || 0,
-            monenumber_of_characters: serverRecord.monenumber_of_characters || 0,
-            money_dt_count: serverRecord.money_dt_count || 0,
           },
           synced: true,
         });

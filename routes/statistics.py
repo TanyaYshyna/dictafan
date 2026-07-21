@@ -2288,14 +2288,8 @@ def api_save_dictation_record():
 
         dictation_id = data.get('dictation_id')
         positions = data.get('positions')
-        perfect_count = data.get('perfect_count', 0)
-        corrected_count = data.get('corrected_count', 0)
-        audio_count = data.get('audio_count', 0)
-        activity_count = data.get('activity_count', 0)
         lead_time = data.get('lead_time', 0)
         mistake_count = data.get('mistake_count', 0)
-        monenumber_of_characters = data.get('monenumber_of_characters', 0)
-        money_dt_count = data.get('money_dt_count', 0)
 
         if not dictation_id:
             return jsonify({'error': 'Не указан dictation_id'}), 400
@@ -2311,14 +2305,14 @@ def api_save_dictation_record():
             user_id=user_id,
             dictation_id=dictation_id,
             positions=positions,
-            perfect_count=perfect_count,
-            corrected_count=corrected_count,
-            audio_count=audio_count,
-            activity_count=activity_count,
+            perfect_count=0,
+            corrected_count=0,
+            audio_count=0,
+            activity_count=0,
             lead_time=lead_time,
             mistake_count=mistake_count,
-            monenumber_of_characters=monenumber_of_characters,
-            money_dt_count=money_dt_count,
+            monenumber_of_characters=0,
+            money_dt_count=0,
         )
 
         # Всегда возвращаем актуальный record с сервера для синхронизации кеша
