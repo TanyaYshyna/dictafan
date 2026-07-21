@@ -165,6 +165,7 @@
         mistakeCount = 0,
         numberOfCharacters = 0,
         moneyCount = 0,
+        dateStart,
       } = params || {};
 
       console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount });
@@ -184,8 +185,9 @@
 
       const dateId = date || _getLocalDateId();
       const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
-      const key = `act:${userId}:${dateId}:${dictationId}:${selPosStr}`;
-      console.log(TAG, '[enqueueActivity] key=' + key + ' dateId=' + dateId);
+      const dateStartStr = dateStart ? dateStart.replace(/[^0-9\-: ]/g, '') : '';
+      const key = `act:${userId}:${dateId}:${dictationId}:${selPosStr}:${dateStartStr}`;
+      console.log(TAG, '[enqueueActivity] key=' + key + ' dateId=' + dateId + ' dateStart=' + dateStart);
 
       // Увеличиваем pending-счётчик ДО записи в IndexedDB
       state.pendingCount += 1;
@@ -199,6 +201,7 @@
         date: dateId,
         dictation_id: dictationId,
         selected_sentence_positions: selectedSentencePositions || null,
+        date_start: dateStart || null,
         perfect_count: 0,
         corrected_count: 0,
         audio_count: 0,
@@ -510,6 +513,7 @@
                 lead_time_ms: Number(row.lead_time_ms_total) || 0,
                 dictation_language_code: row.dictation_language_code || undefined,
                 selected_sentence_positions: row.selected_sentence_positions || undefined,
+                date_start: row.date_start || undefined,
               }),
             });
 
