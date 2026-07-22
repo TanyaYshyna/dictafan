@@ -167,8 +167,8 @@ def _upsert_history_by_day(
 def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr: list, up_to_date) -> None:
     """Пересчитать number_successes для (user_id, dictation_id, positions) на дату up_to_date.
 
-    number_successes = порядковый номер выполнения в рамках одного дня (date_fact),
-    т.е. для каждого дня нумерация начинается с 1.
+    number_successes = глобальный порядковый номер успешного выполнения
+    для данного диктанта (без разбивки по дням).
     """
     cur.execute(
         """
@@ -176,8 +176,8 @@ def _recalc_number_successes(cur, user_id: int, dictation_id: int, positions_arr
             SELECT
                 id,
                 SUM(successes) OVER (
-                    PARTITION BY user_id, dictation_id, positions, date_fact
-                    ORDER BY created_at ASC
+                    PARTITION BY user_id, dictation_id, positions
+                    ORDER BY date_fact ASC, created_at ASC
                     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
                 ) AS running_total
             FROM history_by_day
