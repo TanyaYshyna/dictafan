@@ -84,6 +84,30 @@
   }
 
   /** Получить время выполнения из сессии в миллисекундах */
+  /**
+   * Установить dateStart сессии, если он ещё не установлен.
+   * Вызывается один раз при старте диктанта (кнопка "Старт").
+   * После установки dateStart больше не меняется в течение всей сессии.
+   * Это гарантирует, что все активности (текст и аудио) используют один и тот же dateStart,
+   * и в outbox_batcher не создаются дублирующие записи с разными dateStart.
+   */
+  function _ensureDateStart(session) {
+    try {
+      if (!session) return;
+      if (!session.dateStart) {
+        const d = new Date();
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        session.dateStart = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+      }
+    } catch (e) {
+    }
+  }
+
   function _getSessionLeadTimeMs(session) {
     try {
       if (!session) return 0;
@@ -1141,6 +1165,15 @@
     } catch (e0completed) {
     }
 
+    // Сбрасываем флаг _completionShown при переходе на новое предложение.
+    // Это нужно, чтобы при завершении всех предложений (allDictationCompleted)
+    // модалка victory могла появиться, даже если updateTaskProgressFromSession
+    // уже пыталась её показать ранее (но не показала из-за isPauseModalOpen или isStartModalOpen).
+    try {
+      dictationModalState._completionShown = false;
+    } catch (eResetCompletion) {
+    }
+
     // Если мы сбрасываем UI для нового предложения (не выполненного),
     // возобновляем таймер — он мог быть остановлен при завершении предыдущего предложения.
     try {
@@ -1247,21 +1280,12 @@
           const session = window.__dictationModalActiveSession;
           if (session) {
             try { dictationModalState.dictationStarted = true; } catch (e0) {}
-            // Устанавливаем дату и время начала диктанта (локальная дата+время)
-            // dateStart устанавливается только если его нет — это позволяет различать:
+            // Устанавливаем дату и время начала диктанта (локальная дата+время).
+            // _ensureDateStart устанавливает dateStart только если его нет — это позволяет различать:
             //   - Продолжить (continue): dateStart уже есть, не меняем
             //   - Новая игра / СТАРТ после сброса: dateStart сброшен в null,
             //     поэтому устанавливается новая дата
-            if (!session.dateStart) {
-              const d = new Date();
-              const yyyy = d.getFullYear();
-              const mm = String(d.getMonth() + 1).padStart(2, '0');
-              const dd = String(d.getDate()).padStart(2, '0');
-              const hh = String(d.getHours()).padStart(2, '0');
-              const mi = String(d.getMinutes()).padStart(2, '0');
-              const ss = String(d.getSeconds()).padStart(2, '0');
-              session.dateStart = `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
-            }
+            _ensureDateStart(session);
             try {
               const p = getProgressPanelInstance();
               if (p && typeof p.startTimer === 'function') p.startTimer();
@@ -1300,6 +1324,30 @@
           try { _saveSentenceTime(session); } catch (e0st) {}
           // Сохраняем сессию в IDB (кеш состояния диктанта) — моментально, без очереди
           try { _persistSessionToIdb(); } catch (e0ps) {}
+          
+          // Проверяем, все ли предложения завершены.
+          // Если все — показываем completion modal, не переходя на следующее.
+          try {
+            const allKeys = session.activeKeys && session.activeKeys.length > 0
+              ? session.activeKeys
+              : (session.content ? session.content.getAllKeys() : []);
+            if (Array.isArray(allKeys) && allKeys.length > 0) {
+              let allDone = true;
+              for (const k of allKeys) {
+                const st = session.getState ? session.getState(k) : null;
+                if (!st) { allDone = false; break; }
+                const { textOk, audioOk } = computeSentenceCompletionState(st);
+                if (!textOk || !audioOk) { allDone = false; break; }
+              }
+              if (allDone && dictationModalState.dictationStarted && !dictationModalState._completionShown) {
+                dictationModalState._completionShown = true;
+                showCompletionModal();
+                return;
+              }
+            }
+          } catch (eAllCheck) {
+          }
+          
           // Переходим на следующее предложение, которое ещё не закрыто (нет звезды или не закрыт микрофон)
           goNextIncomplete(session);
           try { resetSentenceUiFromSession(session); } catch (e00) {}
@@ -3326,6 +3374,7 @@
       if (!type || !st || key == null || !session) {
         return;
       }
+      
       const ob = window.OutboxBatcher;
      if (ob && typeof ob.enqueueActivity === 'function') {
        const dictationId = getCurrentDictationIdForDb();
@@ -3385,10 +3434,15 @@
     } catch (eTask) {
     }
 
-    // Обновляем видимость кнопки "Далее"
-    try {
-      updateNextButtonVisibilityFromSession(session);
-    } catch (eNext) {
+    // Обновляем видимость кнопки "Далее" только для текстовых активностей.
+    // Для аудио-активностей кнопка "Далее" обновляется отдельно в onRecognitionComplete
+    // (только при ok=true, т.е. ≥80%). Это предотвращает ситуацию, когда аудио при 50-80%
+    // включает кнопку "Далее" (если textOk уже true, а audioOk ещё false).
+    if (type !== 'audio') {
+      try {
+        updateNextButtonVisibilityFromSession(session);
+      } catch (eNext) {
+      }
     }
   }
 
