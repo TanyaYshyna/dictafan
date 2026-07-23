@@ -2128,6 +2128,7 @@ def save_success():
         except Exception:
             money_earned = 0
         date_start = data.get('date_start')
+        plan_date = data.get('plan_date')
         source_group_id = data.get('source_group_id')
         sentences_data = data.get('sentences_data')
         error_words = data.get('error_words')
@@ -2204,6 +2205,7 @@ def save_success():
             dictation_language_code=dictation_language_code,
             started_at=started_at,
             date_start=date_start,
+            plan_date=plan_date,
             completion_count=completion_count,
             money_earned=money_earned,
         )
