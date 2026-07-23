@@ -702,7 +702,7 @@
     // Режим 3: ничего нет — оставляем текущее значение
     updateMedalDisplay(session.completionCount || 0);
   }
-  function showCompletionModal() {
+  async function showCompletionModal() {
     const completionModal = document.getElementById('completionModal');
     if (!completionModal) return;
 
@@ -1000,7 +1000,8 @@
           const selectedSentencePositions = _getSelectedSentencePositions(session);
 
           console.log('[DM:771] enqueueSuccess:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
-          ob.enqueueSuccess({
+          // Дожидаемся записи success в outbox, чтобы flushAll гарантированно отправил и его
+          try { await ob.enqueueSuccess({
             dictation_id: dictationId,
             perfect_count: totalPerfect,
             corrected_count: totalCorrected,
@@ -1018,11 +1019,13 @@
             completed_at_tz_offset_min: tzOffsetMin,
             selected_sentence_positions: selectedSentencePositions,
             date_start: session.dateStart,
-          });
+          }); } catch (eEnq) { console.warn('[DM] enqueueSuccess error:', eEnq); }
 
-          // Принудительно отправляем всё накопленное (activity + success)
+          // Принудительно отправляем всё накопленное.
+          // _flushOutbox сам найдёт пару activity+success для одного диктанта,
+          // смержит их в один запрос и отправит на сервер.
           if (typeof ob.flushAll === 'function') {
-            ob.flushAll().catch(function(e){});
+            try { await ob.flushAll(); } catch (eFlush) { console.warn('[DM] flushAll error:', eFlush); }
           }
         }
       }

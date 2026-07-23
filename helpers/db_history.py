@@ -1091,10 +1091,13 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 date_plan=date_plan,
                 date_fact=date_fact,
                 date_start=date_start_parsed,
-                # perfect/corrected/audio уже обновлены в add_activity_bulk — не дублируем
-                perfect_delta=0,
-                corrected_delta=0,
-                audio_delta=0,
+                # perfect/corrected/audio передаются вместе с success, чтобы
+                # гарантировать консистентность данных: _flushOutbox на клиенте
+                # находит пару activity+success для одного диктанта, мержит их
+                # в один запрос и отправляет на сервер.
+                perfect_delta=int(perfect_count or 0),
+                corrected_delta=int(corrected_count or 0),
+                audio_delta=int(audio_count or 0),
                 mistake_delta=int(mistake_count or 0),
                 monenumber_of_characters_delta=int(monenumber_of_characters or 0),
                 lead_time_delta=int(time_ms or 0),

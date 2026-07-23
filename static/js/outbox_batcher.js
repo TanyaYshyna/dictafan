@@ -20,7 +20,7 @@
 (function () {
   if (window.OutboxBatcher) return;
 
-  const BATCH_INTERVAL_MS = 10000; // 10 секунд (для теста)
+  const BATCH_INTERVAL_MS = 1800000; // 30 минут
   const MAX_BATCH_SIZE = 20; // макс. количество записей в одном батче
 
   const TAG = '[OutboxBatcher]';
@@ -30,6 +30,8 @@
     timerStartedAt: null,
     pendingCount: 0,
     flushing: false,
+    /** Если true — после завершения текущего flush запустить ещё один */
+    _retryFlush: false,
   };
 
   /** Проверить, авторизован ли пользователь */
@@ -465,9 +467,30 @@
 
   // ======================== ОТПРАВКА ========================
 
+  /**
+   * Смержить данные activity в success-пакет.
+   * Все поля activity (perfect_count, audio_count и т.д.) суммируются
+   * с соответствующими полями success.
+   */
+  function _mergeActivityIntoSuccess(activityRow, successPayload) {
+    return {
+      ...successPayload,
+      perfect_count: (Number(successPayload.perfect_count) || 0) + (Number(activityRow.perfect_count) || 0),
+      corrected_count: (Number(successPayload.corrected_count) || 0) + (Number(activityRow.corrected_count) || 0),
+      audio_count: (Number(successPayload.audio_count) || 0) + (Number(activityRow.audio_count) || 0),
+      mistake_count: (Number(successPayload.mistake_count) || 0) + (Number(activityRow.mistake_count) || 0),
+      monenumber_of_characters: (Number(successPayload.monenumber_of_characters) || 0) + (Number(activityRow.monenumber_of_characters) || 0),
+      money_earned: (Number(successPayload.money_earned) || 0) + (Number(activityRow.money_count) || 0),
+      time_ms: (Number(successPayload.time_ms) || 0) + (Number(activityRow.lead_time_ms_total) || 0),
+      selected_sentence_positions: successPayload.selected_sentence_positions || activityRow.selected_sentence_positions || undefined,
+      date_start: successPayload.date_start || activityRow.date_start || undefined,
+    };
+  }
+
   /** Отправить все накопленные записи из outbox */
   async function _flushOutbox() {
     if (state.flushing) {
+      state._retryFlush = true;
       return;
     }
     state.flushing = true;
@@ -483,120 +506,242 @@
         return;
       }
 
+      // Группируем строки: для каждого диктанта может быть activity + success.
+      // Если есть и activity, и success — мержим activity в success и отправляем
+      // одним запросом (success). Если есть только activity — отправляем activity.
+      // dictation_record отправляется отдельно.
+      const activityRows = [];    // activity без пары success
+      const successRows = [];     // success без пары activity
+      const recordRows = [];      // dictation_record
+
+      // Для поиска пары activity+success группируем по ключу диктанта
+      const activityByDict = {};  // dictation_id -> activity row
+      const successByDict = {};   // dictation_id -> success row
+
+      for (const row of rows) {
+        if (row.synced) continue;
+
+        if (row.type === 'activity') {
+          const dictKey = String(row.dictation_id);
+          activityByDict[dictKey] = row;
+        } else if (row.type === 'success') {
+          const dictKey = String(row.payload?.dictation_id);
+          if (dictKey && dictKey !== 'undefined') {
+            successByDict[dictKey] = row;
+          } else {
+            successRows.push(row);
+          }
+        } else if (row.type === 'dictation_record') {
+          recordRows.push(row);
+        }
+      }
+
+      // Формируем пары: если для одного диктанта есть и activity, и success —
+      // мержим activity в success
+      const mergedPairs = []; // { successRow, activityRow }
+      const processedDicts = new Set();
+
+      for (const dictKey of Object.keys(activityByDict)) {
+        const actRow = activityByDict[dictKey];
+        const sucRow = successByDict[dictKey];
+
+        if (sucRow) {
+          // Есть и activity, и success — мержим
+          mergedPairs.push({ successRow: sucRow, activityRow: actRow });
+          processedDicts.add(dictKey);
+        } else {
+          // Только activity
+          activityRows.push(actRow);
+        }
+      }
+
+      // Success без пары activity
+      for (const dictKey of Object.keys(successByDict)) {
+        if (!processedDicts.has(dictKey)) {
+          successRows.push(successByDict[dictKey]);
+        }
+      }
+
       const token = _getToken();
       let allOk = true;
 
-      for (const row of rows) {
+      // 1. Отправляем success с вмерженными activity (один запрос вместо двух)
+      for (const { successRow, activityRow } of mergedPairs) {
         try {
-          // Пропускаем уже синхронизированные записи (кеш рекордов)
-          if (row.synced) {
-            continue;
+          // Перечитываем activity из IDB — если была обновлена, пропускаем
+          const currentAct = await window.IdbManager.idbGet('outbox', activityRow.key);
+          if (!currentAct) continue;
+          if (currentAct.updatedAt !== activityRow.updatedAt) continue;
+
+          // Перечитываем success из IDB
+          const currentSuc = await window.IdbManager.idbGet('outbox', successRow.key);
+          if (!currentSuc) continue;
+
+          // Мержим activity data в success payload
+          const mergedPayload = _mergeActivityIntoSuccess(currentAct, currentSuc.payload);
+
+          const response = await fetch('/api/statistics/success', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(mergedPayload),
+          });
+
+          if (response.ok) {
+            // Удаляем и activity, и success
+            await window.IdbManager.idbDelete('outbox', activityRow.key);
+            await window.IdbManager.idbDelete('outbox', successRow.key);
+          } else if (response.status === 401) {
+            allOk = false;
+            break;
+          } else {
+            allOk = false;
+            break;
           }
+        } catch (e) {
+          allOk = false;
+          break;
+        }
+      }
 
-          if (row.type === 'activity') {
-            const response = await fetch('/api/statistics/activity', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                dictation_id: row.dictation_id,
-                date: row.date,
-                perfect_count: Number(row.perfect_count) || 0,
-                corrected_count: Number(row.corrected_count) || 0,
-                audio_count: Number(row.audio_count) || 0,
-                activity_count: Number(row.activity_count) || 0,
-                money_count: Number(row.money_count) || 0,
-                mistake_count: Number(row.mistake_count) || 0,
-                monenumber_of_characters: Number(row.monenumber_of_characters) || 0,
-                lead_time_ms: Number(row.lead_time_ms_total) || 0,
-                dictation_language_code: row.dictation_language_code || undefined,
-                selected_sentence_positions: row.selected_sentence_positions || undefined,
-                date_start: row.date_start || undefined,
-              }),
-            });
+      if (!allOk) {
+        state.flushing = false;
+        return;
+      }
 
-            if (response.ok) {
+      // 2. Отправляем оставшиеся activity (без пары success)
+      for (const row of activityRows) {
+        try {
+          const currentRow = await window.IdbManager.idbGet('outbox', row.key);
+          if (!currentRow) continue;
+          if (currentRow.updatedAt !== row.updatedAt) continue;
+
+          const response = await fetch('/api/statistics/activity', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              dictation_id: currentRow.dictation_id,
+              date: currentRow.date,
+              perfect_count: Number(currentRow.perfect_count) || 0,
+              corrected_count: Number(currentRow.corrected_count) || 0,
+              audio_count: Number(currentRow.audio_count) || 0,
+              activity_count: Number(currentRow.activity_count) || 0,
+              money_count: Number(currentRow.money_count) || 0,
+              mistake_count: Number(currentRow.mistake_count) || 0,
+              monenumber_of_characters: Number(currentRow.monenumber_of_characters) || 0,
+              lead_time_ms: Number(currentRow.lead_time_ms_total) || 0,
+              dictation_language_code: currentRow.dictation_language_code || undefined,
+              selected_sentence_positions: currentRow.selected_sentence_positions || undefined,
+              date_start: currentRow.date_start || undefined,
+            }),
+          });
+
+          if (response.ok) {
+            const finalRow = await window.IdbManager.idbGet('outbox', row.key);
+            if (finalRow && finalRow.updatedAt === currentRow.updatedAt) {
               await window.IdbManager.idbDelete('outbox', row.key);
-            } else if (response.status === 401) {
-              allOk = false;
-              break;
-            } else {
-              allOk = false;
-              break;
             }
-          } else if (row.type === 'success') {
-            const response = await fetch('/api/statistics/success', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(row.payload),
-            });
+          } else if (response.status === 401) {
+            allOk = false;
+            break;
+          } else {
+            allOk = false;
+            break;
+          }
+        } catch (e) {
+          allOk = false;
+          break;
+        }
+      }
 
-            if (response.ok) {
-              await window.IdbManager.idbDelete('outbox', row.key);
-            } else if (response.status === 401) {
-              allOk = false;
-              break;
-            } else {
-              allOk = false;
-              break;
-            }
-          } else if (row.type === 'dictation_record') {
-            // Отправляем рекорд на сервер
-            const response = await fetch('/api/statistics/dictation-record/save', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(row.payload),
-            });
+      if (!allOk) {
+        state.flushing = false;
+        return;
+      }
 
-            if (response.ok) {
-              const respData = await response.json();
-              // Сервер всегда возвращает актуальный record для синхронизации кеша
-              if (respData && respData.record) {
-                const serverRecord = respData.record;
-                const updatedPayload = {
-                  dictation_id: serverRecord.dictation_id || row.payload.dictation_id,
-                  positions: serverRecord.positions || row.payload.positions,
-                  lead_time: serverRecord.lead_time || 0,
-                  mistake_count: serverRecord.mistake_count || 0,
-                };
-                // Обновляем record в IndexedDB актуальными данными с сервера
-                // (запись остаётся как кеш для офлайн-доступа)
-                await window.IdbManager.idbPut('outbox', {
-                  key: row.key,
-                  type: 'dictation_record',
-                  userId: row.userId,
-                  createdAt: row.createdAt,
-                  payload: updatedPayload,
-                  synced: true,
-                });
-              } else {
-                // Сервер не вернул record — просто помечаем как синхронизированный
-                await window.IdbManager.idbPut('outbox', {
-                  key: row.key,
-                  type: 'dictation_record',
-                  userId: row.userId,
-                  createdAt: row.createdAt,
-                  payload: row.payload,
-                  synced: true,
-                });
-              }
-              // НЕ удаляем запись — она остаётся как кеш для офлайн-доступа
-              // При следующем flush запись с synced:true будет пропущена
-            } else if (response.status === 401) {
-              allOk = false;
-              break;
+      // 3. Отправляем success без пары activity
+      for (const row of successRows) {
+        try {
+          const response = await fetch('/api/statistics/success', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(row.payload),
+          });
+
+          if (response.ok) {
+            await window.IdbManager.idbDelete('outbox', row.key);
+          } else if (response.status === 401) {
+            allOk = false;
+            break;
+          } else {
+            allOk = false;
+            break;
+          }
+        } catch (e) {
+          allOk = false;
+          break;
+        }
+      }
+
+      if (!allOk) {
+        state.flushing = false;
+        return;
+      }
+
+      // 4. Отправляем dictation_record
+      for (const row of recordRows) {
+        try {
+          const response = await fetch('/api/statistics/dictation-record/save', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(row.payload),
+          });
+
+          if (response.ok) {
+            const respData = await response.json();
+            if (respData && respData.record) {
+              const serverRecord = respData.record;
+              const updatedPayload = {
+                dictation_id: serverRecord.dictation_id || row.payload.dictation_id,
+                positions: serverRecord.positions || row.payload.positions,
+                lead_time: serverRecord.lead_time || 0,
+                mistake_count: serverRecord.mistake_count || 0,
+              };
+              await window.IdbManager.idbPut('outbox', {
+                key: row.key,
+                type: 'dictation_record',
+                userId: row.userId,
+                createdAt: row.createdAt,
+                payload: updatedPayload,
+                synced: true,
+              });
             } else {
-              allOk = false;
-              break;
+              await window.IdbManager.idbPut('outbox', {
+                key: row.key,
+                type: 'dictation_record',
+                userId: row.userId,
+                createdAt: row.createdAt,
+                payload: row.payload,
+                synced: true,
+              });
             }
+          } else if (response.status === 401) {
+            allOk = false;
+            break;
+          } else {
+            allOk = false;
+            break;
           }
         } catch (e) {
           allOk = false;
@@ -611,6 +756,10 @@
       // ignore
     } finally {
       state.flushing = false;
+      if (state._retryFlush) {
+        state._retryFlush = false;
+        setTimeout(() => _flushOutbox(), 0);
+      }
     }
   }
 
@@ -627,6 +776,8 @@
       state.timerStartedAt = null;
     }
 
+    // Если flush уже выполняется, _flushOutbox установит _retryFlush=true
+    // и после завершения текущего flush запустит повторный
     await _flushOutbox();
   }
 
