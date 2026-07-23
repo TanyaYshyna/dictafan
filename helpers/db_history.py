@@ -1013,7 +1013,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, completion_count=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, completion_count=None, money_earned=None):
     """
     Добавляет запись успешного завершения диктанта в history_by_day
     
@@ -1091,10 +1091,12 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 date_plan=date_plan,
                 date_fact=date_fact,
                 date_start=date_start_parsed,
-                # perfect/corrected/audio передаются вместе с success, чтобы
-                # гарантировать консистентность данных: _flushOutbox на клиенте
-                # находит пару activity+success для одного диктанта, мержит их
-                # в один запрос и отправляет на сервер.
+                # perfect/corrected/audio/money передаются вместе с success.
+                # На клиенте _flushOutbox находит пару activity+success для
+                # одного диктанта, склеивает их в один запрос и отправляет
+                # на сервер. Success payload уже содержит итоговые totals
+                # из сессии (showCompletionModal), поэтому суммировать их
+                # с activity НЕ нужно — это приведёт к удвоению.
                 perfect_delta=int(perfect_count or 0),
                 corrected_delta=int(corrected_count or 0),
                 audio_delta=int(audio_count or 0),
@@ -1103,7 +1105,7 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 lead_time_delta=int(time_ms or 0),
                 successes_delta=int(completion_count or 1),
                 activity_count_delta=0,
-                money_dt_delta=0,
+                money_dt_delta=int(money_earned or 0),
             )
 
             # Обновляем history_current — актуальное количество побед для этого упражнения

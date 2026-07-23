@@ -2102,10 +2102,15 @@ def save_success():
         current_email = get_jwt_identity()
         data = request.get_json()
         
-        # Временные логи для отладки
+        # Логи для отлова дублирования/удвоения
         print(f'📥 [SAVE_SUCCESS] Получен запрос на сохранение успеха')
         print(f'   email: {current_email}')
         print(f'   данные: {data}')
+        # Проверка на удвоение: если perfect_count > audio_count — возможно дублирование
+        pc = int(data.get('perfect_count', 0) or 0)
+        ac = int(data.get('audio_count', 0) or 0)
+        if pc > ac:
+            print(f'⚠️ [SAVE_SUCCESS] ВНИМАНИЕ: perfect_count ({pc}) > audio_count ({ac}) — возможное удвоение!')
         
         dictation_id = data.get('dictation_id')  # может быть dict_<id> или integer
         perfect_count = data.get('perfect_count', 0)
@@ -2200,6 +2205,7 @@ def save_success():
             started_at=started_at,
             date_start=date_start,
             completion_count=completion_count,
+            money_earned=money_earned,
         )
 
         print(f'✅ [SAVE_SUCCESS] Успех успешно сохранен в БД')
