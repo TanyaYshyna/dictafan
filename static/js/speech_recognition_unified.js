@@ -519,7 +519,6 @@
       var rec = new SpeechRecognition();
       this._recognition = rec;
       var mySessionId = this._sessionId;
-      try { console.log('WWWWWWWWW[UnifiedSpeechRecognition] _initWebSpeech: язык перед rec.start() =', this.state.language); } catch (e) {}
       rec.lang = this.state.language;
       // Android Chrome often returns empty transcripts in continuous+interim mode.
       // Prefer single-utterance recognition with final results.
@@ -641,7 +640,6 @@
      */
     async _startRecordingOnly() {
       try {
-        console.log('[UnifiedSpeechRecognition] _startRecordingOnly');
         this._audioChunks = [];
         this._audioBlob = null;
         this._sessionId = (this._sessionId || 0) + 1;
@@ -683,7 +681,6 @@
         this._recordingTimer = setTimeout(function () {
           try {
             if (self.state.isRecording && mySessionId === self._sessionId) {
-              console.log('[UnifiedSpeechRecognition] record: автостоп 30с');
               self.stopRecording('max_duration');
             }
           } catch (e) {
@@ -702,7 +699,6 @@
      */
     async _stopRecordingOnly(cause) {
       try {
-        console.log('[UnifiedSpeechRecognition] _stopRecordingOnly, cause=' + cause);
         this._clearRecordingTimer();
 
         if (this._mediaRecorder && this._mediaRecorder.state === 'recording') {

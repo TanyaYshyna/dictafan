@@ -468,20 +468,22 @@
   // ======================== ОТПРАВКА ========================
 
   /**
-   * Смержить данные activity в success-пакет.
-   * Все поля activity (perfect_count, audio_count и т.д.) суммируются
-   * с соответствующими полями success.
+   * Склеить activity и success в один пакет для отправки одним запросом.
+   *
+   * ВАЖНО: success payload уже содержит ИТОГОВЫЕ totals, рассчитанные из
+   * состояния сессии в showCompletionModal() (totalPerfect, totalCorrected,
+   * totalAudio, totalErrors, totalChars, totalMoneyEarned).
+   * Activity row содержит те же данные, накопленные по одному за предложение.
+   * Суммировать их НЕЛЬЗЯ — это приведёт к удвоению (баг 40/20).
+   *
+   * Поэтому возвращаем successPayload как есть. Activity row нужна только
+   * для того, чтобы знать, что её нужно удалить из outbox после отправки.
    */
   function _mergeActivityIntoSuccess(activityRow, successPayload) {
+    // successPayload уже содержит правильные totals из сессии;
+    // activity данные не суммируем, чтобы избежать удвоения.
     return {
       ...successPayload,
-      perfect_count: (Number(successPayload.perfect_count) || 0) + (Number(activityRow.perfect_count) || 0),
-      corrected_count: (Number(successPayload.corrected_count) || 0) + (Number(activityRow.corrected_count) || 0),
-      audio_count: (Number(successPayload.audio_count) || 0) + (Number(activityRow.audio_count) || 0),
-      mistake_count: (Number(successPayload.mistake_count) || 0) + (Number(activityRow.mistake_count) || 0),
-      monenumber_of_characters: (Number(successPayload.monenumber_of_characters) || 0) + (Number(activityRow.monenumber_of_characters) || 0),
-      money_earned: (Number(successPayload.money_earned) || 0) + (Number(activityRow.money_count) || 0),
-      time_ms: (Number(successPayload.time_ms) || 0) + (Number(activityRow.lead_time_ms_total) || 0),
       selected_sentence_positions: successPayload.selected_sentence_positions || activityRow.selected_sentence_positions || undefined,
       date_start: successPayload.date_start || activityRow.date_start || undefined,
     };
@@ -507,9 +509,13 @@
       }
 
       // Группируем строки: для каждого диктанта может быть activity + success.
-      // Если есть и activity, и success — мержим activity в success и отправляем
-      // одним запросом (success). Если есть только activity — отправляем activity.
+      // Если есть и activity, и success — склеиваем их в один запрос (success).
+      // Если есть только activity — отправляем activity отдельно.
       // dictation_record отправляется отдельно.
+      //
+      // ВАЖНО: _mergeActivityIntoSuccess НЕ суммирует activity поля в success,
+      // потому что success payload уже содержит итоговые totals из сессии.
+      // Суммирование привело бы к удвоению (баг 40/20).
       const activityRows = [];    // activity без пары success
       const successRows = [];     // success без пары activity
       const recordRows = [];      // dictation_record
@@ -577,8 +583,19 @@
           const currentSuc = await window.IdbManager.idbGet('outbox', successRow.key);
           if (!currentSuc) continue;
 
-          // Мержим activity data в success payload
+          // Склеиваем activity + success в один payload
           const mergedPayload = _mergeActivityIntoSuccess(currentAct, currentSuc.payload);
+
+          console.log('[OB:flushOutbox] mergedPayload:', JSON.stringify({
+            dictation_id: mergedPayload.dictation_id,
+            perfect_count: mergedPayload.perfect_count,
+            corrected_count: mergedPayload.corrected_count,
+            audio_count: mergedPayload.audio_count,
+            mistake_count: mergedPayload.mistake_count,
+            monenumber_of_characters: mergedPayload.monenumber_of_characters,
+            money_earned: mergedPayload.money_earned,
+            time_ms: mergedPayload.time_ms,
+          }));
 
           const response = await fetch('/api/statistics/success', {
             method: 'POST',

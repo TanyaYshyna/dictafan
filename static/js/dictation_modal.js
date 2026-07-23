@@ -1000,7 +1000,10 @@
           const selectedSentencePositions = _getSelectedSentencePositions(session);
 
           console.log('[DM:771] enqueueSuccess:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
-          // Дожидаемся записи success в outbox, чтобы flushAll гарантированно отправил и его
+          // Записываем success в outbox. _flushOutbox найдёт пару activity+success
+          // для этого диктанта, склеит их в один запрос и отправит на сервер.
+          // ВАЖНО: success payload содержит ИТОГОВЫЕ totals из сессии (totalPerfect и т.д.).
+          // _mergeActivityIntoSuccess НЕ суммирует их с activity — это предотвращает удвоение.
           try { await ob.enqueueSuccess({
             dictation_id: dictationId,
             perfect_count: totalPerfect,
