@@ -908,8 +908,8 @@
     } catch (e6) {
     }
 
-    // Сначала устанавливаем слушатель события рекорда (до enqueueSuccess,
-    // т.к. enqueueSuccess диспатчит событие синхронно после локальной проверки)
+    // Сначала устанавливаем слушатель события рекорда (до enqueueActivity с completionCount,
+    // т.к. enqueueActivity диспатчит событие рекорда через _checkAndSaveRecord)
     try {
       const recordHandler = function(e) {
         try {
@@ -938,98 +938,13 @@
     } catch (e9) {
     }
 
-    // Отправляем success в outbox_batcher (завершение диктанта)
-    // enqueueSuccess проверит рекорд локально и диспатчнет событие dictation-record
+    // Success уже отправлен в последнем activity (звезда/полузвезда/аудио)
+    // с параметрами completionCount=1 и successNumber.
+    // Здесь только принудительно отправляем всё накопленное (flushAll).
     try {
       const ob = window.OutboxBatcher;
-      if (ob && typeof ob.enqueueSuccess === 'function') {
-        const session = window.__dictationModalActiveSession;
-        if (session) {
-          const allKeys = session.content ? session.content.getAllKeys() : [];
-          let totalPerfect = 0;
-          let totalCorrected = 0;
-          let totalAudio = 0;
-          let totalErrors = 0;
-          let totalAttempts = 0;
-          let totalChars = 0;
-          let totalMoneyEarned = 0;
-          const sentencesData = [];
-
-          for (const key of allKeys) {
-            const st = session.getState(key);
-            const p = Number(st.number_of_perfect) || 0;
-            const c = Number(st.number_of_corrected) || 0;
-            const a = Number(st.number_of_audio) || 0;
-            const er = Number(st.mistake_count) || 0;
-            const at = Number(st.attempts_total) || 0;
-            const ch = Number(st.number_of_characters) || 0;
-
-            totalPerfect += p;
-            totalCorrected += c;
-            totalAudio += a;
-            totalErrors += er;
-            totalAttempts += at;
-            totalChars += ch;
-            totalMoneyEarned += (Number(st.money_earned) || 0);
-
-            if (p > 0 || c > 0 || a > 0) {
-              sentencesData.push({
-                sentence_key: key,
-                perfect_count: p,
-                corrected_count: c,
-                audio_count: a,
-                attempts_total: at,
-                mistake_count: er,
-                selection_state: st.selection_state || 'unchecked',
-              });
-            }
-          }
-
-          // Используем progressPanel как единственный источник времени
-          let totalTimeMs = 0;
-          try {
-            const snap = getProgressTimerSnapshot();
-            totalTimeMs = snap.accumulatedMs || 0;
-          } catch (e) {
-            totalTimeMs = session.timer ? (session.timer.accumulatedMs || 0) : 0;
-          }
-          const nowMs = Date.now();
-          const tzOffsetMin = -new Date().getTimezoneOffset();
-          const dictationId = getCurrentDictationIdForDb();
-          const dictationLanguageCode = _getDictationLanguageCode();
-          const selectedSentencePositions = _getSelectedSentencePositions(session);
-
-          console.log('[DM:771] enqueueSuccess:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
-          // Записываем success в outbox. Activity и success мержатся в единую hbd-запись
-          // с ключом hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart}.
-          // Все данные отправляются одним запросом POST /api/statistics/success.
-          try { await ob.enqueueSuccess({
-            dictation_id: dictationId,
-            perfect_count: totalPerfect,
-            corrected_count: totalCorrected,
-            audio_count: totalAudio,
-            attempts_total: totalAttempts,
-            mistake_count: totalErrors,
-            monenumber_of_characters: totalChars,
-            money_earned: totalMoneyEarned,
-            time_ms: totalTimeMs,
-            completion_count: 1,
-            completion_count_after: completionCountAfter,
-            dictation_language_code: dictationLanguageCode,
-            sentences_data: sentencesData,
-            completed_at_ms: nowMs,
-            completed_at_tz_offset_min: tzOffsetMin,
-            selected_sentence_positions: selectedSentencePositions,
-            date_start: session.dateStart,
-            source_group_id: session.sourceGroupId || null,
-            plan_date: session.planDate || null,
-          }); } catch (eEnq) { console.warn('[DM] enqueueSuccess error:', eEnq); }
-
-          // Принудительно отправляем всё накопленное.
-          if (typeof ob.flushAll === 'function') {
-            try { await ob.flushAll(); } catch (eFlush) { console.warn('[DM] flushAll error:', eFlush); }
-          }
-        }
+      if (ob && typeof ob.flushAll === 'function') {
+        try { await ob.flushAll(); } catch (eFlush) { console.warn('[DM] flushAll error:', eFlush); }
       }
     } catch (e7) {
     }
@@ -1710,7 +1625,27 @@
                     const charsThisAttempt = _ensureExpectedCharsLen(session);
                     // Дельта: ошибки за эту попытку (mistake_count_current сбрасывается при resetSentenceUiFromSession)
                     const mistakesThisAttempt = Number(st && st.mistake_count_current) || 0;
-                    await handleActivity(typeActivity, st, key, session, reward, mistakesThisAttempt, charsThisAttempt);
+
+                    // Проверяем, будет ли это действие последним (завершает ли диктант).
+                    // Если после этого действия все предложения будут завершены — передаём
+                    // completionCount=1 и successNumber (текущий номер успеха).
+                    // success — это не отдельное движение, а флаг на последнем activity.
+                    let compCount = 0;
+                    let succNumber = 0;
+                    try {
+                      // success отправляется только один раз.
+                      // Если session.completionCount уже > 0 — значит success уже был отправлен,
+                      // и повторные доработки (полузвезды → звезды) не должны увеличивать successes.
+                      if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
+                        const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
+                        compCount = 1;
+                        succNumber = nextCompletionCount;
+                        console.log('[DM:checkText] последнее действие, передаём completionCount=1 successNumber=' + succNumber);
+                      }
+                    } catch (eCompDetect) {
+                    }
+
+                    await handleActivity(typeActivity, st, key, session, reward, mistakesThisAttempt, charsThisAttempt, compCount, succNumber);
                   }
                 }
 
@@ -2667,6 +2602,29 @@
   }
 
   /**
+   * Проверить, все ли предложения диктанта полностью завершены (textOk && audioOk).
+   * Используется для определения, нужно ли передавать completionCount/successNumber
+   * в handleActivity() при последнем действии.
+   */
+  function _isDictationFullyCompleted(session) {
+    try {
+      if (!session) return false;
+      const activeKeys = session.activeKeys;
+      const allKeys = (activeKeys && activeKeys.length > 0) ? activeKeys : (session.content ? session.content.getAllKeys() : []);
+      if (!Array.isArray(allKeys) || allKeys.length === 0) return false;
+      for (const k of allKeys) {
+        const st = session.getState ? session.getState(k) : null;
+        if (!st) return false;
+        const { textOk, audioOk } = computeSentenceCompletionState(st);
+        if (!textOk || !audioOk) return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * Сильный критерий завершённости предложения: только звезда (perfect >= 1) + аудио.
    * Используется для визуального отображения (серый цвет строки, недоступность).
    * Полузвезда (corrected) НЕ считается — пользователь может улучшить до звезды.
@@ -3374,7 +3332,7 @@
    * @param {object} session — сессия диктанта
    * @param {number} [moneyCount=0] — дельта заработанных монет (сколько заработано этим действием)
    */
-  async function handleActivity(type, st, key, session, moneyCount, mistakeCount, numberOfCharacters) {
+  async function handleActivity(type, st, key, session, moneyCount, mistakeCount, numberOfCharacters, completionCount = 0, successNumber = 0) {
     try {
       if (!type || !st || key == null || !session) {
         return;
@@ -3382,24 +3340,26 @@
       
       const ob = window.OutboxBatcher;
      if (ob && typeof ob.enqueueActivity === 'function') {
-       const dictationId = getCurrentDictationIdForDb();
-       const dictationLanguageCode = _getDictationLanguageCode();
-       const selectedSentencePositions = _getSelectedSentencePositions(session);
-       const enqueued = await ob.enqueueActivity({
-         type: type,
-         count: 1,
-         leadTimeMs: _getSessionLeadTimeMs(session),
-         dictationId,
-         date: null,
-         dictationLanguageCode,
-         selectedSentencePositions,
-         mistakeCount: Number(mistakeCount) || 0,
-         numberOfCharacters: Number(numberOfCharacters) || 0,
-         moneyCount: Number(moneyCount) || 0,
-         dateStart: session.dateStart || null,
-         sourceGroupId: session.sourceGroupId || null,
-         planDate: session.planDate || null,
-       });
+        const dictationId = getCurrentDictationIdForDb();
+        const dictationLanguageCode = _getDictationLanguageCode();
+        const selectedSentencePositions = _getSelectedSentencePositions(session);
+        const enqueued = await ob.enqueueActivity({
+          type: type,
+          count: 1,
+          leadTimeMs: _getSessionLeadTimeMs(session),
+          dictationId,
+          date: null,
+          dictationLanguageCode,
+          selectedSentencePositions,
+          mistakeCount: Number(mistakeCount) || 0,
+          numberOfCharacters: Number(numberOfCharacters) || 0,
+          moneyCount: Number(moneyCount) || 0,
+          dateStart: session.dateStart || null,
+          sourceGroupId: session.sourceGroupId || null,
+          planDate: session.planDate || null,
+          completionCount: Number(completionCount) || 0,
+          successNumber: Number(successNumber) || 0,
+        });
         if (!enqueued) {
           console.warn('[DM:handleActivity] enqueueActivity вернул false', { type, dictationId });
         }
@@ -3763,7 +3723,22 @@
               } catch (e0s) {
               }
               // Аудио: символы и ошибки не добавляются (0, 0)
-              const haResult = await handleActivity('audio', st, _key, session, _add, 0, 0);
+              // Проверяем, будет ли это действие последним (завершает ли диктант).
+              let audioCompCount = 0;
+              let audioSuccNumber = 0;
+              try {
+                // success отправляется только один раз.
+                // Если session.completionCount уже > 0 — значит success уже был отправлен,
+                // и повторные доработки не должны увеличивать successes.
+                if (_isDictationFullyCompleted(session) && (Number(session.completionCount) || 0) === 0) {
+                  const nextCompletionCount = (Number(session.completionCount) || 0) + 1;
+                  audioCompCount = 1;
+                  audioSuccNumber = nextCompletionCount;
+                  console.log('[DM:onRecognitionComplete] последнее действие (audio), передаём completionCount=1 successNumber=' + audioSuccNumber);
+                }
+              } catch (eCompDetectAudio) {
+              }
+              const haResult = await handleActivity('audio', st, _key, session, _add, 0, 0, audioCompCount, audioSuccNumber);
 
               // После успешного аудио проверяем, выполнен ли академический минимум.
               // Если да — обновляем кнопку "Далее" и ставим таймер на паузу.
