@@ -5,7 +5,21 @@
  * Ключ: hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart}
  * — совпадает с уникальным ключом строки в history_by_day.
  *
- * Activity и success суммируются в одну и ту же запись в IDB.
+ * Activity и success — это ОДНО и то же движение. Каждое действие
+ * (звезда, полузвезда, аудио) отправляется через enqueueActivity().
+ * Если действие является последним (завершает диктант), в него
+ * добавляются параметры completionCount=1 и successNumber=N.
+ *
+ * Принцип работы:
+ *   - enqueueActivity() увеличивает счётчики (perfect_count, audio_count и т.д.)
+ *     и, если передан completionCount, увеличивает successes
+ *   - _flushOutbox() отправляет ДЕЛЬТУ: (текущее_значение - synced_значение)
+ *   - После отправки запись НЕ удаляется, а synced_* поля обновляются
+ *     до текущих значений
+ *
+ * Это гарантирует, что даже если activity отправлялась частями,
+ * финальный completionCount отправит только то, что ещё не было отправлено.
+ *
  * Отправка происходит:
  *   1) По таймеру (BATCH_INTERVAL_MS) — все накопленные данные
  *   2) При завершении диктанта — принудительный flushAll()
@@ -14,8 +28,7 @@
  * Если нет интернета — данные хранятся в IndexedDB до следующей попытки.
  *
  * Использование:
- *   OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, ... })
- *   OutboxBatcher.enqueueSuccess(payload)
+ *   OutboxBatcher.enqueueActivity({ type, count, leadTimeMs, ..., completionCount, successNumber })
  *   OutboxBatcher.flushAll()  // принудительная отправка всего outbox
  */
 (function () {
@@ -123,8 +136,21 @@
       monenumber_of_characters: 0,
       lead_time_ms_total: 0,
       successes: 0,
+      success_number: 0,
       money_earned: 0,
       attempts_total: 0,
+      // synced_* — значения, которые уже отправлены на сервер
+      synced_perfect_count: 0,
+      synced_corrected_count: 0,
+      synced_audio_count: 0,
+      synced_activity_count: 0,
+      synced_money_count: 0,
+      synced_mistake_count: 0,
+      synced_monenumber_of_characters: 0,
+      synced_lead_time_ms_total: 0,
+      synced_successes: 0,
+      synced_money_earned: 0,
+      synced_attempts_total: 0,
       updatedAt: 0,
     };
   }
@@ -145,9 +171,11 @@
         dateStart,
         sourceGroupId,
         planDate,
+        completionCount = 0,    // 1 если это последнее действие, завершающее диктант
+        successNumber = 0,      // номер успеха (например, 12)
       } = params || {};
 
-      console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount, sourceGroupId, planDate });
+      console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount, sourceGroupId, planDate, completionCount, successNumber });
 
       if (!dictationId || !type) {
         console.warn(TAG, '[1a] enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
@@ -206,12 +234,37 @@
       existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(numberOfCharacters) || 0);
       existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(leadTimeMs) || 0);
       existing.dictation_language_code = dictationLanguageCode || existing.dictation_language_code;
+
+      // Если это последнее действие, завершающее диктант — добавляем completionCount и successNumber
+      const compCount = Number(completionCount) || 0;
+      const succNumber = Number(successNumber) || 0;
+      if (compCount > 0) {
+        existing.successes = (Number(existing.successes) || 0) + compCount;
+        existing.success_number = succNumber;
+      }
+
       existing.updatedAt = Date.now();
 
-      console.log(TAG, '[enqueueActivity] запись в IDB:', { key, audio_count: existing.audio_count, money_count: existing.money_count });
+      console.log(TAG, '[enqueueActivity] запись в IDB:', { key, audio_count: existing.audio_count, money_count: existing.money_count, successes: existing.successes, success_number: existing.success_number });
       await window.IdbManager.idbPut('outbox', existing);
 
-      _scheduleFlush();
+      // Если это завершение диктанта — проверяем рекорд и принудительно отправляем всё
+      if (compCount > 0) {
+        try {
+          await _checkAndSaveRecord({
+            dictation_id: dictationId,
+            selected_sentence_positions: selectedSentencePositions,
+            mistake_count: existing.mistake_count,
+            time_ms: existing.lead_time_ms_total,
+          }, key);
+        } catch (eRec) {
+          console.warn(TAG, '[enqueueActivity] ошибка проверки рекорда:', eRec);
+        }
+        // Принудительная отправка при завершении диктанта
+        try { await flushAll(); } catch (eFlush) { console.warn(TAG, '[enqueueActivity] ошибка flushAll:', eFlush); }
+      } else {
+        _scheduleFlush();
+      }
 
       return true;
     } catch (e) {
@@ -356,117 +409,29 @@
   }
 
   /**
-   * Добавить success-данные в очередь (завершение диктанта).
-   * Использует единый ключ hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart},
-   * совпадающий с уникальным ключом строки в history_by_day.
-   * Данные суммируются с уже существующей hbd-записью (activity + success в одной строке).
-   * После сохранения success — проверяет рекорд локально и сохраняет record.
+   * Проверить рекорд локально и, если это рекорд, сохранить его.
+   * Вызывается из enqueueActivity() когда передан completionCount.
    */
-  async function enqueueSuccess(payload) {
+  async function _checkAndSaveRecord(payload, key) {
     try {
-      if (!payload || !payload.dictation_id) {
-        console.warn(TAG, '[5a] enqueueSuccess: пропущено (нет dictation_id)', payload);
-        return false;
-      }
-
-      const userId = _getUserId();
-      if (!userId) {
-        console.warn(TAG, '[5b] enqueueSuccess: пропущено (нет userId)');
-        return false;
-      }
-
-      const dictationId = String(payload.dictation_id).trim();
-      const dateFact = payload.date || _getLocalDateId();
-      const datePlanVal = payload.plan_date || dateFact;
-      const dateStartStr = payload.date_start ? String(payload.date_start).replace(/[^0-9\-: ]/g, '') : '';
-      const key = _buildHbdKey({
-        userId,
-        dictationId,
-        positions: payload.selected_sentence_positions,
-        datePlan: datePlanVal,
-        dateFact,
-        dateStart: dateStartStr,
-      });
-
-      console.log(TAG, '[enqueueSuccess] key=' + key);
-
-      // Увеличиваем pending-счётчик ДО записи в IndexedDB
-      state.pendingCount += 1;
-
-      // Читаем существующую hbd-запись или создаём новую
-      const existing = (await window.IdbManager.idbGet('outbox', key)) || _createHbdRecord(key, {
-        userId,
-        dictationId,
-        selectedSentencePositions: payload.selected_sentence_positions,
-        dateStart: dateStartStr,
-        datePlan: datePlanVal,
-        dateFact,
-        sourceGroupId: payload.source_group_id || null,
-        dictationLanguageCode: payload.dictation_language_code || null,
-      });
-
-      // Суммируем success-поля в hbd-запись
-      existing.perfect_count = (Number(existing.perfect_count) || 0) + (Number(payload.perfect_count) || 0);
-      existing.corrected_count = (Number(existing.corrected_count) || 0) + (Number(payload.corrected_count) || 0);
-      existing.audio_count = (Number(existing.audio_count) || 0) + (Number(payload.audio_count) || 0);
-      existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(payload.mistake_count) || 0);
-      existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(payload.monenumber_of_characters) || 0);
-      existing.money_earned = (Number(existing.money_earned) || 0) + (Number(payload.money_earned) || 0);
-      existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(payload.time_ms) || 0);
-      existing.attempts_total = (Number(existing.attempts_total) || 0) + (Number(payload.attempts_total) || 0);
-      existing.successes = (Number(existing.successes) || 0) + (Number(payload.completion_count) || 1);
-
-      // source_group_id — если был передан и ещё не установлен
-      if (payload.source_group_id && !existing.source_group_id) {
-        existing.source_group_id = payload.source_group_id;
-      }
-      // dictation_language_code
-      if (payload.dictation_language_code) {
-        existing.dictation_language_code = payload.dictation_language_code;
-      }
-
-      existing.updatedAt = Date.now();
-
-      console.log(TAG, '[enqueueSuccess] запись в IDB:', {
-        key,
-        perfect_count: existing.perfect_count,
-        corrected_count: existing.corrected_count,
-        audio_count: existing.audio_count,
-        mistake_count: existing.mistake_count,
-        successes: existing.successes,
-      });
-
-      await window.IdbManager.idbPut('outbox', existing);
-
-      // Проверяем рекорд локально и сохраняем
-      try {
-        const recordResult = await _checkRecordLocally(payload, key);
-        if (recordResult.is_record && recordResult.record) {
-          await _enqueueRecord(recordResult.record);
-          console.log(TAG, '[enqueueSuccess] новый рекорд!', recordResult.record);
-          // Диспатчим событие для dictation_modal.js
-          try {
-            document.dispatchEvent(new CustomEvent('dictation-record', {
-              detail: {
-                is_record: true,
-                is_first: recordResult.is_first,
-                record: recordResult.record,
-              },
-            }));
-          } catch (eDisp) {
-            console.warn(TAG, '[enqueueSuccess] ошибка диспатча события:', eDisp);
-          }
+      const recordResult = await _checkRecordLocally(payload, key);
+      if (recordResult.is_record && recordResult.record) {
+        await _enqueueRecord(recordResult.record);
+        console.log(TAG, '[checkAndSaveRecord] новый рекорд!', recordResult.record);
+        try {
+          document.dispatchEvent(new CustomEvent('dictation-record', {
+            detail: {
+              is_record: true,
+              is_first: recordResult.is_first,
+              record: recordResult.record,
+            },
+          }));
+        } catch (eDisp) {
+          console.warn(TAG, '[checkAndSaveRecord] ошибка диспатча события:', eDisp);
         }
-      } catch (eRec) {
-        console.warn(TAG, '[enqueueSuccess] ошибка проверки рекорда:', eRec);
       }
-
-      _scheduleFlush();
-
-      return true;
-    } catch (e) {
-      console.warn(TAG, '[5err] enqueueSuccess: ошибка', e);
-      return false;
+    } catch (eRec) {
+      console.warn(TAG, '[checkAndSaveRecord] ошибка проверки рекорда:', eRec);
     }
   }
 
@@ -506,14 +471,14 @@
         return;
       }
 
-      // В новой архитектуре все activity и success хранятся в единых hbd-записях.
-      // Отправляем все hbd-записи как POST /api/statistics/success.
+      // Все activity и success хранятся в единых hbd-записях.
+      // Отправляем ДЕЛЬТУ: (текущее_значение - synced_значение).
+      // После отправки обновляем synced_* поля (запись НЕ удаляется).
       // dictation_record отправляется отдельно.
       const hbdRows = [];
       const recordRows = [];
 
       for (const row of rows) {
-        if (row.synced) continue;
         if (row.type === 'hbd') {
           hbdRows.push(row);
         } else if (row.type === 'dictation_record') {
@@ -524,35 +489,57 @@
       const token = _getToken();
       let allOk = true;
 
-      // 1. Отправляем все hbd-записи как success
+      // 1. Отправляем все hbd-записи как success (только дельту)
       for (const row of hbdRows) {
         try {
           const currentRow = await window.IdbManager.idbGet('outbox', row.key);
           if (!currentRow) continue;
           if (currentRow.updatedAt !== row.updatedAt) continue;
 
+          // Вычисляем дельту: что ещё не отправлено
+          const perfectDelta = Math.max(0, (Number(currentRow.perfect_count) || 0) - (Number(currentRow.synced_perfect_count) || 0));
+          const correctedDelta = Math.max(0, (Number(currentRow.corrected_count) || 0) - (Number(currentRow.synced_corrected_count) || 0));
+          const audioDelta = Math.max(0, (Number(currentRow.audio_count) || 0) - (Number(currentRow.synced_audio_count) || 0));
+          const mistakeDelta = Math.max(0, (Number(currentRow.mistake_count) || 0) - (Number(currentRow.synced_mistake_count) || 0));
+          const monenumberDelta = Math.max(0, (Number(currentRow.monenumber_of_characters) || 0) - (Number(currentRow.synced_monenumber_of_characters) || 0));
+          const moneyEarnedDelta = Math.max(0, (Number(currentRow.money_earned) || 0) - (Number(currentRow.synced_money_earned) || 0));
+          const leadTimeDelta = Math.max(0, (Number(currentRow.lead_time_ms_total) || 0) - (Number(currentRow.synced_lead_time_ms_total) || 0));
+          const attemptsDelta = Math.max(0, (Number(currentRow.attempts_total) || 0) - (Number(currentRow.synced_attempts_total) || 0));
+          const successesDelta = Math.max(0, (Number(currentRow.successes) || 0) - (Number(currentRow.synced_successes) || 0));
+          const activityCountDelta = Math.max(0, (Number(currentRow.activity_count) || 0) - (Number(currentRow.synced_activity_count) || 0));
+          const moneyCountDelta = Math.max(0, (Number(currentRow.money_count) || 0) - (Number(currentRow.synced_money_count) || 0));
+
+          // Если дельта нулевая — пропускаем (нечего отправлять)
+          if (perfectDelta === 0 && correctedDelta === 0 && audioDelta === 0 &&
+              mistakeDelta === 0 && monenumberDelta === 0 && moneyEarnedDelta === 0 &&
+              leadTimeDelta === 0 && attemptsDelta === 0 && successesDelta === 0 &&
+              activityCountDelta === 0 && moneyCountDelta === 0) {
+            continue;
+          }
+
           const payload = {
             dictation_id: currentRow.dictation_id,
-            perfect_count: Number(currentRow.perfect_count) || 0,
-            corrected_count: Number(currentRow.corrected_count) || 0,
-            audio_count: Number(currentRow.audio_count) || 0,
-            mistake_count: Number(currentRow.mistake_count) || 0,
-            monenumber_of_characters: Number(currentRow.monenumber_of_characters) || 0,
-            money_earned: Number(currentRow.money_earned) || 0,
-            time_ms: Number(currentRow.lead_time_ms_total) || 0,
-            attempts_total: Number(currentRow.attempts_total) || 0,
-            completion_count: Number(currentRow.successes) || 0,
-            activity_count: Number(currentRow.activity_count) || 0,
-            money_count: Number(currentRow.money_count) || 0,
-            lead_time_ms: Number(currentRow.lead_time_ms_total) || 0,
+            perfect_count: perfectDelta,
+            corrected_count: correctedDelta,
+            audio_count: audioDelta,
+            mistake_count: mistakeDelta,
+            monenumber_of_characters: monenumberDelta,
+            money_earned: moneyEarnedDelta,
+            time_ms: leadTimeDelta,
+            attempts_total: attemptsDelta,
+            completion_count: successesDelta,
+            activity_count: activityCountDelta,
+            money_count: moneyCountDelta,
+            lead_time_ms: leadTimeDelta,
             selected_sentence_positions: currentRow.selected_sentence_positions || undefined,
             date_start: currentRow.date_start || undefined,
             plan_date: currentRow.date_plan || undefined,
             source_group_id: currentRow.source_group_id || undefined,
             dictation_language_code: currentRow.dictation_language_code || undefined,
+            success_number: currentRow.success_number || undefined,
           };
 
-          console.log('[OB:flushOutbox] hbd->success:', JSON.stringify({
+          console.log('[OB:flushOutbox] hbd->success (delta):', JSON.stringify({
             dictation_id: payload.dictation_id,
             perfect_count: payload.perfect_count,
             corrected_count: payload.corrected_count,
@@ -573,9 +560,21 @@
           });
 
           if (response.ok) {
+            // Обновляем synced_* поля (запись НЕ удаляем)
             const finalRow = await window.IdbManager.idbGet('outbox', row.key);
             if (finalRow && finalRow.updatedAt === currentRow.updatedAt) {
-              await window.IdbManager.idbDelete('outbox', row.key);
+              finalRow.synced_perfect_count = Number(finalRow.perfect_count) || 0;
+              finalRow.synced_corrected_count = Number(finalRow.corrected_count) || 0;
+              finalRow.synced_audio_count = Number(finalRow.audio_count) || 0;
+              finalRow.synced_mistake_count = Number(finalRow.mistake_count) || 0;
+              finalRow.synced_monenumber_of_characters = Number(finalRow.monenumber_of_characters) || 0;
+              finalRow.synced_money_earned = Number(finalRow.money_earned) || 0;
+              finalRow.synced_lead_time_ms_total = Number(finalRow.lead_time_ms_total) || 0;
+              finalRow.synced_attempts_total = Number(finalRow.attempts_total) || 0;
+              finalRow.synced_successes = Number(finalRow.successes) || 0;
+              finalRow.synced_activity_count = Number(finalRow.activity_count) || 0;
+              finalRow.synced_money_count = Number(finalRow.money_count) || 0;
+              await window.IdbManager.idbPut('outbox', finalRow);
             }
           } else if (response.status === 401) {
             allOk = false;
@@ -703,7 +702,7 @@
     try {
       // Используем pendingCount вместо количества записей в IndexedDB,
       // потому что activity и success мержатся в единую hbd-запись по ключу
-      // и в IDB всегда может быть 1 запись, хотя enqueueActivity/enqueueSuccess вызывались много раз.
+      // и в IDB всегда может быть 1 запись, хотя enqueueActivity вызывался много раз.
       var count = state.pendingCount;
 
       var now = Date.now();
@@ -872,7 +871,6 @@
   // Экспортируем в глобальную область
   window.OutboxBatcher = {
     enqueueActivity,
-    enqueueSuccess,
     flushAll,
     notifySwToSync,
     getQueueInfo,
@@ -893,9 +891,26 @@
     }
 
     window.IdbManager.idbGetAll('outbox').then(function (rows) {
-      var count = Array.isArray(rows) ? rows.length : 0;
-      if (count > 0) {
-        state.pendingCount = count;
+      var pending = 0;
+      if (Array.isArray(rows)) {
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i];
+          if (r.type === 'hbd') {
+            // Считаем сумму дельт как pendingCount
+            var delta = 0;
+            delta += Math.max(0, (Number(r.perfect_count) || 0) - (Number(r.synced_perfect_count) || 0));
+            delta += Math.max(0, (Number(r.corrected_count) || 0) - (Number(r.synced_corrected_count) || 0));
+            delta += Math.max(0, (Number(r.audio_count) || 0) - (Number(r.synced_audio_count) || 0));
+            delta += Math.max(0, (Number(r.mistake_count) || 0) - (Number(r.synced_mistake_count) || 0));
+            delta += Math.max(0, (Number(r.successes) || 0) - (Number(r.synced_successes) || 0));
+            if (delta > 0) pending += 1;
+          } else if (r.type === 'dictation_record' && !r.synced) {
+            pending += 1;
+          }
+        }
+      }
+      if (pending > 0) {
+        state.pendingCount = pending;
         _scheduleFlush();
       }
     }).catch(function (e) {
