@@ -145,7 +145,7 @@
   }
 
   class DictationSession {
-    constructor({ content, exerciseId = null, subsetPositions = null }) {
+    constructor({ content, exerciseId = null, subsetPositions = null, sourceGroupId = null, planDate = null }) {
       this.content = content;
       this.dictationId = content ? content.dictationId : null;
 
@@ -170,6 +170,12 @@
 
       // Количество успешных завершений этого упражнения (диктант + позиции)
       this.completionCount = 0;
+
+      // ID группы (из assignment launch context) — для определения teacher_id на сервере
+      this.sourceGroupId = sourceGroupId || null;
+
+      // Дата плана (из assignment launch context) — для date_plan в history_by_day
+      this.planDate = planDate || null;
 
       this.lastUsedAtMs = _nowMs();
     }
@@ -433,6 +439,8 @@
         dateStart: this.dateStart,
         completed: this.completed === true ? true : undefined,
         completionCount: Number(this.completionCount) || 0,
+        sourceGroupId: this.sourceGroupId,
+        planDate: this.planDate,
         timer: {
           running: this.timer.running,
           startedAtMs: this.timer.startedAtMs,
@@ -446,6 +454,8 @@
         content: content || null,
         exerciseId: data.exerciseId || null,
         subsetPositions: data.subsetPositions || null,
+        sourceGroupId: data.sourceGroupId || null,
+        planDate: data.planDate || null,
       });
       s.activeKeys = data.activeKeys || null;
       s.selectedKeys = data.selectedKeys || [];
@@ -493,7 +503,7 @@
       return content;
     }
 
-    getOrCreateSession({ dictationId, exerciseId = null, subsetPositions = null, subsetSignature = null }) {
+    getOrCreateSession({ dictationId, exerciseId = null, subsetPositions = null, subsetSignature = null, sourceGroupId = null, planDate = null }) {
       const content = this.getOrCreateContent({ dictationId });
       const sig = subsetSignature || (subsetPositions ? _normalizeSubsetPositions(subsetPositions).join(',') : null);
       const key = _sessionKey(dictationId, '', exerciseId, sig);
@@ -502,6 +512,8 @@
           content,
           exerciseId,
           subsetPositions: subsetPositions || (sig ? sig.split(',').map(Number) : null),
+          sourceGroupId,
+          planDate,
         });
         this._sessions.set(key, session);
         this._evictIfNeeded(1);

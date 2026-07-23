@@ -1,10 +1,11 @@
 /**
  * OutboxBatcher — модуль для накопления и отправки данных на сервер.
  *
- * Единая очередь (outbox), куда попадают все действия пользователя:
- *   - activity (perfect/corrected/audio) — каждое законченное предложение
- *   - success (завершение диктанта) — когда юзер закончил все предложения
+ * Единая очередь (outbox) с единым ключом для activity и success.
+ * Ключ: hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart}
+ * — совпадает с уникальным ключом строки в history_by_day.
  *
+ * Activity и success суммируются в одну и ту же запись в IDB.
  * Отправка происходит:
  *   1) По таймеру (BATCH_INTERVAL_MS) — все накопленные данные
  *   2) При завершении диктанта — принудительный flushAll()
@@ -20,8 +21,7 @@
 (function () {
   if (window.OutboxBatcher) return;
 
-  const BATCH_INTERVAL_MS = 1800000; // 30 минут
-  const MAX_BATCH_SIZE = 20; // макс. количество записей в одном батче
+  const BATCH_INTERVAL_MS = 300000; // 5 минут — для тестирования (потом вернуть 1800000)
 
   const TAG = '[OutboxBatcher]';
 
@@ -83,77 +83,52 @@
     }
   }
 
-  function _mergeSuccessPayloads(prev, next) {
-    function mergeSentencesData(a, b) {
-      const map = new Map();
-      for (const row of Array.isArray(a) ? a : []) {
-        if (!row || !row.sentence_key) continue;
-        map.set(row.sentence_key, { ...row });
-      }
-      for (const row of Array.isArray(b) ? b : []) {
-        if (!row || !row.sentence_key) continue;
-        const p = map.get(row.sentence_key);
-        if (!p) {
-          map.set(row.sentence_key, { ...row });
-        } else {
-          p.perfect_count = (Number(p.perfect_count) || 0) + (Number(row.perfect_count) || 0);
-          p.corrected_count = (Number(p.corrected_count) || 0) + (Number(row.corrected_count) || 0);
-          p.audio_count = (Number(p.audio_count) || 0) + (Number(row.audio_count) || 0);
-          p.attempts_total = (Number(p.attempts_total) || 0) + (Number(row.attempts_total) || 0);
-          p.mistake_count = (Number(p.mistake_count) || 0) + (Number(row.mistake_count) || 0);
-          map.set(row.sentence_key, p);
-        }
-      }
-      return Array.from(map.values());
-    }
-
-    function mergeErrorWords(a, b) {
-      try {
-        const aa = (a && typeof a === 'object') ? a : {};
-        const bb = (b && typeof b === 'object') ? b : {};
-        const out = { ...aa };
-        Object.keys(bb).forEach((k) => {
-          const prev = Number(out[k] || 0) || 0;
-          const next = Number(bb[k] || 0) || 0;
-          if (next > 0) out[k] = prev + next;
-        });
-        return out;
-      } catch (e) {
-        return (a && typeof a === 'object') ? a : ((b && typeof b === 'object') ? b : {});
-      }
-    }
-
-    return {
-      ...prev,
-      dictation_id: next.dictation_id,
-      perfect_count: (Number(prev.perfect_count) || 0) + (Number(next.perfect_count) || 0),
-      corrected_count: (Number(prev.corrected_count) || 0) + (Number(next.corrected_count) || 0),
-      audio_count: (Number(prev.audio_count) || 0) + (Number(next.audio_count) || 0),
-      attempts_total: (Number(prev.attempts_total) || 0) + (Number(next.attempts_total) || 0),
-      mistake_count: (Number(prev.mistake_count) || 0) + (Number(next.mistake_count) || 0),
-      monenumber_of_characters: (Number(prev.monenumber_of_characters) || 0) + (Number(next.monenumber_of_characters) || 0),
-      money_earned: (Number(prev.money_earned) || 0) + (Number(next.money_earned) || 0),
-      time_ms: (Number(prev.time_ms) || 0) + (Number(next.time_ms) || 0),
-      completion_count: (Number(prev.completion_count) || 0) + (Number(next.completion_count) || 0),
-      source_group_id: (prev.source_group_id != null) ? prev.source_group_id : next.source_group_id,
-      selected_sentence_positions: (prev.selected_sentence_positions != null)
-        ? prev.selected_sentence_positions
-        : next.selected_sentence_positions,
-      date_start: prev.date_start || next.date_start,
-      sentences_data: mergeSentencesData(prev.sentences_data, next.sentences_data),
-      settings_json: next.settings_json || prev.settings_json,
-      error_words: mergeErrorWords(prev.error_words, next.error_words),
-      completed_at_ms: prev.completed_at_ms || next.completed_at_ms,
-      completed_at_tz_offset_min: prev.completed_at_tz_offset_min || next.completed_at_tz_offset_min,
-    };
-  }
 
   // ======================== ЕДИНАЯ ОЧЕРЕДЬ ========================
 
   /**
-   * Добавить активность в очередь (activity — каждое действие).
-   * Данные мержатся по ключу: userId:dateId:dictationId:selPosStr
+   * Построить единый ключ для history_by_day.
+   * Формат: hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart}
+   * Совпадает с уникальным ключом строки в history_by_day (без teacher_id — он резолвится на сервере).
    */
+  function _buildHbdKey({ userId, dictationId, positions, datePlan, dateFact, dateStart }) {
+    const selPosStr = _serializeSelectedPositions(positions);
+    const dp = datePlan ? String(datePlan).replace(/[^0-9\-]/g, '') : '';
+    const df = dateFact ? String(dateFact).replace(/[^0-9\-]/g, '') : '';
+    const ds = dateStart ? String(dateStart).replace(/[^0-9\-: ]/g, '') : '';
+    return `hbd:${userId}:${dictationId}:${selPosStr}:${dp}:${df}:${ds}`;
+  }
+
+  /**
+   * Создать базовый объект записи hbd для IDB.
+   */
+  function _createHbdRecord(key, params) {
+    return {
+      key,
+      type: 'hbd',
+      userId: params.userId,
+      dictation_id: params.dictationId,
+      selected_sentence_positions: params.selectedSentencePositions || null,
+      date_start: params.dateStart || null,
+      date_plan: params.datePlan || null,
+      date_fact: params.dateFact || null,
+      source_group_id: params.sourceGroupId || null,
+      dictation_language_code: params.dictationLanguageCode || null,
+      perfect_count: 0,
+      corrected_count: 0,
+      audio_count: 0,
+      activity_count: 0,
+      money_count: 0,
+      mistake_count: 0,
+      monenumber_of_characters: 0,
+      lead_time_ms_total: 0,
+      successes: 0,
+      money_earned: 0,
+      attempts_total: 0,
+      updatedAt: 0,
+    };
+  }
+
   async function enqueueActivity(params) {
     try {
       const {
@@ -168,15 +143,16 @@
         numberOfCharacters = 0,
         moneyCount = 0,
         dateStart,
+        sourceGroupId,
+        planDate,
       } = params || {};
 
-      console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount });
+      console.log(TAG, '[enqueueActivity] params:', { type, dictationId, mistakeCount, numberOfCharacters, moneyCount, sourceGroupId, planDate });
 
       if (!dictationId || !type) {
         console.warn(TAG, '[1a] enqueueActivity: пропущено (нет dictationId или type)', { dictationId, type });
         return false;
       }
-
 
       const userId = _getUserId();
       console.log(TAG, '[enqueueActivity] userId=' + userId);
@@ -185,36 +161,39 @@
         return false;
       }
 
-      const dateId = date || _getLocalDateId();
-      const selPosStr = _serializeSelectedPositions(selectedSentencePositions);
+      const dateFact = date || _getLocalDateId();
+      const datePlanVal = planDate || dateFact; // если planDate нет, datePlan = dateFact
       const dateStartStr = dateStart ? dateStart.replace(/[^0-9\-: ]/g, '') : '';
-      const key = `act:${userId}:${dateId}:${dictationId}:${selPosStr}:${dateStartStr}`;
-      console.log(TAG, '[enqueueActivity] key=' + key + ' dateId=' + dateId + ' dateStart=' + dateStart);
+      const key = _buildHbdKey({
+        userId,
+        dictationId,
+        positions: selectedSentencePositions,
+        datePlan: datePlanVal,
+        dateFact,
+        dateStart: dateStartStr,
+      });
+      console.log(TAG, '[enqueueActivity] key=' + key + ' dateFact=' + dateFact + ' datePlan=' + datePlanVal + ' dateStart=' + dateStartStr);
 
       // Увеличиваем pending-счётчик ДО записи в IndexedDB
       state.pendingCount += 1;
       console.log(TAG, '[enqueueActivity] pendingCount теперь = ' + state.pendingCount);
 
       // Читаем существующую запись или создаём новую
-      const existing = (await window.IdbManager.idbGet('outbox', key)) || {
-        key,
-        type: 'activity',
+      const existing = (await window.IdbManager.idbGet('outbox', key)) || _createHbdRecord(key, {
         userId,
-        date: dateId,
-        dictation_id: dictationId,
-        selected_sentence_positions: selectedSentencePositions || null,
-        date_start: dateStart || null,
-        perfect_count: 0,
-        corrected_count: 0,
-        audio_count: 0,
-        activity_count: 0,
-        money_count: 0,
-        mistake_count: 0,
-        monenumber_of_characters: 0,
-        lead_time_ms_total: 0,
-        dictation_language_code: dictationLanguageCode || null,
-        updatedAt: 0,
-      };
+        dictationId,
+        selectedSentencePositions,
+        dateStart: dateStartStr,
+        datePlan: datePlanVal,
+        dateFact,
+        sourceGroupId,
+        dictationLanguageCode,
+      });
+
+      // Обновляем source_group_id если передан (может быть только при первом создании)
+      if (sourceGroupId && !existing.source_group_id) {
+        existing.source_group_id = sourceGroupId;
+      }
 
       const n = Number(count) || 0;
       if (type === 'perfect') existing.perfect_count += n;
@@ -290,18 +269,18 @@
       const currentMistakes = Number(currentPayload.mistake_count) || 0;
       const currentTime = Number(currentPayload.time_ms) || 0;
 
-      // Собираем все success-записи из outbox для этого пользователя и диктанта
+      // Собираем все hbd-записи из outbox для этого пользователя и диктанта
       const allRows = await window.IdbManager.idbGetAll('outbox');
-      const successRows = allRows.filter(r =>
-        r.type === 'success' &&
+      const hbdRows = allRows.filter(r =>
+        r.type === 'hbd' &&
         r.userId === userId &&
-        String(r.payload?.dictation_id).trim() === dictationId &&
-        _positionsMatch(r.payload?.selected_sentence_positions, currentPositions) &&
+        String(r.dictation_id).trim() === dictationId &&
+        _positionsMatch(r.selected_sentence_positions, currentPositions) &&
         // Исключаем текущую запись (которая только что была добавлена)
         r.key !== excludeKey
       );
 
-      if (successRows.length === 0) {
+      if (hbdRows.length === 0) {
         // Нет других завершений — это первый рекорд
         return {
           is_record: true,
@@ -315,14 +294,13 @@
         };
       }
 
-      // Ищем лучший результат среди всех success (исключая текущий)
+      // Ищем лучший результат среди всех hbd (исключая текущий)
       let bestMistakes = currentMistakes;
       let bestTime = currentTime;
 
-      for (const row of successRows) {
-        const p = row.payload;
-        const m = Number(p.mistake_count) || 0;
-        const t = Number(p.time_ms) || 0;
+      for (const row of hbdRows) {
+        const m = Number(row.mistake_count) || 0;
+        const t = Number(row.lead_time_ms_total) || 0;
 
         const isBetter = (m < bestMistakes) || (m === bestMistakes && t < bestTime);
         if (isBetter) {
@@ -335,7 +313,7 @@
 
       return {
         is_record: isRecord,
-        is_first: false, // если successRows.length > 0, значит это не первый
+        is_first: false, // если hbdRows.length > 0, значит это не первый
         record: isRecord ? {
           dictation_id: dictationId,
           positions: currentPositions,
@@ -379,7 +357,9 @@
 
   /**
    * Добавить success-данные в очередь (завершение диктанта).
-   * Автоматически мержит с существующей записью (суммирует счётчики).
+   * Использует единый ключ hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart},
+   * совпадающий с уникальным ключом строки в history_by_day.
+   * Данные суммируются с уже существующей hbd-записью (activity + success в одной строке).
    * После сохранения success — проверяет рекорд локально и сохраняет record.
    */
   async function enqueueSuccess(payload) {
@@ -395,28 +375,72 @@
         return false;
       }
 
-      const rawId = String(payload.dictation_id).trim();
-      const dateId = payload.date || _getLocalDateId();
-      const key = `suc:${userId}:${rawId}:${dateId}`;
+      const dictationId = String(payload.dictation_id).trim();
+      const dateFact = payload.date || _getLocalDateId();
+      const datePlanVal = payload.plan_date || dateFact;
+      const dateStartStr = payload.date_start ? String(payload.date_start).replace(/[^0-9\-: ]/g, '') : '';
+      const key = _buildHbdKey({
+        userId,
+        dictationId,
+        positions: payload.selected_sentence_positions,
+        datePlan: datePlanVal,
+        dateFact,
+        dateStart: dateStartStr,
+      });
+
+      console.log(TAG, '[enqueueSuccess] key=' + key);
 
       // Увеличиваем pending-счётчик ДО записи в IndexedDB
       state.pendingCount += 1;
-      const existing = await window.IdbManager.idbGet('outbox', key);
 
-      const mergedPayload = existing?.payload ? _mergeSuccessPayloads(existing.payload, payload) : payload;
-
-      await window.IdbManager.idbPut('outbox', {
-        key,
-        type: 'success',
+      // Читаем существующую hbd-запись или создаём новую
+      const existing = (await window.IdbManager.idbGet('outbox', key)) || _createHbdRecord(key, {
         userId,
-        createdAt: existing?.createdAt || Date.now(),
-        payload: mergedPayload,
+        dictationId,
+        selectedSentencePositions: payload.selected_sentence_positions,
+        dateStart: dateStartStr,
+        datePlan: datePlanVal,
+        dateFact,
+        sourceGroupId: payload.source_group_id || null,
+        dictationLanguageCode: payload.dictation_language_code || null,
       });
 
+      // Суммируем success-поля в hbd-запись
+      existing.perfect_count = (Number(existing.perfect_count) || 0) + (Number(payload.perfect_count) || 0);
+      existing.corrected_count = (Number(existing.corrected_count) || 0) + (Number(payload.corrected_count) || 0);
+      existing.audio_count = (Number(existing.audio_count) || 0) + (Number(payload.audio_count) || 0);
+      existing.mistake_count = (Number(existing.mistake_count) || 0) + (Number(payload.mistake_count) || 0);
+      existing.monenumber_of_characters = (Number(existing.monenumber_of_characters) || 0) + (Number(payload.monenumber_of_characters) || 0);
+      existing.money_earned = (Number(existing.money_earned) || 0) + (Number(payload.money_earned) || 0);
+      existing.lead_time_ms_total = (Number(existing.lead_time_ms_total) || 0) + (Number(payload.time_ms) || 0);
+      existing.attempts_total = (Number(existing.attempts_total) || 0) + (Number(payload.attempts_total) || 0);
+      existing.successes = (Number(existing.successes) || 0) + (Number(payload.completion_count) || 1);
+
+      // source_group_id — если был передан и ещё не установлен
+      if (payload.source_group_id && !existing.source_group_id) {
+        existing.source_group_id = payload.source_group_id;
+      }
+      // dictation_language_code
+      if (payload.dictation_language_code) {
+        existing.dictation_language_code = payload.dictation_language_code;
+      }
+
+      existing.updatedAt = Date.now();
+
+      console.log(TAG, '[enqueueSuccess] запись в IDB:', {
+        key,
+        perfect_count: existing.perfect_count,
+        corrected_count: existing.corrected_count,
+        audio_count: existing.audio_count,
+        mistake_count: existing.mistake_count,
+        successes: existing.successes,
+      });
+
+      await window.IdbManager.idbPut('outbox', existing);
+
       // Проверяем рекорд локально и сохраняем
-      // Передаём ключ текущей записи, чтобы исключить её из поиска (иначе is_first никогда не сработает)
       try {
-        const recordResult = await _checkRecordLocally(mergedPayload, key);
+        const recordResult = await _checkRecordLocally(payload, key);
         if (recordResult.is_record && recordResult.record) {
           await _enqueueRecord(recordResult.record);
           console.log(TAG, '[enqueueSuccess] новый рекорд!', recordResult.record);
@@ -448,13 +472,9 @@
 
   // ======================== ТАЙМЕР ========================
 
-  /** Запланировать отправку outbox */
+  /** Запланировать отправку outbox — только по таймеру (раз в 30 минут) */
   function _scheduleFlush() {
     if (state.timerId) {
-      return;
-    }
-    if (state.pendingCount >= MAX_BATCH_SIZE) {
-      _flushOutbox();
       return;
     }
     state.timerStartedAt = Date.now();
@@ -466,28 +486,6 @@
   }
 
   // ======================== ОТПРАВКА ========================
-
-  /**
-   * Склеить activity и success в один пакет для отправки одним запросом.
-   *
-   * ВАЖНО: success payload уже содержит ИТОГОВЫЕ totals, рассчитанные из
-   * состояния сессии в showCompletionModal() (totalPerfect, totalCorrected,
-   * totalAudio, totalErrors, totalChars, totalMoneyEarned).
-   * Activity row содержит те же данные, накопленные по одному за предложение.
-   * Суммировать их НЕЛЬЗЯ — это приведёт к удвоению (баг 40/20).
-   *
-   * Поэтому возвращаем successPayload как есть. Activity row нужна только
-   * для того, чтобы знать, что её нужно удалить из outbox после отправки.
-   */
-  function _mergeActivityIntoSuccess(activityRow, successPayload) {
-    // successPayload уже содержит правильные totals из сессии;
-    // activity данные не суммируем, чтобы избежать удвоения.
-    return {
-      ...successPayload,
-      selected_sentence_positions: successPayload.selected_sentence_positions || activityRow.selected_sentence_positions || undefined,
-      date_start: successPayload.date_start || activityRow.date_start || undefined,
-    };
-  }
 
   /** Отправить все накопленные записи из outbox */
   async function _flushOutbox() {
@@ -508,93 +506,61 @@
         return;
       }
 
-      // Группируем строки: для каждого диктанта может быть activity + success.
-      // Если есть и activity, и success — склеиваем их в один запрос (success).
-      // Если есть только activity — отправляем activity отдельно.
+      // В новой архитектуре все activity и success хранятся в единых hbd-записях.
+      // Отправляем все hbd-записи как POST /api/statistics/success.
       // dictation_record отправляется отдельно.
-      //
-      // ВАЖНО: _mergeActivityIntoSuccess НЕ суммирует activity поля в success,
-      // потому что success payload уже содержит итоговые totals из сессии.
-      // Суммирование привело бы к удвоению (баг 40/20).
-      const activityRows = [];    // activity без пары success
-      const successRows = [];     // success без пары activity
-      const recordRows = [];      // dictation_record
-
-      // Для поиска пары activity+success группируем по ключу диктанта
-      const activityByDict = {};  // dictation_id -> activity row
-      const successByDict = {};   // dictation_id -> success row
+      const hbdRows = [];
+      const recordRows = [];
 
       for (const row of rows) {
         if (row.synced) continue;
-
-        if (row.type === 'activity') {
-          const dictKey = String(row.dictation_id);
-          activityByDict[dictKey] = row;
-        } else if (row.type === 'success') {
-          const dictKey = String(row.payload?.dictation_id);
-          if (dictKey && dictKey !== 'undefined') {
-            successByDict[dictKey] = row;
-          } else {
-            successRows.push(row);
-          }
+        if (row.type === 'hbd') {
+          hbdRows.push(row);
         } else if (row.type === 'dictation_record') {
           recordRows.push(row);
-        }
-      }
-
-      // Формируем пары: если для одного диктанта есть и activity, и success —
-      // мержим activity в success
-      const mergedPairs = []; // { successRow, activityRow }
-      const processedDicts = new Set();
-
-      for (const dictKey of Object.keys(activityByDict)) {
-        const actRow = activityByDict[dictKey];
-        const sucRow = successByDict[dictKey];
-
-        if (sucRow) {
-          // Есть и activity, и success — мержим
-          mergedPairs.push({ successRow: sucRow, activityRow: actRow });
-          processedDicts.add(dictKey);
-        } else {
-          // Только activity
-          activityRows.push(actRow);
-        }
-      }
-
-      // Success без пары activity
-      for (const dictKey of Object.keys(successByDict)) {
-        if (!processedDicts.has(dictKey)) {
-          successRows.push(successByDict[dictKey]);
         }
       }
 
       const token = _getToken();
       let allOk = true;
 
-      // 1. Отправляем success с вмерженными activity (один запрос вместо двух)
-      for (const { successRow, activityRow } of mergedPairs) {
+      // 1. Отправляем все hbd-записи как success
+      for (const row of hbdRows) {
         try {
-          // Перечитываем activity из IDB — если была обновлена, пропускаем
-          const currentAct = await window.IdbManager.idbGet('outbox', activityRow.key);
-          if (!currentAct) continue;
-          if (currentAct.updatedAt !== activityRow.updatedAt) continue;
+          const currentRow = await window.IdbManager.idbGet('outbox', row.key);
+          if (!currentRow) continue;
+          if (currentRow.updatedAt !== row.updatedAt) continue;
 
-          // Перечитываем success из IDB
-          const currentSuc = await window.IdbManager.idbGet('outbox', successRow.key);
-          if (!currentSuc) continue;
+          const payload = {
+            dictation_id: currentRow.dictation_id,
+            perfect_count: Number(currentRow.perfect_count) || 0,
+            corrected_count: Number(currentRow.corrected_count) || 0,
+            audio_count: Number(currentRow.audio_count) || 0,
+            mistake_count: Number(currentRow.mistake_count) || 0,
+            monenumber_of_characters: Number(currentRow.monenumber_of_characters) || 0,
+            money_earned: Number(currentRow.money_earned) || 0,
+            time_ms: Number(currentRow.lead_time_ms_total) || 0,
+            attempts_total: Number(currentRow.attempts_total) || 0,
+            completion_count: Number(currentRow.successes) || 0,
+            activity_count: Number(currentRow.activity_count) || 0,
+            money_count: Number(currentRow.money_count) || 0,
+            lead_time_ms: Number(currentRow.lead_time_ms_total) || 0,
+            selected_sentence_positions: currentRow.selected_sentence_positions || undefined,
+            date_start: currentRow.date_start || undefined,
+            plan_date: currentRow.date_plan || undefined,
+            source_group_id: currentRow.source_group_id || undefined,
+            dictation_language_code: currentRow.dictation_language_code || undefined,
+          };
 
-          // Склеиваем activity + success в один payload
-          const mergedPayload = _mergeActivityIntoSuccess(currentAct, currentSuc.payload);
-
-          console.log('[OB:flushOutbox] mergedPayload:', JSON.stringify({
-            dictation_id: mergedPayload.dictation_id,
-            perfect_count: mergedPayload.perfect_count,
-            corrected_count: mergedPayload.corrected_count,
-            audio_count: mergedPayload.audio_count,
-            mistake_count: mergedPayload.mistake_count,
-            monenumber_of_characters: mergedPayload.monenumber_of_characters,
-            money_earned: mergedPayload.money_earned,
-            time_ms: mergedPayload.time_ms,
+          console.log('[OB:flushOutbox] hbd->success:', JSON.stringify({
+            dictation_id: payload.dictation_id,
+            perfect_count: payload.perfect_count,
+            corrected_count: payload.corrected_count,
+            audio_count: payload.audio_count,
+            mistake_count: payload.mistake_count,
+            completion_count: payload.completion_count,
+            source_group_id: payload.source_group_id,
+            plan_date: payload.plan_date,
           }));
 
           const response = await fetch('/api/statistics/success', {
@@ -603,59 +569,7 @@
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify(mergedPayload),
-          });
-
-          if (response.ok) {
-            // Удаляем и activity, и success
-            await window.IdbManager.idbDelete('outbox', activityRow.key);
-            await window.IdbManager.idbDelete('outbox', successRow.key);
-          } else if (response.status === 401) {
-            allOk = false;
-            break;
-          } else {
-            allOk = false;
-            break;
-          }
-        } catch (e) {
-          allOk = false;
-          break;
-        }
-      }
-
-      if (!allOk) {
-        state.flushing = false;
-        return;
-      }
-
-      // 2. Отправляем оставшиеся activity (без пары success)
-      for (const row of activityRows) {
-        try {
-          const currentRow = await window.IdbManager.idbGet('outbox', row.key);
-          if (!currentRow) continue;
-          if (currentRow.updatedAt !== row.updatedAt) continue;
-
-          const response = await fetch('/api/statistics/activity', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              dictation_id: currentRow.dictation_id,
-              date: currentRow.date,
-              perfect_count: Number(currentRow.perfect_count) || 0,
-              corrected_count: Number(currentRow.corrected_count) || 0,
-              audio_count: Number(currentRow.audio_count) || 0,
-              activity_count: Number(currentRow.activity_count) || 0,
-              money_count: Number(currentRow.money_count) || 0,
-              mistake_count: Number(currentRow.mistake_count) || 0,
-              monenumber_of_characters: Number(currentRow.monenumber_of_characters) || 0,
-              lead_time_ms: Number(currentRow.lead_time_ms_total) || 0,
-              dictation_language_code: currentRow.dictation_language_code || undefined,
-              selected_sentence_positions: currentRow.selected_sentence_positions || undefined,
-              date_start: currentRow.date_start || undefined,
-            }),
+            body: JSON.stringify(payload),
           });
 
           if (response.ok) {
@@ -681,39 +595,7 @@
         return;
       }
 
-      // 3. Отправляем success без пары activity
-      for (const row of successRows) {
-        try {
-          const response = await fetch('/api/statistics/success', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(row.payload),
-          });
-
-          if (response.ok) {
-            await window.IdbManager.idbDelete('outbox', row.key);
-          } else if (response.status === 401) {
-            allOk = false;
-            break;
-          } else {
-            allOk = false;
-            break;
-          }
-        } catch (e) {
-          allOk = false;
-          break;
-        }
-      }
-
-      if (!allOk) {
-        state.flushing = false;
-        return;
-      }
-
-      // 4. Отправляем dictation_record
+      // 2. Отправляем dictation_record
       for (const row of recordRows) {
         try {
           const response = await fetch('/api/statistics/dictation-record/save', {
@@ -820,8 +702,8 @@
   async function getQueueInfo() {
     try {
       // Используем pendingCount вместо количества записей в IndexedDB,
-      // потому что activity-записи мержатся по ключу (act:userId:date:dictationId:positions)
-      // и в IDB всегда может быть 1 запись, хотя enqueueActivity вызывался много раз.
+      // потому что activity и success мержатся в единую hbd-запись по ключу
+      // и в IDB всегда может быть 1 запись, хотя enqueueActivity/enqueueSuccess вызывались много раз.
       var count = state.pendingCount;
 
       var now = Date.now();

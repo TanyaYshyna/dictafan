@@ -1000,10 +1000,9 @@
           const selectedSentencePositions = _getSelectedSentencePositions(session);
 
           console.log('[DM:771] enqueueSuccess:', { dictationId, totalPerfect, totalCorrected, totalAudio, totalAttempts, totalErrors, totalChars, totalMoneyEarned });
-          // Записываем success в outbox. _flushOutbox найдёт пару activity+success
-          // для этого диктанта, склеит их в один запрос и отправит на сервер.
-          // ВАЖНО: success payload содержит ИТОГОВЫЕ totals из сессии (totalPerfect и т.д.).
-          // _mergeActivityIntoSuccess НЕ суммирует их с activity — это предотвращает удвоение.
+          // Записываем success в outbox. Activity и success мержатся в единую hbd-запись
+          // с ключом hbd:{userId}:{dictationId}:{positions}:{datePlan}:{dateFact}:{dateStart}.
+          // Все данные отправляются одним запросом POST /api/statistics/success.
           try { await ob.enqueueSuccess({
             dictation_id: dictationId,
             perfect_count: totalPerfect,
@@ -1022,11 +1021,11 @@
             completed_at_tz_offset_min: tzOffsetMin,
             selected_sentence_positions: selectedSentencePositions,
             date_start: session.dateStart,
+            source_group_id: session.sourceGroupId || null,
+            plan_date: session.planDate || null,
           }); } catch (eEnq) { console.warn('[DM] enqueueSuccess error:', eEnq); }
 
           // Принудительно отправляем всё накопленное.
-          // _flushOutbox сам найдёт пару activity+success для одного диктанта,
-          // смержит их в один запрос и отправит на сервер.
           if (typeof ob.flushAll === 'function') {
             try { await ob.flushAll(); } catch (eFlush) { console.warn('[DM] flushAll error:', eFlush); }
           }
@@ -3398,6 +3397,8 @@
          numberOfCharacters: Number(numberOfCharacters) || 0,
          moneyCount: Number(moneyCount) || 0,
          dateStart: session.dateStart || null,
+         sourceGroupId: session.sourceGroupId || null,
+         planDate: session.planDate || null,
        });
         if (!enqueued) {
           console.warn('[DM:handleActivity] enqueueActivity вернул false', { type, dictationId });
@@ -4770,7 +4771,7 @@
     return true;
   }
 
-  function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null) {
+  function getOrCreateDefaultSessionFromParsed(parsed, subsetPositions = null, launchCtx = null) {
     const store = getRuntimeStore();
     if (!store) {
       return null;
@@ -4789,11 +4790,21 @@
       return null;
     }
 
+    // Извлекаем assignment launch context (plan_date, source_group_id)
+    let sourceGroupId = null;
+    let planDate = null;
+    if (launchCtx) {
+      sourceGroupId = launchCtx.source_group_id ? Number(launchCtx.source_group_id) : null;
+      planDate = launchCtx.plan_date ? String(launchCtx.plan_date) : null;
+    }
+
     const session = store.getOrCreateSession({
       dictationId,
       exerciseId: null,
       subsetPositions,
       subsetSignature: null,
+      sourceGroupId,
+      planDate,
     });
 
     try {
@@ -6818,9 +6829,34 @@
       } catch (eReset) {
       }
 
+      // Читаем assignment launch context из localStorage (plan_date, source_group_id и т.д.)
+      let launchCtx = null;
+      try {
+        const raw = localStorage.getItem('dictafan_assignment_launch_ctx');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          // Проверяем, что контекст относится к этому диктанту
+          if (parsed && parsed.dictation_id && parsed.dictation_id === parsed?.dictation_id) {
+            launchCtx = parsed;
+          }
+          // В любом случае удаляем, чтобы не применился к следующему диктанту
+          localStorage.removeItem('dictafan_assignment_launch_ctx');
+        }
+      } catch (eCtx) {
+      }
+
+      // Отправляем всё, что накопилось в outbox (если диктант выполнялся в несколько дней)
+      try {
+        const ob = window.OutboxBatcher;
+        if (ob && typeof ob.flushAll === 'function') {
+          ob.flushAll().catch(function(e){});
+        }
+      } catch (eFlush) {
+      }
+
        try {
         const subsetPositions = opts && Array.isArray(opts.subsetPositions) ? opts.subsetPositions : null;
-        const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions) : null;
+        const session = (parsed && contentLoaded) ? getOrCreateDefaultSessionFromParsed(parsed, subsetPositions, launchCtx) : null;
         if (session) {
           // Если сессия помечена как завершённая (например, страницу закрыли до очистки кеша),
           // сбрасываем прогресс как при нажатии «всё по новой»

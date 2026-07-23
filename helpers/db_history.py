@@ -1013,7 +1013,7 @@ def get_activity_totals_by_period(user_id, start_date, end_date, language_code=N
         conn.close()
 
 
-def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, completion_count=None, money_earned=None):
+def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_count, time_ms, attempts_total=0, mistake_count=0, monenumber_of_characters=0, source_group_id=None, selected_sentence_positions=None, dictation_language_code=None, started_at=None, date_start=None, plan_date=None, completion_count=None, money_earned=None):
     """
     Добавляет запись успешного завершения диктанта в history_by_day
     
@@ -1066,16 +1066,28 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                         ds = date_start.strip()
                         # PostgreSQL сам сконвертирует строку в TIMESTAMP
                         date_start_parsed = ds
-                        # date_plan = дата начала сессии (из date_start, без времени)
-                        date_plan = datetime.fromisoformat(ds[:10]).date()
                     else:
                         date_start_parsed = date_start
-                        date_plan = date_fact
                 except Exception:
                     date_start_parsed = date_fact
-                    date_plan = date_fact
             else:
                 date_start_parsed = date_fact
+
+            # date_plan: если передан явно — используем его, иначе вычисляем из date_start
+            if plan_date is not None:
+                try:
+                    if isinstance(plan_date, str):
+                        date_plan = datetime.fromisoformat(plan_date[:10]).date()
+                    else:
+                        date_plan = plan_date
+                except Exception:
+                    date_plan = date_fact
+            elif date_start is not None and isinstance(date_start, str):
+                try:
+                    date_plan = datetime.fromisoformat(date_start.strip()[:10]).date()
+                except Exception:
+                    date_plan = date_fact
+            else:
                 date_plan = date_fact
 
             # Нормализуем selected_sentence_positions для history_by_day
@@ -1092,11 +1104,9 @@ def add_success(user_id, dictation_id, perfect_count, corrected_count, audio_cou
                 date_fact=date_fact,
                 date_start=date_start_parsed,
                 # perfect/corrected/audio/money передаются вместе с success.
-                # На клиенте _flushOutbox находит пару activity+success для
-                # одного диктанта, склеивает их в один запрос и отправляет
-                # на сервер. Success payload уже содержит итоговые totals
-                # из сессии (showCompletionModal), поэтому суммировать их
-                # с activity НЕ нужно — это приведёт к удвоению.
+                # На клиенте activity и success мержатся в единую hbd-запись
+                # с единым ключом, совпадающим с уникальным ключом history_by_day.
+                # Все данные отправляются одним запросом POST /api/statistics/success.
                 perfect_delta=int(perfect_count or 0),
                 corrected_delta=int(corrected_count or 0),
                 audio_delta=int(audio_count or 0),
