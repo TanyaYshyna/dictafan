@@ -238,9 +238,6 @@
       if (compCount > 0) {
         existing.successes = (Number(existing.successes) || 0) + compCount;
         existing.success_number = succNumber;
-        console.log(TAG, '[enqueueActivity] ✅ ДОБАВЛЯЕМ SUCCESS: compCount=' + compCount + ' succNumber=' + succNumber + ' total_successes=' + existing.successes);
-      } else {
-        console.log(TAG, '[enqueueActivity] ❌ НЕ добавляем success: compCount=' + compCount + ' (completionCount=' + completionCount + ')');
       }
 
       existing.updatedAt = Date.now();
@@ -505,9 +502,6 @@
           const leadTimeDelta = Math.max(0, (Number(currentRow.lead_time_ms_total) || 0) - (Number(currentRow.synced_lead_time_ms_total) || 0));
           const attemptsDelta = Math.max(0, (Number(currentRow.attempts_total) || 0) - (Number(currentRow.synced_attempts_total) || 0));
           const successesDelta = Math.max(0, (Number(currentRow.successes) || 0) - (Number(currentRow.synced_successes) || 0));
-          if (successesDelta > 0) {
-            console.log('[OB:flushOutbox] 🏆 ОТПРАВЛЯЕМ SUCCESS: successesDelta=' + successesDelta + ' success_number=' + currentRow.success_number + ' total_successes=' + currentRow.successes + ' synced=' + currentRow.synced_successes);
-          }
           const activityCountDelta = Math.max(0, (Number(currentRow.activity_count) || 0) - (Number(currentRow.synced_activity_count) || 0));
           const moneyCountDelta = Math.max(0, (Number(currentRow.money_count) || 0) - (Number(currentRow.synced_money_count) || 0));
 

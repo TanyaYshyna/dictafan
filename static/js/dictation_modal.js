@@ -1635,25 +1635,14 @@
                   const mistakesThisAttempt = Number(st && st.mistake_count_current) || 0;
 
                   // Проверяем, будет ли это действие последним (завершает ли диктант).
-                  // Если после этого действия все предложения будут завершены — передаём
-                  // completionCount=1 и successNumber (текущий номер успеха).
-                  // success — это не отдельное движение, а флаг на последнем activity.
                   let compCount = 0;
                   let succNumber = 0;
                   try {
-                    // success отправляется, когда диктант полностью выполнен.
-                    // session.completionCount — это глобальный порядковый номер успеха
-                    // (сколько раз диктант был успешно завершён за всё время).
-                    // Он может быть > 0 от предыдущих завершений, это нормально.
-                    // Мы всегда передаём compCount=1 при полном выполнении,
-                    // а succNumber = следующий порядковый номер.
                     if (_isDictationFullyCompleted(session)) {
                       compCount = 1;
                       succNumber = (Number(session.completionCount) || 0) + 1;
-                      console.log('[DM] ✅ success: text completionCount=1 succNumber=' + succNumber);
                     }
                   } catch (eCompDetect) {
-                    console.warn('[DM:checkText] ошибка в определении completion:', eCompDetect);
                   }
 
                   await handleActivity(typeActivity, st, key, session, moneyToAdd, mistakesThisAttempt, charsThisAttempt, compCount, succNumber);
@@ -3758,13 +3747,9 @@
               let audioCompCount = 0;
               let audioSuccNumber = 0;
               try {
-                // success отправляется, когда диктант полностью выполнен.
-                // session.completionCount — это глобальный порядковый номер успеха,
-                // может быть > 0 от предыдущих завершений — это нормально.
                 if (_isDictationFullyCompleted(session)) {
                   audioCompCount = 1;
                   audioSuccNumber = (Number(session.completionCount) || 0) + 1;
-                  console.log('[DM:onRecognitionComplete] последнее действие (audio), передаём completionCount=1 successNumber=' + audioSuccNumber);
                 }
               } catch (eCompDetectAudio) {
               }
